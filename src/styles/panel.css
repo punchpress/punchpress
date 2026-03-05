@@ -1,0 +1,152 @@
+.properties-panel {
+  padding: 0;
+  overflow-y: auto;
+  background: #1a1a1e;
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.panel-header {
+  display: none;
+}
+
+.panel-message {
+  padding: 10px 12px;
+  margin: 12px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.25);
+  text-align: center;
+}
+
+.panel-message.error {
+  margin-bottom: 8px;
+  font-size: 11px;
+  color: #ffacac;
+  text-align: left;
+  background: rgba(255, 60, 60, 0.06);
+  border: 1px solid rgba(255, 60, 60, 0.1);
+  border-radius: 4px;
+}
+
+/* ── Sections ─────────────────────────────────────── */
+
+.panel-section {
+  margin-bottom: 0;
+  padding: 8px 12px;
+}
+
+.panel-section + .panel-section {
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.panel-section h3 {
+  padding: 0 0 6px;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.45);
+  text-transform: none;
+  letter-spacing: 0;
+  border-bottom: none;
+}
+
+/* ── Fields ───────────────────────────────────────── */
+
+.panel-fields {
+  display: grid;
+  gap: 4px;
+  margin-top: 0;
+}
+
+.field {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 0 6px;
+  align-items: center;
+}
+
+.field > span {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.field-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.field-pair .field {
+  grid-template-columns: 14px 1fr;
+  gap: 0 4px;
+}
+
+/* ── Select ───────────────────────────────────────── */
+
+.select-wrap {
+  position: relative;
+}
+
+.select-wrap select {
+  padding-right: 22px;
+}
+
+.select-wrap::after {
+  position: absolute;
+  top: 50%;
+  right: 7px;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.2);
+  pointer-events: none;
+  content: "▾";
+  transform: translateY(-52%);
+}
+
+/* ── Color field ──────────────────────────────────── */
+
+.color-field {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+/* ── Range pair ───────────────────────────────────── */
+
+.range-pair {
+  display: grid;
+  grid-template-columns: 1fr 52px;
+  gap: 6px;
+  align-items: center;
+}
+
+/* ── Delete button ────────────────────────────────── */
+
+.delete-button {
+  width: calc(100% - 24px);
+  margin: 8px 12px 12px;
+  padding: 5px 8px;
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 100, 100, 0.6);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid rgba(255, 100, 100, 0.08);
+  border-radius: 4px;
+  transition:
+    background 80ms ease,
+    color 80ms ease,
+    border-color 80ms ease;
+}
+
+.delete-button:hover {
+  color: rgba(255, 100, 100, 0.85);
+  background: rgba(255, 70, 70, 0.06);
+  border-color: rgba(255, 100, 100, 0.14);
+}
+
+@media (max-width: 960px) {
+  .properties-panel {
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-left: none;
+  }
+}
