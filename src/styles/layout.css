@@ -28,93 +28,106 @@
   align-items: center;
   justify-content: center;
   padding: 4px;
-  background: #ffffff;
-  border: 1px solid #e8e8ec;
+  background: #1c1c21;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
   box-shadow:
-    0 2px 16px rgba(0, 0, 0, 0.08),
-    0 0 0 0.5px rgba(0, 0, 0, 0.04);
+    0 4px 24px rgba(0, 0, 0, 0.5),
+    0 1px 4px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
   transform: translateX(-50%);
 }
 
 .tool-dock-group {
   display: flex;
-  gap: 0;
+  gap: 2px;
   align-items: center;
 }
 
 .tool-dock-divider {
   width: 1px;
-  height: 28px;
+  height: 24px;
   margin: 0 4px;
-  background: #e8e8ec;
+  background: rgba(255, 255, 255, 0.1);
 }
 
-.tool-button {
+/* ── Dock tool buttons ───────────────────────────── */
+
+.dock-tool-btn {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 46px;
-  height: 46px;
+  width: 40px;
+  height: 40px;
   padding: 0;
-  color: #1d1d1f;
+  color: rgba(255, 255, 255, 0.65);
   cursor: pointer;
+  outline: none;
   background: transparent;
   border: none;
   border-radius: 12px;
   transition:
-    background 100ms ease,
-    color 100ms ease;
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
-.tool-button svg {
-  width: 22px;
-  height: 22px;
-  color: currentColor;
+.dock-tool-btn:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.08);
 }
 
-.tool-button:hover {
-  background: #f2f2f4;
+.dock-tool-btn.active {
+  color: #fff;
+  background: #2f81f7;
+  box-shadow:
+    0 1px 3px rgba(47, 129, 247, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
-.tool-button.active {
-  color: #ffffff;
-  background: var(--accent);
+.dock-tool-btn.active:hover {
+  background: #4090f8;
 }
 
-.dock-button {
+/* ── Dock small buttons (zoom, export) ───────────── */
+
+.dock-sm-btn {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   padding: 0;
-  color: #6b6b72;
+  color: rgba(255, 255, 255, 0.65);
   cursor: pointer;
+  outline: none;
   background: transparent;
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   transition:
-    background 100ms ease,
-    color 100ms ease;
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
-.dock-button:hover {
-  color: #1d1d1f;
-  background: #f2f2f4;
+.dock-sm-btn:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.08);
 }
 
-.dock-button:active {
-  background: #eaeaed;
+.dock-sm-btn:active {
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .zoom-readout {
-  min-width: 42px;
+  min-width: 48px;
   font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: 11px;
+  font-size: 13px;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
-  color: #8b8b92;
+  color: rgba(255, 255, 255, 0.5);
   text-align: center;
+  user-select: none;
 }
 
 /* ── Workspace ────────────────────────────────────── */
@@ -229,23 +242,26 @@
 }
 
 .canvas-text-input {
+  box-sizing: border-box;
+  display: block;
   width: 100%;
-  min-width: 120px;
-  min-height: 1em;
+  min-width: 0;
+  height: 100%;
   padding: 0;
+  margin: 0;
   font-weight: 400;
   line-height: 1.05;
   text-align: center;
-  border: 2px solid #ff6fae;
-  border-radius: 8px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  border: 1.5px solid #ff6fae;
+  border-radius: 6px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.26);
 }
 
 .canvas-text-input:focus {
-  border-color: #ff6fae;
+  outline: none;
   box-shadow:
-    0 0 0 2px rgba(255, 111, 174, 0.25),
-    0 14px 42px rgba(0, 0, 0, 0.55);
+    0 0 0 2px rgba(255, 111, 174, 0.22),
+    0 12px 34px rgba(0, 0, 0, 0.32);
 }
 
 /* ── Status bar ───────────────────────────────────── */

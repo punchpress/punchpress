@@ -18,7 +18,7 @@ const ToolButton = ({ icon, active, label, onClick, shortcut }) => {
   return (
     <button
       aria-label={`${label} (${shortcut})`}
-      className={`tool-button ${active ? "active" : ""}`}
+      className={`dock-tool-btn${active ? "active" : ""}`}
       onClick={onClick}
       title={`${label} (${shortcut})`}
       type="button"
@@ -26,8 +26,8 @@ const ToolButton = ({ icon, active, label, onClick, shortcut }) => {
       <HugeiconsIcon
         color="currentColor"
         icon={icon}
-        size={22}
-        strokeWidth={1.8}
+        size={24}
+        strokeWidth={1.6}
       />
     </button>
   );
@@ -36,7 +36,7 @@ const ToolButton = ({ icon, active, label, onClick, shortcut }) => {
 const DockButton = ({ children, onClick, title }) => {
   return (
     <button
-      className="dock-button"
+      className="dock-sm-btn"
       onClick={onClick}
       title={title}
       type="button"
@@ -78,8 +78,8 @@ export const EditorToolbar = ({
           <HugeiconsIcon
             color="currentColor"
             icon={Remove01Icon}
-            size={18}
-            strokeWidth={2}
+            size={22}
+            strokeWidth={1.8}
           />
         </DockButton>
         <div className="zoom-readout">{Math.round(zoom * 100)}%</div>
@@ -87,8 +87,8 @@ export const EditorToolbar = ({
           <HugeiconsIcon
             color="currentColor"
             icon={Add01Icon}
-            size={18}
-            strokeWidth={2}
+            size={22}
+            strokeWidth={1.8}
           />
         </DockButton>
       </div>
@@ -100,8 +100,8 @@ export const EditorToolbar = ({
           <HugeiconsIcon
             color="currentColor"
             icon={Download04Icon}
-            size={18}
-            strokeWidth={1.8}
+            size={22}
+            strokeWidth={1.6}
           />
         </DockButton>
       </div>

@@ -1,19 +1,31 @@
 import { useEffect, useRef } from "react";
 
-const getEditorDimensions = (metrics, node, text) => {
+const getEditorFrame = (geometry, metrics, node, text) => {
+  if (geometry?.bbox) {
+    const { maxX, maxY, minX, minY } = geometry.bbox;
+
+    return {
+      height: Math.max(24, maxY - minY),
+      width: Math.max(24, maxX - minX),
+      x: node.x + (minX + maxX) / 2,
+      y: node.y + (minY + maxY) / 2,
+    };
+  }
+
   if (metrics) {
     return {
-      width: Math.max(120, metrics.width + node.fontSize * 0.35),
-      height: Math.max(
-        node.fontSize * 1.2,
-        metrics.height + node.fontSize * 0.35
-      ),
+      height: Math.max(24, metrics.height),
+      width: Math.max(24, metrics.width),
+      x: node.x + (metrics.minX + metrics.maxX) / 2,
+      y: node.y + (metrics.minY + metrics.maxY) / 2,
     };
   }
 
   return {
-    width: Math.max(120, node.fontSize * Math.max(1.4, text.length * 0.58)),
     height: Math.max(48, node.fontSize * 1.25),
+    width: Math.max(120, node.fontSize * Math.max(1.4, text.length * 0.58)),
+    x: node.x,
+    y: node.y,
   };
 };
 
@@ -36,18 +48,19 @@ const hexToRgb = (hex) => {
 const getEditorBackground = (fill) => {
   const rgb = hexToRgb(fill);
   if (!rgb) {
-    return "rgba(13, 13, 13, 0.68)";
+    return "rgba(18, 18, 18, 0.32)";
   }
 
   const luminance = (0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b) / 255;
   return luminance > 0.68
-    ? "rgba(10, 10, 10, 0.7)"
-    : "rgba(255, 255, 255, 0.22)";
+    ? "rgba(10, 10, 10, 0.28)"
+    : "rgba(255, 255, 255, 0.16)";
 };
 
 export const CanvasTextEditor = ({
   editingText,
   fontFamily,
+  geometry,
   metrics,
   node,
   onCancel,
@@ -55,11 +68,7 @@ export const CanvasTextEditor = ({
   onCommit,
 }) => {
   const inputRef = useRef(null);
-  const dimensions = getEditorDimensions(metrics, node, editingText);
-  const strokeWidth = Math.min(
-    node.strokeWidth,
-    Math.max(1, node.fontSize * 0.06)
-  );
+  const frame = getEditorFrame(geometry, metrics, node, editingText);
 
   useEffect(() => {
     if (!inputRef.current) {
@@ -74,10 +83,10 @@ export const CanvasTextEditor = ({
     <div
       className="canvas-text-editor"
       style={{
-        left: `${node.x}px`,
-        top: `${node.y}px`,
-        width: `${dimensions.width}px`,
-        minHeight: `${dimensions.height}px`,
+        left: `${frame.x}px`,
+        top: `${frame.y}px`,
+        width: `${frame.width}px`,
+        height: `${frame.height}px`,
       }}
     >
       <input
@@ -100,8 +109,6 @@ export const CanvasTextEditor = ({
         ref={inputRef}
         spellCheck={false}
         style={{
-          WebkitTextStrokeColor: node.stroke,
-          WebkitTextStrokeWidth: `${strokeWidth}px`,
           background: getEditorBackground(node.fill),
           caretColor: node.fill,
           color: node.fill,

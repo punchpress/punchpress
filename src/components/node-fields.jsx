@@ -1,3 +1,12 @@
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toNumber } from "../editor/math-utils";
 import { getDefaultWarp } from "../editor/model";
 import { ColorField, FieldRow, Section } from "./node-fields-shared";
@@ -13,7 +22,8 @@ export const NodeFields = ({
     <>
       <Section title="Text">
         <FieldRow label="Text">
-          <input
+          <Input
+            nativeInput
             onChange={(event) =>
               updateSelectedNode({ text: event.target.value })
             }
@@ -22,27 +32,33 @@ export const NodeFields = ({
         </FieldRow>
 
         <FieldRow label="Font">
-          <div className="select-wrap">
-            <select
-              onChange={(event) =>
-                updateSelectedNode({ fontUrl: event.target.value })
+          <Select
+            onValueChange={(value) => {
+              if (value) {
+                updateSelectedNode({ fontUrl: value });
               }
-              value={node.fontUrl}
-            >
+            }}
+            value={node.fontUrl}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
               {fonts.map((font) => {
                 return (
-                  <option key={font.id} value={font.url}>
+                  <SelectItem key={font.id} value={font.url}>
                     {font.label}
-                  </option>
+                  </SelectItem>
                 );
               })}
-            </select>
-          </div>
+            </SelectContent>
+          </Select>
         </FieldRow>
 
         <div className="field-pair">
           <FieldRow label="Size">
-            <input
+            <Input
+              nativeInput
               onChange={(event) => {
                 const fontSize = Math.max(
                   1,
@@ -56,7 +72,8 @@ export const NodeFields = ({
           </FieldRow>
 
           <FieldRow label="Track">
-            <input
+            <Input
+              nativeInput
               onChange={(event) => {
                 const tracking = toNumber(event.target.value, node.tracking);
                 updateSelectedNode({ tracking });
@@ -84,7 +101,8 @@ export const NodeFields = ({
         </FieldRow>
 
         <FieldRow label="Width">
-          <input
+          <Input
+            nativeInput
             onChange={(event) => {
               const strokeWidth = Math.max(
                 0,
@@ -100,21 +118,26 @@ export const NodeFields = ({
 
       <Section title="Warp">
         <FieldRow label="Type">
-          <div className="select-wrap">
-            <select
-              onChange={(event) => {
+          <Select
+            onValueChange={(value) => {
+              if (value) {
                 updateSelectedNode({
-                  warp: getDefaultWarp(event.target.value),
+                  warp: getDefaultWarp(value),
                 });
-              }}
-              value={node.warp.kind}
-            >
-              <option value="none">None</option>
-              <option value="arch">Arch</option>
-              <option value="wave">Wave</option>
-              <option value="circle">Circle</option>
-            </select>
-          </div>
+              }
+            }}
+            value={node.warp.kind}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None</SelectItem>
+              <SelectItem value="arch">Arch</SelectItem>
+              <SelectItem value="wave">Wave</SelectItem>
+              <SelectItem value="circle">Circle</SelectItem>
+            </SelectContent>
+          </Select>
         </FieldRow>
 
         <NodeFieldsWarpInputs
@@ -126,7 +149,8 @@ export const NodeFields = ({
       <Section title="Position">
         <div className="field-pair">
           <FieldRow label="X">
-            <input
+            <Input
+              nativeInput
               onChange={(event) =>
                 updateSelectedNode({ x: toNumber(event.target.value, node.x) })
               }
@@ -136,7 +160,8 @@ export const NodeFields = ({
           </FieldRow>
 
           <FieldRow label="Y">
-            <input
+            <Input
+              nativeInput
               onChange={(event) =>
                 updateSelectedNode({ y: toNumber(event.target.value, node.y) })
               }
@@ -147,9 +172,15 @@ export const NodeFields = ({
         </div>
       </Section>
 
-      <button className="delete-button" onClick={deleteSelected} type="button">
-        Delete
-      </button>
+      <div className="delete-button-wrap">
+        <Button
+          onClick={deleteSelected}
+          type="button"
+          variant="destructive-outline"
+        >
+          Delete
+        </Button>
+      </div>
     </>
   );
 };

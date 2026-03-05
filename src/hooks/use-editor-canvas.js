@@ -146,24 +146,72 @@ export const useEditorCanvas = (
     });
   }, []);
 
-  const handleWheel = useCallback(
-    (event) => {
-      event.preventDefault();
-
+  const zoomFromClientPoint = useCallback(
+    (factor, clientX, clientY) => {
       const workspaceElement = workspaceRef.current;
       if (!workspaceElement) {
         return;
       }
 
       const rect = workspaceElement.getBoundingClientRect();
-      const screenX = event.clientX - rect.left;
-      const screenY = event.clientY - rect.top;
-      const factor = Math.exp(-event.deltaY * 0.0012);
+      const insideWorkspace =
+        clientX >= rect.left &&
+        clientX <= rect.right &&
+        clientY >= rect.top &&
+        clientY <= rect.bottom;
 
-      zoomAtPoint(factor, screenX, screenY);
+      if (insideWorkspace) {
+        zoomAtPoint(factor, clientX - rect.left, clientY - rect.top);
+        return;
+      }
+
+      zoomAtPoint(factor, rect.width / 2, rect.height / 2);
     },
     [zoomAtPoint]
   );
+
+  const handleWheel = useCallback(
+    (event) => {
+      event.preventDefault();
+      const factor = Math.exp(-event.deltaY * 0.0012);
+      zoomFromClientPoint(factor, event.clientX, event.clientY);
+    },
+    [zoomFromClientPoint]
+  );
+
+  useEffect(() => {
+    const onBrowserZoomGesture = (event) => {
+      if (!(event.ctrlKey || event.metaKey)) {
+        return;
+      }
+
+      if (event.defaultPrevented) {
+        return;
+      }
+
+      const workspaceElement = workspaceRef.current;
+      if (!workspaceElement) {
+        return;
+      }
+
+      const shellElement = workspaceElement.closest(".editor-shell");
+      if (!shellElement?.contains(event.target)) {
+        return;
+      }
+
+      event.preventDefault();
+      const factor = Math.exp(-event.deltaY * 0.0012);
+      zoomFromClientPoint(factor, event.clientX, event.clientY);
+    };
+
+    window.addEventListener("wheel", onBrowserZoomGesture, {
+      passive: false,
+    });
+
+    return () => {
+      window.removeEventListener("wheel", onBrowserZoomGesture);
+    };
+  }, [zoomFromClientPoint]);
 
   const handleWorkspacePointerDown = useCallback(
     (event) => {
