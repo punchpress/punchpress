@@ -8,6 +8,8 @@ import "./styles/base.css";
 import "./styles/layout.css";
 import "./styles/panel.css";
 
+document.documentElement.classList.add("dark");
+
 const queryClient = new QueryClient();
 
 const trpcClient = trpc.createClient({

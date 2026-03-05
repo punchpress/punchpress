@@ -1,3 +1,5 @@
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardContent } from "@/components/ui/card";
 import { NodeFields } from "./node-fields";
 
 export const PropertiesPanel = ({
@@ -11,12 +13,18 @@ export const PropertiesPanel = ({
   return (
     <aside className="properties-panel">
       {bootstrapState === "error" && (
-        <div className="panel-message error">
-          tRPC bootstrap failed: {bootstrapError || "Unknown error"}
-        </div>
+        <Alert variant="error">
+          <AlertDescription>
+            tRPC bootstrap failed: {bootstrapError || "Unknown error"}
+          </AlertDescription>
+        </Alert>
       )}
 
-      {!selectedNode && <div className="panel-message">No selection</div>}
+      {!selectedNode && (
+        <Card>
+          <CardContent>No selection</CardContent>
+        </Card>
+      )}
 
       {selectedNode && (
         <NodeFields

@@ -1,46 +1,39 @@
+import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 import { clamp, toNumber } from "../editor/math-utils";
 import { FieldRow } from "./node-fields-shared";
 
 export const NodeFieldsWarpInputs = ({ node, updateSelectedNode }) => {
   if (node.warp.kind === "arch") {
+    const setBend = (value) => {
+      const bend = clamp(toNumber(value, node.warp.bend), -1, 1);
+      updateSelectedNode((currentNode) => {
+        return {
+          ...currentNode,
+          warp: { ...currentNode.warp, bend },
+        };
+      });
+    };
+
     return (
       <FieldRow label="Bend">
         <div className="range-pair">
-          <input
+          <Slider
             max={1}
             min={-1}
-            onChange={(event) => {
-              const bend = clamp(
-                toNumber(event.target.value, node.warp.bend),
-                -1,
-                1
-              );
-              updateSelectedNode((currentNode) => {
-                return {
-                  ...currentNode,
-                  warp: { ...currentNode.warp, bend },
-                };
-              });
+            onValueChange={(value) => {
+              const next = Array.isArray(value) ? value[0] : value;
+              setBend(next);
             }}
             step={0.01}
-            type="range"
             value={node.warp.bend}
           />
-          <input
+          <Input
             max={1}
             min={-1}
+            nativeInput
             onChange={(event) => {
-              const bend = clamp(
-                toNumber(event.target.value, node.warp.bend),
-                -1,
-                1
-              );
-              updateSelectedNode((currentNode) => {
-                return {
-                  ...currentNode,
-                  warp: { ...currentNode.warp, bend },
-                };
-              });
+              setBend(event.target.value);
             }}
             step={0.01}
             type="number"
@@ -55,7 +48,8 @@ export const NodeFieldsWarpInputs = ({ node, updateSelectedNode }) => {
     return (
       <>
         <FieldRow label="Amplitude">
-          <input
+          <Input
+            nativeInput
             onChange={(event) => {
               const amplitude = toNumber(
                 event.target.value,
@@ -74,8 +68,9 @@ export const NodeFieldsWarpInputs = ({ node, updateSelectedNode }) => {
         </FieldRow>
 
         <FieldRow label="Cycles">
-          <input
+          <Input
             min={0.1}
+            nativeInput
             onChange={(event) => {
               const cycles = Math.max(
                 0.1,
@@ -104,7 +99,8 @@ export const NodeFieldsWarpInputs = ({ node, updateSelectedNode }) => {
   return (
     <>
       <FieldRow label="Radius">
-        <input
+        <Input
+          nativeInput
           onChange={(event) => {
             const radius = Math.max(
               1,
@@ -123,7 +119,8 @@ export const NodeFieldsWarpInputs = ({ node, updateSelectedNode }) => {
       </FieldRow>
 
       <FieldRow label="Sweep">
-        <input
+        <Input
+          nativeInput
           onChange={(event) => {
             const sweepDeg = toNumber(event.target.value, node.warp.sweepDeg);
             updateSelectedNode((currentNode) => {

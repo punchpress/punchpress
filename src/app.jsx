@@ -83,6 +83,11 @@ export const App = () => {
     return measureStraightText(editingNode, editingFont);
   }, [editingFont, editingNode]);
 
+  const editingGeometry =
+    editingNode && geometryById.has(editingNode.id)
+      ? geometryById.get(editingNode.id)
+      : null;
+
   const editingFontFamily = useMemo(() => {
     if (!editingNode) {
       return "DM Sans, sans-serif";
@@ -340,6 +345,7 @@ export const App = () => {
       <CanvasTextEditor
         editingText={editingText}
         fontFamily={editingFontFamily}
+        geometry={editingGeometry}
         metrics={editingMetrics}
         node={editingNode}
         onCancel={cancelEditing}
