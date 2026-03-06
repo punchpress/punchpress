@@ -1,3 +1,5 @@
+import { WARP_TEXT_NODE_KIND } from "./constants";
+
 export const createId = () => {
   if (
     typeof crypto !== "undefined" &&
@@ -28,6 +30,7 @@ export const getDefaultWarp = (kind) => {
 export const createDefaultNode = (fontUrl) => {
   return {
     id: createId(),
+    kind: WARP_TEXT_NODE_KIND,
     text: "YOUR TEXT",
     fontUrl,
     fontSize: 400,
