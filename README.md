@@ -104,11 +104,13 @@ _A brief summary of key architectural decisions for engineers and AI assistants 
 
 **LLM generates validated JSON, not code.** The AI produces structured JSON conforming to the document schema — not React code, not SVG markup. This gives us safety (no arbitrary code execution), determinism (same input → same output), and reliability (schema validation catches errors before rendering).
 
-**Canvas interaction layer is now built on React Flow.** The canvas shell handles composition primitives (pan, zoom, selection, drag, resize), while warped text geometry, export, and design-recipe logic remain Punchpress-native.
+**Canvas interaction layer now uses specialized canvas tooling.** The canvas shell handles pan, zoom, selection, drag, and resize with dedicated viewer/selection helpers, while warped text geometry, export, and design-recipe logic remain Punchpress-native.
 
 ## Third-party credits
 
-- **React Flow / @xyflow/react (MIT)** — canvas composition runtime for node-based interaction.
+- **react-infinite-viewer (MIT)** — zoomable and pannable artboard viewport.
+- **react-moveable (MIT)** — drag and resize handles for canvas nodes.
+- **react-selecto (MIT)** — selection behavior for canvas interaction.
 
 ---
 
