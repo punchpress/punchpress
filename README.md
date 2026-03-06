@@ -62,6 +62,9 @@ The AI doesn't generate pixels. It generates designs.
 ### Warped and styled text
 The bread and butter of POD design. Arced headlines, wavy text, circular layouts, flag effects — all fully editable. Change the text and the warp recomputes. This isn't SVG `<textPath>` — it's outlined vector geometry that exports like Illustrator.
 
+### Vector editing
+Full bezier path editing — anchor points, control handles, direct selection — for precise control over shapes and letterforms. Double-click into any element to enter vector edit mode and manipulate individual path segments, just like Illustrator's pen tool and direct selection tool.
+
 ### AI-generated assets
 Icons, illustrations, badges, decorative elements — generated or sourced by AI and composable as layers in the design. These sit alongside editable text, not baked into it.
 
@@ -90,30 +93,69 @@ Browse, search, duplicate, and organize your designs. Batch-edit across variatio
 
 _A brief summary of key architectural decisions for engineers and AI assistants working on implementation._
 
+### Architecture
+
 **Design recipe as source of truth.** Every design is stored as a JSON document (a "scene graph") describing layers, text, fonts, colors, warp parameters, effects, and layout. The renderer is a pure function of this document. The editor manipulates this document. The AI generates this document. This is the single representation that flows through the entire system.
-
-**Text rendered as outlined glyph paths.** Fonts are loaded in-browser (via opentype.js initially, HarfBuzz later if needed). Each character is converted to SVG `<path>` outlines. This means text is rendered as vector geometry — identical to "Create Outlines" in Illustrator. The text string and font settings are preserved in the recipe, so the outlines can be regenerated at any time.
-
-**Warp as a parameter, not a bake.** Warp transforms (arch, wave, circle, flag, distort, mesh) are stored as parameters in the recipe and applied at render time. Editing the warp or the text re-runs the pipeline. The geometry is only flattened to final outlines on export.
-
-**Two-class warp system.** Placement warps (circle, path) reposition glyphs with rigid transforms — fast, perfect quality. Deformation warps (arch, wave, flag, distort, mesh) bend the actual geometry by flattening curves to points, warping through a mapping function, and rebuilding paths.
-
-**Bi-directional state.** The JSON document drives the canvas, and canvas interactions (drag, edit, adjust) write back to the JSON document via patches. Neither the JSON editor nor the visual canvas is "primary" — they're both views of the same state.
-
-**Export bakes the recipe.** Export converts all text to outlined paths, expands strokes, flattens effects, and produces a self-contained SVG. Optionally embeds the original recipe in `<metadata>` so the file can be re-imported with full editability restored.
 
 **LLM generates validated JSON, not code.** The AI produces structured JSON conforming to the document schema — not React code, not SVG markup. This gives us safety (no arbitrary code execution), determinism (same input → same output), and reliability (schema validation catches errors before rendering).
 
-**Canvas interaction layer now uses specialized canvas tooling.** The canvas shell handles pan, zoom, selection, drag, and resize with dedicated viewer/selection helpers, while warped text geometry, export, and design-recipe logic remain Punchpress-native.
+**Bi-directional state.** The JSON document drives the canvas, and canvas interactions (drag, edit, adjust) write back to the JSON document via patches. Neither a code editor nor the visual canvas is "primary" — they're both views of the same state.
 
-## Third-party credits
+### Text & warp engine
 
-- **react-infinite-viewer (MIT)** — zoomable and pannable artboard viewport.
-- **react-moveable (MIT)** — drag and resize handles for canvas nodes.
-- **react-selecto (MIT)** — selection behavior for canvas interaction.
+**Text rendered as outlined glyph paths.** Fonts are loaded in-browser via opentype.js. Each character is converted to SVG `<path>` outlines — identical to "Create Outlines" in Illustrator. The text string and font settings are preserved in the recipe, so outlines can be regenerated at any time.
+
+**Warp as a parameter, not a bake.** Warp transforms (arch, wave, circle, flag, distort, mesh) are stored as parameters in the recipe and applied at render time. Editing the warp or the text re-runs the pipeline. Geometry is only flattened to final outlines on export.
+
+**Two-class warp system.** Placement warps (circle, path) reposition glyphs with rigid transforms — fast, perfect quality. Deformation warps (arch, wave, flag, distort, mesh) bend the actual geometry by flattening curves to points, warping through a mapping function, and rebuilding paths.
+
+### Editor interaction layer
+
+**Composable interaction primitives, not a monolithic framework.** The editor shell is assembled from small, focused, MIT-licensed libraries from the daybrush ecosystem that are designed to work together:
+
+- **react-infinite-viewer** — infinite canvas with zoom, pan, and scrolling
+- **react-moveable** — drag, resize, rotate, scale, snap, and warp handles on any DOM/SVG element
+- **react-selecto** — drag-to-select (lasso) across elements
+
+This gives us a tldraw/Figma-quality interaction feel without depending on a monolithic canvas framework. Moveable wraps whatever we render (SVG paths, images, groups) with interaction chrome. The rendering itself is entirely ours.
+
+**Two-layer editing model (like Illustrator).** Object-level editing (select tool — drag, resize, rotate whole elements) is handled by Moveable. Path-level editing (pen tool / direct selection — edit anchor points and bezier handles) is a separate mode powered by Paper.js. Double-click into an element to enter vector edit mode; click away to return to object mode.
+
+### Vector editing
+
+**Paper.js** provides the bezier path editing foundation — anchor point manipulation, control handles, path boolean operations (unite, intersect, subtract), path simplification, and SVG import/export. Paper.js renders to a `<canvas>` overlay that activates when entering vector edit mode for a specific element. Edits are written back to the SVG path data in the document store.
+
+### State management
+
+**Zustand** with Immer middleware. A single store holds the document state (nodes array), editor state (selected element, active tool, zoom), and UI state. Zustand's selector-based subscriptions ensure that dragging one element doesn't re-render the property panel or other elements. The `zundo` middleware provides undo/redo via a patch history stack.
+
+### Export pipeline
+
+**Export bakes the recipe.** Export converts all text to outlined paths, expands strokes, flattens effects, and produces a self-contained SVG. Optionally embeds the original recipe in `<metadata>` so the file can be re-imported with full editability restored.
+
+### Desktop distribution
+
+**Tauri** wraps the React web app for desktop distribution. Tauri uses the system webview (WebKit on macOS, WebView2/Chromium on Windows) — resulting in ~5-10MB app bundles versus Electron's 150-300MB. The Rust backend provides a path to offload heavy computation (batch exports, image processing, warp geometry on large designs) off the main thread in the future. The app ships as a web app first; Tauri packaging is additive, not a rewrite.
+
+---
+
+## Technology stack
+
+| Layer | Technology | License | Purpose |
+|---|---|---|---|
+| UI framework | React + TypeScript | MIT | Application shell, components, property panels |
+| Styling | Tailwind CSS | MIT | Design system, dark theme |
+| State | Zustand + Immer + zundo | MIT | Document store, undo/redo, granular subscriptions |
+| Infinite canvas | react-infinite-viewer | MIT | Zoom, pan, scrollable viewport |
+| Object interaction | react-moveable | MIT | Drag, resize, rotate, snap handles |
+| Selection | react-selecto | MIT | Lasso / click selection |
+| Vector editing | Paper.js | MIT | Pen tool, bezier handles, boolean ops, path editing |
+| Font engine | opentype.js | MIT | Font loading, glyph outlines, kerning |
+| Warp engine | Custom | — | Flatten → warp → rebuild SVG path pipeline |
+| Desktop shell | Tauri | MIT | Native app packaging, system webview, Rust backend |
 
 ---
 
 ## Project status
 
-Currently in proof-of-concept phase. The PoC validates the core technology: font loading → glyph outlining → warp transforms → editable SVG output, inside a minimal interactive editor. Production features like AI generation, templates, asset management, and collaboration come after the core rendering pipeline is proven.
+Currently in proof-of-concept phase. The PoC validates the core technology: font loading → glyph outlining → warp transforms → editable SVG output, inside a minimal interactive editor. Production features like AI generation, templates, vector editing tools, asset management, and collaboration come after the core rendering pipeline is proven.
