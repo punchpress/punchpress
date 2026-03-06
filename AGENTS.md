@@ -52,6 +52,14 @@ This file is the quick-reference for code style and a short index to scoped docs
 11. Prefer one primary component per file; small tightly-coupled presentational helpers are acceptable when splitting hurts readability.
 12. Keep invalidation logic in the domain hook that owns the subscription/mutation; avoid shared cross-domain invalidation hooks.
 
+### UI Components and Design System
+
+1. Use a shadcn-style local component system: components live in `src/components/ui/*`, are copied into the repo, and are owned locally.
+2. Base UI is the only primitive/component foundation for new shared UI work; do not add new Radix UI dependencies or build new shared components on Radix primitives.
+3. COSS UI is the source of truth for new shared components and patterns. Start from the COSS UI docs/registry, then adapt the component into the local `src/components/ui/*` layer.
+4. Prefer extending the existing local wrapper/component API over importing Base UI primitives directly in feature code.
+5. Keep design-system guidance in `@docs/design-system.md` and update it when the component workflow or source-of-truth changes.
+
 ### Jobs and Ingestion (`apps/server/src/jobs/*`)
 
 1. Prefer job-first orchestration: API routes enqueue or record intent; jobs own scheduling, retries, and coordination.
@@ -129,6 +137,7 @@ Use Conventional Commit style: `feat: ...`, `fix: ...`, `docs: ...`, `chore: ...
 Use these scoped docs for everything outside code style:
 
 - `@docs/README.md` (full docs index)
+- `@docs/design-system.md` (shared UI system, Base UI policy, and COSS UI workflow)
 - `@docs/api-surfaces.md` (API surface split boundaries and invariants)
 - `@docs/logging-events.md` (event taxonomy, logging invariants, and query contracts)
 - `@docs/merch-api-knowledge.md` (external Merch API quirks and integration behavior memory)

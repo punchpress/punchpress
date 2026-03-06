@@ -17,8 +17,9 @@ export const NodeFieldsWarpInputs = ({ node, updateSelectedNode }) => {
 
     return (
       <FieldRow label="Bend">
-        <div className="range-pair">
+        <div className="grid grid-cols-[minmax(0,1fr)_64px] items-center gap-2">
           <Slider
+            className="min-w-0"
             max={1}
             min={-1}
             onValueChange={(value) => {

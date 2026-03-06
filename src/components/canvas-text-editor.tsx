@@ -66,6 +66,7 @@ export const CanvasTextEditor = ({
   onCancel,
   onChange,
   onCommit,
+  onFinalize,
 }) => {
   const inputRef = useRef(null);
   const frame = getEditorFrame(geometry, metrics, node, editingText);
@@ -81,7 +82,7 @@ export const CanvasTextEditor = ({
 
   return (
     <div
-      className="canvas-text-editor"
+      className="pointer-events-auto absolute z-10 -translate-x-1/2 -translate-y-1/2"
       style={{
         left: `${frame.x}px`,
         top: `${frame.y}px`,
@@ -90,13 +91,13 @@ export const CanvasTextEditor = ({
       }}
     >
       <input
-        className="canvas-text-input"
-        onBlur={onCommit}
+        className="block h-full w-full min-w-0 rounded-lg border-[1.5px] px-0 py-0 text-center font-normal leading-[1.05] shadow-[0_4px_16px_rgba(0,0,0,0.1)] focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--editor-accent)_20%,transparent),0_4px_16px_rgba(0,0,0,0.1)] focus:outline-none"
+        onBlur={onFinalize || onCommit}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Enter") {
             event.preventDefault();
-            onCommit();
+            (onFinalize || onCommit)();
             return;
           }
 
@@ -110,6 +111,7 @@ export const CanvasTextEditor = ({
         spellCheck={false}
         style={{
           background: getEditorBackground(node.fill),
+          borderColor: "color-mix(in srgb, var(--editor-accent) 60%, black)",
           caretColor: node.fill,
           color: node.fill,
           fontFamily,

@@ -1,37 +1,47 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import { toSafeHex } from "../editor/math-utils";
 
-export const Section = ({ children, title }) => {
+export const Section = ({ children, className, title }) => {
   return (
-    <section className="panel-section">
-      <Card>
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="panel-fields">{children}</div>
-        </CardContent>
-      </Card>
+    <section className={cn("py-3 first:pt-0 last:pb-0", className)}>
+      <h3 className="mb-2.5 font-semibold text-[12px] text-black/70 tracking-[-0.01em]">
+        {title}
+      </h3>
+      <div className="grid gap-2">{children}</div>
     </section>
   );
 };
 
-export const FieldRow = ({ children, label }) => {
+const ROW_GRID = "grid grid-cols-[60px_24px_minmax(0,1fr)] items-center";
+const ROW_LABEL = "select-none text-[12px] text-black/40";
+
+export const FieldRow = ({ action, children, label }) => {
   return (
-    <div className="field">
-      <Label>{label}</Label>
-      <div>{children}</div>
+    <div className={ROW_GRID}>
+      <Label className={ROW_LABEL}>{label}</Label>
+      <div className="flex items-center justify-center">{action}</div>
+      <div className="min-w-0">{children}</div>
+    </div>
+  );
+};
+
+export const PairedRow = ({ action, children, label }) => {
+  return (
+    <div className={ROW_GRID}>
+      <Label className={ROW_LABEL}>{label}</Label>
+      <div className="flex items-center justify-center">{action}</div>
+      <div className="grid grid-cols-2 gap-2">{children}</div>
     </div>
   );
 };
 
 export const ColorField = ({ onChange, value }) => {
   return (
-    <div className="color-field">
+    <div className="flex items-center gap-2">
       <Input
-        className="color-picker-input"
+        className="w-9 min-w-9"
         nativeInput
         onChange={(event) => onChange(event.target.value)}
         type="color"

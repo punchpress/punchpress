@@ -36,6 +36,15 @@ export const inflateBounds = (bbox, amount) => {
   };
 };
 
+const getStrokeInflatedBounds = (node, bbox) => {
+  const strokeInset = Math.max(node.strokeWidth / 2, 0);
+  if (strokeInset === 0) {
+    return bbox;
+  }
+
+  return inflateBounds(bbox, strokeInset);
+};
+
 export const layoutGlyphs = (node, font) => {
   const text = node.text.length > 0 ? [...node.text] : [" "];
   const scale = node.fontSize / font.unitsPerEm;
@@ -112,7 +121,7 @@ export const applyWaveWarp = (contours, amplitude, cycles) => {
 const buildFallbackGeometry = (node) => {
   return {
     paths: [],
-    bbox: estimateBounds(node),
+    bbox: getStrokeInflatedBounds(node, estimateBounds(node)),
     ready: false,
   };
 };
@@ -126,8 +135,8 @@ const buildArchGeometry = (layout, node) => {
 
   const warpedContours = applyArchWarp(mergedContours, node.warp.bend);
   return {
-    paths: [{ d: contoursToPath(warpedContours) }],
-    bbox: getBounds(warpedContours),
+    paths: [{ key: "shape-0", d: contoursToPath(warpedContours) }],
+    bbox: getStrokeInflatedBounds(node, getBounds(warpedContours)),
     ready: true,
   };
 };
@@ -146,8 +155,8 @@ const buildWaveGeometry = (layout, node) => {
   );
 
   return {
-    paths: [{ d: contoursToPath(warpedContours) }],
-    bbox: getBounds(warpedContours),
+    paths: [{ key: "shape-0", d: contoursToPath(warpedContours) }],
+    bbox: getStrokeInflatedBounds(node, getBounds(warpedContours)),
     ready: true,
   };
 };
@@ -158,7 +167,7 @@ const buildCircleGeometry = (layout, node) => {
   const totalWidth = Math.max(layout.totalWidth, 1);
   const radius = Math.max(1, node.warp.radius);
 
-  for (const glyph of layout.glyphs) {
+  for (const [index, glyph] of layout.glyphs.entries()) {
     const centerX = glyph.baseX + glyph.advance / 2;
     const u = clamp((centerX + totalWidth / 2) / totalWidth, 0, 1);
     const angleDeg = (u - 0.5) * node.warp.sweepDeg;
@@ -168,6 +177,7 @@ const buildCircleGeometry = (layout, node) => {
     const arcY = radius - radius * Math.cos(angleRad);
 
     paths.push({
+      key: `glyph-${index}`,
       d: glyph.path,
       transform: `translate(${format(arcX)} ${format(arcY)}) rotate(${format(
         angleDeg
@@ -193,17 +203,18 @@ const buildCircleGeometry = (layout, node) => {
 
   return {
     paths,
-    bbox: getBounds(mergedContours),
+    bbox: getStrokeInflatedBounds(node, getBounds(mergedContours)),
     ready: true,
   };
 };
 
-const buildFlatGeometry = (layout) => {
+const buildFlatGeometry = (layout, node) => {
   const paths = [];
   const mergedContours = [];
 
-  for (const glyph of layout.glyphs) {
+  for (const [index, glyph] of layout.glyphs.entries()) {
     paths.push({
+      key: `glyph-${index}`,
       d: glyph.path,
       transform: `translate(${format(glyph.baseX)} 0)`,
     });
@@ -213,7 +224,7 @@ const buildFlatGeometry = (layout) => {
 
   return {
     paths,
-    bbox: getBounds(mergedContours),
+    bbox: getStrokeInflatedBounds(node, getBounds(mergedContours)),
     ready: true,
   };
 };
@@ -225,14 +236,14 @@ export const buildNodeGeometry = (node, font) => {
     if (layout.glyphs.length === 0) {
       return {
         paths: [],
-        bbox: {
+        bbox: getStrokeInflatedBounds(node, {
           minX: -20,
           minY: -20,
           maxX: 20,
           maxY: 20,
           width: 40,
           height: 40,
-        },
+        }),
         ready: true,
       };
     }
@@ -249,7 +260,7 @@ export const buildNodeGeometry = (node, font) => {
       return buildCircleGeometry(layout, node);
     }
 
-    return buildFlatGeometry(layout);
+    return buildFlatGeometry(layout, node);
   } catch {
     return buildFallbackGeometry(node);
   }

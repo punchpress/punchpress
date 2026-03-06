@@ -2,13 +2,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink } from "@trpc/client";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import "react-infinite-viewer/src/index.css";
+import "react-selecto/src/index.css";
 import { App } from "./app";
+import { initializeTheme } from "./theme/theme-provider";
 import { trpc } from "./trpc";
-import "./styles/base.css";
-import "./styles/layout.css";
-import "./styles/panel.css";
+import "./styles/global.css";
 
-document.documentElement.classList.add("dark");
+initializeTheme();
 
 const queryClient = new QueryClient();
 
