@@ -1,15 +1,17 @@
 {
   "name": "@punchpress/desktop",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "tauri dev",
-    "build": "tauri build",
-    "tauri": "tauri"
+    "dev": "bun run scripts/dev-desktop.ts",
+    "dev:app": "bun run prepare:runtime && electrobun dev --watch",
+    "dev:web": "bun run --cwd ../web dev",
+    "build": "bun run build:web && bun run prepare:runtime && electrobun build --env=stable",
+    "build:web": "bun run --cwd ../web build",
+    "prepare:runtime": "bun run scripts/ensure-electrobun-runtime.ts",
+    "run": "bun run prepare:runtime && electrobun run"
   },
   "dependencies": {
-    "@tauri-apps/api": "2.10.1"
-  },
-  "devDependencies": {
-    "@tauri-apps/cli": "2.10.1"
+    "electrobun": "1.15.1"
   }
 }

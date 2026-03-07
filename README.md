@@ -13,15 +13,15 @@ Think of it as what happens when you cross Kittl with an AI that actually unders
 The repo is organized as a small Bun workspace so the app and desktop shell stay independent:
 
 - `apps/web` contains the actual Punchpress editor and can run as a normal Vite web app on its own.
-- `apps/desktop` contains the Tauri v2 wrapper that points at the web app in development and bundles its production build for desktop distribution.
+- `apps/desktop` contains the Electrobun wrapper that points at the web app in development and bundles its production build for desktop distribution with CEF.
 
 ## Development
 
 - `bun install` installs all workspace dependencies.
 - `bun run dev` starts the standalone web app.
-- `bun run dev:desktop` starts the Tauri wrapper against the web app dev server.
+- `bun run dev:desktop` starts the Electrobun shell against the web app dev server.
 - `bun run build:web` builds the web app only.
-- `bun run build:desktop` builds the desktop app. This requires a Rust toolchain from `rustup`.
+- `bun run build:desktop` builds the desktop app. The first desktop build downloads the Electrobun runtime and bundled CEF binaries for the current platform.
 
 ---
 
@@ -152,7 +152,7 @@ This gives us a tldraw/Figma-quality interaction feel without depending on a mon
 
 ### Desktop distribution
 
-**Tauri** wraps the React web app for desktop distribution. Tauri uses the system webview (WebKit on macOS, WebView2/Chromium on Windows) — resulting in ~5-10MB app bundles versus Electron's 150-300MB. The Rust backend provides a path to offload heavy computation (batch exports, image processing, warp geometry on large designs) off the main thread in the future. The app ships as a web app first; Tauri packaging is additive, not a rewrite.
+**Electrobun + CEF** wraps the React web app for desktop distribution. Electrobun runs the desktop main process on Bun and bundles Chromium Embedded Framework so the desktop shell uses the same rendering engine across macOS, Windows, and Linux. The app still ships as a web app first; desktop packaging remains additive, not a rewrite.
 
 ---
 
@@ -169,7 +169,7 @@ This gives us a tldraw/Figma-quality interaction feel without depending on a mon
 | Vector editing | Paper.js | MIT | Pen tool, bezier handles, boolean ops, path editing |
 | Font engine | opentype.js | MIT | Font loading, glyph outlines, kerning |
 | Warp engine | Custom | — | Flatten → warp → rebuild SVG path pipeline |
-| Desktop shell | Tauri | MIT | Native app packaging, system webview, Rust backend |
+| Desktop shell | Electrobun + CEF | MIT | Native app packaging, Bun main process, bundled Chromium runtime |
 
 ---
 
