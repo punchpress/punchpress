@@ -1,0 +1,39 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Punchpress",
+  "version": "0.1.0",
+  "identifier": "build.punchpress.desktop",
+  "build": {
+    "frontendDist": "../../web/dist",
+    "devUrl": "http://127.0.0.1:5273",
+    "beforeDevCommand": "bun run --cwd ../web dev",
+    "beforeBuildCommand": "bun run --cwd ../web build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Punchpress",
+        "width": 1440,
+        "height": 960,
+        "minWidth": 1120,
+        "minHeight": 760,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}
