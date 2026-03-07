@@ -1,9 +1,5 @@
 @layer components {
-  .canvas-viewer .infinite-viewer-wrapper {
-    border-radius: 0;
-  }
-
-  .canvas-viewer .infinite-viewer-scroll-area {
+  .canvas-surface {
     background-color: var(--designer-bg);
     background-image: radial-gradient(
       circle,
@@ -13,7 +9,7 @@
     background-size: 24px 24px;
   }
 
-  .dark .canvas-viewer .infinite-viewer-scroll-area {
+  .dark .canvas-surface {
     background-color: color-mix(in srgb, var(--designer-bg) 92%, black);
     background-image: radial-gradient(
       circle,

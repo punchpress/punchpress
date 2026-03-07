@@ -4,12 +4,7 @@ import InfiniteViewer from "react-infinite-viewer";
 import Moveable from "react-moveable";
 import Selecto from "react-selecto";
 import { cn } from "@/lib/utils";
-import {
-  ARTBOARD_HEIGHT,
-  ARTBOARD_WIDTH,
-  MAX_ZOOM,
-  MIN_ZOOM,
-} from "../editor/constants";
+import { MAX_ZOOM, MIN_ZOOM } from "../editor/constants";
 import { isInputElement } from "../editor/dom-utils";
 import { clamp, round } from "../editor/math-utils";
 import { useSpacePan } from "../hooks/use-space-pan";
@@ -17,7 +12,7 @@ import { CanvasNode } from "./canvas-node";
 import { DesignerFloatingToolbar, DesignerFrame } from "./designer/designer";
 import { EditorToolbar } from "./editor-toolbar";
 
-const INITIAL_ZOOM = 0.12;
+const INITIAL_ZOOM = 1;
 
 const getResizeAnchor = (targetRect, direction) => {
   const [horizontalDirection, verticalDirection] = direction;
@@ -57,10 +52,7 @@ const getResizePointer = (event) => {
 
 const getCenterPoint = (viewer, host, zoom) => {
   if (!(viewer && host)) {
-    return {
-      x: ARTBOARD_WIDTH / 2,
-      y: ARTBOARD_HEIGHT / 2,
-    };
+    return { x: 0, y: 0 };
   }
 
   const rect = host.getBoundingClientRect();
@@ -68,6 +60,19 @@ const getCenterPoint = (viewer, host, zoom) => {
   return {
     x: viewer.getScrollLeft() + rect.width / (2 * zoom),
     y: viewer.getScrollTop() + rect.height / (2 * zoom),
+  };
+};
+
+const getCanvasPoint = (viewer, host, clientX, clientY, zoom) => {
+  if (!(viewer && host)) {
+    return { x: 0, y: 0 };
+  }
+
+  const rect = host.getBoundingClientRect();
+
+  return {
+    x: viewer.getScrollLeft() + (clientX - rect.left) / zoom,
+    y: viewer.getScrollTop() + (clientY - rect.top) / zoom,
   };
 };
 
@@ -88,16 +93,11 @@ export const Canvas = ({
 }) => {
   const [spacePressed, setSpacePressed] = useState(false);
   const [selectedTarget, setSelectedTarget] = useState(null);
-  const [viewport, setViewport] = useState({
-    scrollLeft: ARTBOARD_WIDTH / 2,
-    scrollTop: ARTBOARD_HEIGHT / 2,
-    zoom: INITIAL_ZOOM,
-  });
+  const [viewport, setViewport] = useState({ zoom: INITIAL_ZOOM });
 
   const viewerRef = useRef(null);
   const hostRef = useRef(null);
   const nodeElementsRef = useRef(new Map());
-  const centeredRef = useRef(false);
   const spacePressedRef = useRef(false);
   const moveableRef = useRef(null);
 
@@ -114,29 +114,6 @@ export const Canvas = ({
         : null
     );
   }, [selectedNodeId]);
-
-  useEffect(() => {
-    if (centeredRef.current) {
-      return;
-    }
-
-    const viewer = viewerRef.current;
-    if (!viewer) {
-      return;
-    }
-
-    const rafId = window.requestAnimationFrame(() => {
-      viewer.scrollCenter?.();
-      setViewport({
-        scrollLeft: viewer.getScrollLeft(),
-        scrollTop: viewer.getScrollTop(),
-        zoom: viewer.getZoom ? viewer.getZoom() : INITIAL_ZOOM,
-      });
-      centeredRef.current = true;
-    });
-
-    return () => window.cancelAnimationFrame(rafId);
-  }, []);
 
   useEffect(() => {
     if (!(selectedTarget && moveableRef.current)) {
@@ -161,10 +138,26 @@ export const Canvas = ({
     [selectedNodeId]
   );
 
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) {
+      return;
+    }
+
+    const rafId = window.requestAnimationFrame(() => {
+      viewer.setTo?.({
+        x: 0,
+        y: 0,
+        zoom: INITIAL_ZOOM,
+      });
+      setViewport({ zoom: INITIAL_ZOOM });
+    });
+
+    return () => window.cancelAnimationFrame(rafId);
+  }, []);
+
   const handleScroll = useCallback((event) => {
     setViewport({
-      scrollLeft: event.scrollLeft,
-      scrollTop: event.scrollTop,
       zoom: event.zoomX,
     });
     moveableRef.current?.updateRect?.();
@@ -238,7 +231,7 @@ export const Canvas = ({
       <div className="relative flex min-h-0 flex-1" ref={hostRef}>
         <InfiniteViewer
           className={cn(
-            "canvas-viewer h-full w-full bg-[var(--designer-bg)]",
+            "canvas-surface h-full w-full bg-[var(--designer-bg)]",
             (spacePressed || activeTool === "hand") && "cursor-grab"
           )}
           margin={2400}
@@ -253,7 +246,7 @@ export const Canvas = ({
           zoomRange={[MIN_ZOOM, MAX_ZOOM]}
         >
           <div
-            className="relative overflow-hidden border-0 bg-transparent shadow-none"
+            className="relative h-full w-full overflow-visible border-0 bg-transparent shadow-none"
             onPointerDown={(event) => {
               if (event.target !== event.currentTarget) {
                 return;
@@ -265,19 +258,22 @@ export const Canvas = ({
               }
 
               if (activeTool === "text") {
-                const rect = event.currentTarget.getBoundingClientRect();
+                const point = getCanvasPoint(
+                  viewerRef.current,
+                  hostRef.current,
+                  event.clientX,
+                  event.clientY,
+                  viewport.zoom
+                );
+
                 onAddText({
-                  x: round((event.clientX - rect.left) / viewport.zoom, 2),
-                  y: round((event.clientY - rect.top) / viewport.zoom, 2),
+                  x: round(point.x, 2),
+                  y: round(point.y, 2),
                 });
                 return;
               }
 
               onClearSelection();
-            }}
-            style={{
-              height: `${ARTBOARD_HEIGHT}px`,
-              width: `${ARTBOARD_WIDTH}px`,
             }}
           >
             {nodes.map((node) => {
