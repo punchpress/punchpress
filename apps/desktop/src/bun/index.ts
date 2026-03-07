@@ -9,6 +9,34 @@ const defaultWindowSize = {
   height: 960,
 };
 
+const blockDevToolsShortcutScript = `
+(() => {
+  if ((window).__punchpressBlockDevToolsShortcutInstalled) {
+    return;
+  }
+
+  (window).__punchpressBlockDevToolsShortcutInstalled = true;
+
+  const shouldBlock = (event) => {
+    const isModifierPressed = event.metaKey || event.ctrlKey;
+    return isModifierPressed && event.shiftKey && event.key.toLowerCase() === "i";
+  };
+
+  const blockShortcut = (event) => {
+    if (!shouldBlock(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+  };
+
+  window.addEventListener("keydown", blockShortcut, true);
+  window.addEventListener("keyup", blockShortcut, true);
+})();
+`;
+
 const installApplicationMenu = () => {
   const appLabel = "PunchPress";
   const appMenu =
@@ -87,7 +115,7 @@ const main = async () => {
   const url = await resolveAppUrl();
   installApplicationMenu();
 
-  new BrowserWindow({
+  const window = new BrowserWindow({
     title: "PunchPress",
     url,
     renderer: "cef",
@@ -97,6 +125,10 @@ const main = async () => {
       width: defaultWindowSize.width,
       height: defaultWindowSize.height,
     },
+  });
+
+  window.webview.on("dom-ready", () => {
+    window.webview.executeJavascript(blockDevToolsShortcutScript);
   });
 };
 
