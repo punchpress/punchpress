@@ -1,69 +1,66 @@
 "use client";
 
-import { Field as FieldPrimitive } from "@base-ui/react/field";
+import { Field as BaseFieldPrimitive } from "@base-ui/react/field";
 
 import { cn } from "@/lib/utils";
 
-function Field({
-  className,
-  ...props
-}) {
+const FieldPrimitive = BaseFieldPrimitive;
+
+function Field({ className, ...props }) {
   return (
-    <FieldPrimitive.Root
+    <BaseFieldPrimitive.Root
       className={cn("flex flex-col items-start gap-2", className)}
       data-slot="field"
-      {...props} />
+      {...props}
+    />
   );
 }
 
-function FieldLabel({
-  className,
-  ...props
-}) {
+function FieldLabel({ className, ...props }) {
   return (
-    <FieldPrimitive.Label
+    <BaseFieldPrimitive.Label
       className={cn(
         "inline-flex items-center gap-2 font-medium text-base/4.5 text-foreground sm:text-sm/4",
         className
       )}
       data-slot="field-label"
-      {...props} />
+      {...props}
+    />
   );
 }
 
-function FieldItem({
-  className,
-  ...props
-}) {
-  return (<FieldPrimitive.Item className={cn("flex", className)} data-slot="field-item" {...props} />);
+function FieldItem({ className, ...props }) {
+  return (
+    <BaseFieldPrimitive.Item
+      className={cn("flex", className)}
+      data-slot="field-item"
+      {...props}
+    />
+  );
 }
 
-function FieldDescription({
-  className,
-  ...props
-}) {
+function FieldDescription({ className, ...props }) {
   return (
-    <FieldPrimitive.Description
+    <BaseFieldPrimitive.Description
       className={cn("text-muted-foreground text-xs", className)}
       data-slot="field-description"
-      {...props} />
+      {...props}
+    />
   );
 }
 
-function FieldError({
-  className,
-  ...props
-}) {
+function FieldError({ className, ...props }) {
   return (
-    <FieldPrimitive.Error
+    <BaseFieldPrimitive.Error
       className={cn("text-destructive-foreground text-xs", className)}
       data-slot="field-error"
-      {...props} />
+      {...props}
+    />
   );
 }
 
-const FieldControl = FieldPrimitive.Control;
-const FieldValidity = FieldPrimitive.Validity;
+const FieldControl = BaseFieldPrimitive.Control;
+const FieldValidity = BaseFieldPrimitive.Validity;
 
 export {
   Field,
@@ -72,6 +69,6 @@ export {
   FieldError,
   FieldControl,
   FieldItem,
-  FieldValidity,
   FieldPrimitive,
+  FieldValidity,
 };

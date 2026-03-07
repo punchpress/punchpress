@@ -1,7 +1,10 @@
-"use client";;
-import { ScrollArea as ScrollAreaPrimitive } from "@base-ui/react/scroll-area";
+"use client";
+
+import { ScrollArea as BaseScrollAreaPrimitive } from "@base-ui/react/scroll-area";
 
 import { cn } from "@/lib/utils";
+
+const ScrollAreaPrimitive = BaseScrollAreaPrimitive;
 
 function ScrollArea({
   className,
@@ -11,11 +14,11 @@ function ScrollArea({
   ...props
 }) {
   return (
-    <ScrollAreaPrimitive.Root
+    <BaseScrollAreaPrimitive.Root
       className={cn("size-full min-h-0", className)}
       {...props}
     >
-      <ScrollAreaPrimitive.Viewport
+      <BaseScrollAreaPrimitive.Viewport
         className={cn(
           "h-full rounded-[inherit] outline-none transition-shadows focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background data-has-overflow-y:overscroll-y-contain data-has-overflow-x:overscroll-x-contain",
           scrollFade &&
@@ -26,21 +29,17 @@ function ScrollArea({
         data-slot="scroll-area-viewport"
       >
         {children}
-      </ScrollAreaPrimitive.Viewport>
+      </BaseScrollAreaPrimitive.Viewport>
       <ScrollBar orientation="vertical" />
       <ScrollBar orientation="horizontal" />
-      <ScrollAreaPrimitive.Corner data-slot="scroll-area-corner" />
-    </ScrollAreaPrimitive.Root>
+      <BaseScrollAreaPrimitive.Corner data-slot="scroll-area-corner" />
+    </BaseScrollAreaPrimitive.Root>
   );
 }
 
-function ScrollBar({
-  className,
-  orientation = "vertical",
-  ...props
-}) {
+function ScrollBar({ className, orientation = "vertical", ...props }) {
   return (
-    <ScrollAreaPrimitive.Scrollbar
+    <BaseScrollAreaPrimitive.Scrollbar
       className={cn(
         "m-1 flex opacity-0 transition-opacity delay-300 data-[orientation=horizontal]:h-1.5 data-[orientation=vertical]:w-1.5 data-[orientation=horizontal]:flex-col data-hovering:opacity-100 data-scrolling:opacity-100 data-hovering:delay-0 data-scrolling:delay-0 data-hovering:duration-100 data-scrolling:duration-100",
         className
@@ -49,11 +48,11 @@ function ScrollBar({
       orientation={orientation}
       {...props}
     >
-      <ScrollAreaPrimitive.Thumb
+      <BaseScrollAreaPrimitive.Thumb
         className="relative flex-1 rounded-full bg-foreground/20"
         data-slot="scroll-area-thumb"
       />
-    </ScrollAreaPrimitive.Scrollbar>
+    </BaseScrollAreaPrimitive.Scrollbar>
   );
 }
 
