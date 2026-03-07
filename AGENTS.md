@@ -137,6 +137,7 @@ Use Conventional Commit style: `feat: ...`, `fix: ...`, `docs: ...`, `chore: ...
 Use these scoped docs for everything outside code style:
 
 - `@docs/README.md` (full docs index)
+- `@docs/architecture-decisions/README.md` (durable architectural decisions and implementation invariants)
 - `@docs/design-system.md` (shared UI system, Base UI policy, and COSS UI workflow)
 - `@docs/api-surfaces.md` (API surface split boundaries and invariants)
 - `@docs/logging-events.md` (event taxonomy, logging invariants, and query contracts)

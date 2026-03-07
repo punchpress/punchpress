@@ -3,7 +3,6 @@ import { flushSync } from "react-dom";
 import InfiniteViewer from "react-infinite-viewer";
 import Moveable from "react-moveable";
 import Selecto from "react-selecto";
-import { cn } from "@/lib/utils";
 import { MAX_ZOOM, MIN_ZOOM } from "../editor/constants";
 import { isInputElement } from "../editor/dom-utils";
 import { clamp, round } from "../editor/math-utils";
@@ -50,19 +49,6 @@ const getResizePointer = (event) => {
   return null;
 };
 
-const getCenterPoint = (viewer, host, zoom) => {
-  if (!(viewer && host)) {
-    return { x: 0, y: 0 };
-  }
-
-  const rect = host.getBoundingClientRect();
-
-  return {
-    x: viewer.getScrollLeft() + rect.width / (2 * zoom),
-    y: viewer.getScrollTop() + rect.height / (2 * zoom),
-  };
-};
-
 const getCanvasPoint = (viewer, host, clientX, clientY, zoom) => {
   if (!(viewer && host)) {
     return { x: 0, y: 0 };
@@ -74,6 +60,42 @@ const getCanvasPoint = (viewer, host, clientX, clientY, zoom) => {
     x: viewer.getScrollLeft() + (clientX - rect.left) / zoom,
     y: viewer.getScrollTop() + (clientY - rect.top) / zoom,
   };
+};
+
+const TOOL_SHORTCUTS = {
+  h: "hand",
+  t: "text",
+  v: "pointer",
+};
+
+const handleToolShortcut = ({
+  activeTool,
+  key,
+  onClearSelection,
+  onSelectTool,
+  selectedNodeId,
+}) => {
+  if (key === "escape") {
+    if (activeTool !== "pointer") {
+      onSelectTool("pointer");
+      return true;
+    }
+
+    if (selectedNodeId) {
+      onClearSelection();
+      return true;
+    }
+
+    return false;
+  }
+
+  const nextTool = TOOL_SHORTCUTS[key];
+  if (!nextTool) {
+    return false;
+  }
+
+  onSelectTool(nextTool);
+  return true;
 };
 
 export const Canvas = ({
@@ -181,18 +203,6 @@ export const Canvas = ({
     viewer.setZoom(clamp(viewport.zoom / 1.18, MIN_ZOOM, MAX_ZOOM));
   }, [viewport.zoom]);
 
-  const handleAddTextAtCenter = useCallback(() => {
-    const point = getCenterPoint(
-      viewerRef.current,
-      hostRef.current,
-      viewport.zoom
-    );
-    onAddText({
-      x: round(point.x, 2),
-      y: round(point.y, 2),
-    });
-  }, [onAddText, viewport.zoom]);
-
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.metaKey || event.ctrlKey || event.altKey) {
@@ -203,28 +213,23 @@ export const Canvas = ({
         return;
       }
 
-      const key = event.key.toLowerCase();
-      if (key === "t") {
+      if (
+        handleToolShortcut({
+          activeTool,
+          key: event.key.toLowerCase(),
+          onClearSelection,
+          onSelectTool,
+          selectedNodeId,
+        })
+      ) {
         event.preventDefault();
-        handleAddTextAtCenter();
         return;
-      }
-
-      if (key === "v") {
-        event.preventDefault();
-        onSelectTool("pointer");
-        return;
-      }
-
-      if (key === "h") {
-        event.preventDefault();
-        onSelectTool("hand");
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleAddTextAtCenter, onSelectTool]);
+  }, [activeTool, onClearSelection, onSelectTool, selectedNodeId]);
 
   return (
     <DesignerFrame>
@@ -233,13 +238,11 @@ export const Canvas = ({
         data-panning={
           spacePressed || activeTool === "hand" ? "true" : undefined
         }
+        data-tool={activeTool}
         ref={hostRef}
       >
         <InfiniteViewer
-          className={cn(
-            "canvas-surface h-full w-full bg-[var(--designer-bg)]",
-            (spacePressed || activeTool === "hand") && "cursor-grab"
-          )}
+          className="canvas-surface h-full w-full bg-[var(--designer-bg)]"
           margin={2400}
           onScroll={handleScroll}
           ref={viewerRef}
@@ -302,13 +305,15 @@ export const Canvas = ({
                       return;
                     }
 
-                    if (editingNodeId) {
-                      onFinalizeEditing();
+                    if (activeTool === "text") {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onStartEditing(node);
                       return;
                     }
 
-                    if (activeTool === "text") {
-                      onStartEditing(node);
+                    if (editingNodeId) {
+                      onFinalizeEditing();
                       return;
                     }
 
