@@ -1,7 +1,10 @@
-"use client";;
-import { Input as InputPrimitive } from "@base-ui/react/input";
+"use client";
+
+import { Input as BaseInputPrimitive } from "@base-ui/react/input";
 
 import { cn } from "@/lib/utils";
+
+const InputPrimitive = BaseInputPrimitive;
 
 function Input({
   className,
@@ -11,7 +14,7 @@ function Input({
   ...props
 }) {
   const inputClassName = cn(
-    "h-8.5 w-full min-w-0 rounded-[inherit] px-[calc(--spacing(3)-1px)] leading-8.5 outline-none placeholder:text-muted-foreground/72 sm:h-7.5 sm:leading-7.5 [transition:background-color_5000000s_ease-in-out_0s]",
+    "h-8.5 w-full min-w-0 rounded-[inherit] px-[calc(--spacing(3)-1px)] leading-8.5 outline-none [transition:background-color_5000000s_ease-in-out_0s] placeholder:text-muted-foreground/72 sm:h-7.5 sm:leading-7.5",
     size === "sm" &&
       "h-7.5 px-[calc(--spacing(2.5)-1px)] leading-7.5 sm:h-6.5 sm:leading-6.5",
     size === "lg" && "h-9.5 leading-9.5 sm:h-8.5 sm:leading-8.5",
@@ -24,23 +27,29 @@ function Input({
   return (
     <span
       className={
-        cn(!unstyled &&
-          "relative inline-flex w-full rounded-lg border border-transparent bg-muted text-base text-foreground ring-ring/24 transition-shadow has-focus-visible:has-aria-invalid:border-destructive/64 has-focus-visible:has-aria-invalid:ring-destructive/16 has-aria-invalid:border-destructive/36 has-focus-visible:border-ring has-autofill:bg-foreground/4 has-disabled:opacity-64 has-focus-visible:ring-[3px] sm:text-sm dark:bg-input/32 dark:has-autofill:bg-foreground/8 dark:has-aria-invalid:ring-destructive/24", className) || undefined
+        cn(
+          !unstyled &&
+            "relative inline-flex w-full rounded-lg border border-transparent bg-muted text-base text-foreground ring-ring/24 transition-shadow has-focus-visible:has-aria-invalid:border-destructive/64 has-focus-visible:has-aria-invalid:ring-destructive/16 has-aria-invalid:border-destructive/36 has-focus-visible:border-ring has-autofill:bg-foreground/4 has-disabled:opacity-64 has-focus-visible:ring-[3px] sm:text-sm dark:bg-input/32 dark:has-autofill:bg-foreground/8 dark:has-aria-invalid:ring-destructive/24",
+          className
+        ) || undefined
       }
       data-size={size}
-      data-slot="input-control">
+      data-slot="input-control"
+    >
       {nativeInput ? (
         <input
           className={inputClassName}
           data-slot="input"
           size={typeof size === "number" ? size : undefined}
-          {...props} />
+          {...props}
+        />
       ) : (
-        <InputPrimitive
+        <BaseInputPrimitive
           className={inputClassName}
           data-slot="input"
           size={typeof size === "number" ? size : undefined}
-          {...props} />
+          {...props}
+        />
       )}
     </span>
   );

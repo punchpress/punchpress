@@ -22,36 +22,28 @@ const alertVariants = cva(
   }
 );
 
-function Alert({
-  className,
-  variant,
-  ...props
-}) {
+function Alert({ className, variant, ...props }) {
   return (
     <div
       className={cn(alertVariants({ variant }), className)}
       data-slot="alert"
       role="alert"
-      {...props} />
+      {...props}
+    />
   );
 }
 
-function AlertTitle({
-  className,
-  ...props
-}) {
+function AlertTitle({ className, ...props }) {
   return (
     <div
       className={cn("font-medium [svg~&]:col-start-2", className)}
       data-slot="alert-title"
-      {...props} />
+      {...props}
+    />
   );
 }
 
-function AlertDescription({
-  className,
-  ...props
-}) {
+function AlertDescription({ className, ...props }) {
   return (
     <div
       className={cn(
@@ -59,14 +51,12 @@ function AlertDescription({
         className
       )}
       data-slot="alert-description"
-      {...props} />
+      {...props}
+    />
   );
 }
 
-function AlertAction({
-  className,
-  ...props
-}) {
+function AlertAction({ className, ...props }) {
   return (
     <div
       className={cn(
@@ -74,7 +64,8 @@ function AlertAction({
         className
       )}
       data-slot="alert-action"
-      {...props} />
+      {...props}
+    />
   );
 }
 

@@ -1,32 +1,31 @@
-"use client";;
+"use client";
 
-import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
+import { Dialog as BaseDialogPrimitive } from "@base-ui/react/dialog";
 import { XIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
-const DialogCreateHandle = DialogPrimitive.createHandle;
+const DialogPrimitive = BaseDialogPrimitive;
 
-const Dialog = DialogPrimitive.Root;
+const DialogCreateHandle = BaseDialogPrimitive.createHandle;
 
-const DialogPortal = DialogPrimitive.Portal;
+const Dialog = BaseDialogPrimitive.Root;
+
+const DialogPortal = BaseDialogPrimitive.Portal;
 
 function DialogTrigger(props) {
-  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />;
+  return <BaseDialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />;
 }
 
 function DialogClose(props) {
-  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
+  return <BaseDialogPrimitive.Close data-slot="dialog-close" {...props} />;
 }
 
-function DialogBackdrop({
-  className,
-  ...props
-}) {
+function DialogBackdrop({ className, ...props }) {
   return (
-    <DialogPrimitive.Backdrop
+    <BaseDialogPrimitive.Backdrop
       className={cn(
         "fixed inset-0 z-50 bg-black/32 backdrop-blur-sm transition-all duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0",
         className
@@ -37,12 +36,9 @@ function DialogBackdrop({
   );
 }
 
-function DialogViewport({
-  className,
-  ...props
-}) {
+function DialogViewport({ className, ...props }) {
   return (
-    <DialogPrimitive.Viewport
+    <BaseDialogPrimitive.Viewport
       className={cn(
         "fixed inset-0 z-50 grid grid-rows-[1fr_auto_3fr] justify-items-center p-4",
         className
@@ -70,7 +66,7 @@ function DialogPopup({
             "max-sm:grid-rows-[1fr_auto] max-sm:p-0 max-sm:pt-12"
         )}
       >
-        <DialogPrimitive.Popup
+        <BaseDialogPrimitive.Popup
           className={cn(
             "relative row-start-2 flex max-h-full min-h-0 w-full min-w-0 max-w-lg origin-center flex-col rounded-2xl border bg-popover not-dark:bg-clip-padding text-popover-foreground opacity-[calc(1-var(--nested-dialogs))] shadow-lg/5 transition-[scale,opacity,translate] duration-200 ease-in-out will-change-transform before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-2xl)-1px)] before:shadow-[0_1px_--theme(--color-black/4%)] data-ending-style:opacity-0 data-starting-style:opacity-0 sm:scale-[calc(1-0.1*var(--nested-dialogs))] sm:data-ending-style:scale-98 sm:data-starting-style:scale-98 dark:before:shadow-[0_-1px_--theme(--color-white/6%)]",
             bottomStickOnMobile &&
@@ -82,25 +78,22 @@ function DialogPopup({
         >
           {children}
           {showCloseButton && (
-            <DialogPrimitive.Close
+            <BaseDialogPrimitive.Close
               aria-label="Close"
               className="absolute end-2 top-2"
               render={<Button size="icon" variant="ghost" />}
               {...closeProps}
             >
               <XIcon />
-            </DialogPrimitive.Close>
+            </BaseDialogPrimitive.Close>
           )}
-        </DialogPrimitive.Popup>
+        </BaseDialogPrimitive.Popup>
       </DialogViewport>
     </DialogPortal>
   );
 }
 
-function DialogHeader({
-  className,
-  ...props
-}) {
+function DialogHeader({ className, ...props }) {
   return (
     <div
       className={cn(
@@ -113,11 +106,7 @@ function DialogHeader({
   );
 }
 
-function DialogFooter({
-  className,
-  variant = "default",
-  ...props
-}) {
+function DialogFooter({ className, variant = "default", ...props }) {
   return (
     <div
       className={cn(
@@ -133,25 +122,22 @@ function DialogFooter({
   );
 }
 
-function DialogTitle({
-  className,
-  ...props
-}) {
+function DialogTitle({ className, ...props }) {
   return (
-    <DialogPrimitive.Title
-      className={cn("font-heading font-semibold text-xl leading-none", className)}
+    <BaseDialogPrimitive.Title
+      className={cn(
+        "font-heading font-semibold text-xl leading-none",
+        className
+      )}
       data-slot="dialog-title"
       {...props}
     />
   );
 }
 
-function DialogDescription({
-  className,
-  ...props
-}) {
+function DialogDescription({ className, ...props }) {
   return (
-    <DialogPrimitive.Description
+    <BaseDialogPrimitive.Description
       className={cn("text-muted-foreground text-sm", className)}
       data-slot="dialog-description"
       {...props}
@@ -159,11 +145,7 @@ function DialogDescription({
   );
 }
 
-function DialogPanel({
-  className,
-  scrollFade = true,
-  ...props
-}) {
+function DialogPanel({ className, scrollFade = true, ...props }) {
   return (
     <ScrollArea scrollFade={scrollFade}>
       <div
