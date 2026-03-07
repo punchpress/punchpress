@@ -191,6 +191,10 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+[data-panning="true"] .canvas-node {
+  cursor: grab;
+}
+
 @theme inline {
   --font-heading: var(--font-heading);
   --font-mono: var(--font-mono);

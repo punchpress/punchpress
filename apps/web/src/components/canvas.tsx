@@ -228,7 +228,13 @@ export const Canvas = ({
 
   return (
     <DesignerFrame>
-      <div className="relative flex min-h-0 flex-1" ref={hostRef}>
+      <div
+        className="relative flex min-h-0 flex-1"
+        data-panning={
+          spacePressed || activeTool === "hand" ? "true" : undefined
+        }
+        ref={hostRef}
+      >
         <InfiniteViewer
           className={cn(
             "canvas-surface h-full w-full bg-[var(--designer-bg)]",
@@ -238,7 +244,7 @@ export const Canvas = ({
           onScroll={handleScroll}
           ref={viewerRef}
           threshold={0}
-          useAutoZoom={false}
+          useAutoZoom
           useMouseDrag={spacePressed || activeTool === "hand"}
           useWheelScroll
           wheelPinchKey="meta"
@@ -292,6 +298,10 @@ export const Canvas = ({
                       return;
                     }
 
+                    if (spacePressed || activeTool === "hand") {
+                      return;
+                    }
+
                     if (editingNodeId) {
                       onFinalizeEditing();
                       return;
@@ -331,6 +341,8 @@ export const Canvas = ({
           hitRate={10}
           onDragStart={(event) => {
             if (
+              spacePressed ||
+              event.inputEvent.button !== 0 ||
               activeTool !== "pointer" ||
               isInputElement(event.inputEvent.target) ||
               moveableRef.current?.isMoveableElement?.(event.inputEvent.target)
@@ -349,6 +361,7 @@ export const Canvas = ({
         />
 
         <Moveable
+          className="canvas-moveable"
           container={hostRef.current}
           draggable={Boolean(selectedTarget && !editingNodeId)}
           flushSync={flushSync}
@@ -461,7 +474,6 @@ export const Canvas = ({
           resizable={Boolean(selectedTarget && selectedNode && !editingNodeId)}
           rootContainer={hostRef.current}
           target={selectedTarget}
-          zoom={1 / Math.max(viewport.zoom, MIN_ZOOM)}
         />
       </div>
     </DesignerFrame>
