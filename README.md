@@ -8,6 +8,23 @@ Think of it as what happens when you cross Kittl with an AI that actually unders
 
 ---
 
+## Workspace layout
+
+The repo is organized as a small Bun workspace so the app and desktop shell stay independent:
+
+- `apps/web` contains the actual Punchpress editor and can run as a normal Vite web app on its own.
+- `apps/desktop` contains the Tauri v2 wrapper that points at the web app in development and bundles its production build for desktop distribution.
+
+## Development
+
+- `bun install` installs all workspace dependencies.
+- `bun run dev` starts the standalone web app.
+- `bun run dev:desktop` starts the Tauri wrapper against the web app dev server.
+- `bun run build:web` builds the web app only.
+- `bun run build:desktop` builds the desktop app. This requires a Rust toolchain from `rustup`.
+
+---
+
 ## The problem
 
 Print on Demand designers today are stuck between two bad options:
