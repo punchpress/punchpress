@@ -191,8 +191,17 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+[data-panning="true"] .canvas-surface,
 [data-panning="true"] .canvas-node {
   cursor: grab;
+}
+
+[data-tool="text"] .canvas-surface {
+  cursor: crosshair;
+}
+
+[data-tool="text"] .canvas-node {
+  cursor: text;
 }
 
 @theme inline {
