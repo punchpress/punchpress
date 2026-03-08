@@ -1,15 +1,25 @@
 {
   "name": "@punchpress/desktop",
   "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "out/main/index.js",
+  "description": "The Electron desktop app for PunchPress.",
   "scripts": {
-    "dev": "tauri dev",
-    "build": "tauri build",
-    "tauri": "tauri"
+    "dev": "bun run scripts/dev-desktop.ts",
+    "build": "bun run clean && bun run build:web && bun run build:electron",
+    "build:web": "bun run --cwd ../web build",
+    "build:electron": "electron-vite build && electron-builder --mac --config.mac.identity=null",
+    "clean": "rimraf artifacts out",
+    "postinstall": "node ../../node_modules/electron/install.js"
   },
-  "dependencies": {
-    "@tauri-apps/api": "2.10.1"
+  "build": {
+    "extends": "./electron-builder.yml"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "2.10.1"
+    "electron": "39.2.7",
+    "electron-builder": "^26.4.0",
+    "electron-vite": "^5.0.0",
+    "rimraf": "^5.0.5"
   }
 }
