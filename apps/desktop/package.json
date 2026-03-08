@@ -1,17 +1,25 @@
 {
   "name": "@punchpress/desktop",
   "private": true,
+  "version": "0.1.0",
   "type": "module",
+  "main": "out/main/index.js",
+  "description": "The Electron desktop app for PunchPress.",
   "scripts": {
     "dev": "bun run scripts/dev-desktop.ts",
-    "dev:app": "bun run prepare:runtime && electrobun dev --watch",
-    "dev:web": "bun run --cwd ../web dev",
-    "build": "bun run build:web && bun run prepare:runtime && electrobun build --env=stable",
+    "build": "bun run clean && bun run build:web && bun run build:electron",
     "build:web": "bun run --cwd ../web build",
-    "prepare:runtime": "bun run scripts/ensure-electrobun-runtime.ts",
-    "run": "bun run prepare:runtime && electrobun run"
+    "build:electron": "electron-vite build && electron-builder --mac --config.mac.identity=null",
+    "clean": "rimraf artifacts out",
+    "postinstall": "node ../../node_modules/electron/install.js"
   },
-  "dependencies": {
-    "electrobun": "1.15.1"
+  "build": {
+    "extends": "./electron-builder.yml"
+  },
+  "devDependencies": {
+    "electron": "39.2.7",
+    "electron-builder": "^26.4.0",
+    "electron-vite": "^5.0.0",
+    "rimraf": "^5.0.5"
   }
 }

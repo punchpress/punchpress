@@ -1,0 +1,29 @@
+appId: build.punchpress.desktop
+productName: PunchPress
+
+directories:
+  output: artifacts
+  buildResources: build_resources
+
+files:
+  - from: out
+    to: out
+    filter:
+      - '**/*'
+  - from: ../web/dist
+    to: dist
+    filter:
+      - '**/*'
+  - package.json
+  - '!**/*.map'
+
+mac:
+  category: public.app-category.graphics-design
+  icon: build_resources/logo.icns
+  target:
+    - dmg
+
+dmg:
+  sign: false
+  format: ULFO
+  icon: build_resources/logo.icns

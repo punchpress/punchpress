@@ -1,73 +1,130 @@
-import { fileURLToPath } from "node:url";
+import { spawn } from "node:child_process";
+import net from "node:net";
 
-const devUrl = "http://127.0.0.1:5273";
-const cwd = fileURLToPath(new URL("..", import.meta.url));
-const waitIntervalMs = 500;
-const waitTimeoutMs = 30_000;
+const devServerTimeoutMs = 60_000;
+const host = "127.0.0.1";
+const defaultPort = 5273;
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const waitForDevServer = async (url: string, webProcess: Bun.Subprocess) => {
-  let webExitCode: number | null = null;
-  webProcess.exited.then((code) => {
-    webExitCode = code;
+const sleep = (milliseconds: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, milliseconds);
   });
 
-  const startedAt = Date.now();
+const isPortAvailable = async (port: number) =>
+  new Promise<boolean>((resolve) => {
+    const server = net.createServer();
+    server.unref();
 
-  while (Date.now() - startedAt < waitTimeoutMs) {
-    if (webExitCode !== null) {
-      throw new Error(`web dev server exited early with code ${webExitCode}`);
-    }
+    server.once("error", () => {
+      resolve(false);
+    });
 
-    try {
-      const response = await fetch(url);
-      if (response.ok) {
+    server.listen(port, host, () => {
+      server.close(() => {
+        resolve(true);
+      });
+    });
+  });
+
+const getEphemeralPort = async () =>
+  new Promise<number>((resolve, reject) => {
+    const server = net.createServer();
+    server.unref();
+
+    server.once("error", reject);
+
+    server.listen(0, host, () => {
+      const address = server.address();
+      if (!address || typeof address !== "object") {
+        server.close(() => {
+          reject(new Error("Failed to resolve an ephemeral port."));
+        });
         return;
       }
-    } catch {
-      // Keep polling until Vite is ready.
-    }
 
-    await sleep(waitIntervalMs);
-  }
-
-  throw new Error(`timed out waiting for ${url}`);
-};
-
-const spawnScript = (scriptName: string) =>
-  Bun.spawn(["bun", "run", scriptName], {
-    cwd,
-    stdio: ["ignore", "inherit", "inherit"],
-    env: process.env,
+      server.close(() => {
+        resolve(address.port);
+      });
+    });
   });
 
-const webProcess = spawnScript("dev:web");
+const findAvailablePort = async (preferredPort: number) => {
+  if (await isPortAvailable(preferredPort)) {
+    return preferredPort;
+  }
 
-try {
-  await waitForDevServer(devUrl, webProcess);
-} catch (error) {
-  webProcess.kill();
-  throw error;
-}
-
-const desktopProcess = spawnScript("dev:app");
-
-const stopProcesses = () => {
-  desktopProcess.kill();
-  webProcess.kill();
+  return getEphemeralPort();
 };
 
-process.on("SIGINT", stopProcesses);
-process.on("SIGTERM", stopProcesses);
+const waitForHttp = async (url: string) => {
+  const startedAt = Date.now();
 
-const result = await Promise.race([
-  webProcess.exited.then((code) => ({ name: "web", code })),
-  desktopProcess.exited.then((code) => ({ name: "desktop", code })),
-]);
+  while (Date.now() - startedAt < devServerTimeoutMs) {
+    try {
+      await fetch(url, { method: "GET" });
+      return;
+    } catch {
+      await sleep(250);
+    }
+  }
 
-stopProcesses();
+  throw new Error(`Timed out waiting for ${url}`);
+};
 
-if (result.code !== 0) {
-  throw new Error(`${result.name} process exited with code ${result.code}`);
-}
+const killProcess = (child?: ReturnType<typeof spawn>) => {
+  if (child && !child.killed) {
+    child.kill("SIGTERM");
+  }
+};
+
+const run = async () => {
+  const vitePort = await findAvailablePort(defaultPort);
+  const env = {
+    ...process.env,
+    ELECTRON_IS_DEV: "1",
+    VITE_PORT: String(vitePort),
+    VITE_DEV_SERVER_URL: `http://${host}:${vitePort}`,
+  };
+
+  const viteProcess = spawn(
+    "bun",
+    ["--cwd", "../web", "vite", "--host", host, "--port", String(vitePort)],
+    {
+      cwd: process.cwd(),
+      env,
+      stdio: "inherit",
+    },
+  );
+
+  let electronProcess: ReturnType<typeof spawn> | undefined;
+
+  const shutdown = (code = 0) => {
+    killProcess(viteProcess);
+    killProcess(electronProcess);
+    process.exit(code);
+  };
+
+  process.on("SIGINT", () => shutdown(0));
+  process.on("SIGTERM", () => shutdown(0));
+
+  viteProcess.on("exit", (code) => {
+    shutdown(code ?? 1);
+  });
+
+  await waitForHttp(`http://${host}:${vitePort}`);
+
+  electronProcess = spawn("bun", ["electron-vite", "dev"], {
+    cwd: process.cwd(),
+    env,
+    stdio: "inherit",
+  });
+
+  electronProcess.on("exit", (code) => {
+    shutdown(code ?? 0);
+  });
+};
+
+run().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

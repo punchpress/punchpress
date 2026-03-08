@@ -13,15 +13,15 @@ Think of it as what happens when you cross Kittl with an AI that actually unders
 The repo is organized as a small Bun workspace so the app and desktop shell stay independent:
 
 - `apps/web` contains the actual Punchpress editor and can run as a normal Vite web app on its own.
-- `apps/desktop` contains the Electrobun wrapper that points at the web app in development and bundles its production build for desktop distribution with CEF.
+- `apps/desktop` contains the Electron wrapper that points at the web app in development and bundles its production build for desktop distribution.
 
 ## Development
 
 - `bun install` installs all workspace dependencies.
 - `bun run dev` starts the standalone web app.
-- `bun run dev:desktop` starts the Electrobun shell against the web app dev server.
+- `bun run dev:desktop` starts the Electron shell against the web app dev server.
 - `bun run build:web` builds the web app only.
-- `bun run build:desktop` builds the desktop app. The first desktop build downloads the Electrobun runtime and bundled CEF binaries for the current platform.
+- `bun run build:desktop` builds the desktop app DMG with Electron Builder.
 
 ---
 
@@ -152,7 +152,7 @@ This gives us a tldraw/Figma-quality interaction feel without depending on a mon
 
 ### Desktop distribution
 
-**Electrobun + CEF** wraps the React web app for desktop distribution. Electrobun runs the desktop main process on Bun and bundles Chromium Embedded Framework so the desktop shell uses the same rendering engine across macOS, Windows, and Linux. The app still ships as a web app first; desktop packaging remains additive, not a rewrite.
+**Electron + electron-vite** wraps the React web app for desktop distribution. Electron runs a native desktop shell around the same Vite app used on the web, with electron-vite building the main/preload processes and Electron Builder packaging the macOS app. The app still ships as a web app first; desktop packaging remains additive, not a rewrite.
 
 ---
 
@@ -169,7 +169,7 @@ This gives us a tldraw/Figma-quality interaction feel without depending on a mon
 | Vector editing | Paper.js | MIT | Pen tool, bezier handles, boolean ops, path editing |
 | Font engine | opentype.js | MIT | Font loading, glyph outlines, kerning |
 | Warp engine | Custom | — | Flatten → warp → rebuild SVG path pipeline |
-| Desktop shell | Electrobun + CEF | MIT | Native app packaging, Bun main process, bundled Chromium runtime |
+| Desktop shell | Electron + electron-vite | MIT | Native app packaging, Electron main process, Chromium renderer |
 
 ---
 
