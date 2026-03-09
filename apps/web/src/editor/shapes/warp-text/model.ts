@@ -27,6 +27,10 @@ export const getDefaultWarp = (kind) => {
   return { kind: "none" };
 };
 
+export const isNodeVisible = (node) => {
+  return node?.visible !== false;
+};
+
 export const createDefaultNode = (fontUrl) => {
   return {
     id: createId(),
@@ -38,6 +42,7 @@ export const createDefaultNode = (fontUrl) => {
     fill: "#ffffff",
     stroke: "#000000",
     strokeWidth: 12,
+    visible: true,
     warp: { kind: "arch", bend: 0.4 },
     x: 2250,
     y: 2700,

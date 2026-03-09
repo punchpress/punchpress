@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { isNodeVisible } from "../../editor/shapes/warp-text/model";
 import { useEditor } from "../../editor/use-editor";
 import { useEditorValue } from "../../editor/use-editor-value";
 
@@ -61,7 +62,9 @@ const getEditorBackground = (fill) => {
 
 export const CanvasTextEditor = () => {
   const editor = useEditor();
-  const editingNode = useEditorValue((editor) => editor.editingNode);
+  const editingNode = useEditorValue((editor) => {
+    return isNodeVisible(editor.editingNode) ? editor.editingNode : null;
+  });
   const editingText = useEditorValue((_, state) => state.editingText);
   const fontFamily = useEditorValue((editor) => editor.editingFontFamily);
   const geometry = useEditorValue((editor) => editor.editingGeometry);

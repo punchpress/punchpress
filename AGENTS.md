@@ -25,6 +25,7 @@ Use these standards for new code and touched code during refactors.
 - Prefer TypeScript inference when the type context is already provided.
 - Use components from `components/ui/` instead of raw HTML controls.
 - Use component `variant` and `size` props instead of ad-hoc styling overrides.
+- Default to no CSS transitions for state changes like hover/selected backgrounds. Add motion only when it is intentional and clearly improves the interaction.
 - Use Biome + Ultracite configuration (`biome.jsonc` + `bun run lint`).
 
 ## Architecture

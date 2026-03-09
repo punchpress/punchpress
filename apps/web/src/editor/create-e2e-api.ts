@@ -127,6 +127,7 @@ export const createEditorE2eApi = (editor) => {
           strokeWidth: node.strokeWidth,
           text: node.text,
           tracking: node.tracking,
+          visible: node.visible,
           warp: { ...node.warp },
           x: node.x,
           y: node.y,

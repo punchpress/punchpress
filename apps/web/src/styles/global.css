@@ -111,6 +111,7 @@
     "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", monospace;
   --font-sans:
     "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --menu-min-width: 14rem;
   --radius: 0.5rem;
   --background: var(--color-neutral-50);
   --foreground: var(--color-neutral-800);
@@ -128,6 +129,7 @@
     var(--color-neutral-500) 90%,
     var(--color-black)
   );
+  --surface-hover: --alpha(var(--color-black) / 7%);
   --accent: --alpha(var(--color-black) / 5%);
   --accent-foreground: var(--color-neutral-800);
   --destructive: var(--color-red-500);
@@ -189,6 +191,16 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea,
+[contenteditable="true"],
+[contenteditable="plaintext-only"] {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 [data-panning="true"] .canvas-surface,
