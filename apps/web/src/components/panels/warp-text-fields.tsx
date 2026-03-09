@@ -9,26 +9,30 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
-import { toNumber } from "../editor/math-utils";
-import { getDefaultWarp } from "../editor/model";
-import { ColorField, FieldRow, PairedRow, Section } from "./node-fields-shared";
-import { NodeFieldsWarpInputs } from "./node-fields-warp-inputs";
+import { toNumber } from "../../editor/primitives/math";
+import { getDefaultWarp } from "../../editor/shapes/warp-text/model";
+import { useEditor } from "../../editor/use-editor";
+import { useEditorValue } from "../../editor/use-editor-value";
+import { ColorField, FieldRow, PairedRow, Section } from "./field-primitives";
+import { NodeFieldsWarpInputs } from "./warp-text-warp-fields";
 
-export const NodeFields = ({
-  deleteSelected,
-  fonts,
-  node,
-  updateSelectedNode,
-}) => {
+export const NodeFields = () => {
+  const editor = useEditor();
+  const node = useEditorValue((editor) => editor.selectedNode);
+
+  if (!node) {
+    return null;
+  }
+
+  const update = (changes) => editor.updateSelectedNode(changes);
+
   return (
     <>
       <Section title="Text">
         <FieldRow label="Text">
           <Input
             nativeInput
-            onChange={(event) =>
-              updateSelectedNode({ text: event.target.value })
-            }
+            onChange={(event) => update({ text: event.target.value })}
             value={node.text}
           />
         </FieldRow>
@@ -37,7 +41,7 @@ export const NodeFields = ({
           <Select
             onValueChange={(value) => {
               if (value) {
-                updateSelectedNode({ fontUrl: value });
+                update({ fontUrl: value });
               }
             }}
             value={node.fontUrl}
@@ -46,7 +50,7 @@ export const NodeFields = ({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {fonts.map((font) => {
+              {editor.availableFonts.map((font) => {
                 return (
                   <SelectItem key={font.id} value={font.url}>
                     {font.label}
@@ -76,7 +80,7 @@ export const NodeFields = ({
                 1,
                 toNumber(event.target.value, node.fontSize)
               );
-              updateSelectedNode({ fontSize });
+              update({ fontSize });
             }}
             type="number"
             value={node.fontSize}
@@ -85,7 +89,7 @@ export const NodeFields = ({
             nativeInput
             onChange={(event) => {
               const tracking = toNumber(event.target.value, node.tracking);
-              updateSelectedNode({ tracking });
+              update({ tracking });
             }}
             type="number"
             value={node.tracking}
@@ -96,14 +100,14 @@ export const NodeFields = ({
       <Section className="border-black/6 border-t" title="Fill & Stroke">
         <FieldRow label="Fill">
           <ColorField
-            onChange={(fill) => updateSelectedNode({ fill })}
+            onChange={(fill) => update({ fill })}
             value={node.fill}
           />
         </FieldRow>
 
         <FieldRow label="Stroke">
           <ColorField
-            onChange={(stroke) => updateSelectedNode({ stroke })}
+            onChange={(stroke) => update({ stroke })}
             value={node.stroke}
           />
         </FieldRow>
@@ -116,7 +120,7 @@ export const NodeFields = ({
                 0,
                 toNumber(event.target.value, node.strokeWidth)
               );
-              updateSelectedNode({ strokeWidth });
+              update({ strokeWidth });
             }}
             type="number"
             value={node.strokeWidth}
@@ -129,7 +133,7 @@ export const NodeFields = ({
           <Select
             onValueChange={(value) => {
               if (value) {
-                updateSelectedNode({
+                update({
                   warp: getDefaultWarp(value),
                 });
               }
@@ -148,10 +152,7 @@ export const NodeFields = ({
           </Select>
         </FieldRow>
 
-        <NodeFieldsWarpInputs
-          node={node}
-          updateSelectedNode={updateSelectedNode}
-        />
+        <NodeFieldsWarpInputs />
       </Section>
 
       <Section className="border-black/6 border-t" title="Position">
@@ -159,7 +160,7 @@ export const NodeFields = ({
           <Input
             nativeInput
             onChange={(event) =>
-              updateSelectedNode({ x: toNumber(event.target.value, node.x) })
+              update({ x: toNumber(event.target.value, node.x) })
             }
             type="number"
             value={node.x}
@@ -167,7 +168,7 @@ export const NodeFields = ({
           <Input
             nativeInput
             onChange={(event) =>
-              updateSelectedNode({ y: toNumber(event.target.value, node.y) })
+              update({ y: toNumber(event.target.value, node.y) })
             }
             type="number"
             value={node.y}
@@ -177,7 +178,7 @@ export const NodeFields = ({
 
       <div className="border-black/6 border-t pt-3 [&_[data-slot=button]]:w-full">
         <Button
-          onClick={deleteSelected}
+          onClick={() => editor.deleteSelected()}
           size="sm"
           type="button"
           variant="destructive-outline"

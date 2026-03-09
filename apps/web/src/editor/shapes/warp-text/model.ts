@@ -1,4 +1,4 @@
-import { WARP_TEXT_NODE_KIND } from "./constants";
+import { WARP_TEXT_NODE_KIND } from "../../constants";
 
 export const createId = () => {
   if (

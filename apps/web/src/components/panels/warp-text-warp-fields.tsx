@@ -1,13 +1,24 @@
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
-import { clamp, toNumber } from "../editor/math-utils";
-import { FieldRow } from "./node-fields-shared";
+import { clamp, toNumber } from "../../editor/primitives/math";
+import { useEditor } from "../../editor/use-editor";
+import { useEditorValue } from "../../editor/use-editor-value";
+import { FieldRow } from "./field-primitives";
 
-export const NodeFieldsWarpInputs = ({ node, updateSelectedNode }) => {
+export const NodeFieldsWarpInputs = () => {
+  const editor = useEditor();
+  const node = useEditorValue((editor) => editor.selectedNode);
+
+  if (!node) {
+    return null;
+  }
+
+  const update = (updater) => editor.updateSelectedNode(updater);
+
   if (node.warp.kind === "arch") {
     const setBend = (value) => {
       const bend = clamp(toNumber(value, node.warp.bend), -1, 1);
-      updateSelectedNode((currentNode) => {
+      update((currentNode) => {
         return {
           ...currentNode,
           warp: { ...currentNode.warp, bend },
@@ -56,7 +67,7 @@ export const NodeFieldsWarpInputs = ({ node, updateSelectedNode }) => {
                 event.target.value,
                 node.warp.amplitude
               );
-              updateSelectedNode((currentNode) => {
+              update((currentNode) => {
                 return {
                   ...currentNode,
                   warp: { ...currentNode.warp, amplitude },
@@ -77,7 +88,7 @@ export const NodeFieldsWarpInputs = ({ node, updateSelectedNode }) => {
                 0.1,
                 toNumber(event.target.value, node.warp.cycles)
               );
-              updateSelectedNode((currentNode) => {
+              update((currentNode) => {
                 return {
                   ...currentNode,
                   warp: { ...currentNode.warp, cycles },
@@ -107,7 +118,7 @@ export const NodeFieldsWarpInputs = ({ node, updateSelectedNode }) => {
               1,
               toNumber(event.target.value, node.warp.radius)
             );
-            updateSelectedNode((currentNode) => {
+            update((currentNode) => {
               return {
                 ...currentNode,
                 warp: { ...currentNode.warp, radius },
@@ -124,7 +135,7 @@ export const NodeFieldsWarpInputs = ({ node, updateSelectedNode }) => {
           nativeInput
           onChange={(event) => {
             const sweepDeg = toNumber(event.target.value, node.warp.sweepDeg);
-            updateSelectedNode((currentNode) => {
+            update((currentNode) => {
               return {
                 ...currentNode,
                 warp: { ...currentNode.warp, sweepDeg },

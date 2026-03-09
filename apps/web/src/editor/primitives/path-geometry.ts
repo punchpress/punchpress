@@ -1,4 +1,4 @@
-import { format } from "./math-utils";
+import { format } from "./math";
 
 export const midpoint = (a, b) => {
   return {

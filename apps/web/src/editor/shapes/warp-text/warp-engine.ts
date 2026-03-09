@@ -1,12 +1,12 @@
-import { ARTBOARD_HEIGHT, ARTBOARD_WIDTH } from "./constants";
-import { clamp, format } from "./math-utils";
+import { ARTBOARD_HEIGHT, ARTBOARD_WIDTH } from "../../constants";
+import { clamp, format } from "../../primitives/math";
 import {
   commandsToContours,
   contoursToPath,
   getBounds,
   mapContours,
   translateContours,
-} from "./path-geometry";
+} from "../../primitives/path-geometry";
 
 export const estimateBounds = (node) => {
   const halfWidth = Math.max(

@@ -1,4 +1,6 @@
 import { useEffect, useRef } from "react";
+import { useEditor } from "../../editor/use-editor";
+import { useEditorValue } from "../../editor/use-editor-value";
 
 const getEditorFrame = (geometry, metrics, node, text) => {
   if (geometry?.bbox) {
@@ -42,7 +44,7 @@ const hexToRgb = (hex) => {
     return null;
   }
 
-  return { r, g, b };
+  return { b, g, r };
 };
 
 const getEditorBackground = (fill) => {
@@ -57,19 +59,14 @@ const getEditorBackground = (fill) => {
     : "rgba(255, 255, 255, 0.16)";
 };
 
-export const CanvasTextEditor = ({
-  editingText,
-  fontFamily,
-  geometry,
-  metrics,
-  node,
-  onCancel,
-  onChange,
-  onCommit,
-  onFinalize,
-}) => {
+export const CanvasTextEditor = () => {
+  const editor = useEditor();
+  const editingNode = useEditorValue((editor) => editor.editingNode);
+  const editingText = useEditorValue((_, state) => state.editingText);
+  const fontFamily = useEditorValue((editor) => editor.editingFontFamily);
+  const geometry = useEditorValue((editor) => editor.editingGeometry);
+  const metrics = useEditorValue((editor) => editor.editingMetrics);
   const inputRef = useRef(null);
-  const frame = getEditorFrame(geometry, metrics, node, editingText);
 
   useEffect(() => {
     if (!inputRef.current) {
@@ -80,43 +77,51 @@ export const CanvasTextEditor = ({
     inputRef.current.select();
   }, []);
 
+  if (!editingNode) {
+    return null;
+  }
+
+  const frame = getEditorFrame(geometry, metrics, editingNode, editingText);
+
   return (
     <div
       className="pointer-events-auto absolute z-10 -translate-x-1/2 -translate-y-1/2"
       style={{
+        height: `${frame.height}px`,
         left: `${frame.x}px`,
         top: `${frame.y}px`,
         width: `${frame.width}px`,
-        height: `${frame.height}px`,
       }}
     >
       <input
         className="block h-full w-full min-w-0 rounded-lg border-[1.5px] px-0 py-0 text-center font-normal leading-[1.05] shadow-[0_4px_16px_rgba(0,0,0,0.1)] focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--editor-accent)_20%,transparent),0_4px_16px_rgba(0,0,0,0.1)] focus:outline-none"
-        onBlur={onFinalize || onCommit}
-        onChange={(event) => onChange(event.target.value)}
+        key={editingNode.id}
+        onBlur={() => editor.finalizeEditing()}
+        onChange={(event) => editor.setEditingText(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Enter") {
             event.preventDefault();
-            (onFinalize || onCommit)();
+            editor.finalizeEditing();
             return;
           }
 
           if (event.key === "Escape") {
             event.preventDefault();
-            onCancel();
+            editor.cancelEditing();
+            editor.setActiveTool("pointer");
           }
         }}
         onPointerDown={(event) => event.stopPropagation()}
         ref={inputRef}
         spellCheck={false}
         style={{
-          background: getEditorBackground(node.fill),
+          background: getEditorBackground(editingNode.fill),
           borderColor: "color-mix(in srgb, var(--editor-accent) 60%, black)",
-          caretColor: node.fill,
-          color: node.fill,
+          caretColor: editingNode.fill,
+          color: editingNode.fill,
           fontFamily,
-          fontSize: `${node.fontSize}px`,
-          letterSpacing: `${node.tracking}px`,
+          fontSize: `${editingNode.fontSize}px`,
+          letterSpacing: `${editingNode.tracking}px`,
         }}
         type="text"
         value={editingText}
