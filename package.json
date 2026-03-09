@@ -16,6 +16,12 @@
     "lint": "bun run --cwd apps/web lint",
     "lint:fix": "bun run --cwd apps/web lint:fix",
     "check": "bun run --cwd apps/web check",
-    "fix": "bun run --cwd apps/web fix"
+    "fix": "bun run --cwd apps/web fix",
+    "playwright:install": "playwright install chromium",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2"
   }
 }

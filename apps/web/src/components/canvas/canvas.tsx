@@ -100,6 +100,7 @@ export const Canvas = () => {
         >
           <div
             className="relative h-full w-full overflow-visible border-0 bg-transparent shadow-none"
+            data-testid="canvas-stage"
             onPointerDown={(event) => {
               if (event.target !== event.currentTarget) {
                 return;

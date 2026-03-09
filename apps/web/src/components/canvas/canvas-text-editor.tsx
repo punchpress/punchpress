@@ -94,7 +94,9 @@ export const CanvasTextEditor = () => {
       }}
     >
       <input
+        aria-label="Edit text layer"
         className="block h-full w-full min-w-0 rounded-lg border-[1.5px] px-0 py-0 text-center font-normal leading-[1.05] shadow-[0_4px_16px_rgba(0,0,0,0.1)] focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--editor-accent)_20%,transparent),0_4px_16px_rgba(0,0,0,0.1)] focus:outline-none"
+        data-testid="canvas-text-input"
         key={editingNode.id}
         onBlur={() => editor.finalizeEditing()}
         onChange={(event) => editor.setEditingText(event.target.value)}
