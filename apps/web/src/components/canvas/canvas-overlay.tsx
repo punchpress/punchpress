@@ -3,6 +3,7 @@ import { flushSync } from "react-dom";
 import Moveable from "react-moveable";
 import Selecto from "react-selecto";
 import { clamp, round } from "../../editor/primitives/math";
+import { isNodeVisible } from "../../editor/shapes/warp-text/model";
 import { useEditor } from "../../editor/use-editor";
 import { useEditorValue } from "../../editor/use-editor-value";
 
@@ -74,10 +75,22 @@ export const CanvasOverlay = ({ spacePressed }) => {
 
   const activeTool = useEditorValue((_, state) => state.activeTool);
   const editingNodeId = useEditorValue((_, state) => state.editingNodeId);
-  const selectedNodeId = useEditorValue((_, state) => state.selectedNodeId);
-  const selectedNode = useEditorValue((editor) => editor.selectedNode);
+  const selectedNodeId = useEditorValue((editor, state) => {
+    const node = state.selectedNodeId
+      ? editor.getNode(state.selectedNodeId)
+      : null;
+
+    return isNodeVisible(node) ? state.selectedNodeId : null;
+  });
+  const selectedNode = useEditorValue((editor) => {
+    return isNodeVisible(editor.selectedNode) ? editor.selectedNode : null;
+  });
   const selectedGeometry = useEditorValue((editor, state) => {
-    if (!state.selectedNodeId) {
+    const node = state.selectedNodeId
+      ? editor.getNode(state.selectedNodeId)
+      : null;
+
+    if (!(node && isNodeVisible(node))) {
       return null;
     }
 

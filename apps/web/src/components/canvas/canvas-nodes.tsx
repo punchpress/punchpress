@@ -1,7 +1,9 @@
+import { isNodeVisible } from "../../editor/shapes/warp-text/model";
 import { useEditorValue } from "../../editor/use-editor-value";
 import { CanvasNode } from "./canvas-node";
 
-const selectNodeIds = (_, state) => state.nodes.map((node) => node.id);
+const selectNodeIds = (_, state) =>
+  state.nodes.filter(isNodeVisible).map((node) => node.id);
 
 export const CanvasNodes = ({ spacePressed }) => {
   const nodeIds = useEditorValue(selectNodeIds);

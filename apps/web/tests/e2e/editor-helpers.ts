@@ -56,6 +56,26 @@ export const getSelectionSnapshot = (page) => {
   });
 };
 
+export const getStateSnapshot = (page) => {
+  return page.evaluate(() => {
+    return (
+      window as Window & {
+        __PUNCHPRESS_E2E__: {
+          getStateSnapshot: () => Record<string, unknown>;
+        };
+      }
+    ).__PUNCHPRESS_E2E__.getStateSnapshot();
+  });
+};
+
+export const getCanvasNodeIds = (page) => {
+  return page.locator("[data-node-id]").evaluateAll((elements) => {
+    return elements
+      .map((element) => element.getAttribute("data-node-id"))
+      .filter(Boolean);
+  });
+};
+
 export const moveSelectedNodeBy = (page, delta) => {
   return page.evaluate((nextDelta) => {
     return (
@@ -81,6 +101,28 @@ export const scaleSelectedNodeBy = (page, options) => {
       }
     ).__PUNCHPRESS_E2E__.scaleSelectedNodeBy(nextOptions);
   }, options);
+};
+
+export const dragLayerBelow = async (page, sourceLabel, targetLabel) => {
+  const source = page.getByRole("button", { name: sourceLabel }).first();
+  const target = page.getByRole("button", { name: targetLabel }).first();
+  const sourceBox = await source.boundingBox();
+  const targetBox = await target.boundingBox();
+
+  if (!(sourceBox && targetBox)) {
+    throw new Error("Missing layer row bounds for drag reorder");
+  }
+
+  const sourceX = sourceBox.x + Math.min(36, sourceBox.width / 2);
+  const sourceY = sourceBox.y + sourceBox.height / 2;
+  const targetX = targetBox.x + Math.min(36, targetBox.width / 2);
+  const targetY = targetBox.y + targetBox.height * 0.8;
+
+  await page.mouse.move(sourceX, sourceY);
+  await page.mouse.down();
+  await page.mouse.move(sourceX, sourceY + 12, { steps: 4 });
+  await page.mouse.move(targetX, targetY, { steps: 10 });
+  await page.mouse.up();
 };
 
 export const waitForNodeReady = async (page, nodeId) => {

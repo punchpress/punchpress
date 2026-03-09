@@ -6,6 +6,7 @@ import {
 import { GeometryManager } from "./managers/geometry-manager";
 import { isInputElement } from "./primitives/dom";
 import { clamp } from "./primitives/math";
+import { isNodeVisible } from "./shapes/warp-text/model";
 import { measureStraightText } from "./shapes/warp-text/straight-text-metrics";
 import { createEditorStore } from "./state/store";
 import { HandTool } from "./tools/hand-tool";
@@ -146,6 +147,10 @@ export class Editor {
     return this.getState().nodes;
   }
 
+  get layerNodeIds() {
+    return [...this.nodes].reverse().map((node) => node.id);
+  }
+
   get selectedNode() {
     return this.getNode(this.selectedNodeId);
   }
@@ -168,6 +173,29 @@ export class Editor {
     }
 
     return this.nodes.find((node) => node.id === nodeId) || null;
+  }
+
+  getLayerRow(nodeId) {
+    const nodeIndex = this.nodes.findIndex((node) => node.id === nodeId);
+    if (nodeIndex < 0) {
+      return null;
+    }
+
+    const node = this.nodes[nodeIndex];
+    const layerIndex = this.nodes.length - 1 - nodeIndex;
+    const isVisible = isNodeVisible(node);
+    const label =
+      node.text.trim().length > 0 ? node.text : `Text ${layerIndex + 1}`;
+
+    return {
+      isBackmost: nodeIndex === 0,
+      isFrontmost: nodeIndex === this.nodes.length - 1,
+      isSelected: node.id === this.selectedNodeId,
+      isVisible,
+      label,
+      node,
+      visibilityLabel: isVisible ? "Hide layer" : "Show layer",
+    };
   }
 
   getNodeGeometry(nodeId) {
@@ -198,6 +226,10 @@ export class Editor {
     this.getState().deleteSelected();
   }
 
+  deleteNode(nodeId) {
+    this.getState().deleteNodeById(nodeId);
+  }
+
   dispatchCanvasPointerDown(info) {
     this.currentTool.onCanvasPointerDown(info);
   }
@@ -206,21 +238,55 @@ export class Editor {
     this.currentTool.onNodePointerDown(info);
   }
 
+  duplicateNode(nodeId) {
+    this.getState().duplicateNodeById(nodeId);
+  }
+
   finalizeEditing() {
     this.commitEditing();
     this.setActiveTool("pointer");
   }
 
   handleWindowKeyDown(event) {
-    if (event.metaKey || event.ctrlKey || event.altKey) {
-      return;
-    }
-
     if (isInputElement(event.target)) {
       return;
     }
 
     const key = event.key.toLowerCase();
+    if ((event.metaKey || event.ctrlKey) && !event.altKey && key === "j") {
+      if (!this.selectedNodeId) {
+        return;
+      }
+
+      event.preventDefault();
+      this.duplicateNode(this.selectedNodeId);
+      return;
+    }
+
+    if (event.metaKey || event.ctrlKey || event.altKey) {
+      return;
+    }
+
+    if (event.code === "BracketLeft") {
+      if (!this.selectedNodeId) {
+        return;
+      }
+
+      event.preventDefault();
+      this.sendNodeToBack(this.selectedNodeId);
+      return;
+    }
+
+    if (event.code === "BracketRight") {
+      if (!this.selectedNodeId) {
+        return;
+      }
+
+      event.preventDefault();
+      this.bringNodeToFront(this.selectedNodeId);
+      return;
+    }
+
     if (key === "backspace" || key === "delete") {
       event.preventDefault();
       this.deleteSelected();
@@ -257,8 +323,20 @@ export class Editor {
     this.getState().setEditingText(value);
   }
 
+  setNodeOrder(nodeIds) {
+    this.getState().setNodeOrder(nodeIds);
+  }
+
   setViewportZoom(zoom) {
     this.getState().setViewportZoom(zoom);
+  }
+
+  toggleNodeVisibility(nodeId) {
+    this.getState().toggleNodeVisibilityById(nodeId);
+  }
+
+  sendNodeToBack(nodeId) {
+    this.getState().sendNodeToBack(nodeId);
   }
 
   startEditing(node) {
@@ -271,6 +349,10 @@ export class Editor {
 
   updateSelectedNode(updater) {
     this.getState().updateSelectedNode(updater);
+  }
+
+  bringNodeToFront(nodeId) {
+    this.getState().bringNodeToFront(nodeId);
   }
 
   registerNodeElement(nodeId, element) {

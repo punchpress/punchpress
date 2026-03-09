@@ -8,6 +8,7 @@ export const Designer = ({ children, className, ...props }) => {
         "[--designer-bg:var(--background)] [--designer-surface:var(--card)]",
         "[--designer-border:var(--border)]",
         "[--designer-border-strong:var(--input)]",
+        "[--designer-hover:var(--surface-hover)]",
         "[--designer-text-muted:var(--muted-foreground)]",
         className
       )}
