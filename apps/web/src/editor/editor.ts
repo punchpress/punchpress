@@ -155,8 +155,18 @@ export class Editor {
     return this.getNode(this.selectedNodeId);
   }
 
+  get selectedNodes() {
+    return this.selectedNodeIds
+      .map((nodeId) => this.getNode(nodeId))
+      .filter(Boolean);
+  }
+
   get selectedNodeId() {
-    return this.getState().selectedNodeId;
+    return this.selectedNodeIds.at(-1) || null;
+  }
+
+  get selectedNodeIds() {
+    return this.getState().selectedNodeIds;
   }
 
   get zoom() {
@@ -190,7 +200,7 @@ export class Editor {
     return {
       isBackmost: nodeIndex === 0,
       isFrontmost: nodeIndex === this.nodes.length - 1,
-      isSelected: node.id === this.selectedNodeId,
+      isSelected: this.isNodeSelected(node.id),
       isVisible,
       label,
       node,
@@ -204,6 +214,10 @@ export class Editor {
     }
 
     return this.geometry.getById(this.nodes, this.fontRevision, nodeId);
+  }
+
+  getSelectionBounds(nodeIds = this.selectedNodeIds) {
+    return getSelectionBounds(this, nodeIds);
   }
 
   addTextNode(point) {
@@ -227,6 +241,11 @@ export class Editor {
   }
 
   deleteNode(nodeId) {
+    if (this.isNodeSelected(nodeId)) {
+      this.deleteSelected();
+      return;
+    }
+
     this.getState().deleteNodeById(nodeId);
   }
 
@@ -239,7 +258,16 @@ export class Editor {
   }
 
   duplicateNode(nodeId) {
+    if (this.isNodeSelected(nodeId)) {
+      this.duplicateSelected();
+      return;
+    }
+
     this.getState().duplicateNodeById(nodeId);
+  }
+
+  duplicateSelected() {
+    this.getState().duplicateSelectedNodes();
   }
 
   finalizeEditing() {
@@ -254,12 +282,12 @@ export class Editor {
 
     const key = event.key.toLowerCase();
     if ((event.metaKey || event.ctrlKey) && !event.altKey && key === "j") {
-      if (!this.selectedNodeId) {
+      if (this.selectedNodeIds.length === 0) {
         return;
       }
 
       event.preventDefault();
-      this.duplicateNode(this.selectedNodeId);
+      this.duplicateSelected();
       return;
     }
 
@@ -268,22 +296,22 @@ export class Editor {
     }
 
     if (event.code === "BracketLeft") {
-      if (!this.selectedNodeId) {
+      if (this.selectedNodeIds.length === 0) {
         return;
       }
 
       event.preventDefault();
-      this.sendNodeToBack(this.selectedNodeId);
+      this.sendSelectedToBack();
       return;
     }
 
     if (event.code === "BracketRight") {
-      if (!this.selectedNodeId) {
+      if (this.selectedNodeIds.length === 0) {
         return;
       }
 
       event.preventDefault();
-      this.bringNodeToFront(this.selectedNodeId);
+      this.bringSelectedToFront();
       return;
     }
 
@@ -305,6 +333,30 @@ export class Editor {
     }
 
     this.getState().selectNode(nodeId);
+  }
+
+  selectNodes(nodeIds) {
+    this.getState().selectNodes(nodeIds);
+  }
+
+  toggleNodeSelection(nodeId) {
+    if (!nodeId) {
+      return;
+    }
+
+    this.getState().toggleNodeSelection(nodeId);
+  }
+
+  ensureNodeSelected(nodeId) {
+    if (!nodeId) {
+      return;
+    }
+
+    if (this.isNodeSelected(nodeId)) {
+      return;
+    }
+
+    this.selectNode(nodeId);
   }
 
   setActiveTool(toolId) {
@@ -336,7 +388,16 @@ export class Editor {
   }
 
   sendNodeToBack(nodeId) {
+    if (this.isNodeSelected(nodeId) && this.selectedNodeIds.length > 1) {
+      this.sendSelectedToBack();
+      return;
+    }
+
     this.getState().sendNodeToBack(nodeId);
+  }
+
+  sendSelectedToBack() {
+    this.getState().sendSelectedNodesToBack();
   }
 
   startEditing(node) {
@@ -347,12 +408,29 @@ export class Editor {
     this.getState().updateNodeById(nodeId, updater);
   }
 
+  updateNodes(nodeIds, updater) {
+    this.getState().updateNodesById(nodeIds, updater);
+  }
+
   updateSelectedNode(updater) {
     this.getState().updateSelectedNode(updater);
   }
 
   bringNodeToFront(nodeId) {
+    if (this.isNodeSelected(nodeId) && this.selectedNodeIds.length > 1) {
+      this.bringSelectedToFront();
+      return;
+    }
+
     this.getState().bringNodeToFront(nodeId);
+  }
+
+  bringSelectedToFront() {
+    this.getState().bringSelectedNodesToFront();
+  }
+
+  isNodeSelected(nodeId) {
+    return this.selectedNodeIds.includes(nodeId);
   }
 
   registerNodeElement(nodeId, element) {
@@ -404,3 +482,42 @@ export class Editor {
     this.onSpacePressedChange?.(false);
   }
 }
+
+const getSelectionBounds = (editor, nodeIds) => {
+  const bounds = nodeIds
+    .map((nodeId) => {
+      const node = editor.getNode(nodeId);
+      const geometry = editor.getNodeGeometry(nodeId);
+      const bbox = geometry?.bbox;
+
+      if (!(node && bbox)) {
+        return null;
+      }
+
+      return {
+        maxX: node.x + bbox.maxX,
+        maxY: node.y + bbox.maxY,
+        minX: node.x + bbox.minX,
+        minY: node.y + bbox.minY,
+      };
+    })
+    .filter(Boolean);
+
+  if (bounds.length === 0) {
+    return null;
+  }
+
+  const minX = Math.min(...bounds.map((bbox) => bbox.minX));
+  const minY = Math.min(...bounds.map((bbox) => bbox.minY));
+  const maxX = Math.max(...bounds.map((bbox) => bbox.maxX));
+  const maxY = Math.max(...bounds.map((bbox) => bbox.maxY));
+
+  return {
+    height: maxY - minY,
+    maxX,
+    maxY,
+    minX,
+    minY,
+    width: maxX - minX,
+  };
+};

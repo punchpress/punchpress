@@ -58,18 +58,11 @@ export const SortableList = ({
 };
 
 export const SortableItem = ({ children, id }) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id });
+  const { listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id });
 
   return children({
     dragHandleProps: {
-      ...attributes,
       ...listeners,
     },
     isDragging,

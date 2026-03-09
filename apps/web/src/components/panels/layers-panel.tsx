@@ -96,15 +96,114 @@ const LAYER_SHORTCUTS = {
   sendToBack: "[",
 };
 
-const SortableLayerRow = ({ nodeId }) => {
+const getLayerPrimaryButtonClassName = ({
+  isSelected,
+  joinWithNext,
+  joinWithPrevious,
+}) => {
+  return cn(
+    "h-auto min-w-0 flex-1 appearance-none justify-start gap-2 rounded-r-none border-0 bg-transparent px-2 py-1.5 text-left text-[13px] text-inherit shadow-none outline-none ring-0 transition-[box-shadow,opacity] hover:bg-[var(--designer-hover)] focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
+    joinWithPrevious ? "rounded-tl-none" : "rounded-tl-[8px]",
+    joinWithNext ? "rounded-bl-none" : "rounded-bl-[8px]",
+    !isSelected && "group-hover:bg-[var(--designer-hover)]",
+    isSelected &&
+      "bg-blue-600 text-white shadow-[0_10px_22px_rgba(37,99,235,0.22)] hover:bg-blue-600 hover:text-white"
+  );
+};
+
+const getLayerVisibilityButtonClassName = ({
+  isSelected,
+  isVisible,
+  joinWithNext,
+  joinWithPrevious,
+}) => {
+  return cn(
+    "h-auto shrink-0 rounded-l-none border-0 bg-transparent px-2 text-foreground/34 shadow-none hover:bg-[var(--designer-hover)] hover:text-foreground/70",
+    joinWithPrevious ? "rounded-tr-none" : "rounded-tr-[8px]",
+    joinWithNext ? "rounded-br-none" : "rounded-br-[8px]",
+    isVisible && !isSelected && "opacity-0 group-hover:opacity-100",
+    !isSelected && "group-hover:bg-[var(--designer-hover)]",
+    !isVisible && "text-foreground/60 opacity-100",
+    isSelected && "bg-blue-600 text-white/65 hover:bg-blue-600 hover:text-white"
+  );
+};
+
+const getLayerGlyphClassName = ({ isSelected, isVisible }) => {
+  return cn(
+    "inline-flex shrink-0 cursor-grab items-center justify-center text-foreground/35 active:cursor-grabbing",
+    !(isVisible || isSelected) && "text-foreground/22",
+    isSelected && "text-white/70"
+  );
+};
+
+const getLayerLabelClassName = ({ isSelected, isVisible }) => {
+  return cn(
+    "min-w-0 cursor-grab truncate whitespace-nowrap font-[450] active:cursor-grabbing",
+    !(isVisible || isSelected) && "text-foreground/55"
+  );
+};
+
+const SortableLayerRow = ({
+  nodeId,
+  previousNodeId,
+  nextNodeId,
+  hoveredNodeId,
+  onHoverChange,
+}) => {
   const editor = useEditor();
   const layer = useEditorValue((editor) => editor.getLayerRow(nodeId));
+  const previousLayer = useEditorValue((editor) => {
+    return previousNodeId ? editor.getLayerRow(previousNodeId) : null;
+  });
+  const nextLayer = useEditorValue((editor) => {
+    return nextNodeId ? editor.getLayerRow(nextNodeId) : null;
+  });
+  const selectedCount = useEditorValue((editor) => {
+    return editor.isNodeSelected(nodeId) ? editor.selectedNodeIds.length : 1;
+  });
 
   if (!layer) {
     return null;
   }
 
   const VisibilityIcon = layer.isVisible ? ViewIcon : ViewOffIcon;
+  const isMultiSelection = selectedCount > 1;
+  const isHovered = hoveredNodeId === nodeId;
+  const previousIsActive =
+    Boolean(previousLayer?.isSelected) ||
+    (previousNodeId ? hoveredNodeId === previousNodeId : false);
+  const nextIsActive =
+    Boolean(nextLayer?.isSelected) ||
+    (nextNodeId ? hoveredNodeId === nextNodeId : false);
+  const joinWithPrevious = (layer.isSelected || isHovered) && previousIsActive;
+  const joinWithNext = (layer.isSelected || isHovered) && nextIsActive;
+  const primaryButtonClassName = getLayerPrimaryButtonClassName({
+    isSelected: layer.isSelected,
+    joinWithNext,
+    joinWithPrevious,
+  });
+  const visibilityButtonClassName = getLayerVisibilityButtonClassName({
+    isSelected: layer.isSelected,
+    isVisible: layer.isVisible,
+    joinWithNext,
+    joinWithPrevious,
+  });
+  const glyphClassName = getLayerGlyphClassName({
+    isSelected: layer.isSelected,
+    isVisible: layer.isVisible,
+  });
+  const labelClassName = getLayerLabelClassName({
+    isSelected: layer.isSelected,
+    isVisible: layer.isVisible,
+  });
+  const handleSelect = (event) => {
+    if (event.shiftKey) {
+      editor.toggleNodeSelection(nodeId);
+      return;
+    }
+
+    editor.ensureNodeSelected(nodeId);
+  };
 
   return (
     <SortableItem id={nodeId}>
@@ -113,87 +212,64 @@ const SortableLayerRow = ({ nodeId }) => {
           <ContextMenu.Root>
             <ContextMenu.Trigger
               className="block"
-              onContextMenuCapture={() => editor.selectNode(nodeId)}
+              onContextMenuCapture={() => editor.ensureNodeSelected(nodeId)}
+              onPointerEnter={() => onHoverChange(nodeId)}
+              onPointerLeave={() => onHoverChange(null)}
               ref={setItemRef}
               style={itemStyle}
             >
               <div
                 className={cn(
-                  "group flex items-stretch gap-0 rounded-[10px] p-0.5 transition-[transform,opacity,box-shadow]",
+                  "group flex items-stretch gap-0 transition-[transform,opacity,box-shadow]",
                   isDragging && "scale-[0.985] opacity-80"
                 )}
               >
-                <Button
-                  className={cn(
-                    "h-auto min-w-0 flex-1 justify-start gap-2 rounded-r-none rounded-l-[8px] border-0 bg-transparent px-2 py-1.5 text-left text-[13px] text-inherit shadow-none transition-[box-shadow,opacity] hover:bg-[var(--designer-hover)]",
-                    !layer.isSelected &&
-                      "group-hover:bg-[var(--designer-hover)]",
-                    layer.isSelected &&
-                      "bg-blue-600 text-white shadow-[0_10px_22px_rgba(37,99,235,0.22)] hover:bg-blue-600 hover:text-white"
-                  )}
-                  onClick={() => editor.selectNode(nodeId)}
+                <button
+                  aria-pressed={layer.isSelected}
+                  className={primaryButtonClassName}
+                  onClick={handleSelect}
                   onDoubleClick={() => editor.startEditing(layer.node)}
+                  onFocus={(event) => {
+                    if (!event.currentTarget.matches(":focus-visible")) {
+                      return;
+                    }
+
+                    editor.selectNode(nodeId);
+                  }}
                   type="button"
-                  variant="ghost"
                 >
                   <span
                     className="flex min-w-0 flex-1 items-center gap-2"
                     {...dragHandleProps}
                   >
-                    <span
-                      aria-hidden="true"
-                      className={cn(
-                        "inline-flex shrink-0 cursor-grab items-center justify-center text-foreground/35 active:cursor-grabbing",
-                        !(layer.isVisible || layer.isSelected) &&
-                          "text-foreground/22",
-                        layer.isSelected && "text-white/70"
-                      )}
-                    >
+                    <span aria-hidden="true" className={glyphClassName}>
                       <LayerGlyph
                         icon={TextFontIcon}
                         size={16}
                         strokeWidth={1.7}
                       />
                     </span>
-                    <span
-                      className={cn(
-                        "min-w-0 cursor-grab truncate whitespace-nowrap font-[450] active:cursor-grabbing",
-                        !(layer.isVisible || layer.isSelected) &&
-                          "text-foreground/55"
-                      )}
-                    >
-                      {layer.label}
-                    </span>
+                    <span className={labelClassName}>{layer.label}</span>
                   </span>
-                </Button>
+                </button>
 
-                <Button
+                <button
                   aria-label={layer.visibilityLabel}
-                  className={cn(
-                    "h-auto shrink-0 rounded-r-[8px] rounded-l-none border-0 bg-transparent px-2 text-foreground/34 shadow-none hover:bg-[var(--designer-hover)] hover:text-foreground/70",
-                    layer.isVisible &&
-                      !layer.isSelected &&
-                      "opacity-0 group-hover:opacity-100",
-                    !layer.isSelected &&
-                      "group-hover:bg-[var(--designer-hover)]",
-                    !layer.isVisible && "text-foreground/60 opacity-100",
-                    layer.isSelected &&
-                      "bg-blue-600 text-white/65 hover:bg-blue-600 hover:text-white"
-                  )}
+                  className={visibilityButtonClassName}
                   onClick={(event) => {
                     event.stopPropagation();
                     editor.toggleNodeVisibility(nodeId);
                   }}
                   onPointerDown={(event) => event.stopPropagation()}
+                  tabIndex={-1}
                   type="button"
-                  variant="ghost"
                 >
                   <LayerGlyph
                     icon={VisibilityIcon}
                     size={16}
                     strokeWidth={1.8}
                   />
-                </Button>
+                </button>
               </div>
             </ContextMenu.Trigger>
 
@@ -217,7 +293,7 @@ const SortableLayerRow = ({ nodeId }) => {
               </LayerContextMenuItem>
               <LayerContextMenuSeparator />
               <LayerContextMenuItem
-                disabled={layer.isFrontmost}
+                disabled={!isMultiSelection && layer.isFrontmost}
                 onClick={() => editor.bringNodeToFront(nodeId)}
               >
                 <LayerGlyph
@@ -229,7 +305,7 @@ const SortableLayerRow = ({ nodeId }) => {
                 <MenuShortcut>{LAYER_SHORTCUTS.bringToFront}</MenuShortcut>
               </LayerContextMenuItem>
               <LayerContextMenuItem
-                disabled={layer.isBackmost}
+                disabled={!isMultiSelection && layer.isBackmost}
                 onClick={() => editor.sendNodeToBack(nodeId)}
               >
                 <LayerGlyph
@@ -259,6 +335,7 @@ const SortableLayerRow = ({ nodeId }) => {
 export const LayersPanel = () => {
   const editor = useEditor();
   const layerNodeIds = useEditorValue((editor) => editor.layerNodeIds);
+  const [hoveredNodeId, setHoveredNodeId] = useState(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   return (
@@ -305,7 +382,7 @@ export const LayersPanel = () => {
           </Menu>
         </div>
 
-        <div className="flex flex-col gap-px px-1 pb-1">
+        <div className="flex flex-col gap-[0.5px] px-1 pb-1">
           {layerNodeIds.length > 0 ? (
             <SortableList
               items={layerNodeIds}
@@ -313,11 +390,20 @@ export const LayersPanel = () => {
                 editor.setNodeOrder([...nextIds].reverse());
               }}
               onReorderStart={(nodeId) => {
-                editor.selectNode(nodeId);
+                editor.ensureNodeSelected(nodeId);
               }}
             >
-              {layerNodeIds.map((nodeId) => {
-                return <SortableLayerRow key={nodeId} nodeId={nodeId} />;
+              {layerNodeIds.map((nodeId, index) => {
+                return (
+                  <SortableLayerRow
+                    hoveredNodeId={hoveredNodeId}
+                    key={nodeId}
+                    nextNodeId={layerNodeIds[index + 1] || null}
+                    nodeId={nodeId}
+                    onHoverChange={setHoveredNodeId}
+                    previousNodeId={layerNodeIds[index - 1] || null}
+                  />
+                );
               })}
             </SortableList>
           ) : (

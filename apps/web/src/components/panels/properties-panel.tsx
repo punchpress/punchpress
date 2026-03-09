@@ -5,9 +5,14 @@ import { NodeFields } from "./warp-text-fields";
 export const PropertiesPanel = () => {
   const bootstrapError = useEditorValue((editor) => editor.bootstrapError);
   const bootstrapState = useEditorValue((editor) => editor.bootstrapState);
-  const selectedNode = useEditorValue((editor) => editor.selectedNode);
+  const selectedNode = useEditorValue((editor) => {
+    return editor.selectedNodeIds.length === 1 ? editor.selectedNode : null;
+  });
+  const selectedCount = useEditorValue(
+    (editor) => editor.selectedNodeIds.length
+  );
 
-  if (!selectedNode && bootstrapState !== "error") {
+  if (!(selectedNode || selectedCount > 1) && bootstrapState !== "error") {
     return null;
   }
 
@@ -20,6 +25,13 @@ export const PropertiesPanel = () => {
               Bootstrap failed: {bootstrapError || "Unknown error"}
             </AlertDescription>
           </Alert>
+        )}
+
+        {selectedCount > 1 && (
+          <p className="m-0 text-[var(--designer-text-muted)] text-sm">
+            {selectedCount} layers selected. Shared actions are available from
+            the canvas, shortcuts, and the layers panel.
+          </p>
         )}
 
         {selectedNode && <NodeFields />}
