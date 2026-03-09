@@ -25,6 +25,10 @@ export const createTextNode = (page, options) => {
             x?: number;
             y?: number;
           }) => string | null;
+          scaleSelectedGroupBy: (options?: {
+            corner?: "ne" | "nw" | "se" | "sw";
+            scale?: number;
+          }) => string[];
           scaleSelectedNodeBy: (options?: { scale?: number }) => string | null;
         };
       }
@@ -36,11 +40,11 @@ export const getNodeSnapshot = (page, nodeId) => {
   return page.evaluate((nextNodeId) => {
     return (
       window as Window & {
-        __PUNCHPRESS_E2E__: {
+        __PUNCHPRESS_E2E__?: {
           getNodeSnapshot: (nodeId: string) => Record<string, unknown> | null;
         };
       }
-    ).__PUNCHPRESS_E2E__.getNodeSnapshot(nextNodeId);
+    ).__PUNCHPRESS_E2E__?.getNodeSnapshot(nextNodeId);
   }, nodeId);
 };
 
@@ -48,11 +52,11 @@ export const getSelectionSnapshot = (page) => {
   return page.evaluate(() => {
     return (
       window as Window & {
-        __PUNCHPRESS_E2E__: {
+        __PUNCHPRESS_E2E__?: {
           getSelectionSnapshot: () => Record<string, unknown>;
         };
       }
-    ).__PUNCHPRESS_E2E__.getSelectionSnapshot();
+    ).__PUNCHPRESS_E2E__?.getSelectionSnapshot();
   });
 };
 
@@ -60,11 +64,11 @@ export const getStateSnapshot = (page) => {
   return page.evaluate(() => {
     return (
       window as Window & {
-        __PUNCHPRESS_E2E__: {
+        __PUNCHPRESS_E2E__?: {
           getStateSnapshot: () => Record<string, unknown>;
         };
       }
-    ).__PUNCHPRESS_E2E__.getStateSnapshot();
+    ).__PUNCHPRESS_E2E__?.getStateSnapshot();
   });
 };
 
@@ -80,14 +84,14 @@ export const moveSelectedNodeBy = (page, delta) => {
   return page.evaluate((nextDelta) => {
     return (
       window as Window & {
-        __PUNCHPRESS_E2E__: {
+        __PUNCHPRESS_E2E__?: {
           moveSelectedNodeBy: (delta?: {
             x?: number;
             y?: number;
           }) => string | null;
         };
       }
-    ).__PUNCHPRESS_E2E__.moveSelectedNodeBy(nextDelta);
+    ).__PUNCHPRESS_E2E__?.moveSelectedNodeBy(nextDelta);
   }, delta);
 };
 
@@ -95,11 +99,26 @@ export const scaleSelectedNodeBy = (page, options) => {
   return page.evaluate((nextOptions) => {
     return (
       window as Window & {
-        __PUNCHPRESS_E2E__: {
+        __PUNCHPRESS_E2E__?: {
           scaleSelectedNodeBy: (options?: { scale?: number }) => string | null;
         };
       }
-    ).__PUNCHPRESS_E2E__.scaleSelectedNodeBy(nextOptions);
+    ).__PUNCHPRESS_E2E__?.scaleSelectedNodeBy(nextOptions);
+  }, options);
+};
+
+export const scaleSelectedGroupBy = (page, options) => {
+  return page.evaluate((nextOptions) => {
+    return (
+      window as Window & {
+        __PUNCHPRESS_E2E__?: {
+          scaleSelectedGroupBy: (options?: {
+            corner?: "ne" | "nw" | "se" | "sw";
+            scale?: number;
+          }) => string[];
+        };
+      }
+    ).__PUNCHPRESS_E2E__?.scaleSelectedGroupBy(nextOptions);
   }, options);
 };
 
@@ -123,6 +142,19 @@ export const dragLayerBelow = async (page, sourceLabel, targetLabel) => {
   await page.mouse.move(sourceX, sourceY + 12, { steps: 4 });
   await page.mouse.move(targetX, targetY, { steps: 10 });
   await page.mouse.up();
+};
+
+export const marqueeSelect = async (page, from, to) => {
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(to.x, to.y, { steps: 12 });
+  await page.mouse.up();
+};
+
+export const shiftClickLayer = async (page, label) => {
+  await page.keyboard.down("Shift");
+  await page.getByRole("button", { name: label }).first().click();
+  await page.keyboard.up("Shift");
 };
 
 export const waitForNodeReady = async (page, nodeId) => {

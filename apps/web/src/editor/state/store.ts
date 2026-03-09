@@ -12,7 +12,16 @@ const toCommittedText = (value) => {
 
 const applyNodeUpdate = (node, updater) => {
   if (typeof updater === "function") {
-    return updater(node);
+    const nextNode = updater(node);
+
+    if (!(nextNode && typeof nextNode === "object")) {
+      return node;
+    }
+
+    return {
+      ...node,
+      ...nextNode,
+    };
   }
 
   return {
@@ -24,6 +33,22 @@ const applyNodeUpdate = (node, updater) => {
 const mapNodeById = (nodes, targetId, updater) => {
   return nodes.map((node) => {
     if (node.id !== targetId) {
+      return node;
+    }
+
+    return applyNodeUpdate(node, updater);
+  });
+};
+
+const mapNodesByIds = (nodes, targetIds, updater) => {
+  if (targetIds.length === 0) {
+    return nodes;
+  }
+
+  const targetIdSet = new Set(targetIds);
+
+  return nodes.map((node) => {
+    if (!targetIdSet.has(node.id)) {
       return node;
     }
 
@@ -44,10 +69,33 @@ const orderNodesByIds = (nodes, orderedIds) => {
   return orderedNodes.length === nodes.length ? orderedNodes : nodes;
 };
 
-const commitEditingState = (state, selectedNodeId = state.selectedNodeId) => {
+const getSelectedNodeIds = (state, nodeIds = state.selectedNodeIds) => {
+  if (!(Array.isArray(nodeIds) && nodeIds.length > 0)) {
+    return [];
+  }
+
+  const availableNodeIds = new Set(state.nodes.map((node) => node.id));
+  const selectedNodeIds = /** @type {string[]} */ ([]);
+
+  for (const nodeId of nodeIds) {
+    if (!(nodeId && availableNodeIds.has(nodeId))) {
+      continue;
+    }
+
+    if (selectedNodeIds.includes(nodeId)) {
+      continue;
+    }
+
+    selectedNodeIds.push(nodeId);
+  }
+
+  return selectedNodeIds;
+};
+
+const commitEditingState = (state, selectedNodeIds = state.selectedNodeIds) => {
   if (!state.editingNodeId) {
     return {
-      selectedNodeId,
+      selectedNodeIds: getSelectedNodeIds(state, selectedNodeIds),
     };
   }
 
@@ -60,13 +108,16 @@ const commitEditingState = (state, selectedNodeId = state.selectedNodeId) => {
     nodes: mapNodeById(state.nodes, state.editingNodeId, (node) =>
       node.text === nextText ? node : { ...node, text: nextText }
     ),
-    selectedNodeId,
+    selectedNodeIds: getSelectedNodeIds(state, selectedNodeIds),
   };
 };
 
-const finalizeEditingState = (state, selectedNodeId = state.selectedNodeId) => {
+const finalizeEditingState = (
+  state,
+  selectedNodeIds = state.selectedNodeIds
+) => {
   return {
-    ...commitEditingState(state, selectedNodeId),
+    ...commitEditingState(state, selectedNodeIds),
     activeTool: "pointer",
   };
 };
@@ -84,8 +135,32 @@ const deleteNodeState = (state, nodeId) => {
     editingOriginalText: isEditingNode ? "" : state.editingOriginalText,
     editingText: isEditingNode ? "" : state.editingText,
     nodes: state.nodes.filter((node) => node.id !== nodeId),
-    selectedNodeId:
-      state.selectedNodeId === nodeId ? null : state.selectedNodeId,
+    selectedNodeIds: state.selectedNodeIds.filter(
+      (selectedNodeId) => selectedNodeId !== nodeId
+    ),
+  };
+};
+
+const deleteNodesState = (state, nodeIds) => {
+  const selectedNodeIds = getSelectedNodeIds(state, nodeIds);
+
+  if (selectedNodeIds.length === 0) {
+    return {};
+  }
+
+  const selectedNodeIdSet = new Set(selectedNodeIds);
+  const isEditingNodeSelected =
+    state.editingNodeId && selectedNodeIdSet.has(state.editingNodeId);
+
+  return {
+    activeTool: isEditingNodeSelected ? "pointer" : state.activeTool,
+    editingNodeId: isEditingNodeSelected ? null : state.editingNodeId,
+    editingOriginalText: isEditingNodeSelected ? "" : state.editingOriginalText,
+    editingText: isEditingNodeSelected ? "" : state.editingText,
+    nodes: state.nodes.filter((node) => !selectedNodeIdSet.has(node.id)),
+    selectedNodeIds: state.selectedNodeIds.filter(
+      (selectedNodeId) => !selectedNodeIdSet.has(selectedNodeId)
+    ),
   };
 };
 
@@ -102,7 +177,7 @@ const toggleNodeVisibilityState = (state, nodeId) => {
   const nextVisible = !isNodeVisible(targetNode);
   const baseState =
     !nextVisible && state.editingNodeId === nodeId
-      ? { ...state, ...finalizeEditingState(state, state.selectedNodeId) }
+      ? { ...state, ...finalizeEditingState(state, state.selectedNodeIds) }
       : state;
 
   return {
@@ -113,7 +188,70 @@ const toggleNodeVisibilityState = (state, nodeId) => {
     nodes: mapNodeById(baseState.nodes, nodeId, {
       visible: nextVisible,
     }),
-    selectedNodeId: baseState.selectedNodeId,
+    selectedNodeIds: baseState.selectedNodeIds,
+  };
+};
+
+const duplicateNodesState = (state, nodeIds) => {
+  const selectedNodeIds = getSelectedNodeIds(state, nodeIds);
+
+  if (selectedNodeIds.length === 0) {
+    return {};
+  }
+
+  const committedState =
+    state.editingNodeId && selectedNodeIds.includes(state.editingNodeId)
+      ? { ...state, ...finalizeEditingState(state, selectedNodeIds) }
+      : state;
+  const selectedNodeIdSet = new Set(selectedNodeIds);
+  const duplicateNodeIds = /** @type {string[]} */ ([]);
+  const nodes = committedState.nodes.flatMap((node) => {
+    if (!selectedNodeIdSet.has(node.id)) {
+      return [node];
+    }
+
+    const duplicateNode = {
+      ...node,
+      id: createId(),
+      x: node.x + 120,
+      y: node.y + 120,
+    };
+
+    duplicateNodeIds.push(duplicateNode.id);
+
+    return [node, duplicateNode];
+  });
+
+  return {
+    activeTool: committedState.activeTool,
+    editingNodeId: committedState.editingNodeId,
+    editingOriginalText: committedState.editingOriginalText,
+    editingText: committedState.editingText,
+    nodes,
+    selectedNodeIds: duplicateNodeIds,
+  };
+};
+
+const moveNodesToBoundaryState = (state, nodeIds, edge) => {
+  const selectedNodeIds = getSelectedNodeIds(state, nodeIds);
+
+  if (selectedNodeIds.length === 0) {
+    return {};
+  }
+
+  const selectedNodeIdSet = new Set(selectedNodeIds);
+  const selectedNodes = state.nodes.filter((node) =>
+    selectedNodeIdSet.has(node.id)
+  );
+  const unselectedNodes = state.nodes.filter(
+    (node) => !selectedNodeIdSet.has(node.id)
+  );
+
+  return {
+    nodes:
+      edge === "back"
+        ? [...selectedNodes, ...unselectedNodes]
+        : [...unselectedNodes, ...selectedNodes],
   };
 };
 
@@ -132,7 +270,7 @@ export const createEditorStore = ({
     editingText: "",
     fontRevision: 0,
     nodes: [],
-    selectedNodeId: null,
+    selectedNodeIds: [],
     viewport: {
       zoom: initialZoom,
     },
@@ -151,7 +289,7 @@ export const createEditorStore = ({
         editingOriginalText: node.text,
         editingText: node.text,
         nodes: [...state.nodes, node],
-        selectedNodeId: node.id,
+        selectedNodeIds: [node.id],
       }));
     },
 
@@ -181,11 +319,11 @@ export const createEditorStore = ({
     clearSelection: () => {
       set((state) => {
         if (state.editingNodeId) {
-          return commitEditingState(state, null);
+          return commitEditingState(state, []);
         }
 
         return {
-          selectedNodeId: null,
+          selectedNodeIds: [],
         };
       });
     },
@@ -198,11 +336,11 @@ export const createEditorStore = ({
 
     deleteSelected: () => {
       set((state) => {
-        if (!state.selectedNodeId) {
+        if (state.selectedNodeIds.length === 0) {
           return {};
         }
 
-        return deleteNodeState(state, state.selectedNodeId);
+        return deleteNodesState(state, state.selectedNodeIds);
       });
     },
 
@@ -214,52 +352,66 @@ export const createEditorStore = ({
 
     duplicateNodeById: (nodeId) => {
       set((state) => {
-        if (!nodeId) {
-          return {};
-        }
+        return duplicateNodesState(state, [nodeId]);
+      });
+    },
 
-        const committedState =
-          state.editingNodeId === nodeId
-            ? { ...state, ...finalizeEditingState(state, nodeId) }
-            : state;
-        const nodeIndex = committedState.nodes.findIndex(
-          (node) => node.id === nodeId
-        );
-
-        if (nodeIndex < 0) {
-          return {};
-        }
-
-        const sourceNode = committedState.nodes[nodeIndex];
-        const duplicateNode = {
-          ...sourceNode,
-          id: createId(),
-          x: sourceNode.x + 120,
-          y: sourceNode.y + 120,
-        };
-        const nodes = [...committedState.nodes];
-
-        nodes.splice(nodeIndex + 1, 0, duplicateNode);
-
-        return {
-          activeTool: committedState.activeTool,
-          editingNodeId: committedState.editingNodeId,
-          editingOriginalText: committedState.editingOriginalText,
-          editingText: committedState.editingText,
-          nodes,
-          selectedNodeId: duplicateNode.id,
-        };
+    duplicateSelectedNodes: () => {
+      set((state) => {
+        return duplicateNodesState(state, state.selectedNodeIds);
       });
     },
 
     selectNode: (nodeId) => {
       set((state) => {
+        const nextSelectedNodeIds = getSelectedNodeIds(state, [nodeId]);
+
         if (state.editingNodeId && state.editingNodeId !== nodeId) {
-          return commitEditingState(state, nodeId);
+          return commitEditingState(state, nextSelectedNodeIds);
         }
 
         return {
-          selectedNodeId: nodeId,
+          selectedNodeIds: nextSelectedNodeIds,
+        };
+      });
+    },
+
+    selectNodes: (nodeIds) => {
+      set((state) => {
+        const nextSelectedNodeIds = getSelectedNodeIds(state, nodeIds);
+
+        if (
+          state.editingNodeId &&
+          (nextSelectedNodeIds.length !== 1 ||
+            nextSelectedNodeIds[0] !== state.editingNodeId)
+        ) {
+          return finalizeEditingState(state, nextSelectedNodeIds);
+        }
+
+        return {
+          selectedNodeIds: nextSelectedNodeIds,
+        };
+      });
+    },
+
+    toggleNodeSelection: (nodeId) => {
+      set((state) => {
+        const nextSelectedNodeIds = state.selectedNodeIds.includes(nodeId)
+          ? state.selectedNodeIds.filter(
+              (selectedNodeId) => selectedNodeId !== nodeId
+            )
+          : getSelectedNodeIds(state, [...state.selectedNodeIds, nodeId]);
+
+        if (
+          state.editingNodeId &&
+          (nextSelectedNodeIds.length !== 1 ||
+            nextSelectedNodeIds[0] !== state.editingNodeId)
+        ) {
+          return finalizeEditingState(state, nextSelectedNodeIds);
+        }
+
+        return {
+          selectedNodeIds: nextSelectedNodeIds,
         };
       });
     },
@@ -270,19 +422,13 @@ export const createEditorStore = ({
 
     sendNodeToBack: (nodeId) => {
       set((state) => {
-        if (!nodeId) {
-          return {};
-        }
+        return moveNodesToBoundaryState(state, [nodeId], "back");
+      });
+    },
 
-        const node = state.nodes.find((item) => item.id === nodeId);
-
-        if (!node || state.nodes[0]?.id === nodeId) {
-          return {};
-        }
-
-        return {
-          nodes: [node, ...state.nodes.filter((item) => item.id !== nodeId)],
-        };
+    sendSelectedNodesToBack: () => {
+      set((state) => {
+        return moveNodesToBoundaryState(state, state.selectedNodeIds, "back");
       });
     },
 
@@ -328,7 +474,7 @@ export const createEditorStore = ({
       set((state) => {
         const baseState =
           state.editingNodeId && state.editingNodeId !== node.id
-            ? commitEditingState(state, node.id)
+            ? commitEditingState(state, [node.id])
             : {};
 
         return {
@@ -337,7 +483,7 @@ export const createEditorStore = ({
           editingNodeId: node.id,
           editingOriginalText: node.text,
           editingText: node.text,
-          selectedNodeId: node.id,
+          selectedNodeIds: [node.id],
         };
       });
     },
@@ -350,32 +496,36 @@ export const createEditorStore = ({
 
     updateSelectedNode: (updater) => {
       set((state) => {
-        if (!state.selectedNodeId) {
+        if (state.selectedNodeIds.length === 0) {
           return {};
         }
 
         return {
-          nodes: mapNodeById(state.nodes, state.selectedNodeId, updater),
+          nodes: mapNodesByIds(state.nodes, state.selectedNodeIds, updater),
         };
       });
     },
 
     bringNodeToFront: (nodeId) => {
       set((state) => {
-        if (!nodeId) {
-          return {};
-        }
-
-        const node = state.nodes.find((item) => item.id === nodeId);
-
-        if (!node || state.nodes.at(-1)?.id === nodeId) {
-          return {};
-        }
-
-        return {
-          nodes: [...state.nodes.filter((item) => item.id !== nodeId), node],
-        };
+        return moveNodesToBoundaryState(state, [nodeId], "front");
       });
+    },
+
+    bringSelectedNodesToFront: () => {
+      set((state) => {
+        return moveNodesToBoundaryState(state, state.selectedNodeIds, "front");
+      });
+    },
+
+    updateNodesById: (nodeIds, updater) => {
+      set((state) => ({
+        nodes: mapNodesByIds(
+          state.nodes,
+          getSelectedNodeIds(state, nodeIds),
+          updater
+        ),
+      }));
     },
   }));
 };

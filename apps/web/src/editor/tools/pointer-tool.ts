@@ -5,13 +5,18 @@ export class PointerTool extends Tool {
     this.editor.clearSelection();
   }
 
-  onNodePointerDown({ node }) {
-    this.editor.selectNode(node.id);
+  onNodePointerDown({ event, node }) {
+    if (event.shiftKey) {
+      this.editor.toggleNodeSelection(node.id);
+      return;
+    }
+
+    this.editor.ensureNodeSelected(node.id);
   }
 
   onKeyDown({ key }) {
     if (key === "escape") {
-      if (this.editor.selectedNodeId) {
+      if (this.editor.selectedNodeIds.length > 0) {
         this.editor.clearSelection();
         return true;
       }
