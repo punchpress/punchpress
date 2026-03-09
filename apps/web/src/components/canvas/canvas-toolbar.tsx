@@ -6,7 +6,6 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { HandIcon } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/ui/toggle";
 import {
@@ -15,6 +14,8 @@ import {
   ToolbarGroup,
   ToolbarSeparator,
 } from "@/components/ui/toolbar";
+import { useEditor } from "../../editor/use-editor";
+import { useEditorValue } from "../../editor/use-editor-value";
 
 const TOOL_CONFIG = [
   {
@@ -40,13 +41,11 @@ const TOOL_CONFIG = [
   },
 ];
 
-export const EditorToolbar = ({
-  activeTool,
-  onSelectTool,
-  onZoomIn,
-  onZoomOut,
-  zoom,
-}) => {
+export const CanvasToolbar = () => {
+  const editor = useEditor();
+  const activeTool = useEditorValue((_, state) => state.activeTool);
+  const zoom = useEditorValue((_, state) => state.viewport.zoom);
+
   return (
     <Toolbar>
       <ToolbarGroup>
@@ -62,7 +61,7 @@ export const EditorToolbar = ({
                   aria-pressed={activeTool === id}
                   onPressedChange={(pressed) => {
                     if (pressed) {
-                      onSelectTool(id);
+                      editor.setActiveTool(id);
                     }
                   }}
                   pressed={activeTool === id}
@@ -90,7 +89,7 @@ export const EditorToolbar = ({
       <ToolbarGroup>
         <ToolbarButton
           aria-label="Zoom out"
-          onClick={onZoomOut}
+          onClick={() => editor.zoomOut()}
           render={<Button size="icon-sm" variant="ghost" />}
           title="Zoom out"
         >
@@ -106,7 +105,7 @@ export const EditorToolbar = ({
         </span>
         <ToolbarButton
           aria-label="Zoom in"
-          onClick={onZoomIn}
+          onClick={() => editor.zoomIn()}
           render={<Button size="icon-sm" variant="ghost" />}
           title="Zoom in"
         >

@@ -1,14 +1,12 @@
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { NodeFields } from "./node-fields";
+import { useEditorValue } from "../../editor/use-editor-value";
+import { NodeFields } from "./warp-text-fields";
 
-export const PropertiesPanel = ({
-  bootstrapError,
-  bootstrapState,
-  deleteSelected,
-  fonts,
-  selectedNode,
-  updateSelectedNode,
-}) => {
+export const PropertiesPanel = () => {
+  const bootstrapError = useEditorValue((editor) => editor.bootstrapError);
+  const bootstrapState = useEditorValue((editor) => editor.bootstrapState);
+  const selectedNode = useEditorValue((editor) => editor.selectedNode);
+
   if (!selectedNode && bootstrapState !== "error") {
     return null;
   }
@@ -19,19 +17,12 @@ export const PropertiesPanel = ({
         {bootstrapState === "error" && (
           <Alert variant="error">
             <AlertDescription>
-              tRPC bootstrap failed: {bootstrapError || "Unknown error"}
+              Bootstrap failed: {bootstrapError || "Unknown error"}
             </AlertDescription>
           </Alert>
         )}
 
-        {selectedNode && (
-          <NodeFields
-            deleteSelected={deleteSelected}
-            fonts={fonts}
-            node={selectedNode}
-            updateSelectedNode={updateSelectedNode}
-          />
-        )}
+        {selectedNode && <NodeFields />}
       </div>
     </div>
   );

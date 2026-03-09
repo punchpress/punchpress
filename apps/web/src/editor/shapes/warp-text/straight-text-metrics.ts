@@ -1,4 +1,4 @@
-import { getBounds, translateContours } from "./path-geometry";
+import { getBounds, translateContours } from "../../primitives/path-geometry";
 import { layoutGlyphs } from "./warp-engine";
 
 export const measureStraightText = (node, font) => {

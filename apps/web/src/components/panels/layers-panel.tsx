@@ -1,4 +1,4 @@
-import { ChevronDownIcon, PlusIcon, TypeIcon } from "lucide-react";
+import { ChevronDownIcon, TypeIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,11 +8,12 @@ import {
   MenuItem,
   MenuPopup,
   MenuSeparator,
-  MenuShortcut,
   MenuTrigger,
 } from "@/components/ui/menu";
 import { cn } from "@/lib/utils";
-import { SettingsDialog } from "./settings-dialog";
+import { useEditor } from "../../editor/use-editor";
+import { useEditorValue } from "../../editor/use-editor-value";
+import { SettingsDialog } from "../settings-dialog";
 
 const getLayerLabel = (node, index) => {
   const text = node.text.trim();
@@ -23,19 +24,16 @@ const getLayerLabel = (node, index) => {
   return `Text ${index + 1}`;
 };
 
-export const LayersPanel = ({
-  nodes,
-  onAddText,
-  onSelectNode,
-  onStartEditing,
-  selectedNodeId,
-}) => {
+export const LayersPanel = () => {
+  const editor = useEditor();
+  const nodes = useEditorValue((_, state) => state.nodes);
+  const selectedNodeId = useEditorValue((_, state) => state.selectedNodeId);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   return (
     <>
       <div className="flex flex-col rounded-xl border border-[var(--designer-border)] bg-[var(--designer-surface)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.06)]">
-        <div className="flex items-center justify-between px-2.5 pt-2.5 pb-1.5">
+        <div className="flex items-center px-2.5 pt-2.5 pb-1.5">
           <Menu modal={false}>
             <Button
               aria-label="Open main menu"
@@ -62,10 +60,6 @@ export const LayersPanel = ({
             <MenuPopup align="start" className="min-w-44" sideOffset={12}>
               <MenuGroup>
                 <MenuGroupLabel>PunchPress</MenuGroupLabel>
-                <MenuItem onClick={onAddText}>
-                  Add text layer
-                  <MenuShortcut>T</MenuShortcut>
-                </MenuItem>
                 <MenuItem onClick={() => setIsSettingsOpen(true)}>
                   Settings
                 </MenuItem>
@@ -74,15 +68,6 @@ export const LayersPanel = ({
               </MenuGroup>
             </MenuPopup>
           </Menu>
-          <Button
-            className="h-6 w-6 p-0"
-            onClick={onAddText}
-            size="sm"
-            type="button"
-            variant="ghost"
-          >
-            <PlusIcon size={14} />
-          </Button>
         </div>
 
         <div className="flex flex-col gap-px px-1 pb-1">
@@ -96,8 +81,8 @@ export const LayersPanel = ({
                   isSelected && "bg-blue-600 text-white hover:bg-blue-600"
                 )}
                 key={node.id}
-                onClick={() => onSelectNode(node.id)}
-                onDoubleClick={() => onStartEditing(node)}
+                onClick={() => editor.selectNode(node.id)}
+                onDoubleClick={() => editor.startEditing(node)}
                 type="button"
               >
                 <span
@@ -130,7 +115,7 @@ export const LayersPanel = ({
               <kbd className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded border border-[var(--designer-border)] bg-foreground/5 px-1 font-medium text-[11px] text-foreground/55">
                 T
               </kbd>{" "}
-              or click <strong>+</strong> to add text.
+              or use the text tool in the bottom toolbar to add text.
             </p>
           )}
         </div>

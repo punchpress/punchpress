@@ -1,17 +1,23 @@
 import { cn } from "@/lib/utils";
-import { estimateBounds } from "../editor/warp-engine";
+import { estimateBounds } from "../../editor/shapes/warp-text/warp-engine";
+import { useEditor } from "../../editor/use-editor";
+import { useEditorValue } from "../../editor/use-editor-value";
 
-export const CanvasNode = ({
-  geometry,
-  isEditing,
-  node,
-  onDoubleClick,
-  onPointerDown,
-  registerElement,
-}) => {
+export const CanvasNode = ({ nodeId, spacePressed }) => {
+  const editor = useEditor();
+  const activeTool = useEditorValue((_, state) => state.activeTool);
+  const editingNodeId = useEditorValue((_, state) => state.editingNodeId);
+  const node = useEditorValue((editor) => editor.getNode(nodeId));
+  const geometry = useEditorValue((editor) => editor.getNodeGeometry(nodeId));
+
+  if (!node) {
+    return null;
+  }
+
   const bbox = geometry?.bbox || estimateBounds(node);
   const width = Math.max(1, bbox.width);
   const height = Math.max(1, bbox.height);
+  const isEditing = editingNodeId === nodeId;
 
   return (
     <button
@@ -20,9 +26,19 @@ export const CanvasNode = ({
         !geometry?.ready && "opacity-50"
       )}
       data-node-id={node.id}
-      onDoubleClick={onDoubleClick}
-      onPointerDown={onPointerDown}
-      ref={(element) => registerElement(node.id, element)}
+      onDoubleClick={() => editor.startEditing(node)}
+      onPointerDown={(event) => {
+        if (event.button !== 0) {
+          return;
+        }
+
+        if (spacePressed || activeTool === "hand") {
+          return;
+        }
+
+        editor.dispatchNodePointerDown({ event, node });
+      }}
+      ref={(element) => editor.registerNodeElement(node.id, element)}
       style={{
         height: `${height}px`,
         left: `${node.x + bbox.minX}px`,
