@@ -94,7 +94,7 @@ export const DesignerPanel = ({
   return (
     <aside
       className={cn(
-        "absolute top-4 z-10 hidden max-h-[calc(100%-32px)] overflow-hidden md:block md:w-[240px] lg:w-[280px]",
+        "absolute top-4 z-10 hidden max-h-[calc(100%-32px)] md:block md:w-[240px] lg:w-[280px]",
         side === "left" ? "left-4" : "right-4",
         className
       )}

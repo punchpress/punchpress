@@ -106,8 +106,7 @@ const getLayerPrimaryButtonClassName = ({
     joinWithPrevious ? "rounded-tl-none" : "rounded-tl-[8px]",
     joinWithNext ? "rounded-bl-none" : "rounded-bl-[8px]",
     !isSelected && "group-hover:bg-[var(--designer-hover)]",
-    isSelected &&
-      "bg-blue-600 text-white shadow-[0_10px_22px_rgba(37,99,235,0.22)] hover:bg-blue-600 hover:text-white"
+    isSelected && "bg-blue-600 text-white hover:bg-blue-600 hover:text-white"
   );
 };
 
