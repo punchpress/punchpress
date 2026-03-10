@@ -88,11 +88,13 @@ export const CanvasTextEditor = () => {
 
   return (
     <div
-      className="pointer-events-auto absolute z-10 -translate-x-1/2 -translate-y-1/2"
+      className="pointer-events-auto absolute z-10"
       style={{
         height: `${frame.height}px`,
         left: `${frame.x}px`,
         top: `${frame.y}px`,
+        transform: `translate(-50%, -50%) rotate(${editingNode.rotation || 0}deg)`,
+        transformOrigin: "center center",
         width: `${frame.width}px`,
       }}
     >

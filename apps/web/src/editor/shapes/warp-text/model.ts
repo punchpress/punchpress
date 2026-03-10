@@ -44,6 +44,7 @@ export const createDefaultNode = (fontUrl) => {
     strokeWidth: 12,
     visible: true,
     warp: { kind: "arch", bend: 0.4 },
+    rotation: 0,
     x: 2250,
     y: 2700,
   };

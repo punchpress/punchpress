@@ -122,6 +122,94 @@ export const scaleSelectedGroupBy = (page, options) => {
   }, options);
 };
 
+const getHandleCenter = (handle) => {
+  return {
+    x: handle.x + handle.width / 2,
+    y: handle.y + handle.height / 2,
+  };
+};
+
+const dragSelectionFromCorner = async (
+  page,
+  { corner = "nw", drag = { x: 120, y: 80 }, offset = 20, release = true } = {}
+) => {
+  const selection = await waitForSelectionHandles(page);
+  const handle = selection.handles[corner];
+
+  if (!handle) {
+    throw new Error(`Missing ${corner} selection handle for corner rotation`);
+  }
+
+  const handleCenter = getHandleCenter(handle);
+  const start = {
+    x: handleCenter.x + (corner.endsWith("e") ? offset : -offset),
+    y: handleCenter.y + (corner.startsWith("s") ? offset : -offset),
+  };
+  const end = {
+    x: start.x + drag.x,
+    y: start.y + drag.y,
+  };
+
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(end.x, end.y, { steps: 20 });
+
+  if (release) {
+    await page.mouse.up();
+  }
+
+  return { end, start };
+};
+
+export const rotateSelectionFromCorner = async (page, options) => {
+  await dragSelectionFromCorner(page, options);
+};
+
+export const rotateSelectionFromCornerWithoutRelease = async (page, options) => {
+  // Rotation starts just outside the visible corner handle.
+  // The corner itself remains the resize affordance.
+  return dragSelectionFromCorner(page, { ...options, release: false });
+};
+
+export const getGroupRotationPreviewRect = async (page) => {
+  const locator = page.locator(".canvas-group-rotation-preview");
+
+  if ((await locator.count()) === 0) {
+    return null;
+  }
+
+  return locator.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+
+    return {
+      bottom: rect.bottom,
+      height: rect.height,
+      left: rect.left,
+      right: rect.right,
+      top: rect.top,
+      width: rect.width,
+      x: rect.x,
+      y: rect.y,
+    };
+  });
+};
+
+export const getSelectionBoxRect = async (page) => {
+  const selection = await waitForSelectionHandles(page);
+  const { nw, se } = selection.handles;
+
+  return {
+    bottom: se.y + se.height / 2,
+    height: se.y + se.height / 2 - (nw.y + nw.height / 2),
+    left: nw.x + nw.width / 2,
+    right: se.x + se.width / 2,
+    top: nw.y + nw.height / 2,
+    width: se.x + se.width / 2 - (nw.x + nw.width / 2),
+    x: nw.x + nw.width / 2,
+    y: nw.y + nw.height / 2,
+  };
+};
+
 export const dragLayerBelow = async (page, sourceLabel, targetLabel) => {
   const source = page.getByRole("button", { name: sourceLabel }).first();
   const target = page.getByRole("button", { name: targetLabel }).first();
@@ -186,6 +274,12 @@ export const waitForSelectionHandles = async (page) => {
 export const zoomIn = async (page, times = 1) => {
   for (let index = 0; index < times; index += 1) {
     await page.getByRole("button", { name: "Zoom in" }).click();
+  }
+};
+
+export const zoomOut = async (page, times = 1) => {
+  for (let index = 0; index < times; index += 1) {
+    await page.getByRole("button", { name: "Zoom out" }).click();
   }
 };
 

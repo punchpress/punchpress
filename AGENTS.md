@@ -25,6 +25,7 @@ Use these standards for new code and touched code during refactors.
 - Prefer TypeScript inference when the type context is already provided.
 - Prefer `components/ui/` for standard controls and app chrome. Use native semantic elements when a custom interaction needs a different accessibility model.
 - Use component `variant` and `size` props instead of ad-hoc styling overrides.
+- Prefer shared color tokens in `apps/web/src/styles/global.css` or an existing token source over scattering bespoke color values through component or vendor CSS.
 - Default to no CSS transitions for state changes like hover/selected backgrounds. Add motion only when it is intentional and clearly improves the interaction.
 - Use Biome + Ultracite configuration (`biome.jsonc` + `bun run lint`).
 

@@ -1,8 +1,13 @@
 import {
+  getCornerPointFromBounds,
   getResizeAnchorFromBounds,
+  getResizeCorner,
+  getResizedNodeUpdate,
   getScaledGroupNodeUpdate,
 } from "./primitives/group-resize";
 import { round } from "./primitives/math";
+import { getNodeWorldPoint } from "./primitives/rotation";
+import { estimateBounds } from "./shapes/warp-text/warp-engine";
 
 const toRect = (rect) => {
   if (!rect) {
@@ -66,6 +71,7 @@ const getNodeSnapshot = (editor, nodeId) => {
     fontSize: node.fontSize,
     id: node.id,
     ready: Boolean(geometry?.ready),
+    rotation: node.rotation || 0,
     strokeWidth: node.strokeWidth,
     text: node.text,
     tracking: node.tracking,
@@ -109,7 +115,7 @@ export const createEditorE2eApi = (editor) => {
             host
               ?.querySelector(getResizeHandleSelector("sw"))
               ?.getBoundingClientRect?.()
-          ),
+            ),
         },
         selectedNodeIds: editor.selectedNodeIds,
         selectedNodeId: editor.selectedNodeId,
@@ -128,6 +134,7 @@ export const createEditorE2eApi = (editor) => {
           fontUrl: node.fontUrl,
           id: node.id,
           kind: node.kind,
+          rotation: node.rotation || 0,
           stroke: node.stroke,
           strokeWidth: node.strokeWidth,
           text: node.text,
@@ -158,19 +165,27 @@ export const createEditorE2eApi = (editor) => {
     scaleSelectedNodeBy: ({ scale = 1 } = {}) => {
       const selectedNode = editor.selectedNode;
       const geometry = editor.getNodeGeometry(selectedNode?.id);
-      const bbox = geometry?.bbox;
+      const bbox =
+        geometry?.bbox || (selectedNode ? estimateBounds(selectedNode) : null);
 
       if (!(selectedNode && bbox)) {
         return null;
       }
 
-      editor.updateNode(selectedNode.id, {
-        fontSize: round(Math.max(1, selectedNode.fontSize * scale), 2),
-        strokeWidth: round(Math.max(0, selectedNode.strokeWidth * scale), 2),
-        tracking: round(selectedNode.tracking * scale, 2),
-        x: round(selectedNode.x + bbox.minX - bbox.minX * scale, 2),
-        y: round(selectedNode.y + bbox.minY - bbox.minY * scale, 2),
-      });
+      editor.updateNode(
+        selectedNode.id,
+        getResizedNodeUpdate(
+          selectedNode,
+          bbox,
+          getNodeWorldPoint(
+            selectedNode,
+            bbox,
+            getCornerPointFromBounds(bbox, getResizeCorner([1, 1], true))
+          ),
+          scale,
+          [1, 1]
+        )
+      );
       queueOverlayRefresh(editor);
 
       return selectedNode.id;
