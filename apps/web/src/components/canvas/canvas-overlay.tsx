@@ -3,24 +3,16 @@ import { flushSync } from "react-dom";
 import Moveable from "react-moveable";
 import Selecto from "react-selecto";
 import {
-  getResizeAnchorFromBounds,
+  getResizeCorner,
+  getResizedNodeUpdate,
   getScaledGroupNodeUpdate,
 } from "../../editor/primitives/group-resize";
 import { clamp, round } from "../../editor/primitives/math";
+import { getRotatedNodeUpdate } from "../../editor/primitives/rotation";
 import { isNodeVisible } from "../../editor/shapes/warp-text/model";
+import { estimateBounds } from "../../editor/shapes/warp-text/warp-engine";
 import { useEditor } from "../../editor/use-editor";
 import { useEditorValue } from "../../editor/use-editor-value";
-
-const getResizeAnchor = (targetRect, direction) => {
-  const [horizontalDirection, verticalDirection] = direction;
-
-  return {
-    bboxX: horizontalDirection >= 0 ? "minX" : "maxX",
-    bboxY: verticalDirection >= 0 ? "minY" : "maxY",
-    clientX: horizontalDirection >= 0 ? targetRect.left : targetRect.right,
-    clientY: verticalDirection >= 0 ? targetRect.top : targetRect.bottom,
-  };
-};
 
 const getResizePointer = (event) => {
   const inputEvent = event.inputEvent;
@@ -47,27 +39,6 @@ const getResizePointer = (event) => {
   return null;
 };
 
-const getGroupResizeScale = (event, baseClientBounds) => {
-  const widthScale =
-    baseClientBounds.width > 0
-      ? event.boundingWidth / baseClientBounds.width
-      : null;
-  const heightScale =
-    baseClientBounds.height > 0
-      ? event.boundingHeight / baseClientBounds.height
-      : null;
-
-  if (Number.isFinite(widthScale)) {
-    return clamp(widthScale, 0.001, 20);
-  }
-
-  if (Number.isFinite(heightScale)) {
-    return clamp(heightScale, 0.001, 20);
-  }
-
-  return 1;
-};
-
 const getTargetClientBounds = (targets) => {
   if (targets.length === 0) {
     return null;
@@ -86,6 +57,131 @@ const getTargetClientBounds = (targets) => {
     right,
     top,
     width: right - left,
+  };
+};
+
+const getRectCenter = (rect) => {
+  return {
+    x: rect.left + rect.width / 2,
+    y: rect.top + rect.height / 2,
+  };
+};
+
+const getResizeHandleSelector = (corner) => {
+  return `.canvas-moveable .moveable-control.moveable-${corner}`;
+};
+
+const getHandleClientCenter = (hostElement, selector) => {
+  const element = hostElement?.querySelector(selector);
+  const rect = element?.getBoundingClientRect?.();
+  if (!rect) {
+    return null;
+  }
+
+  return getRectCenter(rect);
+};
+
+const getCanvasPointFromClientPoint = (editor, point) => {
+  const host = editor.hostRef;
+  const viewer = editor.viewerRef;
+  if (!(host && viewer && point && editor.zoom > 0)) {
+    return null;
+  }
+
+  const hostRect = host.getBoundingClientRect();
+
+  return {
+    x: viewer.getScrollLeft() + (point.x - hostRect.left) / editor.zoom,
+    y: viewer.getScrollTop() + (point.y - hostRect.top) / editor.zoom,
+  };
+};
+
+const getResizeSession = (editor, hostElement, direction, pointer) => {
+  if (!pointer) {
+    return null;
+  }
+
+  const anchorClient = getHandleClientCenter(
+    hostElement,
+    getResizeHandleSelector(getResizeCorner(direction, true))
+  );
+  if (!anchorClient) {
+    return null;
+  }
+
+  const anchorCanvas = getCanvasPointFromClientPoint(editor, anchorClient);
+  if (!anchorCanvas) {
+    return null;
+  }
+
+  return {
+    anchorCanvas,
+    anchorClient,
+    startDistance: Math.max(
+      Math.hypot(pointer.x - anchorClient.x, pointer.y - anchorClient.y),
+      1
+    ),
+  };
+};
+
+const getSelectionCenter = (bounds) => {
+  if (!bounds) {
+    return null;
+  }
+
+  return {
+    x: bounds.minX + bounds.width / 2,
+    y: bounds.minY + bounds.height / 2,
+  };
+};
+
+const areSameTargets = (currentTargets, nextTargets) => {
+  if (currentTargets.length !== nextTargets.length) {
+    return false;
+  }
+
+  return currentTargets.every((target, index) => target === nextTargets[index]);
+};
+
+const queueMoveableRefresh = (moveableRef) => {
+  if (typeof window === "undefined") {
+    moveableRef.current?.updateRect?.();
+    return;
+  }
+
+  window.requestAnimationFrame(() => {
+    moveableRef.current?.updateRect?.();
+  });
+};
+
+const setMoveableMuted = (hostElement, muted) => {
+  hostElement?.classList.toggle("canvas-overlay-moveable-muted", muted);
+};
+
+const setGroupRotationPreviewActive = (hostElement, active) => {
+  hostElement?.classList.toggle("canvas-overlay-group-rotating", active);
+};
+
+const getHostRectFromCanvasBounds = (editor, bounds) => {
+  const host = editor.hostRef;
+  const viewer = editor.viewerRef;
+
+  if (!(host && viewer && bounds && editor.zoom > 0)) {
+    return null;
+  }
+
+  const scrollLeft = viewer.getScrollLeft?.();
+  const scrollTop = viewer.getScrollTop?.();
+
+  if (!(Number.isFinite(scrollLeft) && Number.isFinite(scrollTop))) {
+    return null;
+  }
+
+  return {
+    height: bounds.height * editor.zoom,
+    left: (bounds.minX - scrollLeft) * editor.zoom,
+    top: (bounds.minY - scrollTop) * editor.zoom,
+    width: bounds.width * editor.zoom,
   };
 };
 
@@ -148,6 +244,8 @@ export const CanvasOverlay = ({ spacePressed }) => {
   const moveableRef = useRef(null);
   const selectoRef = useRef(null);
   const [selectedTargets, setSelectedTargets] = useState([]);
+  const [isGroupRotationPreviewVisible, setIsGroupRotationPreviewVisible] =
+    useState(false);
 
   const activeTool = useEditorValue((_, state) => state.activeTool);
   const editingNodeId = useEditorValue((_, state) => state.editingNodeId);
@@ -174,13 +272,25 @@ export const CanvasOverlay = ({ spacePressed }) => {
   const selectedBounds = useEditorValue((editor) => {
     return editor.getSelectionBounds(visibleSelectedNodeIds);
   });
+  const hostElement = editor.hostRef;
+  const keyContainer = typeof window === "undefined" ? undefined : window;
+  const selectedTarget = selectedTargets[0] || null;
+  const hasGroupSelection = visibleSelectedNodeIds.length > 1;
+  const groupRotationPreviewRect =
+    isGroupRotationPreviewVisible && hasGroupSelection
+      ? getHostRectFromCanvasBounds(editor, selectedBounds)
+      : null;
 
   useEffect(() => {
-    setSelectedTargets(
-      visibleSelectedNodeIds
-        .map((nodeId) => editor.getNodeElement(nodeId))
-        .filter(Boolean)
-    );
+    const nextTargets = visibleSelectedNodeIds
+      .map((nodeId) => editor.getNodeElement(nodeId))
+      .filter(Boolean);
+
+    setSelectedTargets((currentTargets) => {
+      return areSameTargets(currentTargets, nextTargets)
+        ? currentTargets
+        : nextTargets;
+    });
   }, [editor, visibleSelectedNodeIds]);
 
   useEffect(() => {
@@ -208,10 +318,59 @@ export const CanvasOverlay = ({ spacePressed }) => {
     };
   }, [editor]);
 
-  const hostElement = editor.hostRef;
-  const keyContainer = typeof window === "undefined" ? undefined : window;
-  const selectedTarget = selectedTargets[0] || null;
-  const hasGroupSelection = visibleSelectedNodeIds.length > 1;
+  useEffect(() => {
+    if (!hostElement) {
+      return;
+    }
+
+    const clientBounds =
+      selectedTargets.length > 1
+        ? getTargetClientBounds(selectedTargets)
+        : selectedTarget?.getBoundingClientRect?.() || null;
+    const minDimension = clientBounds
+      ? Math.min(clientBounds.width, clientBounds.height)
+      : 0;
+    const offset = clamp(minDimension * 0.18, 12, 36);
+
+    hostElement.style.setProperty("--canvas-rotation-offset", `${offset}px`);
+
+    return () => {
+      hostElement.style.removeProperty("--canvas-rotation-offset");
+    };
+  }, [hostElement, selectedTarget, selectedTargets]);
+
+  useEffect(() => {
+    if (!hostElement) {
+      return;
+    }
+
+    if (
+      selectedTargets.length === 0 ||
+      editingNodeId ||
+      activeTool !== "pointer"
+    ) {
+      setMoveableMuted(hostElement, false);
+    }
+
+    return () => {
+      setMoveableMuted(hostElement, false);
+    };
+  }, [activeTool, editingNodeId, hostElement, selectedTargets.length]);
+
+  useEffect(() => {
+    if (!hostElement) {
+      return;
+    }
+
+    if (!isGroupRotationPreviewVisible) {
+      setGroupRotationPreviewActive(hostElement, false);
+    }
+
+    return () => {
+      setGroupRotationPreviewActive(hostElement, false);
+    };
+  }, [hostElement, isGroupRotationPreviewVisible]);
+
   const isDraggable = Boolean(
     activeTool === "pointer" && selectedTargets.length > 0 && !editingNodeId
   );
@@ -220,6 +379,12 @@ export const CanvasOverlay = ({ spacePressed }) => {
       selectedTargets.length > 0 &&
       (hasGroupSelection ? selectedBounds : selectedTarget) &&
       (hasGroupSelection || (selectedNode && selectedGeometry)) &&
+      !editingNodeId
+  );
+  const isRotatable = Boolean(
+    activeTool === "pointer" &&
+      selectedTargets.length > 0 &&
+      (hasGroupSelection ? selectedBounds : selectedGeometry) &&
       !editingNodeId
   );
 
@@ -272,6 +437,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
       <Moveable
         className="canvas-moveable"
         container={hostElement}
+        controlPadding={32}
         draggable={isDraggable}
         flushSync={flushSync}
         hideChildMoveableDefaultLines={hasGroupSelection}
@@ -282,10 +448,16 @@ export const CanvasOverlay = ({ spacePressed }) => {
             return;
           }
 
+          const bbox = selectedGeometry?.bbox || estimateBounds(selectedNode);
+
           editor.updateNode(selectedNode.id, {
-            x: round(event.datas.startX + event.beforeTranslate[0], 2),
-            y: round(event.datas.startY + event.beforeTranslate[1], 2),
+            x: round(event.left - bbox.minX, 2),
+            y: round(event.top - bbox.minY, 2),
           });
+        }}
+        onDragEnd={() => {
+          setMoveableMuted(hostElement, false);
+          queueMoveableRefresh(moveableRef);
         }}
         onDragGroup={(event) => {
           const nextSelectedNodeIds = visibleSelectedNodeIds;
@@ -294,7 +466,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
             return;
           }
 
-          editor.updateNodes(nextSelectedNodeIds, (node) => {
+          editor.updateNodes(visibleSelectedNodeIds, (node) => {
             const groupEvent = event.events.find(
               (item) => item.target?.dataset.nodeId === node.id
             );
@@ -303,38 +475,43 @@ export const CanvasOverlay = ({ spacePressed }) => {
               return node;
             }
 
+            const bbox = groupEvent.datas.bbox;
+            if (!bbox) {
+              return node;
+            }
             return {
-              x: round(
-                groupEvent.datas.startX + groupEvent.beforeTranslate[0],
-                2
-              ),
-              y: round(
-                groupEvent.datas.startY + groupEvent.beforeTranslate[1],
-                2
-              ),
+              x: round(groupEvent.left - bbox.minX, 2),
+              y: round(groupEvent.top - bbox.minY, 2),
             };
           });
         }}
+        onDragGroupEnd={() => {
+          setMoveableMuted(hostElement, false);
+          queueMoveableRefresh(moveableRef);
+        }}
         onDragGroupStart={(event) => {
+          setMoveableMuted(hostElement, true);
+
           for (const groupEvent of event.events) {
             const nodeId = groupEvent.target?.dataset.nodeId;
             const node = editor.getNode(nodeId);
 
-            groupEvent.datas.startX = node?.x || 0;
-            groupEvent.datas.startY = node?.y || 0;
+            groupEvent.datas.bbox =
+              node &&
+              (editor.getNodeGeometry(nodeId)?.bbox || estimateBounds(node));
           }
         }}
-        onDragStart={(event) => {
-          event.datas.startX = selectedNode?.x || 0;
-          event.datas.startY = selectedNode?.y || 0;
+        onDragStart={() => {
+          setMoveableMuted(hostElement, true);
         }}
         onResize={(event) => {
           if (
             !(
               selectedNode &&
               event.datas.baseBBox &&
-              Number.isFinite(event.datas.anchorClientX) &&
-              Number.isFinite(event.datas.anchorClientY) &&
+              event.datas.anchorClient &&
+              event.datas.anchorCanvas &&
+              event.datas.direction &&
               Number.isFinite(event.datas.startDistance)
             )
           ) {
@@ -348,48 +525,54 @@ export const CanvasOverlay = ({ spacePressed }) => {
 
           const resizeScale = clamp(
             Math.hypot(
-              pointer.x - event.datas.anchorClientX,
-              pointer.y - event.datas.anchorClientY
+              pointer.x - event.datas.anchorClient.x,
+              pointer.y - event.datas.anchorClient.y
             ) / event.datas.startDistance,
             0.001,
             20
           );
 
-          editor.updateNode(selectedNode.id, {
-            fontSize: round(
-              Math.max(1, event.datas.baseFontSize * resizeScale),
-              2
-            ),
-            strokeWidth: round(
-              Math.max(0, event.datas.baseStrokeWidth * resizeScale),
-              2
-            ),
-            tracking: round(event.datas.baseTracking * resizeScale, 2),
-            x: round(
-              event.datas.baseX +
-                event.datas.baseBBox[event.datas.anchorBBoxX] -
-                event.datas.baseBBox[event.datas.anchorBBoxX] * resizeScale,
-              2
-            ),
-            y: round(
-              event.datas.baseY +
-                event.datas.baseBBox[event.datas.anchorBBoxY] -
-                event.datas.baseBBox[event.datas.anchorBBoxY] * resizeScale,
-              2
-            ),
-          });
+          editor.updateNode(
+            selectedNode.id,
+            getResizedNodeUpdate(
+              event.datas.baseNode,
+              event.datas.baseBBox,
+              event.datas.anchorCanvas,
+              resizeScale,
+              event.datas.direction
+            )
+          );
+        }}
+        onResizeEnd={() => {
+          queueMoveableRefresh(moveableRef);
         }}
         onResizeGroup={(event) => {
-          const baseBounds = event.datas.baseBounds;
-          const baseClientBounds = event.datas.baseClientBounds;
+          const anchorCanvas = event.datas.anchorCanvas;
           const baseNodes = event.datas.baseNodes;
+          const anchorClient = event.datas.anchorClient;
 
-          if (!(baseBounds && baseClientBounds && baseNodes)) {
+          if (
+            !(
+              anchorCanvas &&
+              anchorClient &&
+              baseNodes &&
+              Number.isFinite(event.datas.startDistance)
+            )
+          ) {
             return;
           }
 
-          const scale = getGroupResizeScale(event, baseClientBounds);
-          const anchor = getResizeAnchorFromBounds(baseBounds, event.direction);
+          const pointer = getResizePointer(event);
+          if (!pointer) {
+            return;
+          }
+
+          const scale = clamp(
+            Math.hypot(pointer.x - anchorClient.x, pointer.y - anchorClient.y) /
+              event.datas.startDistance,
+            0.001,
+            20
+          );
 
           editor.updateNodes(visibleSelectedNodeIds, (node) => {
             const baseNode = baseNodes.get(node.id);
@@ -398,16 +581,22 @@ export const CanvasOverlay = ({ spacePressed }) => {
               return node;
             }
 
-            return getScaledGroupNodeUpdate(baseNode, anchor, scale);
+            return getScaledGroupNodeUpdate(baseNode, anchorCanvas, scale);
           });
         }}
+        onResizeGroupEnd={() => {
+          queueMoveableRefresh(moveableRef);
+        }}
         onResizeGroupStart={(event) => {
-          if (!selectedBounds) {
-            return;
-          }
+          const pointer = getResizePointer(event);
+          const resizeSession = getResizeSession(
+            editor,
+            hostElement,
+            event.direction,
+            pointer
+          );
 
-          const baseClientBounds = getTargetClientBounds(selectedTargets);
-          if (!baseClientBounds) {
+          if (!resizeSession) {
             return;
           }
 
@@ -428,54 +617,193 @@ export const CanvasOverlay = ({ spacePressed }) => {
             });
           }
 
-          event.datas.baseBounds = selectedBounds;
-          event.datas.baseClientBounds = baseClientBounds;
+          event.datas.anchorCanvas = resizeSession.anchorCanvas;
+          event.datas.anchorClient = resizeSession.anchorClient;
           event.datas.baseNodes = baseNodes;
+          event.datas.startDistance = resizeSession.startDistance;
         }}
         onResizeStart={(event) => {
           if (!selectedNode) {
             return;
           }
 
-          const bbox = selectedGeometry?.bbox;
-          if (!bbox) {
-            return;
-          }
+          const bbox = selectedGeometry?.bbox || estimateBounds(selectedNode);
 
-          const targetRect = selectedTarget?.getBoundingClientRect();
           const pointer = getResizePointer(event);
-          if (!(targetRect && pointer)) {
+          const resizeSession = getResizeSession(
+            editor,
+            hostElement,
+            event.direction,
+            pointer
+          );
+
+          if (!resizeSession) {
             return;
           }
-
-          const anchor = getResizeAnchor(targetRect, event.direction);
 
           event.datas.baseBBox = bbox;
-          event.datas.anchorBBoxX = anchor.bboxX;
-          event.datas.anchorBBoxY = anchor.bboxY;
-          event.datas.anchorClientX = anchor.clientX;
-          event.datas.anchorClientY = anchor.clientY;
-          event.datas.baseFontSize = selectedNode.fontSize;
-          event.datas.baseStrokeWidth = selectedNode.strokeWidth;
-          event.datas.baseTracking = selectedNode.tracking;
-          event.datas.baseX = selectedNode.x;
-          event.datas.baseY = selectedNode.y;
-          event.datas.startDistance = Math.max(
-            Math.hypot(
-              pointer.x - event.datas.anchorClientX,
-              pointer.y - event.datas.anchorClientY
-            ),
-            1
+          event.datas.anchorCanvas = resizeSession.anchorCanvas;
+          event.datas.anchorClient = resizeSession.anchorClient;
+          event.datas.baseNode = {
+            fontSize: selectedNode.fontSize,
+            rotation: selectedNode.rotation || 0,
+            strokeWidth: selectedNode.strokeWidth,
+            tracking: selectedNode.tracking,
+            x: selectedNode.x,
+            y: selectedNode.y,
+          };
+          event.datas.direction = event.direction;
+          event.datas.startDistance = resizeSession.startDistance;
+        }}
+        onRotate={(event) => {
+          if (
+            !(
+              selectedNode &&
+              event.datas.baseNode &&
+              event.datas.baseBBox &&
+              event.datas.selectionCenter
+            )
+          ) {
+            return;
+          }
+
+          editor.updateNode(
+            selectedNode.id,
+            getRotatedNodeUpdate(
+              event.datas.baseNode,
+              event.datas.baseBBox,
+              event.datas.selectionCenter,
+              event.beforeDist
+            )
           );
+        }}
+        onRotateEnd={() => {
+          setMoveableMuted(hostElement, false);
+          queueMoveableRefresh(moveableRef);
+        }}
+        onRotateGroup={(event) => {
+          const baseNodes = event.datas.baseNodes;
+          const selectionCenter = event.datas.selectionCenter;
+
+          if (!(baseNodes && selectionCenter)) {
+            return;
+          }
+
+          // Keep Moveable's internal group frame stable during drag.
+          // The live multi-selection box is rendered as a passive preview instead.
+          editor.updateNodes(visibleSelectedNodeIds, (node) => {
+            const baseNode = baseNodes.get(node.id);
+
+            if (!baseNode) {
+              return node;
+            }
+
+            return getRotatedNodeUpdate(
+              baseNode,
+              baseNode.bbox,
+              selectionCenter,
+              event.beforeDist
+            );
+          });
+        }}
+        onRotateGroupEnd={() => {
+          setMoveableMuted(hostElement, false);
+          queueMoveableRefresh(moveableRef);
+
+          if (typeof window === "undefined") {
+            setGroupRotationPreviewActive(hostElement, false);
+            setIsGroupRotationPreviewVisible(false);
+            return;
+          }
+
+          window.requestAnimationFrame(() => {
+            setGroupRotationPreviewActive(hostElement, false);
+            setIsGroupRotationPreviewVisible(false);
+          });
+        }}
+        onRotateGroupStart={(event) => {
+          const selectionCenter = getSelectionCenter(selectedBounds);
+
+          if (!selectionCenter) {
+            return;
+          }
+
+          setMoveableMuted(hostElement, true);
+          setGroupRotationPreviewActive(hostElement, true);
+          setIsGroupRotationPreviewVisible(true);
+
+          const baseNodes = new Map();
+
+          for (const groupEvent of event.events) {
+            const nodeId = groupEvent.target?.dataset.nodeId;
+            const node = editor.getNode(nodeId);
+
+            if (!node) {
+              continue;
+            }
+
+            groupEvent.set(node.rotation || 0);
+
+            baseNodes.set(nodeId, {
+              bbox:
+                editor.getNodeGeometry(nodeId)?.bbox || estimateBounds(node),
+              rotation: node.rotation || 0,
+              x: node.x,
+              y: node.y,
+            });
+          }
+
+          event.datas.baseNodes = baseNodes;
+          event.datas.selectionCenter = selectionCenter;
+        }}
+        onRotateStart={(event) => {
+          if (!selectedNode) {
+            return;
+          }
+
+          setMoveableMuted(hostElement, true);
+
+          const bbox = selectedGeometry?.bbox || estimateBounds(selectedNode);
+
+          event.set(selectedNode.rotation || 0);
+          event.datas.baseBBox = bbox;
+          event.datas.baseNode = {
+            rotation: selectedNode.rotation || 0,
+            x: selectedNode.x,
+            y: selectedNode.y,
+          };
+          event.datas.selectionCenter = getSelectionCenter({
+            height: bbox.height,
+            maxX: selectedNode.x + bbox.maxX,
+            maxY: selectedNode.y + bbox.maxY,
+            minX: selectedNode.x + bbox.minX,
+            minY: selectedNode.y + bbox.minY,
+            width: bbox.width,
+          });
         }}
         origin={false}
         ref={moveableRef}
         renderDirections={["nw", "ne", "sw", "se"]}
         resizable={isResizable}
         rootContainer={hostElement}
+        rotatable={isRotatable}
+        rotateAroundControls
+        rotationPosition="none"
         target={hasGroupSelection ? null : selectedTarget}
         targets={hasGroupSelection ? selectedTargets : undefined}
       />
+
+      {groupRotationPreviewRect ? (
+        <div
+          className="canvas-group-rotation-preview pointer-events-none absolute"
+          style={{
+            height: `${groupRotationPreviewRect.height}px`,
+            left: `${groupRotationPreviewRect.left}px`,
+            top: `${groupRotationPreviewRect.top}px`,
+            width: `${groupRotationPreviewRect.width}px`,
+          }}
+        />
+      ) : null}
     </>
   );
 };

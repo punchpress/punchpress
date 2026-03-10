@@ -43,6 +43,8 @@ export const CanvasNode = ({ nodeId, spacePressed }) => {
         height: `${height}px`,
         left: `${node.x + bbox.minX}px`,
         top: `${node.y + bbox.minY}px`,
+        transform: `rotate(${node.rotation || 0}deg)`,
+        transformOrigin: "center center",
         width: `${width}px`,
       }}
       type="button"

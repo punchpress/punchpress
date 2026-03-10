@@ -486,6 +486,11 @@ export class Editor {
 const getSelectionBounds = (editor, nodeIds) => {
   const bounds = nodeIds
     .map((nodeId) => {
+      const renderedBounds = getRenderedNodeBounds(editor, nodeId);
+      if (renderedBounds) {
+        return renderedBounds;
+      }
+
       const node = editor.getNode(nodeId);
       const geometry = editor.getNodeGeometry(nodeId);
       const bbox = geometry?.bbox;
@@ -519,5 +524,31 @@ const getSelectionBounds = (editor, nodeIds) => {
     minX,
     minY,
     width: maxX - minX,
+  };
+};
+
+const getRenderedNodeBounds = (editor, nodeId) => {
+  const element = editor.getNodeElement(nodeId);
+  const host = editor.hostRef;
+  const viewer = editor.viewerRef;
+
+  if (!(element && host && viewer && editor.zoom > 0)) {
+    return null;
+  }
+
+  const elementRect = element.getBoundingClientRect();
+  const hostRect = host.getBoundingClientRect();
+  const scrollLeft = viewer.getScrollLeft?.();
+  const scrollTop = viewer.getScrollTop?.();
+
+  if (!(Number.isFinite(scrollLeft) && Number.isFinite(scrollTop))) {
+    return null;
+  }
+
+  return {
+    maxX: scrollLeft + (elementRect.right - hostRect.left) / editor.zoom,
+    maxY: scrollTop + (elementRect.bottom - hostRect.top) / editor.zoom,
+    minX: scrollLeft + (elementRect.left - hostRect.left) / editor.zoom,
+    minY: scrollTop + (elementRect.top - hostRect.top) / editor.zoom,
   };
 };

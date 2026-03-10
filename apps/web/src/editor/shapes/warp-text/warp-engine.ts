@@ -50,7 +50,8 @@ export const layoutGlyphs = (node, font) => {
   const scale = node.fontSize / font.unitsPerEm;
   let cursorX = 0;
 
-  const glyphs = [];
+  const glyphs =
+    /** @type {Array<{ advance: number, baseX: number, centerX: number, contours: ReturnType<typeof commandsToContours>, path: string }>} */ ([]);
 
   for (const char of text) {
     const glyph = font.charToGlyph(char);
@@ -127,7 +128,8 @@ const buildFallbackGeometry = (node) => {
 };
 
 const buildArchGeometry = (layout, node) => {
-  const mergedContours = [];
+  const mergedContours =
+    /** @type {ReturnType<typeof commandsToContours>} */ ([]);
 
   for (const glyph of layout.glyphs) {
     mergedContours.push(...translateContours(glyph.contours, glyph.baseX, 0));
@@ -142,7 +144,8 @@ const buildArchGeometry = (layout, node) => {
 };
 
 const buildWaveGeometry = (layout, node) => {
-  const mergedContours = [];
+  const mergedContours =
+    /** @type {ReturnType<typeof commandsToContours>} */ ([]);
 
   for (const glyph of layout.glyphs) {
     mergedContours.push(...translateContours(glyph.contours, glyph.baseX, 0));
@@ -162,8 +165,10 @@ const buildWaveGeometry = (layout, node) => {
 };
 
 const buildCircleGeometry = (layout, node) => {
-  const paths = [];
-  const mergedContours = [];
+  const paths =
+    /** @type {Array<{ d: string, key: string, transform?: string }>} */ ([]);
+  const mergedContours =
+    /** @type {ReturnType<typeof commandsToContours>} */ ([]);
   const totalWidth = Math.max(layout.totalWidth, 1);
   const radius = Math.max(1, node.warp.radius);
 
@@ -209,8 +214,10 @@ const buildCircleGeometry = (layout, node) => {
 };
 
 const buildFlatGeometry = (layout, node) => {
-  const paths = [];
-  const mergedContours = [];
+  const paths =
+    /** @type {Array<{ d: string, key: string, transform?: string }>} */ ([]);
+  const mergedContours =
+    /** @type {ReturnType<typeof commandsToContours>} */ ([]);
 
   for (const [index, glyph] of layout.glyphs.entries()) {
     paths.push({
@@ -279,6 +286,15 @@ export const buildSvgExport = (nodes, geometryById) => {
 
     body.push(`<g transform="translate(${format(node.x)} ${format(node.y)})">`);
 
+    if (node.rotation) {
+      const centerX = (geometry.bbox.minX + geometry.bbox.maxX) / 2;
+      const centerY = (geometry.bbox.minY + geometry.bbox.maxY) / 2;
+
+      body.push(
+        `<g transform="rotate(${format(node.rotation)} ${format(centerX)} ${format(centerY)})">`
+      );
+    }
+
     for (const path of geometry.paths) {
       const transform = path.transform ? ` transform="${path.transform}"` : "";
       body.push(
@@ -286,6 +302,10 @@ export const buildSvgExport = (nodes, geometryById) => {
           node.strokeWidth
         )}" paint-order="stroke fill" stroke-linejoin="round" stroke-linecap="round"/>`
       );
+    }
+
+    if (node.rotation) {
+      body.push("</g>");
     }
 
     body.push("</g>");
