@@ -1,3 +1,6 @@
+import { exportDesignDocument } from "../document/export";
+import { loadDesignDocument } from "../document/load";
+import { saveDesignDocument } from "../document/save";
 import { FALLBACK_FONTS, MAX_ZOOM, MIN_ZOOM, UI_ACCENT } from "./constants";
 import {
   DEFAULT_EDITABLE_FONT_FAMILY,
@@ -6,7 +9,7 @@ import {
 import { GeometryManager } from "./managers/geometry-manager";
 import { isInputElement } from "./primitives/dom";
 import { clamp } from "./primitives/math";
-import { isNodeVisible } from "./shapes/warp-text/model";
+import { getNodeX, getNodeY, isNodeVisible } from "./shapes/warp-text/model";
 import { measureStraightText } from "./shapes/warp-text/straight-text-metrics";
 import { createEditorStore } from "./state/store";
 import { HandTool } from "./tools/hand-tool";
@@ -27,6 +30,8 @@ export class Editor {
     this.nodeElements = new Map();
     this.viewerRef = null;
     this.hostRef = null;
+    this.pendingViewportFocusFrame = null;
+    this.viewportFocusRequest = 0;
     this.store = createEditorStore({ fonts, initialZoom });
     this.fonts = new FontManager({
       onChange: () => this.store.getState().bumpFontRevision(),
@@ -77,6 +82,8 @@ export class Editor {
       window.removeEventListener("keydown", this.handleSpaceDown);
       window.removeEventListener("keyup", this.handleSpaceUp);
     }
+
+    this.cancelPendingViewportFocus();
   }
 
   getState() {
@@ -228,6 +235,14 @@ export class Editor {
     return getSelectionBounds(this, nodeIds);
   }
 
+  getDocument() {
+    if (this.editingNodeId) {
+      this.commitEditing();
+    }
+
+    return saveDesignDocument(this.nodes).document;
+  }
+
   addTextNode(point) {
     this.getState().addTextNode(point);
   }
@@ -276,6 +291,10 @@ export class Editor {
 
   duplicateSelected() {
     this.getState().duplicateSelectedNodes();
+  }
+
+  exportDocument() {
+    return exportDesignDocument(this.getDocument());
   }
 
   finalizeEditing() {
@@ -449,12 +468,25 @@ export class Editor {
     return this.selectedNodeIds.includes(nodeId);
   }
 
+  loadDocument(contents) {
+    const { nodes } = loadDesignDocument(contents);
+    this.getState().loadNodes(nodes);
+
+    if (typeof window !== "undefined") {
+      this.scheduleViewportFocus(nodes.map((node) => node.id));
+    }
+  }
+
   registerNodeElement(nodeId, element) {
     if (element) {
       this.nodeElements.set(nodeId, element);
     } else {
       this.nodeElements.delete(nodeId);
     }
+  }
+
+  serializeDocument() {
+    return saveDesignDocument(this.nodes).contents;
   }
 
   getNodeElement(nodeId) {
@@ -497,6 +529,65 @@ export class Editor {
     this.spacePressed = false;
     this.onSpacePressedChange?.(false);
   }
+
+  cancelPendingViewportFocus() {
+    if (
+      typeof window === "undefined" ||
+      this.pendingViewportFocusFrame === null
+    ) {
+      this.pendingViewportFocusFrame = null;
+      return;
+    }
+
+    window.cancelAnimationFrame(this.pendingViewportFocusFrame);
+    this.pendingViewportFocusFrame = null;
+  }
+
+  scheduleViewportFocus(nodeIds) {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    this.cancelPendingViewportFocus();
+    this.viewportFocusRequest += 1;
+
+    const requestId = this.viewportFocusRequest;
+    const attemptFocus = (attempt = 0) => {
+      if (this.viewportFocusRequest !== requestId) {
+        return;
+      }
+
+      const visibleNodeIds = nodeIds.filter((nodeId) => {
+        return isNodeVisible(this.getNode(nodeId));
+      });
+
+      if (visibleNodeIds.length === 0) {
+        this.pendingViewportFocusFrame = null;
+        return;
+      }
+
+      const bounds = this.getSelectionBounds(visibleNodeIds);
+      const isReady = visibleNodeIds.every((nodeId) => {
+        return Boolean(
+          this.getNodeElement(nodeId) && this.getNodeGeometry(nodeId)?.ready
+        );
+      });
+
+      if (bounds && (isReady || attempt >= 120)) {
+        focusCanvasBoundsInViewport(this, bounds);
+        this.pendingViewportFocusFrame = null;
+        return;
+      }
+
+      this.pendingViewportFocusFrame = window.requestAnimationFrame(() => {
+        attemptFocus(attempt + 1);
+      });
+    };
+
+    this.pendingViewportFocusFrame = window.requestAnimationFrame(() => {
+      attemptFocus();
+    });
+  }
 }
 
 const getSelectionBounds = (editor, nodeIds) => {
@@ -516,10 +607,10 @@ const getSelectionBounds = (editor, nodeIds) => {
       }
 
       return {
-        maxX: node.x + bbox.maxX,
-        maxY: node.y + bbox.maxY,
-        minX: node.x + bbox.minX,
-        minY: node.y + bbox.minY,
+        maxX: getNodeX(node) + bbox.maxX,
+        maxY: getNodeY(node) + bbox.maxY,
+        minX: getNodeX(node) + bbox.minX,
+        minY: getNodeY(node) + bbox.minY,
       };
     })
     .filter(Boolean);
@@ -541,6 +632,38 @@ const getSelectionBounds = (editor, nodeIds) => {
     minY,
     width: maxX - minX,
   };
+};
+
+const focusCanvasBoundsInViewport = (editor, bounds) => {
+  const viewer = editor.viewerRef;
+  const host = editor.hostRef;
+
+  if (!(viewer && host && bounds)) {
+    return;
+  }
+
+  const hostRect = host.getBoundingClientRect();
+  const width = Math.max(hostRect.width, 1);
+  const height = Math.max(hostRect.height, 1);
+  const padding = 160;
+  const contentWidth = Math.max(bounds.maxX - bounds.minX, 1);
+  const contentHeight = Math.max(bounds.maxY - bounds.minY, 1);
+  const zoom = clamp(
+    Math.min(
+      width / (contentWidth + padding * 2),
+      height / (contentHeight + padding * 2),
+      1
+    ),
+    MIN_ZOOM,
+    MAX_ZOOM
+  );
+  const canvasWidth = width / zoom;
+  const canvasHeight = height / zoom;
+  const x = bounds.minX - (canvasWidth - contentWidth) / 2;
+  const y = bounds.minY - (canvasHeight - contentHeight) / 2;
+
+  viewer.setTo?.({ x, y, zoom });
+  editor.setViewportZoom(zoom);
 };
 
 const getRenderedNodeBounds = (editor, nodeId) => {

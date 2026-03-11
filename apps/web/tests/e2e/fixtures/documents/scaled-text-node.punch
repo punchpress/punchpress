@@ -1,0 +1,27 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "scaled-node",
+      "type": "text",
+      "text": "SCALED",
+      "fontUrl": "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/bebasneue/BebasNeue-Regular.ttf",
+      "transform": {
+        "x": 1600,
+        "y": 1200,
+        "rotation": 18,
+        "scaleX": 1.45,
+        "scaleY": 0.82
+      },
+      "fontSize": 300,
+      "tracking": 10,
+      "fill": "#ffffff",
+      "stroke": "#000000",
+      "strokeWidth": 10,
+      "visible": true,
+      "warp": {
+        "kind": "none"
+      }
+    }
+  ]
+}

@@ -1,5 +1,10 @@
 import { useEffect, useRef } from "react";
-import { isNodeVisible } from "../../editor/shapes/warp-text/model";
+import {
+  getNodeCssTransform,
+  getNodeX,
+  getNodeY,
+  isNodeVisible,
+} from "../../editor/shapes/warp-text/model";
 import { useEditor } from "../../editor/use-editor";
 import { useEditorValue } from "../../editor/use-editor-value";
 
@@ -9,26 +14,32 @@ const getEditorFrame = (geometry, metrics, node, text) => {
 
     return {
       height: Math.max(24, maxY - minY),
+      left: getNodeX(node) + minX,
+      top: getNodeY(node) + minY,
       width: Math.max(24, maxX - minX),
-      x: node.x + (minX + maxX) / 2,
-      y: node.y + (minY + maxY) / 2,
     };
   }
 
   if (metrics) {
     return {
       height: Math.max(24, metrics.height),
+      left: getNodeX(node) + metrics.minX,
+      top: getNodeY(node) + metrics.minY,
       width: Math.max(24, metrics.width),
-      x: node.x + (metrics.minX + metrics.maxX) / 2,
-      y: node.y + (metrics.minY + metrics.maxY) / 2,
     };
   }
 
+  const width = Math.max(
+    120,
+    node.fontSize * Math.max(1.4, text.length * 0.58)
+  );
+  const height = Math.max(48, node.fontSize * 1.25);
+
   return {
-    height: Math.max(48, node.fontSize * 1.25),
-    width: Math.max(120, node.fontSize * Math.max(1.4, text.length * 0.58)),
-    x: node.x,
-    y: node.y,
+    height,
+    left: getNodeX(node) - width / 2,
+    top: getNodeY(node) - height / 2,
+    width,
   };
 };
 
@@ -91,9 +102,9 @@ export const CanvasTextEditor = () => {
       className="pointer-events-auto absolute z-10"
       style={{
         height: `${frame.height}px`,
-        left: `${frame.x}px`,
-        top: `${frame.y}px`,
-        transform: `translate(-50%, -50%) rotate(${editingNode.rotation || 0}deg)`,
+        left: `${frame.left}px`,
+        top: `${frame.top}px`,
+        transform: getNodeCssTransform(editingNode),
         transformOrigin: "center center",
         width: `${frame.width}px`,
       }}

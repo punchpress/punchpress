@@ -1,13 +1,16 @@
 import { EditorShell } from "./components/editor/editor-shell";
+import { ToastProvider } from "./components/ui/toast";
 import { EditorProvider } from "./editor/editor-provider";
 import { ThemeProvider } from "./theme/theme-provider";
 
 export const App = () => {
   return (
     <ThemeProvider>
-      <EditorProvider>
-        <EditorShell />
-      </EditorProvider>
+      <ToastProvider>
+        <EditorProvider>
+          <EditorShell />
+        </EditorProvider>
+      </ToastProvider>
     </ThemeProvider>
   );
 };

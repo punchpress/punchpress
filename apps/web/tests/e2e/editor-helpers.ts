@@ -92,6 +92,18 @@ export const getCanvasNodeIds = (page) => {
   });
 };
 
+export const loadDocument = (page, contents) => {
+  return page.evaluate((nextContents) => {
+    return (
+      window as Window & {
+        __PUNCHPRESS_E2E__?: {
+          loadDocument: (contents: string) => string | null;
+        };
+      }
+    ).__PUNCHPRESS_E2E__?.loadDocument(nextContents);
+  }, contents);
+};
+
 export const moveSelectedNodeBy = (page, delta) => {
   return page.evaluate((nextDelta) => {
     return (
@@ -117,6 +129,30 @@ export const scaleSelectedNodeBy = (page, options) => {
       }
     ).__PUNCHPRESS_E2E__?.scaleSelectedNodeBy(nextOptions);
   }, options);
+};
+
+export const serializeDocument = (page) => {
+  return page.evaluate(() => {
+    return (
+      window as Window & {
+        __PUNCHPRESS_E2E__?: {
+          serializeDocument: () => string;
+        };
+      }
+    ).__PUNCHPRESS_E2E__?.serializeDocument();
+  });
+};
+
+export const exportDocument = (page) => {
+  return page.evaluate(() => {
+    return (
+      window as Window & {
+        __PUNCHPRESS_E2E__?: {
+          exportDocument: () => Promise<string>;
+        };
+      }
+    ).__PUNCHPRESS_E2E__?.exportDocument();
+  });
 };
 
 export const scaleSelectedGroupBy = (page, options) => {

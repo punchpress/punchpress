@@ -1,3 +1,4 @@
+import { getNodeRotation, getNodeX, getNodeY } from "../shapes/warp-text/model";
 import { round } from "./math";
 
 export const getLocalBoundsCenter = (bbox) => {
@@ -11,8 +12,8 @@ export const getNodeRotationCenter = (node, bbox) => {
   const localCenter = getLocalBoundsCenter(bbox);
 
   return {
-    x: node.x + localCenter.x,
-    y: node.y + localCenter.y,
+    x: getNodeX(node) + localCenter.x,
+    y: getNodeY(node) + localCenter.y,
   };
 };
 
@@ -43,7 +44,7 @@ export const getNodeWorldPoint = (node, bbox, point) => {
       x: point.x - localCenter.x,
       y: point.y - localCenter.y,
     },
-    node.rotation || 0
+    getNodeRotation(node) || 0
   );
 
   return {
@@ -66,8 +67,10 @@ export const getRotatedNodeUpdate = (
   );
 
   return {
-    rotation: round((baseNode.rotation || 0) + deltaRotation, 2),
-    x: round(nextCenter.x - localCenter.x, 2),
-    y: round(nextCenter.y - localCenter.y, 2),
+    transform: {
+      rotation: round((getNodeRotation(baseNode) || 0) + deltaRotation, 2),
+      x: round(nextCenter.x - localCenter.x, 2),
+      y: round(nextCenter.y - localCenter.y, 2),
+    },
   };
 };

@@ -1,0 +1,28 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "test-node",
+      "type": "text",
+      "text": "TEST",
+      "fontUrl": "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/bebasneue/BebasNeue-Regular.ttf",
+      "transform": {
+        "x": 960,
+        "y": 720,
+        "rotation": 0,
+        "scaleX": 1,
+        "scaleY": 1
+      },
+      "fontSize": 280,
+      "tracking": 8,
+      "fill": "#ffffff",
+      "stroke": "#000000",
+      "strokeWidth": 10,
+      "visible": true,
+      "warp": {
+        "kind": "arch",
+        "bend": 0.4
+      }
+    }
+  ]
+}

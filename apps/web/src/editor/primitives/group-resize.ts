@@ -1,3 +1,4 @@
+import { getNodeRotation, getNodeX, getNodeY } from "../shapes/warp-text/model";
 import { round } from "./math";
 import { getLocalBoundsCenter, rotateVector } from "./rotation";
 
@@ -27,8 +28,10 @@ export const getScaledGroupNodeUpdate = (node, anchor, scale) => {
     fontSize: round(Math.max(1, node.fontSize * scale), 2),
     strokeWidth: round(Math.max(0, node.strokeWidth * scale), 2),
     tracking: round(node.tracking * scale, 2),
-    x: round(anchor.x + (node.x - anchor.x) * scale, 2),
-    y: round(anchor.y + (node.y - anchor.y) * scale, 2),
+    transform: {
+      x: round(anchor.x + (getNodeX(node) - anchor.x) * scale, 2),
+      y: round(anchor.y + (getNodeY(node) - anchor.y) * scale, 2),
+    },
   };
 };
 
@@ -51,14 +54,16 @@ export const getResizedNodeUpdate = (node, bbox, anchor, scale, direction) => {
       x: scaledFixedCorner.x - scaledCenter.x,
       y: scaledFixedCorner.y - scaledCenter.y,
     },
-    node.rotation || 0
+    getNodeRotation(node) || 0
   );
 
   return {
     fontSize: round(Math.max(1, node.fontSize * scale), 2),
     strokeWidth: round(Math.max(0, node.strokeWidth * scale), 2),
     tracking: round(node.tracking * scale, 2),
-    x: round(anchor.x - scaledCenter.x - rotatedOffset.x, 2),
-    y: round(anchor.y - scaledCenter.y - rotatedOffset.y, 2),
+    transform: {
+      x: round(anchor.x - scaledCenter.x - rotatedOffset.x, 2),
+      y: round(anchor.y - scaledCenter.y - rotatedOffset.y, 2),
+    },
   };
 };

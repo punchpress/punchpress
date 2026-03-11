@@ -9,21 +9,33 @@ import {
   ViewOffIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ChevronDownIcon } from "lucide-react";
-import { useState } from "react";
+import {
+  ChevronDownIcon,
+  DownloadIcon,
+  FolderOpenIcon,
+  SaveIcon,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Menu,
   MenuGroup,
-  MenuGroupLabel,
   MenuItem,
   MenuPopup,
-  MenuSeparator,
   MenuShortcut,
   MenuTrigger,
 } from "@/components/ui/menu";
 import { SortableItem, SortableList } from "@/components/ui/sortable-list";
+import { showToast } from "@/components/ui/toast";
+import { DEFAULT_DOCUMENT_BASE_NAME } from "@/document/constants";
 import { cn } from "@/lib/utils";
+import {
+  getDocumentBaseName,
+  openPunchDocumentFile,
+  type PunchDocumentHandle,
+  savePunchDocumentFile,
+  savePunchSvgFile,
+} from "@/platform/web-document-files";
 import { useEditor } from "../../editor/use-editor";
 import { useEditorValue } from "../../editor/use-editor-value";
 import { SettingsDialog } from "../settings-dialog";
@@ -94,6 +106,48 @@ const LAYER_SHORTCUTS = {
   duplicate: "\u2318J",
   bringToFront: "]",
   sendToBack: "[",
+};
+
+const getDocumentCommandFromKeyEvent = (event) => {
+  if (!(event.metaKey || event.ctrlKey) || event.altKey) {
+    return null;
+  }
+
+  const key = event.key.toLowerCase();
+
+  if (key === "o") {
+    return "open";
+  }
+
+  if (key === "e") {
+    return "export";
+  }
+
+  if (key === "s" && event.shiftKey) {
+    return "save-as";
+  }
+
+  if (key === "s") {
+    return "save";
+  }
+
+  return null;
+};
+
+const getDocumentCommandErrorTitle = (command) => {
+  if (command === "open") {
+    return "Couldn't open file";
+  }
+
+  if (command === "save" || command === "save-as") {
+    return "Couldn't save file";
+  }
+
+  if (command === "export") {
+    return "Couldn't export SVG";
+  }
+
+  return "File action failed";
 };
 
 const getLayerPrimaryButtonClassName = ({
@@ -336,11 +390,158 @@ export const LayersPanel = () => {
   const editor = useEditor();
   const layerNodeIds = useEditorValue((editor) => editor.layerNodeIds);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [documentBaseName, setDocumentBaseName] = useState(
+    DEFAULT_DOCUMENT_BASE_NAME
+  );
+  const [documentHandle, setDocumentHandle] =
+    useState<PunchDocumentHandle>(null);
+
+  const runDocumentCommand = async (command) => {
+    if (command === "open") {
+      await handleOpen();
+      return;
+    }
+
+    if (command === "save") {
+      await handleSave();
+      return;
+    }
+
+    if (command === "save-as") {
+      await handleSaveAs();
+      return;
+    }
+
+    if (command === "export") {
+      await handleExport();
+    }
+  };
+
+  useEffect(() => {
+    const handleWindowKeyDown = (event) => {
+      const command = getDocumentCommandFromKeyEvent(event);
+
+      if (!command) {
+        return;
+      }
+
+      event.preventDefault();
+      runDocumentCommandSafely(command);
+    };
+
+    window.addEventListener("keydown", handleWindowKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleWindowKeyDown);
+    };
+  });
+
+  useEffect(() => {
+    const unsubscribe = window.electron?.documentCommands?.onCommand(
+      (command) => {
+        runDocumentCommandSafely(command);
+      }
+    );
+
+    return () => {
+      unsubscribe?.();
+    };
+  });
+
+  const handleActionError = (command, error) => {
+    console.error(error);
+    const title = getDocumentCommandErrorTitle(command);
+    const description =
+      error instanceof Error ? error.message : "Unknown file error.";
+
+    showToast({
+      message: `${title}: ${description}`,
+      priority: "high",
+      type: "error",
+    });
+  };
+
+  const runDocumentCommandSafely = (command) => {
+    runDocumentCommand(command).catch((error) => {
+      handleActionError(command, error);
+    });
+  };
+
+  const handleOpen = async () => {
+    const openedFile = await openPunchDocumentFile();
+
+    if (!openedFile) {
+      return;
+    }
+
+    editor.loadDocument(openedFile.contents);
+    setDocumentHandle(openedFile.fileHandle);
+    setDocumentBaseName(getDocumentBaseName(openedFile.fileName));
+  };
+
+  const handleSave = async () => {
+    const result = await savePunchDocumentFile(
+      editor.serializeDocument(),
+      documentBaseName,
+      documentHandle
+    );
+
+    if (result.canceled) {
+      return;
+    }
+
+    setDocumentHandle(result.fileHandle || documentHandle);
+    if (result.fileName) {
+      setDocumentBaseName(getDocumentBaseName(result.fileName));
+    }
+
+    showToast({
+      message: `Saved ${result.fileName || `${documentBaseName}.punch`}`,
+      type: "success",
+    });
+  };
+
+  const handleSaveAs = async () => {
+    const result = await savePunchDocumentFile(
+      editor.serializeDocument(),
+      documentBaseName,
+      null,
+      true
+    );
+
+    if (result.canceled) {
+      return;
+    }
+
+    setDocumentHandle(result.fileHandle || documentHandle);
+    if (result.fileName) {
+      setDocumentBaseName(getDocumentBaseName(result.fileName));
+    }
+
+    showToast({
+      message: `Saved ${result.fileName || `${documentBaseName}.punch`}`,
+      type: "success",
+    });
+  };
+
+  const handleExport = async () => {
+    const svg = await editor.exportDocument();
+    const result = await savePunchSvgFile(svg, documentBaseName);
+
+    if (result.canceled) {
+      return;
+    }
+
+    showToast({
+      message: `Exported ${result.fileName || `${documentBaseName}.svg`}`,
+      type: "success",
+    });
+  };
 
   return (
     <>
       <div className="flex flex-col rounded-xl border border-[var(--designer-border)] bg-[var(--designer-surface)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.06)]">
-        <div className="flex items-center px-2.5 pt-2.5 pb-1.5">
+        <div className="flex items-center gap-2 px-2.5 pt-2.5 pb-1.5">
           <Menu modal={false}>
             <Button
               aria-label="Open main menu"
@@ -370,12 +571,48 @@ export const LayersPanel = () => {
               sideOffset={12}
             >
               <MenuGroup>
-                <MenuGroupLabel>PunchPress</MenuGroupLabel>
+                <MenuItem
+                  onClick={() => {
+                    runDocumentCommandSafely("open");
+                  }}
+                >
+                  <FolderOpenIcon size={15} />
+                  Open
+                  <MenuShortcut>⌘O</MenuShortcut>
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    runDocumentCommandSafely("save");
+                  }}
+                >
+                  <SaveIcon size={15} />
+                  Save
+                  <MenuShortcut>⌘S</MenuShortcut>
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    runDocumentCommandSafely("save-as");
+                  }}
+                >
+                  <SaveIcon size={15} />
+                  Save As...
+                  <MenuShortcut>⇧⌘S</MenuShortcut>
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    runDocumentCommandSafely("export");
+                  }}
+                >
+                  <DownloadIcon size={15} />
+                  Export SVG
+                  <MenuShortcut>⌘E</MenuShortcut>
+                </MenuItem>
+              </MenuGroup>
+              <div aria-hidden="true" className="mx-2 my-1 h-px bg-border" />
+              <MenuGroup>
                 <MenuItem onClick={() => setIsSettingsOpen(true)}>
                   Settings
                 </MenuItem>
-                <MenuSeparator />
-                <MenuItem disabled>Export</MenuItem>
               </MenuGroup>
             </MenuPopup>
           </Menu>

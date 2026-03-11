@@ -51,7 +51,7 @@ export const ColorField = ({ onChange, value }) => {
         nativeInput
         onBlur={(event) => onChange(toSafeHex(event.target.value))}
         onChange={(event) => onChange(event.target.value)}
-        value={value}
+        value={value ?? ""}
       />
     </div>
   );

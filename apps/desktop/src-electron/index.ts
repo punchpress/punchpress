@@ -7,6 +7,7 @@ import {
   session,
   type MenuItemConstructorOptions,
 } from "electron";
+import { registerDocumentFileHandlers } from "./document-files.js";
 import { configurePrivilegedStaticAppScheme, serveStaticAt } from "./helpers/serve-static-app.js";
 import { isDev } from "./utils/is-dev.js";
 
@@ -31,6 +32,12 @@ const getRendererDevUrl = () => {
   return process.env.VITE_DEV_SERVER_URL ?? "http://127.0.0.1:5273";
 };
 
+const sendDocumentCommand = (
+  command: "export" | "open" | "save" | "save-as"
+) => {
+  mainWindow?.webContents.send("document:command", command);
+};
+
 const installApplicationMenu = () => {
   const template: MenuItemConstructorOptions[] = [
     {
@@ -43,6 +50,31 @@ const installApplicationMenu = () => {
         { role: "showAll" },
         { type: "separator" },
         { role: "quit" },
+      ],
+    },
+    {
+      label: "File",
+      submenu: [
+        {
+          accelerator: "CmdOrCtrl+O",
+          click: () => sendDocumentCommand("open"),
+          label: "Open...",
+        },
+        {
+          accelerator: "CmdOrCtrl+S",
+          click: () => sendDocumentCommand("save"),
+          label: "Save",
+        },
+        {
+          accelerator: "CmdOrCtrl+Shift+S",
+          click: () => sendDocumentCommand("save-as"),
+          label: "Save As...",
+        },
+        {
+          accelerator: "CmdOrCtrl+E",
+          click: () => sendDocumentCommand("export"),
+          label: "Export SVG...",
+        },
       ],
     },
     {
@@ -124,6 +156,7 @@ const createMainWindow = () => {
 const launch = async () => {
   await app.whenReady();
   installApplicationMenu();
+  registerDocumentFileHandlers();
 
   if (!isDev) {
     await serveStaticAt(path.join(app.getAppPath(), "dist"));
