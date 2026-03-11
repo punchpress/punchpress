@@ -9,6 +9,11 @@ import {
 } from "electron";
 import { registerDocumentFileHandlers } from "./document-files.js";
 import { configurePrivilegedStaticAppScheme, serveStaticAt } from "./helpers/serve-static-app.js";
+import {
+  getRecentDocuments,
+  openRecentDocument,
+  type DesktopOpenedDocument,
+} from "./recent-documents.js";
 import { isDev } from "./utils/is-dev.js";
 
 const defaultWindowSize = {
@@ -38,12 +43,55 @@ const sendDocumentCommand = (
   mainWindow?.webContents.send("document:command", command);
 };
 
-const installApplicationMenu = () => {
+const sendOpenedDocument = (openedDocument: DesktopOpenedDocument) => {
+  mainWindow?.webContents.send("document:open-file", openedDocument);
+};
+
+const openRecentDocumentFromMenu = async (filePath: string) => {
+  const openedDocument = await openRecentDocument(filePath);
+
+  await installApplicationMenu();
+
+  if (!openedDocument) {
+    return;
+  }
+
+  sendOpenedDocument(openedDocument);
+};
+
+const buildOpenRecentSubmenu = async (): Promise<MenuItemConstructorOptions[]> => {
+  const recentDocuments = await getRecentDocuments();
+
+  if (recentDocuments.length === 0) {
+    return [
+      {
+        enabled: false,
+        label: "No Recent Documents",
+      },
+    ];
+  }
+
+  return recentDocuments.map((recentDocument) => ({
+    click: () => {
+      openRecentDocumentFromMenu(recentDocument.filePath).catch((error) => {
+        console.error(error);
+      });
+    },
+    label: recentDocument.fileName,
+  }));
+};
+
+const installApplicationMenu = async () => {
+  const openRecentSubmenu = await buildOpenRecentSubmenu();
   const template: MenuItemConstructorOptions[] = [
     {
       label: "PunchPress",
       submenu: [
         { role: "about" },
+        {
+          label: "Open Recent",
+          submenu: openRecentSubmenu,
+        },
         { type: "separator" },
         { role: "hide" },
         { role: "hideOthers" },
@@ -155,8 +203,14 @@ const createMainWindow = () => {
 
 const launch = async () => {
   await app.whenReady();
-  installApplicationMenu();
-  registerDocumentFileHandlers();
+  await installApplicationMenu();
+  registerDocumentFileHandlers({
+    onRecentDocumentsChanged: () => {
+      installApplicationMenu().catch((error) => {
+        console.error(error);
+      });
+    },
+  });
 
   if (!isDev) {
     await serveStaticAt(path.join(app.getAppPath(), "dist"));
