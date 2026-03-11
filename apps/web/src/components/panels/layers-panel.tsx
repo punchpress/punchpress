@@ -618,6 +618,14 @@ export const LayersPanel = () => {
           </Menu>
         </div>
 
+        <div className="mx-2.5 h-px bg-[var(--designer-border)]" />
+
+        <div className="px-3 pt-2.5 pb-1.5">
+          <span className="text-[11px] font-medium text-[var(--designer-text-muted)]">
+            Layers
+          </span>
+        </div>
+
         <div className="flex flex-col gap-[0.5px] px-1 pb-1">
           {layerNodeIds.length > 0 ? (
             <SortableList
@@ -644,15 +652,7 @@ export const LayersPanel = () => {
                 );
               })}
             </SortableList>
-          ) : (
-            <p className="m-0 px-2.5 py-3 text-[12px] text-[var(--designer-text-muted)] leading-1.5">
-              No layers yet. Press{" "}
-              <kbd className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded border border-[var(--designer-border)] bg-foreground/5 px-1 font-medium text-[11px] text-foreground/55">
-                T
-              </kbd>{" "}
-              or use the text tool in the bottom toolbar to add text.
-            </p>
-          )}
+          ) : null}
         </div>
       </div>
 
