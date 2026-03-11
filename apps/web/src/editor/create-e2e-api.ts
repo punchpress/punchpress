@@ -7,6 +7,7 @@ import {
 } from "./primitives/group-resize";
 import { round } from "./primitives/math";
 import { getNodeWorldPoint } from "./primitives/rotation";
+import { getNodeRotation, getNodeX, getNodeY } from "./shapes/warp-text/model";
 import { estimateBounds } from "./shapes/warp-text/warp-engine";
 
 const toRect = (rect) => {
@@ -71,12 +72,12 @@ const getNodeSnapshot = (editor, nodeId) => {
     fontSize: node.fontSize,
     id: node.id,
     ready: Boolean(geometry?.ready),
-    rotation: node.rotation || 0,
+    rotation: getNodeRotation(node) || 0,
     strokeWidth: node.strokeWidth,
     text: node.text,
     tracking: node.tracking,
-    x: node.x,
-    y: node.y,
+    x: getNodeX(node),
+    y: getNodeY(node),
   };
 };
 
@@ -87,6 +88,9 @@ export const createEditorE2eApi = (editor) => {
       editor.setEditingText(text);
       editor.finalizeEditing();
       return editor.selectedNodeId;
+    },
+    exportDocument: () => {
+      return editor.exportDocument();
     },
     getNodeSnapshot: (nodeId) => {
       return getNodeSnapshot(editor, nodeId);
@@ -148,21 +152,25 @@ export const createEditorE2eApi = (editor) => {
           fontSize: node.fontSize,
           fontUrl: node.fontUrl,
           id: node.id,
-          kind: node.kind,
-          rotation: node.rotation || 0,
+          rotation: getNodeRotation(node) || 0,
           stroke: node.stroke,
           strokeWidth: node.strokeWidth,
           text: node.text,
           tracking: node.tracking,
+          type: node.type,
           visible: node.visible,
           warp: { ...node.warp },
-          x: node.x,
-          y: node.y,
+          x: getNodeX(node),
+          y: getNodeY(node),
         })),
         selectedNodeIds: state.selectedNodeIds,
         selectedNodeId: editor.selectedNodeId,
         zoom: state.viewport.zoom,
       };
+    },
+    loadDocument: (contents) => {
+      editor.loadDocument(contents);
+      return editor.selectedNodeId;
     },
     moveSelectedNodeBy: ({ x = 0, y = 0 } = {}) => {
       if (editor.selectedNodeIds.length === 0) {
@@ -170,12 +178,17 @@ export const createEditorE2eApi = (editor) => {
       }
 
       editor.updateNodes(editor.selectedNodeIds, (node) => ({
-        x: round(node.x + x, 2),
-        y: round(node.y + y, 2),
+        transform: {
+          x: round(getNodeX(node) + x, 2),
+          y: round(getNodeY(node) + y, 2),
+        },
       }));
       queueOverlayRefresh(editor);
 
       return editor.selectedNodeId;
+    },
+    serializeDocument: () => {
+      return editor.serializeDocument();
     },
     scaleSelectedNodeBy: ({ scale = 1 } = {}) => {
       const selectedNode = editor.selectedNode;

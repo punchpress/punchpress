@@ -11,9 +11,7 @@ const toCommittedText = (value) => {
 };
 
 const applyNodeUpdate = (node, updater) => {
-  if (typeof updater === "function") {
-    const nextNode = updater(node);
-
+  const mergeNodeUpdate = (nextNode) => {
     if (!(nextNode && typeof nextNode === "object")) {
       return node;
     }
@@ -21,13 +19,20 @@ const applyNodeUpdate = (node, updater) => {
     return {
       ...node,
       ...nextNode,
+      transform: nextNode.transform
+        ? {
+            ...node.transform,
+            ...nextNode.transform,
+          }
+        : node.transform,
     };
+  };
+
+  if (typeof updater === "function") {
+    return mergeNodeUpdate(updater(node));
   }
 
-  return {
-    ...node,
-    ...updater,
-  };
+  return mergeNodeUpdate(updater);
 };
 
 const mapNodeById = (nodes, targetId, updater) => {
@@ -219,8 +224,11 @@ const duplicateNodesState = (state, nodeIds) => {
     const duplicateNode = {
       ...node,
       id: createId(),
-      x: node.x + 120,
-      y: node.y + 120,
+      transform: {
+        ...node.transform,
+        x: node.transform.x + 120,
+        y: node.transform.y + 120,
+      },
     };
 
     duplicateNodeIds.push(duplicateNode.id);
@@ -287,8 +295,11 @@ export const createEditorStore = ({
       const node = createDefaultNode(resolveDefaultFontUrl());
 
       if (point) {
-        node.x = point.x;
-        node.y = point.y;
+        node.transform = {
+          ...node.transform,
+          x: point.x,
+          y: point.y,
+        };
       }
 
       set((state) => ({
@@ -388,6 +399,20 @@ export const createEditorStore = ({
       set((state) => {
         return duplicateNodesState(state, state.selectedNodeIds);
       });
+    },
+
+    loadNodes: (nodes) => {
+      set((state) => ({
+        activeTool: "pointer",
+        editingNodeId: null,
+        editingOriginalText: "",
+        editingText: "",
+        hoveredNodeId: null,
+        isHoveringSuppressed: false,
+        nodes: [...nodes],
+        selectedNodeIds: [],
+        viewport: state.viewport,
+      }));
     },
 
     selectNode: (nodeId) => {

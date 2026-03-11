@@ -24,7 +24,7 @@ export const toNumber = (value, fallback) => {
 };
 
 export const toSafeHex = (value) => {
-  const normalized = value.trim();
+  const normalized = typeof value === "string" ? value.trim() : "";
 
   if (HEX6_REGEX.test(normalized)) {
     return normalized;

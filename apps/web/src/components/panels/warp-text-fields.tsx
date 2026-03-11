@@ -10,7 +10,11 @@ import {
 } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
 import { toNumber } from "../../editor/primitives/math";
-import { getDefaultWarp } from "../../editor/shapes/warp-text/model";
+import {
+  getDefaultWarp,
+  getNodeX,
+  getNodeY,
+} from "../../editor/shapes/warp-text/model";
 import { useEditor } from "../../editor/use-editor";
 import { useEditorValue } from "../../editor/use-editor-value";
 import { ColorField, FieldRow, PairedRow, Section } from "./field-primitives";
@@ -157,18 +161,26 @@ export const NodeFields = () => {
           <Input
             nativeInput
             onChange={(event) =>
-              update({ x: toNumber(event.target.value, node.x) })
+              update({
+                transform: {
+                  x: toNumber(event.target.value, getNodeX(node)),
+                },
+              })
             }
             type="number"
-            value={node.x}
+            value={getNodeX(node)}
           />
           <Input
             nativeInput
             onChange={(event) =>
-              update({ y: toNumber(event.target.value, node.y) })
+              update({
+                transform: {
+                  y: toNumber(event.target.value, getNodeY(node)),
+                },
+              })
             }
             type="number"
-            value={node.y}
+            value={getNodeY(node)}
           />
         </PairedRow>
       </Section>

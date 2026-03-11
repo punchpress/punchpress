@@ -1,4 +1,9 @@
 import { cn } from "@/lib/utils";
+import {
+  getNodeCssTransform,
+  getNodeX,
+  getNodeY,
+} from "../../editor/shapes/warp-text/model";
 import { estimateBounds } from "../../editor/shapes/warp-text/warp-engine";
 import { useEditor } from "../../editor/use-editor";
 import { useEditorValue } from "../../editor/use-editor-value";
@@ -55,9 +60,9 @@ export const CanvasNode = ({ nodeId, spacePressed }) => {
       ref={(element) => editor.registerNodeElement(node.id, element)}
       style={{
         height: `${height}px`,
-        left: `${node.x + bbox.minX}px`,
-        top: `${node.y + bbox.minY}px`,
-        transform: `rotate(${node.rotation || 0}deg)`,
+        left: `${getNodeX(node) + bbox.minX}px`,
+        top: `${getNodeY(node) + bbox.minY}px`,
+        transform: getNodeCssTransform(node),
         transformOrigin: "center center",
         width: `${width}px`,
       }}

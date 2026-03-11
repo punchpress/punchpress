@@ -17,6 +17,8 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@fontsource-variable/geist": "^5.2.8",
+    "@fontsource-variable/geist-mono": "^5.2.7",
     "@fontsource/caveat-brush": "4.5.9",
     "@fontsource/crimson-pro": "4.5.10",
     "@fontsource/recursive": "4.5.11",
@@ -45,6 +47,7 @@
     "react-moveable": "^0.56.0",
     "react-selecto": "^1.26.3",
     "tailwind-merge": "^3.5.0",
+    "zod": "^4.3.6",
     "zustand": "4.1.1"
   },
   "devDependencies": {

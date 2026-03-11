@@ -1,7 +1,12 @@
 "use client";
 
 import { Menu as BaseMenuPrimitive } from "@base-ui/react/menu";
-import { CheckIcon, ChevronRightIcon } from "lucide-react";
+import {
+  ArrowBigUpDashIcon,
+  CheckIcon,
+  ChevronRightIcon,
+  CommandIcon,
+} from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -172,16 +177,18 @@ function MenuSeparator({ className, ...props }) {
   );
 }
 
-function MenuShortcut({ className, ...props }) {
+function MenuShortcut({ children, className, ...props }) {
   return (
     <kbd
       className={cn(
-        "ms-auto font-medium font-mono text-muted-foreground/72 text-xs tracking-widest",
+        "ms-auto inline-flex items-center gap-1 text-[11px] text-muted-foreground/78 leading-none",
         className
       )}
       data-slot="menu-shortcut"
       {...props}
-    />
+    >
+      {typeof children === "string" ? renderShortcut(children) : children}
+    </kbd>
   );
 }
 
@@ -227,6 +234,57 @@ function MenuSubPopup({
     />
   );
 }
+
+const renderShortcut = (shortcut) => {
+  const tokenCounts = new Map();
+
+  return Array.from(shortcut).map((token) => {
+    if (token === " ") {
+      return null;
+    }
+
+    const occurrence = tokenCounts.get(token) ?? 0;
+    tokenCounts.set(token, occurrence + 1);
+    const key = `${token}-${occurrence}`;
+
+    if (token === "⇧") {
+      return (
+        <ShortcutToken key={key} label="Shift">
+          <ArrowBigUpDashIcon className="size-[11px] stroke-[2.2]" />
+        </ShortcutToken>
+      );
+    }
+
+    if (token === "⌘") {
+      return (
+        <ShortcutToken key={key} label="Command">
+          <CommandIcon className="size-[11px] stroke-[2.1]" />
+        </ShortcutToken>
+      );
+    }
+
+    return (
+      <span
+        className="inline-flex min-w-[0.6rem] items-center justify-center font-medium font-sans uppercase"
+        key={key}
+      >
+        {token}
+      </span>
+    );
+  });
+};
+
+const ShortcutToken = ({ children, label }) => {
+  return (
+    <span
+      aria-label={label}
+      className="inline-flex min-w-[0.7rem] items-center justify-center"
+      role="img"
+    >
+      {children}
+    </span>
+  );
+};
 
 export {
   MenuCreateHandle,

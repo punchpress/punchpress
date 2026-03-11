@@ -1,0 +1,29 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "circle-node",
+      "type": "text",
+      "text": "PUNCHPRESS",
+      "fontUrl": "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/bebasneue/BebasNeue-Regular.ttf",
+      "transform": {
+        "x": 2250,
+        "y": 2200,
+        "rotation": 0,
+        "scaleX": 1,
+        "scaleY": 1
+      },
+      "fontSize": 360,
+      "tracking": 12,
+      "fill": "#ffffff",
+      "stroke": "#000000",
+      "strokeWidth": 12,
+      "visible": true,
+      "warp": {
+        "kind": "circle",
+        "radius": 1400,
+        "sweepDeg": 220
+      }
+    }
+  ]
+}

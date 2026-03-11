@@ -9,7 +9,13 @@ import {
 } from "../../editor/primitives/group-resize";
 import { clamp, round } from "../../editor/primitives/math";
 import { getRotatedNodeUpdate } from "../../editor/primitives/rotation";
-import { isNodeVisible } from "../../editor/shapes/warp-text/model";
+import {
+  getNodeCssTransform,
+  getNodeRotation,
+  getNodeX,
+  getNodeY,
+  isNodeVisible,
+} from "../../editor/shapes/warp-text/model";
 import { estimateBounds } from "../../editor/shapes/warp-text/warp-engine";
 import { useEditor } from "../../editor/use-editor";
 import { useEditorValue } from "../../editor/use-editor-value";
@@ -186,8 +192,8 @@ const getHostRectFromNodeFrame = (editor, node, bbox) => {
 
   const frame = getHostRectFromCanvasBounds(editor, {
     height: bbox.height,
-    minX: node.x + bbox.minX,
-    minY: node.y + bbox.minY,
+    minX: getNodeX(node) + bbox.minX,
+    minY: getNodeY(node) + bbox.minY,
     width: bbox.width,
   });
 
@@ -197,7 +203,7 @@ const getHostRectFromNodeFrame = (editor, node, bbox) => {
 
   return {
     ...frame,
-    rotation: node.rotation || 0,
+    transform: getNodeCssTransform(node),
   };
 };
 
@@ -503,8 +509,10 @@ export const CanvasOverlay = ({ spacePressed }) => {
           const bbox = selectedGeometry?.bbox || estimateBounds(selectedNode);
 
           editor.updateNode(selectedNode.id, {
-            x: round(event.left - bbox.minX, 2),
-            y: round(event.top - bbox.minY, 2),
+            transform: {
+              x: round(event.left - bbox.minX, 2),
+              y: round(event.top - bbox.minY, 2),
+            },
           });
         }}
         onDragEnd={() => {
@@ -535,8 +543,10 @@ export const CanvasOverlay = ({ spacePressed }) => {
               return node;
             }
             return {
-              x: round(groupEvent.left - bbox.minX, 2),
-              y: round(groupEvent.top - bbox.minY, 2),
+              transform: {
+                x: round(groupEvent.left - bbox.minX, 2),
+                y: round(groupEvent.top - bbox.minY, 2),
+              },
             };
           });
         }}
@@ -667,13 +677,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
               continue;
             }
 
-            baseNodes.set(nodeId, {
-              fontSize: node.fontSize,
-              strokeWidth: node.strokeWidth,
-              tracking: node.tracking,
-              x: node.x,
-              y: node.y,
-            });
+            baseNodes.set(nodeId, { ...node });
           }
 
           event.datas.anchorCanvas = resizeSession.anchorCanvas;
@@ -705,12 +709,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
           event.datas.anchorCanvas = resizeSession.anchorCanvas;
           event.datas.anchorClient = resizeSession.anchorClient;
           event.datas.baseNode = {
-            fontSize: selectedNode.fontSize,
-            rotation: selectedNode.rotation || 0,
-            strokeWidth: selectedNode.strokeWidth,
-            tracking: selectedNode.tracking,
-            x: selectedNode.x,
-            y: selectedNode.y,
+            ...selectedNode,
           };
           event.datas.direction = event.direction;
           event.datas.startDistance = resizeSession.startDistance;
@@ -805,14 +804,12 @@ export const CanvasOverlay = ({ spacePressed }) => {
               continue;
             }
 
-            groupEvent.set(node.rotation || 0);
+            groupEvent.set(getNodeRotation(node) || 0);
 
             baseNodes.set(nodeId, {
               bbox:
                 editor.getNodeGeometry(nodeId)?.bbox || estimateBounds(node),
-              rotation: node.rotation || 0,
-              x: node.x,
-              y: node.y,
+              ...node,
             });
           }
 
@@ -829,19 +826,17 @@ export const CanvasOverlay = ({ spacePressed }) => {
 
           const bbox = selectedGeometry?.bbox || estimateBounds(selectedNode);
 
-          event.set(selectedNode.rotation || 0);
+          event.set(getNodeRotation(selectedNode) || 0);
           event.datas.baseBBox = bbox;
           event.datas.baseNode = {
-            rotation: selectedNode.rotation || 0,
-            x: selectedNode.x,
-            y: selectedNode.y,
+            ...selectedNode,
           };
           event.datas.selectionCenter = getSelectionCenter({
             height: bbox.height,
-            maxX: selectedNode.x + bbox.maxX,
-            maxY: selectedNode.y + bbox.maxY,
-            minX: selectedNode.x + bbox.minX,
-            minY: selectedNode.y + bbox.minY,
+            maxX: getNodeX(selectedNode) + bbox.maxX,
+            maxY: getNodeY(selectedNode) + bbox.maxY,
+            minX: getNodeX(selectedNode) + bbox.minX,
+            minY: getNodeY(selectedNode) + bbox.minY,
             width: bbox.width,
           });
         }}
@@ -876,7 +871,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
             height: `${hoveredNodePreviewRect.height}px`,
             left: `${hoveredNodePreviewRect.left}px`,
             top: `${hoveredNodePreviewRect.top}px`,
-            transform: `rotate(${hoveredNodePreviewRect.rotation}deg)`,
+            transform: hoveredNodePreviewRect.transform,
             transformOrigin: "center center",
             width: `${hoveredNodePreviewRect.width}px`,
           }}
