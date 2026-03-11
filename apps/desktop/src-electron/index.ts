@@ -167,8 +167,8 @@ const createMainWindow = () => {
     frame: false,
     transparent: true,
     trafficLightPosition: {
-      x: 14,
-      y: 12,
+      x: 18,
+      y: 16,
     },
     webPreferences: {
       preload: path.join(__dirname, "../preload/preload.mjs"),
