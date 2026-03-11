@@ -6,8 +6,27 @@ import {
   PUNCH_SVG_EXTENSION,
   PUNCH_SVG_MIME_TYPE,
 } from "../document/constants";
+import {
+  getBrowserRecentDocuments,
+  openBrowserRecentDocument,
+  rememberBrowserRecentDocument,
+} from "./browser-recent-documents";
 
 export type PunchDocumentHandle = FileSystemFileHandle | string | null;
+export interface PunchOpenedDocumentFile {
+  contents: string;
+  fileHandle: PunchDocumentHandle;
+  fileName: string;
+}
+
+export interface PunchRecentDocument {
+  fileHandle?: FileSystemFileHandle | null;
+  fileName: string;
+  filePath: string | null;
+  id: string;
+  lastOpenedAt: string;
+}
+
 export interface PunchFileSaveResult {
   canceled: boolean;
   fileHandle: PunchDocumentHandle;
@@ -73,11 +92,17 @@ export const openPunchDocumentFile = async () => {
       mimeTypes: [PUNCH_DOCUMENT_MIME_TYPE],
     });
 
-    return {
+    const openedDocument = {
       contents: await file.text(),
       fileHandle: file.handle || null,
       fileName: file.name,
     };
+
+    if (file.handle) {
+      await rememberBrowserRecentDocument(file.handle);
+    }
+
+    return openedDocument;
   } catch (error) {
     if (isUserAbortError(error)) {
       return null;
@@ -85,6 +110,48 @@ export const openPunchDocumentFile = async () => {
 
     throw error;
   }
+};
+
+export const openRecentPunchDocumentFile = (
+  recentDocument: PunchRecentDocument
+) => {
+  const desktopDocumentFiles = getDesktopDocumentFiles();
+
+  if (desktopDocumentFiles) {
+    return recentDocument.filePath
+      ? desktopDocumentFiles.openRecentDocument(recentDocument.filePath)
+      : Promise.resolve(null);
+  }
+
+  return recentDocument.fileHandle
+    ? openBrowserRecentDocument(
+        recentDocument.fileHandle,
+        recentDocument.fileName
+      )
+    : Promise.resolve(null);
+};
+
+export const getRecentPunchDocumentFiles = () => {
+  const desktopDocumentFiles = getDesktopDocumentFiles();
+
+  if (desktopDocumentFiles) {
+    return desktopDocumentFiles.getRecentDocuments().then((recentDocuments) => {
+      return recentDocuments.map((recentDocument) => ({
+        fileName: recentDocument.fileName,
+        fileHandle: null,
+        filePath: recentDocument.filePath,
+        id: recentDocument.filePath,
+        lastOpenedAt: recentDocument.lastOpenedAt,
+      }));
+    });
+  }
+
+  return getBrowserRecentDocuments().then((recentDocuments) => {
+    return recentDocuments.map((recentDocument) => ({
+      ...recentDocument,
+      filePath: null,
+    }));
+  });
 };
 
 export const savePunchDocumentFile = async (
@@ -123,12 +190,18 @@ export const savePunchDocumentFile = async (
       },
       typeof nextHandle === "string" ? null : nextHandle
     );
+    const savedHandle =
+      fileHandle || (typeof nextHandle === "string" ? null : nextHandle);
+
+    if (savedHandle) {
+      await rememberBrowserRecentDocument(savedHandle);
+    }
 
     return {
       canceled: false,
-      fileHandle: fileHandle || nextHandle,
+      fileHandle: savedHandle || nextHandle,
       fileName:
-        fileHandle?.name || getHandleFileName(nextHandle) || defaultFileName,
+        savedHandle?.name || getHandleFileName(nextHandle) || defaultFileName,
     };
   } catch (error) {
     if (isUserAbortError(error)) {

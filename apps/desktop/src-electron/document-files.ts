@@ -1,10 +1,18 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import {
+  getRecentDocuments,
+  openRecentDocument,
+  readDocumentAtPath,
+  rememberRecentDocument,
+} from "./recent-documents.js";
 
 const OPEN_DOCUMENT_CHANNEL = "document:open";
+const OPEN_RECENT_DOCUMENT_CHANNEL = "document:open-recent";
 const SAVE_DOCUMENT_CHANNEL = "document:save";
 const SAVE_SVG_CHANNEL = "document:save-svg";
+const GET_RECENT_DOCUMENTS_CHANNEL = "document:get-recent-documents";
 
 const getDialogWindow = () => {
   return BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
@@ -30,7 +38,11 @@ const showSaveDialogForPath = async (
   return result.canceled ? null : normalizeFilePath(result.filePath);
 };
 
-export const registerDocumentFileHandlers = () => {
+export const registerDocumentFileHandlers = ({
+  onRecentDocumentsChanged,
+}: {
+  onRecentDocumentsChanged?: () => void;
+} = {}) => {
   ipcMain.handle(OPEN_DOCUMENT_CHANNEL, async () => {
     const result = await dialog.showOpenDialog(getDialogWindow(), {
       filters: [
@@ -47,12 +59,18 @@ export const registerDocumentFileHandlers = () => {
     }
 
     const filePath = result.filePaths[0];
+    const openedDocument = await readDocumentAtPath(filePath);
 
-    return {
-      contents: await readFile(filePath, "utf8"),
-      fileHandle: filePath,
-      fileName: path.basename(filePath),
-    };
+    await rememberRecentDocument(filePath);
+    onRecentDocumentsChanged?.();
+
+    return openedDocument;
+  });
+
+  ipcMain.handle(OPEN_RECENT_DOCUMENT_CHANNEL, async (_event, filePath) => {
+    const openedDocument = await openRecentDocument(filePath);
+    onRecentDocumentsChanged?.();
+    return openedDocument;
   });
 
   ipcMain.handle(
@@ -84,6 +102,8 @@ export const registerDocumentFileHandlers = () => {
       }
 
       await writeFile(targetPath, payload.contents, "utf8");
+      await rememberRecentDocument(targetPath);
+      onRecentDocumentsChanged?.();
 
       return {
         canceled: false,
@@ -126,4 +146,8 @@ export const registerDocumentFileHandlers = () => {
       };
     }
   );
+
+  ipcMain.handle(GET_RECENT_DOCUMENTS_CHANNEL, async () => {
+    return getRecentDocuments();
+  });
 };

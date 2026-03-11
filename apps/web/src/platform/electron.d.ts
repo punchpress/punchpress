@@ -4,6 +4,12 @@ export interface DesktopDocumentFileResult {
   fileName: string;
 }
 
+export interface DesktopRecentDocument {
+  fileName: string;
+  filePath: string;
+  lastOpenedAt: string;
+}
+
 export interface DesktopSaveFileResult {
   canceled: boolean;
   fileHandle: string | null;
@@ -17,9 +23,15 @@ declare global {
         onCommand: (
           callback: (command: "export" | "open" | "save" | "save-as") => void
         ) => () => void;
+        onOpenDocument: (
+          callback: (openedDocument: DesktopDocumentFileResult) => void
+        ) => () => void;
       };
       documentFiles?: {
         openDocument: () => Promise<DesktopDocumentFileResult | null>;
+        openRecentDocument: (
+          filePath: string
+        ) => Promise<DesktopDocumentFileResult | null>;
         saveDocument: (payload: {
           contents: string;
           defaultFileName: string;
@@ -29,6 +41,7 @@ declare global {
           contents: string;
           defaultFileName: string;
         }) => Promise<DesktopSaveFileResult>;
+        getRecentDocuments: () => Promise<DesktopRecentDocument[]>;
       };
       versions?: {
         chrome: string;
