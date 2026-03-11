@@ -99,10 +99,7 @@ export const NodeFields = () => {
 
       <Section className="border-black/6 border-t" title="Fill & Stroke">
         <FieldRow label="Fill">
-          <ColorField
-            onChange={(fill) => update({ fill })}
-            value={node.fill}
-          />
+          <ColorField onChange={(fill) => update({ fill })} value={node.fill} />
         </FieldRow>
 
         <FieldRow label="Stroke">
