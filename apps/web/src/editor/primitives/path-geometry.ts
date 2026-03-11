@@ -1,5 +1,15 @@
 import { format } from "./math";
 
+interface PathPoint {
+  x: number;
+  y: number;
+}
+
+interface PathContour {
+  closed: boolean;
+  points: PathPoint[];
+}
+
 export const midpoint = (a, b) => {
   return {
     x: (a.x + b.x) / 2,
@@ -63,10 +73,10 @@ export const flattenQuadratic = (p0, p1, p2, tolerance, out, depth) => {
 };
 
 export const commandsToContours = (commands, tolerance) => {
-  const contours = [];
-  let currentContour = [];
+  const contours: PathContour[] = [];
+  let currentContour: PathPoint[] = [];
   let currentPoint = { x: 0, y: 0 };
-  let contourStart = null;
+  let contourStart: PathPoint | null = null;
 
   const flushContour = (closed) => {
     if (currentContour.length === 0) {
@@ -98,7 +108,7 @@ export const commandsToContours = (commands, tolerance) => {
     }
 
     if (command.type === "C") {
-      const points = [];
+      const points: PathPoint[] = [];
       flattenCubic(
         currentPoint,
         { x: command.x1, y: command.y1 },
@@ -114,7 +124,7 @@ export const commandsToContours = (commands, tolerance) => {
     }
 
     if (command.type === "Q") {
-      const points = [];
+      const points: PathPoint[] = [];
       flattenQuadratic(
         currentPoint,
         { x: command.x1, y: command.y1 },
@@ -186,7 +196,7 @@ export const getBounds = (contours) => {
 
 export const mapContours = (contours, mapper) => {
   return contours.map((contour) => {
-    const points = [];
+    const points: PathPoint[] = [];
     for (const point of contour.points) {
       points.push(mapper(point));
     }
@@ -207,7 +217,7 @@ export const translateContours = (contours, dx, dy) => {
 };
 
 export const contoursToPath = (contours) => {
-  const pathParts = [];
+  const pathParts: string[] = [];
 
   for (const contour of contours) {
     if (contour.points.length === 0) {

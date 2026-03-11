@@ -287,9 +287,6 @@ test("resizes a rotated selection without shifting the fixed group anchor", asyn
   await zoomOut(page, 5);
   await pauseForUi(page);
 
-  const firstBefore = await waitForNodeReady(page, firstNodeId);
-  const secondBefore = await waitForNodeReady(page, secondNodeId);
-
   await page.getByRole("button", { name: "Scale first" }).first().click();
   await shiftClickLayer(page, "Scale second");
   await pauseForUi(page);

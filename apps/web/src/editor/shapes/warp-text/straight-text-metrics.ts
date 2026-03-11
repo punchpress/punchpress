@@ -3,7 +3,7 @@ import { layoutGlyphs } from "./warp-engine";
 
 export const measureStraightText = (node, font) => {
   const layout = layoutGlyphs(node, font);
-  const mergedContours = [];
+  const mergedContours: ReturnType<typeof translateContours> = [];
 
   for (const glyph of layout.glyphs) {
     mergedContours.push(...translateContours(glyph.contours, glyph.baseX, 0));

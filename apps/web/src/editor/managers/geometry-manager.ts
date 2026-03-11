@@ -1,4 +1,7 @@
-import { buildNodeGeometry, estimateBounds } from "../shapes/warp-text/warp-engine";
+import {
+  buildNodeGeometry,
+  estimateBounds,
+} from "../shapes/warp-text/warp-engine";
 
 const getGeometrySignature = (node, fontRevision) => {
   return JSON.stringify({
