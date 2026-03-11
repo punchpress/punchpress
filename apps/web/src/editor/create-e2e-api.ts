@@ -115,8 +115,11 @@ export const createEditorE2eApi = (editor) => {
             host
               ?.querySelector(getResizeHandleSelector("sw"))
               ?.getBoundingClientRect?.()
-            ),
+          ),
         },
+        isMoveableMuted: host?.classList.contains(
+          "canvas-overlay-moveable-muted"
+        ),
         selectedNodeIds: editor.selectedNodeIds,
         selectedNodeId: editor.selectedNodeId,
         zoom: editor.zoom,

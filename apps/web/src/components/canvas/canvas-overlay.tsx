@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import Moveable from "react-moveable";
 import Selecto from "react-selecto";
@@ -135,14 +135,6 @@ const getSelectionCenter = (bounds) => {
   };
 };
 
-const areSameTargets = (currentTargets, nextTargets) => {
-  if (currentTargets.length !== nextTargets.length) {
-    return false;
-  }
-
-  return currentTargets.every((target, index) => target === nextTargets[index]);
-};
-
 const queueMoveableRefresh = (moveableRef) => {
   if (typeof window === "undefined") {
     moveableRef.current?.updateRect?.();
@@ -243,7 +235,6 @@ export const CanvasOverlay = ({ spacePressed }) => {
   const editor = useEditor();
   const moveableRef = useRef(null);
   const selectoRef = useRef(null);
-  const [selectedTargets, setSelectedTargets] = useState([]);
   const [isGroupRotationPreviewVisible, setIsGroupRotationPreviewVisible] =
     useState(false);
 
@@ -253,6 +244,12 @@ export const CanvasOverlay = ({ spacePressed }) => {
     return state.selectedNodeIds.filter((nodeId) => {
       return isNodeVisible(editor.getNode(nodeId));
     });
+  });
+  const selectedTargets = useEditorValue((editor, state) => {
+    return state.selectedNodeIds
+      .filter((nodeId) => isNodeVisible(editor.getNode(nodeId)))
+      .map((nodeId) => editor.getNodeElement(nodeId))
+      .filter(Boolean);
   });
   const visibleSelectedNodeId = visibleSelectedNodeIds.at(-1) || null;
   const selectedNode = useEditorValue((editor) => {
@@ -281,23 +278,11 @@ export const CanvasOverlay = ({ spacePressed }) => {
       ? getHostRectFromCanvasBounds(editor, selectedBounds)
       : null;
 
-  useEffect(() => {
-    const nextTargets = visibleSelectedNodeIds
-      .map((nodeId) => editor.getNodeElement(nodeId))
-      .filter(Boolean);
-
-    setSelectedTargets((currentTargets) => {
-      return areSameTargets(currentTargets, nextTargets)
-        ? currentTargets
-        : nextTargets;
-    });
-  }, [editor, visibleSelectedNodeIds]);
-
-  useEffect(() => {
+  useLayoutEffect(() => {
     selectoRef.current?.setSelectedTargets?.(selectedTargets);
   }, [selectedTargets]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!(selectedTargets.length > 0 && moveableRef.current)) {
       return;
     }
@@ -448,6 +433,8 @@ export const CanvasOverlay = ({ spacePressed }) => {
             return;
           }
 
+          setMoveableMuted(hostElement, true);
+
           const bbox = selectedGeometry?.bbox || estimateBounds(selectedNode);
 
           editor.updateNode(selectedNode.id, {
@@ -465,6 +452,8 @@ export const CanvasOverlay = ({ spacePressed }) => {
           if (nextSelectedNodeIds.length === 0) {
             return;
           }
+
+          setMoveableMuted(hostElement, true);
 
           editor.updateNodes(visibleSelectedNodeIds, (node) => {
             const groupEvent = event.events.find(
@@ -490,8 +479,6 @@ export const CanvasOverlay = ({ spacePressed }) => {
           queueMoveableRefresh(moveableRef);
         }}
         onDragGroupStart={(event) => {
-          setMoveableMuted(hostElement, true);
-
           for (const groupEvent of event.events) {
             const nodeId = groupEvent.target?.dataset.nodeId;
             const node = editor.getNode(nodeId);
@@ -500,9 +487,6 @@ export const CanvasOverlay = ({ spacePressed }) => {
               node &&
               (editor.getNodeGeometry(nodeId)?.bbox || estimateBounds(node));
           }
-        }}
-        onDragStart={() => {
-          setMoveableMuted(hostElement, true);
         }}
         onResize={(event) => {
           if (
