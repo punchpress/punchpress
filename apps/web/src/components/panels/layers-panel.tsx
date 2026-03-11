@@ -142,14 +142,9 @@ const getLayerLabelClassName = ({ isSelected, isVisible }) => {
   );
 };
 
-const SortableLayerRow = ({
-  nodeId,
-  previousNodeId,
-  nextNodeId,
-  hoveredNodeId,
-  onHoverChange,
-}) => {
+const SortableLayerRow = ({ nodeId, previousNodeId, nextNodeId }) => {
   const editor = useEditor();
+  const hoveredNodeId = useEditorValue((_, state) => state.hoveredNodeId);
   const layer = useEditorValue((editor) => editor.getLayerRow(nodeId));
   const previousLayer = useEditorValue((editor) => {
     return previousNodeId ? editor.getLayerRow(previousNodeId) : null;
@@ -212,8 +207,14 @@ const SortableLayerRow = ({
             <ContextMenu.Trigger
               className="block"
               onContextMenuCapture={() => editor.ensureNodeSelected(nodeId)}
-              onPointerEnter={() => onHoverChange(nodeId)}
-              onPointerLeave={() => onHoverChange(null)}
+              onPointerEnter={() => editor.setHoveredNode(nodeId)}
+              onPointerLeave={() => {
+                if (editor.hoveredNodeId !== nodeId) {
+                  return;
+                }
+
+                editor.setHoveredNode(null);
+              }}
               ref={setItemRef}
               style={itemStyle}
             >
@@ -334,7 +335,6 @@ const SortableLayerRow = ({
 export const LayersPanel = () => {
   const editor = useEditor();
   const layerNodeIds = useEditorValue((editor) => editor.layerNodeIds);
-  const [hoveredNodeId, setHoveredNodeId] = useState(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   return (
@@ -388,18 +388,20 @@ export const LayersPanel = () => {
               onReorder={(nextIds) => {
                 editor.setNodeOrder([...nextIds].reverse());
               }}
+              onReorderEnd={() => {
+                editor.setHoveringSuppressed(false);
+              }}
               onReorderStart={(nodeId) => {
+                editor.setHoveringSuppressed(true);
                 editor.ensureNodeSelected(nodeId);
               }}
             >
               {layerNodeIds.map((nodeId, index) => {
                 return (
                   <SortableLayerRow
-                    hoveredNodeId={hoveredNodeId}
                     key={nodeId}
                     nextNodeId={layerNodeIds[index + 1] || null}
                     nodeId={nodeId}
-                    onHoverChange={setHoveredNodeId}
                     previousNodeId={layerNodeIds[index - 1] || null}
                   />
                 );

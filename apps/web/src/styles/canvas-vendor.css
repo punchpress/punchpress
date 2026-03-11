@@ -108,4 +108,21 @@
     border: 1px solid var(--canvas-transform-preview-box-lines);
     @apply rounded;
   }
+
+  .canvas-hover-preview {
+    z-index: 5;
+    background: color-mix(
+      in srgb,
+      var(--canvas-transform-preview-box-lines) 10%,
+      transparent
+    );
+    border: 1px solid var(--canvas-transform-preview-box-lines);
+    box-shadow: 0 0 0 1px
+      color-mix(
+        in srgb,
+        var(--canvas-transform-preview-box-lines) 18%,
+        transparent
+      );
+    @apply rounded;
+  }
 }

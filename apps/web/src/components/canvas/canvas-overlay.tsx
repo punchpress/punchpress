@@ -177,6 +177,30 @@ const getHostRectFromCanvasBounds = (editor, bounds) => {
   };
 };
 
+const getHostRectFromNodeFrame = (editor, node, bbox) => {
+  const viewer = editor.viewerRef;
+
+  if (!(node && bbox && viewer)) {
+    return null;
+  }
+
+  const frame = getHostRectFromCanvasBounds(editor, {
+    height: bbox.height,
+    minX: node.x + bbox.minX,
+    minY: node.y + bbox.minY,
+    width: bbox.width,
+  });
+
+  if (!frame) {
+    return null;
+  }
+
+  return {
+    ...frame,
+    rotation: node.rotation || 0,
+  };
+};
+
 const shouldBlockSelectionStart = (target) => {
   if (!(target instanceof Element)) {
     return false;
@@ -237,6 +261,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
   const selectoRef = useRef(null);
   const [isGroupRotationPreviewVisible, setIsGroupRotationPreviewVisible] =
     useState(false);
+  const [, setViewportRevision] = useState(0);
 
   const activeTool = useEditorValue((_, state) => state.activeTool);
   const editingNodeId = useEditorValue((_, state) => state.editingNodeId);
@@ -269,10 +294,37 @@ export const CanvasOverlay = ({ spacePressed }) => {
   const selectedBounds = useEditorValue((editor) => {
     return editor.getSelectionBounds(visibleSelectedNodeIds);
   });
+  const hoveredNodePreview = useEditorValue((editor, state) => {
+    if (
+      spacePressed ||
+      activeTool !== "pointer" ||
+      editingNodeId ||
+      state.isHoveringSuppressed ||
+      !state.hoveredNodeId ||
+      state.selectedNodeIds.includes(state.hoveredNodeId)
+    ) {
+      return null;
+    }
+
+    const node = editor.getNode(state.hoveredNodeId);
+    if (!(node && isNodeVisible(node))) {
+      return null;
+    }
+
+    return {
+      bbox: editor.getNodeGeometry(node.id)?.bbox || estimateBounds(node),
+      node,
+    };
+  });
   const hostElement = editor.hostRef;
   const keyContainer = typeof window === "undefined" ? undefined : window;
   const selectedTarget = selectedTargets[0] || null;
   const hasGroupSelection = visibleSelectedNodeIds.length > 1;
+  const hoveredNodePreviewRect = getHostRectFromNodeFrame(
+    editor,
+    hoveredNodePreview?.node,
+    hoveredNodePreview?.bbox
+  );
   const groupRotationPreviewRect =
     isGroupRotationPreviewVisible && hasGroupSelection
       ? getHostRectFromCanvasBounds(editor, selectedBounds)
@@ -293,6 +345,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
   useEffect(() => {
     const handleViewportChange = () => {
       moveableRef.current?.updateRect?.();
+      setViewportRevision((value) => value + 1);
     };
     editor.onViewportChange = handleViewportChange;
 
@@ -372,6 +425,12 @@ export const CanvasOverlay = ({ spacePressed }) => {
       (hasGroupSelection ? selectedBounds : selectedGeometry) &&
       !editingNodeId
   );
+  const suppressHover = () => {
+    editor.setHoveringSuppressed(true);
+  };
+  const restoreHover = () => {
+    editor.setHoveringSuppressed(false);
+  };
 
   return (
     <>
@@ -391,13 +450,19 @@ export const CanvasOverlay = ({ spacePressed }) => {
             moveableRef.current?.isMoveableElement?.(event.inputEvent.target)
           ) {
             event.stop();
+            restoreHover();
+            return;
           }
+
+          suppressHover();
         }}
         onSelectEnd={(event) => {
           const nextSelectedNodeIds = getNodeIdsFromSelectionRect(
             editor,
             event.rect
           );
+
+          restoreHover();
 
           if (event.inputEvent?.shiftKey) {
             editor.selectNodes([
@@ -443,6 +508,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
           });
         }}
         onDragEnd={() => {
+          restoreHover();
           setMoveableMuted(hostElement, false);
           queueMoveableRefresh(moveableRef);
         }}
@@ -475,10 +541,13 @@ export const CanvasOverlay = ({ spacePressed }) => {
           });
         }}
         onDragGroupEnd={() => {
+          restoreHover();
           setMoveableMuted(hostElement, false);
           queueMoveableRefresh(moveableRef);
         }}
         onDragGroupStart={(event) => {
+          suppressHover();
+
           for (const groupEvent of event.events) {
             const nodeId = groupEvent.target?.dataset.nodeId;
             const node = editor.getNode(nodeId);
@@ -487,6 +556,9 @@ export const CanvasOverlay = ({ spacePressed }) => {
               node &&
               (editor.getNodeGeometry(nodeId)?.bbox || estimateBounds(node));
           }
+        }}
+        onDragStart={() => {
+          suppressHover();
         }}
         onResize={(event) => {
           if (
@@ -528,6 +600,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
           );
         }}
         onResizeEnd={() => {
+          restoreHover();
           queueMoveableRefresh(moveableRef);
         }}
         onResizeGroup={(event) => {
@@ -569,6 +642,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
           });
         }}
         onResizeGroupEnd={() => {
+          restoreHover();
           queueMoveableRefresh(moveableRef);
         }}
         onResizeGroupStart={(event) => {
@@ -584,6 +658,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
             return;
           }
 
+          suppressHover();
           const baseNodes = new Map();
 
           for (const nodeId of visibleSelectedNodeIds) {
@@ -625,6 +700,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
             return;
           }
 
+          suppressHover();
           event.datas.baseBBox = bbox;
           event.datas.anchorCanvas = resizeSession.anchorCanvas;
           event.datas.anchorClient = resizeSession.anchorClient;
@@ -662,6 +738,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
           );
         }}
         onRotateEnd={() => {
+          restoreHover();
           setMoveableMuted(hostElement, false);
           queueMoveableRefresh(moveableRef);
         }}
@@ -691,6 +768,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
           });
         }}
         onRotateGroupEnd={() => {
+          restoreHover();
           setMoveableMuted(hostElement, false);
           queueMoveableRefresh(moveableRef);
 
@@ -712,6 +790,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
             return;
           }
 
+          suppressHover();
           setMoveableMuted(hostElement, true);
           setGroupRotationPreviewActive(hostElement, true);
           setIsGroupRotationPreviewVisible(true);
@@ -745,6 +824,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
             return;
           }
 
+          suppressHover();
           setMoveableMuted(hostElement, true);
 
           const bbox = selectedGeometry?.bbox || estimateBounds(selectedNode);
@@ -785,6 +865,20 @@ export const CanvasOverlay = ({ spacePressed }) => {
             left: `${groupRotationPreviewRect.left}px`,
             top: `${groupRotationPreviewRect.top}px`,
             width: `${groupRotationPreviewRect.width}px`,
+          }}
+        />
+      ) : null}
+
+      {hoveredNodePreviewRect ? (
+        <div
+          className="canvas-hover-preview pointer-events-none absolute"
+          style={{
+            height: `${hoveredNodePreviewRect.height}px`,
+            left: `${hoveredNodePreviewRect.left}px`,
+            top: `${hoveredNodePreviewRect.top}px`,
+            transform: `rotate(${hoveredNodePreviewRect.rotation}deg)`,
+            transformOrigin: "center center",
+            width: `${hoveredNodePreviewRect.width}px`,
           }}
         />
       ) : null}

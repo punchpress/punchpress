@@ -60,6 +60,18 @@ export const getSelectionSnapshot = (page) => {
   });
 };
 
+export const panViewportBy = (page, delta) => {
+  return page.evaluate((nextDelta) => {
+    return (
+      window as Window & {
+        __PUNCHPRESS_E2E__?: {
+          panViewportBy: (delta?: { x?: number; y?: number }) => boolean;
+        };
+      }
+    ).__PUNCHPRESS_E2E__?.panViewportBy(nextDelta);
+  }, delta);
+};
+
 export const getStateSnapshot = (page) => {
   return page.evaluate(() => {
     return (
@@ -165,7 +177,7 @@ export const rotateSelectionFromCorner = async (page, options) => {
   await dragSelectionFromCorner(page, options);
 };
 
-export const rotateSelectionFromCornerWithoutRelease = async (page, options) => {
+export const rotateSelectionFromCornerWithoutRelease = (page, options) => {
   // Rotation starts just outside the visible corner handle.
   // The corner itself remains the resize affordance.
   return dragSelectionFromCorner(page, { ...options, release: false });
@@ -173,6 +185,29 @@ export const rotateSelectionFromCornerWithoutRelease = async (page, options) => 
 
 export const getGroupRotationPreviewRect = async (page) => {
   const locator = page.locator(".canvas-group-rotation-preview");
+
+  if ((await locator.count()) === 0) {
+    return null;
+  }
+
+  return locator.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+
+    return {
+      bottom: rect.bottom,
+      height: rect.height,
+      left: rect.left,
+      right: rect.right,
+      top: rect.top,
+      width: rect.width,
+      x: rect.x,
+      y: rect.y,
+    };
+  });
+};
+
+export const getHoverPreviewRect = async (page) => {
+  const locator = page.locator(".canvas-hover-preview");
 
   if ((await locator.count()) === 0) {
     return null;
