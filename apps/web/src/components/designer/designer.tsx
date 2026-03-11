@@ -89,15 +89,22 @@ export const DesignerPanel = ({
   children,
   className,
   side = "left",
+  style,
   ...props
 }) => {
   return (
     <aside
       className={cn(
-        "absolute top-4 z-10 hidden max-h-[calc(100%-32px)] md:block md:w-[240px] lg:w-[280px]",
+        "absolute z-10 hidden md:block md:w-[240px] lg:w-[280px]",
         side === "left" ? "left-4" : "right-4",
         className
       )}
+      style={{
+        maxHeight:
+          "calc(100% - var(--desktop-chrome-height, 0px) - var(--desktop-panel-top-gap, 16px) - 16px)",
+        top: "calc(var(--desktop-chrome-height, 0px) + var(--desktop-panel-top-gap, 16px))",
+        ...style,
+      }}
       {...props}
     >
       {children}
@@ -161,9 +168,16 @@ export const DesignerPaneBody = ({ children, className, ...props }) => {
   );
 };
 
-export const DesignerCanvas = ({ children, className, ...props }) => {
+export const DesignerCanvas = ({ children, className, style, ...props }) => {
   return (
-    <section className={cn("absolute inset-0", className)} {...props}>
+    <section
+      className={cn("absolute right-0 bottom-0 left-0", className)}
+      style={{
+        top: "var(--desktop-chrome-height, 0px)",
+        ...style,
+      }}
+      {...props}
+    >
       {children}
     </section>
   );
@@ -194,5 +208,21 @@ export const DesignerFloatingToolbar = ({ children, className, ...props }) => {
     >
       {children}
     </div>
+  );
+};
+
+export const DesignerWindowDragRegion = ({ className, style, ...props }) => {
+  return (
+    <div
+      aria-hidden="true"
+      className={cn("absolute top-0 right-0 z-20", className)}
+      style={{
+        WebkitAppRegion: "drag",
+        height: "var(--desktop-chrome-height, 0px)",
+        left: "var(--desktop-drag-left-inset, 0px)",
+        ...style,
+      }}
+      {...props}
+    />
   );
 };

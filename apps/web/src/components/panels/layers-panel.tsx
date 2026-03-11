@@ -545,25 +545,30 @@ export const LayersPanel = () => {
           <Menu modal={false}>
             <Button
               aria-label="Open main menu"
-              className="h-11 rounded-[16px] px-2.5"
+              className="group h-11 rounded-xl px-0 hover:bg-transparent data-pressed:bg-transparent"
               render={<MenuTrigger />}
+              style={{
+                marginLeft: "var(--shell-logo-offset-x, 0px)",
+              }}
               type="button"
               variant="ghost"
             >
-              <span className="flex size-5 items-center justify-center">
-                <img
-                  alt=""
-                  aria-hidden="true"
-                  className="h-4.5 w-4.5"
-                  height="18"
-                  src="/logo.svg"
-                  width="18"
+              <span className="flex h-10 translate-x-px items-center gap-1.5 rounded-lg px-[9px] group-hover:bg-accent">
+                <span className="flex size-5 items-center justify-center">
+                  <img
+                    alt=""
+                    aria-hidden="true"
+                    className="h-4.5 w-4.5"
+                    height="18"
+                    src="/logo.svg"
+                    width="18"
+                  />
+                </span>
+                <ChevronDownIcon
+                  className="size-4 opacity-80"
+                  strokeWidth={2.2}
                 />
               </span>
-              <ChevronDownIcon
-                className="size-4 opacity-80"
-                strokeWidth={2.2}
-              />
             </Button>
             <MenuPopup
               align="start"
@@ -621,7 +626,7 @@ export const LayersPanel = () => {
         <div className="mx-2.5 h-px bg-[var(--designer-border)]" />
 
         <div className="px-3 pt-2.5 pb-1.5">
-          <span className="text-[11px] font-medium text-[var(--designer-text-muted)]">
+          <span className="font-medium text-[11px] text-[var(--designer-text-muted)]">
             Layers
           </span>
         </div>
