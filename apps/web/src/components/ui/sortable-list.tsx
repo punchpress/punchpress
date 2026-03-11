@@ -18,6 +18,7 @@ export const SortableList = ({
   children,
   items,
   onReorder,
+  onReorderEnd,
   onReorderStart,
 }) => {
   const sensors = useSensors(
@@ -31,19 +32,20 @@ export const SortableList = ({
   return (
     <DndContext
       collisionDetection={closestCenter}
+      onDragCancel={() => {
+        onReorderEnd?.();
+      }}
       onDragEnd={({ active, over }) => {
-        if (!over || active.id === over.id) {
-          return;
+        if (over && active.id !== over.id) {
+          const oldIndex = items.indexOf(active.id);
+          const newIndex = items.indexOf(over.id);
+
+          if (!(oldIndex < 0 || newIndex < 0)) {
+            onReorder(arrayMove(items, oldIndex, newIndex));
+          }
         }
 
-        const oldIndex = items.indexOf(active.id);
-        const newIndex = items.indexOf(over.id);
-
-        if (oldIndex < 0 || newIndex < 0) {
-          return;
-        }
-
-        onReorder(arrayMove(items, oldIndex, newIndex));
+        onReorderEnd?.(active.id);
       }}
       onDragStart={({ active }) => {
         onReorderStart?.(active.id);

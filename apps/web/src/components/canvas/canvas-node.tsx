@@ -38,6 +38,20 @@ export const CanvasNode = ({ nodeId, spacePressed }) => {
 
         editor.dispatchNodePointerDown({ event, node });
       }}
+      onPointerEnter={() => {
+        if (spacePressed || activeTool !== "pointer") {
+          return;
+        }
+
+        editor.setHoveredNode(node.id);
+      }}
+      onPointerLeave={() => {
+        if (editor.hoveredNodeId !== node.id) {
+          return;
+        }
+
+        editor.setHoveredNode(null);
+      }}
       ref={(element) => editor.registerNodeElement(node.id, element)}
       style={{
         height: `${height}px`,

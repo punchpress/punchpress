@@ -147,6 +147,14 @@ export class Editor {
     return this.getState().nodes;
   }
 
+  get hoveredNodeId() {
+    return this.getState().hoveredNodeId;
+  }
+
+  get isHoveringSuppressed() {
+    return this.getState().isHoveringSuppressed;
+  }
+
   get layerNodeIds() {
     return [...this.nodes].reverse().map((node) => node.id);
   }
@@ -345,6 +353,14 @@ export class Editor {
     }
 
     this.getState().toggleNodeSelection(nodeId);
+  }
+
+  setHoveredNode(nodeId) {
+    this.getState().setHoveredNodeId(nodeId);
+  }
+
+  setHoveringSuppressed(isHoveringSuppressed) {
+    this.getState().setHoveringSuppressed(isHoveringSuppressed);
   }
 
   ensureNodeSelected(nodeId) {

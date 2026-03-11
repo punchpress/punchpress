@@ -125,6 +125,18 @@ export const createEditorE2eApi = (editor) => {
         zoom: editor.zoom,
       };
     },
+    panViewportBy: ({ x = 0, y = 0 } = {}) => {
+      const viewer = editor.viewerRef;
+
+      if (!viewer) {
+        return false;
+      }
+
+      viewer.scrollBy(x, y);
+      queueOverlayRefresh(editor);
+
+      return true;
+    },
     getStateSnapshot: () => {
       const state = editor.getState();
 

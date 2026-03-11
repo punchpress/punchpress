@@ -95,6 +95,7 @@ const getSelectedNodeIds = (state, nodeIds = state.selectedNodeIds) => {
 const commitEditingState = (state, selectedNodeIds = state.selectedNodeIds) => {
   if (!state.editingNodeId) {
     return {
+      isHoveringSuppressed: false,
       selectedNodeIds: getSelectedNodeIds(state, selectedNodeIds),
     };
   }
@@ -105,6 +106,7 @@ const commitEditingState = (state, selectedNodeIds = state.selectedNodeIds) => {
     editingNodeId: null,
     editingOriginalText: "",
     editingText: nextText,
+    isHoveringSuppressed: false,
     nodes: mapNodeById(state.nodes, state.editingNodeId, (node) =>
       node.text === nextText ? node : { ...node, text: nextText }
     ),
@@ -134,6 +136,7 @@ const deleteNodeState = (state, nodeId) => {
     editingNodeId: isEditingNode ? null : state.editingNodeId,
     editingOriginalText: isEditingNode ? "" : state.editingOriginalText,
     editingText: isEditingNode ? "" : state.editingText,
+    isHoveringSuppressed: isEditingNode ? false : state.isHoveringSuppressed,
     nodes: state.nodes.filter((node) => node.id !== nodeId),
     selectedNodeIds: state.selectedNodeIds.filter(
       (selectedNodeId) => selectedNodeId !== nodeId
@@ -157,6 +160,9 @@ const deleteNodesState = (state, nodeIds) => {
     editingNodeId: isEditingNodeSelected ? null : state.editingNodeId,
     editingOriginalText: isEditingNodeSelected ? "" : state.editingOriginalText,
     editingText: isEditingNodeSelected ? "" : state.editingText,
+    isHoveringSuppressed: isEditingNodeSelected
+      ? false
+      : state.isHoveringSuppressed,
     nodes: state.nodes.filter((node) => !selectedNodeIdSet.has(node.id)),
     selectedNodeIds: state.selectedNodeIds.filter(
       (selectedNodeId) => !selectedNodeIdSet.has(selectedNodeId)
@@ -269,6 +275,8 @@ export const createEditorStore = ({
     editingOriginalText: "",
     editingText: "",
     fontRevision: 0,
+    hoveredNodeId: null,
+    isHoveringSuppressed: false,
     nodes: [],
     selectedNodeIds: [],
     viewport: {
@@ -299,6 +307,25 @@ export const createEditorStore = ({
       }));
     },
 
+    setHoveredNodeId: (nodeId) => {
+      set((state) => {
+        const hoveredNodeId =
+          state.isHoveringSuppressed ||
+          !state.nodes.some((node) => node.id === nodeId)
+            ? null
+            : nodeId;
+
+        return { hoveredNodeId };
+      });
+    },
+
+    setHoveringSuppressed: (isHoveringSuppressed) => {
+      set((state) => ({
+        hoveredNodeId: isHoveringSuppressed ? null : state.hoveredNodeId,
+        isHoveringSuppressed,
+      }));
+    },
+
     cancelEditing: () => {
       set((state) => {
         if (!state.editingNodeId) {
@@ -309,6 +336,7 @@ export const createEditorStore = ({
           editingNodeId: null,
           editingOriginalText: "",
           editingText: state.editingOriginalText,
+          isHoveringSuppressed: false,
           nodes: mapNodeById(state.nodes, state.editingNodeId, {
             text: state.editingOriginalText,
           }),
@@ -483,6 +511,7 @@ export const createEditorStore = ({
           editingNodeId: node.id,
           editingOriginalText: node.text,
           editingText: node.text,
+          isHoveringSuppressed: true,
           selectedNodeIds: [node.id],
         };
       });
