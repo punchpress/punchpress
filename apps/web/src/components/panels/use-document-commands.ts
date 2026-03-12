@@ -96,15 +96,32 @@ export const useDocumentCommands = () => {
     }
   );
 
+  const finishOpenedDocument = useEffectEvent(
+    async (openedDocument: PunchOpenedDocumentFile | null) => {
+      if (!openedDocument) {
+        return;
+      }
+
+      try {
+        applyOpenedDocument(openedDocument);
+      } finally {
+        await refreshRecentDocuments();
+      }
+    }
+  );
+
+  const finishOpenedDocumentSafely = useEffectEvent(
+    (openedDocument: PunchOpenedDocumentFile | null) => {
+      finishOpenedDocument(openedDocument).catch((error) => {
+        handleActionError("open", error);
+      });
+    }
+  );
+
   const handleOpenDocument = useEffectEvent(async () => {
     const openedDocument = await openPunchDocumentFile();
 
-    if (!openedDocument) {
-      return;
-    }
-
-    applyOpenedDocument(openedDocument);
-    await refreshRecentDocuments();
+    await finishOpenedDocument(openedDocument);
   });
 
   const handleSaveDocument = useEffectEvent(async (forceDialog = false) => {
@@ -169,13 +186,7 @@ export const useDocumentCommands = () => {
   const openRecentDocumentSafely = useEffectEvent(
     (recentDocument: PunchRecentDocument) => {
       openRecentPunchDocumentFile(recentDocument)
-        .then(async (openedDocument) => {
-          if (openedDocument) {
-            applyOpenedDocument(openedDocument);
-          }
-
-          await refreshRecentDocuments();
-        })
+        .then((openedDocument) => finishOpenedDocument(openedDocument))
         .catch((error) => {
           handleActionError("open", error);
         });
@@ -221,11 +232,9 @@ export const useDocumentCommands = () => {
     );
     const unsubscribeOpenDocument =
       window.electron?.documentCommands?.onOpenDocument((openedDocument) => {
-        applyOpenedDocument(openedDocument);
-        refreshRecentDocuments().catch((error) => {
-          handleActionError("open", error);
-        });
+        finishOpenedDocumentSafely(openedDocument);
       });
+    window.electron?.documentCommands?.markReady();
 
     return () => {
       unsubscribeCommand?.();

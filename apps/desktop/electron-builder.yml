@@ -17,6 +17,13 @@ files:
   - package.json
   - '!**/*.map'
 
+fileAssociations:
+  - ext: punch
+    icon: punch.icns
+    mimeType: application/vnd.punchpress+json
+    name: PunchPress Document
+    role: Editor
+
 mac:
   category: public.app-category.graphics-design
   icon: build_resources/logo.icns

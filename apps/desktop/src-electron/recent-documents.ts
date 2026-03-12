@@ -175,6 +175,18 @@ export const rememberRecentDocument = async (filePath: string) => {
   return nextRecentDocuments;
 };
 
+export const openDocumentAtPath = async (filePath: string) => {
+  const resolvedFilePath = path.resolve(filePath);
+
+  if (!(await isFileAvailable(resolvedFilePath))) {
+    return null;
+  }
+
+  const openedDocument = await readDocumentAtPath(resolvedFilePath);
+  await rememberRecentDocument(resolvedFilePath);
+  return openedDocument;
+};
+
 export const openRecentDocument = async (filePath: string) => {
   const resolvedFilePath = path.resolve(filePath);
 
@@ -186,7 +198,5 @@ export const openRecentDocument = async (filePath: string) => {
     return null;
   }
 
-  const openedDocument = await readDocumentAtPath(resolvedFilePath);
-  await rememberRecentDocument(resolvedFilePath);
-  return openedDocument;
+  return openDocumentAtPath(resolvedFilePath);
 };

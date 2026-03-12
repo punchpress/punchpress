@@ -2,6 +2,7 @@ import path from "node:path";
 import {
   app,
   BrowserWindow,
+  ipcMain,
   Menu,
   shell,
   session,
@@ -11,6 +12,7 @@ import { registerDocumentFileHandlers } from "./document-files.js";
 import { configurePrivilegedStaticAppScheme, serveStaticAt } from "./helpers/serve-static-app.js";
 import {
   getRecentDocuments,
+  openDocumentAtPath,
   openRecentDocument,
   type DesktopOpenedDocument,
 } from "./recent-documents.js";
@@ -23,7 +25,13 @@ const defaultWindowSize = {
   minHeight: 760,
 };
 
+const DOCUMENT_OPENED_CHANNEL = "document:open-file";
+const RENDERER_READY_CHANNEL = "document:renderer-ready";
+const PUNCH_DOCUMENT_EXTENSION = ".punch";
+
 let mainWindow: BrowserWindow | null = null;
+let isMainWindowRendererReady = false;
+let isFlushingPendingOpenDocumentPaths = false;
 
 app.setName("PunchPress");
 app.setPath(
@@ -44,7 +52,12 @@ const sendDocumentCommand = (
 };
 
 const sendOpenedDocument = (openedDocument: DesktopOpenedDocument) => {
-  mainWindow?.webContents.send("document:open-file", openedDocument);
+  if (!mainWindow || !isMainWindowRendererReady) {
+    pendingOpenedDocuments.push(openedDocument);
+    return;
+  }
+
+  mainWindow.webContents.send(DOCUMENT_OPENED_CHANNEL, openedDocument);
 };
 
 const openRecentDocumentFromMenu = async (filePath: string) => {
@@ -57,6 +70,104 @@ const openRecentDocumentFromMenu = async (filePath: string) => {
   }
 
   sendOpenedDocument(openedDocument);
+};
+
+const normalizeOpenDocumentPath = (value: unknown) => {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmedValue = value.trim();
+
+  if (trimmedValue.length === 0 || trimmedValue.startsWith("-")) {
+    return null;
+  }
+
+  const resolvedFilePath = path.resolve(trimmedValue);
+
+  return path.extname(resolvedFilePath).toLowerCase() ===
+    PUNCH_DOCUMENT_EXTENSION
+    ? resolvedFilePath
+    : null;
+};
+
+const extractOpenDocumentPathsFromArgv = (argv: string[]) => {
+  const filePaths = argv
+    .map(normalizeOpenDocumentPath)
+    .filter((filePath): filePath is string => Boolean(filePath));
+
+  return [...new Set(filePaths)];
+};
+
+const pendingOpenDocumentPaths = extractOpenDocumentPathsFromArgv(process.argv);
+const pendingOpenedDocuments: DesktopOpenedDocument[] = [];
+
+const focusMainWindow = () => {
+  if (!mainWindow) {
+    return;
+  }
+
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+
+  mainWindow.show();
+  mainWindow.focus();
+};
+
+const flushPendingOpenedDocuments = () => {
+  if (!mainWindow || !isMainWindowRendererReady) {
+    return;
+  }
+
+  const openedDocumentsToSend = pendingOpenedDocuments.splice(0);
+
+  for (const openedDocument of openedDocumentsToSend) {
+    mainWindow.webContents.send(DOCUMENT_OPENED_CHANNEL, openedDocument);
+  }
+};
+
+const openDocumentFromPath = async (filePath: string) => {
+  const openedDocument = await openDocumentAtPath(filePath);
+
+  await installApplicationMenu();
+
+  if (!openedDocument) {
+    return;
+  }
+
+  sendOpenedDocument(openedDocument);
+};
+
+const flushPendingOpenDocumentPaths = async () => {
+  if (
+    !app.isReady() ||
+    isFlushingPendingOpenDocumentPaths ||
+    pendingOpenDocumentPaths.length === 0
+  ) {
+    return;
+  }
+
+  isFlushingPendingOpenDocumentPaths = true;
+
+  try {
+    while (pendingOpenDocumentPaths.length > 0) {
+      const filePath = pendingOpenDocumentPaths.shift();
+
+      if (!filePath) {
+        continue;
+      }
+
+      try {
+        await openDocumentFromPath(filePath);
+      } catch (error) {
+        console.error(`Failed to open document at ${filePath}`, error);
+      }
+    }
+  } finally {
+    isFlushingPendingOpenDocumentPaths = false;
+    flushPendingOpenedDocuments();
+  }
 };
 
 const buildOpenRecentSubmenu = async (): Promise<MenuItemConstructorOptions[]> => {
@@ -156,7 +267,7 @@ const installApplicationMenu = async () => {
 const createMainWindow = () => {
   const sharedSession = session.fromPartition("persist:shared-session");
 
-  mainWindow = new BrowserWindow({
+  const nextWindow = new BrowserWindow({
     show: false,
     width: defaultWindowSize.width,
     height: defaultWindowSize.height,
@@ -179,31 +290,71 @@ const createMainWindow = () => {
       session: sharedSession,
     },
   });
+  isMainWindowRendererReady = false;
+  mainWindow = nextWindow;
 
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+  nextWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: "deny" };
   });
 
-  mainWindow.once("ready-to-show", () => {
-    mainWindow?.show();
+  nextWindow.once("ready-to-show", () => {
+    nextWindow.show();
   });
 
-  mainWindow.on("closed", () => {
+  nextWindow.on("closed", () => {
     mainWindow = null;
+    isMainWindowRendererReady = false;
   });
 
   if (isDev) {
-    void mainWindow.loadURL(getRendererDevUrl());
+    void nextWindow.loadURL(getRendererDevUrl());
+    return nextWindow;
+  }
+
+  void nextWindow.loadURL("app://static/index.html");
+  return nextWindow;
+};
+
+const ensureMainWindow = () => {
+  return mainWindow || createMainWindow();
+};
+
+const enqueueOpenDocumentPath = (filePath: string) => {
+  const normalizedFilePath = normalizeOpenDocumentPath(filePath);
+
+  if (!normalizedFilePath) {
     return;
   }
 
-  void mainWindow.loadURL("app://static/index.html");
+  const existingIndex = pendingOpenDocumentPaths.indexOf(normalizedFilePath);
+
+  if (existingIndex >= 0) {
+    pendingOpenDocumentPaths.splice(existingIndex, 1);
+  }
+
+  pendingOpenDocumentPaths.push(normalizedFilePath);
+
+  if (!app.isReady()) {
+    return;
+  }
+
+  ensureMainWindow();
+  focusMainWindow();
+  void flushPendingOpenDocumentPaths();
 };
 
 const launch = async () => {
   await app.whenReady();
   await installApplicationMenu();
+  ipcMain.on(RENDERER_READY_CHANNEL, (event) => {
+    if (mainWindow?.webContents !== event.sender) {
+      return;
+    }
+
+    isMainWindowRendererReady = true;
+    flushPendingOpenedDocuments();
+  });
   registerDocumentFileHandlers({
     onRecentDocumentsChanged: () => {
       installApplicationMenu().catch((error) => {
@@ -217,11 +368,15 @@ const launch = async () => {
   }
 
   createMainWindow();
+  await flushPendingOpenDocumentPaths();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createMainWindow();
+      return;
     }
+
+    focusMainWindow();
   });
 };
 
@@ -231,4 +386,26 @@ app.on("window-all-closed", () => {
   }
 });
 
-void launch();
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on("second-instance", (_event, argv) => {
+    for (const filePath of extractOpenDocumentPathsFromArgv(argv)) {
+      enqueueOpenDocumentPath(filePath);
+    }
+
+    if (!app.isReady()) {
+      return;
+    }
+
+    ensureMainWindow();
+    focusMainWindow();
+  });
+
+  app.on("open-file", (event, filePath) => {
+    event.preventDefault();
+    enqueueOpenDocumentPath(filePath);
+  });
+
+  void launch();
+}

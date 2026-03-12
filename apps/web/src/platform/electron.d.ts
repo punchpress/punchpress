@@ -20,6 +20,7 @@ declare global {
   interface Window {
     electron?: {
       documentCommands?: {
+        markReady: () => void;
         onCommand: (
           callback: (command: "export" | "open" | "save" | "save-as") => void
         ) => () => void;
