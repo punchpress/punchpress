@@ -160,6 +160,54 @@ const setGroupRotationPreviewActive = (hostElement, active) => {
   hostElement?.classList.toggle("canvas-overlay-group-rotating", active);
 };
 
+const applySingleDragUpdate = (editor, nodeId, dragEvent) => {
+  if (!(nodeId && dragEvent)) {
+    return;
+  }
+
+  const node = editor.getNode(nodeId);
+  if (!node) {
+    return;
+  }
+
+  const bbox = editor.getNodeGeometry(nodeId)?.bbox || estimateBounds(node);
+
+  editor.updateNode(nodeId, {
+    transform: {
+      x: round(dragEvent.left - bbox.minX, 2),
+      y: round(dragEvent.top - bbox.minY, 2),
+    },
+  });
+};
+
+const applyGroupDragUpdate = (editor, nodeIds, dragEvents) => {
+  if (!(nodeIds.length > 0 && dragEvents.length > 0)) {
+    return;
+  }
+
+  editor.updateNodes(nodeIds, (node) => {
+    const groupEvent = dragEvents.find(
+      (item) => item.target?.dataset.nodeId === node.id
+    );
+
+    if (!groupEvent) {
+      return node;
+    }
+
+    const bbox =
+      groupEvent.datas?.bbox ||
+      editor.getNodeGeometry(node.id)?.bbox ||
+      estimateBounds(node);
+
+    return {
+      transform: {
+        x: round(groupEvent.left - bbox.minX, 2),
+        y: round(groupEvent.top - bbox.minY, 2),
+      },
+    };
+  });
+};
+
 const getHostRectFromCanvasBounds = (editor, bounds) => {
   const host = editor.hostRef;
   const viewer = editor.viewerRef;
@@ -506,18 +554,16 @@ export const CanvasOverlay = ({ spacePressed }) => {
 
           setMoveableMuted(hostElement, true);
 
-          const bbox = selectedGeometry?.bbox || estimateBounds(selectedNode);
-
-          editor.updateNode(selectedNode.id, {
-            transform: {
-              x: round(event.left - bbox.minX, 2),
-              y: round(event.top - bbox.minY, 2),
-            },
-          });
+          applySingleDragUpdate(editor, selectedNode.id, event);
         }}
-        onDragEnd={() => {
+        onDragEnd={(event) => {
+          if (selectedNode && event.lastEvent) {
+            applySingleDragUpdate(editor, selectedNode.id, event.lastEvent);
+          }
+
           restoreHover();
           setMoveableMuted(hostElement, false);
+          editor.endHistoryTransaction();
           queueMoveableRefresh(moveableRef);
         }}
         onDragGroup={(event) => {
@@ -529,33 +575,24 @@ export const CanvasOverlay = ({ spacePressed }) => {
 
           setMoveableMuted(hostElement, true);
 
-          editor.updateNodes(visibleSelectedNodeIds, (node) => {
-            const groupEvent = event.events.find(
-              (item) => item.target?.dataset.nodeId === node.id
-            );
-
-            if (!groupEvent) {
-              return node;
-            }
-
-            const bbox = groupEvent.datas.bbox;
-            if (!bbox) {
-              return node;
-            }
-            return {
-              transform: {
-                x: round(groupEvent.left - bbox.minX, 2),
-                y: round(groupEvent.top - bbox.minY, 2),
-              },
-            };
-          });
+          applyGroupDragUpdate(editor, visibleSelectedNodeIds, event.events);
         }}
-        onDragGroupEnd={() => {
+        onDragGroupEnd={(event) => {
+          const lastEvents = event.events
+            .map((groupEvent) => groupEvent.lastEvent)
+            .filter(Boolean);
+
+          if (lastEvents.length > 0) {
+            applyGroupDragUpdate(editor, visibleSelectedNodeIds, lastEvents);
+          }
+
           restoreHover();
           setMoveableMuted(hostElement, false);
+          editor.endHistoryTransaction();
           queueMoveableRefresh(moveableRef);
         }}
         onDragGroupStart={(event) => {
+          editor.beginHistoryTransaction();
           suppressHover();
 
           for (const groupEvent of event.events) {
@@ -568,6 +605,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
           }
         }}
         onDragStart={() => {
+          editor.beginHistoryTransaction();
           suppressHover();
         }}
         onResize={(event) => {
@@ -611,6 +649,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
         }}
         onResizeEnd={() => {
           restoreHover();
+          editor.endHistoryTransaction();
           queueMoveableRefresh(moveableRef);
         }}
         onResizeGroup={(event) => {
@@ -653,6 +692,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
         }}
         onResizeGroupEnd={() => {
           restoreHover();
+          editor.endHistoryTransaction();
           queueMoveableRefresh(moveableRef);
         }}
         onResizeGroupStart={(event) => {
@@ -668,6 +708,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
             return;
           }
 
+          editor.beginHistoryTransaction();
           suppressHover();
           const baseNodes = new Map();
 
@@ -704,6 +745,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
             return;
           }
 
+          editor.beginHistoryTransaction();
           suppressHover();
           event.datas.baseBBox = bbox;
           event.datas.anchorCanvas = resizeSession.anchorCanvas;
@@ -739,6 +781,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
         onRotateEnd={() => {
           restoreHover();
           setMoveableMuted(hostElement, false);
+          editor.endHistoryTransaction();
           queueMoveableRefresh(moveableRef);
         }}
         onRotateGroup={(event) => {
@@ -769,6 +812,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
         onRotateGroupEnd={() => {
           restoreHover();
           setMoveableMuted(hostElement, false);
+          editor.endHistoryTransaction();
           queueMoveableRefresh(moveableRef);
 
           if (typeof window === "undefined") {
@@ -789,6 +833,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
             return;
           }
 
+          editor.beginHistoryTransaction();
           suppressHover();
           setMoveableMuted(hostElement, true);
           setGroupRotationPreviewActive(hostElement, true);
@@ -821,6 +866,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
             return;
           }
 
+          editor.beginHistoryTransaction();
           suppressHover();
           setMoveableMuted(hostElement, true);
 

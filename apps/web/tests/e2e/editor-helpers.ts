@@ -170,6 +170,18 @@ export const scaleSelectedGroupBy = (page, options) => {
   }, options);
 };
 
+export const setSelectedText = (page, text) => {
+  return page.evaluate((nextText) => {
+    return (
+      window as Window & {
+        __PUNCHPRESS_E2E__?: {
+          setSelectedText: (text: string) => string | null;
+        };
+      }
+    ).__PUNCHPRESS_E2E__?.setSelectedText(nextText);
+  }, text);
+};
+
 const getHandleCenter = (handle) => {
   return {
     x: handle.x + handle.width / 2,
@@ -314,6 +326,29 @@ export const shiftClickLayer = async (page, label) => {
   await page.keyboard.down("Shift");
   await page.getByRole("button", { name: label }).first().click();
   await page.keyboard.up("Shift");
+};
+
+export const dragNodeBy = async (page, nodeId, delta) => {
+  const snapshot = await waitForNodeReady(page, nodeId);
+  const rect = snapshot.elementRect;
+
+  if (!rect) {
+    throw new Error(`Missing node rect for ${nodeId}`);
+  }
+
+  const start = {
+    x: rect.x + rect.width / 2,
+    y: rect.y + rect.height / 2,
+  };
+  const end = {
+    x: start.x + (delta.x || 0),
+    y: start.y + (delta.y || 0),
+  };
+
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(end.x, end.y, { steps: 12 });
+  await page.mouse.up();
 };
 
 export const waitForNodeReady = async (page, nodeId) => {

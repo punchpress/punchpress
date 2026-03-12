@@ -35,6 +35,7 @@ export const EditorShell = () => {
 
   return (
     <Designer
+      data-editor-shell-root=""
       style={{
         ...shellChromeVars,
         "--editor-accent": editor.accent,

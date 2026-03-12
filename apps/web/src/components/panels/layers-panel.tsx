@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { useEditor } from "../../editor/use-editor";
 import { useEditorValue } from "../../editor/use-editor-value";
 import { SettingsDialog } from "../settings-dialog";
+import { UnsavedDocumentDialog } from "./unsaved-document-dialog";
 import { useDocumentCommands } from "./use-document-commands";
 
 const LayerGlyph = ({ icon, size = 18, strokeWidth = 1.8 }) => {
@@ -348,6 +349,7 @@ export const LayersPanel = () => {
     openRecentDocumentSafely,
     recentDocuments,
     runDocumentCommandSafely,
+    unsavedDocumentDialogProps,
   } = useDocumentCommands();
 
   return (
@@ -506,6 +508,7 @@ export const LayersPanel = () => {
       </div>
 
       <SettingsDialog onOpenChange={setIsSettingsOpen} open={isSettingsOpen} />
+      <UnsavedDocumentDialog {...unsavedDocumentDialogProps} />
     </>
   );
 };

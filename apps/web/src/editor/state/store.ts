@@ -74,6 +74,11 @@ const orderNodesByIds = (nodes, orderedIds) => {
   return orderedNodes.length === nodes.length ? orderedNodes : nodes;
 };
 
+const withDocumentMutation = (unusedState, nextState) => {
+  unusedState;
+  return nextState;
+};
+
 const getSelectedNodeIds = (state, nodeIds = state.selectedNodeIds) => {
   if (!(Array.isArray(nodeIds) && nodeIds.length > 0)) {
     return [];
@@ -302,14 +307,16 @@ export const createEditorStore = ({
         };
       }
 
-      set((state) => ({
-        activeTool: "text",
-        editingNodeId: node.id,
-        editingOriginalText: node.text,
-        editingText: node.text,
-        nodes: [...state.nodes, node],
-        selectedNodeIds: [node.id],
-      }));
+      set((state) =>
+        withDocumentMutation(state, {
+          activeTool: "text",
+          editingNodeId: node.id,
+          editingOriginalText: node.text,
+          editingText: node.text,
+          nodes: [...state.nodes, node],
+          selectedNodeIds: [node.id],
+        })
+      );
     },
 
     bumpFontRevision: () => {
@@ -343,7 +350,7 @@ export const createEditorStore = ({
           return {};
         }
 
-        return {
+        return withDocumentMutation(state, {
           editingNodeId: null,
           editingOriginalText: "",
           editingText: state.editingOriginalText,
@@ -351,14 +358,14 @@ export const createEditorStore = ({
           nodes: mapNodeById(state.nodes, state.editingNodeId, {
             text: state.editingOriginalText,
           }),
-        };
+        });
       });
     },
 
     clearSelection: () => {
       set((state) => {
         if (state.editingNodeId) {
-          return commitEditingState(state, []);
+          return withDocumentMutation(state, commitEditingState(state, []));
         }
 
         return {
@@ -369,7 +376,7 @@ export const createEditorStore = ({
 
     commitEditing: () => {
       set((state) => {
-        return commitEditingState(state);
+        return withDocumentMutation(state, commitEditingState(state));
       });
     },
 
@@ -379,25 +386,34 @@ export const createEditorStore = ({
           return {};
         }
 
-        return deleteNodesState(state, state.selectedNodeIds);
+        return withDocumentMutation(
+          state,
+          deleteNodesState(state, state.selectedNodeIds)
+        );
       });
     },
 
     deleteNodeById: (nodeId) => {
       set((state) => {
-        return deleteNodeState(state, nodeId);
+        return withDocumentMutation(state, deleteNodeState(state, nodeId));
       });
     },
 
     duplicateNodeById: (nodeId) => {
       set((state) => {
-        return duplicateNodesState(state, [nodeId]);
+        return withDocumentMutation(
+          state,
+          duplicateNodesState(state, [nodeId])
+        );
       });
     },
 
     duplicateSelectedNodes: () => {
       set((state) => {
-        return duplicateNodesState(state, state.selectedNodeIds);
+        return withDocumentMutation(
+          state,
+          duplicateNodesState(state, state.selectedNodeIds)
+        );
       });
     },
 
@@ -420,7 +436,10 @@ export const createEditorStore = ({
         const nextSelectedNodeIds = getSelectedNodeIds(state, [nodeId]);
 
         if (state.editingNodeId && state.editingNodeId !== nodeId) {
-          return commitEditingState(state, nextSelectedNodeIds);
+          return withDocumentMutation(
+            state,
+            commitEditingState(state, nextSelectedNodeIds)
+          );
         }
 
         return {
@@ -438,7 +457,10 @@ export const createEditorStore = ({
           (nextSelectedNodeIds.length !== 1 ||
             nextSelectedNodeIds[0] !== state.editingNodeId)
         ) {
-          return finalizeEditingState(state, nextSelectedNodeIds);
+          return withDocumentMutation(
+            state,
+            finalizeEditingState(state, nextSelectedNodeIds)
+          );
         }
 
         return {
@@ -460,7 +482,10 @@ export const createEditorStore = ({
           (nextSelectedNodeIds.length !== 1 ||
             nextSelectedNodeIds[0] !== state.editingNodeId)
         ) {
-          return finalizeEditingState(state, nextSelectedNodeIds);
+          return withDocumentMutation(
+            state,
+            finalizeEditingState(state, nextSelectedNodeIds)
+          );
         }
 
         return {
@@ -475,13 +500,19 @@ export const createEditorStore = ({
 
     sendNodeToBack: (nodeId) => {
       set((state) => {
-        return moveNodesToBoundaryState(state, [nodeId], "back");
+        return withDocumentMutation(
+          state,
+          moveNodesToBoundaryState(state, [nodeId], "back")
+        );
       });
     },
 
     sendSelectedNodesToBack: () => {
       set((state) => {
-        return moveNodesToBoundaryState(state, state.selectedNodeIds, "back");
+        return withDocumentMutation(
+          state,
+          moveNodesToBoundaryState(state, state.selectedNodeIds, "back")
+        );
       });
     },
 
@@ -493,25 +524,30 @@ export const createEditorStore = ({
           };
         }
 
-        return {
+        return withDocumentMutation(state, {
           editingText: value,
           nodes: mapNodeById(state.nodes, state.editingNodeId, {
             text: value.length > 0 ? value : " ",
           }),
-        };
+        });
       });
     },
 
     toggleNodeVisibilityById: (nodeId) => {
       set((state) => {
-        return toggleNodeVisibilityState(state, nodeId);
+        return withDocumentMutation(
+          state,
+          toggleNodeVisibilityState(state, nodeId)
+        );
       });
     },
 
     setNodeOrder: (orderedIds) => {
-      set((state) => ({
-        nodes: orderNodesByIds(state.nodes, orderedIds),
-      }));
+      set((state) =>
+        withDocumentMutation(state, {
+          nodes: orderNodesByIds(state.nodes, orderedIds),
+        })
+      );
     },
 
     setViewportZoom: (zoom) => {
@@ -530,7 +566,7 @@ export const createEditorStore = ({
             ? commitEditingState(state, [node.id])
             : {};
 
-        return {
+        return withDocumentMutation(state, {
           ...baseState,
           activeTool: "text",
           editingNodeId: node.id,
@@ -538,14 +574,16 @@ export const createEditorStore = ({
           editingText: node.text,
           isHoveringSuppressed: true,
           selectedNodeIds: [node.id],
-        };
+        });
       });
     },
 
     updateNodeById: (nodeId, updater) => {
-      set((state) => ({
-        nodes: mapNodeById(state.nodes, nodeId, updater),
-      }));
+      set((state) =>
+        withDocumentMutation(state, {
+          nodes: mapNodeById(state.nodes, nodeId, updater),
+        })
+      );
     },
 
     updateSelectedNode: (updater) => {
@@ -554,32 +592,40 @@ export const createEditorStore = ({
           return {};
         }
 
-        return {
+        return withDocumentMutation(state, {
           nodes: mapNodesByIds(state.nodes, state.selectedNodeIds, updater),
-        };
+        });
       });
     },
 
     bringNodeToFront: (nodeId) => {
       set((state) => {
-        return moveNodesToBoundaryState(state, [nodeId], "front");
+        return withDocumentMutation(
+          state,
+          moveNodesToBoundaryState(state, [nodeId], "front")
+        );
       });
     },
 
     bringSelectedNodesToFront: () => {
       set((state) => {
-        return moveNodesToBoundaryState(state, state.selectedNodeIds, "front");
+        return withDocumentMutation(
+          state,
+          moveNodesToBoundaryState(state, state.selectedNodeIds, "front")
+        );
       });
     },
 
     updateNodesById: (nodeIds, updater) => {
-      set((state) => ({
-        nodes: mapNodesByIds(
-          state.nodes,
-          getSelectedNodeIds(state, nodeIds),
-          updater
-        ),
-      }));
+      set((state) =>
+        withDocumentMutation(state, {
+          nodes: mapNodesByIds(
+            state.nodes,
+            getSelectedNodeIds(state, nodeIds),
+            updater
+          ),
+        })
+      );
     },
   }));
 };

@@ -126,7 +126,6 @@ export const CanvasTextEditor = () => {
           if (event.key === "Escape") {
             event.preventDefault();
             editor.cancelEditing();
-            editor.setActiveTool("pointer");
           }
         }}
         onPointerDown={(event) => event.stopPropagation()}
