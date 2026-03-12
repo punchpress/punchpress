@@ -2,6 +2,9 @@ import { contextBridge, ipcRenderer } from "electron";
 
 contextBridge.exposeInMainWorld("electron", {
   documentCommands: {
+    markReady: () => {
+      ipcRenderer.send("document:renderer-ready");
+    },
     onCommand: (callback) => {
       const listener = (_event, command) => callback(command);
 
