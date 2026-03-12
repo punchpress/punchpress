@@ -254,5 +254,17 @@ export const createEditorE2eApi = (editor) => {
 
       return editor.selectedNodeIds;
     },
+    setSelectedText: (text) => {
+      const selectedNode = editor.selectedNode;
+
+      if (!selectedNode) {
+        return null;
+      }
+
+      editor.updateSelectedNode({ text });
+      queueOverlayRefresh(editor);
+
+      return selectedNode.id;
+    },
   };
 };

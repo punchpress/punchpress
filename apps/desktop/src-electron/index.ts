@@ -4,17 +4,20 @@ import {
   BrowserWindow,
   ipcMain,
   Menu,
-  shell,
-  session,
   type MenuItemConstructorOptions,
+  session,
+  shell,
 } from "electron";
 import { registerDocumentFileHandlers } from "./document-files.js";
-import { configurePrivilegedStaticAppScheme, serveStaticAt } from "./helpers/serve-static-app.js";
 import {
+  configurePrivilegedStaticAppScheme,
+  serveStaticAt,
+} from "./helpers/serve-static-app.js";
+import {
+  type DesktopOpenedDocument,
   getRecentDocuments,
   openDocumentAtPath,
   openRecentDocument,
-  type DesktopOpenedDocument,
 } from "./recent-documents.js";
 import { isDev } from "./utils/is-dev.js";
 
@@ -36,7 +39,7 @@ let isFlushingPendingOpenDocumentPaths = false;
 app.setName("PunchPress");
 app.setPath(
   "userData",
-  path.join(app.getPath("appData"), "build.punchpress.desktop"),
+  path.join(app.getPath("appData"), "build.punchpress.desktop")
 );
 
 configurePrivilegedStaticAppScheme();
@@ -51,8 +54,12 @@ const sendDocumentCommand = (
   mainWindow?.webContents.send("document:command", command);
 };
 
+const sendEditorCommand = (command: "redo" | "undo") => {
+  mainWindow?.webContents.send("editor:command", command);
+};
+
 const sendOpenedDocument = (openedDocument: DesktopOpenedDocument) => {
-  if (!mainWindow || !isMainWindowRendererReady) {
+  if (!(mainWindow && isMainWindowRendererReady)) {
     pendingOpenedDocuments.push(openedDocument);
     return;
   }
@@ -116,7 +123,7 @@ const focusMainWindow = () => {
 };
 
 const flushPendingOpenedDocuments = () => {
-  if (!mainWindow || !isMainWindowRendererReady) {
+  if (!(mainWindow && isMainWindowRendererReady)) {
     return;
   }
 
@@ -170,7 +177,9 @@ const flushPendingOpenDocumentPaths = async () => {
   }
 };
 
-const buildOpenRecentSubmenu = async (): Promise<MenuItemConstructorOptions[]> => {
+const buildOpenRecentSubmenu = async (): Promise<
+  MenuItemConstructorOptions[]
+> => {
   const recentDocuments = await getRecentDocuments();
 
   if (recentDocuments.length === 0) {
@@ -239,8 +248,16 @@ const installApplicationMenu = async () => {
     {
       label: "Edit",
       submenu: [
-        { role: "undo" },
-        { role: "redo" },
+        {
+          accelerator: "CmdOrCtrl+Z",
+          click: () => sendEditorCommand("undo"),
+          label: "Undo",
+        },
+        {
+          accelerator: "CmdOrCtrl+Shift+Z",
+          click: () => sendEditorCommand("redo"),
+          label: "Redo",
+        },
         { type: "separator" },
         { role: "cut" },
         { role: "copy" },
@@ -282,7 +299,7 @@ const createMainWindow = () => {
       y: 16,
     },
     webPreferences: {
-      preload: path.join(__dirname, "../preload/preload.mjs"),
+      preload: path.join(import.meta.dirname, "../preload/preload.mjs"),
       backgroundThrottling: false,
       contextIsolation: true,
       nodeIntegration: false,
@@ -308,11 +325,15 @@ const createMainWindow = () => {
   });
 
   if (isDev) {
-    void nextWindow.loadURL(getRendererDevUrl());
+    nextWindow.loadURL(getRendererDevUrl()).catch((error) => {
+      console.error(error);
+    });
     return nextWindow;
   }
 
-  void nextWindow.loadURL("app://static/index.html");
+  nextWindow.loadURL("app://static/index.html").catch((error) => {
+    console.error(error);
+  });
   return nextWindow;
 };
 
@@ -341,7 +362,9 @@ const enqueueOpenDocumentPath = (filePath: string) => {
 
   ensureMainWindow();
   focusMainWindow();
-  void flushPendingOpenDocumentPaths();
+  flushPendingOpenDocumentPaths().catch((error) => {
+    console.error(error);
+  });
 };
 
 const launch = async () => {
@@ -386,9 +409,7 @@ app.on("window-all-closed", () => {
   }
 });
 
-if (!app.requestSingleInstanceLock()) {
-  app.quit();
-} else {
+if (app.requestSingleInstanceLock()) {
   app.on("second-instance", (_event, argv) => {
     for (const filePath of extractOpenDocumentPathsFromArgv(argv)) {
       enqueueOpenDocumentPath(filePath);
@@ -407,5 +428,10 @@ if (!app.requestSingleInstanceLock()) {
     enqueueOpenDocumentPath(filePath);
   });
 
-  void launch();
+  launch().catch((error) => {
+    console.error(error);
+    app.quit();
+  });
+} else {
+  app.quit();
 }

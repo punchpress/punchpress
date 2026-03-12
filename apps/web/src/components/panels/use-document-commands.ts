@@ -1,4 +1,10 @@
-import { useEffect, useEffectEvent, useState } from "react";
+import {
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { showToast } from "@/components/ui/toast";
 import { DEFAULT_DOCUMENT_BASE_NAME } from "@/document/constants";
 import {
@@ -12,7 +18,9 @@ import {
   savePunchDocumentFile,
   savePunchSvgFile,
 } from "@/platform/web-document-files";
+import { shouldIgnoreGlobalShortcutTarget } from "../../editor/primitives/dom";
 import { useEditor } from "../../editor/use-editor";
+import type { UnsavedDocumentChoice } from "./unsaved-document-dialog";
 
 type DocumentCommand = "export" | "open" | "save" | "save-as";
 
@@ -65,9 +73,14 @@ export const useDocumentCommands = () => {
   );
   const [documentHandle, setDocumentHandle] =
     useState<PunchDocumentHandle>(null);
+  const [isUnsavedDocumentDialogOpen, setIsUnsavedDocumentDialogOpen] =
+    useState(false);
   const [recentDocuments, setRecentDocuments] = useState<PunchRecentDocument[]>(
     []
   );
+  const pendingUnsavedDocumentChoiceResolverRef = useRef<
+    ((choice: UnsavedDocumentChoice) => void) | null
+  >(null);
 
   const refreshRecentDocuments = useEffectEvent(async () => {
     setRecentDocuments(await getRecentPunchDocumentFiles());
@@ -110,20 +123,6 @@ export const useDocumentCommands = () => {
     }
   );
 
-  const finishOpenedDocumentSafely = useEffectEvent(
-    (openedDocument: PunchOpenedDocumentFile | null) => {
-      finishOpenedDocument(openedDocument).catch((error) => {
-        handleActionError("open", error);
-      });
-    }
-  );
-
-  const handleOpenDocument = useEffectEvent(async () => {
-    const openedDocument = await openPunchDocumentFile();
-
-    await finishOpenedDocument(openedDocument);
-  });
-
   const handleSaveDocument = useEffectEvent(async (forceDialog = false) => {
     const result = await savePunchDocumentFile(
       editor.serializeDocument(),
@@ -133,19 +132,78 @@ export const useDocumentCommands = () => {
     );
 
     if (result.canceled) {
-      return;
+      return false;
     }
 
     setDocumentHandle(result.fileHandle || documentHandle);
     if (result.fileName) {
       setDocumentBaseName(getDocumentBaseName(result.fileName));
     }
+    editor.markDocumentSaved();
 
     showToast({
       message: `Saved ${result.fileName || `${documentBaseName}.punch`}`,
       type: "success",
     });
     await refreshRecentDocuments();
+    return true;
+  });
+
+  const resolveUnsavedDocumentChoice = useEffectEvent(
+    (choice: UnsavedDocumentChoice) => {
+      const resolve = pendingUnsavedDocumentChoiceResolverRef.current;
+
+      pendingUnsavedDocumentChoiceResolverRef.current = null;
+      setIsUnsavedDocumentDialogOpen(false);
+      resolve?.(choice);
+    }
+  );
+
+  const handleUnsavedDocumentDialogOpenChange = useEffectEvent(
+    (open: boolean) => {
+      if (open) {
+        setIsUnsavedDocumentDialogOpen(true);
+        return;
+      }
+
+      if (pendingUnsavedDocumentChoiceResolverRef.current) {
+        resolveUnsavedDocumentChoice("cancel");
+        return;
+      }
+
+      setIsUnsavedDocumentDialogOpen(false);
+    }
+  );
+
+  const confirmReplacingDirtyDocument = useEffectEvent(async () => {
+    if (!editor.isDirty) {
+      return true;
+    }
+
+    if (pendingUnsavedDocumentChoiceResolverRef.current) {
+      return false;
+    }
+
+    setIsUnsavedDocumentDialogOpen(true);
+    const choice = await new Promise<UnsavedDocumentChoice>((resolve) => {
+      pendingUnsavedDocumentChoiceResolverRef.current = resolve;
+    });
+
+    if (choice === "save") {
+      return handleSaveDocument();
+    }
+
+    return choice === "discard";
+  });
+
+  const handleOpenDocument = useEffectEvent(async () => {
+    if (!(await confirmReplacingDirtyDocument())) {
+      return;
+    }
+
+    const openedDocument = await openPunchDocumentFile();
+
+    await finishOpenedDocument(openedDocument);
   });
 
   const handleExportDocument = useEffectEvent(async () => {
@@ -184,12 +242,29 @@ export const useDocumentCommands = () => {
   );
 
   const openRecentDocumentSafely = useEffectEvent(
-    (recentDocument: PunchRecentDocument) => {
-      openRecentPunchDocumentFile(recentDocument)
-        .then((openedDocument) => finishOpenedDocument(openedDocument))
-        .catch((error) => {
-          handleActionError("open", error);
-        });
+    async (recentDocument: PunchRecentDocument) => {
+      try {
+        if (!(await confirmReplacingDirtyDocument())) {
+          return;
+        }
+
+        const openedDocument =
+          await openRecentPunchDocumentFile(recentDocument);
+
+        await finishOpenedDocument(openedDocument);
+      } catch (error) {
+        handleActionError("open", error);
+      }
+    }
+  );
+
+  const applyOpenedDocumentSafely = useEffectEvent(
+    async (openedDocument: PunchOpenedDocumentFile | null) => {
+      if (!(await confirmReplacingDirtyDocument())) {
+        return;
+      }
+
+      await finishOpenedDocument(openedDocument);
     }
   );
 
@@ -207,6 +282,10 @@ export const useDocumentCommands = () => {
     }
 
     const handleWindowKeyDown = (event: KeyboardEvent) => {
+      if (shouldIgnoreGlobalShortcutTarget(event.target)) {
+        return;
+      }
+
       const command = getDocumentCommandFromKeyEvent(event);
 
       if (!command) {
@@ -232,9 +311,11 @@ export const useDocumentCommands = () => {
     );
     const unsubscribeOpenDocument =
       window.electron?.documentCommands?.onOpenDocument((openedDocument) => {
-        finishOpenedDocumentSafely(openedDocument);
+        applyOpenedDocumentSafely(openedDocument).catch((error) => {
+          handleActionError("open", error);
+        });
       });
-    window.electron?.documentCommands?.markReady();
+    window.electron?.documentCommands?.markReady?.();
 
     return () => {
       unsubscribeCommand?.();
@@ -248,9 +329,33 @@ export const useDocumentCommands = () => {
     });
   }, []);
 
+  useLayoutEffect(() => {
+    const editorShell = document.querySelector("[data-editor-shell-root]");
+
+    if (!(editorShell instanceof HTMLElement)) {
+      return;
+    }
+
+    const previousPointerEvents = editorShell.style.pointerEvents;
+    editorShell.inert = isUnsavedDocumentDialogOpen;
+    editorShell.style.pointerEvents = isUnsavedDocumentDialogOpen
+      ? "none"
+      : previousPointerEvents;
+
+    return () => {
+      editorShell.inert = false;
+      editorShell.style.pointerEvents = previousPointerEvents;
+    };
+  }, [isUnsavedDocumentDialogOpen]);
+
   return {
     openRecentDocumentSafely,
     recentDocuments,
     runDocumentCommandSafely,
+    unsavedDocumentDialogProps: {
+      onChoice: resolveUnsavedDocumentChoice,
+      onOpenChange: handleUnsavedDocumentDialogOpenChange,
+      open: isUnsavedDocumentDialogOpen,
+    },
   };
 };

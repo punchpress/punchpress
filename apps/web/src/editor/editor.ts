@@ -3,11 +3,19 @@ import { loadDesignDocument } from "../document/load";
 import { saveDesignDocument } from "../document/save";
 import { FALLBACK_FONTS, MAX_ZOOM, MIN_ZOOM, UI_ACCENT } from "./constants";
 import {
+  applyDocumentChange,
+  createDocumentChange,
+} from "./history/document-change";
+import {
   DEFAULT_EDITABLE_FONT_FAMILY,
   FontManager,
 } from "./managers/font-manager";
 import { GeometryManager } from "./managers/geometry-manager";
-import { isInputElement } from "./primitives/dom";
+import { HistoryManager } from "./managers/history-manager";
+import {
+  isInputElement,
+  shouldIgnoreGlobalShortcutTarget,
+} from "./primitives/dom";
 import { clamp } from "./primitives/math";
 import { getNodeX, getNodeY, isNodeVisible } from "./shapes/warp-text/model";
 import { measureStraightText } from "./shapes/warp-text/straight-text-metrics";
@@ -42,7 +50,34 @@ export class Editor {
       ["hand", new HandTool(this)],
       ["text", new TextTool(this)],
     ]);
+    this.unsubscribeEditorCommand = null;
     this.unsubscribe = null;
+    this.history = new HistoryManager({
+      applyChange: applyDocumentChange,
+      applyState: (nodes) => {
+        const previousSelectedNodeIds = this.selectedNodeIds;
+        this.getState().loadNodes(nodes);
+        const nextSelectedNodeIds = previousSelectedNodeIds.filter((nodeId) => {
+          return nodes.some((node) => node.id === nodeId);
+        });
+
+        if (nextSelectedNodeIds.length > 0) {
+          this.getState().selectNodes(nextSelectedNodeIds);
+        }
+
+        if (typeof window === "undefined") {
+          this.onViewportChange?.();
+          return;
+        }
+
+        window.requestAnimationFrame(() => {
+          this.onViewportChange?.();
+        });
+      },
+      captureState: () => this.nodes,
+      captureSnapshot: () => this.serializeDocument(),
+      createChange: createDocumentChange,
+    });
     this.handleWindowKeyDown = this.handleWindowKeyDown.bind(this);
     this.handleSpaceDown = this.handleSpaceDown.bind(this);
     this.handleSpaceUp = this.handleSpaceUp.bind(this);
@@ -67,6 +102,15 @@ export class Editor {
     }
 
     if (typeof window !== "undefined") {
+      this.unsubscribeEditorCommand =
+        window.electron?.editorCommands?.onCommand((command) => {
+          if (command === "undo") {
+            this.undo();
+            return;
+          }
+
+          this.redo();
+        }) || null;
       window.addEventListener("keydown", this.handleWindowKeyDown);
       window.addEventListener("keydown", this.handleSpaceDown);
       window.addEventListener("keyup", this.handleSpaceUp);
@@ -74,6 +118,8 @@ export class Editor {
   }
 
   dispose() {
+    this.unsubscribeEditorCommand?.();
+    this.unsubscribeEditorCommand = null;
     this.unsubscribe?.();
     this.unsubscribe = null;
 
@@ -96,6 +142,14 @@ export class Editor {
 
   get currentTool() {
     return this.tools.get(this.activeTool) || this.tools.get("pointer");
+  }
+
+  get canRedo() {
+    return this.history.canRedo;
+  }
+
+  get canUndo() {
+    return this.history.canUndo;
   }
 
   get editingNodeId() {
@@ -156,6 +210,10 @@ export class Editor {
 
   get hoveredNodeId() {
     return this.getState().hoveredNodeId;
+  }
+
+  get isDirty() {
+    return this.history.isDirty;
   }
 
   get isHoveringSuppressed() {
@@ -237,21 +295,26 @@ export class Editor {
 
   getDocument() {
     if (this.editingNodeId) {
-      this.commitEditing();
+      this.finalizeEditing();
     }
 
     return saveDesignDocument(this.nodes).document;
   }
 
   addTextNode(point) {
+    this.finishEditingIfNeeded();
+    this.beginHistoryTransaction();
     this.getState().addTextNode(point);
   }
 
   cancelEditing() {
     this.getState().cancelEditing();
+    this.endHistoryTransaction();
+    this.getState().setActiveTool("pointer");
   }
 
   clearSelection() {
+    this.finishEditingIfNeeded();
     this.getState().clearSelection();
   }
 
@@ -260,16 +323,22 @@ export class Editor {
   }
 
   deleteSelected() {
-    this.getState().deleteSelected();
+    this.finishEditingIfNeeded();
+    this.runDocumentChange(() => {
+      this.getState().deleteSelected();
+    });
   }
 
   deleteNode(nodeId) {
+    this.finishEditingIfNeeded();
     if (this.isNodeSelected(nodeId)) {
       this.deleteSelected();
       return;
     }
 
-    this.getState().deleteNodeById(nodeId);
+    this.runDocumentChange(() => {
+      this.getState().deleteNodeById(nodeId);
+    });
   }
 
   dispatchCanvasPointerDown(info) {
@@ -281,16 +350,22 @@ export class Editor {
   }
 
   duplicateNode(nodeId) {
+    this.finishEditingIfNeeded();
     if (this.isNodeSelected(nodeId)) {
       this.duplicateSelected();
       return;
     }
 
-    this.getState().duplicateNodeById(nodeId);
+    this.runDocumentChange(() => {
+      this.getState().duplicateNodeById(nodeId);
+    });
   }
 
   duplicateSelected() {
-    this.getState().duplicateSelectedNodes();
+    this.finishEditingIfNeeded();
+    this.runDocumentChange(() => {
+      this.getState().duplicateSelectedNodes();
+    });
   }
 
   exportDocument() {
@@ -299,52 +374,87 @@ export class Editor {
 
   finalizeEditing() {
     this.commitEditing();
+    this.endHistoryTransaction();
     this.setActiveTool("pointer");
   }
 
-  handleWindowKeyDown(event) {
-    if (isInputElement(event.target)) {
-      return;
+  handleEditingShortcutKeyDown(event, key) {
+    if ((event.metaKey || event.ctrlKey) && !event.altKey && key === "z") {
+      event.preventDefault();
+
+      if (event.shiftKey) {
+        this.redo();
+        return true;
+      }
+
+      this.undo();
+      return true;
     }
 
-    const key = event.key.toLowerCase();
+    if ((event.metaKey || event.ctrlKey) && !event.altKey && key === "y") {
+      event.preventDefault();
+      this.redo();
+      return true;
+    }
+
     if ((event.metaKey || event.ctrlKey) && !event.altKey && key === "j") {
       if (this.selectedNodeIds.length === 0) {
-        return;
+        return true;
       }
 
       event.preventDefault();
       this.duplicateSelected();
-      return;
+      return true;
     }
 
+    return false;
+  }
+
+  handleCanvasShortcutKeyDown(event, key) {
     if (event.metaKey || event.ctrlKey || event.altKey) {
-      return;
+      return false;
     }
 
     if (event.code === "BracketLeft") {
       if (this.selectedNodeIds.length === 0) {
-        return;
+        return true;
       }
 
       event.preventDefault();
       this.sendSelectedToBack();
-      return;
+      return true;
     }
 
     if (event.code === "BracketRight") {
       if (this.selectedNodeIds.length === 0) {
-        return;
+        return true;
       }
 
       event.preventDefault();
       this.bringSelectedToFront();
-      return;
+      return true;
     }
 
     if (key === "backspace" || key === "delete") {
       event.preventDefault();
       this.deleteSelected();
+      return true;
+    }
+
+    return false;
+  }
+
+  handleWindowKeyDown(event) {
+    if (shouldIgnoreGlobalShortcutTarget(event.target)) {
+      return;
+    }
+
+    const key = event.key.toLowerCase();
+    if (this.handleEditingShortcutKeyDown(event, key)) {
+      return;
+    }
+
+    if (this.handleCanvasShortcutKeyDown(event, key)) {
       return;
     }
 
@@ -359,16 +469,31 @@ export class Editor {
       return;
     }
 
+    if (this.editingNodeId && this.editingNodeId !== nodeId) {
+      this.finalizeEditing();
+    }
+
     this.getState().selectNode(nodeId);
   }
 
   selectNodes(nodeIds) {
+    if (
+      this.editingNodeId &&
+      (nodeIds.length !== 1 || nodeIds[0] !== this.editingNodeId)
+    ) {
+      this.finalizeEditing();
+    }
+
     this.getState().selectNodes(nodeIds);
   }
 
   toggleNodeSelection(nodeId) {
     if (!nodeId) {
       return;
+    }
+
+    if (this.editingNodeId) {
+      this.finalizeEditing();
     }
 
     this.getState().toggleNodeSelection(nodeId);
@@ -400,7 +525,7 @@ export class Editor {
     }
 
     if (toolId !== "text" && this.editingNodeId) {
-      this.commitEditing();
+      this.finalizeEditing();
     }
 
     this.getState().setActiveTool(toolId);
@@ -411,7 +536,10 @@ export class Editor {
   }
 
   setNodeOrder(nodeIds) {
-    this.getState().setNodeOrder(nodeIds);
+    this.finishEditingIfNeeded();
+    this.runDocumentChange(() => {
+      this.getState().setNodeOrder(nodeIds);
+    });
   }
 
   setViewportZoom(zoom) {
@@ -419,49 +547,78 @@ export class Editor {
   }
 
   toggleNodeVisibility(nodeId) {
-    this.getState().toggleNodeVisibilityById(nodeId);
+    this.finishEditingIfNeeded();
+    this.runDocumentChange(() => {
+      this.getState().toggleNodeVisibilityById(nodeId);
+    });
   }
 
   sendNodeToBack(nodeId) {
+    this.finishEditingIfNeeded();
     if (this.isNodeSelected(nodeId) && this.selectedNodeIds.length > 1) {
       this.sendSelectedToBack();
       return;
     }
 
-    this.getState().sendNodeToBack(nodeId);
+    this.runDocumentChange(() => {
+      this.getState().sendNodeToBack(nodeId);
+    });
   }
 
   sendSelectedToBack() {
-    this.getState().sendSelectedNodesToBack();
+    this.finishEditingIfNeeded();
+    this.runDocumentChange(() => {
+      this.getState().sendSelectedNodesToBack();
+    });
   }
 
   startEditing(node) {
+    if (this.editingNodeId && this.editingNodeId !== node.id) {
+      this.finalizeEditing();
+    }
+
+    this.beginHistoryTransaction();
     this.getState().startEditing(node);
   }
 
   updateNode(nodeId, updater) {
-    this.getState().updateNodeById(nodeId, updater);
+    this.finishEditingIfNeeded();
+    this.runDocumentChange(() => {
+      this.getState().updateNodeById(nodeId, updater);
+    });
   }
 
   updateNodes(nodeIds, updater) {
-    this.getState().updateNodesById(nodeIds, updater);
+    this.finishEditingIfNeeded();
+    this.runDocumentChange(() => {
+      this.getState().updateNodesById(nodeIds, updater);
+    });
   }
 
   updateSelectedNode(updater) {
-    this.getState().updateSelectedNode(updater);
+    this.finishEditingIfNeeded();
+    this.runDocumentChange(() => {
+      this.getState().updateSelectedNode(updater);
+    });
   }
 
   bringNodeToFront(nodeId) {
+    this.finishEditingIfNeeded();
     if (this.isNodeSelected(nodeId) && this.selectedNodeIds.length > 1) {
       this.bringSelectedToFront();
       return;
     }
 
-    this.getState().bringNodeToFront(nodeId);
+    this.runDocumentChange(() => {
+      this.getState().bringNodeToFront(nodeId);
+    });
   }
 
   bringSelectedToFront() {
-    this.getState().bringSelectedNodesToFront();
+    this.finishEditingIfNeeded();
+    this.runDocumentChange(() => {
+      this.getState().bringSelectedNodesToFront();
+    });
   }
 
   isNodeSelected(nodeId) {
@@ -471,6 +628,7 @@ export class Editor {
   loadDocument(contents) {
     const { nodes } = loadDesignDocument(contents);
     this.getState().loadNodes(nodes);
+    this.resetHistory();
 
     if (typeof window !== "undefined") {
       this.scheduleViewportFocus(nodes.map((node) => node.id));
@@ -487,6 +645,46 @@ export class Editor {
 
   serializeDocument() {
     return saveDesignDocument(this.nodes).contents;
+  }
+
+  markDocumentSaved() {
+    this.history.markSaved();
+  }
+
+  beginHistoryTransaction() {
+    this.history.beginTransaction();
+  }
+
+  endHistoryTransaction() {
+    return this.history.endTransaction();
+  }
+
+  redo() {
+    return this.history.redo();
+  }
+
+  undo() {
+    return this.history.undo();
+  }
+
+  resetHistory() {
+    this.history.reset();
+  }
+
+  finishEditingIfNeeded() {
+    if (!this.editingNodeId) {
+      return;
+    }
+
+    this.finalizeEditing();
+  }
+
+  recordHistoryChange(beforeSnapshot) {
+    return this.history.recordChange(beforeSnapshot);
+  }
+
+  runDocumentChange(runChange) {
+    this.history.run(runChange);
   }
 
   getNodeElement(nodeId) {

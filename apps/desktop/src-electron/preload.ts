@@ -24,13 +24,25 @@ contextBridge.exposeInMainWorld("electron", {
       };
     },
   },
+  editorCommands: {
+    onCommand: (callback) => {
+      const listener = (_event, command) => callback(command);
+
+      ipcRenderer.on("editor:command", listener);
+
+      return () => {
+        ipcRenderer.removeListener("editor:command", listener);
+      };
+    },
+  },
   documentFiles: {
     openDocument: () => ipcRenderer.invoke("document:open"),
     openRecentDocument: (filePath) =>
       ipcRenderer.invoke("document:open-recent", filePath),
     saveDocument: (payload) => ipcRenderer.invoke("document:save", payload),
     saveSvg: (payload) => ipcRenderer.invoke("document:save-svg", payload),
-    getRecentDocuments: () => ipcRenderer.invoke("document:get-recent-documents"),
+    getRecentDocuments: () =>
+      ipcRenderer.invoke("document:get-recent-documents"),
   },
   versions: {
     chrome: process.versions.chrome,

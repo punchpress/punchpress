@@ -28,6 +28,9 @@ declare global {
           callback: (openedDocument: DesktopDocumentFileResult) => void
         ) => () => void;
       };
+      editorCommands?: {
+        onCommand: (callback: (command: "redo" | "undo") => void) => () => void;
+      };
       documentFiles?: {
         openDocument: () => Promise<DesktopDocumentFileResult | null>;
         openRecentDocument: (
