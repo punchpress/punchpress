@@ -21,7 +21,19 @@ The repo is organized as a small Bun workspace so the app and desktop shell stay
 - `bun run dev` starts the standalone web app.
 - `bun run dev:desktop` starts the Electron shell against the web app dev server.
 - `bun run build:web` builds the web app only.
-- `bun run build:desktop` builds the desktop app DMG with Electron Builder.
+- `bun run build:desktop` builds the signed desktop app DMG with Electron Builder.
+- `bun run build:desktop:unsigned` builds an unsigned desktop app DMG for local verification.
+- `bun run publish:desktop` builds the macOS release and publishes the updater artifacts to S3.
+
+## Release
+
+- Canonical runbook: `docs/release-runbook.md`
+- One-command bump: `bun run release:bump patch` (or `minor` / `major` / explicit `X.Y.Z`)
+- AI command (`do a version bump`): `docs/ai-commands/version-bump/README.md`
+- Changelog context export: `bun run release:collect-changelog-context`
+- Release integrity checks: `bun run release:check && bun run build:desktop:unsigned && bun run release:check-desktop-artifacts`
+- Tag push (`vX.Y.Z`) publishes GitHub release notes from the matching `CHANGELOG.md` entry
+- Signed publish happens manually from a release Mac after the tag is pushed: `bun run build:desktop && bun run publish:desktop`
 
 ---
 
@@ -153,6 +165,17 @@ This gives us a tldraw/Figma-quality interaction feel without depending on a mon
 ### Desktop distribution
 
 **Electron + electron-vite** wraps the React web app for desktop distribution. Electron runs a native desktop shell around the same Vite app used on the web, with electron-vite building the main/preload processes and Electron Builder packaging the macOS app. The app still ships as a web app first; desktop packaging remains additive, not a rewrite.
+
+### Desktop releases
+
+PunchPress now ships macOS desktop releases through Electron Builder with:
+
+- `Developer ID Application` signing via the locally installed Apple certificate
+- notarization via `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID`
+- S3-hosted update artifacts in `s3://punchpress-electron-app-209596837609-us-east-1-an`
+- automatic update checks on launch and every 10 minutes in packaged builds
+
+Release setup is documented in [docs/desktop-release.md](./docs/desktop-release.md).
 
 ---
 

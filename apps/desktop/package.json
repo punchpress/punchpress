@@ -9,14 +9,21 @@
     "dev": "bun run scripts/dev-desktop.ts",
     "build": "bun run clean && bun run build:web && bun run build:electron",
     "build:web": "bun run --cwd ../web build",
-    "build:electron": "electron-vite build && electron-builder --mac --config.mac.identity=null",
+    "build:electron": "dotenv -e ../../.env -- sh -c 'electron-vite build && electron-builder --mac'",
+    "build:unsigned": "electron-vite build && electron-builder --mac --config.mac.identity=null --config.mac.notarize=false",
     "clean": "rimraf artifacts out",
+    "publish": "dotenv -e ../../.env -- sh -c 'bun run clean && bun run build:web && electron-vite build && electron-builder --mac --publish always'",
     "postinstall": "node ../../node_modules/electron/install.js"
   },
   "build": {
     "extends": "./electron-builder.yml"
   },
+  "dependencies": {
+    "electron-updater": "^6.8.3"
+  },
   "devDependencies": {
+    "@electron/notarize": "^3.1.1",
+    "dotenv-cli": "^11.0.0",
     "electron": "39.2.7",
     "electron-builder": "^26.4.0",
     "electron-vite": "^5.0.0",

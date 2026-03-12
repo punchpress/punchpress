@@ -67,7 +67,17 @@ The editor follows a three-layer architecture inspired by tldraw:
 - `docs/architecture.md` — Editor architecture, file structure, and layer responsibilities
 - `docs/architecture-north-star.md` — Original north star (historical reference)
 - `docs/design-system.md` — UI component system, Base UI policy, COSS UI workflow
+- `docs/desktop-release.md` — macOS signing, notarization, S3 publishing, and auto-update setup
+- `docs/release-runbook.md` — canonical version bump, changelog, tag, and publish flow
+- `docs/ai-commands/version-bump/README.md` — agent workflow for `do a version bump`
 - `docs/architecture-decisions/` — Durable architectural decisions
+
+## Release Workflow
+
+- Treat `docs/release-runbook.md` as the source of truth for version bumps, changelog updates, GitHub tags, and desktop publish steps.
+- If the user says `do a version bump`, follow `docs/ai-commands/version-bump/README.md`.
+- Keep `CHANGELOG.md`, `apps/desktop/package.json`, and `apps/web/package.json` synchronized for each release.
+- Write changelog entries for end users in product-release language, not engineering implementation language.
 
 ## Commit Format
 

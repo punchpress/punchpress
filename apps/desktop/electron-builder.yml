@@ -27,6 +27,10 @@ fileAssociations:
 mac:
   category: public.app-category.graphics-design
   icon: build_resources/logo.icns
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build_resources/entitlements.mac.plist
+  entitlementsInherit: build_resources/entitlements.mac.plist
   target:
     - dmg
 
@@ -34,3 +38,12 @@ dmg:
   sign: false
   format: ULFO
   icon: build_resources/logo.icns
+
+publish:
+  - provider: s3
+    bucket: punchpress-electron-app-209596837609-us-east-1-an
+    region: us-east-1
+    acl: null
+    path: /mac
+
+afterSign: scripts/notarize.mjs

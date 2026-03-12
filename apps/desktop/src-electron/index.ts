@@ -19,6 +19,7 @@ import {
   openDocumentAtPath,
   openRecentDocument,
 } from "./recent-documents.js";
+import { startAutoUpdater } from "./helpers/app-updater.js";
 import { isDev } from "./utils/is-dev.js";
 
 const defaultWindowSize = {
@@ -391,6 +392,7 @@ const launch = async () => {
   }
 
   createMainWindow();
+  startAutoUpdater();
   await flushPendingOpenDocumentPaths();
 
   app.on("activate", () => {
