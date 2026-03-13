@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.2.0 - 2026-03-13
+
+### Added
+
+- Browse fonts installed on your Mac directly in PunchPress and swap missing fonts before export instead of guessing replacements.
+- Pick text colors with a full color picker in the properties panel for faster visual tuning.
+- Reopen recent PunchPress documents from the desktop app with clearer recent-file controls.
+
+### Fixed
+
+- Text editing now stays aligned with the editable frame, which makes in-place text updates much more predictable.
+
 ## v0.1.0 - 2026-03-12
 
 - PunchPress is here.
