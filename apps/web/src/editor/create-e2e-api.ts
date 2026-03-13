@@ -1,3 +1,4 @@
+import { createLocalFontDescriptor } from "./local-fonts";
 import {
   getCornerPointFromBounds,
   getResizeAnchorFromBounds,
@@ -7,9 +8,8 @@ import {
 } from "./primitives/group-resize";
 import { round } from "./primitives/math";
 import { getNodeWorldPoint } from "./primitives/rotation";
-import { createLocalFontDescriptor } from "./local-fonts";
 import { getNodeRotation, getNodeX, getNodeY } from "./shapes/warp-text/model";
-import { estimateBounds } from "./shapes/warp-text/warp-engine";
+import { estimateBounds } from "./shapes/warp-text/warp-layout";
 
 const toRect = (rect) => {
   if (!rect) {

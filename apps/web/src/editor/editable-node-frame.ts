@@ -3,7 +3,7 @@ import {
   getNodeX,
   getNodeY,
 } from "./shapes/warp-text/model";
-import { estimateBounds } from "./shapes/warp-text/warp-engine";
+import { estimateBounds } from "./shapes/warp-text/warp-layout";
 
 const getTextNodeEditableBounds = (node, geometry) => {
   return geometry?.bbox || estimateBounds(node);

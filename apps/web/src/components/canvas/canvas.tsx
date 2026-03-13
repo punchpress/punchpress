@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import InfiniteViewer from "react-infinite-viewer";
 import { MAX_ZOOM, MIN_ZOOM } from "../../editor/constants";
 import { round } from "../../editor/primitives/math";
@@ -6,7 +6,7 @@ import { useEditor } from "../../editor/use-editor";
 import { useEditorValue } from "../../editor/use-editor-value";
 import { DesignerFloatingToolbar, DesignerFrame } from "../designer/designer";
 import { CanvasNodes } from "./canvas-nodes";
-import { CanvasOverlay } from "./canvas-overlay";
+import { CanvasOverlay } from "./canvas-overlay/canvas-overlay";
 import { CanvasTextEditor } from "./canvas-text-editor";
 import { CanvasToolbar } from "./canvas-toolbar";
 
@@ -28,19 +28,11 @@ const getCanvasPoint = (viewer, host, clientX, clientY, zoom) => {
 export const Canvas = () => {
   const editor = useEditor();
   const activeTool = useEditorValue((_, state) => state.activeTool);
+  const spacePressed = useEditorValue((_, state) => state.spacePressed);
   const zoom = useEditorValue((_, state) => state.viewport.zoom);
 
-  const [spacePressed, setSpacePressed] = useState(false);
   const viewerRef = useRef(null);
   const hostRef = useRef(null);
-
-  useEffect(() => {
-    editor.onSpacePressedChange = setSpacePressed;
-
-    return () => {
-      editor.onSpacePressedChange = null;
-    };
-  }, [editor]);
 
   useEffect(() => {
     const viewer = viewerRef.current;
@@ -127,7 +119,7 @@ export const Canvas = () => {
               });
             }}
           >
-            <CanvasNodes spacePressed={spacePressed} />
+            <CanvasNodes />
             <CanvasTextEditor />
           </div>
         </InfiniteViewer>
@@ -136,7 +128,7 @@ export const Canvas = () => {
           <CanvasToolbar />
         </DesignerFloatingToolbar>
 
-        <CanvasOverlay spacePressed={spacePressed} />
+        <CanvasOverlay />
       </div>
     </DesignerFrame>
   );

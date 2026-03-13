@@ -25,18 +25,33 @@ export const CanvasTextEditor = () => {
   );
   const editingText = useEditorValue((_, state) => state.editingText);
   const fontFamily = useEditorValue((editor) => editor.editingFontFamily);
+  const ignoreInitialBlurRef = useRef(false);
   const inputRef = useRef(null);
 
   useEffect(() => {
+    if (!editingNode) {
+      return;
+    }
+
     const input = inputRef.current;
     if (!input) {
       return;
     }
 
+    ignoreInitialBlurRef.current = true;
     input.focus();
     const caretPosition = input.value.length;
     input.setSelectionRange(caretPosition, caretPosition);
-  }, [editingNode?.id]);
+
+    const timeoutId = window.setTimeout(() => {
+      ignoreInitialBlurRef.current = false;
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      ignoreInitialBlurRef.current = false;
+    };
+  }, [editingNode]);
 
   if (!(editingNode && editingFrame)) {
     return null;
@@ -66,7 +81,9 @@ export const CanvasTextEditor = () => {
         width={frame.width}
       >
         {previewBounds ? (
-          <g transform={`translate(${-previewBounds.minX} ${-previewBounds.minY})`}>
+          <g
+            transform={`translate(${-previewBounds.minX} ${-previewBounds.minY})`}
+          >
             {(editingPreviewGeometry?.paths || []).map((path) => {
               return (
                 <path
@@ -92,7 +109,13 @@ export const CanvasTextEditor = () => {
         className="block h-full w-full min-w-0 appearance-none border-0 bg-transparent px-0 py-0 text-center font-normal leading-[1.05] shadow-none focus:outline-none"
         data-testid="canvas-text-input"
         key={editingNode.id}
-        onBlur={() => editor.finalizeEditing()}
+        onBlur={() => {
+          if (ignoreInitialBlurRef.current) {
+            return;
+          }
+
+          editor.finalizeEditing();
+        }}
         onChange={(event) => editor.setEditingText(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Enter") {

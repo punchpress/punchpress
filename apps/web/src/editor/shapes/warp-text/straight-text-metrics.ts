@@ -1,5 +1,5 @@
 import { getBounds, translateContours } from "../../primitives/path-geometry";
-import { layoutGlyphs } from "./warp-engine";
+import { layoutGlyphs } from "./warp-layout";
 
 export const measureStraightText = (node, font) => {
   const layout = layoutGlyphs(node, font);
