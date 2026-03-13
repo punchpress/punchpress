@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.2.1 - 2026-03-13
+
+- PunchPress now shows a compact in-app indicator while a desktop update is downloading, so you can see progress without leaving the canvas.
+- When an update finishes downloading, the app keeps a restart action in the titlebar lane so you can install it later instead of losing the prompt.
+
 ## v0.2.0 - 2026-03-13
 
 ### Added
