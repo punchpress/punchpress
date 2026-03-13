@@ -1,22 +1,8 @@
-import opentype from "opentype.js";
 import {
   buildNodeGeometry,
   buildSvgExport,
 } from "../editor/shapes/warp-text/warp-engine";
 import type { DesignDocument } from "./schema";
-
-const loadFont = (url: string) => {
-  return new Promise((resolve, reject) => {
-    opentype.load(url, (error, font) => {
-      if (error || !font) {
-        reject(error || new Error(`Unable to load font: ${url}`));
-        return;
-      }
-
-      resolve(font);
-    });
-  });
-};
 
 const escapeMetadata = (value: string) => {
   return value
@@ -25,17 +11,20 @@ const escapeMetadata = (value: string) => {
     .replaceAll(">", "&gt;");
 };
 
-export const exportDesignDocument = async (document: DesignDocument) => {
+export const exportDesignDocument = async (
+  document: DesignDocument,
+  loadFont: (font: DesignDocument["nodes"][number]["font"]) => Promise<unknown>
+) => {
   const nodes = document.nodes.filter((node) => node.visible !== false);
   const fontPromises = new Map<string, ReturnType<typeof loadFont>>();
   const geometryById = new Map();
 
   for (const node of nodes) {
-    if (!fontPromises.has(node.fontUrl)) {
-      fontPromises.set(node.fontUrl, loadFont(node.fontUrl));
+    if (!fontPromises.has(node.font.postscriptName)) {
+      fontPromises.set(node.font.postscriptName, loadFont(node.font));
     }
 
-    const font = await fontPromises.get(node.fontUrl);
+    const font = await fontPromises.get(node.font.postscriptName);
     geometryById.set(node.id, buildNodeGeometry(node, font));
   }
 

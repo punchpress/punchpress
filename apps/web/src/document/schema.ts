@@ -39,12 +39,21 @@ export const warpSchema = z.discriminatedUnion("kind", [
     .strict(),
 ]);
 
+export const localFontSchema = z
+  .object({
+    family: z.string().min(1),
+    fullName: z.string().min(1),
+    postscriptName: z.string().min(1),
+    style: z.string().min(1),
+  })
+  .strict();
+
 export const textNodeSchema = z
   .object({
     id: z.string().min(1),
     type: z.literal("text"),
     text: z.string(),
-    fontUrl: z.string().min(1),
+    font: localFontSchema,
     transform: transformSchema,
     fontSize: finiteNumber,
     tracking: finiteNumber,
@@ -81,5 +90,6 @@ export const designDocumentSchema = z
 
 export type DesignDocument = z.infer<typeof designDocumentSchema>;
 export type TextNodeDocument = z.infer<typeof textNodeSchema>;
+export type LocalFontDocument = z.infer<typeof localFontSchema>;
 export type TransformDocument = z.infer<typeof transformSchema>;
 export type WarpDocument = z.infer<typeof warpSchema>;

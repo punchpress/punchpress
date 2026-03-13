@@ -6,8 +6,8 @@ import {
 const getGeometrySignature = (node, fontRevision) => {
   return JSON.stringify({
     fontRevision,
+    font: node.font,
     fontSize: node.fontSize,
-    fontUrl: node.fontUrl,
     strokeWidth: node.strokeWidth,
     text: node.text,
     tracking: node.tracking,
@@ -51,7 +51,7 @@ export class GeometryManager {
         continue;
       }
 
-      const font = this.fontManager.getLoadedFont(node.fontUrl);
+      const font = this.fontManager.getLoadedFont(node.font);
       if (!font) {
         if (cached?.geometry?.ready) {
           nextCache.set(node.id, cached);

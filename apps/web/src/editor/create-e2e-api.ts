@@ -7,6 +7,7 @@ import {
 } from "./primitives/group-resize";
 import { round } from "./primitives/math";
 import { getNodeWorldPoint } from "./primitives/rotation";
+import { createLocalFontDescriptor } from "./local-fonts";
 import { getNodeRotation, getNodeX, getNodeY } from "./shapes/warp-text/model";
 import { estimateBounds } from "./shapes/warp-text/warp-engine";
 
@@ -92,6 +93,9 @@ export const createEditorE2eApi = (editor) => {
     exportDocument: () => {
       return editor.exportDocument();
     },
+    requestLocalFonts: () => {
+      return editor.requestLocalFonts();
+    },
     getNodeSnapshot: (nodeId) => {
       return getNodeSnapshot(editor, nodeId);
     },
@@ -150,7 +154,7 @@ export const createEditorE2eApi = (editor) => {
         nodes: state.nodes.map((node) => ({
           fill: node.fill,
           fontSize: node.fontSize,
-          fontUrl: node.fontUrl,
+          font: { ...node.font },
           id: node.id,
           rotation: getNodeRotation(node) || 0,
           stroke: node.stroke,
@@ -262,6 +266,20 @@ export const createEditorE2eApi = (editor) => {
       }
 
       editor.updateSelectedNode({ text });
+      queueOverlayRefresh(editor);
+
+      return selectedNode.id;
+    },
+    setSelectedFont: (font) => {
+      const selectedNode = editor.selectedNode;
+
+      if (!selectedNode) {
+        return null;
+      }
+
+      editor.updateSelectedNode({
+        font: createLocalFontDescriptor(font),
+      });
       queueOverlayRefresh(editor);
 
       return selectedNode.id;

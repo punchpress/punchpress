@@ -1,4 +1,5 @@
 import { LinkIcon } from "lucide-react";
+import { FontPicker } from "@/components/fonts-picker/font-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -9,6 +10,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
+import {
+  createLocalFontDescriptor,
+  createLocalFontOption,
+} from "../../editor/local-fonts";
 import { toNumber } from "../../editor/primitives/math";
 import {
   getDefaultWarp,
@@ -23,6 +28,9 @@ import { NodeFieldsWarpInputs } from "./warp-text-warp-fields";
 export const NodeFields = () => {
   const editor = useEditor();
   const node = useEditorValue((editor) => editor.selectedNode);
+  const availableFonts = useEditorValue((editor) => editor.availableFonts);
+  const fontCatalogState = useEditorValue((editor) => editor.fontCatalogState);
+  const fontCatalogError = useEditorValue((editor) => editor.bootstrapError);
 
   if (!node) {
     return null;
@@ -42,27 +50,19 @@ export const NodeFields = () => {
         </FieldRow>
 
         <FieldRow label="Font">
-          <Select
-            onValueChange={(value) => {
-              if (value) {
-                update({ fontUrl: value });
-              }
+          <FontPicker
+            fonts={availableFonts}
+            onRequestFonts={() => {
+              editor.requestLocalFonts().catch(() => undefined);
             }}
-            value={node.fontUrl}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {editor.availableFonts.map((font) => {
-                return (
-                  <SelectItem key={font.id} value={font.url}>
-                    {font.label}
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
+            onValueChange={(font) => {
+              editor.setLastUsedFont(font);
+              update({ font: createLocalFontDescriptor(font) });
+            }}
+            state={fontCatalogState}
+            stateMessage={fontCatalogError}
+            value={createLocalFontOption(node.font)}
+          />
         </FieldRow>
 
         <PairedRow
