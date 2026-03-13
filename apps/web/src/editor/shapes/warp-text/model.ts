@@ -1,3 +1,5 @@
+import { createLocalFontDescriptor } from "../../local-fonts";
+
 export const createId = () => {
   if (
     typeof crypto !== "undefined" &&
@@ -73,12 +75,12 @@ export const withNodeTransform = (node, transformPatch) => {
   };
 };
 
-export const createDefaultNode = (fontUrl) => {
+export const createDefaultNode = (font) => {
   return {
     id: createId(),
     type: "text",
     text: "YOUR TEXT",
-    fontUrl,
+    font: createLocalFontDescriptor(font),
     fontSize: 400,
     tracking: 10,
     fill: "#ffffff",

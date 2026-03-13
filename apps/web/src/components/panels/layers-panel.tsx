@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { useEditor } from "../../editor/use-editor";
 import { useEditorValue } from "../../editor/use-editor-value";
 import { SettingsDialog } from "../settings-dialog";
+import { MissingFontsExportDialog } from "./missing-fonts-export-dialog";
 import { UnsavedDocumentDialog } from "./unsaved-document-dialog";
 import { useDocumentCommands } from "./use-document-commands";
 
@@ -346,6 +347,7 @@ export const LayersPanel = () => {
   const layerNodeIds = useEditorValue((editor) => editor.layerNodeIds);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const {
+    missingFontsExportDialogProps,
     openRecentDocumentSafely,
     recentDocuments,
     runDocumentCommandSafely,
@@ -503,11 +505,16 @@ export const LayersPanel = () => {
                 );
               })}
             </SortableList>
-          ) : null}
+          ) : (
+            <div className="px-2 py-2.5 text-[13px] text-[var(--designer-text-muted)]">
+              No layers yet.
+            </div>
+          )}
         </div>
       </div>
 
       <SettingsDialog onOpenChange={setIsSettingsOpen} open={isSettingsOpen} />
+      <MissingFontsExportDialog {...missingFontsExportDialogProps} />
       <UnsavedDocumentDialog {...unsavedDocumentDialogProps} />
     </>
   );

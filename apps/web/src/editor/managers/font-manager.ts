@@ -1,11 +1,19 @@
 import opentype from "opentype.js";
+import { readLocalFontBytes } from "../../platform/local-fonts";
+import {
+  areLocalFontsEqual,
+  createLocalFontDescriptor,
+  DEFAULT_LOCAL_FONT,
+  getLocalFontId,
+} from "../local-fonts";
 
-const editableFamilyByUrl = new Map();
-const loadedEditableFamilies = new Set();
+const editableFamilyById = new Map<string, string>();
+const loadedEditableFamilies = new Set<string>();
 
-export const DEFAULT_EDITABLE_FONT_FAMILY = "DM Sans, sans-serif";
+export const DEFAULT_EDITABLE_FONT_FAMILY = "system-ui, sans-serif";
+export const IDLE_FONT_STATUS = "idle";
 
-const hashString = (value) => {
+const hashString = (value: string) => {
   let hash = 17;
   for (const char of value) {
     hash = (hash * 31 + char.charCodeAt(0)) % 2_147_483_647;
@@ -14,43 +22,45 @@ const hashString = (value) => {
   return Math.abs(hash).toString(36);
 };
 
-const getEditableFamilyName = (url) => {
-  if (editableFamilyByUrl.has(url)) {
-    return editableFamilyByUrl.get(url);
+const getEditableFamilyName = (font) => {
+  const fontId = getLocalFontId(font);
+
+  if (editableFamilyById.has(fontId)) {
+    return editableFamilyById.get(fontId);
   }
 
-  const family = `warp-edit-${hashString(url)}`;
-  editableFamilyByUrl.set(url, family);
+  const family = `warp-edit-${hashString(fontId)}`;
+  editableFamilyById.set(fontId, family);
   return family;
 };
 
-const ensureEditableFontFamilyLoaded = async (url) => {
+const loadFont = async (font) => {
+  const bytes = await readLocalFontBytes(font);
+
+  if (!bytes) {
+    throw new Error(`Unable to read font bytes for ${font.fullName}.`);
+  }
+
+  return {
+    bytes,
+    font: opentype.parse(bytes),
+  };
+};
+
+const ensureEditableFontFamilyLoaded = async (font, bytes) => {
   if (typeof FontFace === "undefined" || typeof document === "undefined") {
     return;
   }
 
-  const family = getEditableFamilyName(url);
+  const family = getEditableFamilyName(font);
   if (loadedEditableFamilies.has(family)) {
     return;
   }
 
-  const fontFace = new FontFace(family, `url("${url}")`);
+  const fontFace = new FontFace(family, bytes);
   await fontFace.load();
   document.fonts.add(fontFace);
   loadedEditableFamilies.add(family);
-};
-
-const loadFont = (url) => {
-  return new Promise((resolve, reject) => {
-    opentype.load(url, (error, font) => {
-      if (error || !font) {
-        reject(error || new Error("Unable to load font."));
-        return;
-      }
-
-      resolve(font);
-    });
-  });
 };
 
 export class FontManager {
@@ -59,59 +69,105 @@ export class FontManager {
     this.onChange = onChange;
   }
 
-  preload(fonts, nodes) {
-    const urls = new Set();
-
-    for (const font of fonts) {
-      urls.add(font.url);
-    }
-
+  preload(nodes) {
     for (const node of nodes) {
-      urls.add(node.fontUrl);
-    }
-
-    for (const url of urls) {
-      this.ensureLoaded(url);
+      this.ensureLoaded(node.font);
     }
   }
 
-  ensureLoaded(url) {
-    const cacheEntry = this.cache.get(url);
+  preloadFont(font) {
+    this.ensureLoaded(font);
+  }
+
+  getCacheEntry(font) {
+    const descriptor = createLocalFontDescriptor(font || DEFAULT_LOCAL_FONT);
+    return this.cache.get(getLocalFontId(descriptor)) || null;
+  }
+
+  getLoadState(font) {
+    return this.getCacheEntry(font)?.status || IDLE_FONT_STATUS;
+  }
+
+  ensureLoaded(font) {
+    const descriptor = createLocalFontDescriptor(font || DEFAULT_LOCAL_FONT);
+    const fontId = getLocalFontId(descriptor);
+    const cacheEntry = this.cache.get(fontId);
+
     if (cacheEntry?.status === "ready" || cacheEntry?.status === "loading") {
       return;
     }
 
-    this.cache.set(url, { status: "loading" });
-    this.loadIntoCache(url).catch(() => undefined);
+    this.cache.set(fontId, {
+      descriptor,
+      status: "loading",
+    });
+    this.loadIntoCache(descriptor).catch(() => undefined);
   }
 
-  getLoadedFont(url) {
-    const cacheEntry = this.cache.get(url);
+  getLoadedFont(font) {
+    const cacheEntry = this.getCacheEntry(font);
     return cacheEntry?.status === "ready" ? cacheEntry.font : null;
   }
 
-  getEditableFontFamily(url) {
-    const cacheEntry = this.cache.get(url);
+  getEditableFontFamily(font) {
+    const descriptor = createLocalFontDescriptor(font || DEFAULT_LOCAL_FONT);
+    const cacheEntry = this.getCacheEntry(descriptor);
+
     if (cacheEntry?.status === "ready" && cacheEntry.editableFamily) {
       return cacheEntry.editableFamily;
     }
 
-    return DEFAULT_EDITABLE_FONT_FAMILY;
+    return descriptor.family
+      ? `"${descriptor.family}", ${DEFAULT_EDITABLE_FONT_FAMILY}`
+      : DEFAULT_EDITABLE_FONT_FAMILY;
   }
 
-  async loadIntoCache(url) {
+  async loadIntoCache(font) {
+    const descriptor = createLocalFontDescriptor(font);
+    const fontId = getLocalFontId(descriptor);
+
     try {
-      const font = await loadFont(url);
-      await ensureEditableFontFamilyLoaded(url);
-      this.cache.set(url, {
+      const { bytes, font: loadedFont } = await loadFont(descriptor);
+      await ensureEditableFontFamilyLoaded(descriptor, bytes);
+      this.cache.set(fontId, {
+        descriptor,
+        editableFamily: getEditableFamilyName(descriptor),
+        font: loadedFont,
         status: "ready",
-        font,
-        editableFamily: getEditableFamilyName(url),
       });
       this.onChange();
     } catch {
-      this.cache.set(url, { status: "error" });
+      this.cache.set(fontId, {
+        descriptor,
+        status: "error",
+      });
       this.onChange();
     }
+  }
+
+  async loadFontForExport(font) {
+    const descriptor = createLocalFontDescriptor(font || DEFAULT_LOCAL_FONT);
+    const cached = this.getCacheEntry(descriptor);
+
+    if (
+      cached?.status === "ready" &&
+      areLocalFontsEqual(cached.descriptor, descriptor)
+    ) {
+      return cached.font;
+    }
+
+    const { bytes, font: loadedFont } = await loadFont(descriptor);
+    await ensureEditableFontFamilyLoaded(descriptor, bytes).catch(
+      () => undefined
+    );
+
+    this.cache.set(getLocalFontId(descriptor), {
+      descriptor,
+      editableFamily: getEditableFamilyName(descriptor),
+      font: loadedFont,
+      status: "ready",
+    });
+
+    return loadedFont;
   }
 }

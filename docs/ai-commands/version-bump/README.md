@@ -69,7 +69,6 @@ Insert a new top entry in `CHANGELOG.md`:
 - use section headings only when they improve scanning; otherwise write a clean flat list of bullets
 
 Do not add or keep `## Unreleased`.
-This entry is also used as the GitHub release notes body when tag `vX.Y.Z` is pushed.
 
 6. Run validation/build checks.
 
@@ -98,6 +97,7 @@ Summarize:
 ```bash
 git add CHANGELOG.md apps/desktop/package.json apps/web/package.json bun.lock
 git commit -m "release: vX.Y.Z"
+git tag -a vX.Y.Z -m "release: vX.Y.Z"
 git push origin main --follow-tags
 ```
 

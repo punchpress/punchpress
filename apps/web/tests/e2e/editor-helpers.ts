@@ -1,9 +1,86 @@
+import { existsSync, readFileSync } from "node:fs";
 import { expect } from "@playwright/test";
 
 const stepDelayMs = process.env.CI ? 0 : 450;
+const TEST_FONT_PATHS = [
+  "/System/Library/Fonts/Supplemental/Arial.ttf",
+  "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+  "C:\\Windows\\Fonts\\arial.ttf",
+];
+const TEST_FONT_PATH = TEST_FONT_PATHS.find((candidate) =>
+  existsSync(candidate)
+);
+const TEST_FONT_BYTES = TEST_FONT_PATH ? [...readFileSync(TEST_FONT_PATH)] : [];
+const TEST_FONT_DESCRIPTOR = TEST_FONT_PATH?.toLowerCase().includes("dejavu")
+  ? {
+      family: "DejaVu Sans",
+      fullName: "DejaVu Sans",
+      id: "dejavusans",
+      postscriptName: "DejaVuSans",
+      style: "Book",
+    }
+  : {
+      family: "Arial",
+      fullName: "Arial",
+      id: "arialmt",
+      postscriptName: "ArialMT",
+      style: "Regular",
+    };
+const TEST_FONT_DESCRIPTORS = [
+  TEST_FONT_DESCRIPTOR,
+  {
+    family: "PunchPress Sans",
+    fullName: "PunchPress Sans",
+    id: "punchpresssans-regular",
+    postscriptName: "PunchPressSans-Regular",
+    style: "Regular",
+  },
+];
+
+const installLocalFontMocks = (page) => {
+  return page.addInitScript(
+    ({ fontBytes, fontDescriptors }) => {
+      const queryLocalFonts = () => {
+        return Promise.resolve(
+          fontDescriptors.map((fontDescriptor) => ({
+            blob: () =>
+              Promise.resolve(
+                new Blob([new Uint8Array(fontBytes)], {
+                  type: "font/ttf",
+                })
+              ),
+            family: fontDescriptor.family,
+            fullName: fontDescriptor.fullName,
+            postscriptName: fontDescriptor.postscriptName,
+            style: fontDescriptor.style,
+          }))
+        );
+      };
+
+      Object.defineProperty(window, "queryLocalFonts", {
+        configurable: true,
+        value: queryLocalFonts,
+      });
+    },
+    {
+      fontBytes: TEST_FONT_BYTES,
+      fontDescriptors: TEST_FONT_DESCRIPTORS,
+    }
+  );
+};
 
 export const gotoEditor = async (page) => {
+  await installLocalFontMocks(page);
   await page.goto("/");
+  await page.evaluate(() => {
+    return (
+      window as Window & {
+        __PUNCHPRESS_E2E__?: {
+          requestLocalFonts: () => Promise<void>;
+        };
+      }
+    ).__PUNCHPRESS_E2E__?.requestLocalFonts();
+  });
   await expect(page.getByRole("button", { name: "Text (T)" })).toBeVisible();
 };
 
@@ -30,6 +107,12 @@ export const createTextNode = (page, options) => {
             scale?: number;
           }) => string[];
           scaleSelectedNodeBy: (options?: { scale?: number }) => string | null;
+          setSelectedFont: (font: {
+            family: string;
+            fullName: string;
+            postscriptName: string;
+            style: string;
+          }) => string | null;
         };
       }
     ).__PUNCHPRESS_E2E__.createTextNode(nextOptions);
@@ -180,6 +263,23 @@ export const setSelectedText = (page, text) => {
       }
     ).__PUNCHPRESS_E2E__?.setSelectedText(nextText);
   }, text);
+};
+
+export const setSelectedFont = (page, font) => {
+  return page.evaluate((nextFont) => {
+    return (
+      window as Window & {
+        __PUNCHPRESS_E2E__?: {
+          setSelectedFont: (font: {
+            family: string;
+            fullName: string;
+            postscriptName: string;
+            style: string;
+          }) => string | null;
+        };
+      }
+    ).__PUNCHPRESS_E2E__?.setSelectedFont(nextFont);
+  }, font);
 };
 
 const getHandleCenter = (handle) => {

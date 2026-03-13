@@ -32,7 +32,6 @@ The repo is organized as a small Bun workspace so the app and desktop shell stay
 - AI command (`do a version bump`): `docs/ai-commands/version-bump/README.md`
 - Changelog context export: `bun run release:collect-changelog-context`
 - Release integrity checks: `bun run release:check && bun run build:desktop:unsigned && bun run release:check-desktop-artifacts`
-- Tag push (`vX.Y.Z`) publishes GitHub release notes from the matching `CHANGELOG.md` entry
 - Signed publish happens manually from a release Mac after the tag is pushed: `bun run build:desktop && bun run publish:desktop`
 
 ---

@@ -44,6 +44,10 @@ contextBridge.exposeInMainWorld("electron", {
     getRecentDocuments: () =>
       ipcRenderer.invoke("document:get-recent-documents"),
   },
+  localFonts: {
+    listFonts: () => ipcRenderer.invoke("fonts:list"),
+    readFont: (fontId) => ipcRenderer.invoke("fonts:read", fontId),
+  },
   versions: {
     chrome: process.versions.chrome,
     electron: process.versions.electron,

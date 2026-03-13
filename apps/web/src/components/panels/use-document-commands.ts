@@ -7,6 +7,7 @@ import {
 } from "react";
 import { showToast } from "@/components/ui/toast";
 import { DEFAULT_DOCUMENT_BASE_NAME } from "@/document/constants";
+import { MissingDocumentFontsError } from "@/document/errors";
 import {
   getDocumentBaseName,
   getRecentPunchDocumentFiles,
@@ -19,6 +20,7 @@ import {
   savePunchSvgFile,
 } from "@/platform/web-document-files";
 import { shouldIgnoreGlobalShortcutTarget } from "../../editor/primitives/dom";
+import type { LocalFontDescriptor } from "../../editor/local-fonts";
 import { useEditor } from "../../editor/use-editor";
 import type { UnsavedDocumentChoice } from "./unsaved-document-dialog";
 
@@ -66,6 +68,18 @@ const getDocumentCommandErrorTitle = (command: DocumentCommand) => {
   return "File action failed";
 };
 
+const formatFontList = (fonts: LocalFontDescriptor[]) => {
+  if (fonts.length === 1) {
+    return fonts[0].fullName;
+  }
+
+  if (fonts.length === 2) {
+    return `${fonts[0].fullName} and ${fonts[1].fullName}`;
+  }
+
+  return `${fonts[0].fullName}, ${fonts[1].fullName}, and ${fonts.length - 2} more`;
+};
+
 export const useDocumentCommands = () => {
   const editor = useEditor();
   const [documentBaseName, setDocumentBaseName] = useState(
@@ -75,6 +89,11 @@ export const useDocumentCommands = () => {
     useState<PunchDocumentHandle>(null);
   const [isUnsavedDocumentDialogOpen, setIsUnsavedDocumentDialogOpen] =
     useState(false);
+  const [isMissingFontsExportDialogOpen, setIsMissingFontsExportDialogOpen] =
+    useState(false);
+  const [missingFontsForExport, setMissingFontsForExport] = useState<
+    LocalFontDescriptor[]
+  >([]);
   const [recentDocuments, setRecentDocuments] = useState<PunchRecentDocument[]>(
     []
   );
@@ -88,6 +107,12 @@ export const useDocumentCommands = () => {
 
   const handleActionError = useEffectEvent(
     (command: DocumentCommand, error: unknown) => {
+      if (command === "export" && error instanceof MissingDocumentFontsError) {
+        setMissingFontsForExport(error.missingFonts);
+        setIsMissingFontsExportDialogOpen(true);
+        return;
+      }
+
       console.error(error);
       const title = getDocumentCommandErrorTitle(command);
       const description =
@@ -102,10 +127,25 @@ export const useDocumentCommands = () => {
   );
 
   const applyOpenedDocument = useEffectEvent(
-    (openedDocument: PunchOpenedDocumentFile) => {
-      editor.loadDocument(openedDocument.contents);
+    async (openedDocument: PunchOpenedDocumentFile) => {
+      await editor.initializeLocalFonts().catch(() => undefined);
+      const resolution = editor.loadDocument(openedDocument.contents);
       setDocumentHandle(openedDocument.fileHandle);
       setDocumentBaseName(getDocumentBaseName(openedDocument.fileName));
+
+      if (
+        resolution.missingFonts.length > 0 &&
+        resolution.replacementFont
+      ) {
+        showToast({
+          message: `Replaced missing font${
+            resolution.missingFonts.length === 1 ? "" : "s"
+          } ${formatFontList(resolution.missingFonts)} with ${
+            resolution.replacementFont.fullName
+          }.`,
+          type: "warning",
+        });
+      }
     }
   );
 
@@ -116,7 +156,7 @@ export const useDocumentCommands = () => {
       }
 
       try {
-        applyOpenedDocument(openedDocument);
+        await applyOpenedDocument(openedDocument);
       } finally {
         await refreshRecentDocuments();
       }
@@ -331,14 +371,16 @@ export const useDocumentCommands = () => {
 
   useLayoutEffect(() => {
     const editorShell = document.querySelector("[data-editor-shell-root]");
+    const isBlockingDialogOpen =
+      isMissingFontsExportDialogOpen || isUnsavedDocumentDialogOpen;
 
     if (!(editorShell instanceof HTMLElement)) {
       return;
     }
 
     const previousPointerEvents = editorShell.style.pointerEvents;
-    editorShell.inert = isUnsavedDocumentDialogOpen;
-    editorShell.style.pointerEvents = isUnsavedDocumentDialogOpen
+    editorShell.inert = isBlockingDialogOpen;
+    editorShell.style.pointerEvents = isBlockingDialogOpen
       ? "none"
       : previousPointerEvents;
 
@@ -346,9 +388,14 @@ export const useDocumentCommands = () => {
       editorShell.inert = false;
       editorShell.style.pointerEvents = previousPointerEvents;
     };
-  }, [isUnsavedDocumentDialogOpen]);
+  }, [isMissingFontsExportDialogOpen, isUnsavedDocumentDialogOpen]);
 
   return {
+    missingFontsExportDialogProps: {
+      missingFonts: missingFontsForExport,
+      onOpenChange: setIsMissingFontsExportDialogOpen,
+      open: isMissingFontsExportDialogOpen,
+    },
     openRecentDocumentSafely,
     recentDocuments,
     runDocumentCommandSafely,

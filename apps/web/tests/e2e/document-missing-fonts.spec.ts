@@ -2,9 +2,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import {
   createTextNode,
-  getSelectionSnapshot,
   getStateSnapshot,
   gotoEditor,
+  setSelectedFont,
 } from "./editor-helpers";
 
 type CommandListener = (
@@ -19,16 +19,13 @@ type OpenDocumentListener = (openedDocument: OpenedDocumentPayload) => void;
 type SavedPayload = Record<string, unknown>;
 type TestElectronWindow = Window & {
   __TEST_ELECTRON__: {
+    emitCommand: (command: "export" | "open" | "save" | "save-as") => void;
     emitOpenDocument: (openedDocument: OpenedDocumentPayload) => void;
-    getSavedPayloads: () => SavedPayload[];
+    getSavedSvgPayloads: () => SavedPayload[];
   };
   electron: Window["electron"];
 };
 
-const TEST_DOCUMENT = readFileSync(
-  new URL("./fixtures/documents/document-io-roundtrip.punch", import.meta.url),
-  "utf8"
-);
 const TEST_FONT_PATHS = [
   "/System/Library/Fonts/Supplemental/Arial.ttf",
   "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -54,12 +51,48 @@ const TEST_FONT_DESCRIPTOR = TEST_FONT_PATH?.toLowerCase().includes("dejavu")
       style: "Regular",
     };
 
+const MISSING_FONT_DESCRIPTOR = {
+  family: "Missing Font",
+  fullName: "Missing Font",
+  postscriptName: "MissingFont-Regular",
+  style: "Regular",
+} as const;
+
+const MISSING_FONT_DOCUMENT = JSON.stringify({
+  nodes: [
+    {
+      fill: "#ffffff",
+      font: MISSING_FONT_DESCRIPTOR,
+      fontSize: 280,
+      id: "missing-font-node",
+      stroke: "#000000",
+      strokeWidth: 10,
+      text: "TEST",
+      tracking: 8,
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: 960,
+        y: 720,
+      },
+      type: "text",
+      visible: true,
+      warp: {
+        bend: 0.4,
+        kind: "arch",
+      },
+    },
+  ],
+  version: "1.1",
+});
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(
     ({ fontBytes, fontDescriptor }) => {
       const commandListeners: CommandListener[] = [];
       const openDocumentListeners: OpenDocumentListener[] = [];
-      const savedPayloads: SavedPayload[] = [];
+      const savedSvgPayloads: SavedPayload[] = [];
       const testWindow = window as TestElectronWindow;
 
       const removeListener = <T>(listeners: T[], callback: T) => {
@@ -71,18 +104,24 @@ test.beforeEach(async ({ page }) => {
       };
 
       testWindow.__TEST_ELECTRON__ = {
+        emitCommand(command) {
+          for (const listener of commandListeners) {
+            listener(command);
+          }
+        },
         emitOpenDocument(openedDocument) {
           for (const listener of openDocumentListeners) {
             listener(openedDocument);
           }
         },
-        getSavedPayloads() {
-          return [...savedPayloads];
+        getSavedSvgPayloads() {
+          return [...savedSvgPayloads];
         },
       };
 
       testWindow.electron = {
         documentCommands: {
+          markReady() {},
           onCommand(callback) {
             commandListeners.push(callback);
             return () => removeListener(commandListeners, callback);
@@ -102,20 +141,19 @@ test.beforeEach(async ({ page }) => {
           openRecentDocument() {
             return Promise.resolve(null);
           },
-          saveDocument(payload) {
-            savedPayloads.push(payload as SavedPayload);
-
-            return Promise.resolve({
-              canceled: false,
-              fileHandle: "/tmp/saved-from-test.punch",
-              fileName: "saved-from-test.punch",
-            });
-          },
-          saveSvg() {
+          saveDocument() {
             return Promise.resolve({
               canceled: true,
               fileHandle: null,
               fileName: null,
+            });
+          },
+          saveSvg(payload) {
+            savedSvgPayloads.push(payload as SavedPayload);
+            return Promise.resolve({
+              canceled: false,
+              fileHandle: "/tmp/exported-from-test.svg",
+              fileName: "exported-from-test.svg",
             });
           },
         },
@@ -123,8 +161,10 @@ test.beforeEach(async ({ page }) => {
           listFonts() {
             return Promise.resolve([fontDescriptor]);
           },
-          readFont() {
-            return Promise.resolve(new Uint8Array(fontBytes));
+          readFont(fontId) {
+            return Promise.resolve(
+              fontId === fontDescriptor.id ? new Uint8Array(fontBytes) : null
+            );
           },
         },
         versions: {
@@ -141,98 +181,62 @@ test.beforeEach(async ({ page }) => {
   );
 });
 
-test("prompts before replacing dirty state from the desktop open-file event", async ({
+test("notifies when an opened document falls back to the default font", async ({
   page,
 }) => {
   await gotoEditor(page);
-  await createTextNode(page, { text: "DIRTY", x: 240, y: 240 });
+
+  await page.evaluate((contents) => {
+    const testWindow = window as TestElectronWindow;
+
+    testWindow.__TEST_ELECTRON__.emitOpenDocument({
+      contents,
+      fileHandle: "/tmp/missing-font-document.punch",
+      fileName: "missing-font-document.punch",
+    });
+  }, MISSING_FONT_DOCUMENT);
 
   await expect(
-    page.getByRole("button", { name: "DIRTY" }).first()
+    page.getByText(
+      `Replaced missing font Missing Font with ${TEST_FONT_DESCRIPTOR.fullName}.`
+    )
   ).toBeVisible();
 
-  await page.evaluate((contents) => {
-    const testWindow = window as TestElectronWindow;
-
-    testWindow.__TEST_ELECTRON__.emitOpenDocument({
-      contents,
-      fileHandle: "/tmp/opened-from-event.punch",
-      fileName: "opened-from-event.punch",
-    });
-  }, TEST_DOCUMENT);
-
-  await expect(page.getByText("Save changes before opening?")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Save" })).toBeFocused();
-  expect((await getSelectionSnapshot(page)).selectedNodeIds).toHaveLength(1);
-  await page.keyboard.press("Delete");
   await expect
     .poll(async () => {
       const state = await getStateSnapshot(page);
-      return state.nodes.map((node) => node.text);
+      return state.nodes[0]?.font?.fullName;
     })
-    .toEqual(["DIRTY"]);
+    .toBe(TEST_FONT_DESCRIPTOR.fullName);
+});
+
+test("shows an export error dialog when the current document uses a missing font", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await createTextNode(page, { text: "EXPORT", x: 360, y: 280 });
+  await setSelectedFont(page, MISSING_FONT_DESCRIPTOR);
+
+  await page.evaluate(() => {
+    const testWindow = window as TestElectronWindow;
+
+    testWindow.__TEST_ELECTRON__.emitCommand("export");
+  });
+
+  await expect(
+    page.getByText("Can't export while fonts are missing")
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("dialog", { name: "Can't export while fonts are missing" })
+      .getByText("Missing Font", { exact: true })
+  ).toBeVisible();
+
   expect(
     await page.evaluate(() => {
       const testWindow = window as TestElectronWindow;
 
-      return testWindow.__TEST_ELECTRON__.getSavedPayloads();
+      return testWindow.__TEST_ELECTRON__.getSavedSvgPayloads();
     })
   ).toHaveLength(0);
-
-  await page
-    .getByText("Save your work first, discard your changes, or cancel.")
-    .click();
-  expect((await getSelectionSnapshot(page)).selectedNodeIds).toHaveLength(1);
-
-  const canvasStageBox = await page.getByTestId("canvas-stage").boundingBox();
-
-  if (!canvasStageBox) {
-    throw new Error("Missing canvas stage bounds.");
-  }
-
-  await page.mouse.click(canvasStageBox.x + 40, canvasStageBox.y + 40);
-  await expect(page.getByText("Save changes before opening?")).toBeVisible();
-  expect((await getSelectionSnapshot(page)).selectedNodeIds).toHaveLength(1);
-
-  await page.getByRole("button", { name: "Cancel" }).click();
-  await expect(page.getByText("Save changes before opening?")).toHaveCount(0);
-
-  await expect
-    .poll(async () => {
-      const state = await getStateSnapshot(page);
-      return state.nodes.map((node) => node.text);
-    })
-    .toEqual(["DIRTY"]);
-
-  await page.evaluate((contents) => {
-    const testWindow = window as TestElectronWindow;
-
-    testWindow.__TEST_ELECTRON__.emitOpenDocument({
-      contents,
-      fileHandle: "/tmp/opened-from-event.punch",
-      fileName: "opened-from-event.punch",
-    });
-  }, TEST_DOCUMENT);
-
-  await expect(page.getByText("Save changes before opening?")).toBeVisible();
-  await page.getByRole("button", { name: "Save" }).click();
-
-  await expect
-    .poll(async () => {
-      const state = await getStateSnapshot(page);
-      return state.nodes.map((node) => node.text);
-    })
-    .toEqual(["TEST"]);
-
-  expect(
-    await page.evaluate(() => {
-      const testWindow = window as TestElectronWindow;
-
-      return testWindow.__TEST_ELECTRON__.getSavedPayloads();
-    })
-  ).toEqual([
-    expect.objectContaining({
-      defaultFileName: "untitled-design.punch",
-    }),
-  ]);
 });

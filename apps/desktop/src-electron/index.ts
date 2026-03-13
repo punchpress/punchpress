@@ -13,6 +13,7 @@ import {
   configurePrivilegedStaticAppScheme,
   serveStaticAt,
 } from "./helpers/serve-static-app.js";
+import { registerLocalFontHandlers } from "./local-fonts.js";
 import {
   type DesktopOpenedDocument,
   getRecentDocuments,
@@ -386,6 +387,7 @@ const launch = async () => {
       });
     },
   });
+  registerLocalFontHandlers();
 
   if (!isDev) {
     await serveStaticAt(path.join(app.getAppPath(), "dist"));
