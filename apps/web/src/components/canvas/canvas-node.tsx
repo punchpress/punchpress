@@ -81,12 +81,12 @@ export const CanvasNode = ({ nodeId, spacePressed }) => {
             return (
               <path
                 d={path.d}
-                fill={isEditing ? "#ff6fae" : node.fill}
+                fill={node.fill}
                 key={path.key || `${path.transform || "shape"}-${path.d}`}
-                opacity={isEditing ? 0.24 : 1}
+                opacity={isEditing ? 0 : 1}
                 paintOrder="stroke fill"
                 pointerEvents="none"
-                stroke={isEditing ? "#ff6fae" : node.stroke}
+                stroke={node.stroke}
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={node.strokeWidth}

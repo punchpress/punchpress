@@ -103,6 +103,13 @@
     opacity: 0 !important;
   }
 
+  .canvas-edit-selection {
+    z-index: 8;
+    border: 1.5px solid color-mix(in srgb, var(--editor-accent) 72%, black);
+    box-shadow: 0 0 0 1px
+      color-mix(in srgb, var(--editor-accent) 16%, transparent);
+  }
+
   .canvas-group-rotation-preview {
     z-index: 6;
     border: 1px solid var(--canvas-transform-preview-box-lines);

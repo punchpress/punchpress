@@ -72,6 +72,13 @@ The editor follows a three-layer architecture inspired by tldraw:
 - `docs/ai-commands/version-bump/README.md` — agent workflow for `do a version bump`
 - `docs/architecture-decisions/` — Durable architectural decisions
 
+## Product Specs
+
+- `/specs` contains high-level product specs for PunchPress behavior.
+- Specs are living docs: concise, product-facing, and implementation-agnostic.
+- Do not put code pointers, architecture notes, or technical recommendations into `/specs`.
+- When behavior changes or becomes clearer, update the relevant spec in `/specs` in the same task.
+
 ## Release Workflow
 
 - Treat `docs/release-runbook.md` as the source of truth for version bumps, changelog updates, GitHub tags, and desktop publish steps.
