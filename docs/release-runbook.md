@@ -9,6 +9,7 @@ Keep these release surfaces synchronized to one `X.Y.Z`:
 - `CHANGELOG.md` (`vX.Y.Z` heading)
 - `apps/desktop/package.json`
 - `apps/web/package.json`
+- GitHub Release title + notes
 
 Changelog policy:
 
@@ -115,10 +116,21 @@ git push origin main --follow-tags
 
 Tag `vX.Y.Z` is the canonical commit boundary for that build.
 
-## 5. Tag Release Commit
+## 5. Create GitHub Release
 
 Pushing tag `vX.Y.Z` marks the canonical release commit boundary.
 GitHub does not publish release notes or desktop artifacts from tag pushes.
+Create a GitHub Release from the pushed tag and use the matching changelog entry body as the
+release notes.
+
+```bash
+tmp_notes_file="$(mktemp)"
+bun run release:notes -- --version X.Y.Z > "$tmp_notes_file"
+gh release create vX.Y.Z --title vX.Y.Z --notes-file "$tmp_notes_file"
+rm "$tmp_notes_file"
+```
+
+Do not rely on the annotated tag message as the GitHub Release body.
 
 ## 6. Publish Desktop Release
 

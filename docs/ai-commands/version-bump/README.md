@@ -10,6 +10,7 @@ This command intentionally splits work into:
 ## Deterministic Scripts
 
 - `bun run release:bump <patch|minor|major|X.Y.Z>`
+- `bun run release:notes [-- --version X.Y.Z]`
 - `bun run release:collect-changelog-context [--since-ref <git-ref>] [--max-commits <N>]`
 - `bun run release:check`
 - `bun run build:desktop:unsigned`
@@ -84,21 +85,23 @@ On the release Mac, also run:
 bun run build:desktop
 ```
 
-7. Report completion.
-Summarize:
-
-- new version
-- changelog highlights
-- files changed
-- whether checks passed
-
-8. Commit and push release changes first.
+7. Commit, tag, and push release changes first.
 
 ```bash
 git add CHANGELOG.md apps/desktop/package.json apps/web/package.json bun.lock
 git commit -m "release: vX.Y.Z"
 git tag -a vX.Y.Z -m "release: vX.Y.Z"
 git push origin main --follow-tags
+```
+
+8. Create the GitHub Release from the pushed tag.
+Use the changelog entry body as the GitHub Release notes instead of relying on the tag annotation.
+
+```bash
+tmp_notes_file="$(mktemp)"
+bun run release:notes -- --version X.Y.Z > "$tmp_notes_file"
+gh release create vX.Y.Z --title vX.Y.Z --notes-file "$tmp_notes_file"
+rm "$tmp_notes_file"
 ```
 
 9. Publish after push by default.
@@ -112,6 +115,15 @@ bun install --frozen-lockfile
 bun run build:desktop
 bun run publish:desktop
 ```
+
+10. Report completion.
+Summarize:
+
+- new version
+- changelog highlights
+- GitHub Release URL/status
+- files changed
+- whether checks passed
 
 ## Editing Rules
 

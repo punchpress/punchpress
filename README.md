@@ -30,9 +30,10 @@ The repo is organized as a small Bun workspace so the app and desktop shell stay
 - Canonical runbook: `docs/release-runbook.md`
 - One-command bump: `bun run release:bump patch` (or `minor` / `major` / explicit `X.Y.Z`)
 - AI command (`do a version bump`): `docs/ai-commands/version-bump/README.md`
+- GitHub Release notes export: `bun run release:notes -- --version X.Y.Z`
 - Changelog context export: `bun run release:collect-changelog-context`
 - Release integrity checks: `bun run release:check && bun run build:desktop:unsigned && bun run release:check-desktop-artifacts`
-- Signed publish happens manually from a release Mac after the tag is pushed: `bun run build:desktop && bun run publish:desktop`
+- After the tag is pushed, create a GitHub Release from that tag and then run the signed desktop publish from a release Mac: `bun run build:desktop && bun run publish:desktop`
 
 ---
 

@@ -16,6 +16,7 @@
     "preview": "bun run --cwd apps/web preview",
     "publish:desktop": "bun run --cwd apps/desktop publish",
     "release:bump": "node scripts/release/bump-version.mjs",
+    "release:notes": "node scripts/release/extract-release-notes-from-changelog.mjs",
     "release:collect-changelog-context": "node scripts/release/collect-changelog-context.mjs",
     "release:check": "node scripts/release/validate-release-metadata.mjs",
     "release:check-desktop-artifacts": "node scripts/release/check-desktop-artifacts.mjs",
