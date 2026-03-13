@@ -115,17 +115,10 @@ git push origin main --follow-tags
 
 Tag `vX.Y.Z` is the canonical commit boundary for that build.
 
-## 5. GitHub Release Notes (Auto)
+## 5. Tag Release Commit
 
-Pushing tag `vX.Y.Z` triggers `.github/workflows/release-integrity.yml` to:
-
-- run release metadata validation
-- build the unsigned desktop artifacts
-- validate the generated Electron updater outputs
-- extract the matching `## vX.Y.Z - YYYY-MM-DD` section from `CHANGELOG.md`
-- publish that extracted markdown as the GitHub release body
-
-This keeps GitHub release notes human-readable and aligned with the changelog source of truth.
+Pushing tag `vX.Y.Z` marks the canonical release commit boundary.
+GitHub does not publish release notes or desktop artifacts from tag pushes.
 
 ## 6. Publish Desktop Release
 
@@ -145,7 +138,6 @@ This uploads the DMG, blockmap, and `latest-mac.yml` updater metadata to S3.
 ## 7. Final Validation
 
 - Confirm `latest-mac.yml` and the DMG exist under `s3://punchpress-electron-app-209596837609-us-east-1-an/mac/`.
-- Confirm the GitHub release for tag `vX.Y.Z` contains the matching changelog entry.
 - Install or update from a prior PunchPress build to verify the auto-updater downloads the new release.
 
 ## Fast Failure Handling
