@@ -1,7 +1,5 @@
-import {
-  buildNodeGeometry,
-  buildSvgExport,
-} from "../editor/shapes/warp-text/warp-engine";
+import { buildNodeGeometry } from "../editor/shapes/warp-text/warp-engine";
+import { buildSvgExport } from "../editor/shapes/warp-text/warp-svg-export";
 import type { DesignDocument } from "./schema";
 
 const escapeMetadata = (value: string) => {

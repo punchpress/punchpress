@@ -7,7 +7,7 @@ import {
   DesignerPanel,
   DesignerWindowDragRegion,
 } from "../designer/designer";
-import { LayersPanel } from "../panels/layers-panel";
+import { LayersPanel } from "../panels/layers-panel/layers-panel";
 import { PropertiesPanel } from "../panels/properties-panel";
 
 const SHELL_CHROME_VARS = {

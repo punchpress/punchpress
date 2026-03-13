@@ -1,26 +1,61 @@
+import { UI_ACCENT } from "./constants";
+import { getStoredLastUsedFont } from "./default-font";
 import {
-  getMissingDocumentFonts,
-  replaceMissingDocumentFonts,
-} from "../document/document-fonts";
-import { MissingDocumentFontsError } from "../document/errors";
-import { exportDesignDocument } from "../document/export";
-import { loadDesignDocument } from "../document/load";
-import { saveDesignDocument } from "../document/save";
+  newDocument as createNewEditorDocument,
+  exportDocument as exportEditorDocument,
+  getDocument as getEditorDocument,
+  loadDocument as loadEditorDocument,
+  serializeDocument as serializeEditorDocument,
+} from "./document/document-actions";
 import {
-  getInitialLocalFontCatalog,
-  requestLocalFontCatalog,
-} from "../platform/local-fonts";
-import { MAX_ZOOM, MIN_ZOOM, UI_ACCENT } from "./constants";
-import {
-  getStoredLastUsedFont,
-  rememberLastUsedFont,
-  resolveDefaultFont,
-} from "./default-font";
+  bringNodeToFront as bringEditorNodeToFront,
+  bringSelectedToFront as bringEditorSelectedToFront,
+  deleteNode as deleteEditorNode,
+  deleteSelected as deleteEditorSelected,
+  duplicateNode as duplicateEditorNode,
+  duplicateSelected as duplicateEditorSelected,
+  sendNodeToBack as sendEditorNodeToBack,
+  sendSelectedToBack as sendEditorSelectedToBack,
+  setNodeOrder as setEditorNodeOrder,
+  toggleNodeVisibility as toggleEditorNodeVisibility,
+  updateNode as updateEditorNode,
+  updateNodes as updateEditorNodes,
+  updateSelectedNode as updateEditorSelectedNode,
+} from "./document/node-actions";
 import { getEditableNodeFrame } from "./editable-node-frame";
+import {
+  addTextNode as addEditorTextNode,
+  cancelEditing as cancelEditorEditing,
+  commitEditing as commitEditorEditing,
+  finalizeEditing as finalizeEditorEditing,
+  finishEditingIfNeeded as finishEditorEditingIfNeeded,
+  setActiveTool as setEditorActiveTool,
+  setEditingText as setEditorEditingText,
+  startEditing as startEditorEditing,
+} from "./editing/editing-actions";
+import {
+  applyLocalFontCatalog as applyEditorLocalFontCatalog,
+  getDefaultFont as getEditorDefaultFont,
+  getFontPreviewFamily as getEditorFontPreviewFamily,
+  getFontPreviewState as getEditorFontPreviewState,
+  initializeLocalFonts as initializeEditorLocalFonts,
+  preloadFontOptions as preloadEditorFontOptions,
+  preloadFonts as preloadEditorFonts,
+  requestLocalFonts as requestEditorLocalFonts,
+  setLastUsedFont as setEditorLastUsedFont,
+} from "./fonts/font-catalog-actions";
 import {
   applyDocumentChange,
   createDocumentChange,
 } from "./history/document-change";
+import {
+  handleCanvasShortcutKeyDown as handleEditorCanvasShortcutKeyDown,
+  handleEditingShortcutKeyDown as handleEditorEditingShortcutKeyDown,
+  handleSpaceDown as handleEditorSpaceDown,
+  handleSpaceUp as handleEditorSpaceUp,
+  handleWindowKeyDown as handleEditorWindowKeyDown,
+} from "./input/keyboard-shortcuts";
+import { disposeEditor, mountEditor } from "./lifecycle/editor-lifecycle";
 import { createLocalFontDescriptor, DEFAULT_LOCAL_FONT } from "./local-fonts";
 import {
   DEFAULT_EDITABLE_FONT_FAMILY,
@@ -29,17 +64,35 @@ import {
 import { GeometryManager } from "./managers/geometry-manager";
 import { HistoryManager } from "./managers/history-manager";
 import {
-  isInputElement,
-  shouldIgnoreGlobalShortcutTarget,
-} from "./primitives/dom";
-import { clamp } from "./primitives/math";
-import { isNodeVisible } from "./shapes/warp-text/model";
+  getLayerRow as getEditorLayerRow,
+  getNode as getEditorNode,
+  getNodeFrame as getEditorNodeFrame,
+  getNodeGeometry as getEditorNodeGeometry,
+  getSelectionFrameKey as getEditorSelectionFrameKey,
+} from "./queries/node-queries";
+import {
+  clearSelection as clearEditorSelection,
+  ensureNodeSelected as ensureEditorNodeSelected,
+  isNodeSelected as isEditorNodeSelected,
+  selectNode as selectEditorNode,
+  selectNodes as selectEditorNodes,
+  toggleNodeSelection as toggleEditorNodeSelection,
+} from "./selection/selection-actions";
+import { getSelectionBounds as getEditorSelectionBounds } from "./selection/selection-bounds";
 import { buildNodeGeometry } from "./shapes/warp-text/warp-engine";
-import { createEditorStore } from "./state/store";
+import { createEditorStore } from "./state/store/create-editor-store";
 import { HandTool } from "./tools/hand-tool";
 import { PointerTool } from "./tools/pointer-tool";
 import { TextTool } from "./tools/text-tool";
+import {
+  cancelPendingViewportFocus as cancelEditorPendingViewportFocus,
+  scheduleViewportFocus as scheduleEditorViewportFocus,
+  zoomIn as zoomEditorIn,
+  zoomOut as zoomEditorOut,
+} from "./viewport/viewport-focus";
 
+// Intentional facade: keep the public editor API and durable subsystem wiring
+// here, and move behavior-heavy implementation into capability modules.
 export class Editor {
   constructor({ accent = UI_ACCENT, initialZoom = 1 } = {}) {
     this.accent = accent;
@@ -48,7 +101,6 @@ export class Editor {
     this.defaultFont = createLocalFontDescriptor(
       this.lastUsedFont || DEFAULT_LOCAL_FONT
     );
-    this.spacePressed = false;
     this.nodeElements = new Map();
     this.viewerRef = null;
     this.hostRef = null;
@@ -99,63 +151,15 @@ export class Editor {
     this.handleWindowKeyDown = this.handleWindowKeyDown.bind(this);
     this.handleSpaceDown = this.handleSpaceDown.bind(this);
     this.handleSpaceUp = this.handleSpaceUp.bind(this);
-    this.onSpacePressedChange = null;
     this.onViewportChange = null;
   }
 
   mount() {
-    this.preloadFonts();
-    this.initializeLocalFonts().catch((error) => {
-      this.getState().setFontCatalogState(
-        "error",
-        error instanceof Error
-          ? error.message
-          : "Unable to initialize local fonts."
-      );
-    });
-
-    if (!this.unsubscribe) {
-      let previousNodes = this.nodes;
-
-      this.unsubscribe = this.store.subscribe((state) => {
-        if (state.nodes === previousNodes) {
-          return;
-        }
-
-        previousNodes = state.nodes;
-        this.preloadFonts(state.nodes);
-      });
-    }
-
-    if (typeof window !== "undefined") {
-      this.unsubscribeEditorCommand =
-        window.electron?.editorCommands?.onCommand((command) => {
-          if (command === "undo") {
-            this.undo();
-            return;
-          }
-
-          this.redo();
-        }) || null;
-      window.addEventListener("keydown", this.handleWindowKeyDown);
-      window.addEventListener("keydown", this.handleSpaceDown);
-      window.addEventListener("keyup", this.handleSpaceUp);
-    }
+    mountEditor(this);
   }
 
   dispose() {
-    this.unsubscribeEditorCommand?.();
-    this.unsubscribeEditorCommand = null;
-    this.unsubscribe?.();
-    this.unsubscribe = null;
-
-    if (typeof window !== "undefined") {
-      window.removeEventListener("keydown", this.handleWindowKeyDown);
-      window.removeEventListener("keydown", this.handleSpaceDown);
-      window.removeEventListener("keyup", this.handleSpaceUp);
-    }
-
-    this.cancelPendingViewportFocus();
+    disposeEditor(this);
   }
 
   getState() {
@@ -319,25 +323,23 @@ export class Editor {
   }
 
   preloadFonts(nodes = this.nodes) {
-    this.fonts.preload(nodes);
+    preloadEditorFonts(this, nodes);
   }
 
   preloadFontOptions(fonts) {
-    for (const font of fonts) {
-      this.fonts.preloadFont(font);
-    }
+    preloadEditorFontOptions(this, fonts);
   }
 
   getFontPreviewState(font) {
-    return this.fonts.getLoadState(font);
+    return getEditorFontPreviewState(this, font);
   }
 
   getFontPreviewFamily(font) {
-    return this.fonts.getEditableFontFamily(font);
+    return getEditorFontPreviewFamily(this, font);
   }
 
   getDefaultFont() {
-    return createLocalFontDescriptor(this.defaultFont);
+    return getEditorDefaultFont(this);
   }
 
   get fontCatalogState() {
@@ -345,157 +347,71 @@ export class Editor {
   }
 
   async initializeLocalFonts() {
-    return this.loadLocalFontCatalog(() => getInitialLocalFontCatalog());
+    return await initializeEditorLocalFonts(this);
   }
 
   async requestLocalFonts() {
-    this.getState().setFontCatalogState("loading");
-    return this.loadLocalFontCatalog(() => requestLocalFontCatalog(), {
-      force: true,
-    });
+    return await requestEditorLocalFonts(this);
   }
 
   setLastUsedFont(font) {
-    const descriptor = createLocalFontDescriptor(font);
-    this.lastUsedFont = descriptor;
-    this.defaultFont = descriptor;
-    rememberLastUsedFont(descriptor);
+    setEditorLastUsedFont(this, font);
   }
 
   applyLocalFontCatalog(catalog) {
-    this.availableFonts = catalog.fonts;
-
-    const preferredFont = resolveDefaultFont(catalog.fonts, this.lastUsedFont);
-
-    if (preferredFont) {
-      this.defaultFont = createLocalFontDescriptor(preferredFont);
-    }
-
-    this.getState().setFontCatalogState(catalog.state, catalog.error);
-    this.getState().bumpFontRevision();
-    this.preloadFonts();
+    applyEditorLocalFontCatalog(this, catalog);
   }
 
   getNode(nodeId) {
-    if (!nodeId) {
-      return null;
-    }
-
-    return this.nodes.find((node) => node.id === nodeId) || null;
+    return getEditorNode(this, nodeId);
   }
 
   getLayerRow(nodeId) {
-    const nodeIndex = this.nodes.findIndex((node) => node.id === nodeId);
-    if (nodeIndex < 0) {
-      return null;
-    }
-
-    const node = this.nodes[nodeIndex];
-    const layerIndex = this.nodes.length - 1 - nodeIndex;
-    const isVisible = isNodeVisible(node);
-    const label =
-      node.text.trim().length > 0 ? node.text : `Text ${layerIndex + 1}`;
-
-    return {
-      isBackmost: nodeIndex === 0,
-      isFrontmost: nodeIndex === this.nodes.length - 1,
-      isSelected: this.isNodeSelected(node.id),
-      isVisible,
-      label,
-      node,
-      visibilityLabel: isVisible ? "Hide layer" : "Show layer",
-    };
+    return getEditorLayerRow(this, nodeId);
   }
 
   getNodeGeometry(nodeId) {
-    if (!nodeId) {
-      return null;
-    }
-
-    return this.geometry.getById(this.nodes, this.fontRevision, nodeId);
+    return getEditorNodeGeometry(this, nodeId);
   }
 
   getNodeFrame(nodeId) {
-    if (!nodeId) {
-      return null;
-    }
-
-    const node = this.getNode(nodeId);
-    if (!node) {
-      return null;
-    }
-
-    return getEditableNodeFrame(node, this.getNodeGeometry(nodeId));
+    return getEditorNodeFrame(this, nodeId);
   }
 
   getSelectionFrameKey(nodeIds = this.selectedNodeIds) {
-    return nodeIds
-      .map((nodeId) => {
-        const frame = this.getNodeFrame(nodeId);
-
-        if (!frame) {
-          return nodeId;
-        }
-
-        return JSON.stringify({
-          bounds: frame.bounds,
-          nodeId,
-          transform: frame.transform || "",
-        });
-      })
-      .join("|");
+    return getEditorSelectionFrameKey(this, nodeIds);
   }
 
   getSelectionBounds(nodeIds = this.selectedNodeIds) {
-    return getSelectionBounds(this, nodeIds);
+    return getEditorSelectionBounds(this, nodeIds);
   }
 
   getDocument() {
-    if (this.editingNodeId) {
-      this.finalizeEditing();
-    }
-
-    return saveDesignDocument(this.nodes).document;
+    return getEditorDocument(this);
   }
 
   addTextNode(point) {
-    this.finishEditingIfNeeded();
-    this.beginHistoryTransaction();
-    this.getState().addTextNode(point, this.getDefaultFont());
+    addEditorTextNode(this, point);
   }
 
   cancelEditing() {
-    this.getState().cancelEditing();
-    this.endHistoryTransaction();
-    this.getState().setActiveTool("pointer");
+    cancelEditorEditing(this);
   }
 
   clearSelection() {
-    this.finishEditingIfNeeded();
-    this.getState().clearSelection();
+    clearEditorSelection(this);
   }
 
   commitEditing() {
-    this.getState().commitEditing();
+    commitEditorEditing(this);
   }
 
   deleteSelected() {
-    this.finishEditingIfNeeded();
-    this.runDocumentChange(() => {
-      this.getState().deleteSelected();
-    });
+    deleteEditorSelected(this);
   }
 
   deleteNode(nodeId) {
-    this.finishEditingIfNeeded();
-    if (this.isNodeSelected(nodeId)) {
-      this.deleteSelected();
-      return;
-    }
-
-    this.runDocumentChange(() => {
-      this.getState().deleteNodeById(nodeId);
-    });
+    deleteEditorNode(this, nodeId);
   }
 
   dispatchCanvasPointerDown(info) {
@@ -507,165 +423,43 @@ export class Editor {
   }
 
   duplicateNode(nodeId) {
-    this.finishEditingIfNeeded();
-    if (this.isNodeSelected(nodeId)) {
-      this.duplicateSelected();
-      return;
-    }
-
-    this.runDocumentChange(() => {
-      this.getState().duplicateNodeById(nodeId);
-    });
+    duplicateEditorNode(this, nodeId);
   }
 
   duplicateSelected() {
-    this.finishEditingIfNeeded();
-    this.runDocumentChange(() => {
-      this.getState().duplicateSelectedNodes();
-    });
+    duplicateEditorSelected(this);
   }
 
   async exportDocument() {
-    await this.initializeLocalFonts().catch(() => undefined);
-    const missingFonts = getMissingDocumentFonts(
-      this.nodes,
-      this.availableFonts
-    );
-
-    if (missingFonts.length > 0) {
-      throw new MissingDocumentFontsError(missingFonts);
-    }
-
-    return exportDesignDocument(this.getDocument(), (font) =>
-      this.fonts.loadFontForExport(font)
-    );
+    return await exportEditorDocument(this);
   }
 
   finalizeEditing() {
-    this.commitEditing();
-    this.endHistoryTransaction();
-    this.setActiveTool("pointer");
+    finalizeEditorEditing(this);
   }
 
   handleEditingShortcutKeyDown(event, key) {
-    if ((event.metaKey || event.ctrlKey) && !event.altKey && key === "z") {
-      event.preventDefault();
-
-      if (event.shiftKey) {
-        this.redo();
-        return true;
-      }
-
-      this.undo();
-      return true;
-    }
-
-    if ((event.metaKey || event.ctrlKey) && !event.altKey && key === "y") {
-      event.preventDefault();
-      this.redo();
-      return true;
-    }
-
-    if ((event.metaKey || event.ctrlKey) && !event.altKey && key === "j") {
-      if (this.selectedNodeIds.length === 0) {
-        return true;
-      }
-
-      event.preventDefault();
-      this.duplicateSelected();
-      return true;
-    }
-
-    return false;
+    return handleEditorEditingShortcutKeyDown(this, event, key);
   }
 
   handleCanvasShortcutKeyDown(event, key) {
-    if (event.metaKey || event.ctrlKey || event.altKey) {
-      return false;
-    }
-
-    if (event.code === "BracketLeft") {
-      if (this.selectedNodeIds.length === 0) {
-        return true;
-      }
-
-      event.preventDefault();
-      this.sendSelectedToBack();
-      return true;
-    }
-
-    if (event.code === "BracketRight") {
-      if (this.selectedNodeIds.length === 0) {
-        return true;
-      }
-
-      event.preventDefault();
-      this.bringSelectedToFront();
-      return true;
-    }
-
-    if (key === "backspace" || key === "delete") {
-      event.preventDefault();
-      this.deleteSelected();
-      return true;
-    }
-
-    return false;
+    return handleEditorCanvasShortcutKeyDown(this, event, key);
   }
 
   handleWindowKeyDown(event) {
-    if (shouldIgnoreGlobalShortcutTarget(event.target)) {
-      return;
-    }
-
-    const key = event.key.toLowerCase();
-    if (this.handleEditingShortcutKeyDown(event, key)) {
-      return;
-    }
-
-    if (this.handleCanvasShortcutKeyDown(event, key)) {
-      return;
-    }
-
-    if (this.currentTool.onKeyDown({ event, key })) {
-      event.preventDefault();
-    }
+    handleEditorWindowKeyDown(this, event);
   }
 
   selectNode(nodeId) {
-    if (!nodeId) {
-      this.clearSelection();
-      return;
-    }
-
-    if (this.editingNodeId && this.editingNodeId !== nodeId) {
-      this.finalizeEditing();
-    }
-
-    this.getState().selectNode(nodeId);
+    selectEditorNode(this, nodeId);
   }
 
   selectNodes(nodeIds) {
-    if (
-      this.editingNodeId &&
-      (nodeIds.length !== 1 || nodeIds[0] !== this.editingNodeId)
-    ) {
-      this.finalizeEditing();
-    }
-
-    this.getState().selectNodes(nodeIds);
+    selectEditorNodes(this, nodeIds);
   }
 
   toggleNodeSelection(nodeId) {
-    if (!nodeId) {
-      return;
-    }
-
-    if (this.editingNodeId) {
-      this.finalizeEditing();
-    }
-
-    this.getState().toggleNodeSelection(nodeId);
+    toggleEditorNodeSelection(this, nodeId);
   }
 
   setHoveredNode(nodeId) {
@@ -677,38 +471,19 @@ export class Editor {
   }
 
   ensureNodeSelected(nodeId) {
-    if (!nodeId) {
-      return;
-    }
-
-    if (this.isNodeSelected(nodeId)) {
-      return;
-    }
-
-    this.selectNode(nodeId);
+    ensureEditorNodeSelected(this, nodeId);
   }
 
   setActiveTool(toolId) {
-    if (!this.tools.has(toolId)) {
-      return;
-    }
-
-    if (toolId !== "text" && this.editingNodeId) {
-      this.finalizeEditing();
-    }
-
-    this.getState().setActiveTool(toolId);
+    setEditorActiveTool(this, toolId);
   }
 
   setEditingText(value) {
-    this.getState().setEditingText(value);
+    setEditorEditingText(this, value);
   }
 
   setNodeOrder(nodeIds) {
-    this.finishEditingIfNeeded();
-    this.runDocumentChange(() => {
-      this.getState().setNodeOrder(nodeIds);
-    });
+    setEditorNodeOrder(this, nodeIds);
   }
 
   setViewportZoom(zoom) {
@@ -716,106 +491,51 @@ export class Editor {
   }
 
   toggleNodeVisibility(nodeId) {
-    this.finishEditingIfNeeded();
-    this.runDocumentChange(() => {
-      this.getState().toggleNodeVisibilityById(nodeId);
-    });
+    toggleEditorNodeVisibility(this, nodeId);
   }
 
   sendNodeToBack(nodeId) {
-    this.finishEditingIfNeeded();
-    if (this.isNodeSelected(nodeId) && this.selectedNodeIds.length > 1) {
-      this.sendSelectedToBack();
-      return;
-    }
-
-    this.runDocumentChange(() => {
-      this.getState().sendNodeToBack(nodeId);
-    });
+    sendEditorNodeToBack(this, nodeId);
   }
 
   sendSelectedToBack() {
-    this.finishEditingIfNeeded();
-    this.runDocumentChange(() => {
-      this.getState().sendSelectedNodesToBack();
-    });
+    sendEditorSelectedToBack(this);
   }
 
   startEditing(node) {
-    if (this.editingNodeId && this.editingNodeId !== node.id) {
-      this.finalizeEditing();
-    }
-
-    this.beginHistoryTransaction();
-    this.getState().startEditing(node);
+    startEditorEditing(this, node);
   }
 
   updateNode(nodeId, updater) {
-    this.finishEditingIfNeeded();
-    this.runDocumentChange(() => {
-      this.getState().updateNodeById(nodeId, updater);
-    });
+    updateEditorNode(this, nodeId, updater);
   }
 
   updateNodes(nodeIds, updater) {
-    this.finishEditingIfNeeded();
-    this.runDocumentChange(() => {
-      this.getState().updateNodesById(nodeIds, updater);
-    });
+    updateEditorNodes(this, nodeIds, updater);
   }
 
   updateSelectedNode(updater) {
-    this.finishEditingIfNeeded();
-    this.runDocumentChange(() => {
-      this.getState().updateSelectedNode(updater);
-    });
+    updateEditorSelectedNode(this, updater);
   }
 
   bringNodeToFront(nodeId) {
-    this.finishEditingIfNeeded();
-    if (this.isNodeSelected(nodeId) && this.selectedNodeIds.length > 1) {
-      this.bringSelectedToFront();
-      return;
-    }
-
-    this.runDocumentChange(() => {
-      this.getState().bringNodeToFront(nodeId);
-    });
+    bringEditorNodeToFront(this, nodeId);
   }
 
   bringSelectedToFront() {
-    this.finishEditingIfNeeded();
-    this.runDocumentChange(() => {
-      this.getState().bringSelectedNodesToFront();
-    });
+    bringEditorSelectedToFront(this);
   }
 
   isNodeSelected(nodeId) {
-    return this.selectedNodeIds.includes(nodeId);
+    return isEditorNodeSelected(this, nodeId);
   }
 
   loadDocument(contents) {
-    const { nodes } = loadDesignDocument(contents);
-    const resolution = replaceMissingDocumentFonts(
-      nodes,
-      this.availableFonts,
-      this.getDefaultFont()
-    );
-
-    this.getState().loadNodes(resolution.nodes);
-    this.resetHistory();
-
-    if (typeof window !== "undefined") {
-      this.scheduleViewportFocus(resolution.nodes.map((node) => node.id));
-    }
-
-    return resolution;
+    return loadEditorDocument(this, contents);
   }
 
   newDocument() {
-    this.finishEditingIfNeeded();
-    this.getState().loadNodes([]);
-    this.resetHistory();
+    createNewEditorDocument(this);
   }
 
   registerNodeElement(nodeId, element) {
@@ -827,7 +547,7 @@ export class Editor {
   }
 
   serializeDocument() {
-    return saveDesignDocument(this.nodes).contents;
+    return serializeEditorDocument(this);
   }
 
   markDocumentSaved() {
@@ -855,11 +575,7 @@ export class Editor {
   }
 
   finishEditingIfNeeded() {
-    if (!this.editingNodeId) {
-      return;
-    }
-
-    this.finalizeEditing();
+    finishEditorEditingIfNeeded(this);
   }
 
   recordHistoryChange(beforeSnapshot) {
@@ -875,99 +591,27 @@ export class Editor {
   }
 
   zoomIn() {
-    const viewer = this.viewerRef;
-    if (!viewer) {
-      return;
-    }
-
-    viewer.setZoom(clamp(this.zoom * 1.18, MIN_ZOOM, MAX_ZOOM));
+    zoomEditorIn(this);
   }
 
   zoomOut() {
-    const viewer = this.viewerRef;
-    if (!viewer) {
-      return;
-    }
-
-    viewer.setZoom(clamp(this.zoom / 1.18, MIN_ZOOM, MAX_ZOOM));
+    zoomEditorOut(this);
   }
 
   handleSpaceDown(event) {
-    if (event.code !== "Space" || isInputElement(event.target)) {
-      return;
-    }
-
-    event.preventDefault();
-    this.spacePressed = true;
-    this.onSpacePressedChange?.(true);
+    handleEditorSpaceDown(this, event);
   }
 
   handleSpaceUp(event) {
-    if (event.code !== "Space") {
-      return;
-    }
-
-    this.spacePressed = false;
-    this.onSpacePressedChange?.(false);
+    handleEditorSpaceUp(this, event);
   }
 
   cancelPendingViewportFocus() {
-    if (
-      typeof window === "undefined" ||
-      this.pendingViewportFocusFrame === null
-    ) {
-      this.pendingViewportFocusFrame = null;
-      return;
-    }
-
-    window.cancelAnimationFrame(this.pendingViewportFocusFrame);
-    this.pendingViewportFocusFrame = null;
+    cancelEditorPendingViewportFocus(this);
   }
 
   scheduleViewportFocus(nodeIds) {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    this.cancelPendingViewportFocus();
-    this.viewportFocusRequest += 1;
-
-    const requestId = this.viewportFocusRequest;
-    const attemptFocus = (attempt = 0) => {
-      if (this.viewportFocusRequest !== requestId) {
-        return;
-      }
-
-      const visibleNodeIds = nodeIds.filter((nodeId) => {
-        return isNodeVisible(this.getNode(nodeId));
-      });
-
-      if (visibleNodeIds.length === 0) {
-        this.pendingViewportFocusFrame = null;
-        return;
-      }
-
-      const bounds = this.getSelectionBounds(visibleNodeIds);
-      const isReady = visibleNodeIds.every((nodeId) => {
-        return Boolean(
-          this.getNodeElement(nodeId) && this.getNodeGeometry(nodeId)?.ready
-        );
-      });
-
-      if (bounds && (isReady || attempt >= 120)) {
-        focusCanvasBoundsInViewport(this, bounds);
-        this.pendingViewportFocusFrame = null;
-        return;
-      }
-
-      this.pendingViewportFocusFrame = window.requestAnimationFrame(() => {
-        attemptFocus(attempt + 1);
-      });
-    };
-
-    this.pendingViewportFocusFrame = window.requestAnimationFrame(() => {
-      attemptFocus();
-    });
+    scheduleEditorViewportFocus(this, nodeIds);
   }
 
   loadLocalFontCatalog(loadCatalog, { force = false } = {}) {
@@ -988,97 +632,3 @@ export class Editor {
     return this.localFontCatalogPromise;
   }
 }
-
-const getSelectionBounds = (editor, nodeIds) => {
-  const bounds = nodeIds
-    .map((nodeId) => {
-      const renderedBounds = getRenderedNodeBounds(editor, nodeId);
-      if (renderedBounds) {
-        return renderedBounds;
-      }
-
-      const frame = editor.getNodeFrame(nodeId);
-      if (!frame) {
-        return null;
-      }
-
-      return frame.bounds;
-    })
-    .filter(Boolean);
-
-  if (bounds.length === 0) {
-    return null;
-  }
-
-  const minX = Math.min(...bounds.map((bbox) => bbox.minX));
-  const minY = Math.min(...bounds.map((bbox) => bbox.minY));
-  const maxX = Math.max(...bounds.map((bbox) => bbox.maxX));
-  const maxY = Math.max(...bounds.map((bbox) => bbox.maxY));
-
-  return {
-    height: maxY - minY,
-    maxX,
-    maxY,
-    minX,
-    minY,
-    width: maxX - minX,
-  };
-};
-
-const focusCanvasBoundsInViewport = (editor, bounds) => {
-  const viewer = editor.viewerRef;
-  const host = editor.hostRef;
-
-  if (!(viewer && host && bounds)) {
-    return;
-  }
-
-  const hostRect = host.getBoundingClientRect();
-  const width = Math.max(hostRect.width, 1);
-  const height = Math.max(hostRect.height, 1);
-  const padding = 160;
-  const contentWidth = Math.max(bounds.maxX - bounds.minX, 1);
-  const contentHeight = Math.max(bounds.maxY - bounds.minY, 1);
-  const zoom = clamp(
-    Math.min(
-      width / (contentWidth + padding * 2),
-      height / (contentHeight + padding * 2),
-      1
-    ),
-    MIN_ZOOM,
-    MAX_ZOOM
-  );
-  const canvasWidth = width / zoom;
-  const canvasHeight = height / zoom;
-  const x = bounds.minX - (canvasWidth - contentWidth) / 2;
-  const y = bounds.minY - (canvasHeight - contentHeight) / 2;
-
-  viewer.setTo?.({ x, y, zoom });
-  editor.setViewportZoom(zoom);
-};
-
-const getRenderedNodeBounds = (editor, nodeId) => {
-  const element = editor.getNodeElement(nodeId);
-  const host = editor.hostRef;
-  const viewer = editor.viewerRef;
-
-  if (!(element && host && viewer && editor.zoom > 0)) {
-    return null;
-  }
-
-  const elementRect = element.getBoundingClientRect();
-  const hostRect = host.getBoundingClientRect();
-  const scrollLeft = viewer.getScrollLeft?.();
-  const scrollTop = viewer.getScrollTop?.();
-
-  if (!(Number.isFinite(scrollLeft) && Number.isFinite(scrollTop))) {
-    return null;
-  }
-
-  return {
-    maxX: scrollLeft + (elementRect.right - hostRect.left) / editor.zoom,
-    maxY: scrollTop + (elementRect.bottom - hostRect.top) / editor.zoom,
-    minX: scrollLeft + (elementRect.left - hostRect.left) / editor.zoom,
-    minY: scrollTop + (elementRect.top - hostRect.top) / editor.zoom,
-  };
-};

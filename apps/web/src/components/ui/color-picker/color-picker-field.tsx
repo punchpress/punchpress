@@ -5,15 +5,11 @@ import { useEffect, useRef, useState } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import {
-  ColorPicker,
-  ColorPickerAlpha,
-  ColorPickerEyeDropper,
-  ColorPickerFormat,
-  ColorPickerHue,
-  ColorPickerOutput,
-  ColorPickerSelection,
-} from "./color-picker";
+import { ColorPicker } from "./color-picker";
+import { ColorPickerEyeDropper } from "./color-picker-eye-dropper";
+import { ColorPickerFormat, ColorPickerOutput } from "./color-picker-output";
+import { ColorPickerSelection } from "./color-picker-selection";
+import { ColorPickerAlpha, ColorPickerHue } from "./color-picker-sliders";
 import {
   CHECKERBOARD_STYLE,
   formatStorageColor,

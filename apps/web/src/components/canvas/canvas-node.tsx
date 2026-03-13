@@ -4,14 +4,15 @@ import {
   getNodeX,
   getNodeY,
 } from "../../editor/shapes/warp-text/model";
-import { estimateBounds } from "../../editor/shapes/warp-text/warp-engine";
+import { estimateBounds } from "../../editor/shapes/warp-text/warp-layout";
 import { useEditor } from "../../editor/use-editor";
 import { useEditorValue } from "../../editor/use-editor-value";
 
-export const CanvasNode = ({ nodeId, spacePressed }) => {
+export const CanvasNode = ({ nodeId }) => {
   const editor = useEditor();
   const activeTool = useEditorValue((_, state) => state.activeTool);
   const editingNodeId = useEditorValue((_, state) => state.editingNodeId);
+  const spacePressed = useEditorValue((_, state) => state.spacePressed);
   const node = useEditorValue((editor) => editor.getNode(nodeId));
   const geometry = useEditorValue((editor) => editor.getNodeGeometry(nodeId));
 

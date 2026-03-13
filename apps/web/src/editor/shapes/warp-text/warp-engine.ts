@@ -1,47 +1,11 @@
-import { ARTBOARD_HEIGHT, ARTBOARD_WIDTH } from "../../constants";
 import { clamp, format } from "../../primitives/math";
 import {
-  commandsToContours,
   contoursToPath,
   getBounds,
   mapContours,
   translateContours,
 } from "../../primitives/path-geometry";
-import {
-  getNodeRotation,
-  getNodeScaleX,
-  getNodeScaleY,
-  getNodeX,
-  getNodeY,
-} from "./model";
-
-export const estimateBounds = (node) => {
-  const halfWidth = Math.max(
-    120,
-    node.fontSize * Math.max(1, node.text.length * 0.28)
-  );
-  const halfHeight = Math.max(90, node.fontSize * 0.7);
-
-  return {
-    minX: -halfWidth,
-    minY: -halfHeight,
-    maxX: halfWidth,
-    maxY: halfHeight,
-    width: halfWidth * 2,
-    height: halfHeight * 2,
-  };
-};
-
-export const inflateBounds = (bbox, amount) => {
-  return {
-    minX: bbox.minX - amount,
-    minY: bbox.minY - amount,
-    maxX: bbox.maxX + amount,
-    maxY: bbox.maxY + amount,
-    width: bbox.width + amount * 2,
-    height: bbox.height + amount * 2,
-  };
-};
+import { estimateBounds, inflateBounds, layoutGlyphs } from "./warp-layout";
 
 const getStrokeInflatedBounds = (node, bbox) => {
   const strokeInset = Math.max(node.strokeWidth / 2, 0);
@@ -50,48 +14,6 @@ const getStrokeInflatedBounds = (node, bbox) => {
   }
 
   return inflateBounds(bbox, strokeInset);
-};
-
-export const layoutGlyphs = (node, font) => {
-  const text = node.text.length > 0 ? [...node.text] : [" "];
-  const scale = node.fontSize / font.unitsPerEm;
-  let cursorX = 0;
-
-  const glyphs =
-    /** @type {Array<{ advance: number, baseX: number, centerX: number, contours: ReturnType<typeof commandsToContours>, path: string }>} */ ([]);
-
-  for (const char of text) {
-    const glyph = font.charToGlyph(char);
-    const path = glyph.getPath(0, 0, node.fontSize);
-    const contours = commandsToContours(path.commands, 1);
-    const bounds = getBounds(contours);
-    const advance =
-      (glyph.advanceWidth || font.unitsPerEm) * scale + node.tracking;
-    const centerX =
-      bounds.width > 0 ? (bounds.minX + bounds.maxX) / 2 : advance / 2;
-
-    glyphs.push({
-      path: path.toPathData(3),
-      contours,
-      advance,
-      baseX: cursorX,
-      centerX,
-    });
-
-    cursorX += advance;
-  }
-
-  const totalWidth = Math.max(cursorX - node.tracking, 0);
-  const centeringOffset = -totalWidth / 2;
-
-  for (const glyph of glyphs) {
-    glyph.baseX += centeringOffset;
-  }
-
-  return {
-    glyphs,
-    totalWidth,
-  };
 };
 
 export const applyArchWarp = (contours, bend) => {
@@ -278,80 +200,4 @@ export const buildNodeGeometry = (node, font) => {
   } catch {
     return buildFallbackGeometry(node);
   }
-};
-
-const getNodeLocalTransform = (node, bbox) => {
-  const rotation = getNodeRotation(node) || 0;
-  const scaleX = getNodeScaleX(node) ?? 1;
-  const scaleY = getNodeScaleY(node) ?? 1;
-
-  if (!(rotation || scaleX !== 1 || scaleY !== 1)) {
-    return null;
-  }
-
-  const centerX = (bbox.minX + bbox.maxX) / 2;
-  const centerY = (bbox.minY + bbox.maxY) / 2;
-  const transforms = [`translate(${format(centerX)} ${format(centerY)})`];
-
-  if (rotation) {
-    transforms.push(`rotate(${format(rotation)})`);
-  }
-
-  if (scaleX !== 1 || scaleY !== 1) {
-    transforms.push(`scale(${format(scaleX)} ${format(scaleY)})`);
-  }
-
-  transforms.push(`translate(${format(-centerX)} ${format(-centerY)})`);
-
-  return transforms.join(" ");
-};
-
-const buildSvgPathMarkup = (node, path) => {
-  const stroke = node.stroke ?? "none";
-  const transform = path.transform ? ` transform="${path.transform}"` : "";
-
-  return `<path d="${path.d}"${transform} fill="${node.fill}" stroke="${stroke}" stroke-width="${format(
-    node.strokeWidth
-  )}" paint-order="stroke fill" stroke-linejoin="round" stroke-linecap="round"/>`;
-};
-
-export const buildSvgExport = (nodes, geometryById) => {
-  const body = [
-    `<rect width="${ARTBOARD_WIDTH}" height="${ARTBOARD_HEIGHT}" fill="#2d2d2d"/>`,
-  ];
-
-  for (const node of nodes) {
-    if (node.visible === false) {
-      continue;
-    }
-
-    const geometry = geometryById.get(node.id);
-    if (!geometry || geometry.paths.length === 0) {
-      continue;
-    }
-
-    body.push(
-      `<g transform="translate(${format(getNodeX(node))} ${format(
-        getNodeY(node)
-      )})">`
-    );
-
-    const localTransform = getNodeLocalTransform(node, geometry.bbox);
-
-    if (localTransform) {
-      body.push(`<g transform="${localTransform}">`);
-    }
-
-    for (const path of geometry.paths) {
-      body.push(buildSvgPathMarkup(node, path));
-    }
-
-    if (localTransform) {
-      body.push("</g>");
-    }
-
-    body.push("</g>");
-  }
-
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${ARTBOARD_WIDTH}" height="${ARTBOARD_HEIGHT}" viewBox="0 0 ${ARTBOARD_WIDTH} ${ARTBOARD_HEIGHT}">${body.join("")}</svg>`;
 };

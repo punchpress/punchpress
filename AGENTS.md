@@ -13,7 +13,16 @@ Use these standards for new code and touched code during refactors.
 
 ## Code Style
 
-- Keep files cohesive and scoped to one responsibility; target ~300 LoC per file unless there is a strong reason not to.
+- Keep files highly cohesive, functionally oriented, and scoped to one responsibility; target under 300 LoC for most files unless there is a strong reason not to.
+- Prefer composition of small focused modules and components over monolithic files or layered indirection.
+- Do not prop drill. Reach shared state through the appropriate editor API, context, store, or manager.
+- Keep function parameter lists and component prop surfaces small; prefer 4 or fewer inputs unless a broader interface is clearly justified.
+- When a file grows past ~180-220 LoC or starts owning multiple concerns, turn it into a feature folder and split the behavior into sibling modules.
+- React components should primarily render and compose. Move non-trivial behavior, orchestration, and policy into focused domain modules or hooks outside the component file.
+- Use compound component composition for complex UI instead of wide prop APIs. Prefer `Root`, `Trigger`, `Content`, `List`, `Item`, and similar patterns over passing large config bags through a single component.
+- Pass structure downward and read shared state locally. Passing `children`, slots, ids, and event handlers is good; relaying derived editor/app state through intermediate components is not.
+- Prefer plain modules for editor behavior. Reserve long-lived "manager" objects for stateful subsystems with lifecycle, caching, async coordination, or external integration boundaries.
+- Name modules and hooks after user-facing behaviors or actions when possible. Prefer names like `use-unsaved-document-warning` over mechanism names like `use-unsaved-document-guard`.
 - Use kebab-case for file names.
 - Prefer `const` + arrow function style for new functions/components.
 - Prefer `.ts`/`.tsx` for new files. Existing `.jsx` files in `components/ui/` are fine as-is.
@@ -53,6 +62,9 @@ The editor follows a three-layer architecture inspired by tldraw:
 4. **Components are flat.** Max 1 level of nesting inside `canvas/` or `panels/`.
 5. **Pure logic has no React imports.** Geometry, math, warping, font parsing — none of these need React.
 6. **Shape-specific code goes under `editor/shapes/<shape-name>/`.** Don't mix shape logic with editor infrastructure.
+7. **Split behavior by capability.** Prefer folders like `document/`, `selection/`, `transform/`, `viewport/`, and `input/` over large mixed-purpose modules.
+8. **Manager is a high bar.** Use a manager only when the code owns durable state, subscriptions, caching, async work, or an external system boundary.
+9. **Favor compound UI families.** Complex controls should live in dedicated folders and expose composable parts instead of one component with many props.
 
 ### Adding a New Node Type
 
