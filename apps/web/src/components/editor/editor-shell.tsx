@@ -9,6 +9,7 @@ import {
 } from "../designer/designer";
 import { LayersPanel } from "../panels/layers-panel/layers-panel";
 import { PropertiesPanel } from "../panels/properties-panel";
+import { DesktopUpdateIndicator } from "./desktop-update-indicator";
 
 const SHELL_CHROME_VARS = {
   desktop: {
@@ -42,6 +43,7 @@ export const EditorShell = () => {
       }}
     >
       <DesignerContent>
+        {isDesktopShell ? <DesktopUpdateIndicator /> : null}
         {isDesktopShell ? <DesignerWindowDragRegion /> : null}
 
         <DesignerCanvas>

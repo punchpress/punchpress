@@ -16,6 +16,12 @@ export interface DesktopSaveFileResult {
   fileName: string | null;
 }
 
+export type DesktopUpdateStatus =
+  | { phase: "idle" }
+  | { phase: "checking" }
+  | { phase: "downloading"; percent: number; version: string | null }
+  | { phase: "ready"; version: string | null };
+
 export interface DesktopLocalFont {
   family: string;
   fullName: string;
@@ -43,6 +49,13 @@ declare global {
       };
       editorCommands?: {
         onCommand: (callback: (command: "redo" | "undo") => void) => () => void;
+      };
+      updaterCommands?: {
+        getStatus: () => Promise<DesktopUpdateStatus>;
+        onStatusChange: (
+          callback: (status: DesktopUpdateStatus) => void
+        ) => () => void;
+        restartToUpdate: () => Promise<void>;
       };
       documentFiles?: {
         openDocument: () => Promise<DesktopDocumentFileResult | null>;

@@ -2,6 +2,9 @@ import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
 import { installApplicationMenu } from "./application-menu.js";
 import {
+  DESKTOP_UPDATE_GET_STATUS_CHANNEL,
+  DESKTOP_UPDATE_RESTART_CHANNEL,
+  DESKTOP_UPDATE_STATUS_CHANNEL,
   DOCUMENT_CLOSE_RESPONSE_CHANNEL,
   DOCUMENT_COMMAND_CHANNEL,
   EDITOR_COMMAND_CHANNEL,
@@ -12,7 +15,12 @@ import {
   createDocumentOpeningController,
   extractOpenDocumentPathsFromArgv,
 } from "./document-opening.js";
-import { startAutoUpdater } from "./helpers/app-updater.js";
+import {
+  getAutoUpdaterStatus,
+  onAutoUpdaterStatus,
+  quitAndInstallUpdate,
+  startAutoUpdater,
+} from "./helpers/app-updater.js";
 import {
   configurePrivilegedStaticAppScheme,
   serveStaticAt,
@@ -94,6 +102,18 @@ const launch = async () => {
     }
 
     documentOpeningController.flushPendingOpenedDocuments();
+    mainWindowController.sendToRenderer(
+      DESKTOP_UPDATE_STATUS_CHANNEL,
+      getAutoUpdaterStatus()
+    );
+  });
+
+  ipcMain.handle(DESKTOP_UPDATE_GET_STATUS_CHANNEL, () => {
+    return getAutoUpdaterStatus();
+  });
+
+  ipcMain.handle(DESKTOP_UPDATE_RESTART_CHANNEL, () => {
+    quitAndInstallUpdate();
   });
 
   registerDocumentFileHandlers({
@@ -111,6 +131,9 @@ const launch = async () => {
   }
 
   mainWindowController.createMainWindow();
+  onAutoUpdaterStatus((status) => {
+    mainWindowController.sendToRenderer(DESKTOP_UPDATE_STATUS_CHANNEL, status);
+  });
   startAutoUpdater();
   await documentOpeningController.flushPendingOpenDocumentPaths();
 

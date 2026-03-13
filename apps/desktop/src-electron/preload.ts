@@ -59,6 +59,19 @@ contextBridge.exposeInMainWorld("electron", {
       };
     },
   },
+  updaterCommands: {
+    getStatus: () => ipcRenderer.invoke("updater:get-status"),
+    onStatusChange: (callback) => {
+      const listener = (_event, status) => callback(status);
+
+      ipcRenderer.on("updater:status-changed", listener);
+
+      return () => {
+        ipcRenderer.removeListener("updater:status-changed", listener);
+      };
+    },
+    restartToUpdate: () => ipcRenderer.invoke("updater:restart-and-install"),
+  },
   documentFiles: {
     openDocument: () => ipcRenderer.invoke("document:open"),
     openRecentDocument: (filePath) =>

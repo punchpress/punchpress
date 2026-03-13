@@ -6,3 +6,6 @@ export const DOCUMENT_CLOSE_RESPONSE_CHANNEL = "document:close-response";
 export const DOCUMENT_RECENT_DOCUMENTS_CHANGED_CHANNEL =
   "document:recent-documents-changed";
 export const RENDERER_READY_CHANNEL = "document:renderer-ready";
+export const DESKTOP_UPDATE_STATUS_CHANNEL = "updater:status-changed";
+export const DESKTOP_UPDATE_GET_STATUS_CHANNEL = "updater:get-status";
+export const DESKTOP_UPDATE_RESTART_CHANNEL = "updater:restart-and-install";
