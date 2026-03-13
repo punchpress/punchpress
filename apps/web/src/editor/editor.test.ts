@@ -134,3 +134,18 @@ describe("Editor.exportDocument", () => {
     await expect(editor.exportDocument()).rejects.toThrow(MissingDocumentFontsError);
   });
 });
+
+describe("Editor.getSelectionFrameKey", () => {
+  test("updates the selection frame key when selected text geometry changes", () => {
+    const editor = new Editor();
+
+    editor.loadDocument(createDocument("selected-node", "HEYHEYHEYHEY"));
+    editor.getState().selectNode("selected-node");
+
+    const beforeKey = editor.getSelectionFrameKey();
+
+    editor.updateSelectedNode({ text: "HEY" });
+
+    expect(editor.getSelectionFrameKey()).not.toBe(beforeKey);
+  });
+});

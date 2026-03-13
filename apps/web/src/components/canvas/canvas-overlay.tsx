@@ -10,7 +10,6 @@ import {
 import { clamp, round } from "../../editor/primitives/math";
 import { getRotatedNodeUpdate } from "../../editor/primitives/rotation";
 import {
-  getNodeCssTransform,
   getNodeRotation,
   getNodeX,
   getNodeY,
@@ -231,27 +230,19 @@ const getHostRectFromCanvasBounds = (editor, bounds) => {
   };
 };
 
-const getHostRectFromNodeFrame = (editor, node, bbox) => {
-  const viewer = editor.viewerRef;
-
-  if (!(node && bbox && viewer)) {
-    return null;
-  }
-
-  const frame = getHostRectFromCanvasBounds(editor, {
-    height: bbox.height,
-    minX: getNodeX(node) + bbox.minX,
-    minY: getNodeY(node) + bbox.minY,
-    width: bbox.width,
-  });
-
+const getHostRectFromNodeFrame = (editor, frame) => {
   if (!frame) {
     return null;
   }
 
+  const hostRect = getHostRectFromCanvasBounds(editor, frame.bounds);
+  if (!hostRect) {
+    return null;
+  }
+
   return {
-    ...frame,
-    transform: getNodeCssTransform(node),
+    ...hostRect,
+    transform: frame.transform,
   };
 };
 
@@ -348,6 +339,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
   const selectedBounds = useEditorValue((editor) => {
     return editor.getSelectionBounds(visibleSelectedNodeIds);
   });
+  const editingFrame = useEditorValue((editor) => editor.editingFrame);
   const hoveredNodePreview = useEditorValue((editor, state) => {
     if (
       spacePressed ||
@@ -365,23 +357,26 @@ export const CanvasOverlay = ({ spacePressed }) => {
       return null;
     }
 
-    return {
-      bbox: editor.getNodeGeometry(node.id)?.bbox || estimateBounds(node),
-      node,
-    };
+    return editor.getNodeFrame(node.id);
   });
   const hostElement = editor.hostRef;
   const keyContainer = typeof window === "undefined" ? undefined : window;
   const selectedTarget = selectedTargets[0] || null;
   const hasGroupSelection = visibleSelectedNodeIds.length > 1;
+  const selectionFrameKey = useEditorValue((editor) => {
+    return editor.getSelectionFrameKey(visibleSelectedNodeIds);
+  });
   const hoveredNodePreviewRect = getHostRectFromNodeFrame(
     editor,
-    hoveredNodePreview?.node,
-    hoveredNodePreview?.bbox
+    hoveredNodePreview
   );
   const groupRotationPreviewRect =
     isGroupRotationPreviewVisible && hasGroupSelection
       ? getHostRectFromCanvasBounds(editor, selectedBounds)
+      : null;
+  const editingSelectionRect =
+    editingNodeId && visibleSelectedNodeIds.length === 1
+      ? getHostRectFromNodeFrame(editor, editingFrame)
       : null;
 
   useLayoutEffect(() => {
@@ -394,7 +389,7 @@ export const CanvasOverlay = ({ spacePressed }) => {
     }
 
     moveableRef.current.updateRect?.();
-  }, [selectedTargets]);
+  }, [selectedTargets, selectionFrameKey]);
 
   useEffect(() => {
     const handleViewportChange = () => {
@@ -544,8 +539,10 @@ export const CanvasOverlay = ({ spacePressed }) => {
         controlPadding={32}
         draggable={isDraggable}
         flushSync={flushSync}
-        hideChildMoveableDefaultLines={hasGroupSelection}
-        hideDefaultLines={false}
+        hideChildMoveableDefaultLines={
+          hasGroupSelection || Boolean(editingNodeId)
+        }
+        hideDefaultLines={Boolean(editingNodeId)}
         keepRatio
         onDrag={(event) => {
           if (!selectedNode) {
@@ -894,9 +891,25 @@ export const CanvasOverlay = ({ spacePressed }) => {
         rotatable={isRotatable}
         rotateAroundControls
         rotationPosition="none"
-        target={hasGroupSelection ? null : selectedTarget}
-        targets={hasGroupSelection ? selectedTargets : undefined}
+        target={editingNodeId || hasGroupSelection ? null : selectedTarget}
+        targets={
+          editingNodeId || !hasGroupSelection ? undefined : selectedTargets
+        }
       />
+
+      {editingSelectionRect ? (
+        <div
+          className="canvas-edit-selection pointer-events-none absolute"
+          style={{
+            height: `${editingSelectionRect.height}px`,
+            left: `${editingSelectionRect.left}px`,
+            top: `${editingSelectionRect.top}px`,
+            transform: editingSelectionRect.transform,
+            transformOrigin: "center center",
+            width: `${editingSelectionRect.width}px`,
+          }}
+        />
+      ) : null}
 
       {groupRotationPreviewRect ? (
         <div

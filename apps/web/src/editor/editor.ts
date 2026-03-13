@@ -6,6 +6,7 @@ import { MissingDocumentFontsError } from "../document/errors";
 import { exportDesignDocument } from "../document/export";
 import { loadDesignDocument } from "../document/load";
 import { saveDesignDocument } from "../document/save";
+import { getEditableNodeFrame } from "./editable-node-frame";
 import {
   getInitialLocalFontCatalog,
   requestLocalFontCatalog,
@@ -32,8 +33,8 @@ import {
   shouldIgnoreGlobalShortcutTarget,
 } from "./primitives/dom";
 import { clamp } from "./primitives/math";
-import { getNodeX, getNodeY, isNodeVisible } from "./shapes/warp-text/model";
-import { measureStraightText } from "./shapes/warp-text/straight-text-metrics";
+import { isNodeVisible } from "./shapes/warp-text/model";
+import { buildNodeGeometry } from "./shapes/warp-text/warp-engine";
 import { createEditorStore } from "./state/store";
 import { HandTool } from "./tools/hand-tool";
 import { PointerTool } from "./tools/pointer-tool";
@@ -189,14 +190,6 @@ export class Editor {
     return this.getState().editingText;
   }
 
-  get editingGeometry() {
-    if (!this.editingNodeId) {
-      return null;
-    }
-
-    return this.getNodeGeometry(this.editingNodeId);
-  }
-
   get editingFont() {
     if (!this.editingNode) {
       return null;
@@ -213,12 +206,45 @@ export class Editor {
     return this.fonts.getEditableFontFamily(this.editingNode.font);
   }
 
-  get editingMetrics() {
-    if (!(this.editingFont && this.editingNode)) {
+  get editingPreviewNode() {
+    if (!this.editingNode) {
       return null;
     }
 
-    return measureStraightText(this.editingNode, this.editingFont);
+    if (this.editingNode.type !== "text") {
+      return this.editingNode;
+    }
+
+    return {
+      ...this.editingNode,
+      warp: { kind: "none" },
+    };
+  }
+
+  get editingPreviewGeometry() {
+    if (!(this.editingPreviewNode && this.editingFont)) {
+      return null;
+    }
+
+    const geometry = buildNodeGeometry(this.editingPreviewNode, this.editingFont);
+
+    return {
+      bbox: geometry.bbox,
+      id: this.editingPreviewNode.id,
+      paths: geometry.paths,
+      ready: geometry.ready,
+    };
+  }
+
+  get editingFrame() {
+    if (!this.editingPreviewNode) {
+      return null;
+    }
+
+    return getEditableNodeFrame(
+      this.editingPreviewNode,
+      this.editingPreviewGeometry
+    );
   }
 
   get fontRevision() {
@@ -384,6 +410,37 @@ export class Editor {
     }
 
     return this.geometry.getById(this.nodes, this.fontRevision, nodeId);
+  }
+
+  getNodeFrame(nodeId) {
+    if (!nodeId) {
+      return null;
+    }
+
+    const node = this.getNode(nodeId);
+    if (!node) {
+      return null;
+    }
+
+    return getEditableNodeFrame(node, this.getNodeGeometry(nodeId));
+  }
+
+  getSelectionFrameKey(nodeIds = this.selectedNodeIds) {
+    return nodeIds
+      .map((nodeId) => {
+        const frame = this.getNodeFrame(nodeId);
+
+        if (!frame) {
+          return nodeId;
+        }
+
+        return JSON.stringify({
+          bounds: frame.bounds,
+          nodeId,
+          transform: frame.transform || "",
+        });
+      })
+      .join("|");
   }
 
   getSelectionBounds(nodeIds = this.selectedNodeIds) {
@@ -928,20 +985,12 @@ const getSelectionBounds = (editor, nodeIds) => {
         return renderedBounds;
       }
 
-      const node = editor.getNode(nodeId);
-      const geometry = editor.getNodeGeometry(nodeId);
-      const bbox = geometry?.bbox;
-
-      if (!(node && bbox)) {
+      const frame = editor.getNodeFrame(nodeId);
+      if (!frame) {
         return null;
       }
 
-      return {
-        maxX: getNodeX(node) + bbox.maxX,
-        maxY: getNodeY(node) + bbox.maxY,
-        minX: getNodeX(node) + bbox.minX,
-        minY: getNodeY(node) + bbox.minY,
-      };
+      return frame.bounds;
     })
     .filter(Boolean);
 
