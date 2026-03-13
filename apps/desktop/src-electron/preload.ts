@@ -23,6 +23,30 @@ contextBridge.exposeInMainWorld("electron", {
         ipcRenderer.removeListener("document:open-file", listener);
       };
     },
+    onRecentDocumentsChanged: (callback) => {
+      const listener = () => callback();
+
+      ipcRenderer.on("document:recent-documents-changed", listener);
+
+      return () => {
+        ipcRenderer.removeListener(
+          "document:recent-documents-changed",
+          listener
+        );
+      };
+    },
+    onBeforeClose: (callback) => {
+      const listener = (_event, requestId) => callback(requestId);
+
+      ipcRenderer.on("document:before-close", listener);
+
+      return () => {
+        ipcRenderer.removeListener("document:before-close", listener);
+      };
+    },
+    respondBeforeClose: (requestId, shouldClose) => {
+      ipcRenderer.send("document:close-response", requestId, shouldClose);
+    },
   },
   editorCommands: {
     onCommand: (callback) => {
@@ -43,6 +67,8 @@ contextBridge.exposeInMainWorld("electron", {
     saveSvg: (payload) => ipcRenderer.invoke("document:save-svg", payload),
     getRecentDocuments: () =>
       ipcRenderer.invoke("document:get-recent-documents"),
+    clearRecentDocuments: () =>
+      ipcRenderer.invoke("document:clear-recent-documents"),
   },
   localFonts: {
     listFonts: () => ipcRenderer.invoke("fonts:list"),

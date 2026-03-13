@@ -88,4 +88,22 @@ describe("desktop recent documents", () => {
     expect(openedDocument).toBeNull();
     expect(remainingRecentDocuments).toEqual([]);
   });
+
+  test("clears persisted recent documents", async () => {
+    userDataPath = await createTempDir();
+
+    const existingFilePath = path.join(userDataPath, "existing-clear.punch");
+    await writeFile(existingFilePath, "existing contents", "utf8");
+
+    const { clearRecentDocuments, getRecentDocuments, rememberRecentDocument } =
+      await importRecentDocuments();
+    await rememberRecentDocument(existingFilePath);
+    clearRecentDocumentsMock.mockClear();
+    addRecentDocumentMock.mockClear();
+    await clearRecentDocuments();
+
+    expect(await getRecentDocuments()).toEqual([]);
+    expect(clearRecentDocumentsMock).toHaveBeenCalled();
+    expect(addRecentDocumentMock).not.toHaveBeenCalled();
+  });
 });

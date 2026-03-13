@@ -9,18 +9,19 @@ import {
   shell,
 } from "electron";
 import { registerDocumentFileHandlers } from "./document-files.js";
+import { startAutoUpdater } from "./helpers/app-updater.js";
 import {
   configurePrivilegedStaticAppScheme,
   serveStaticAt,
 } from "./helpers/serve-static-app.js";
 import { registerLocalFontHandlers } from "./local-fonts.js";
 import {
+  clearRecentDocuments,
   type DesktopOpenedDocument,
   getRecentDocuments,
   openDocumentAtPath,
   openRecentDocument,
 } from "./recent-documents.js";
-import { startAutoUpdater } from "./helpers/app-updater.js";
 import { isDev } from "./utils/is-dev.js";
 
 const defaultWindowSize = {
@@ -31,12 +32,19 @@ const defaultWindowSize = {
 };
 
 const DOCUMENT_OPENED_CHANNEL = "document:open-file";
+const DOCUMENT_BEFORE_CLOSE_CHANNEL = "document:before-close";
+const DOCUMENT_CLOSE_RESPONSE_CHANNEL = "document:close-response";
+const DOCUMENT_RECENT_DOCUMENTS_CHANGED_CHANNEL =
+  "document:recent-documents-changed";
 const RENDERER_READY_CHANNEL = "document:renderer-ready";
 const PUNCH_DOCUMENT_EXTENSION = ".punch";
 
 let mainWindow: BrowserWindow | null = null;
+let isMainWindowCloseApproved = false;
 let isMainWindowRendererReady = false;
 let isFlushingPendingOpenDocumentPaths = false;
+let nextCloseRequestId = 0;
+let pendingCloseRequestId: number | null = null;
 
 app.setName("PunchPress");
 app.setPath(
@@ -51,7 +59,7 @@ const getRendererDevUrl = () => {
 };
 
 const sendDocumentCommand = (
-  command: "export" | "open" | "save" | "save-as"
+  command: "export" | "new" | "open" | "save" | "save-as"
 ) => {
   mainWindow?.webContents.send("document:command", command);
 };
@@ -69,16 +77,31 @@ const sendOpenedDocument = (openedDocument: DesktopOpenedDocument) => {
   mainWindow.webContents.send(DOCUMENT_OPENED_CHANNEL, openedDocument);
 };
 
+const notifyRecentDocumentsChanged = () => {
+  if (!(mainWindow && isMainWindowRendererReady)) {
+    return;
+  }
+
+  mainWindow.webContents.send(DOCUMENT_RECENT_DOCUMENTS_CHANGED_CHANNEL);
+};
+
 const openRecentDocumentFromMenu = async (filePath: string) => {
   const openedDocument = await openRecentDocument(filePath);
 
   await installApplicationMenu();
+  notifyRecentDocumentsChanged();
 
   if (!openedDocument) {
     return;
   }
 
   sendOpenedDocument(openedDocument);
+};
+
+const clearRecentDocumentsFromMenu = async () => {
+  await clearRecentDocuments();
+  await installApplicationMenu();
+  notifyRecentDocumentsChanged();
 };
 
 const normalizeOpenDocumentPath = (value: unknown) => {
@@ -140,12 +163,30 @@ const openDocumentFromPath = async (filePath: string) => {
   const openedDocument = await openDocumentAtPath(filePath);
 
   await installApplicationMenu();
+  notifyRecentDocumentsChanged();
 
   if (!openedDocument) {
     return;
   }
 
   sendOpenedDocument(openedDocument);
+};
+
+const requestMainWindowCloseApproval = () => {
+  if (
+    !(mainWindow && isMainWindowRendererReady) ||
+    pendingCloseRequestId !== null
+  ) {
+    return false;
+  }
+
+  nextCloseRequestId += 1;
+  pendingCloseRequestId = nextCloseRequestId;
+  mainWindow.webContents.send(
+    DOCUMENT_BEFORE_CLOSE_CHANNEL,
+    nextCloseRequestId
+  );
+  return true;
 };
 
 const flushPendingOpenDocumentPaths = async () => {
@@ -193,14 +234,36 @@ const buildOpenRecentSubmenu = async (): Promise<
     ];
   }
 
-  return recentDocuments.map((recentDocument) => ({
-    click: () => {
-      openRecentDocumentFromMenu(recentDocument.filePath).catch((error) => {
-        console.error(error);
-      });
+  const duplicateRecentDocumentNames = new Set(
+    recentDocuments
+      .map((recentDocument) => recentDocument.fileName)
+      .filter((fileName, index, fileNames) => {
+        return fileNames.indexOf(fileName) !== index;
+      })
+  );
+
+  return [
+    ...recentDocuments.map((recentDocument) => ({
+      click: () => {
+        openRecentDocumentFromMenu(recentDocument.filePath).catch((error) => {
+          console.error(error);
+        });
+      },
+      label: recentDocument.fileName,
+      sublabel: duplicateRecentDocumentNames.has(recentDocument.fileName)
+        ? path.dirname(recentDocument.filePath)
+        : undefined,
+    })),
+    { type: "separator" },
+    {
+      click: () => {
+        clearRecentDocumentsFromMenu().catch((error) => {
+          console.error(error);
+        });
+      },
+      label: "Clear Recent",
     },
-    label: recentDocument.fileName,
-  }));
+  ];
 };
 
 const installApplicationMenu = async () => {
@@ -225,6 +288,11 @@ const installApplicationMenu = async () => {
     {
       label: "File",
       submenu: [
+        {
+          accelerator: "CmdOrCtrl+N",
+          click: () => sendDocumentCommand("new"),
+          label: "New",
+        },
         {
           accelerator: "CmdOrCtrl+O",
           click: () => sendDocumentCommand("open"),
@@ -323,7 +391,31 @@ const createMainWindow = () => {
 
   nextWindow.on("closed", () => {
     mainWindow = null;
+    isMainWindowCloseApproved = false;
     isMainWindowRendererReady = false;
+    pendingCloseRequestId = null;
+  });
+
+  nextWindow.on("close", (event) => {
+    if (nextWindow !== mainWindow || isMainWindowCloseApproved) {
+      isMainWindowCloseApproved = false;
+      return;
+    }
+
+    if (isDev) {
+      return;
+    }
+
+    if (pendingCloseRequestId !== null) {
+      event.preventDefault();
+      return;
+    }
+
+    event.preventDefault();
+    if (!requestMainWindowCloseApproval()) {
+      isMainWindowCloseApproved = true;
+      nextWindow.close();
+    }
   });
 
   if (isDev) {
@@ -372,6 +464,26 @@ const enqueueOpenDocumentPath = (filePath: string) => {
 const launch = async () => {
   await app.whenReady();
   await installApplicationMenu();
+  ipcMain.on(
+    DOCUMENT_CLOSE_RESPONSE_CHANNEL,
+    (event, requestId, shouldClose) => {
+      if (
+        mainWindow?.webContents !== event.sender ||
+        requestId !== pendingCloseRequestId
+      ) {
+        return;
+      }
+
+      pendingCloseRequestId = null;
+
+      if (!(shouldClose && mainWindow)) {
+        return;
+      }
+
+      isMainWindowCloseApproved = true;
+      mainWindow.close();
+    }
+  );
   ipcMain.on(RENDERER_READY_CHANNEL, (event) => {
     if (mainWindow?.webContents !== event.sender) {
       return;
@@ -385,6 +497,7 @@ const launch = async () => {
       installApplicationMenu().catch((error) => {
         console.error(error);
       });
+      notifyRecentDocumentsChanged();
     },
   });
   registerLocalFontHandlers();

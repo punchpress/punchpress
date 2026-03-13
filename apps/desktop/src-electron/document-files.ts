@@ -2,6 +2,7 @@ import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import {
+  clearRecentDocuments,
   getRecentDocuments,
   openRecentDocument,
   readDocumentAtPath,
@@ -13,6 +14,7 @@ const OPEN_RECENT_DOCUMENT_CHANNEL = "document:open-recent";
 const SAVE_DOCUMENT_CHANNEL = "document:save";
 const SAVE_SVG_CHANNEL = "document:save-svg";
 const GET_RECENT_DOCUMENTS_CHANNEL = "document:get-recent-documents";
+const CLEAR_RECENT_DOCUMENTS_CHANNEL = "document:clear-recent-documents";
 
 const getDialogWindow = () => {
   return BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
@@ -22,16 +24,26 @@ const normalizeFilePath = (value: unknown) => {
   return typeof value === "string" && value.length > 0 ? value : null;
 };
 
-const resolveDefaultSavePath = (defaultFileName: string) => {
+const resolveDefaultSavePath = (
+  defaultFileName: string,
+  directoryPath?: string | null
+) => {
+  const baseDirectory = normalizeFilePath(directoryPath);
+
+  if (baseDirectory) {
+    return path.join(path.dirname(baseDirectory), defaultFileName);
+  }
+
   return path.join(app.getPath("documents"), defaultFileName);
 };
 
 const showSaveDialogForPath = async (
   defaultFileName: string,
-  filters: Array<{ extensions: string[]; name: string }>
+  filters: Array<{ extensions: string[]; name: string }>,
+  directoryPath?: string | null
 ) => {
   const result = await dialog.showSaveDialog(getDialogWindow(), {
-    defaultPath: resolveDefaultSavePath(defaultFileName),
+    defaultPath: resolveDefaultSavePath(defaultFileName, directoryPath),
     filters,
   });
 
@@ -80,18 +92,23 @@ export const registerDocumentFileHandlers = ({
       payload: {
         contents: string;
         defaultFileName: string;
+        directoryPath?: string | null;
         fileHandle?: string | null;
       }
     ) => {
       const existingPath = normalizeFilePath(payload?.fileHandle);
       const targetPath =
         existingPath ||
-        (await showSaveDialogForPath(payload.defaultFileName, [
-          {
-            extensions: ["punch"],
-            name: "PunchPress documents",
-          },
-        ]));
+        (await showSaveDialogForPath(
+          payload.defaultFileName,
+          [
+            {
+              extensions: ["punch"],
+              name: "PunchPress documents",
+            },
+          ],
+          payload?.directoryPath
+        ));
 
       if (!targetPath) {
         return {
@@ -147,7 +164,12 @@ export const registerDocumentFileHandlers = ({
     }
   );
 
-  ipcMain.handle(GET_RECENT_DOCUMENTS_CHANNEL, async () => {
+  ipcMain.handle(GET_RECENT_DOCUMENTS_CHANNEL, () => {
     return getRecentDocuments();
+  });
+
+  ipcMain.handle(CLEAR_RECENT_DOCUMENTS_CHANNEL, async () => {
+    await clearRecentDocuments();
+    onRecentDocumentsChanged?.();
   });
 };

@@ -8,7 +8,9 @@ import {
 import { showToast } from "@/components/ui/toast";
 import { DEFAULT_DOCUMENT_BASE_NAME } from "@/document/constants";
 import { MissingDocumentFontsError } from "@/document/errors";
+import { useElectronIpcEvent } from "@/hooks/use-electron-ipc-event";
 import {
+  clearRecentPunchDocumentFiles,
   getDocumentBaseName,
   getRecentPunchDocumentFiles,
   openPunchDocumentFile,
@@ -19,12 +21,15 @@ import {
   savePunchDocumentFile,
   savePunchSvgFile,
 } from "@/platform/web-document-files";
-import { shouldIgnoreGlobalShortcutTarget } from "../../editor/primitives/dom";
 import type { LocalFontDescriptor } from "../../editor/local-fonts";
+import { shouldIgnoreGlobalShortcutTarget } from "../../editor/primitives/dom";
 import { useEditor } from "../../editor/use-editor";
-import type { UnsavedDocumentChoice } from "./unsaved-document-dialog";
+import type {
+  UnsavedDocumentChoice,
+  UnsavedDocumentReason,
+} from "./unsaved-document-dialog";
 
-type DocumentCommand = "export" | "open" | "save" | "save-as";
+type DocumentCommand = "export" | "new" | "open" | "save" | "save-as";
 
 const getDocumentCommandFromKeyEvent = (event: KeyboardEvent) => {
   if (!(event.metaKey || event.ctrlKey) || event.altKey) {
@@ -35,6 +40,10 @@ const getDocumentCommandFromKeyEvent = (event: KeyboardEvent) => {
 
   if (key === "o") {
     return "open";
+  }
+
+  if (key === "n") {
+    return "new";
   }
 
   if (key === "e") {
@@ -55,6 +64,10 @@ const getDocumentCommandFromKeyEvent = (event: KeyboardEvent) => {
 const getDocumentCommandErrorTitle = (command: DocumentCommand) => {
   if (command === "open") {
     return "Couldn't open file";
+  }
+
+  if (command === "new") {
+    return "Couldn't create document";
   }
 
   if (command === "save" || command === "save-as") {
@@ -82,6 +95,10 @@ const formatFontList = (fonts: LocalFontDescriptor[]) => {
 
 export const useDocumentCommands = () => {
   const editor = useEditor();
+  const electronDocumentCommands =
+    typeof window === "undefined"
+      ? undefined
+      : window.electron?.documentCommands;
   const [documentBaseName, setDocumentBaseName] = useState(
     DEFAULT_DOCUMENT_BASE_NAME
   );
@@ -89,6 +106,8 @@ export const useDocumentCommands = () => {
     useState<PunchDocumentHandle>(null);
   const [isUnsavedDocumentDialogOpen, setIsUnsavedDocumentDialogOpen] =
     useState(false);
+  const [unsavedDocumentReason, setUnsavedDocumentReason] =
+    useState<UnsavedDocumentReason>("replace");
   const [isMissingFontsExportDialogOpen, setIsMissingFontsExportDialogOpen] =
     useState(false);
   const [missingFontsForExport, setMissingFontsForExport] = useState<
@@ -133,10 +152,7 @@ export const useDocumentCommands = () => {
       setDocumentHandle(openedDocument.fileHandle);
       setDocumentBaseName(getDocumentBaseName(openedDocument.fileName));
 
-      if (
-        resolution.missingFonts.length > 0 &&
-        resolution.replacementFont
-      ) {
+      if (resolution.missingFonts.length > 0 && resolution.replacementFont) {
         showToast({
           message: `Replaced missing font${
             resolution.missingFonts.length === 1 ? "" : "s"
@@ -167,7 +183,7 @@ export const useDocumentCommands = () => {
     const result = await savePunchDocumentFile(
       editor.serializeDocument(),
       documentBaseName,
-      forceDialog ? null : documentHandle,
+      documentHandle,
       forceDialog
     );
 
@@ -215,25 +231,57 @@ export const useDocumentCommands = () => {
     }
   );
 
-  const confirmReplacingDirtyDocument = useEffectEvent(async () => {
+  const confirmDirtyDocument = useEffectEvent(
+    async (reason: UnsavedDocumentReason) => {
+      if (!editor.isDirty) {
+        return true;
+      }
+
+      if (pendingUnsavedDocumentChoiceResolverRef.current) {
+        return false;
+      }
+
+      setUnsavedDocumentReason(reason);
+      setIsUnsavedDocumentDialogOpen(true);
+      const choice = await new Promise<UnsavedDocumentChoice>((resolve) => {
+        pendingUnsavedDocumentChoiceResolverRef.current = resolve;
+      });
+
+      if (choice === "save") {
+        return handleSaveDocument();
+      }
+
+      return choice === "discard";
+    }
+  );
+
+  const confirmReplacingDirtyDocument = useEffectEvent(() => {
+    return confirmDirtyDocument("replace");
+  });
+
+  const confirmQuittingDirtyDocument = useEffectEvent(() => {
+    return confirmDirtyDocument("quit");
+  });
+
+  const confirmCreatingNewDirtyDocument = useEffectEvent(() => {
+    return confirmDirtyDocument("new");
+  });
+
+  const handleNewDocument = useEffectEvent(async () => {
     if (!editor.isDirty) {
-      return true;
+      editor.newDocument();
+      setDocumentHandle(null);
+      setDocumentBaseName(DEFAULT_DOCUMENT_BASE_NAME);
+      return;
     }
 
-    if (pendingUnsavedDocumentChoiceResolverRef.current) {
-      return false;
+    if (!(await confirmCreatingNewDirtyDocument())) {
+      return;
     }
 
-    setIsUnsavedDocumentDialogOpen(true);
-    const choice = await new Promise<UnsavedDocumentChoice>((resolve) => {
-      pendingUnsavedDocumentChoiceResolverRef.current = resolve;
-    });
-
-    if (choice === "save") {
-      return handleSaveDocument();
-    }
-
-    return choice === "discard";
+    editor.newDocument();
+    setDocumentHandle(null);
+    setDocumentBaseName(DEFAULT_DOCUMENT_BASE_NAME);
   });
 
   const handleOpenDocument = useEffectEvent(async () => {
@@ -262,6 +310,11 @@ export const useDocumentCommands = () => {
 
   const runDocumentCommand = useEffectEvent(
     async (command: DocumentCommand) => {
+      if (command === "new") {
+        await handleNewDocument();
+        return;
+      }
+
       if (command === "open") {
         await handleOpenDocument();
         return;
@@ -316,6 +369,50 @@ export const useDocumentCommands = () => {
     }
   );
 
+  const clearRecentDocumentsSafely = useEffectEvent(() => {
+    clearRecentPunchDocumentFiles()
+      .then(() => {
+        setRecentDocuments([]);
+      })
+      .catch((error) => {
+        handleActionError("open", error);
+      });
+  });
+  const isDocumentDirty = useEffectEvent(() => editor.isDirty);
+
+  useElectronIpcEvent(electronDocumentCommands?.onCommand, (command) => {
+    runDocumentCommandSafely(command);
+  });
+
+  useElectronIpcEvent(electronDocumentCommands?.onBeforeClose, (requestId) => {
+    confirmQuittingDirtyDocument()
+      .then((shouldClose) => {
+        electronDocumentCommands?.respondBeforeClose(requestId, shouldClose);
+      })
+      .catch((error) => {
+        console.error(error);
+        electronDocumentCommands?.respondBeforeClose(requestId, false);
+      });
+  });
+
+  useElectronIpcEvent(
+    electronDocumentCommands?.onOpenDocument,
+    (openedDocument) => {
+      applyOpenedDocumentSafely(openedDocument).catch((error) => {
+        handleActionError("open", error);
+      });
+    }
+  );
+
+  useElectronIpcEvent(
+    electronDocumentCommands?.onRecentDocumentsChanged,
+    () => {
+      refreshRecentDocuments().catch((error) => {
+        handleActionError("open", error);
+      });
+    }
+  );
+
   useEffect(() => {
     if (window.electron?.documentCommands) {
       return;
@@ -344,29 +441,34 @@ export const useDocumentCommands = () => {
   }, []);
 
   useEffect(() => {
-    const unsubscribeCommand = window.electron?.documentCommands?.onCommand(
-      (command) => {
-        runDocumentCommandSafely(command);
-      }
-    );
-    const unsubscribeOpenDocument =
-      window.electron?.documentCommands?.onOpenDocument((openedDocument) => {
-        applyOpenedDocumentSafely(openedDocument).catch((error) => {
-          handleActionError("open", error);
-        });
-      });
-    window.electron?.documentCommands?.markReady?.();
-
-    return () => {
-      unsubscribeCommand?.();
-      unsubscribeOpenDocument?.();
-    };
-  }, []);
+    electronDocumentCommands?.markReady?.();
+  }, [electronDocumentCommands]);
 
   useEffect(() => {
     refreshRecentDocuments().catch((error) => {
       handleActionError("open", error);
     });
+  }, []);
+
+  useEffect(() => {
+    if (window.electron?.versions) {
+      return;
+    }
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!isDocumentDirty()) {
+        return;
+      }
+
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
   }, []);
 
   useLayoutEffect(() => {
@@ -391,6 +493,7 @@ export const useDocumentCommands = () => {
   }, [isMissingFontsExportDialogOpen, isUnsavedDocumentDialogOpen]);
 
   return {
+    clearRecentDocumentsSafely,
     missingFontsExportDialogProps: {
       missingFonts: missingFontsForExport,
       onOpenChange: setIsMissingFontsExportDialogOpen,
@@ -403,6 +506,7 @@ export const useDocumentCommands = () => {
       onChoice: resolveUnsavedDocumentChoice,
       onOpenChange: handleUnsavedDocumentDialogOpenChange,
       open: isUnsavedDocumentDialogOpen,
+      reason: unsavedDocumentReason,
     },
   };
 };

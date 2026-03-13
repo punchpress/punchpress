@@ -197,4 +197,22 @@ describe("browser recent documents", () => {
       }),
     ]);
   });
+
+  test("clears persisted recent documents", async () => {
+    recentDocumentStore.set(RECENT_DOCUMENTS_KEY, [
+      {
+        fileHandle: new TestFileSystemFileHandle("clear-me.punch"),
+        fileName: "clear-me.punch",
+        id: "clear-me",
+        lastOpenedAt: "2026-03-13T12:00:00.000Z",
+      },
+    ]);
+
+    const { clearBrowserRecentDocuments } =
+      await importBrowserRecentDocuments();
+    const clearedRecentDocuments = await clearBrowserRecentDocuments();
+
+    expect(clearedRecentDocuments).toEqual([]);
+    expect(recentDocumentStore.get(RECENT_DOCUMENTS_KEY)).toEqual([]);
+  });
 });

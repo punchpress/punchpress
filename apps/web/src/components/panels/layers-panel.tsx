@@ -12,6 +12,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import {
   ChevronDownIcon,
   DownloadIcon,
+  FilePlus2Icon,
   FolderOpenIcon,
   SaveIcon,
 } from "lucide-react";
@@ -37,6 +38,8 @@ import { SettingsDialog } from "../settings-dialog";
 import { MissingFontsExportDialog } from "./missing-fonts-export-dialog";
 import { UnsavedDocumentDialog } from "./unsaved-document-dialog";
 import { useDocumentCommands } from "./use-document-commands";
+
+const PATH_SEPARATOR_PATTERN = /[/\\]/;
 
 const LayerGlyph = ({ icon, size = 18, strokeWidth = 1.8 }) => {
   return (
@@ -104,6 +107,53 @@ const LAYER_SHORTCUTS = {
   duplicate: "\u2318J",
   bringToFront: "]",
   sendToBack: "[",
+};
+
+const getDuplicateRecentDocumentNames = (recentDocuments) => {
+  const nameCounts = new Map();
+
+  for (const recentDocument of recentDocuments) {
+    nameCounts.set(
+      recentDocument.fileName,
+      (nameCounts.get(recentDocument.fileName) || 0) + 1
+    );
+  }
+
+  return new Set(
+    [...nameCounts.entries()]
+      .filter(([, count]) => count > 1)
+      .map(([fileName]) => fileName)
+  );
+};
+
+const getRecentDocumentSecondaryLabel = (
+  recentDocument,
+  duplicateNames: Set<string>
+) => {
+  if (!duplicateNames.has(recentDocument.fileName)) {
+    return null;
+  }
+
+  if (recentDocument.filePath) {
+    const segments = recentDocument.filePath.split(PATH_SEPARATOR_PATTERN);
+
+    if (segments.length <= 1) {
+      return recentDocument.filePath;
+    }
+
+    return segments.slice(0, -1).join("/");
+  }
+
+  const openedAt = new Date(recentDocument.lastOpenedAt);
+
+  if (Number.isNaN(openedAt.getTime())) {
+    return "Saved in browser";
+  }
+
+  return `Opened ${openedAt.toLocaleString([], {
+    dateStyle: "medium",
+    timeStyle: "short",
+  })}`;
 };
 
 const getLayerPrimaryButtonClassName = ({
@@ -347,12 +397,15 @@ export const LayersPanel = () => {
   const layerNodeIds = useEditorValue((editor) => editor.layerNodeIds);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const {
+    clearRecentDocumentsSafely,
     missingFontsExportDialogProps,
     openRecentDocumentSafely,
     recentDocuments,
     runDocumentCommandSafely,
     unsavedDocumentDialogProps,
   } = useDocumentCommands();
+  const duplicateRecentDocumentNames =
+    getDuplicateRecentDocumentNames(recentDocuments);
 
   return (
     <>
@@ -394,6 +447,15 @@ export const LayersPanel = () => {
               <MenuGroup>
                 <MenuItem
                   onClick={() => {
+                    runDocumentCommandSafely("new");
+                  }}
+                >
+                  <FilePlus2Icon size={15} />
+                  New
+                  <MenuShortcut>⌘N</MenuShortcut>
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
                     runDocumentCommandSafely("open");
                   }}
                 >
@@ -409,19 +471,46 @@ export const LayersPanel = () => {
                     </MenuSubTrigger>
                     <MenuSubPopup>
                       {recentDocuments.length > 0 ? (
-                        recentDocuments.map((recentDocument) => {
-                          return (
+                        recentDocuments
+                          .map((recentDocument) => {
+                            const secondaryLabel =
+                              getRecentDocumentSecondaryLabel(
+                                recentDocument,
+                                duplicateRecentDocumentNames
+                              );
+
+                            return (
+                              <MenuItem
+                                key={recentDocument.id}
+                                onClick={() => {
+                                  openRecentDocumentSafely(recentDocument);
+                                }}
+                                title={recentDocument.filePath || undefined}
+                              >
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate">
+                                    {recentDocument.fileName}
+                                  </span>
+                                  {secondaryLabel ? (
+                                    <span className="block truncate text-[11px] text-muted-foreground">
+                                      {secondaryLabel}
+                                    </span>
+                                  ) : null}
+                                </span>
+                              </MenuItem>
+                            );
+                          })
+                          .concat([
+                            <MenuSeparator key="recent-documents-separator" />,
                             <MenuItem
-                              key={recentDocument.id}
+                              key="clear-recent-documents"
                               onClick={() => {
-                                openRecentDocumentSafely(recentDocument);
+                                clearRecentDocumentsSafely();
                               }}
-                              title={recentDocument.filePath || undefined}
                             >
-                              {recentDocument.fileName}
-                            </MenuItem>
-                          );
-                        })
+                              Clear Recent
+                            </MenuItem>,
+                          ])
                       ) : (
                         <MenuItem disabled>No Recent Documents</MenuItem>
                       )}

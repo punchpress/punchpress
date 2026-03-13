@@ -6,7 +6,6 @@ import { MissingDocumentFontsError } from "../document/errors";
 import { exportDesignDocument } from "../document/export";
 import { loadDesignDocument } from "../document/load";
 import { saveDesignDocument } from "../document/save";
-import { getEditableNodeFrame } from "./editable-node-frame";
 import {
   getInitialLocalFontCatalog,
   requestLocalFontCatalog,
@@ -17,6 +16,7 @@ import {
   rememberLastUsedFont,
   resolveDefaultFont,
 } from "./default-font";
+import { getEditableNodeFrame } from "./editable-node-frame";
 import {
   applyDocumentChange,
   createDocumentChange,
@@ -226,7 +226,10 @@ export class Editor {
       return null;
     }
 
-    const geometry = buildNodeGeometry(this.editingPreviewNode, this.editingFont);
+    const geometry = buildNodeGeometry(
+      this.editingPreviewNode,
+      this.editingFont
+    );
 
     return {
       bbox: geometry.bbox,
@@ -524,7 +527,10 @@ export class Editor {
 
   async exportDocument() {
     await this.initializeLocalFonts().catch(() => undefined);
-    const missingFonts = getMissingDocumentFonts(this.nodes, this.availableFonts);
+    const missingFonts = getMissingDocumentFonts(
+      this.nodes,
+      this.availableFonts
+    );
 
     if (missingFonts.length > 0) {
       throw new MissingDocumentFontsError(missingFonts);
@@ -804,6 +810,12 @@ export class Editor {
     }
 
     return resolution;
+  }
+
+  newDocument() {
+    this.finishEditingIfNeeded();
+    this.getState().loadNodes([]);
+    this.resetHistory();
   }
 
   registerNodeElement(nodeId, element) {

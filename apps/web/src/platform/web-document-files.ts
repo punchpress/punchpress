@@ -7,6 +7,7 @@ import {
   PUNCH_SVG_MIME_TYPE,
 } from "../document/constants";
 import {
+  clearBrowserRecentDocuments,
   getBrowserRecentDocuments,
   openBrowserRecentDocument,
   rememberBrowserRecentDocument,
@@ -154,6 +155,17 @@ export const getRecentPunchDocumentFiles = () => {
   });
 };
 
+export const clearRecentPunchDocumentFiles = async () => {
+  const desktopDocumentFiles = getDesktopDocumentFiles();
+
+  if (desktopDocumentFiles) {
+    await desktopDocumentFiles.clearRecentDocuments();
+    return [];
+  }
+
+  return clearBrowserRecentDocuments();
+};
+
 export const savePunchDocumentFile = async (
   contents: string,
   baseName = DEFAULT_DOCUMENT_BASE_NAME,
@@ -168,6 +180,7 @@ export const savePunchDocumentFile = async (
     const result = await desktopDocumentFiles.saveDocument({
       contents,
       defaultFileName,
+      directoryPath: typeof existingHandle === "string" ? existingHandle : null,
       fileHandle: typeof nextHandle === "string" ? nextHandle : null,
     });
 
