@@ -505,7 +505,11 @@ export const LayersPanel = () => {
                 );
               })}
             </SortableList>
-          ) : null}
+          ) : (
+            <div className="px-2 py-2.5 text-[13px] text-[var(--designer-text-muted)]">
+              No layers yet.
+            </div>
+          )}
         </div>
       </div>
 
