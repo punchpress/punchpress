@@ -10,19 +10,44 @@ import {
 } from "@/components/ui/dialog";
 
 export type UnsavedDocumentChoice = "cancel" | "discard" | "save";
+export type UnsavedDocumentReason = "new" | "quit" | "replace";
+
+const DIALOG_CONTENT_BY_REASON = {
+  new: {
+    destructiveActionLabel: "Continue Without Saving",
+    description:
+      "Creating a new document will clear your current editor state. Save your work first, continue without saving, or cancel.",
+    title: "Save changes before creating a new document?",
+  },
+  quit: {
+    destructiveActionLabel: "Quit Without Saving",
+    description:
+      "Quitting will close PunchPress and discard your current unsaved changes. Save your work first, discard your changes, or cancel.",
+    title: "Save changes before quitting?",
+  },
+  replace: {
+    destructiveActionLabel: "Discard",
+    description:
+      "Opening another document will replace your current editor state. Save your work first, discard your changes, or cancel.",
+    title: "Save changes before opening?",
+  },
+} as const;
 
 interface UnsavedDocumentDialogProps {
   onChoice: (choice: UnsavedDocumentChoice) => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
+  reason: UnsavedDocumentReason;
 }
 
 export const UnsavedDocumentDialog = ({
   onChoice,
   onOpenChange,
   open,
+  reason,
 }: UnsavedDocumentDialogProps) => {
   const saveButtonRef = useRef<HTMLButtonElement>(null);
+  const dialogContent = DIALOG_CONTENT_BY_REASON[reason];
 
   return (
     <Dialog
@@ -38,11 +63,8 @@ export const UnsavedDocumentDialog = ({
         showCloseButton={false}
       >
         <DialogHeader>
-          <DialogTitle>Save changes before opening?</DialogTitle>
-          <DialogDescription>
-            Opening another document will replace your current editor state.
-            Save your work first, discard your changes, or cancel.
-          </DialogDescription>
+          <DialogTitle>{dialogContent.title}</DialogTitle>
+          <DialogDescription>{dialogContent.description}</DialogDescription>
         </DialogHeader>
         <DialogFooter className="sm:items-center sm:justify-between">
           <Button onClick={() => onChoice("cancel")} variant="ghost">
@@ -53,7 +75,7 @@ export const UnsavedDocumentDialog = ({
               onClick={() => onChoice("discard")}
               variant="destructive-soft"
             >
-              Discard
+              {dialogContent.destructiveActionLabel}
             </Button>
             <Button onClick={() => onChoice("save")} ref={saveButtonRef}>
               Save

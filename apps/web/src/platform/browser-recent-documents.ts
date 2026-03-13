@@ -165,6 +165,11 @@ export const getBrowserRecentDocuments = () => {
   return getRetainedRecentDocumentRecords();
 };
 
+export const clearBrowserRecentDocuments = async () => {
+  await saveRecentDocumentRecords([]);
+  return [];
+};
+
 export const openBrowserRecentDocument = async (
   fileHandle: FileSystemFileHandle,
   fileName: string

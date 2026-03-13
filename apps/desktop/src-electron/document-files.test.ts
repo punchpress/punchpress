@@ -5,6 +5,7 @@ import path from "node:path";
 
 const handlers = new Map<string, (...args: unknown[]) => Promise<unknown>>();
 const recentDocumentsChanged = mock(() => undefined);
+const clearRecentDocumentsMock = mock(async () => undefined);
 const getFocusedWindowMock = mock(() => ({ id: "focused-window" }));
 const getAllWindowsMock = mock(() => [{ id: "fallback-window" }]);
 const showOpenDialogMock = mock(async () => ({
@@ -60,6 +61,7 @@ mock.module("electron", () => ({
 }));
 
 mock.module("./recent-documents.js", () => ({
+  clearRecentDocuments: clearRecentDocumentsMock,
   getRecentDocuments: getRecentDocumentsMock,
   openRecentDocument: openRecentDocumentMock,
   readDocumentAtPath: readDocumentAtPathMock,
@@ -85,6 +87,7 @@ describe("registerDocumentFileHandlers", () => {
     showSaveDialogMock.mockClear();
     handleMock.mockClear();
     getPathMock.mockClear();
+    clearRecentDocumentsMock.mockClear();
     readDocumentAtPathMock.mockClear();
     rememberRecentDocumentMock.mockClear();
     openRecentDocumentMock.mockClear();
@@ -105,6 +108,7 @@ describe("registerDocumentFileHandlers", () => {
     });
 
     expect([...handlers.keys()].sort()).toEqual([
+      "document:clear-recent-documents",
       "document:get-recent-documents",
       "document:open",
       "document:open-recent",
@@ -195,5 +199,40 @@ describe("registerDocumentFileHandlers", () => {
         lastOpenedAt: "2026-03-12T11:00:00.000Z",
       },
     ]);
+  });
+
+  test("clears recent documents through the IPC channel", async () => {
+    const { registerDocumentFileHandlers } = await importDocumentFiles();
+    registerDocumentFileHandlers({
+      onRecentDocumentsChanged: recentDocumentsChanged,
+    });
+
+    await handlers.get("document:clear-recent-documents")?.();
+
+    expect(clearRecentDocumentsMock).toHaveBeenCalledTimes(1);
+    expect(recentDocumentsChanged).toHaveBeenCalledTimes(1);
+  });
+
+  test("uses the current document directory for save as prompts", async () => {
+    tempDir = await createTempDir();
+    const { registerDocumentFileHandlers } = await importDocumentFiles();
+    registerDocumentFileHandlers();
+
+    await handlers.get("document:save")?.(
+      {},
+      {
+        contents: "next document",
+        defaultFileName: "save-as-target.punch",
+        directoryPath: path.join(tempDir, "existing.punch"),
+        fileHandle: null,
+      }
+    );
+
+    expect(showSaveDialogMock).toHaveBeenCalledWith(
+      { id: "focused-window" },
+      expect.objectContaining({
+        defaultPath: path.join(tempDir, "save-as-target.punch"),
+      })
+    );
   });
 });

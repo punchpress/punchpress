@@ -30,11 +30,16 @@ declare global {
       documentCommands?: {
         markReady: () => void;
         onCommand: (
-          callback: (command: "export" | "open" | "save" | "save-as") => void
+          callback: (
+            command: "export" | "new" | "open" | "save" | "save-as"
+          ) => void
         ) => () => void;
         onOpenDocument: (
           callback: (openedDocument: DesktopDocumentFileResult) => void
         ) => () => void;
+        onRecentDocumentsChanged: (callback: () => void) => () => void;
+        onBeforeClose: (callback: (requestId: number) => void) => () => void;
+        respondBeforeClose: (requestId: number, shouldClose: boolean) => void;
       };
       editorCommands?: {
         onCommand: (callback: (command: "redo" | "undo") => void) => () => void;
@@ -46,6 +51,7 @@ declare global {
         ) => Promise<DesktopDocumentFileResult | null>;
         saveDocument: (payload: {
           contents: string;
+          directoryPath?: string | null;
           defaultFileName: string;
           fileHandle?: string | null;
         }) => Promise<DesktopSaveFileResult>;
@@ -54,6 +60,7 @@ declare global {
           defaultFileName: string;
         }) => Promise<DesktopSaveFileResult>;
         getRecentDocuments: () => Promise<DesktopRecentDocument[]>;
+        clearRecentDocuments: () => Promise<void>;
       };
       localFonts?: {
         listFonts: () => Promise<DesktopLocalFont[]>;

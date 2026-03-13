@@ -46,12 +46,20 @@ test.beforeEach(async ({ page }) => {
 
     testWindow.electron = {
       documentCommands: {
+        markReady() {},
         onCommand() {
+          return () => undefined;
+        },
+        onBeforeClose() {
           return () => undefined;
         },
         onOpenDocument() {
           return () => undefined;
         },
+        onRecentDocumentsChanged() {
+          return () => undefined;
+        },
+        respondBeforeClose() {},
       },
       editorCommands: {
         onCommand(callback) {

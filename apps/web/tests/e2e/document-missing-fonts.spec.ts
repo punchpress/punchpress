@@ -126,10 +126,17 @@ test.beforeEach(async ({ page }) => {
             commandListeners.push(callback);
             return () => removeListener(commandListeners, callback);
           },
+          onBeforeClose() {
+            return () => undefined;
+          },
           onOpenDocument(callback) {
             openDocumentListeners.push(callback);
             return () => removeListener(openDocumentListeners, callback);
           },
+          onRecentDocumentsChanged() {
+            return () => undefined;
+          },
+          respondBeforeClose() {},
         },
         documentFiles: {
           getRecentDocuments() {

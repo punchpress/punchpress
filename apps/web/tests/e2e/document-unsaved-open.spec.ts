@@ -83,14 +83,22 @@ test.beforeEach(async ({ page }) => {
 
       testWindow.electron = {
         documentCommands: {
+          markReady() {},
           onCommand(callback) {
             commandListeners.push(callback);
             return () => removeListener(commandListeners, callback);
+          },
+          onBeforeClose() {
+            return () => undefined;
           },
           onOpenDocument(callback) {
             openDocumentListeners.push(callback);
             return () => removeListener(openDocumentListeners, callback);
           },
+          onRecentDocumentsChanged() {
+            return () => undefined;
+          },
+          respondBeforeClose() {},
         },
         documentFiles: {
           getRecentDocuments() {

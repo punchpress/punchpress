@@ -70,7 +70,9 @@ const normalizeRecentDocuments = (value: unknown) => {
     .slice(0, MAX_RECENT_DOCUMENTS);
 };
 
-const syncSystemRecentDocuments = (recentDocuments: DesktopRecentDocument[]) => {
+const syncSystemRecentDocuments = (
+  recentDocuments: DesktopRecentDocument[]
+) => {
   app.clearRecentDocuments();
 
   for (const recentDocument of recentDocuments) {
@@ -147,6 +149,11 @@ export const getRecentDocuments = async () => {
   }
 
   return availableRecentDocuments;
+};
+
+export const clearRecentDocuments = async () => {
+  await writeRecentDocuments([]);
+  return [];
 };
 
 export const readDocumentAtPath = async (
