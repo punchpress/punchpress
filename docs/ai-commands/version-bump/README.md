@@ -97,6 +97,7 @@ Summarize:
 ```bash
 git add CHANGELOG.md apps/desktop/package.json apps/web/package.json bun.lock
 git commit -m "release: vX.Y.Z"
+git tag -a vX.Y.Z -m "release: vX.Y.Z"
 git push origin main --follow-tags
 ```
 
