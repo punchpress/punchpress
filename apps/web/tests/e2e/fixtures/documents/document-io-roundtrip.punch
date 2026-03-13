@@ -1,11 +1,16 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "nodes": [
     {
       "id": "test-node",
       "type": "text",
       "text": "TEST",
-      "fontUrl": "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/bebasneue/BebasNeue-Regular.ttf",
+      "font": {
+        "family": "Arial",
+        "fullName": "Arial",
+        "postscriptName": "ArialMT",
+        "style": "Regular"
+      },
       "transform": {
         "x": 960,
         "y": 720,

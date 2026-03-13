@@ -16,6 +16,14 @@ export interface DesktopSaveFileResult {
   fileName: string | null;
 }
 
+export interface DesktopLocalFont {
+  family: string;
+  fullName: string;
+  id: string;
+  postscriptName: string;
+  style: string;
+}
+
 declare global {
   interface Window {
     electron?: {
@@ -46,6 +54,10 @@ declare global {
           defaultFileName: string;
         }) => Promise<DesktopSaveFileResult>;
         getRecentDocuments: () => Promise<DesktopRecentDocument[]>;
+      };
+      localFonts?: {
+        listFonts: () => Promise<DesktopLocalFont[]>;
+        readFont: (fontId: string) => Promise<ArrayBuffer | Uint8Array | null>;
       };
       versions?: {
         chrome: string;

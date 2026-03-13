@@ -18,3 +18,26 @@ export class UnsupportedDocumentVersionError extends Error {
     this.name = "UnsupportedDocumentVersionError";
   }
 }
+
+export class MissingDocumentFontsError extends Error {
+  missingFonts: Array<{
+    family: string;
+    fullName: string;
+    postscriptName: string;
+    style: string;
+  }>;
+
+  constructor(
+    missingFonts: Array<{
+      family: string;
+      fullName: string;
+      postscriptName: string;
+      style: string;
+    }>
+  ) {
+    const labels = missingFonts.map((font) => font.fullName).join(", ");
+    super(`Missing fonts: ${labels}`);
+    this.name = "MissingDocumentFontsError";
+    this.missingFonts = missingFonts;
+  }
+}

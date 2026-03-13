@@ -1,5 +1,5 @@
 import createStore from "zustand/vanilla";
-import { FALLBACK_FONTS } from "../constants";
+import { createLocalFontDescriptor, DEFAULT_LOCAL_FONT } from "../local-fonts";
 import {
   createDefaultNode,
   createId,
@@ -275,11 +275,11 @@ const moveNodesToBoundaryState = (state, nodeIds, edge) => {
 };
 
 export const createEditorStore = ({
-  fonts = FALLBACK_FONTS,
+  defaultFont = DEFAULT_LOCAL_FONT,
   initialZoom = 1,
 } = {}) => {
-  const resolveDefaultFontUrl = () => {
-    return fonts[0]?.url || FALLBACK_FONTS[0].url;
+  const resolveDefaultFont = () => {
+    return createLocalFontDescriptor(defaultFont);
   };
 
   return createStore((set) => ({
@@ -287,6 +287,8 @@ export const createEditorStore = ({
     editingNodeId: null,
     editingOriginalText: "",
     editingText: "",
+    fontCatalogError: "",
+    fontCatalogState: "loading",
     fontRevision: 0,
     hoveredNodeId: null,
     isHoveringSuppressed: false,
@@ -296,8 +298,8 @@ export const createEditorStore = ({
       zoom: initialZoom,
     },
 
-    addTextNode: (point) => {
-      const node = createDefaultNode(resolveDefaultFontUrl());
+    addTextNode: (point, font) => {
+      const node = createDefaultNode(font || resolveDefaultFont());
 
       if (point) {
         node.transform = {
@@ -322,6 +324,13 @@ export const createEditorStore = ({
     bumpFontRevision: () => {
       set((state) => ({
         fontRevision: state.fontRevision + 1,
+      }));
+    },
+
+    setFontCatalogState: (fontCatalogState, fontCatalogError = "") => {
+      set(() => ({
+        fontCatalogError,
+        fontCatalogState,
       }));
     },
 

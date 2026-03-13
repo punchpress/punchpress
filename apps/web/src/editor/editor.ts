@@ -1,11 +1,26 @@
+import {
+  getMissingDocumentFonts,
+  replaceMissingDocumentFonts,
+} from "../document/document-fonts";
+import { MissingDocumentFontsError } from "../document/errors";
 import { exportDesignDocument } from "../document/export";
 import { loadDesignDocument } from "../document/load";
 import { saveDesignDocument } from "../document/save";
-import { FALLBACK_FONTS, MAX_ZOOM, MIN_ZOOM, UI_ACCENT } from "./constants";
+import {
+  getInitialLocalFontCatalog,
+  requestLocalFontCatalog,
+} from "../platform/local-fonts";
+import { MAX_ZOOM, MIN_ZOOM, UI_ACCENT } from "./constants";
+import {
+  getStoredLastUsedFont,
+  rememberLastUsedFont,
+  resolveDefaultFont,
+} from "./default-font";
 import {
   applyDocumentChange,
   createDocumentChange,
 } from "./history/document-change";
+import { createLocalFontDescriptor, DEFAULT_LOCAL_FONT } from "./local-fonts";
 import {
   DEFAULT_EDITABLE_FONT_FAMILY,
   FontManager,
@@ -25,22 +40,23 @@ import { PointerTool } from "./tools/pointer-tool";
 import { TextTool } from "./tools/text-tool";
 
 export class Editor {
-  constructor({
-    accent = UI_ACCENT,
-    fonts = FALLBACK_FONTS,
-    initialZoom = 1,
-  } = {}) {
+  constructor({ accent = UI_ACCENT, initialZoom = 1 } = {}) {
     this.accent = accent;
-    this.availableFonts = fonts;
-    this.bootstrapError = "";
-    this.bootstrapState = "ready";
+    this.availableFonts = [];
+    this.lastUsedFont = getStoredLastUsedFont();
+    this.defaultFont = createLocalFontDescriptor(
+      this.lastUsedFont || DEFAULT_LOCAL_FONT
+    );
     this.spacePressed = false;
     this.nodeElements = new Map();
     this.viewerRef = null;
     this.hostRef = null;
     this.pendingViewportFocusFrame = null;
     this.viewportFocusRequest = 0;
-    this.store = createEditorStore({ fonts, initialZoom });
+    this.store = createEditorStore({
+      defaultFont: this.defaultFont,
+      initialZoom,
+    });
     this.fonts = new FontManager({
       onChange: () => this.store.getState().bumpFontRevision(),
     });
@@ -52,6 +68,7 @@ export class Editor {
     ]);
     this.unsubscribeEditorCommand = null;
     this.unsubscribe = null;
+    this.localFontCatalogPromise = null;
     this.history = new HistoryManager({
       applyChange: applyDocumentChange,
       applyState: (nodes) => {
@@ -87,6 +104,14 @@ export class Editor {
 
   mount() {
     this.preloadFonts();
+    this.initializeLocalFonts().catch((error) => {
+      this.getState().setFontCatalogState(
+        "error",
+        error instanceof Error
+          ? error.message
+          : "Unable to initialize local fonts."
+      );
+    });
 
     if (!this.unsubscribe) {
       let previousNodes = this.nodes;
@@ -177,7 +202,7 @@ export class Editor {
       return null;
     }
 
-    return this.fonts.getLoadedFont(this.editingNode.fontUrl);
+    return this.fonts.getLoadedFont(this.editingNode.font);
   }
 
   get editingFontFamily() {
@@ -185,7 +210,7 @@ export class Editor {
       return DEFAULT_EDITABLE_FONT_FAMILY;
     }
 
-    return this.fonts.getEditableFontFamily(this.editingNode.fontUrl);
+    return this.fonts.getEditableFontFamily(this.editingNode.font);
   }
 
   get editingMetrics() {
@@ -198,6 +223,24 @@ export class Editor {
 
   get fontRevision() {
     return this.getState().fontRevision;
+  }
+
+  get bootstrapError() {
+    return this.getState().fontCatalogError;
+  }
+
+  get bootstrapState() {
+    const fontCatalogState = this.getState().fontCatalogState;
+
+    if (fontCatalogState === "error") {
+      return "error";
+    }
+
+    if (fontCatalogState === "loading") {
+      return "loading";
+    }
+
+    return "ready";
   }
 
   get geometryById() {
@@ -247,7 +290,61 @@ export class Editor {
   }
 
   preloadFonts(nodes = this.nodes) {
-    this.fonts.preload(this.availableFonts, nodes);
+    this.fonts.preload(nodes);
+  }
+
+  preloadFontOptions(fonts) {
+    for (const font of fonts) {
+      this.fonts.preloadFont(font);
+    }
+  }
+
+  getFontPreviewState(font) {
+    return this.fonts.getLoadState(font);
+  }
+
+  getFontPreviewFamily(font) {
+    return this.fonts.getEditableFontFamily(font);
+  }
+
+  getDefaultFont() {
+    return createLocalFontDescriptor(this.defaultFont);
+  }
+
+  get fontCatalogState() {
+    return this.getState().fontCatalogState;
+  }
+
+  async initializeLocalFonts() {
+    return this.loadLocalFontCatalog(() => getInitialLocalFontCatalog());
+  }
+
+  async requestLocalFonts() {
+    this.getState().setFontCatalogState("loading");
+    return this.loadLocalFontCatalog(() => requestLocalFontCatalog(), {
+      force: true,
+    });
+  }
+
+  setLastUsedFont(font) {
+    const descriptor = createLocalFontDescriptor(font);
+    this.lastUsedFont = descriptor;
+    this.defaultFont = descriptor;
+    rememberLastUsedFont(descriptor);
+  }
+
+  applyLocalFontCatalog(catalog) {
+    this.availableFonts = catalog.fonts;
+
+    const preferredFont = resolveDefaultFont(catalog.fonts, this.lastUsedFont);
+
+    if (preferredFont) {
+      this.defaultFont = createLocalFontDescriptor(preferredFont);
+    }
+
+    this.getState().setFontCatalogState(catalog.state, catalog.error);
+    this.getState().bumpFontRevision();
+    this.preloadFonts();
   }
 
   getNode(nodeId) {
@@ -304,7 +401,7 @@ export class Editor {
   addTextNode(point) {
     this.finishEditingIfNeeded();
     this.beginHistoryTransaction();
-    this.getState().addTextNode(point);
+    this.getState().addTextNode(point, this.getDefaultFont());
   }
 
   cancelEditing() {
@@ -368,8 +465,17 @@ export class Editor {
     });
   }
 
-  exportDocument() {
-    return exportDesignDocument(this.getDocument());
+  async exportDocument() {
+    await this.initializeLocalFonts().catch(() => undefined);
+    const missingFonts = getMissingDocumentFonts(this.nodes, this.availableFonts);
+
+    if (missingFonts.length > 0) {
+      throw new MissingDocumentFontsError(missingFonts);
+    }
+
+    return exportDesignDocument(this.getDocument(), (font) =>
+      this.fonts.loadFontForExport(font)
+    );
   }
 
   finalizeEditing() {
@@ -627,12 +733,20 @@ export class Editor {
 
   loadDocument(contents) {
     const { nodes } = loadDesignDocument(contents);
-    this.getState().loadNodes(nodes);
+    const resolution = replaceMissingDocumentFonts(
+      nodes,
+      this.availableFonts,
+      this.getDefaultFont()
+    );
+
+    this.getState().loadNodes(resolution.nodes);
     this.resetHistory();
 
     if (typeof window !== "undefined") {
-      this.scheduleViewportFocus(nodes.map((node) => node.id));
+      this.scheduleViewportFocus(resolution.nodes.map((node) => node.id));
     }
+
+    return resolution;
   }
 
   registerNodeElement(nodeId, element) {
@@ -785,6 +899,24 @@ export class Editor {
     this.pendingViewportFocusFrame = window.requestAnimationFrame(() => {
       attemptFocus();
     });
+  }
+
+  loadLocalFontCatalog(loadCatalog, { force = false } = {}) {
+    if (!force && this.localFontCatalogPromise) {
+      return this.localFontCatalogPromise;
+    }
+
+    this.localFontCatalogPromise = loadCatalog()
+      .then((catalog) => {
+        this.applyLocalFontCatalog(catalog);
+        return catalog;
+      })
+      .catch((error) => {
+        this.localFontCatalogPromise = null;
+        throw error;
+      });
+
+    return this.localFontCatalogPromise;
   }
 }
 

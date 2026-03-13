@@ -77,8 +77,8 @@ test("loads a document and keeps it round-trippable", async ({ page }) => {
 
   expect(JSON.parse(serialized)).toEqual(JSON.parse(TEST_DOCUMENT));
   expect(exported).toContain("<metadata>");
-  expect(exported).toContain('<punchpress-document version="1.0">');
-  expect(exported).toContain('"version":"1.0"');
+  expect(exported).toContain('<punchpress-document version="1.1">');
+  expect(exported).toContain('"version":"1.1"');
   expect(exported).toContain("TEST");
 });
 
