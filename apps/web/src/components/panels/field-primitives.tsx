@@ -1,7 +1,6 @@
-import { Input } from "@/components/ui/input";
+import { ColorPickerField } from "@/components/ui/color-picker/color-picker-field";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { toSafeHex } from "../../editor/primitives/math";
 
 export const Section = ({ children, className, title }) => {
   return (
@@ -38,21 +37,5 @@ export const PairedRow = ({ action, children, label }) => {
 };
 
 export const ColorField = ({ onChange, value }) => {
-  return (
-    <div className="flex items-center gap-2">
-      <Input
-        className="w-9 min-w-9"
-        nativeInput
-        onChange={(event) => onChange(event.target.value)}
-        type="color"
-        value={toSafeHex(value)}
-      />
-      <Input
-        nativeInput
-        onBlur={(event) => onChange(toSafeHex(event.target.value))}
-        onChange={(event) => onChange(event.target.value)}
-        value={value ?? ""}
-      />
-    </div>
-  );
+  return <ColorPickerField onChange={onChange} value={value} />;
 };
