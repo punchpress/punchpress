@@ -12,12 +12,10 @@ export type DesktopUpdateStatus =
   | { phase: "ready"; version: string | null };
 
 let isUpdaterInitialized = false;
-let updateCheckTimer: ReturnType<typeof setInterval> | null = null;
 let autoUpdaterStatus: DesktopUpdateStatus = { phase: "idle" };
+let requestQuitAndInstallHandler: (() => void) | null = null;
 
-const statusListeners = new Set<
-  (status: DesktopUpdateStatus) => void
->();
+const statusListeners = new Set<(status: DesktopUpdateStatus) => void>();
 
 const setAutoUpdaterStatus = (nextStatus: DesktopUpdateStatus) => {
   autoUpdaterStatus = nextStatus;
@@ -53,13 +51,28 @@ export const onAutoUpdaterStatus = (
   };
 };
 
+export const onRequestQuitAndInstallUpdate = (handler: (() => void) | null) => {
+  requestQuitAndInstallHandler = handler;
+};
+
+export const requestQuitAndInstallUpdate = () => {
+  if (requestQuitAndInstallHandler) {
+    requestQuitAndInstallHandler();
+    return;
+  }
+
+  autoUpdater.quitAndInstall();
+};
+
 export const quitAndInstallUpdate = () => {
   autoUpdater.quitAndInstall();
 };
 
 export const startAutoUpdater = ({
   initialDelayMs = 3000,
-}: { initialDelayMs?: number } = {}) => {
+}: {
+  initialDelayMs?: number;
+} = {}) => {
   if (!app.isPackaged || isUpdaterInitialized) {
     return;
   }
@@ -112,9 +125,9 @@ const initAutoUpdater = () => {
       });
 
       console.info(
-        `Desktop update download ${progress.percent.toFixed(1)}% (${progress.transferred}/${progress.total})`,
+        `Desktop update download ${progress.percent.toFixed(1)}% (${progress.transferred}/${progress.total})`
       );
-    },
+    }
   );
 
   autoUpdater.on(
@@ -137,15 +150,19 @@ const initAutoUpdater = () => {
       });
 
       if (response === 0) {
-        quitAndInstallUpdate();
+        requestQuitAndInstallUpdate();
       }
-    },
+    }
   );
 
-  void checkForUpdates();
+  checkForUpdates().catch((error) => {
+    console.error(error);
+  });
 
-  updateCheckTimer = setInterval(() => {
-    void checkForUpdates();
+  setInterval(() => {
+    checkForUpdates().catch((error) => {
+      console.error(error);
+    });
   }, UPDATE_CHECK_INTERVAL_MS);
 };
 

@@ -7,6 +7,7 @@ const DOCUMENT_RECENT_DOCUMENTS_CHANGED_CHANNEL =
 const RENDERER_READY_CHANNEL = "document:renderer-ready";
 
 const appHandlers = new Map<string, (...args: unknown[]) => void>();
+const ipcInvokeHandlers = new Map<string, (...args: unknown[]) => unknown>();
 const ipcHandlers = new Map<string, (...args: unknown[]) => void>();
 const createdWindows: FakeBrowserWindow[] = [];
 
@@ -106,6 +107,11 @@ const ipcOnMock = mock(
     ipcHandlers.set(channel, handler);
   }
 );
+const ipcHandleMock = mock(
+  (channel: string, handler: (...args: unknown[]) => unknown) => {
+    ipcInvokeHandlers.set(channel, handler);
+  }
+);
 const openDocumentAtPathMock = mock(async (filePath: string) => ({
   contents: `contents:${filePath}`,
   fileHandle: filePath,
@@ -124,6 +130,20 @@ const requestSingleInstanceLockMock = mock(() => requestSingleInstanceLock);
 const serveStaticAtMock = mock(async (_path: string) => undefined);
 const setApplicationMenuMock = mock((_menu: unknown) => undefined);
 const shellOpenExternalMock = mock((_url: string) => undefined);
+const getAutoUpdaterStatusMock = mock(() => ({ phase: "idle" }));
+const onAutoUpdaterStatusMock = mock(
+  (_listener: (status: unknown) => void) => () => undefined
+);
+let requestQuitAndInstallHandler: (() => void) | null = null;
+const onRequestQuitAndInstallUpdateMock = mock(
+  (handler: (() => void) | null) => {
+    requestQuitAndInstallHandler = handler;
+  }
+);
+const quitAndInstallUpdateMock = mock(() => undefined);
+const requestQuitAndInstallUpdateMock = mock(() => {
+  requestQuitAndInstallHandler?.();
+});
 const startAutoUpdaterMock = mock(() => undefined);
 const whenReadyMock = mock(() => whenReadyPromise);
 
@@ -143,6 +163,7 @@ mock.module("electron", () => ({
   },
   BrowserWindow: FakeBrowserWindow,
   ipcMain: {
+    handle: ipcHandleMock,
     on: ipcOnMock,
   },
   Menu: {
@@ -162,6 +183,11 @@ mock.module("./document-files.js", () => ({
 }));
 
 mock.module("./helpers/app-updater.js", () => ({
+  getAutoUpdaterStatus: getAutoUpdaterStatusMock,
+  onRequestQuitAndInstallUpdate: onRequestQuitAndInstallUpdateMock,
+  onAutoUpdaterStatus: onAutoUpdaterStatusMock,
+  quitAndInstallUpdate: quitAndInstallUpdateMock,
+  requestQuitAndInstallUpdate: requestQuitAndInstallUpdateMock,
   startAutoUpdater: startAutoUpdaterMock,
 }));
 
@@ -204,6 +230,7 @@ describe("desktop index bootstrap", () => {
   beforeEach(() => {
     appHandlers.clear();
     ipcHandlers.clear();
+    ipcInvokeHandlers.clear();
     createdWindows.splice(0);
     appReady = true;
     isDev = false;
@@ -222,9 +249,16 @@ describe("desktop index bootstrap", () => {
     getAppPathMock.mockClear();
     getPathMock.mockClear();
     getRecentDocumentsMock.mockClear();
+    getAutoUpdaterStatusMock.mockClear();
     ipcOnMock.mockClear();
+    ipcHandleMock.mockClear();
+    onRequestQuitAndInstallUpdateMock.mockClear();
+    onAutoUpdaterStatusMock.mockClear();
     openDocumentAtPathMock.mockClear();
     openRecentDocumentMock.mockClear();
+    quitAndInstallUpdateMock.mockClear();
+    requestQuitAndInstallHandler = null;
+    requestQuitAndInstallUpdateMock.mockClear();
     registerDocumentFileHandlersMock.mockClear();
     registerLocalFontHandlersMock.mockClear();
     requestSingleInstanceLockMock.mockClear();
@@ -352,5 +386,72 @@ describe("desktop index bootstrap", () => {
     );
 
     expect(mainWindow.close).toHaveBeenCalledTimes(1);
+  });
+
+  test("prevents app quit until the renderer approves and then resumes quitting", async () => {
+    await importDesktopIndex();
+    await flushTasks();
+
+    const mainWindow = createdWindows[0];
+
+    ipcHandlers.get(RENDERER_READY_CHANNEL)?.({
+      sender: mainWindow.webContents,
+    });
+
+    const beforeQuitEvent = {
+      preventDefault: mock(() => undefined),
+    };
+
+    appHandlers.get("before-quit")?.(beforeQuitEvent);
+
+    expect(beforeQuitEvent.preventDefault).toHaveBeenCalledTimes(1);
+    expect(mainWindow.webContents.send).toHaveBeenCalledWith(
+      DOCUMENT_BEFORE_CLOSE_CHANNEL,
+      1
+    );
+    expect(appQuitMock).not.toHaveBeenCalled();
+
+    ipcHandlers.get(DOCUMENT_CLOSE_RESPONSE_CHANNEL)?.(
+      {
+        sender: mainWindow.webContents,
+      },
+      1,
+      true
+    );
+
+    expect(appQuitMock).toHaveBeenCalledTimes(1);
+    expect(mainWindow.close).not.toHaveBeenCalled();
+  });
+
+  test("waits for renderer approval before installing a downloaded update", async () => {
+    await importDesktopIndex();
+    await flushTasks();
+
+    const mainWindow = createdWindows[0];
+
+    ipcHandlers.get(RENDERER_READY_CHANNEL)?.({
+      sender: mainWindow.webContents,
+    });
+
+    const restartUpdater = ipcInvokeHandlers.get("updater:restart-and-install");
+
+    restartUpdater?.();
+
+    expect(mainWindow.webContents.send).toHaveBeenCalledWith(
+      DOCUMENT_BEFORE_CLOSE_CHANNEL,
+      1
+    );
+    expect(quitAndInstallUpdateMock).not.toHaveBeenCalled();
+
+    ipcHandlers.get(DOCUMENT_CLOSE_RESPONSE_CHANNEL)?.(
+      {
+        sender: mainWindow.webContents,
+      },
+      1,
+      true
+    );
+
+    expect(quitAndInstallUpdateMock).toHaveBeenCalledTimes(1);
+    expect(appQuitMock).not.toHaveBeenCalled();
   });
 });
