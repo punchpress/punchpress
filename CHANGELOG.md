@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.2.2 - 2026-03-13
+
+- Fixed mac desktop auto-updates so released builds can detect and download new versions reliably again.
+- Published updater metadata now points at the ZIP feed the app uses for in-place updates, while the DMG remains available for manual installs.
+
 ## v0.2.1 - 2026-03-13
 
 - PunchPress now shows a compact in-app indicator while a desktop update is downloading, so you can see progress without leaving the canvas.
