@@ -8,6 +8,8 @@ import {
 import type { DesktopOpenedDocument } from "./recent-documents.js";
 import { isDev } from "./utils/is-dev.js";
 
+type CloseAction = "quit" | "quit-and-install" | "window";
+
 const defaultWindowSize = {
   width: 1440,
   height: 960,
@@ -24,6 +26,7 @@ export const createMainWindowController = () => {
   let isMainWindowCloseApproved = false;
   let isMainWindowRendererReady = false;
   let nextCloseRequestId = 0;
+  let pendingCloseAction: CloseAction | null = null;
   let pendingCloseRequestId: number | null = null;
 
   const sendToRenderer = (channel: string, payload?: unknown) => {
@@ -48,16 +51,22 @@ export const createMainWindowController = () => {
     mainWindow.focus();
   };
 
-  const requestRendererCloseApproval = () => {
-    if (
-      !(mainWindow && isMainWindowRendererReady) ||
-      pendingCloseRequestId !== null
-    ) {
+  const requestRendererCloseApproval = (closeAction: CloseAction) => {
+    if (!(mainWindow && isMainWindowRendererReady)) {
       return false;
+    }
+
+    if (pendingCloseRequestId !== null) {
+      if (closeAction !== "window") {
+        pendingCloseAction = closeAction;
+      }
+
+      return true;
     }
 
     nextCloseRequestId += 1;
     pendingCloseRequestId = nextCloseRequestId;
+    pendingCloseAction = closeAction;
     mainWindow.webContents.send(
       DOCUMENT_BEFORE_CLOSE_CHANNEL,
       nextCloseRequestId
@@ -126,7 +135,7 @@ export const createMainWindowController = () => {
       }
 
       event.preventDefault();
-      if (!requestRendererCloseApproval()) {
+      if (!requestRendererCloseApproval("window")) {
         isMainWindowCloseApproved = true;
         nextWindow.close();
       }
@@ -153,22 +162,29 @@ export const createMainWindowController = () => {
     event: Electron.IpcMainEvent,
     requestId: number,
     shouldClose: boolean
-  ) => {
+  ): CloseAction | null => {
     if (
       mainWindow?.webContents !== event.sender ||
       requestId !== pendingCloseRequestId
     ) {
-      return;
+      return null;
     }
 
+    const closeAction = pendingCloseAction;
     pendingCloseRequestId = null;
+    pendingCloseAction = null;
 
     if (!(shouldClose && mainWindow)) {
-      return;
+      return null;
     }
 
     isMainWindowCloseApproved = true;
+    if (closeAction === "quit" || closeAction === "quit-and-install") {
+      return closeAction;
+    }
+
     mainWindow.close();
+    return closeAction;
   };
 
   const handleRendererReady = (sender: Electron.WebContents) => {
@@ -188,6 +204,32 @@ export const createMainWindowController = () => {
     sendToRenderer(DOCUMENT_RECENT_DOCUMENTS_CHANGED_CHANNEL);
   };
 
+  const requestAppQuit = () => {
+    if (!(mainWindow && !isMainWindowCloseApproved)) {
+      return false;
+    }
+
+    if (requestRendererCloseApproval("quit")) {
+      return true;
+    }
+
+    isMainWindowCloseApproved = true;
+    return false;
+  };
+
+  const requestUpdateInstallation = () => {
+    if (!(mainWindow && !isMainWindowCloseApproved)) {
+      return false;
+    }
+
+    if (requestRendererCloseApproval("quit-and-install")) {
+      return true;
+    }
+
+    isMainWindowCloseApproved = true;
+    return false;
+  };
+
   return {
     createMainWindow,
     ensureMainWindow,
@@ -196,6 +238,8 @@ export const createMainWindowController = () => {
     handleCloseResponse,
     handleRendererReady,
     isRendererReady: () => isMainWindowRendererReady,
+    requestAppQuit,
+    requestUpdateInstallation,
     sendOpenedDocument,
     sendRecentDocumentsChanged,
     sendToRenderer,

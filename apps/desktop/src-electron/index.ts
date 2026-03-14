@@ -18,7 +18,9 @@ import {
 import {
   getAutoUpdaterStatus,
   onAutoUpdaterStatus,
+  onRequestQuitAndInstallUpdate,
   quitAndInstallUpdate,
+  requestQuitAndInstallUpdate,
   startAutoUpdater,
 } from "./helpers/app-updater.js";
 import {
@@ -85,6 +87,16 @@ documentOpeningController = createDocumentOpeningController({
   isRendererReady: () => mainWindowController.isRendererReady(),
 });
 
+const requestUpdateInstallation = () => {
+  if (mainWindowController.requestUpdateInstallation()) {
+    return;
+  }
+
+  quitAndInstallUpdate();
+};
+
+onRequestQuitAndInstallUpdate(requestUpdateInstallation);
+
 const launch = async () => {
   await app.whenReady();
   await syncApplicationMenu();
@@ -92,7 +104,20 @@ const launch = async () => {
   ipcMain.on(
     DOCUMENT_CLOSE_RESPONSE_CHANNEL,
     (event, requestId, shouldClose) => {
-      mainWindowController.handleCloseResponse(event, requestId, shouldClose);
+      const closeAction = mainWindowController.handleCloseResponse(
+        event,
+        requestId,
+        shouldClose
+      );
+
+      if (closeAction === "quit") {
+        app.quit();
+        return;
+      }
+
+      if (closeAction === "quit-and-install") {
+        quitAndInstallUpdate();
+      }
     }
   );
 
@@ -113,7 +138,7 @@ const launch = async () => {
   });
 
   ipcMain.handle(DESKTOP_UPDATE_RESTART_CHANNEL, () => {
-    quitAndInstallUpdate();
+    requestQuitAndInstallUpdate();
   });
 
   registerDocumentFileHandlers({
@@ -144,6 +169,14 @@ const launch = async () => {
     }
 
     mainWindowController.focusMainWindow();
+  });
+
+  app.on("before-quit", (event) => {
+    if (!mainWindowController.requestAppQuit()) {
+      return;
+    }
+
+    event.preventDefault();
   });
 };
 
