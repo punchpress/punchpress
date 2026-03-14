@@ -51,10 +51,11 @@ bun run publish:desktop
 
 - `build:desktop` signs and notarizes the macOS app when the Apple certificate and `.env` file are present.
 - `build:desktop:unsigned` skips signing and notarization for local packaging checks.
-- `publish:desktop` uploads the DMG and updater metadata to S3 with `electron-builder --publish always`.
+- `publish:desktop` uploads the DMG, ZIP, and updater metadata to S3 with `electron-builder --publish always`.
 
 ## Auto-Update Flow
 
 - Packaged builds check S3 for updates a few seconds after launch.
+- macOS auto-update requires the published ZIP artifact in addition to the DMG. The DMG is for manual installs; `latest-mac.yml` should point to the ZIP.
 - Update checks repeat every 10 minutes while the app is running.
 - When an update finishes downloading, PunchPress prompts the user to restart and install it.

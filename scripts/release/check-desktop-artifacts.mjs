@@ -14,19 +14,21 @@ const main = async () => {
     const version = desktopPackage.version;
     const dmgName = `PunchPress-${version}-arm64.dmg`;
     const blockmapName = `${dmgName}.blockmap`;
+    const zipName = `PunchPress-${version}-arm64-mac.zip`;
     const latestMacPath = path.join(artifactsDir, 'latest-mac.yml');
 
     await assertFileHasContent(path.join(artifactsDir, dmgName), dmgName);
     await assertFileHasContent(path.join(artifactsDir, blockmapName), blockmapName);
+    await assertFileHasContent(path.join(artifactsDir, zipName), zipName);
 
     const latestMac = await readFile(latestMacPath, 'utf8');
     assertContains(latestMac, `version: ${version}`, 'latest-mac.yml missing release version');
-    assertContains(latestMac, `path: ${dmgName}`, 'latest-mac.yml missing dmg path');
-    assertContains(latestMac, `url: ${dmgName}`, 'latest-mac.yml missing dmg url');
+    assertContains(latestMac, `path: ${zipName}`, 'latest-mac.yml missing zip path');
+    assertContains(latestMac, `url: ${zipName}`, 'latest-mac.yml missing zip url');
     assertContains(latestMac, 'sha512:', 'latest-mac.yml missing sha512');
 
     console.log('release:check-desktop-artifacts passed');
-    console.log(`checked files: ${dmgName}, ${blockmapName}, latest-mac.yml`);
+    console.log(`checked files: ${dmgName}, ${blockmapName}, ${zipName}, latest-mac.yml`);
 };
 
 await main();

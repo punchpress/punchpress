@@ -145,11 +145,11 @@ bun run build:desktop
 bun run publish:desktop
 ```
 
-This uploads the DMG, blockmap, and `latest-mac.yml` updater metadata to S3.
+This uploads the DMG, ZIP, blockmap, and `latest-mac.yml` updater metadata to S3.
 
 ## 7. Final Validation
 
-- Confirm `latest-mac.yml` and the DMG exist under `s3://punchpress-electron-app-209596837609-us-east-1-an/mac/`.
+- Confirm `latest-mac.yml`, the DMG, and the ZIP exist under `s3://punchpress-electron-app-209596837609-us-east-1-an/mac/`.
 - Install or update from a prior PunchPress build to verify the auto-updater downloads the new release.
 
 ## Fast Failure Handling

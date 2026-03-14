@@ -123,7 +123,10 @@ Summarize:
 - changelog highlights
 - GitHub Release URL/status
 - files changed
-- whether checks passed
+  - whether checks passed
+
+For macOS updater releases, make sure the publish step includes the ZIP artifact alongside the
+DMG so `latest-mac.yml` can point to the ZIP feed used by `electron-updater`.
 
 ## Editing Rules
 
