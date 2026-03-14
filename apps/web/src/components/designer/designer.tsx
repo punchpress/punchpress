@@ -211,10 +211,15 @@ export const DesignerFloatingToolbar = ({ children, className, ...props }) => {
   );
 };
 
-export const DesignerWindowDragRegion = ({ className, style, ...props }) => {
+export const DesignerWindowDragRegion = ({
+  children,
+  className,
+  style,
+  ...props
+}) => {
   return (
     <div
-      aria-hidden="true"
+      aria-hidden={children ? undefined : true}
       className={cn("absolute top-0 right-0 z-20", className)}
       style={{
         WebkitAppRegion: "drag",
@@ -223,6 +228,8 @@ export const DesignerWindowDragRegion = ({ className, style, ...props }) => {
         ...style,
       }}
       {...props}
-    />
+    >
+      {children}
+    </div>
   );
 };
