@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { gotoEditor, pauseForUi } from "./editor-helpers";
+import { getStateSnapshot, gotoEditor, pauseForUi } from "./editor-helpers";
 
 const helloWorldLayerName = /Hello world/;
 
@@ -15,6 +15,20 @@ test("creates and commits a text layer", async ({ page }) => {
     position: { x: 400, y: 300 },
   });
   await pauseForUi(page);
+
+  await expect
+    .poll(async () => (await getStateSnapshot(page)).activeTool)
+    .toBe("pointer");
+  await expect
+    .poll(async () => (await getStateSnapshot(page)).editingNodeId)
+    .not.toBeNull();
+  await expect
+    .poll(() => {
+      return page
+        .locator(".canvas-surface")
+        .evaluate((element) => window.getComputedStyle(element).cursor);
+    })
+    .not.toBe("crosshair");
 
   const textInput = page.getByTestId("canvas-text-input");
   await textInput.fill("Hello world");

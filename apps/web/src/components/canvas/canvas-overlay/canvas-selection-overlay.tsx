@@ -11,6 +11,7 @@ export const CanvasSelectionOverlay = () => {
   const selectoRef = useRef(null);
 
   const activeTool = useEditorValue((_, state) => state.activeTool);
+  const editingNodeId = useEditorValue((_, state) => state.editingNodeId);
   const spacePressed = useEditorValue((_, state) => state.spacePressed);
   const selectedTargets = useEditorValue((editor, state) => {
     return state.selectedNodeIds
@@ -43,6 +44,7 @@ export const CanvasSelectionOverlay = () => {
       onDragStart={(event) => {
         if (
           spacePressed ||
+          editingNodeId ||
           event.inputEvent.button !== 0 ||
           activeTool !== "pointer" ||
           shouldBlockSelectionStart(event.inputEvent.target) ||
@@ -56,7 +58,7 @@ export const CanvasSelectionOverlay = () => {
         suppressHover();
       }}
       onSelectEnd={(event) => {
-        if (activeTool !== "pointer") {
+        if (activeTool !== "pointer" || editingNodeId) {
           restoreHover();
           return;
         }

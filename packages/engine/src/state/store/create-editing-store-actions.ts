@@ -66,7 +66,7 @@ export const createEditingStoreActions = (set) => {
 
         return withDocumentMutation(state, {
           ...baseState,
-          activeTool: "text",
+          activeTool: "pointer",
           editingNodeId: node.id,
           editingOriginalText: node.text,
           editingText: node.text,
