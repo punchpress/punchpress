@@ -1,7 +1,8 @@
 # Editor Extraction Plan
 
-This document describes the remaining migration work to make Punchpress's
-editor independent from the React app and ready to move to `packages/editor`.
+This document describes the remaining migration work after extracting the
+editor into `packages/engine` and the document layer into
+`packages/punch-schema`.
 
 It is a migration plan, not a product spec.
 
@@ -9,157 +10,94 @@ It is a migration plan, not a product spec.
 
 Punchpress should have:
 
-- an editor engine that does not live inside `apps/web`
-- a React app that renders editor state and forwards GUI intent into editor
+- a headless engine in `packages/engine`
+- a single `.punch` schema/document package in `packages/punch-schema`
+- a React app that renders engine state and forwards GUI intent into engine
   commands
-- editor-contract tests that validate most editor behavior without the browser
-- Playwright tests that stay focused on browser wiring and visual behavior
-- product specs in `docs/specs/` that describe behavior clearly enough for both
-  editor and browser tests to target
+- editor-contract tests that cover most regression risk
+- Playwright tests that stay focused on UI/browser behavior
 
-The intended final home for the engine is `packages/editor`.
-
-## Current Starting Point
+## Current State
 
 We already have:
 
-- a real `Editor` class
-- a structured debug dump
-- the first migrated editor-contract tests under `apps/web/tests/editor-contract`
-- the first resize refactor where the UI keeps the drag session and editor code
-  owns resize execution
+- `packages/engine`
+- `packages/punch-schema`
+- `apps/web/src/editor-react` as the React bridge
+- editor-contract tests running against the extracted engine
+- Playwright still green against the web app
 
-That is enough foundation to continue the migration incrementally.
+The big move is done. The remaining work is boundary cleanup and API
+tightening.
 
-## Main Workstreams
+## Remaining Work
 
-### 1. Finish Separating Editor Behavior From React
+### 1. Keep Platform Concerns Out Of The Engine
 
-Continue moving durable behavior out of React/canvas code and into editor land.
+Do not let `packages/engine` grow new imports from `apps/web` or browser /
+Electron modules.
 
-The rule is:
+Host-specific concerns should stay app-side, including:
 
-- React owns event handling, DOM integration, and drag-session orchestration
-- editor code owns commands, math, invariants, and resulting state updates
+- local font discovery
+- file picker and save flows
+- recent documents
+- persisted UI preferences
+- Electron command bridges
 
-Priority areas:
+### 2. Keep Tightening The Editor/App Split
 
-- remaining transform paths such as move and rotate
-- selection behavior that still depends on React-local derivation
-- any browser bridge helpers that still own editor behavior
+Continue moving durable behavior out of React/canvas helpers and into engine
+modules.
 
-### 2. Make The Editor Command Surface Explicit
+The rule stays:
+
+- React owns DOM integration and gesture wiring
+- the engine owns commands, math, invariants, and resulting state updates
+
+### 3. Keep The Command Surface Explicit
 
 Every meaningful editor behavior should be callable without the GUI.
 
-That means continuing to add editor-side commands for actions such as:
+Tests, CLI workflows, AI integrations, and browser glue should converge on the
+same engine command surface.
 
-- transforms
-- selection changes
-- text edits
-- layer/order changes
-- document load/save/export flows
-
-Tests, CLI workflows, AI integrations, and browser glue should all converge on
-that same command surface.
-
-### 3. Keep The Inspection Surface Stable
+### 4. Keep The Inspection Surface Stable
 
 The debug dump should remain the main structured inspection surface.
 
-As editor behavior expands, keep adding stable, behaviorally meaningful output
-to the dump rather than pushing tests toward ad hoc DOM reads.
+When new behavior matters for tests or automation, prefer extending structured
+inspection over adding ad hoc DOM reads.
 
-When useful, extend the dump with:
+### 5. Keep Tests On The Right Side Of The Boundary
 
-- geometry and bounds facts
-- selection details
-- export summaries
-- warnings and bootstrap state
-
-### 4. Migrate Tests Deliberately
-
-The goal is not to delete Playwright. The goal is to move the right assertions
-to the right layer.
-
-For each meaningful feature:
-
-1. Add or migrate an editor-contract test for editor behavior.
-2. Keep or add a Playwright test only if the browser path itself matters.
-3. Remove broad Playwright coverage that only re-tests editor invariants.
-
-Playwright should stay responsible for:
-
-- pointer and keyboard wiring
-- focus behavior
-- browser-only APIs
-- visual/overlay correctness
-
-Editor-contract tests should absorb:
+Editor-contract tests should cover:
 
 - document behavior
 - transforms and geometry invariants
 - selection invariants
 - export invariants
-- other deterministic editor behavior
+- other deterministic engine behavior
 
-### 5. Fill Missing Editor-Contract Coverage
+Playwright should cover:
 
-As we migrate, add missing editor-contract tests for the highest-risk editor
-behaviors.
+- pointer and keyboard wiring
+- focus behavior
+- browser-only APIs
+- visible overlay / UI behavior
 
-Priority examples:
+### 6. Update Specs As The Surfaces Get Clearer
 
-- move
-- rotate
-- layer/order behavior
-- undo/redo
-- document round-trip and export invariants
-- missing-font handling that belongs in editor land
-
-The standard shape is:
-
-- load a `.punch` fixture or construct state
-- execute editor commands
-- assert through the debug dump or another structured editor output
-
-### 6. Keep Playwright Thin As It Adapts
-
-When a Playwright test currently reaches into browser-only helper code to do
-editor work:
-
-- move the editor work into editor code
-- have Playwright call that editor capability or the real UI path
-- keep the Playwright assertion focused on browser concerns
-
-This is the same pattern we started with the resize refactor.
-
-### 7. Update Specs As We Go
-
-During this migration, update `docs/specs/` whenever behavior is missing,
-unclear, or changes.
-
-Do not let test migration become disconnected from product behavior.
-
-If a feature is important enough to migrate and protect with better tests, it
-is important enough to have a clear product-facing spec.
-
-## Suggested Sequence
-
-1. Continue transform extraction: move, then rotate.
-2. Migrate the next high-signal editor-contract tests from Playwright.
-3. Tighten Playwright coverage so it focuses on GUI/browser concerns.
-4. Finish any remaining React-local editor behavior moves.
-5. Move `apps/web/src/editor` into `packages/editor`.
-6. Update imports so `apps/web` becomes a client of the extracted package.
+When behavior changes or becomes clearer during this migration, update
+`docs/specs/` in the same task.
 
 ## Done Means
 
 This migration is complete when:
 
 - durable editor behavior no longer lives in React files
-- editor-contract tests cover the bulk of editor regression risk
+- `packages/engine` has no app/platform imports
+- `packages/punch-schema` is the single home of `.punch` schema/versioning
+- editor-contract tests cover the bulk of regression risk
 - Playwright is narrow and browser-focused
-- the editor can be imported independently of `apps/web`
-- the code can be moved to `packages/editor` without changing the conceptual
-  boundary
+- the engine can be imported independently of `apps/web`

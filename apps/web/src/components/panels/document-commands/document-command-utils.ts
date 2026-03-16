@@ -1,4 +1,4 @@
-import type { LocalFontDescriptor } from "../../../editor/local-fonts";
+import type { LocalFontDescriptor } from "@punchpress/punch-schema";
 
 export type DocumentCommand = "export" | "new" | "open" | "save" | "save-as";
 

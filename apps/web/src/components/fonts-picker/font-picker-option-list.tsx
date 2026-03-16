@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
 import {
   areLocalFontsEqual,
   type LocalFontOption,
-} from "../../editor/local-fonts";
-import { useEditor } from "../../editor/use-editor";
-import { useEditorValue } from "../../editor/use-editor-value";
+} from "@punchpress/punch-schema";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
+import { useEditor } from "../../editor-react/use-editor";
+import { useEditorValue } from "../../editor-react/use-editor-value";
 
 const LIST_PADDING = 6;
 const MAX_LIST_HEIGHT = 384;

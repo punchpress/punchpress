@@ -1,4 +1,4 @@
-import { isNodeVisible } from "../../../editor/shapes/warp-text/model";
+import { isNodeVisible } from "@punchpress/engine";
 
 export const getTargetClientBounds = (targets) => {
   if (targets.length === 0) {

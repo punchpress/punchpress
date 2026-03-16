@@ -1,5 +1,4 @@
-import { getResizeCorner } from "../../../editor/primitives/group-resize";
-import { clamp } from "../../../editor/primitives/math";
+import { clamp, getResizeCorner } from "@punchpress/engine";
 
 const getRectCenter = (rect) => {
   return {

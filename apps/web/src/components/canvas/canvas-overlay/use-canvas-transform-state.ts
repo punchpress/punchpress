@@ -1,5 +1,5 @@
-import { isNodeVisible } from "../../../editor/shapes/warp-text/model";
-import { useEditorValue } from "../../../editor/use-editor-value";
+import { isNodeVisible } from "@punchpress/engine";
+import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { getHostRectFromCanvasBounds } from "./canvas-overlay-geometry";
 import { getTransformFlags } from "./canvas-overlay-interactions";
 

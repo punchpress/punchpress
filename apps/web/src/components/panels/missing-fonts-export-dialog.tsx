@@ -1,3 +1,4 @@
+import type { LocalFontDescriptor } from "@punchpress/punch-schema";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -8,7 +9,6 @@ import {
   DialogPopup,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { LocalFontDescriptor } from "../../editor/local-fonts";
 
 interface MissingFontsExportDialogProps {
   missingFonts: LocalFontDescriptor[];
@@ -31,8 +31,8 @@ export const MissingFontsExportDialog = ({
         <DialogHeader>
           <DialogTitle>Can&apos;t export while fonts are missing</DialogTitle>
           <DialogDescription>
-            Install the missing font or choose another font before exporting this
-            document.
+            Install the missing font or choose another font before exporting
+            this document.
           </DialogDescription>
         </DialogHeader>
         <DialogPanel className="pt-0">

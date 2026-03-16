@@ -1,12 +1,12 @@
-import { cn } from "@/lib/utils";
 import {
+  estimateBounds,
   getNodeCssTransform,
   getNodeX,
   getNodeY,
-} from "../../editor/shapes/warp-text/model";
-import { estimateBounds } from "../../editor/shapes/warp-text/warp-layout";
-import { useEditor } from "../../editor/use-editor";
-import { useEditorValue } from "../../editor/use-editor-value";
+} from "@punchpress/engine";
+import { cn } from "@/lib/utils";
+import { useEditor } from "../../editor-react/use-editor";
+import { useEditorValue } from "../../editor-react/use-editor-value";
 
 export const CanvasNode = ({ nodeId }) => {
   const editor = useEditor();

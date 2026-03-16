@@ -1,3 +1,13 @@
+import {
+  getDefaultWarp,
+  getNodeX,
+  getNodeY,
+  toNumber,
+} from "@punchpress/engine";
+import {
+  createLocalFontDescriptor,
+  createLocalFontOption,
+} from "@punchpress/punch-schema";
 import { LinkIcon } from "lucide-react";
 import { FontPicker } from "@/components/fonts-picker/font-picker";
 import { Button } from "@/components/ui/button";
@@ -10,18 +20,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
-import {
-  createLocalFontDescriptor,
-  createLocalFontOption,
-} from "../../editor/local-fonts";
-import { toNumber } from "../../editor/primitives/math";
-import {
-  getDefaultWarp,
-  getNodeX,
-  getNodeY,
-} from "../../editor/shapes/warp-text/model";
-import { useEditor } from "../../editor/use-editor";
-import { useEditorValue } from "../../editor/use-editor-value";
+import { useEditor } from "../../editor-react/use-editor";
+import { useEditorValue } from "../../editor-react/use-editor-value";
 import { ColorField, FieldRow, PairedRow, Section } from "./field-primitives";
 import { NodeFieldsWarpInputs } from "./warp-text-warp-fields";
 

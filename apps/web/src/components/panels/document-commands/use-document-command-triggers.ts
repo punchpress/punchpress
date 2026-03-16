@@ -1,7 +1,7 @@
+import { shouldIgnoreGlobalShortcutTarget } from "@punchpress/engine";
 import { useEffect, useEffectEvent } from "react";
 import { useElectronIpcEvent } from "@/hooks/use-electron-ipc-event";
 import type { PunchOpenedDocumentFile } from "@/platform/web-document-files";
-import { shouldIgnoreGlobalShortcutTarget } from "../../../editor/primitives/dom";
 import type { DocumentCommand } from "./document-command-utils";
 import { getDocumentCommandFromKeyEvent } from "./document-command-utils";
 

@@ -1,6 +1,6 @@
-import { createLocalFontDescriptor } from "../editor/local-fonts";
 import { PUNCH_DOCUMENT_VERSION } from "./constants";
 import { UnsupportedDocumentVersionError } from "./errors";
+import { createLocalFontDescriptor } from "./local-fonts";
 
 const FILE_EXTENSION_RE = /\.[a-z0-9]+$/i;
 const SEPARATOR_RE = /[-_]+/g;

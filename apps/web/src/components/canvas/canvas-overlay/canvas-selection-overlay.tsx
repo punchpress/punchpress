@@ -1,8 +1,8 @@
+import { isNodeVisible } from "@punchpress/engine";
 import { useLayoutEffect, useRef } from "react";
 import Selecto from "react-selecto";
-import { isNodeVisible } from "../../../editor/shapes/warp-text/model";
-import { useEditor } from "../../../editor/use-editor";
-import { useEditorValue } from "../../../editor/use-editor-value";
+import { useEditor } from "../../../editor-react/use-editor";
+import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { getNodeIdsFromSelectionRect } from "./canvas-overlay-geometry";
 import { shouldBlockSelectionStart } from "./canvas-overlay-interactions";
 

@@ -14,8 +14,8 @@ import {
   ToolbarGroup,
   ToolbarSeparator,
 } from "@/components/ui/toolbar";
-import { useEditor } from "../../editor/use-editor";
-import { useEditorValue } from "../../editor/use-editor-value";
+import { useEditor } from "../../editor-react/use-editor";
+import { useEditorValue } from "../../editor-react/use-editor-value";
 
 const TOOL_CONFIG = [
   {

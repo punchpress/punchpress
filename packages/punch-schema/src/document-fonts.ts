@@ -3,12 +3,12 @@ import {
   getLocalFontId,
   type LocalFontDescriptor,
   type LocalFontOption,
-} from "../editor/local-fonts";
+} from "./local-fonts";
 
-type DocumentNode = {
+interface DocumentNode {
   font: LocalFontDescriptor;
   id: string;
-};
+}
 
 const getAvailableFontsById = (
   fonts: readonly (LocalFontDescriptor | LocalFontOption)[]

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { SortableList } from "@/components/ui/sortable-list";
-import { useEditor } from "../../../editor/use-editor";
-import { useEditorValue } from "../../../editor/use-editor-value";
+import { useEditor } from "../../../editor-react/use-editor";
+import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { SettingsDialog } from "../../settings-dialog";
 import { useDocumentCommands } from "../document-commands/use-document-commands";
 import { MissingFontsExportDialog } from "../missing-fonts-export-dialog";

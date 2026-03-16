@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { MissingDocumentFontsError } from "../../src/document/errors";
-import { Editor } from "../../src/editor/editor";
+import { Editor } from "@punchpress/engine";
+import { MissingDocumentFontsError } from "@punchpress/punch-schema";
 
 const AVAILABLE_FONT = {
   family: "Arial",

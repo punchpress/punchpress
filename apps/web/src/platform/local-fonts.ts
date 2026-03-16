@@ -4,7 +4,7 @@ import {
   type LocalFontCatalogResult,
   type LocalFontDescriptor,
   type LocalFontOption,
-} from "../editor/local-fonts";
+} from "@punchpress/punch-schema";
 
 interface BrowserLocalFontData {
   blob: () => Promise<Blob>;
