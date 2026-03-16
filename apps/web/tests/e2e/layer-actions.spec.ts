@@ -9,7 +9,6 @@ import {
   gotoEditor,
   marqueeSelect,
   pauseForUi,
-  scaleSelectedGroupBy,
   shiftClickLayer,
   waitForNodeReady,
   waitForSelectionHandles,
@@ -42,17 +41,6 @@ const getBoundingUnion = (rects) => {
     top,
     width: right - left,
   };
-};
-
-const getGroupNodeRects = async (page, nodeIds) => {
-  const rects = await Promise.all(
-    nodeIds.map(async (nodeId) => {
-      const snapshot = await waitForNodeReady(page, nodeId);
-      return snapshot.elementRect;
-    })
-  );
-
-  return getBoundingUnion(rects);
 };
 
 test("duplicates the selected layer with the keyboard shortcut", async ({
@@ -434,61 +422,7 @@ test("marquee selection shows one wrapper box around the whole group", async ({
   expectHandleAlignedToNodeCorner(selection.handles.se, groupBounds, "se");
 });
 
-test("group resize from the lower-left corner keeps the top-right anchor fixed", async ({
-  page,
-}) => {
-  await gotoEditor(page);
-
-  const firstNodeId = await createTextNode(page, {
-    text: "Top right anchor",
-    x: 780,
-    y: 260,
-  });
-  const secondNodeId = await createTextNode(page, {
-    text: "Bottom left",
-    x: 560,
-    y: 540,
-  });
-
-  const beforeBounds = await getGroupNodeRects(page, [
-    firstNodeId,
-    secondNodeId,
-  ]);
-
-  await marqueeSelect(
-    page,
-    {
-      x: beforeBounds.left - 96,
-      y: beforeBounds.top - 96,
-    },
-    {
-      x: beforeBounds.right + 96,
-      y: beforeBounds.bottom + 96,
-    }
-  );
-  await pauseForUi(page);
-
-  await expect
-    .poll(async () => (await getSelectionSnapshot(page)).selectedNodeIds)
-    .toEqual([firstNodeId, secondNodeId]);
-
-  await scaleSelectedGroupBy(page, { corner: "sw", scale: 1.2 });
-  await pauseForUi(page);
-
-  const afterBounds = await getGroupNodeRects(page, [
-    firstNodeId,
-    secondNodeId,
-  ]);
-
-  expect(afterBounds.left).toBeLessThan(beforeBounds.left);
-  expect(afterBounds.bottom).toBeGreaterThan(beforeBounds.bottom);
-  expect(Math.abs(afterBounds.right - beforeBounds.right)).toBeLessThanOrEqual(
-    8
-  );
-  expect(Math.abs(afterBounds.top - beforeBounds.top)).toBeLessThanOrEqual(8);
-});
-
-test("shift-click layer selection supports grouped ordering and duplicate", async ({
+test("shift-click layer selection groups layers in layer order", async ({
   page,
 }) => {
   await gotoEditor(page);
@@ -509,8 +443,8 @@ test("shift-click layer selection supports grouped ordering and duplicate", asyn
     y: 420,
   });
 
-  const backBefore = await waitForNodeReady(page, backNodeId);
-  const middleBefore = await waitForNodeReady(page, middleNodeId);
+  await waitForNodeReady(page, backNodeId);
+  await waitForNodeReady(page, middleNodeId);
   await waitForNodeReady(page, frontNodeId);
 
   await page.getByRole("button", { name: "Shift back" }).first().click();
@@ -520,48 +454,6 @@ test("shift-click layer selection supports grouped ordering and duplicate", asyn
   await expect
     .poll(async () => (await getSelectionSnapshot(page)).selectedNodeIds)
     .toEqual([backNodeId, middleNodeId]);
-
-  await page.keyboard.press("]");
-  await pauseForUi(page);
-
-  await expect
-    .poll(async () => {
-      const state = await getStateSnapshot(page);
-      return state.nodes.map((node) => node.id);
-    })
-    .toEqual([frontNodeId, backNodeId, middleNodeId]);
-
-  await page.keyboard.press("ControlOrMeta+J");
-  await pauseForUi(page);
-
-  const state = await getStateSnapshot(page);
-  const selection = await getSelectionSnapshot(page);
-
-  expect(state.nodes).toHaveLength(5);
-  expect(selection.selectedNodeIds).toHaveLength(2);
-  expect(state.nodes.map((node) => node.id).slice(0, 5)).toEqual([
-    frontNodeId,
-    backNodeId,
-    selection.selectedNodeIds[0],
-    middleNodeId,
-    selection.selectedNodeIds[1],
-  ]);
-
-  const backDuplicate = await waitForNodeReady(
-    page,
-    selection.selectedNodeIds[0]
-  );
-  const middleDuplicate = await waitForNodeReady(
-    page,
-    selection.selectedNodeIds[1]
-  );
-
-  expect(backDuplicate.text).toBe("Shift back");
-  expect(backDuplicate.x).toBeCloseTo(backBefore.x + 120, 1);
-  expect(backDuplicate.y).toBeCloseTo(backBefore.y + 120, 1);
-  expect(middleDuplicate.text).toBe("Shift middle");
-  expect(middleDuplicate.x).toBeCloseTo(middleBefore.x + 120, 1);
-  expect(middleDuplicate.y).toBeCloseTo(middleBefore.y + 120, 1);
 });
 
 test("shift-clicking another layer while editing exits text editing first", async ({

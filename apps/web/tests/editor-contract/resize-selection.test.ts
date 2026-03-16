@@ -49,7 +49,58 @@ describe("Editor.resizeSelectionFromCorner", () => {
     expect(fixedCornerAfter.x).toBeCloseTo(fixedCornerBefore.x, 1);
     expect(fixedCornerAfter.y).toBeCloseTo(fixedCornerBefore.y, 1);
   });
+
+  test("keeps the opposite group anchor fixed when resizing from the lower-left corner", () => {
+    const editor = new Editor();
+    editor.applyLocalFontCatalog({
+      error: "",
+      fonts: [{ ...ARIAL_FONT, id: "arialmt" }],
+      state: "ready",
+    });
+
+    const firstNodeId = createTextNode(editor, {
+      text: "Top right anchor",
+      x: 780,
+      y: 260,
+    });
+    const secondNodeId = createTextNode(editor, {
+      text: "Bottom left",
+      x: 560,
+      y: 540,
+    });
+
+    editor.setSelectedNodes([firstNodeId, secondNodeId]);
+
+    const beforeDump = editor.getDebugDump();
+    const beforeBounds = beforeDump.selection.bounds;
+
+    const resizedNodeIds = editor.resizeSelectionFromCorner({
+      corner: "sw",
+      scale: 1.2,
+    });
+
+    const afterDump = editor.getDebugDump();
+    const afterBounds = afterDump.selection.bounds;
+
+    expect(resizedNodeIds).toEqual([firstNodeId, secondNodeId]);
+    expect(afterBounds?.minX).toBeLessThan(beforeBounds?.minX ?? 0);
+    expect(afterBounds?.maxY).toBeGreaterThan(beforeBounds?.maxY ?? 0);
+    expect(afterBounds?.maxX).toBeCloseTo(beforeBounds?.maxX ?? 0, 1);
+    expect(afterBounds?.minY).toBeCloseTo(beforeBounds?.minY ?? 0, 1);
+  });
 });
+
+const createTextNode = (editor, { text, x, y }) => {
+  editor.addTextNode({ x, y });
+  editor.setEditingText(text);
+  editor.finalizeEditing();
+
+  if (!editor.selectedNodeId) {
+    throw new Error("Expected a selected node after creating text");
+  }
+
+  return editor.selectedNodeId;
+};
 
 const getDebugNode = (dump, nodeId) => {
   const node = dump.nodes.find((item) => item.id === nodeId);
