@@ -98,17 +98,6 @@ export const createTextNode = (page, options) => {
       window as Window & {
         __PUNCHPRESS_E2E__: {
           createTextNode: (options?: Record<string, unknown>) => string;
-          scaleSelectedNodeBy: (options?: { scale?: number }) => string | null;
-          scaleSelectedGroupBy: (options?: {
-            corner?: "ne" | "nw" | "se" | "sw";
-            scale?: number;
-          }) => string[];
-          setSelectedFont: (font: {
-            family: string;
-            fullName: string;
-            postscriptName: string;
-            style: string;
-          }) => string | null;
         };
       }
     ).__PUNCHPRESS_E2E__.createTextNode(nextOptions);
@@ -116,27 +105,49 @@ export const createTextNode = (page, options) => {
 };
 
 export const getNodeSnapshot = (page, nodeId) => {
-  return page.evaluate((nextNodeId) => {
-    return (
-      window as Window & {
-        __PUNCHPRESS_E2E__?: {
-          getNodeSnapshot: (nodeId: string) => Record<string, unknown> | null;
-        };
-      }
-    ).__PUNCHPRESS_E2E__?.getNodeSnapshot(nextNodeId);
-  }, nodeId);
+  return getDebugDump(page).then((dump) => {
+    const node = dump?.nodes?.find((item) => item.id === nodeId);
+
+    if (!node) {
+      return null;
+    }
+
+    return {
+      bbox: node.geometry?.bbox || null,
+      elementRect: node.elementRect || null,
+      fontSize: node.fontSize,
+      id: node.id,
+      ready: Boolean(node.geometry?.ready),
+      rotation: node.rotation || 0,
+      strokeWidth: node.strokeWidth,
+      text: node.text,
+      tracking: node.tracking,
+      x: node.transform?.x || 0,
+      y: node.transform?.y || 0,
+    };
+  });
 };
 
-export const getSelectionSnapshot = (page) => {
+export const getDebugDump = (page) => {
   return page.evaluate(() => {
     return (
       window as Window & {
         __PUNCHPRESS_E2E__?: {
-          getSelectionSnapshot: () => Record<string, unknown>;
+          getDebugDump: () => Record<string, unknown>;
         };
       }
-    ).__PUNCHPRESS_E2E__?.getSelectionSnapshot();
+    ).__PUNCHPRESS_E2E__?.getDebugDump();
   });
+};
+
+export const getSelectionSnapshot = (page) => {
+  return getDebugDump(page).then((dump) => ({
+    handles: dump?.selection?.handleRects || {},
+    isMoveableMuted: Boolean(dump?.selection?.moveableMuted),
+    selectedNodeIds: dump?.selection?.ids || [],
+    selectedNodeId: dump?.selection?.primaryId || null,
+    zoom: dump?.viewport?.zoom || 1,
+  }));
 };
 
 export const panViewportBy = (page, delta) => {
@@ -152,15 +163,30 @@ export const panViewportBy = (page, delta) => {
 };
 
 export const getStateSnapshot = (page) => {
-  return page.evaluate(() => {
-    return (
-      window as Window & {
-        __PUNCHPRESS_E2E__?: {
-          getStateSnapshot: () => Record<string, unknown>;
-        };
-      }
-    ).__PUNCHPRESS_E2E__?.getStateSnapshot();
-  });
+  return getDebugDump(page).then((dump) => ({
+    activeTool: dump?.tool || "pointer",
+    editingNodeId: dump?.editing?.nodeId || null,
+    nodes:
+      dump?.nodes?.map((node) => ({
+        fill: node.fill,
+        fontSize: node.fontSize,
+        font: node.font,
+        id: node.id,
+        rotation: node.rotation || 0,
+        stroke: node.stroke,
+        strokeWidth: node.strokeWidth,
+        text: node.text,
+        tracking: node.tracking,
+        type: node.type,
+        visible: node.visible,
+        warp: node.warp,
+        x: node.transform?.x || 0,
+        y: node.transform?.y || 0,
+      })) || [],
+    selectedNodeIds: dump?.selection?.ids || [],
+    selectedNodeId: dump?.selection?.primaryId || null,
+    zoom: dump?.viewport?.zoom || 1,
+  }));
 };
 
 export const getCanvasNodeIds = (page) => {
@@ -181,18 +207,6 @@ export const loadDocument = (page, contents) => {
       }
     ).__PUNCHPRESS_E2E__?.loadDocument(nextContents);
   }, contents);
-};
-
-export const scaleSelectedNodeBy = (page, options) => {
-  return page.evaluate((nextOptions) => {
-    return (
-      window as Window & {
-        __PUNCHPRESS_E2E__?: {
-          scaleSelectedNodeBy: (options?: { scale?: number }) => string | null;
-        };
-      }
-    ).__PUNCHPRESS_E2E__?.scaleSelectedNodeBy(nextOptions);
-  }, options);
 };
 
 export const serializeDocument = (page) => {
@@ -217,21 +231,6 @@ export const exportDocument = (page) => {
       }
     ).__PUNCHPRESS_E2E__?.exportDocument();
   });
-};
-
-export const scaleSelectedGroupBy = (page, options) => {
-  return page.evaluate((nextOptions) => {
-    return (
-      window as Window & {
-        __PUNCHPRESS_E2E__?: {
-          scaleSelectedGroupBy: (options?: {
-            corner?: "ne" | "nw" | "se" | "sw";
-            scale?: number;
-          }) => string[];
-        };
-      }
-    ).__PUNCHPRESS_E2E__?.scaleSelectedGroupBy(nextOptions);
-  }, options);
 };
 
 export const setSelectedText = (page, text) => {
@@ -270,9 +269,9 @@ const getHandleCenter = (handle) => {
   };
 };
 
-const dragSelectionFromCorner = async (
+const dragFromSelectionCorner = async (
   page,
-  { corner = "nw", drag = { x: 120, y: 80 }, offset = 20, release = true } = {}
+  { corner = "nw", drag = { x: 120, y: 80 }, offset = 0, release = true } = {}
 ) => {
   const selection = await waitForSelectionHandles(page);
   const handle = selection.handles[corner];
@@ -302,14 +301,48 @@ const dragSelectionFromCorner = async (
   return { end, start };
 };
 
+export const resizeSelectionFromCorner = async (page, options) => {
+  const corner = options?.corner || "se";
+  const drag = options?.drag || { x: 120, y: 80 };
+  const handle = page.locator(
+    `.canvas-moveable .moveable-control.moveable-${corner}`
+  );
+
+  await expect(handle).toBeVisible();
+
+  const box = await handle.boundingBox();
+
+  if (!box) {
+    throw new Error(`Missing ${corner} resize handle`);
+  }
+
+  const start = {
+    x: box.x + box.width / 2,
+    y: box.y + box.height / 2,
+  };
+  const end = {
+    x: start.x + drag.x,
+    y: start.y + drag.y,
+  };
+
+  await handle.hover();
+  await page.mouse.down();
+  await page.mouse.move(end.x, end.y, { steps: 24 });
+  await page.mouse.up();
+};
+
 export const rotateSelectionFromCorner = async (page, options) => {
-  await dragSelectionFromCorner(page, options);
+  await dragFromSelectionCorner(page, options);
 };
 
 export const rotateSelectionFromCornerWithoutRelease = (page, options) => {
   // Rotation starts just outside the visible corner handle.
   // The corner itself remains the resize affordance.
-  return dragSelectionFromCorner(page, { ...options, release: false });
+  return dragFromSelectionCorner(page, {
+    ...options,
+    offset: options?.offset ?? 20,
+    release: false,
+  });
 };
 
 export const getGroupRotationPreviewRect = async (page) => {

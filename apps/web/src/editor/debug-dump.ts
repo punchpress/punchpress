@@ -55,6 +55,9 @@ export const getEditorDebugDump = (editor) => {
       frameKey: editor.getSelectionFrameKey(state.selectedNodeIds),
       handleRects: getSelectionHandleRects(editor),
       ids: [...state.selectedNodeIds],
+      moveableMuted: Boolean(
+        editor.hostRef?.classList.contains("canvas-overlay-moveable-muted")
+      ),
       primaryId: editor.selectedNodeId,
     },
     tool: state.activeTool,

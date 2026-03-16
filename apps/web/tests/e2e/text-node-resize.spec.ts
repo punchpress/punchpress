@@ -5,7 +5,7 @@ import {
   getSelectionSnapshot,
   gotoEditor,
   pauseForUi,
-  scaleSelectedNodeBy,
+  resizeSelectionFromCorner,
   waitForNodeReady,
   waitForSelectionHandles,
   zoomIn,
@@ -25,7 +25,10 @@ test("resizes a text node and keeps the selection aligned through zoom", async (
   const before = await waitForNodeReady(page, nodeId);
   await pauseForUi(page);
 
-  await scaleSelectedNodeBy(page, { scale: 1.25 });
+  await resizeSelectionFromCorner(page, {
+    corner: "se",
+    drag: { x: 56, y: 56 },
+  });
   await pauseForUi(page);
 
   await expect

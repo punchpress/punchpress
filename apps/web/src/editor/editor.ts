@@ -501,6 +501,26 @@ export class Editor {
     setEditorEditingText(this, value);
   }
 
+  setSelectedText(text) {
+    if (!this.selectedNode) {
+      return null;
+    }
+
+    updateEditorSelectedNode(this, { text });
+    return this.selectedNodeId;
+  }
+
+  setSelectedFont(font) {
+    if (!this.selectedNode) {
+      return null;
+    }
+
+    updateEditorSelectedNode(this, {
+      font: createLocalFontDescriptor(font),
+    });
+    return this.selectedNodeId;
+  }
+
   setNodeOrder(nodeIds) {
     setEditorNodeOrder(this, nodeIds);
   }
