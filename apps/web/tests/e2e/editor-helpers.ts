@@ -98,15 +98,11 @@ export const createTextNode = (page, options) => {
       window as Window & {
         __PUNCHPRESS_E2E__: {
           createTextNode: (options?: Record<string, unknown>) => string;
-          moveSelectedNodeBy: (delta?: {
-            x?: number;
-            y?: number;
-          }) => string | null;
+          scaleSelectedNodeBy: (options?: { scale?: number }) => string | null;
           scaleSelectedGroupBy: (options?: {
             corner?: "ne" | "nw" | "se" | "sw";
             scale?: number;
           }) => string[];
-          scaleSelectedNodeBy: (options?: { scale?: number }) => string | null;
           setSelectedFont: (font: {
             family: string;
             fullName: string;
@@ -185,21 +181,6 @@ export const loadDocument = (page, contents) => {
       }
     ).__PUNCHPRESS_E2E__?.loadDocument(nextContents);
   }, contents);
-};
-
-export const moveSelectedNodeBy = (page, delta) => {
-  return page.evaluate((nextDelta) => {
-    return (
-      window as Window & {
-        __PUNCHPRESS_E2E__?: {
-          moveSelectedNodeBy: (delta?: {
-            x?: number;
-            y?: number;
-          }) => string | null;
-        };
-      }
-    ).__PUNCHPRESS_E2E__?.moveSelectedNodeBy(nextDelta);
-  }, delta);
 };
 
 export const scaleSelectedNodeBy = (page, options) => {

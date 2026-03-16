@@ -1,10 +1,10 @@
 import { test } from "@playwright/test";
 import {
   createTextNode,
+  dragNodeBy,
   expectCoordinateShift,
   expectRectShift,
   gotoEditor,
-  moveSelectedNodeBy,
   pauseForUi,
   waitForNodeReady,
 } from "./editor-helpers";
@@ -21,7 +21,7 @@ test("moves a text node around the canvas", async ({ page }) => {
   const before = await waitForNodeReady(page, nodeId);
   await pauseForUi(page);
 
-  await moveSelectedNodeBy(page, { x: 140, y: 80 });
+  await dragNodeBy(page, nodeId, { x: 140, y: 80 });
   await pauseForUi(page);
 
   const after = await waitForNodeReady(page, nodeId);

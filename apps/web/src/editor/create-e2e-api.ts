@@ -169,19 +169,6 @@ export const createEditorE2eApi = (editor) => {
       editor.loadDocument(contents);
       return editor.selectedNodeId;
     },
-    moveSelectedNodeBy: ({ x = 0, y = 0 } = {}) => {
-      const movedNodeIds = editor.moveSelectedNodesBy({
-        queueRefresh: true,
-        x,
-        y,
-      });
-
-      if (movedNodeIds.length === 0) {
-        return null;
-      }
-
-      return editor.selectedNodeId;
-    },
     serializeDocument: () => {
       return editor.serializeDocument();
     },

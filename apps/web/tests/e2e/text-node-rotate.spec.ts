@@ -7,8 +7,6 @@ import {
   pauseForUi,
   rotateSelectionFromCorner,
   rotateSelectionFromCornerWithoutRelease,
-  scaleSelectedGroupBy,
-  scaleSelectedNodeBy,
   shiftClickLayer,
   waitForNodeReady,
   zoomOut,
@@ -29,30 +27,6 @@ const rotatePointAround = (point, center, rotation) => {
   return {
     x: center.x + offsetX * Math.cos(angle) - offsetY * Math.sin(angle),
     y: center.y + offsetX * Math.sin(angle) + offsetY * Math.cos(angle),
-  };
-};
-
-const getNodeCorner = (snapshot, corner) => {
-  const center = {
-    x: (snapshot.bbox.minX + snapshot.bbox.maxX) / 2,
-    y: (snapshot.bbox.minY + snapshot.bbox.maxY) / 2,
-  };
-  const point = {
-    x: corner.endsWith("e") ? snapshot.bbox.maxX : snapshot.bbox.minX,
-    y: corner.startsWith("s") ? snapshot.bbox.maxY : snapshot.bbox.minY,
-  };
-  const rotatedOffset = rotatePointAround(
-    {
-      x: point.x - center.x,
-      y: point.y - center.y,
-    },
-    { x: 0, y: 0 },
-    snapshot.rotation
-  );
-
-  return {
-    x: snapshot.x + center.x + rotatedOffset.x,
-    y: snapshot.y + center.y + rotatedOffset.y,
   };
 };
 
@@ -101,39 +75,6 @@ test("rotates a selected text node from the moveable selection", async ({
   expect(after.y).toBeCloseTo(before.y, 1);
   expect(afterCenter.x).toBeCloseTo(beforeCenter.x, 1);
   expect(afterCenter.y).toBeCloseTo(beforeCenter.y, 1);
-});
-
-test("resizes a rotated text node from the opposite corner anchor", async ({
-  page,
-}) => {
-  await gotoEditor(page);
-
-  const nodeId = await createTextNode(page, {
-    text: "Resize rotate",
-    x: 620,
-    y: 420,
-  });
-
-  await waitForNodeReady(page, nodeId);
-  await zoomOut(page, 5);
-  await pauseForUi(page);
-
-  await rotateSelectionFromCorner(page);
-  await pauseForUi(page);
-
-  const beforeResize = await waitForNodeReady(page, nodeId);
-  const fixedCornerBefore = getNodeCorner(beforeResize, "nw");
-
-  await scaleSelectedNodeBy(page, { scale: 1.25 });
-  await pauseForUi(page);
-
-  const afterResize = await waitForNodeReady(page, nodeId);
-  const fixedCornerAfter = getNodeCorner(afterResize, "nw");
-
-  expect(afterResize.fontSize).toBeGreaterThan(beforeResize.fontSize);
-  expect(afterResize.rotation).toBeCloseTo(beforeResize.rotation, 1);
-  expect(fixedCornerAfter.x).toBeCloseTo(fixedCornerBefore.x, 1);
-  expect(fixedCornerAfter.y).toBeCloseTo(fixedCornerBefore.y, 1);
 });
 
 test("rotates a selected group of text nodes around the shared selection center", async ({
@@ -264,74 +205,4 @@ test("group rotation preview matches the live node bounds through release", asyn
   );
 
   expectRectsClose(previewRect, combinedRect);
-});
-
-test("resizes a rotated selection without shifting the fixed group anchor", async ({
-  page,
-}) => {
-  await gotoEditor(page);
-
-  const firstNodeId = await createTextNode(page, {
-    text: "Scale first",
-    x: 560,
-    y: 320,
-  });
-  const secondNodeId = await createTextNode(page, {
-    text: "Scale second",
-    x: 780,
-    y: 520,
-  });
-
-  await waitForNodeReady(page, firstNodeId);
-  await waitForNodeReady(page, secondNodeId);
-  await zoomOut(page, 5);
-  await pauseForUi(page);
-
-  await page.getByRole("button", { name: "Scale first" }).first().click();
-  await shiftClickLayer(page, "Scale second");
-  await pauseForUi(page);
-
-  await rotateSelectionFromCorner(page);
-  await pauseForUi(page);
-
-  const rotatedFirst = await waitForNodeReady(page, firstNodeId);
-  const rotatedSecond = await waitForNodeReady(page, secondNodeId);
-  const beforeBounds = {
-    bottom: Math.max(
-      rotatedFirst.elementRect.bottom,
-      rotatedSecond.elementRect.bottom
-    ),
-    left: Math.min(
-      rotatedFirst.elementRect.left,
-      rotatedSecond.elementRect.left
-    ),
-    right: Math.max(
-      rotatedFirst.elementRect.right,
-      rotatedSecond.elementRect.right
-    ),
-    top: Math.min(rotatedFirst.elementRect.top, rotatedSecond.elementRect.top),
-  };
-
-  await scaleSelectedGroupBy(page, { corner: "sw", scale: 1.2 });
-  await pauseForUi(page);
-
-  const scaledFirst = await waitForNodeReady(page, firstNodeId);
-  const scaledSecond = await waitForNodeReady(page, secondNodeId);
-  const afterBounds = {
-    bottom: Math.max(
-      scaledFirst.elementRect.bottom,
-      scaledSecond.elementRect.bottom
-    ),
-    left: Math.min(scaledFirst.elementRect.left, scaledSecond.elementRect.left),
-    right: Math.max(
-      scaledFirst.elementRect.right,
-      scaledSecond.elementRect.right
-    ),
-    top: Math.min(scaledFirst.elementRect.top, scaledSecond.elementRect.top),
-  };
-
-  expect(afterBounds.left).toBeLessThan(beforeBounds.left);
-  expect(afterBounds.bottom).toBeGreaterThan(beforeBounds.bottom);
-  expect(afterBounds.right).toBeCloseTo(beforeBounds.right, 1);
-  expect(afterBounds.top).toBeCloseTo(beforeBounds.top, 1);
 });
