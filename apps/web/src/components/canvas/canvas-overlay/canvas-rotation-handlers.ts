@@ -19,7 +19,7 @@ export const getCanvasRotationHandlers = ({
         return;
       }
 
-      editor.updateRotateNode(event.datas.rotateSession, {
+      editor.updateRotateSelection(event.datas.rotateSession, {
         deltaRotation: event.beforeDist,
       });
     },
@@ -37,7 +37,7 @@ export const getCanvasRotationHandlers = ({
         return;
       }
 
-      editor.updateRotateGroup(rotateSession, {
+      editor.updateRotateSelection(rotateSession, {
         deltaRotation: event.beforeDist,
       });
     },
@@ -59,7 +59,7 @@ export const getCanvasRotationHandlers = ({
       });
     },
     onRotateGroupStart: (event) => {
-      const rotateSession = editor.beginRotateGroup({
+      const rotateSession = editor.beginRotateSelection({
         nodeIds: visibleSelectedNodeIds,
       });
 
@@ -80,7 +80,7 @@ export const getCanvasRotationHandlers = ({
     },
     onRotateStart: (event) => {
       const rotateSession = selectedNode
-        ? editor.beginRotateNode({ nodeId: selectedNode.id })
+        ? editor.beginRotateSelection({ nodeId: selectedNode.id })
         : null;
 
       if (!rotateSession) {

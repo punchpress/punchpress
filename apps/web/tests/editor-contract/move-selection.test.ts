@@ -8,7 +8,7 @@ const ARIAL_FONT = {
   style: "Regular",
 } as const;
 
-describe("Editor.moveSelectedNodesBy", () => {
+describe("Editor.moveSelectionBy", () => {
   test("moves a selected text node and its frame by the requested delta", () => {
     const editor = new Editor();
     editor.applyLocalFontCatalog({
@@ -29,7 +29,7 @@ describe("Editor.moveSelectedNodesBy", () => {
     const beforeDump = editor.getDebugDump();
     const beforeNode = getDebugNode(beforeDump, nodeId);
 
-    const movedNodeIds = editor.moveSelectedNodesBy({ x: 140, y: 80 });
+    const movedNodeIds = editor.moveSelectionBy({ x: 140, y: 80 });
 
     const afterDump = editor.getDebugDump();
     const afterNode = getDebugNode(afterDump, nodeId);

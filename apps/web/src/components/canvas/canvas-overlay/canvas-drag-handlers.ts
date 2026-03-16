@@ -16,14 +16,14 @@ export const getCanvasDragHandlers = ({
       }
 
       setMoveableMuted(hostElement, true);
-      editor.updateMoveNode(event.datas.moveSession, {
+      editor.updateMoveSelection(event.datas.moveSession, {
         left: event.left,
         top: event.top,
       });
     },
     onDragEnd: (event) => {
       if (event.datas.moveSession && event.lastEvent) {
-        editor.updateMoveNode(event.datas.moveSession, {
+        editor.updateMoveSelection(event.datas.moveSession, {
           left: event.lastEvent.left,
           top: event.lastEvent.top,
         });
@@ -43,7 +43,7 @@ export const getCanvasDragHandlers = ({
       }
 
       setMoveableMuted(hostElement, true);
-      editor.updateMoveGroup(moveSession, {
+      editor.updateMoveSelection(moveSession, {
         dragEvents: event.events,
       });
     },
@@ -55,7 +55,7 @@ export const getCanvasDragHandlers = ({
         .filter(Boolean);
 
       if (moveSession && lastEvents.length > 0) {
-        editor.updateMoveGroup(moveSession, {
+        editor.updateMoveSelection(moveSession, {
           dragEvents: lastEvents,
         });
       }
@@ -66,7 +66,7 @@ export const getCanvasDragHandlers = ({
       queueRefresh();
     },
     onDragGroupStart: (event) => {
-      const moveSession = editor.beginMoveGroup({
+      const moveSession = editor.beginMoveSelection({
         nodeIds: visibleSelectedNodeIds,
       });
 
@@ -84,7 +84,7 @@ export const getCanvasDragHandlers = ({
     },
     onDragStart: (event) => {
       const moveSession = selectedNode
-        ? editor.beginMoveNode({ nodeId: selectedNode.id })
+        ? editor.beginMoveSelection({ nodeId: selectedNode.id })
         : null;
 
       if (!moveSession) {

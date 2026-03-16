@@ -87,27 +87,20 @@ import { HandTool } from "./tools/hand-tool";
 import { PointerTool } from "./tools/pointer-tool";
 import { TextTool } from "./tools/text-tool";
 import {
-  beginMoveGroup as beginEditorMoveGroup,
-  beginMoveNode as beginEditorMoveNode,
-  moveSelectedNodesBy as moveEditorSelectedNodesBy,
-  updateMoveGroup as updateEditorMoveGroup,
-  updateMoveNode as updateEditorMoveNode,
+  beginMoveSelection as beginEditorMoveSelection,
+  moveSelectionBy as moveEditorSelectionBy,
+  updateMoveSelection as updateEditorMoveSelection,
 } from "./transform/move-selection";
 import {
-  beginRotateGroup as beginEditorRotateGroup,
-  beginRotateNode as beginEditorRotateNode,
-  rotateSelectionBy as rotateEditorSelectionBy,
-  updateRotateGroup as updateEditorRotateGroup,
-  updateRotateNode as updateEditorRotateNode,
-} from "./transform/rotate-selection";
+  beginResizeSelection as beginEditorResizeSelection,
+  resizeSelectionFromCorner as resizeEditorSelectionFromCorner,
+  updateResizeSelection as updateEditorResizeSelection,
+} from "./transform/resize-selection";
 import {
-  createGroupResizeSession as createEditorGroupResizeSession,
-  createNodeResizeSession as createEditorNodeResizeSession,
-  scaleSelectedGroupFromCorner as scaleEditorSelectedGroupFromCorner,
-  scaleSelectedNodeFromCorner as scaleEditorSelectedNodeFromCorner,
-  updateGroupResizeSession as updateEditorGroupResizeSession,
-  updateNodeResizeSession as updateEditorNodeResizeSession,
-} from "./transform/scale-selection";
+  beginRotateSelection as beginEditorRotateSelection,
+  rotateSelectionBy as rotateEditorSelectionBy,
+  updateRotateSelection as updateEditorRotateSelection,
+} from "./transform/rotate-selection";
 import {
   cancelPendingViewportFocus as cancelEditorPendingViewportFocus,
   scheduleViewportFocus as scheduleEditorViewportFocus,
@@ -522,68 +515,40 @@ export class Editor {
     this.getState().setViewportZoom(zoom);
   }
 
-  moveSelectedNodesBy(options) {
-    return moveEditorSelectedNodesBy(this, options);
+  moveSelectionBy(options) {
+    return moveEditorSelectionBy(this, options);
   }
 
-  scaleSelectedNodeFromCorner(options) {
-    return scaleEditorSelectedNodeFromCorner(this, options);
-  }
-
-  scaleSelectedGroupFromCorner(options) {
-    return scaleEditorSelectedGroupFromCorner(this, options);
+  resizeSelectionFromCorner(options) {
+    return resizeEditorSelectionFromCorner(this, options);
   }
 
   rotateSelectionBy(options) {
     return rotateEditorSelectionBy(this, options);
   }
 
-  createNodeResizeSession(options) {
-    return createEditorNodeResizeSession(this, options);
+  beginResizeSelection(options) {
+    return beginEditorResizeSelection(this, options);
   }
 
-  updateNodeResizeSession(session, options) {
-    return updateEditorNodeResizeSession(this, session, options);
+  updateResizeSelection(session, options) {
+    return updateEditorResizeSelection(this, session, options);
   }
 
-  beginMoveNode(options) {
-    return beginEditorMoveNode(this, options);
+  beginMoveSelection(options) {
+    return beginEditorMoveSelection(this, options);
   }
 
-  updateMoveNode(session, options) {
-    return updateEditorMoveNode(this, session, options);
+  updateMoveSelection(session, options) {
+    return updateEditorMoveSelection(this, session, options);
   }
 
-  beginMoveGroup(options) {
-    return beginEditorMoveGroup(this, options);
+  beginRotateSelection(options) {
+    return beginEditorRotateSelection(this, options);
   }
 
-  updateMoveGroup(session, options) {
-    return updateEditorMoveGroup(this, session, options);
-  }
-
-  beginRotateNode(options) {
-    return beginEditorRotateNode(this, options);
-  }
-
-  updateRotateNode(session, options) {
-    return updateEditorRotateNode(this, session, options);
-  }
-
-  beginRotateGroup(options) {
-    return beginEditorRotateGroup(this, options);
-  }
-
-  updateRotateGroup(session, options) {
-    return updateEditorRotateGroup(this, session, options);
-  }
-
-  createGroupResizeSession(options) {
-    return createEditorGroupResizeSession(this, options);
-  }
-
-  updateGroupResizeSession(session, options) {
-    return updateEditorGroupResizeSession(this, session, options);
+  updateRotateSelection(session, options) {
+    return updateEditorRotateSelection(this, session, options);
   }
 
   toggleNodeVisibility(nodeId) {

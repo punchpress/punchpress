@@ -14,7 +14,7 @@ const SCALED_TEXT_DOCUMENT = readFileSync(
   "utf8"
 );
 
-describe("Editor.scaleSelectedNodeFromCorner", () => {
+describe("Editor.resizeSelectionFromCorner", () => {
   test("keeps the opposite corner anchored for a loaded scaled node", () => {
     const editor = new Editor();
     editor.applyLocalFontCatalog({
@@ -29,12 +29,12 @@ describe("Editor.scaleSelectedNodeFromCorner", () => {
     const beforeNode = getDebugNode(beforeDump, "scaled-node");
     const fixedCornerBefore = getNodeCorner(beforeNode, "nw");
 
-    const resizeSession = editor.createNodeResizeSession({
+    const resizeSession = editor.beginResizeSelection({
       anchorCanvas: fixedCornerBefore,
       direction: [1, 1],
       nodeId: "scaled-node",
     });
-    const resizedNodeId = editor.updateNodeResizeSession(resizeSession, {
+    const resizedNodeIds = editor.updateResizeSelection(resizeSession, {
       scale: 1.2,
     });
 
@@ -42,7 +42,7 @@ describe("Editor.scaleSelectedNodeFromCorner", () => {
     const afterNode = getDebugNode(afterDump, "scaled-node");
     const fixedCornerAfter = getNodeCorner(afterNode, "nw");
 
-    expect(resizedNodeId).toBe("scaled-node");
+    expect(resizedNodeIds).toEqual(["scaled-node"]);
     expect(afterDump.selection.primaryId).toBe("scaled-node");
     expect(afterNode.fontSize).toBeGreaterThan(beforeNode.fontSize);
     expect(afterNode.transform.rotation).toBe(beforeNode.transform.rotation);

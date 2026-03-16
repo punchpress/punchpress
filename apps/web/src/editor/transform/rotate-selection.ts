@@ -26,79 +26,31 @@ const queueOverlayRefresh = (editor) => {
   });
 };
 
-export const beginRotateNode = (editor, { nodeId } = {}) => {
-  const rotatedNode = editor.getNode(nodeId || editor.selectedNode?.id);
-  const bbox =
-    editor.getNodeGeometry(rotatedNode?.id)?.bbox ||
-    (rotatedNode ? estimateBounds(rotatedNode) : null);
-
-  if (!(rotatedNode && bbox)) {
-    return null;
-  }
-
-  return {
-    baseBBox: { ...bbox },
-    baseNode: { ...rotatedNode },
-    nodeId: rotatedNode.id,
-    selectionCenter: getNodeRotationCenter(rotatedNode, bbox),
-  };
-};
-
-export const updateRotateNode = (
-  editor,
-  session,
-  { deltaRotation = 0, queueRefresh = false } = {}
-) => {
-  if (!(session && Number.isFinite(deltaRotation))) {
-    return null;
-  }
-
-  editor.updateNode(
-    session.nodeId,
-    getRotatedNodeUpdate(
-      session.baseNode,
-      session.baseBBox,
-      session.selectionCenter,
-      deltaRotation
-    )
-  );
-
-  if (queueRefresh) {
-    queueOverlayRefresh(editor);
-  }
-
-  return session.nodeId;
-};
-
-export const beginRotateGroup = (editor, { nodeIds } = {}) => {
-  const rotatedNodeIds =
-    nodeIds?.filter((nodeId) => editor.getNode(nodeId)) ||
+export const beginRotateSelection = (editor, { nodeId, nodeIds } = {}) => {
+  const resolvedNodeIds =
+    nodeIds?.filter((currentNodeId) => editor.getNode(currentNodeId)) ||
+    (nodeId
+      ? [nodeId].filter((currentNodeId) => editor.getNode(currentNodeId))
+      : null) ||
     editor.selectedNodeIds;
 
-  if (rotatedNodeIds.length === 0) {
-    return null;
-  }
-
-  const selectionBounds = editor.getSelectionBounds(rotatedNodeIds);
-  const selectionCenter = getBoundsCenter(selectionBounds);
-
-  if (!selectionCenter) {
+  if (resolvedNodeIds.length === 0) {
     return null;
   }
 
   const baseNodes = new Map();
 
-  for (const nodeId of rotatedNodeIds) {
-    const rotatedNode = editor.getNode(nodeId);
+  for (const currentNodeId of resolvedNodeIds) {
+    const rotatedNode = editor.getNode(currentNodeId);
     const bbox =
-      editor.getNodeGeometry(nodeId)?.bbox ||
+      editor.getNodeGeometry(currentNodeId)?.bbox ||
       (rotatedNode ? estimateBounds(rotatedNode) : null);
 
     if (!(rotatedNode && bbox)) {
       continue;
     }
 
-    baseNodes.set(nodeId, {
+    baseNodes.set(currentNodeId, {
       bbox: { ...bbox },
       ...rotatedNode,
     });
@@ -108,14 +60,26 @@ export const beginRotateGroup = (editor, { nodeIds } = {}) => {
     return null;
   }
 
+  const selectionCenter =
+    resolvedNodeIds.length === 1
+      ? getNodeRotationCenter(
+          baseNodes.get(resolvedNodeIds[0]),
+          baseNodes.get(resolvedNodeIds[0]).bbox
+        )
+      : getBoundsCenter(editor.getSelectionBounds(resolvedNodeIds));
+
+  if (!selectionCenter) {
+    return null;
+  }
+
   return {
     baseNodes,
-    nodeIds: [...rotatedNodeIds],
+    nodeIds: [...resolvedNodeIds],
     selectionCenter,
   };
 };
 
-export const updateRotateGroup = (
+export const updateRotateSelection = (
   editor,
   session,
   { deltaRotation = 0, queueRefresh = false } = {}
@@ -154,23 +118,11 @@ export const rotateSelectionBy = (
     return [];
   }
 
-  if (editor.selectedNodeIds.length === 1) {
-    const rotateSession = beginRotateNode(editor, {
-      nodeId: editor.selectedNodeIds[0],
-    });
-    const rotatedNodeId = updateRotateNode(editor, rotateSession, {
-      deltaRotation,
-      queueRefresh,
-    });
-
-    return rotatedNodeId ? [rotatedNodeId] : [];
-  }
-
-  const rotateSession = beginRotateGroup(editor, {
+  const rotateSession = beginRotateSelection(editor, {
     nodeIds: editor.selectedNodeIds,
   });
 
-  return updateRotateGroup(editor, rotateSession, {
+  return updateRotateSelection(editor, rotateSession, {
     deltaRotation,
     queueRefresh,
   });

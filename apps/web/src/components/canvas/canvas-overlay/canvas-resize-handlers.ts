@@ -25,7 +25,7 @@ export const getCanvasResizeHandlers = ({
         return;
       }
 
-      editor.updateNodeResizeSession(event.datas.resizeSession, {
+      editor.updateResizeSelection(event.datas.resizeSession, {
         scale: resizeScale,
       });
     },
@@ -45,7 +45,7 @@ export const getCanvasResizeHandlers = ({
         return;
       }
 
-      editor.updateGroupResizeSession(event.datas.resizeSession, {
+      editor.updateResizeSelection(event.datas.resizeSession, {
         scale: resizeScale,
       });
     },
@@ -67,7 +67,7 @@ export const getCanvasResizeHandlers = ({
         return;
       }
 
-      const groupResizeSession = editor.createGroupResizeSession({
+      const groupResizeSession = editor.beginResizeSelection({
         anchorCanvas: resizeSession.anchorCanvas,
         nodeIds: visibleSelectedNodeIds,
       });
@@ -99,7 +99,7 @@ export const getCanvasResizeHandlers = ({
         return;
       }
 
-      const nodeResizeSession = editor.createNodeResizeSession({
+      const nodeResizeSession = editor.beginResizeSelection({
         anchorCanvas: resizeSession.anchorCanvas,
         direction: event.direction,
         nodeId: selectedNode.id,

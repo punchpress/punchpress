@@ -173,10 +173,12 @@ export const createEditorE2eApi = (editor) => {
       return editor.serializeDocument();
     },
     scaleSelectedNodeBy: ({ scale = 1 } = {}) => {
-      return editor.scaleSelectedNodeFromCorner({ corner: "se", scale });
+      return (
+        editor.resizeSelectionFromCorner({ corner: "se", scale })[0] || null
+      );
     },
     scaleSelectedGroupBy: ({ corner = "sw", scale = 1 } = {}) => {
-      return editor.scaleSelectedGroupFromCorner({ corner, scale });
+      return editor.resizeSelectionFromCorner({ corner, scale });
     },
     setSelectedText: (text) => {
       const selectedNode = editor.selectedNode;

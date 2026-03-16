@@ -13,67 +13,31 @@ const queueOverlayRefresh = (editor) => {
   });
 };
 
-export const beginMoveNode = (editor, { nodeId } = {}) => {
-  const draggedNode = editor.getNode(nodeId || editor.selectedNode?.id);
-  const bbox =
-    editor.getNodeGeometry(draggedNode?.id)?.bbox ||
-    (draggedNode ? estimateBounds(draggedNode) : null);
-
-  if (!(draggedNode && bbox)) {
-    return null;
-  }
-
-  return {
-    baseBBox: { ...bbox },
-    nodeId: draggedNode.id,
-  };
-};
-
-export const updateMoveNode = (
-  editor,
-  session,
-  { left, queueRefresh = false, top } = {}
-) => {
-  if (!(session && Number.isFinite(left) && Number.isFinite(top))) {
-    return null;
-  }
-
-  editor.updateNode(session.nodeId, {
-    transform: {
-      x: round(left - session.baseBBox.minX, 2),
-      y: round(top - session.baseBBox.minY, 2),
-    },
-  });
-
-  if (queueRefresh) {
-    queueOverlayRefresh(editor);
-  }
-
-  return session.nodeId;
-};
-
-export const beginMoveGroup = (editor, { nodeIds } = {}) => {
-  const draggedNodeIds =
-    nodeIds?.filter((nodeId) => editor.getNode(nodeId)) ||
+export const beginMoveSelection = (editor, { nodeId, nodeIds } = {}) => {
+  const resolvedNodeIds =
+    nodeIds?.filter((currentNodeId) => editor.getNode(currentNodeId)) ||
+    (nodeId
+      ? [nodeId].filter((currentNodeId) => editor.getNode(currentNodeId))
+      : null) ||
     editor.selectedNodeIds;
 
-  if (draggedNodeIds.length === 0) {
+  if (resolvedNodeIds.length === 0) {
     return null;
   }
 
   const baseBBoxes = new Map();
 
-  for (const nodeId of draggedNodeIds) {
-    const draggedNode = editor.getNode(nodeId);
+  for (const currentNodeId of resolvedNodeIds) {
+    const movedNode = editor.getNode(currentNodeId);
     const bbox =
-      editor.getNodeGeometry(nodeId)?.bbox ||
-      (draggedNode ? estimateBounds(draggedNode) : null);
+      editor.getNodeGeometry(currentNodeId)?.bbox ||
+      (movedNode ? estimateBounds(movedNode) : null);
 
     if (!bbox) {
       continue;
     }
 
-    baseBBoxes.set(nodeId, { ...bbox });
+    baseBBoxes.set(currentNodeId, { ...bbox });
   }
 
   if (baseBBoxes.size === 0) {
@@ -82,33 +46,63 @@ export const beginMoveGroup = (editor, { nodeIds } = {}) => {
 
   return {
     baseBBoxes,
-    nodeIds: [...draggedNodeIds],
+    nodeIds: [...resolvedNodeIds],
   };
 };
 
-export const updateMoveGroup = (
+export const updateMoveSelection = (
   editor,
   session,
-  { dragEvents, queueRefresh = false } = {}
+  { dragEvents, left, queueRefresh = false, top } = {}
 ) => {
-  if (!(session && dragEvents?.length > 0)) {
+  if (!session) {
+    return [];
+  }
+
+  if (
+    session.nodeIds.length === 1 &&
+    Number.isFinite(left) &&
+    Number.isFinite(top)
+  ) {
+    const nodeId = session.nodeIds[0];
+    const bbox = session.baseBBoxes.get(nodeId);
+
+    if (!bbox) {
+      return [];
+    }
+
+    editor.updateNode(nodeId, {
+      transform: {
+        x: round(left - bbox.minX, 2),
+        y: round(top - bbox.minY, 2),
+      },
+    });
+
+    if (queueRefresh) {
+      queueOverlayRefresh(editor);
+    }
+
+    return [nodeId];
+  }
+
+  if (!(dragEvents?.length > 0)) {
     return [];
   }
 
   editor.updateNodes(session.nodeIds, (node) => {
-    const groupEvent = dragEvents.find(
+    const dragEvent = dragEvents.find(
       (item) => item.target?.dataset.nodeId === node.id
     );
     const bbox = session.baseBBoxes.get(node.id);
 
-    if (!(groupEvent && bbox)) {
+    if (!(dragEvent && bbox)) {
       return node;
     }
 
     return {
       transform: {
-        x: round(groupEvent.left - bbox.minX, 2),
-        y: round(groupEvent.top - bbox.minY, 2),
+        x: round(dragEvent.left - bbox.minX, 2),
+        y: round(dragEvent.top - bbox.minY, 2),
       },
     };
   });
@@ -120,7 +114,7 @@ export const updateMoveGroup = (
   return session.nodeIds;
 };
 
-export const moveSelectedNodesBy = (
+export const moveSelectionBy = (
   editor,
   { queueRefresh = false, x = 0, y = 0 } = {}
 ) => {
