@@ -94,6 +94,13 @@ import {
   updateMoveNode as updateEditorMoveNode,
 } from "./transform/move-selection";
 import {
+  beginRotateGroup as beginEditorRotateGroup,
+  beginRotateNode as beginEditorRotateNode,
+  rotateSelectionBy as rotateEditorSelectionBy,
+  updateRotateGroup as updateEditorRotateGroup,
+  updateRotateNode as updateEditorRotateNode,
+} from "./transform/rotate-selection";
+import {
   createGroupResizeSession as createEditorGroupResizeSession,
   createNodeResizeSession as createEditorNodeResizeSession,
   scaleSelectedGroupFromCorner as scaleEditorSelectedGroupFromCorner,
@@ -527,6 +534,10 @@ export class Editor {
     return scaleEditorSelectedGroupFromCorner(this, options);
   }
 
+  rotateSelectionBy(options) {
+    return rotateEditorSelectionBy(this, options);
+  }
+
   createNodeResizeSession(options) {
     return createEditorNodeResizeSession(this, options);
   }
@@ -549,6 +560,22 @@ export class Editor {
 
   updateMoveGroup(session, options) {
     return updateEditorMoveGroup(this, session, options);
+  }
+
+  beginRotateNode(options) {
+    return beginEditorRotateNode(this, options);
+  }
+
+  updateRotateNode(session, options) {
+    return updateEditorRotateNode(this, session, options);
+  }
+
+  beginRotateGroup(options) {
+    return beginEditorRotateGroup(this, options);
+  }
+
+  updateRotateGroup(session, options) {
+    return updateEditorRotateGroup(this, session, options);
   }
 
   createGroupResizeSession(options) {

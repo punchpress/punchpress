@@ -1,23 +1,13 @@
-import { getNodeRotation } from "../../../editor/shapes/warp-text/model";
-import { estimateBounds } from "../../../editor/shapes/warp-text/warp-layout";
-import { getSelectionCenter } from "./canvas-overlay-geometry";
 import {
   setGroupRotationPreviewActive,
   setMoveableMuted,
 } from "./canvas-overlay-interactions";
-import {
-  setRotateStartState,
-  updateGroupRotation,
-  updateSingleNodeRotation,
-} from "./canvas-overlay-rotation";
 
 export const getCanvasRotationHandlers = ({
   editor,
   hostElement,
   queueRefresh,
   restoreHover,
-  selectedBounds,
-  selectedGeometry,
   selectedNode,
   setIsGroupRotationPreviewVisible,
   suppressHover,
@@ -25,7 +15,13 @@ export const getCanvasRotationHandlers = ({
 }) => {
   return {
     onRotate: (event) => {
-      updateSingleNodeRotation(editor, selectedNode, event);
+      if (!event.datas.rotateSession) {
+        return;
+      }
+
+      editor.updateRotateNode(event.datas.rotateSession, {
+        deltaRotation: event.beforeDist,
+      });
     },
     onRotateEnd: () => {
       restoreHover();
@@ -34,7 +30,16 @@ export const getCanvasRotationHandlers = ({
       queueRefresh();
     },
     onRotateGroup: (event) => {
-      updateGroupRotation(editor, visibleSelectedNodeIds, event);
+      const rotateSession =
+        event.datas.rotateSession || event.events[0]?.datas?.rotateSession;
+
+      if (!rotateSession) {
+        return;
+      }
+
+      editor.updateRotateGroup(rotateSession, {
+        deltaRotation: event.beforeDist,
+      });
     },
     onRotateGroupEnd: () => {
       restoreHover();
@@ -54,9 +59,11 @@ export const getCanvasRotationHandlers = ({
       });
     },
     onRotateGroupStart: (event) => {
-      const selectionCenter = getSelectionCenter(selectedBounds);
+      const rotateSession = editor.beginRotateGroup({
+        nodeIds: visibleSelectedNodeIds,
+      });
 
-      if (!selectionCenter) {
+      if (!rotateSession) {
         return;
       }
 
@@ -65,38 +72,25 @@ export const getCanvasRotationHandlers = ({
       setMoveableMuted(hostElement, true);
       setGroupRotationPreviewActive(hostElement, true);
       setIsGroupRotationPreviewVisible(true);
-
-      const baseNodes = new Map();
+      event.datas.rotateSession = rotateSession;
 
       for (const groupEvent of event.events) {
-        const nodeId = groupEvent.target?.dataset.nodeId;
-        const node = editor.getNode(nodeId);
-
-        if (!node) {
-          continue;
-        }
-
-        groupEvent.set(getNodeRotation(node) || 0);
-        baseNodes.set(nodeId, {
-          bbox: editor.getNodeGeometry(nodeId)?.bbox || estimateBounds(node),
-          ...node,
-        });
+        groupEvent.datas.rotateSession = rotateSession;
       }
-
-      event.datas.baseNodes = baseNodes;
-      event.datas.selectionCenter = selectionCenter;
     },
     onRotateStart: (event) => {
-      if (!selectedNode) {
+      const rotateSession = selectedNode
+        ? editor.beginRotateNode({ nodeId: selectedNode.id })
+        : null;
+
+      if (!rotateSession) {
         return;
       }
 
       editor.beginHistoryTransaction();
       suppressHover();
       setMoveableMuted(hostElement, true);
-
-      const bbox = selectedGeometry?.bbox || estimateBounds(selectedNode);
-      setRotateStartState(event, selectedNode, bbox);
+      event.datas.rotateSession = rotateSession;
     },
   };
 };
