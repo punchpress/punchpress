@@ -1,8 +1,3 @@
-import { estimateBounds } from "../../../editor/shapes/warp-text/warp-layout";
-import {
-  applyGroupDragUpdate,
-  applySingleDragUpdate,
-} from "./canvas-overlay-drag";
 import { setMoveableMuted } from "./canvas-overlay-interactions";
 
 export const getCanvasDragHandlers = ({
@@ -16,16 +11,22 @@ export const getCanvasDragHandlers = ({
 }) => {
   return {
     onDrag: (event) => {
-      if (!selectedNode) {
+      if (!event.datas.dragSession) {
         return;
       }
 
       setMoveableMuted(hostElement, true);
-      applySingleDragUpdate(editor, selectedNode.id, event);
+      editor.updateNodeDragSession(event.datas.dragSession, {
+        left: event.left,
+        top: event.top,
+      });
     },
     onDragEnd: (event) => {
-      if (selectedNode && event.lastEvent) {
-        applySingleDragUpdate(editor, selectedNode.id, event.lastEvent);
+      if (event.datas.dragSession && event.lastEvent) {
+        editor.updateNodeDragSession(event.datas.dragSession, {
+          left: event.lastEvent.left,
+          top: event.lastEvent.top,
+        });
       }
 
       restoreHover();
@@ -34,20 +35,29 @@ export const getCanvasDragHandlers = ({
       queueRefresh();
     },
     onDragGroup: (event) => {
-      if (visibleSelectedNodeIds.length === 0) {
+      const dragSession =
+        event.datas.dragSession || event.events[0]?.datas?.dragSession;
+
+      if (!dragSession) {
         return;
       }
 
       setMoveableMuted(hostElement, true);
-      applyGroupDragUpdate(editor, visibleSelectedNodeIds, event.events);
+      editor.updateGroupDragSession(dragSession, {
+        dragEvents: event.events,
+      });
     },
     onDragGroupEnd: (event) => {
+      const dragSession =
+        event.datas.dragSession || event.events[0]?.datas?.dragSession;
       const lastEvents = event.events
         .map((groupEvent) => groupEvent.lastEvent)
         .filter(Boolean);
 
-      if (lastEvents.length > 0) {
-        applyGroupDragUpdate(editor, visibleSelectedNodeIds, lastEvents);
+      if (dragSession && lastEvents.length > 0) {
+        editor.updateGroupDragSession(dragSession, {
+          dragEvents: lastEvents,
+        });
       }
 
       restoreHover();
@@ -56,21 +66,34 @@ export const getCanvasDragHandlers = ({
       queueRefresh();
     },
     onDragGroupStart: (event) => {
+      const dragSession = editor.createGroupDragSession({
+        nodeIds: visibleSelectedNodeIds,
+      });
+
+      if (!dragSession) {
+        return;
+      }
+
       editor.beginHistoryTransaction();
       suppressHover();
+      event.datas.dragSession = dragSession;
 
       for (const groupEvent of event.events) {
-        const nodeId = groupEvent.target?.dataset.nodeId;
-        const node = editor.getNode(nodeId);
-
-        groupEvent.datas.bbox =
-          node &&
-          (editor.getNodeGeometry(nodeId)?.bbox || estimateBounds(node));
+        groupEvent.datas.dragSession = dragSession;
       }
     },
-    onDragStart: () => {
+    onDragStart: (event) => {
+      const dragSession = selectedNode
+        ? editor.createNodeDragSession({ nodeId: selectedNode.id })
+        : null;
+
+      if (!dragSession) {
+        return;
+      }
+
       editor.beginHistoryTransaction();
       suppressHover();
+      event.datas.dragSession = dragSession;
     },
   };
 };

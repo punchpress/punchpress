@@ -1,5 +1,4 @@
 import { createLocalFontDescriptor } from "./local-fonts";
-import { round } from "./primitives/math";
 import { getNodeRotation, getNodeX, getNodeY } from "./shapes/warp-text/model";
 
 const toRect = (rect) => {
@@ -171,17 +170,15 @@ export const createEditorE2eApi = (editor) => {
       return editor.selectedNodeId;
     },
     moveSelectedNodeBy: ({ x = 0, y = 0 } = {}) => {
-      if (editor.selectedNodeIds.length === 0) {
+      const movedNodeIds = editor.moveSelectedNodesBy({
+        queueRefresh: true,
+        x,
+        y,
+      });
+
+      if (movedNodeIds.length === 0) {
         return null;
       }
-
-      editor.updateNodes(editor.selectedNodeIds, (node) => ({
-        transform: {
-          x: round(getNodeX(node) + x, 2),
-          y: round(getNodeY(node) + y, 2),
-        },
-      }));
-      queueOverlayRefresh(editor);
 
       return editor.selectedNodeId;
     },

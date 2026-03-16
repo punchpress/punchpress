@@ -86,6 +86,13 @@ import { HandTool } from "./tools/hand-tool";
 import { PointerTool } from "./tools/pointer-tool";
 import { TextTool } from "./tools/text-tool";
 import {
+  createGroupDragSession as createEditorGroupDragSession,
+  createNodeDragSession as createEditorNodeDragSession,
+  moveSelectedNodesBy as moveEditorSelectedNodesBy,
+  updateGroupDragSession as updateEditorGroupDragSession,
+  updateNodeDragSession as updateEditorNodeDragSession,
+} from "./transform/move-selection";
+import {
   createGroupResizeSession as createEditorGroupResizeSession,
   createNodeResizeSession as createEditorNodeResizeSession,
   scaleSelectedGroupFromCorner as scaleEditorSelectedGroupFromCorner,
@@ -503,6 +510,10 @@ export class Editor {
     this.getState().setViewportZoom(zoom);
   }
 
+  moveSelectedNodesBy(options) {
+    return moveEditorSelectedNodesBy(this, options);
+  }
+
   scaleSelectedNodeFromCorner(options) {
     return scaleEditorSelectedNodeFromCorner(this, options);
   }
@@ -517,6 +528,22 @@ export class Editor {
 
   updateNodeResizeSession(session, options) {
     return updateEditorNodeResizeSession(this, session, options);
+  }
+
+  createNodeDragSession(options) {
+    return createEditorNodeDragSession(this, options);
+  }
+
+  updateNodeDragSession(session, options) {
+    return updateEditorNodeDragSession(this, session, options);
+  }
+
+  createGroupDragSession(options) {
+    return createEditorGroupDragSession(this, options);
+  }
+
+  updateGroupDragSession(session, options) {
+    return updateEditorGroupDragSession(this, session, options);
   }
 
   createGroupResizeSession(options) {
