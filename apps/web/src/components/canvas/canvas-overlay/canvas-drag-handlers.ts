@@ -11,19 +11,19 @@ export const getCanvasDragHandlers = ({
 }) => {
   return {
     onDrag: (event) => {
-      if (!event.datas.dragSession) {
+      if (!event.datas.moveSession) {
         return;
       }
 
       setMoveableMuted(hostElement, true);
-      editor.updateNodeDragSession(event.datas.dragSession, {
+      editor.updateMoveNode(event.datas.moveSession, {
         left: event.left,
         top: event.top,
       });
     },
     onDragEnd: (event) => {
-      if (event.datas.dragSession && event.lastEvent) {
-        editor.updateNodeDragSession(event.datas.dragSession, {
+      if (event.datas.moveSession && event.lastEvent) {
+        editor.updateMoveNode(event.datas.moveSession, {
           left: event.lastEvent.left,
           top: event.lastEvent.top,
         });
@@ -35,27 +35,27 @@ export const getCanvasDragHandlers = ({
       queueRefresh();
     },
     onDragGroup: (event) => {
-      const dragSession =
-        event.datas.dragSession || event.events[0]?.datas?.dragSession;
+      const moveSession =
+        event.datas.moveSession || event.events[0]?.datas?.moveSession;
 
-      if (!dragSession) {
+      if (!moveSession) {
         return;
       }
 
       setMoveableMuted(hostElement, true);
-      editor.updateGroupDragSession(dragSession, {
+      editor.updateMoveGroup(moveSession, {
         dragEvents: event.events,
       });
     },
     onDragGroupEnd: (event) => {
-      const dragSession =
-        event.datas.dragSession || event.events[0]?.datas?.dragSession;
+      const moveSession =
+        event.datas.moveSession || event.events[0]?.datas?.moveSession;
       const lastEvents = event.events
         .map((groupEvent) => groupEvent.lastEvent)
         .filter(Boolean);
 
-      if (dragSession && lastEvents.length > 0) {
-        editor.updateGroupDragSession(dragSession, {
+      if (moveSession && lastEvents.length > 0) {
+        editor.updateMoveGroup(moveSession, {
           dragEvents: lastEvents,
         });
       }
@@ -66,34 +66,34 @@ export const getCanvasDragHandlers = ({
       queueRefresh();
     },
     onDragGroupStart: (event) => {
-      const dragSession = editor.createGroupDragSession({
+      const moveSession = editor.beginMoveGroup({
         nodeIds: visibleSelectedNodeIds,
       });
 
-      if (!dragSession) {
+      if (!moveSession) {
         return;
       }
 
       editor.beginHistoryTransaction();
       suppressHover();
-      event.datas.dragSession = dragSession;
+      event.datas.moveSession = moveSession;
 
       for (const groupEvent of event.events) {
-        groupEvent.datas.dragSession = dragSession;
+        groupEvent.datas.moveSession = moveSession;
       }
     },
     onDragStart: (event) => {
-      const dragSession = selectedNode
-        ? editor.createNodeDragSession({ nodeId: selectedNode.id })
+      const moveSession = selectedNode
+        ? editor.beginMoveNode({ nodeId: selectedNode.id })
         : null;
 
-      if (!dragSession) {
+      if (!moveSession) {
         return;
       }
 
       editor.beginHistoryTransaction();
       suppressHover();
-      event.datas.dragSession = dragSession;
+      event.datas.moveSession = moveSession;
     },
   };
 };

@@ -63,7 +63,7 @@ export const LayersPanel = () => {
               }}
               onReorderStart={(nodeId) => {
                 editor.setHoveringSuppressed(true);
-                editor.ensureNodeSelected(nodeId);
+                editor.ensureSelected(nodeId);
               }}
             >
               {layerNodeIds.map((nodeId, index) => {

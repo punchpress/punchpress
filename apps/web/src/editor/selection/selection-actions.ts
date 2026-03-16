@@ -8,7 +8,7 @@ export const clearSelection = (editor) => {
   editor.getState().clearSelection();
 };
 
-export const selectNode = (editor, nodeId) => {
+export const select = (editor, nodeId) => {
   if (!nodeId) {
     clearSelection(editor);
     return;
@@ -21,7 +21,7 @@ export const selectNode = (editor, nodeId) => {
   editor.getState().selectNode(nodeId);
 };
 
-export const selectNodes = (editor, nodeIds) => {
+export const setSelectedNodes = (editor, nodeIds) => {
   if (
     editor.editingNodeId &&
     (nodeIds.length !== 1 || nodeIds[0] !== editor.editingNodeId)
@@ -32,7 +32,7 @@ export const selectNodes = (editor, nodeIds) => {
   editor.getState().selectNodes(nodeIds);
 };
 
-export const toggleNodeSelection = (editor, nodeId) => {
+export const toggleSelection = (editor, nodeId) => {
   if (!nodeId) {
     return;
   }
@@ -44,14 +44,30 @@ export const toggleNodeSelection = (editor, nodeId) => {
   editor.getState().toggleNodeSelection(nodeId);
 };
 
-export const ensureNodeSelected = (editor, nodeId) => {
-  if (!nodeId || isNodeSelected(editor, nodeId)) {
+export const deselect = (editor, nodeId) => {
+  if (!nodeId) {
+    clearSelection(editor);
     return;
   }
 
-  selectNode(editor, nodeId);
+  if (!isSelected(editor, nodeId)) {
+    return;
+  }
+
+  setSelectedNodes(
+    editor,
+    editor.selectedNodeIds.filter((selectedNodeId) => selectedNodeId !== nodeId)
+  );
 };
 
-export const isNodeSelected = (editor, nodeId) => {
+export const ensureSelected = (editor, nodeId) => {
+  if (!nodeId || isSelected(editor, nodeId)) {
+    return;
+  }
+
+  select(editor, nodeId);
+};
+
+export const isSelected = (editor, nodeId) => {
   return editor.selectedNodeIds.includes(nodeId);
 };

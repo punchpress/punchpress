@@ -1,5 +1,5 @@
 import { finishEditingIfNeeded } from "../editing/editing-actions";
-import { isNodeSelected } from "../selection/selection-actions";
+import { isSelected } from "../selection/selection-actions";
 
 export const deleteSelected = (editor) => {
   finishEditingIfNeeded(editor);
@@ -10,7 +10,7 @@ export const deleteSelected = (editor) => {
 
 export const deleteNode = (editor, nodeId) => {
   finishEditingIfNeeded(editor);
-  if (isNodeSelected(editor, nodeId)) {
+  if (isSelected(editor, nodeId)) {
     deleteSelected(editor);
     return;
   }
@@ -22,7 +22,7 @@ export const deleteNode = (editor, nodeId) => {
 
 export const duplicateNode = (editor, nodeId) => {
   finishEditingIfNeeded(editor);
-  if (isNodeSelected(editor, nodeId)) {
+  if (isSelected(editor, nodeId)) {
     duplicateSelected(editor);
     return;
   }
@@ -55,7 +55,7 @@ export const toggleNodeVisibility = (editor, nodeId) => {
 
 export const sendNodeToBack = (editor, nodeId) => {
   finishEditingIfNeeded(editor);
-  if (isNodeSelected(editor, nodeId) && editor.selectedNodeIds.length > 1) {
+  if (isSelected(editor, nodeId) && editor.selectedNodeIds.length > 1) {
     sendSelectedToBack(editor);
     return;
   }
@@ -95,7 +95,7 @@ export const updateSelectedNode = (editor, updater) => {
 
 export const bringNodeToFront = (editor, nodeId) => {
   finishEditingIfNeeded(editor);
-  if (isNodeSelected(editor, nodeId) && editor.selectedNodeIds.length > 1) {
+  if (isSelected(editor, nodeId) && editor.selectedNodeIds.length > 1) {
     bringSelectedToFront(editor);
     return;
   }

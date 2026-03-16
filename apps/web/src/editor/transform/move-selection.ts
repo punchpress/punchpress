@@ -13,7 +13,7 @@ const queueOverlayRefresh = (editor) => {
   });
 };
 
-export const createNodeDragSession = (editor, { nodeId } = {}) => {
+export const beginMoveNode = (editor, { nodeId } = {}) => {
   const draggedNode = editor.getNode(nodeId || editor.selectedNode?.id);
   const bbox =
     editor.getNodeGeometry(draggedNode?.id)?.bbox ||
@@ -29,7 +29,7 @@ export const createNodeDragSession = (editor, { nodeId } = {}) => {
   };
 };
 
-export const updateNodeDragSession = (
+export const updateMoveNode = (
   editor,
   session,
   { left, queueRefresh = false, top } = {}
@@ -52,7 +52,7 @@ export const updateNodeDragSession = (
   return session.nodeId;
 };
 
-export const createGroupDragSession = (editor, { nodeIds } = {}) => {
+export const beginMoveGroup = (editor, { nodeIds } = {}) => {
   const draggedNodeIds =
     nodeIds?.filter((nodeId) => editor.getNode(nodeId)) ||
     editor.selectedNodeIds;
@@ -86,7 +86,7 @@ export const createGroupDragSession = (editor, { nodeIds } = {}) => {
   };
 };
 
-export const updateGroupDragSession = (
+export const updateMoveGroup = (
   editor,
   session,
   { dragEvents, queueRefresh = false } = {}

@@ -73,11 +73,12 @@ import {
 } from "./queries/node-queries";
 import {
   clearSelection as clearEditorSelection,
-  ensureNodeSelected as ensureEditorNodeSelected,
-  isNodeSelected as isEditorNodeSelected,
-  selectNode as selectEditorNode,
-  selectNodes as selectEditorNodes,
-  toggleNodeSelection as toggleEditorNodeSelection,
+  deselect as deselectEditorNode,
+  ensureSelected as ensureEditorSelected,
+  isSelected as isEditorSelected,
+  select as selectEditorNode,
+  setSelectedNodes as setEditorSelectedNodes,
+  toggleSelection as toggleEditorSelection,
 } from "./selection/selection-actions";
 import { getSelectionBounds as getEditorSelectionBounds } from "./selection/selection-bounds";
 import { buildNodeGeometry } from "./shapes/warp-text/warp-engine";
@@ -86,11 +87,11 @@ import { HandTool } from "./tools/hand-tool";
 import { PointerTool } from "./tools/pointer-tool";
 import { TextTool } from "./tools/text-tool";
 import {
-  createGroupDragSession as createEditorGroupDragSession,
-  createNodeDragSession as createEditorNodeDragSession,
+  beginMoveGroup as beginEditorMoveGroup,
+  beginMoveNode as beginEditorMoveNode,
   moveSelectedNodesBy as moveEditorSelectedNodesBy,
-  updateGroupDragSession as updateEditorGroupDragSession,
-  updateNodeDragSession as updateEditorNodeDragSession,
+  updateMoveGroup as updateEditorMoveGroup,
+  updateMoveNode as updateEditorMoveNode,
 } from "./transform/move-selection";
 import {
   createGroupResizeSession as createEditorGroupResizeSession,
@@ -470,16 +471,20 @@ export class Editor {
     handleEditorWindowKeyDown(this, event);
   }
 
-  selectNode(nodeId) {
+  select(nodeId) {
     selectEditorNode(this, nodeId);
   }
 
-  selectNodes(nodeIds) {
-    selectEditorNodes(this, nodeIds);
+  setSelectedNodes(nodeIds) {
+    setEditorSelectedNodes(this, nodeIds);
   }
 
-  toggleNodeSelection(nodeId) {
-    toggleEditorNodeSelection(this, nodeId);
+  toggleSelection(nodeId) {
+    toggleEditorSelection(this, nodeId);
+  }
+
+  deselect(nodeId) {
+    deselectEditorNode(this, nodeId);
   }
 
   setHoveredNode(nodeId) {
@@ -490,8 +495,8 @@ export class Editor {
     this.getState().setHoveringSuppressed(isHoveringSuppressed);
   }
 
-  ensureNodeSelected(nodeId) {
-    ensureEditorNodeSelected(this, nodeId);
+  ensureSelected(nodeId) {
+    ensureEditorSelected(this, nodeId);
   }
 
   setActiveTool(toolId) {
@@ -530,20 +535,20 @@ export class Editor {
     return updateEditorNodeResizeSession(this, session, options);
   }
 
-  createNodeDragSession(options) {
-    return createEditorNodeDragSession(this, options);
+  beginMoveNode(options) {
+    return beginEditorMoveNode(this, options);
   }
 
-  updateNodeDragSession(session, options) {
-    return updateEditorNodeDragSession(this, session, options);
+  updateMoveNode(session, options) {
+    return updateEditorMoveNode(this, session, options);
   }
 
-  createGroupDragSession(options) {
-    return createEditorGroupDragSession(this, options);
+  beginMoveGroup(options) {
+    return beginEditorMoveGroup(this, options);
   }
 
-  updateGroupDragSession(session, options) {
-    return updateEditorGroupDragSession(this, session, options);
+  updateMoveGroup(session, options) {
+    return updateEditorMoveGroup(this, session, options);
   }
 
   createGroupResizeSession(options) {
@@ -590,8 +595,8 @@ export class Editor {
     bringEditorSelectedToFront(this);
   }
 
-  isNodeSelected(nodeId) {
-    return isEditorNodeSelected(this, nodeId);
+  isSelected(nodeId) {
+    return isEditorSelected(this, nodeId);
   }
 
   loadDocument(contents) {

@@ -7,11 +7,11 @@ export class PointerTool extends Tool {
 
   onNodePointerDown({ event, node }) {
     if (event.shiftKey) {
-      this.editor.toggleNodeSelection(node.id);
+      this.editor.toggleSelection(node.id);
       return;
     }
 
-    this.editor.ensureNodeSelected(node.id);
+    this.editor.ensureSelected(node.id);
   }
 
   onKeyDown({ key }) {

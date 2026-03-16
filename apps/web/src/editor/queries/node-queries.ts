@@ -24,7 +24,7 @@ export const getLayerRow = (editor, nodeId) => {
   return {
     isBackmost: nodeIndex === 0,
     isFrontmost: nodeIndex === editor.nodes.length - 1,
-    isSelected: editor.isNodeSelected(node.id),
+    isSelected: editor.isSelected(node.id),
     isVisible,
     label,
     node,

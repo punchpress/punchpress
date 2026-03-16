@@ -69,14 +69,14 @@ export const CanvasSelectionOverlay = () => {
         restoreHover();
 
         if (event.inputEvent?.shiftKey) {
-          editor.selectNodes([
+          editor.setSelectedNodes([
             ...editor.selectedNodeIds,
             ...nextSelectedNodeIds,
           ]);
           return;
         }
 
-        editor.selectNodes(nextSelectedNodeIds);
+        editor.setSelectedNodes(nextSelectedNodeIds);
       }}
       preventClickEventOnDrag
       preventClickEventOnDragStart

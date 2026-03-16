@@ -23,7 +23,7 @@ describe("Editor.scaleSelectedNodeFromCorner", () => {
       state: "ready",
     });
     editor.loadDocument(SCALED_TEXT_DOCUMENT);
-    editor.selectNode("scaled-node");
+    editor.select("scaled-node");
 
     const beforeDump = editor.getDebugDump();
     const beforeNode = getDebugNode(beforeDump, "scaled-node");

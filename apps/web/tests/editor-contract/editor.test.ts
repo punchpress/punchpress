@@ -56,7 +56,7 @@ describe("Editor.loadDocument", () => {
     const editor = new Editor();
 
     editor.loadDocument(createDocument("first-node", "FIRST", AVAILABLE_FONT));
-    editor.getState().selectNode("first-node");
+    editor.select("first-node");
     editor.addTextNode({ x: 320, y: 240 });
 
     expect(editor.nodes).toHaveLength(2);
@@ -144,7 +144,7 @@ describe("Editor.getSelectionFrameKey", () => {
     const editor = new Editor();
 
     editor.loadDocument(createDocument("selected-node", "HEYHEYHEYHEY"));
-    editor.getState().selectNode("selected-node");
+    editor.select("selected-node");
 
     const beforeKey = editor.getSelectionFrameKey();
 
@@ -163,7 +163,7 @@ describe("Editor.getDebugDump", () => {
       state: "ready",
     });
     editor.loadDocument(createDocument("debug-node", "DEBUG", AVAILABLE_FONT));
-    editor.getState().selectNode("debug-node");
+    editor.select("debug-node");
 
     const dump = editor.getDebugDump();
 

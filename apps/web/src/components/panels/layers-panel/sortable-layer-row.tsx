@@ -78,7 +78,7 @@ export const SortableLayerRow = ({ nodeId, previousNodeId, nextNodeId }) => {
     return nextNodeId ? editor.getLayerRow(nextNodeId) : null;
   });
   const selectedCount = useEditorValue((editor) => {
-    return editor.isNodeSelected(nodeId) ? editor.selectedNodeIds.length : 1;
+    return editor.isSelected(nodeId) ? editor.selectedNodeIds.length : 1;
   });
 
   if (!layer) {
@@ -117,11 +117,11 @@ export const SortableLayerRow = ({ nodeId, previousNodeId, nextNodeId }) => {
   });
   const handleSelect = (event) => {
     if (event.shiftKey) {
-      editor.toggleNodeSelection(nodeId);
+      editor.toggleSelection(nodeId);
       return;
     }
 
-    editor.ensureNodeSelected(nodeId);
+    editor.ensureSelected(nodeId);
   };
 
   return (
@@ -131,7 +131,7 @@ export const SortableLayerRow = ({ nodeId, previousNodeId, nextNodeId }) => {
           <ContextMenu.Root>
             <ContextMenu.Trigger
               className="block"
-              onContextMenuCapture={() => editor.ensureNodeSelected(nodeId)}
+              onContextMenuCapture={() => editor.ensureSelected(nodeId)}
               onPointerEnter={() => editor.setHoveredNode(nodeId)}
               onPointerLeave={() => {
                 if (editor.hoveredNodeId !== nodeId) {
@@ -159,7 +159,7 @@ export const SortableLayerRow = ({ nodeId, previousNodeId, nextNodeId }) => {
                       return;
                     }
 
-                    editor.selectNode(nodeId);
+                    editor.select(nodeId);
                   }}
                   type="button"
                 >
