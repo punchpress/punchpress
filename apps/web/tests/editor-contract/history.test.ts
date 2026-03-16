@@ -31,7 +31,7 @@ describe("Editor history", () => {
     ]);
   });
 
-  test("a drag session records a single history step", () => {
+  test("a marked drag session records a single history step", () => {
     const editor = createEditor();
     const nodeId = createTextNode(editor, {
       text: "DRAG ME",
@@ -47,7 +47,12 @@ describe("Editor history", () => {
       throw new Error("Expected a move session and frame");
     }
 
-    editor.beginHistoryTransaction();
+    const historyMark = editor.markHistoryStep("move selection");
+
+    if (!historyMark) {
+      throw new Error("Expected a history mark");
+    }
+
     editor.updateMoveSelection(moveSession, {
       left: beforeNode.frame.bounds.minX + 70,
       top: beforeNode.frame.bounds.minY + 45,
@@ -56,7 +61,7 @@ describe("Editor history", () => {
       left: beforeNode.frame.bounds.minX + 140,
       top: beforeNode.frame.bounds.minY + 80,
     });
-    editor.endHistoryTransaction();
+    editor.commitHistoryStep(historyMark);
 
     const afterDrag = getDebugNode(editor.getDebugDump(), nodeId);
 
@@ -76,6 +81,43 @@ describe("Editor history", () => {
 
     expect(afterRedo.transform.x).toBeCloseTo(afterDrag.transform.x, 6);
     expect(afterRedo.transform.y).toBeCloseTo(afterDrag.transform.y, 6);
+  });
+
+  test("reverting to a mark restores state without adding a history step", () => {
+    const editor = createEditor();
+    const nodeId = createTextNode(editor, {
+      text: "RESET ME",
+      x: 260,
+      y: 180,
+    });
+
+    editor.resetHistory();
+
+    const beforeNode = getDebugNode(editor.getDebugDump(), nodeId);
+    const historyMark = editor.markHistoryStep("move selection");
+
+    if (!historyMark) {
+      throw new Error("Expected a history mark");
+    }
+
+    editor.moveSelectionBy({
+      x: 90,
+      y: 55,
+    });
+
+    const movedNode = getDebugNode(editor.getDebugDump(), nodeId);
+
+    expect(movedNode.transform.x).toBeCloseTo(beforeNode.transform.x + 90, 6);
+    expect(movedNode.transform.y).toBeCloseTo(beforeNode.transform.y + 55, 6);
+
+    editor.revertToMark(historyMark);
+
+    const revertedNode = getDebugNode(editor.getDebugDump(), nodeId);
+
+    expect(revertedNode.transform.x).toBeCloseTo(beforeNode.transform.x, 6);
+    expect(revertedNode.transform.y).toBeCloseTo(beforeNode.transform.y, 6);
+    expect(editor.canUndo).toBe(false);
+    expect(editor.canRedo).toBe(false);
   });
 });
 

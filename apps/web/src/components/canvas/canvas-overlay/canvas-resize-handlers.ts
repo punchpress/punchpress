@@ -29,9 +29,11 @@ export const getCanvasResizeHandlers = ({
         scale: resizeScale,
       });
     },
-    onResizeEnd: () => {
+    onResizeEnd: (event) => {
       restoreHover();
-      editor.endHistoryTransaction();
+      if (event.datas.historyMark) {
+        editor.commitHistoryStep(event.datas.historyMark);
+      }
       queueRefresh();
     },
     onResizeGroup: (event) => {
@@ -49,9 +51,11 @@ export const getCanvasResizeHandlers = ({
         scale: resizeScale,
       });
     },
-    onResizeGroupEnd: () => {
+    onResizeGroupEnd: (event) => {
       restoreHover();
-      editor.endHistoryTransaction();
+      if (event.datas.historyMark) {
+        editor.commitHistoryStep(event.datas.historyMark);
+      }
       queueRefresh();
     },
     onResizeGroupStart: (event) => {
@@ -76,11 +80,15 @@ export const getCanvasResizeHandlers = ({
         return;
       }
 
-      editor.beginHistoryTransaction();
+      event.datas.historyMark = editor.markHistoryStep("resize selection");
       suppressHover();
       event.datas.anchorClient = resizeSession.anchorClient;
       event.datas.resizeSession = groupResizeSession;
       event.datas.startDistance = resizeSession.startDistance;
+
+      for (const groupEvent of event.events) {
+        groupEvent.datas.historyMark = event.datas.historyMark;
+      }
     },
     onResizeStart: (event) => {
       if (!selectedNode) {
@@ -109,7 +117,7 @@ export const getCanvasResizeHandlers = ({
         return;
       }
 
-      editor.beginHistoryTransaction();
+      event.datas.historyMark = editor.markHistoryStep("resize selection");
       suppressHover();
       event.datas.anchorClient = resizeSession.anchorClient;
       event.datas.resizeSession = nodeResizeSession;

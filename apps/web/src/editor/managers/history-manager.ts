@@ -11,15 +11,16 @@ export class HistoryManager {
   }) {
     this.applyChange = applyChange;
     this.applyState = applyState;
+    this.activeMarks = new Map();
     this.captureState = captureState;
     this.captureSnapshot = captureSnapshot;
     this.createChange = createChange;
     this.currentRevision = 0;
     this.isApplying = false;
     this.limit = limit;
+    this.nextMarkId = 0;
     this.redoStack = [];
     this.savedSnapshot = captureSnapshot();
-    this.transactionState = null;
     this.undoStack = [];
   }
 
@@ -35,29 +36,45 @@ export class HistoryManager {
     return this.captureSnapshot() !== this.savedSnapshot;
   }
 
-  beginTransaction() {
-    if (this.isApplying || this.transactionState !== null) {
-      return;
-    }
-
-    this.transactionState = this.captureState();
-  }
-
-  endTransaction() {
-    if (this.transactionState === null) {
-      return false;
-    }
-
-    const beforeState = this.transactionState;
-    this.transactionState = null;
-    return this.recordChange(beforeState);
-  }
-
   markSaved() {
     this.savedSnapshot = this.captureSnapshot();
   }
 
-  recordChange(beforeState) {
+  mark(name) {
+    if (this.isApplying) {
+      return null;
+    }
+
+    const mark = {
+      beforeState: this.captureState(),
+      id: this.nextMarkId,
+      name: name || null,
+      revision: this.currentRevision,
+    };
+
+    this.nextMarkId += 1;
+    this.activeMarks.set(mark.id, mark);
+    return mark;
+  }
+
+  commitMark(mark) {
+    if (!this.releaseMark(mark) || this.isApplying) {
+      return false;
+    }
+
+    return this.pushChange(mark.beforeState);
+  }
+
+  revertToMark(mark) {
+    if (!this.releaseMark(mark) || this.isApplying) {
+      return false;
+    }
+
+    this.applyState(mark.beforeState);
+    return true;
+  }
+
+  pushChange(beforeState) {
     if (this.isApplying) {
       return false;
     }
@@ -90,22 +107,22 @@ export class HistoryManager {
   }
 
   reset() {
+    this.activeMarks.clear();
     this.currentRevision = 0;
     this.redoStack = [];
     this.savedSnapshot = this.captureSnapshot();
-    this.transactionState = null;
     this.undoStack = [];
   }
 
   run(runChange) {
-    if (this.isApplying || this.transactionState !== null) {
+    if (this.isApplying || this.activeMarks.size > 0) {
       runChange();
       return;
     }
 
     const beforeState = this.captureState();
     runChange();
-    this.recordChange(beforeState);
+    this.pushChange(beforeState);
   }
 
   undo() {
@@ -124,7 +141,7 @@ export class HistoryManager {
 
   restoreChange(change, targetStack, direction) {
     this.isApplying = true;
-    this.transactionState = null;
+    this.activeMarks.clear();
 
     try {
       const nextState = this.applyChange(
@@ -153,5 +170,14 @@ export class HistoryManager {
     }
 
     stack.splice(0, stack.length - this.limit);
+  }
+
+  releaseMark(mark) {
+    if (!(mark && this.activeMarks.has(mark.id))) {
+      return null;
+    }
+
+    this.activeMarks.delete(mark.id);
+    return mark;
   }
 }

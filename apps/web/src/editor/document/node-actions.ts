@@ -3,7 +3,7 @@ import { isSelected } from "../selection/selection-actions";
 
 export const deleteSelected = (editor) => {
   finishEditingIfNeeded(editor);
-  editor.runDocumentChange(() => {
+  editor.run(() => {
     editor.getState().deleteSelected();
   });
 };
@@ -15,7 +15,7 @@ export const deleteNode = (editor, nodeId) => {
     return;
   }
 
-  editor.runDocumentChange(() => {
+  editor.run(() => {
     editor.getState().deleteNodeById(nodeId);
   });
 };
@@ -27,27 +27,27 @@ export const duplicate = (editor, nodeId) => {
       return;
     }
 
-    editor.runDocumentChange(() => {
+    editor.run(() => {
       editor.getState().duplicateSelectedNodes();
     });
     return;
   }
 
-  editor.runDocumentChange(() => {
+  editor.run(() => {
     editor.getState().duplicateNodeById(nodeId);
   });
 };
 
 export const setNodeOrder = (editor, nodeIds) => {
   finishEditingIfNeeded(editor);
-  editor.runDocumentChange(() => {
+  editor.run(() => {
     editor.getState().setNodeOrder(nodeIds);
   });
 };
 
 export const toggleVisibility = (editor, nodeId) => {
   finishEditingIfNeeded(editor);
-  editor.runDocumentChange(() => {
+  editor.run(() => {
     editor.getState().toggleNodeVisibilityById(nodeId);
   });
 };
@@ -62,34 +62,34 @@ export const sendToBack = (editor, nodeId) => {
       return;
     }
 
-    editor.runDocumentChange(() => {
+    editor.run(() => {
       editor.getState().sendSelectedNodesToBack();
     });
     return;
   }
 
-  editor.runDocumentChange(() => {
+  editor.run(() => {
     editor.getState().sendNodeToBack(nodeId);
   });
 };
 
 export const updateNode = (editor, nodeId, updater) => {
   finishEditingIfNeeded(editor);
-  editor.runDocumentChange(() => {
+  editor.run(() => {
     editor.getState().updateNodeById(nodeId, updater);
   });
 };
 
 export const updateNodes = (editor, nodeIds, updater) => {
   finishEditingIfNeeded(editor);
-  editor.runDocumentChange(() => {
+  editor.run(() => {
     editor.getState().updateNodesById(nodeIds, updater);
   });
 };
 
 export const updateSelectedNode = (editor, updater) => {
   finishEditingIfNeeded(editor);
-  editor.runDocumentChange(() => {
+  editor.run(() => {
     editor.getState().updateSelectedNode(updater);
   });
 };
@@ -104,13 +104,13 @@ export const bringToFront = (editor, nodeId) => {
       return;
     }
 
-    editor.runDocumentChange(() => {
+    editor.run(() => {
       editor.getState().bringSelectedNodesToFront();
     });
     return;
   }
 
-  editor.runDocumentChange(() => {
+  editor.run(() => {
     editor.getState().bringNodeToFront(nodeId);
   });
 };

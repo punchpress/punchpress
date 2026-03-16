@@ -133,6 +133,7 @@ export class Editor {
       ["hand", new HandTool(this)],
       ["text", new TextTool(this)],
     ]);
+    this.editingHistoryMark = null;
     this.unsubscribeEditorCommand = null;
     this.unsubscribe = null;
     this.localFontCatalogPromise = null;
@@ -600,12 +601,16 @@ export class Editor {
     this.history.markSaved();
   }
 
-  beginHistoryTransaction() {
-    this.history.beginTransaction();
+  markHistoryStep(name) {
+    return this.history.mark(name);
   }
 
-  endHistoryTransaction() {
-    return this.history.endTransaction();
+  commitHistoryStep(mark) {
+    return this.history.commitMark(mark);
+  }
+
+  revertToMark(mark) {
+    return this.history.revertToMark(mark);
   }
 
   redo() {
@@ -618,17 +623,14 @@ export class Editor {
 
   resetHistory() {
     this.history.reset();
+    this.editingHistoryMark = null;
   }
 
   finishEditingIfNeeded() {
     finishEditorEditingIfNeeded(this);
   }
 
-  recordHistoryChange(beforeSnapshot) {
-    return this.history.recordChange(beforeSnapshot);
-  }
-
-  runDocumentChange(runChange) {
+  run(runChange) {
     this.history.run(runChange);
   }
 

@@ -1,12 +1,12 @@
 export const addTextNode = (editor, point) => {
   finishEditingIfNeeded(editor);
-  editor.beginHistoryTransaction();
+  editor.editingHistoryMark = editor.markHistoryStep("add text");
   editor.getState().addTextNode(point, editor.getDefaultFont());
 };
 
 export const cancelEditing = (editor) => {
   editor.getState().cancelEditing();
-  editor.endHistoryTransaction();
+  commitEditingHistoryStep(editor);
   editor.getState().setActiveTool("pointer");
 };
 
@@ -16,7 +16,7 @@ export const commitEditing = (editor) => {
 
 export const finalizeEditing = (editor) => {
   commitEditing(editor);
-  editor.endHistoryTransaction();
+  commitEditingHistoryStep(editor);
   editor.getState().setActiveTool("pointer");
 };
 
@@ -41,7 +41,10 @@ export const startEditing = (editor, node) => {
     finalizeEditing(editor);
   }
 
-  editor.beginHistoryTransaction();
+  if (!editor.editingHistoryMark) {
+    editor.editingHistoryMark = editor.markHistoryStep("edit text");
+  }
+
   editor.getState().startEditing(node);
 };
 
@@ -51,4 +54,13 @@ export const finishEditingIfNeeded = (editor) => {
   }
 
   finalizeEditing(editor);
+};
+
+const commitEditingHistoryStep = (editor) => {
+  if (!editor.editingHistoryMark) {
+    return;
+  }
+
+  editor.commitHistoryStep(editor.editingHistoryMark);
+  editor.editingHistoryMark = null;
 };

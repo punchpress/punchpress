@@ -31,7 +31,9 @@ export const getCanvasDragHandlers = ({
 
       restoreHover();
       setMoveableMuted(hostElement, false);
-      editor.endHistoryTransaction();
+      if (event.datas.historyMark) {
+        editor.commitHistoryStep(event.datas.historyMark);
+      }
       queueRefresh();
     },
     onDragGroup: (event) => {
@@ -62,7 +64,9 @@ export const getCanvasDragHandlers = ({
 
       restoreHover();
       setMoveableMuted(hostElement, false);
-      editor.endHistoryTransaction();
+      if (event.datas.historyMark) {
+        editor.commitHistoryStep(event.datas.historyMark);
+      }
       queueRefresh();
     },
     onDragGroupStart: (event) => {
@@ -74,11 +78,12 @@ export const getCanvasDragHandlers = ({
         return;
       }
 
-      editor.beginHistoryTransaction();
+      event.datas.historyMark = editor.markHistoryStep("move selection");
       suppressHover();
       event.datas.moveSession = moveSession;
 
       for (const groupEvent of event.events) {
+        groupEvent.datas.historyMark = event.datas.historyMark;
         groupEvent.datas.moveSession = moveSession;
       }
     },
@@ -91,7 +96,7 @@ export const getCanvasDragHandlers = ({
         return;
       }
 
-      editor.beginHistoryTransaction();
+      event.datas.historyMark = editor.markHistoryStep("move selection");
       suppressHover();
       event.datas.moveSession = moveSession;
     },

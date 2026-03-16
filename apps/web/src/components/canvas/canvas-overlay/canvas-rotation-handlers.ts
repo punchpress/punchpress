@@ -23,10 +23,12 @@ export const getCanvasRotationHandlers = ({
         deltaRotation: event.beforeDist,
       });
     },
-    onRotateEnd: () => {
+    onRotateEnd: (event) => {
       restoreHover();
       setMoveableMuted(hostElement, false);
-      editor.endHistoryTransaction();
+      if (event.datas.historyMark) {
+        editor.commitHistoryStep(event.datas.historyMark);
+      }
       queueRefresh();
     },
     onRotateGroup: (event) => {
@@ -41,10 +43,12 @@ export const getCanvasRotationHandlers = ({
         deltaRotation: event.beforeDist,
       });
     },
-    onRotateGroupEnd: () => {
+    onRotateGroupEnd: (event) => {
       restoreHover();
       setMoveableMuted(hostElement, false);
-      editor.endHistoryTransaction();
+      if (event.datas.historyMark) {
+        editor.commitHistoryStep(event.datas.historyMark);
+      }
       queueRefresh();
 
       if (typeof window === "undefined") {
@@ -67,7 +71,7 @@ export const getCanvasRotationHandlers = ({
         return;
       }
 
-      editor.beginHistoryTransaction();
+      event.datas.historyMark = editor.markHistoryStep("rotate selection");
       suppressHover();
       setMoveableMuted(hostElement, true);
       setGroupRotationPreviewActive(hostElement, true);
@@ -75,6 +79,7 @@ export const getCanvasRotationHandlers = ({
       event.datas.rotateSession = rotateSession;
 
       for (const groupEvent of event.events) {
+        groupEvent.datas.historyMark = event.datas.historyMark;
         groupEvent.datas.rotateSession = rotateSession;
       }
     },
@@ -87,7 +92,7 @@ export const getCanvasRotationHandlers = ({
         return;
       }
 
-      editor.beginHistoryTransaction();
+      event.datas.historyMark = editor.markHistoryStep("rotate selection");
       suppressHover();
       setMoveableMuted(hostElement, true);
       event.datas.rotateSession = rotateSession;
