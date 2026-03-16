@@ -23,6 +23,9 @@ Use these standards for new code and touched code during refactors.
 - Pass structure downward and read shared state locally. Passing `children`, slots, ids, and event handlers is good; relaying derived editor/app state through intermediate components is not.
 - Prefer plain modules for editor behavior. Reserve long-lived "manager" objects for stateful subsystems with lifecycle, caching, async coordination, or external integration boundaries.
 - Name modules and hooks after user-facing behaviors or actions when possible. Prefer names like `use-unsaved-document-warning` over mechanism names like `use-unsaved-document-guard`.
+- Prefer simple operation-first editor method names. Favor names like `select`, `moveSelectionBy`, `bringToFront`, and `toggleVisibility` over mechanism-heavy names.
+- Do not encode caller context in public editor method names when it can be expressed by parameters or current selection. Prefer `bringToFront(nodeId?)` over pairs like `bringNodeToFront` and `bringSelectedToFront`.
+- Keep low-level/store primitives more explicit when needed, but keep the `Editor` surface terse and product-shaped.
 - Use kebab-case for file names.
 - Prefer `const` + arrow function style for new functions/components.
 - Prefer `.ts`/`.tsx` for new files. Existing `.jsx` files in `components/ui/` are fine as-is.

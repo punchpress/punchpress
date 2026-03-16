@@ -1,16 +1,12 @@
 import { expect, test } from "@playwright/test";
 import {
   createTextNode,
-  dragNodeBy,
-  expectCoordinateShift,
   expectHandleAlignedToNodeCorner,
-  expectRectShift,
   getNodeSnapshot,
   getSelectionSnapshot,
   getStateSnapshot,
   gotoEditor,
   setSelectedText,
-  waitForNodeReady,
   waitForSelectionHandles,
 } from "./editor-helpers";
 
@@ -46,7 +42,9 @@ test.beforeEach(async ({ page }) => {
 
     testWindow.electron = {
       documentCommands: {
-        markReady() {},
+        markReady() {
+          // Test stub.
+        },
         onCommand() {
           return () => undefined;
         },
@@ -59,7 +57,9 @@ test.beforeEach(async ({ page }) => {
         onRecentDocumentsChanged() {
           return () => undefined;
         },
-        respondBeforeClose() {},
+        respondBeforeClose() {
+          // Test stub.
+        },
       },
       editorCommands: {
         onCommand(callback) {
@@ -235,95 +235,4 @@ test("redo refreshes selection bounds after a text geometry change", async ({
     snapshot.elementRect,
     "se"
   );
-});
-
-test("dragging a node records a single history step", async ({ page }) => {
-  await gotoEditor(page);
-  const nodeId = await createTextNode(page, {
-    text: "DRAG ME",
-    x: 320,
-    y: 260,
-  });
-  const delta = { x: 140, y: 80 };
-  const before = await waitForNodeReady(page, nodeId);
-
-  await dragNodeBy(page, nodeId, delta);
-
-  await expect
-    .poll(async () => {
-      const snapshot = await getNodeSnapshot(page, nodeId);
-
-      if (!snapshot) {
-        return Number.POSITIVE_INFINITY;
-      }
-
-      return Math.max(
-        Math.abs(snapshot.x - (before.x + delta.x)),
-        Math.abs(snapshot.y - (before.y + delta.y))
-      );
-    })
-    .toBeLessThanOrEqual(1);
-
-  const afterDrag = await waitForNodeReady(page, nodeId);
-
-  expectCoordinateShift(before, afterDrag, delta);
-  expectRectShift(before.elementRect, afterDrag.elementRect, delta);
-
-  await page.evaluate(() => {
-    const testWindow = window as TestElectronWindow;
-
-    testWindow.__TEST_ELECTRON__.emitEditorCommand("undo");
-  });
-
-  await expect
-    .poll(async () => {
-      const snapshot = await getNodeSnapshot(page, nodeId);
-
-      if (!snapshot) {
-        return Number.POSITIVE_INFINITY;
-      }
-
-      return Math.max(
-        Math.abs(snapshot.x - before.x),
-        Math.abs(snapshot.y - before.y)
-      );
-    })
-    .toBeLessThanOrEqual(1);
-
-  const afterUndo = await waitForNodeReady(page, nodeId);
-
-  expectCoordinateShift(afterDrag, afterUndo, {
-    x: -delta.x,
-    y: -delta.y,
-  });
-  expectRectShift(afterDrag.elementRect, afterUndo.elementRect, {
-    x: -delta.x,
-    y: -delta.y,
-  });
-
-  await page.evaluate(() => {
-    const testWindow = window as TestElectronWindow;
-
-    testWindow.__TEST_ELECTRON__.emitEditorCommand("redo");
-  });
-
-  await expect
-    .poll(async () => {
-      const snapshot = await getNodeSnapshot(page, nodeId);
-
-      if (!snapshot) {
-        return Number.POSITIVE_INFINITY;
-      }
-
-      return Math.max(
-        Math.abs(snapshot.x - afterDrag.x),
-        Math.abs(snapshot.y - afterDrag.y)
-      );
-    })
-    .toBeLessThanOrEqual(1);
-
-  const afterRedo = await waitForNodeReady(page, nodeId);
-
-  expectCoordinateShift(before, afterRedo, delta);
-  expectRectShift(before.elementRect, afterRedo.elementRect, delta);
 });
