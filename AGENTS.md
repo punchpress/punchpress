@@ -46,13 +46,18 @@ Use these standards for new code and touched code during refactors.
 
 ## Architecture
 
-See `docs/architecture.md` for the full structure and rationale.
+See `docs/architecture/codebase-structure.md` for the current code layout and layer rationale.
+See `docs/architecture/editor-operating-model.md` for the conceptual model of editor land, React land, and automation.
 
 The editor follows a three-layer architecture inspired by tldraw:
 
 1. **Editor core** (`apps/web/src/editor/`) — Plain TypeScript `Editor` class. Owns all state, tools, managers, and shape logic. No React imports in non-provider files.
 2. **React bindings** — `EditorProvider`, `useEditor()`, and `useEditorValue(selector)` bridge the Editor to React.
 3. **Components** (`apps/web/src/components/`) — Flat siblings under `canvas/` and `panels/`. Each calls `useEditor()` directly. No prop drilling for editor state.
+
+The editor is the product engine. Put durable behavior in the editor, not in React.
+React is a client of the editor: it renders editor state and translates GUI interactions into editor commands.
+Tests, CLI workflows, and AI automation should converge on the same editor command and inspection surfaces rather than creating separate behavior paths.
 
 ### Architecture Rules
 
@@ -76,24 +81,31 @@ The editor follows a three-layer architecture inspired by tldraw:
 
 ## Docs Index
 
-- `docs/architecture.md` — Editor architecture, file structure, and layer responsibilities
-- `docs/architecture-north-star.md` — Original north star (historical reference)
-- `docs/design-system.md` — UI component system, Base UI policy, COSS UI workflow
-- `docs/desktop-release.md` — macOS signing, notarization, S3 publishing, and auto-update setup
-- `docs/release-runbook.md` — canonical version bump, changelog, tag, and publish flow
+- `docs/architecture/README.md` — Architecture docs index
+- `docs/architecture/codebase-structure.md` — Current editor architecture and file structure
+- `docs/architecture/editor-operating-model.md` — Editor, React, and automation operating model
+- `docs/architecture/editor-extraction-plan.md` — migration plan to separate the editor from React and move it toward `packages/editor`
+- `docs/architecture/document-model.md` — Design recipe schema, invariants, and export boundaries
+- `docs/design/system.md` — UI component system, Base UI policy, COSS UI workflow
+- `docs/testing/README.md` — testing docs index
+- `docs/testing/strategy.md` — high-level testing split: `editor-contract` and `playwright`
+- `docs/testing/editor-contract.md` — direct `Editor` tests using the debug dump
+- `docs/testing/playwright.md` — browser-backed tests for UI wiring and visual behavior
+- `docs/release/desktop.md` — macOS signing, notarization, S3 publishing, and auto-update setup
+- `docs/release/runbook.md` — canonical version bump, changelog, tag, and publish flow
 - `docs/ai-commands/version-bump/README.md` — agent workflow for `do a version bump`
-- `docs/architecture-decisions/` — Durable architectural decisions
+- `docs/architecture/decisions/` — Durable architectural decisions
 
 ## Product Specs
 
-- `/specs` contains high-level product specs for PunchPress behavior.
+- `docs/specs/` contains high-level product specs for PunchPress behavior.
 - Specs are living docs: concise, product-facing, and implementation-agnostic.
-- Do not put code pointers, architecture notes, or technical recommendations into `/specs`.
-- When behavior changes or becomes clearer, update the relevant spec in `/specs` in the same task.
+- Do not put code pointers, architecture notes, or technical recommendations into `docs/specs/`.
+- When behavior changes or becomes clearer, update the relevant spec in `docs/specs/` in the same task.
 
 ## Release Workflow
 
-- Treat `docs/release-runbook.md` as the source of truth for version bumps, changelog updates, GitHub tags, and desktop publish steps.
+- Treat `docs/release/runbook.md` as the source of truth for version bumps, changelog updates, GitHub tags, and desktop publish steps.
 - If the user says `do a version bump`, follow `docs/ai-commands/version-bump/README.md`.
 - Keep `CHANGELOG.md`, `apps/desktop/package.json`, and `apps/web/package.json` synchronized for each release.
 - Write changelog entries for end users in product-release language, not engineering implementation language.

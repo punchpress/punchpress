@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { expect } from "@playwright/test";
 
-const stepDelayMs = process.env.CI ? 0 : 450;
+const stepDelayMs = Number(process.env.PUNCHPRESS_E2E_STEP_DELAY_MS || 0);
 const TEST_FONT_PATHS = [
   "/System/Library/Fonts/Supplemental/Arial.ttf",
   "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",

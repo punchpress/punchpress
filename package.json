@@ -25,6 +25,8 @@
     "check": "bun run --cwd apps/web check",
     "fix": "bun run --cwd apps/web fix",
     "playwright:install": "playwright install chromium",
+    "test:editor": "bun test apps/web/tests/editor-contract",
+    "test:editor:watch": "bun test --watch apps/web/tests/editor-contract",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:ui": "playwright test --ui"

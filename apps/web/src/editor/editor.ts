@@ -1,4 +1,5 @@
 import { UI_ACCENT } from "./constants";
+import { getEditorDebugDump } from "./debug-dump";
 import { getStoredLastUsedFont } from "./default-font";
 import {
   newDocument as createNewEditorDocument,
@@ -84,6 +85,14 @@ import { createEditorStore } from "./state/store/create-editor-store";
 import { HandTool } from "./tools/hand-tool";
 import { PointerTool } from "./tools/pointer-tool";
 import { TextTool } from "./tools/text-tool";
+import {
+  createGroupResizeSession as createEditorGroupResizeSession,
+  createNodeResizeSession as createEditorNodeResizeSession,
+  scaleSelectedGroupFromCorner as scaleEditorSelectedGroupFromCorner,
+  scaleSelectedNodeFromCorner as scaleEditorSelectedNodeFromCorner,
+  updateGroupResizeSession as updateEditorGroupResizeSession,
+  updateNodeResizeSession as updateEditorNodeResizeSession,
+} from "./transform/scale-selection";
 import {
   cancelPendingViewportFocus as cancelEditorPendingViewportFocus,
   scheduleViewportFocus as scheduleEditorViewportFocus,
@@ -386,6 +395,10 @@ export class Editor {
     return getEditorSelectionBounds(this, nodeIds);
   }
 
+  getDebugDump() {
+    return getEditorDebugDump(this);
+  }
+
   getDocument() {
     return getEditorDocument(this);
   }
@@ -488,6 +501,30 @@ export class Editor {
 
   setViewportZoom(zoom) {
     this.getState().setViewportZoom(zoom);
+  }
+
+  scaleSelectedNodeFromCorner(options) {
+    return scaleEditorSelectedNodeFromCorner(this, options);
+  }
+
+  scaleSelectedGroupFromCorner(options) {
+    return scaleEditorSelectedGroupFromCorner(this, options);
+  }
+
+  createNodeResizeSession(options) {
+    return createEditorNodeResizeSession(this, options);
+  }
+
+  updateNodeResizeSession(session, options) {
+    return updateEditorNodeResizeSession(this, session, options);
+  }
+
+  createGroupResizeSession(options) {
+    return createEditorGroupResizeSession(this, options);
+  }
+
+  updateGroupResizeSession(session, options) {
+    return updateEditorGroupResizeSession(this, session, options);
   }
 
   toggleNodeVisibility(nodeId) {

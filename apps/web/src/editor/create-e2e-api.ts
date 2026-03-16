@@ -1,15 +1,6 @@
 import { createLocalFontDescriptor } from "./local-fonts";
-import {
-  getCornerPointFromBounds,
-  getResizeAnchorFromBounds,
-  getResizeCorner,
-  getResizedNodeUpdate,
-  getScaledGroupNodeUpdate,
-} from "./primitives/group-resize";
 import { round } from "./primitives/math";
-import { getNodeWorldPoint } from "./primitives/rotation";
 import { getNodeRotation, getNodeX, getNodeY } from "./shapes/warp-text/model";
-import { estimateBounds } from "./shapes/warp-text/warp-layout";
 
 const toRect = (rect) => {
   if (!rect) {
@@ -172,6 +163,9 @@ export const createEditorE2eApi = (editor) => {
         zoom: state.viewport.zoom,
       };
     },
+    getDebugDump: () => {
+      return editor.getDebugDump();
+    },
     loadDocument: (contents) => {
       editor.loadDocument(contents);
       return editor.selectedNodeId;
@@ -195,68 +189,10 @@ export const createEditorE2eApi = (editor) => {
       return editor.serializeDocument();
     },
     scaleSelectedNodeBy: ({ scale = 1 } = {}) => {
-      const selectedNode = editor.selectedNode;
-      const geometry = editor.getNodeGeometry(selectedNode?.id);
-      const bbox =
-        geometry?.bbox || (selectedNode ? estimateBounds(selectedNode) : null);
-
-      if (!(selectedNode && bbox)) {
-        return null;
-      }
-
-      editor.updateNode(
-        selectedNode.id,
-        getResizedNodeUpdate(
-          selectedNode,
-          bbox,
-          getNodeWorldPoint(
-            selectedNode,
-            bbox,
-            getCornerPointFromBounds(bbox, getResizeCorner([1, 1], true))
-          ),
-          scale,
-          [1, 1]
-        )
-      );
-      queueOverlayRefresh(editor);
-
-      return selectedNode.id;
+      return editor.scaleSelectedNodeFromCorner({ corner: "se", scale });
     },
     scaleSelectedGroupBy: ({ corner = "sw", scale = 1 } = {}) => {
-      if (editor.selectedNodeIds.length === 0) {
-        return [];
-      }
-
-      const selectionBounds = editor.getSelectionBounds(editor.selectedNodeIds);
-      const directionByCorner = {
-        ne: [1, -1],
-        nw: [-1, -1],
-        se: [1, 1],
-        sw: [-1, 1],
-      };
-      const direction = directionByCorner[corner];
-
-      if (!(selectionBounds && direction)) {
-        return [];
-      }
-
-      const anchor = getResizeAnchorFromBounds(selectionBounds, direction);
-      const baseNodes = new Map(
-        editor.selectedNodes.map((node) => [node.id, { ...node }])
-      );
-
-      editor.updateNodes(editor.selectedNodeIds, (node) => {
-        const baseNode = baseNodes.get(node.id);
-
-        if (!baseNode) {
-          return node;
-        }
-
-        return getScaledGroupNodeUpdate(baseNode, anchor, scale);
-      });
-      queueOverlayRefresh(editor);
-
-      return editor.selectedNodeIds;
+      return editor.scaleSelectedGroupFromCorner({ corner, scale });
     },
     setSelectedText: (text) => {
       const selectedNode = editor.selectedNode;

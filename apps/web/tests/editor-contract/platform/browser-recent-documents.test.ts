@@ -78,7 +78,9 @@ mock.module("idb-keyval", () => ({
 }));
 
 const importBrowserRecentDocuments = () => {
-  return import(`./browser-recent-documents.ts?test=${crypto.randomUUID()}`);
+  return import(
+    `../../../src/platform/browser-recent-documents.ts?test=${crypto.randomUUID()}`
+  );
 };
 
 const setBrowserSupport = () => {

@@ -1,9 +1,26 @@
 # Docs
 
-- [Architecture](./architecture.md) — Editor architecture, file structure, and layer responsibilities
-- [Architecture North Star](./architecture-north-star.md) — Original north star (historical reference)
-- [Document Model](./document-model.md) — Design recipe schema, invariants, and export boundaries
-- [Design System](./design-system.md)
-- [Desktop Release](./desktop-release.md) — macOS signing, S3 publishing, and auto-update flow
-- [Release Runbook](./release-runbook.md) — version bumps, changelog, tags, and Electron release hygiene
-- [Architecture Decisions](./architecture-decisions/README.md)
+## Architecture
+
+- [Architecture Index](./architecture/README.md)
+
+## Specs
+
+- [Product Specs](./specs/README.md)
+
+## Design
+
+- [Design System](./design/system.md)
+
+## Testing
+
+- [Testing Docs](./testing/README.md)
+
+## Release
+
+- [Release Runbook](./release/runbook.md) — version bumps, changelog, tags, and Electron release hygiene
+- [Desktop Release](./release/desktop.md) — macOS signing, S3 publishing, and auto-update flow
+
+## AI Commands
+
+- [Version Bump](./ai-commands/version-bump/README.md)

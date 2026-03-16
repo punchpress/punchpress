@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { readLocalFontBytes } from "./local-fonts";
+import { readLocalFontBytes } from "../../../src/platform/local-fonts";
 
 const restoreWindow = () => {
   if ("window" in globalThis) {
-    delete globalThis.window;
+    Reflect.deleteProperty(globalThis, "window");
   }
 };
 

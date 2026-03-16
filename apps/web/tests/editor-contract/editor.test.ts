@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { MissingDocumentFontsError } from "../document/errors";
-import { Editor } from "./editor";
+import { MissingDocumentFontsError } from "../../src/document/errors";
+import { Editor } from "../../src/editor/editor";
 
 const AVAILABLE_FONT = {
   family: "Arial",
@@ -62,7 +62,9 @@ describe("Editor.loadDocument", () => {
     expect(editor.nodes).toHaveLength(2);
     expect(editor.selectedNodeIds.length).toBeGreaterThan(0);
 
-    editor.loadDocument(createDocument("second-node", "SECOND", AVAILABLE_FONT));
+    editor.loadDocument(
+      createDocument("second-node", "SECOND", AVAILABLE_FONT)
+    );
 
     expect(
       editor.nodes.map((node) => ({
@@ -131,7 +133,9 @@ describe("Editor.exportDocument", () => {
       },
     ]);
 
-    await expect(editor.exportDocument()).rejects.toThrow(MissingDocumentFontsError);
+    await expect(editor.exportDocument()).rejects.toThrow(
+      MissingDocumentFontsError
+    );
   });
 });
 
@@ -147,5 +151,78 @@ describe("Editor.getSelectionFrameKey", () => {
     editor.updateSelectedNode({ text: "HEY" });
 
     expect(editor.getSelectionFrameKey()).not.toBe(beforeKey);
+  });
+});
+
+describe("Editor.getDebugDump", () => {
+  test("returns a normalized snapshot of document, node, and selection state", () => {
+    const editor = new Editor();
+    editor.applyLocalFontCatalog({
+      error: "",
+      fonts: [{ ...AVAILABLE_FONT, id: "arialmt" }],
+      state: "ready",
+    });
+    editor.loadDocument(createDocument("debug-node", "DEBUG", AVAILABLE_FONT));
+    editor.getState().selectNode("debug-node");
+
+    const dump = editor.getDebugDump();
+
+    expect(dump.bootstrap.fontCatalogState).toBe("ready");
+    expect(dump.document.nodeCount).toBe(1);
+    expect(dump.document.version).toBe("1.1");
+    expect(dump.nodes).toHaveLength(1);
+    expect(dump.nodes[0]?.id).toBe("debug-node");
+    expect(dump.nodes[0]?.text).toBe("DEBUG");
+    expect(dump.nodes[0]?.transform).toEqual({
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+      x: 100,
+      y: 200,
+    });
+    expect(dump.nodes[0]?.frame).not.toBeNull();
+    expect(dump.selection.ids).toEqual(["debug-node"]);
+    expect(dump.selection.primaryId).toBe("debug-node");
+    expect(dump.selection.bounds?.minX).toBeCloseTo(
+      dump.nodes[0]?.frame?.bounds.minX ?? 0,
+      6
+    );
+    expect(dump.selection.bounds?.minY).toBeCloseTo(
+      dump.nodes[0]?.frame?.bounds.minY ?? 0,
+      6
+    );
+    expect(dump.selection.bounds?.maxX).toBeCloseTo(
+      dump.nodes[0]?.frame?.bounds.maxX ?? 0,
+      6
+    );
+    expect(dump.selection.bounds?.maxY).toBeCloseTo(
+      dump.nodes[0]?.frame?.bounds.maxY ?? 0,
+      6
+    );
+    expect(dump.selection.handleRects).toEqual({
+      ne: null,
+      nw: null,
+      se: null,
+      sw: null,
+    });
+  });
+
+  test("does not finalize editing when producing the dump", () => {
+    const editor = new Editor();
+    editor.loadDocument(
+      createDocument("editing-node", "ORIGINAL", AVAILABLE_FONT)
+    );
+
+    editor.startEditing(editor.getNode("editing-node"));
+    editor.setEditingText("WORK IN PROGRESS");
+
+    const dump = editor.getDebugDump();
+
+    expect(editor.editingNodeId).toBe("editing-node");
+    expect(dump.editing.nodeId).toBe("editing-node");
+    expect(dump.editing.text).toBe("WORK IN PROGRESS");
+    expect(JSON.parse(dump.document.serialized).nodes[0]?.text).toBe(
+      "WORK IN PROGRESS"
+    );
   });
 });

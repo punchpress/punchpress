@@ -4,8 +4,8 @@ import {
   DocumentParseError,
   DocumentValidationError,
   UnsupportedDocumentVersionError,
-} from "./errors";
-import { parseDesignDocument } from "./load";
+} from "../../../src/document/errors";
+import { parseDesignDocument } from "../../../src/document/load";
 
 const VALID_DOCUMENT = {
   version: "1.0",

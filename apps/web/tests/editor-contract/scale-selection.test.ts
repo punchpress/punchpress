@@ -1,0 +1,101 @@
+import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { Editor } from "../../src/editor/editor";
+
+const ARIAL_FONT = {
+  family: "Arial",
+  fullName: "Arial",
+  postscriptName: "ArialMT",
+  style: "Regular",
+} as const;
+
+const SCALED_TEXT_DOCUMENT = readFileSync(
+  new URL("../e2e/fixtures/documents/scaled-text-node.punch", import.meta.url),
+  "utf8"
+);
+
+describe("Editor.scaleSelectedNodeFromCorner", () => {
+  test("keeps the opposite corner anchored for a loaded scaled node", () => {
+    const editor = new Editor();
+    editor.applyLocalFontCatalog({
+      error: "",
+      fonts: [{ ...ARIAL_FONT, id: "arialmt" }],
+      state: "ready",
+    });
+    editor.loadDocument(SCALED_TEXT_DOCUMENT);
+    editor.selectNode("scaled-node");
+
+    const beforeDump = editor.getDebugDump();
+    const beforeNode = getDebugNode(beforeDump, "scaled-node");
+    const fixedCornerBefore = getNodeCorner(beforeNode, "nw");
+
+    const resizeSession = editor.createNodeResizeSession({
+      anchorCanvas: fixedCornerBefore,
+      direction: [1, 1],
+      nodeId: "scaled-node",
+    });
+    const resizedNodeId = editor.updateNodeResizeSession(resizeSession, {
+      scale: 1.2,
+    });
+
+    const afterDump = editor.getDebugDump();
+    const afterNode = getDebugNode(afterDump, "scaled-node");
+    const fixedCornerAfter = getNodeCorner(afterNode, "nw");
+
+    expect(resizedNodeId).toBe("scaled-node");
+    expect(afterDump.selection.primaryId).toBe("scaled-node");
+    expect(afterNode.fontSize).toBeGreaterThan(beforeNode.fontSize);
+    expect(afterNode.transform.rotation).toBe(beforeNode.transform.rotation);
+    expect(fixedCornerAfter.x).toBeCloseTo(fixedCornerBefore.x, 1);
+    expect(fixedCornerAfter.y).toBeCloseTo(fixedCornerBefore.y, 1);
+  });
+});
+
+const getDebugNode = (dump, nodeId) => {
+  const node = dump.nodes.find((item) => item.id === nodeId);
+
+  if (!node) {
+    throw new Error(`Missing node ${nodeId} in debug dump`);
+  }
+
+  if (!node.frame) {
+    throw new Error(`Missing frame for node ${nodeId} in debug dump`);
+  }
+
+  return node;
+};
+
+const getNodeCorner = (node, corner) => {
+  const localBounds = {
+    maxX: node.frame.bounds.maxX - node.transform.x,
+    maxY: node.frame.bounds.maxY - node.transform.y,
+    minX: node.frame.bounds.minX - node.transform.x,
+    minY: node.frame.bounds.minY - node.transform.y,
+  };
+  const center = {
+    x: (localBounds.minX + localBounds.maxX) / 2,
+    y: (localBounds.minY + localBounds.maxY) / 2,
+  };
+  const point = {
+    x: corner.endsWith("e") ? localBounds.maxX : localBounds.minX,
+    y: corner.startsWith("s") ? localBounds.maxY : localBounds.minY,
+  };
+  const offset = {
+    x: (point.x - center.x) * node.transform.scaleX,
+    y: (point.y - center.y) * node.transform.scaleY,
+  };
+  const angle = (node.transform.rotation * Math.PI) / 180;
+
+  return {
+    x:
+      node.transform.x +
+      center.x +
+      offset.x * Math.cos(angle) -
+      offset.y * Math.sin(angle),
+    y:
+      node.transform.y +
+      center.y +
+      offset.x * Math.sin(angle) +
+      offset.y * Math.cos(angle),
+  };
+};

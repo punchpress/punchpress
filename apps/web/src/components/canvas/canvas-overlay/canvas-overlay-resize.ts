@@ -1,8 +1,4 @@
-import {
-  getResizeCorner,
-  getResizedNodeUpdate,
-  getScaledGroupNodeUpdate,
-} from "../../../editor/primitives/group-resize";
+import { getResizeCorner } from "../../../editor/primitives/group-resize";
 import { clamp } from "../../../editor/primitives/math";
 
 const getRectCenter = (rect) => {
@@ -94,81 +90,20 @@ export const getResizeSession = (editor, hostElement, direction, pointer) => {
   };
 };
 
-export const updateSingleNodeResize = (editor, selectedNode, event) => {
-  if (
-    !(
-      selectedNode &&
-      event.datas.baseBBox &&
-      event.datas.anchorClient &&
-      event.datas.anchorCanvas &&
-      event.datas.direction &&
-      Number.isFinite(event.datas.startDistance)
-    )
-  ) {
-    return;
+export const getResizeScale = (event, anchorClient, startDistance) => {
+  if (!(anchorClient && Number.isFinite(startDistance))) {
+    return null;
   }
 
   const pointer = getResizePointer(event);
   if (!pointer) {
-    return;
+    return null;
   }
 
-  const resizeScale = clamp(
-    Math.hypot(
-      pointer.x - event.datas.anchorClient.x,
-      pointer.y - event.datas.anchorClient.y
-    ) / event.datas.startDistance,
-    0.001,
-    20
-  );
-
-  editor.updateNode(
-    selectedNode.id,
-    getResizedNodeUpdate(
-      event.datas.baseNode,
-      event.datas.baseBBox,
-      event.datas.anchorCanvas,
-      resizeScale,
-      event.datas.direction
-    )
-  );
-};
-
-export const updateGroupResize = (editor, visibleSelectedNodeIds, event) => {
-  const anchorCanvas = event.datas.anchorCanvas;
-  const baseNodes = event.datas.baseNodes;
-  const anchorClient = event.datas.anchorClient;
-
-  if (
-    !(
-      anchorCanvas &&
-      anchorClient &&
-      baseNodes &&
-      Number.isFinite(event.datas.startDistance)
-    )
-  ) {
-    return;
-  }
-
-  const pointer = getResizePointer(event);
-  if (!pointer) {
-    return;
-  }
-
-  const scale = clamp(
+  return clamp(
     Math.hypot(pointer.x - anchorClient.x, pointer.y - anchorClient.y) /
-      event.datas.startDistance,
+      startDistance,
     0.001,
     20
   );
-
-  editor.updateNodes(visibleSelectedNodeIds, (node) => {
-    const baseNode = baseNodes.get(node.id);
-
-    if (!baseNode) {
-      return node;
-    }
-
-    return getScaledGroupNodeUpdate(baseNode, anchorCanvas, scale);
-  });
 };

@@ -1,6 +1,8 @@
-# Editor Architecture
+# Codebase Structure
 
-Punchpress is a browser-based design editor. The architecture is inspired by [tldraw](https://github.com/tldraw/tldraw): a plain TypeScript editor class owns all state and logic, React components are thin views that reach into it.
+This document describes the current code layout and layer boundaries for the Punchpress editor.
+
+Punchpress is a browser-based design editor. The architecture is inspired by [tldraw](https://github.com/tldraw/tldraw): a plain TypeScript editor class owns state and logic, and React components are thin views that reach into it.
 
 ## Layers
 
@@ -49,7 +51,7 @@ editingOriginalText — string
 editingText       — string
 fontRevision      — number (bumped when fonts load)
 nodes             — array of node objects
-selectedNodeId    — string | null
+selectedNodeIds   — string[]
 viewport          — { zoom: number }
 ```
 
@@ -126,35 +128,4 @@ App
 4. **Pointer events** flow through the tool state machine: Canvas calls `editor.dispatchCanvasPointerDown(info)` → Editor forwards to `currentTool.onCanvasPointerDown(info)`
 5. **Keyboard events** are handled globally by the Editor: delete/backspace → `deleteSelected()`, other keys → `currentTool.onKeyDown()`
 
-## Warp Text Node
-
-The only node type currently implemented. A warp text node has:
-
-```
-id, kind, text, fontUrl, fontSize, tracking,
-fill, stroke, strokeWidth, warp, x, y
-```
-
-The `warp` field is a discriminated union:
-- `{ kind: "none" }`
-- `{ kind: "arch", bend: number }`
-- `{ kind: "wave", amplitude: number, cycles: number }`
-- `{ kind: "circle", radius: number, sweepDeg: number }`
-
-**Rendering pipeline:**
-1. `FontManager` loads `.ttf` fonts via opentype.js
-2. `warp-engine.ts` → `layoutGlyphs()` converts text + font → glyph contours
-3. Warp functions (`applyArchWarp`, `applyWaveWarp`, `buildCircleGeometry`) distort contours
-4. `contoursToPath()` converts contours → SVG path `d` strings
-5. `GeometryManager` caches results keyed by a signature of (text, font, fontSize, tracking, warp, fontRevision)
-6. `CanvasNode` renders the paths as `<svg>` elements
-
-## Key Libraries
-
-| Library | Purpose |
-|---------|---------|
-| `zustand` | State management (vanilla store, React bindings via `useStore`) |
-| `opentype.js` | Font parsing and glyph extraction |
-| `react-infinite-viewer` | Infinite canvas with zoom/pan |
-| `react-moveable` | Drag and resize handles |
-| `react-selecto` | Lasso/click selection |
+Current document schema and node fields are documented separately in [Document Model](./document-model.md).

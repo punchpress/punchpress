@@ -9,7 +9,7 @@ The goal of the model is not to capture every future feature up front. The goal 
 - Flat nodes. Each node is self-contained with its own properties inline. You should not need to inspect a distant subtree to understand one node.
 - String IDs, explicit references. Relationships use string ID pointers when needed, never array positions.
 - What you store is what you think in. The JSON in memory is the JSON on disk. There is no second internal document model.
-- Version the schema from day one. Every document carries `version: "1.0"`. Schema changes come with explicit migrations.
+- Version the schema from day one. Every document carries an explicit version. Schema changes come with explicit migrations.
 - Document state is not session state. Nodes and node properties are saved. Selection, zoom, hover, and active tool are not.
 - No omitted fields for saved documents. A valid document is explicit and canonical, not dependent on renderer-side defaults.
 - Transforms are separate from content. Position, rotation, and scale never mutate text, warp params, or path data.
@@ -28,7 +28,7 @@ This section defines a concrete starting schema based on the current feature set
 
 ```ts
 type DesignDocumentV1 = {
-  version: "1.0";
+  version: "1.1";
   nodes: TextNode[];
 };
 ```
@@ -46,7 +46,7 @@ type TextNode = {
   id: string;
   type: "text";
   text: string;
-  fontUrl: string;
+  font: LocalFont;
   transform: Transform;
   fontSize: number;
   tracking: number;
@@ -55,6 +55,13 @@ type TextNode = {
   strokeWidth: number;
   visible: boolean;
   warp: Warp;
+};
+
+type LocalFont = {
+  family: string;
+  fullName: string;
+  postscriptName: string;
+  style: string;
 };
 
 type Transform = {
@@ -77,7 +84,7 @@ This is intentionally simple:
 - `id` is a stable string ID for identity only. It is not the node's semantic role.
 - `type` is explicit.
 - `text` is the editable source string.
-- `fontUrl` points at the font source used to derive geometry.
+- `font` stores the resolved local font descriptor used to derive geometry.
 - `transform` holds placement only.
 - `warp` is an option on text nodes and holds parametric warp settings only.
 
@@ -97,17 +104,22 @@ It does not store transient editor session state or derived renderer data. That 
 
 ## Example Document
 
-This is an example `version: "1.0"` document using the current feature set.
+This is an example `version: "1.1"` document using the current feature set.
 
 ```json
 {
-  "version": "1.0",
+  "version": "1.1",
   "nodes": [
     {
       "id": "node_1",
       "type": "text",
       "text": "BROOKLYN",
-      "fontUrl": "/fonts/college-block.ttf",
+      "font": {
+        "family": "College Block",
+        "fullName": "College Block",
+        "postscriptName": "CollegeBlock-Regular",
+        "style": "Regular"
+      },
       "fontSize": 420,
       "tracking": 10,
       "fill": "#d7b24d",
@@ -130,7 +142,12 @@ This is an example `version: "1.0"` document using the current feature set.
       "id": "node_2",
       "type": "text",
       "text": "ATHLETICS",
-      "fontUrl": "/fonts/college-block.ttf",
+      "font": {
+        "family": "College Block",
+        "fullName": "College Block",
+        "postscriptName": "CollegeBlock-Regular",
+        "style": "Regular"
+      },
       "fontSize": 260,
       "tracking": 20,
       "fill": "#ffffff",

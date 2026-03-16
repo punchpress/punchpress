@@ -1,9 +1,7 @@
-import { estimateBounds } from "../../../editor/shapes/warp-text/warp-layout";
 import {
   getResizePointer,
+  getResizeScale,
   getResizeSession,
-  updateGroupResize,
-  updateSingleNodeResize,
 } from "./canvas-overlay-resize";
 
 export const getCanvasResizeHandlers = ({
@@ -11,14 +9,25 @@ export const getCanvasResizeHandlers = ({
   hostElement,
   queueRefresh,
   restoreHover,
-  selectedGeometry,
   selectedNode,
   suppressHover,
   visibleSelectedNodeIds,
 }) => {
   return {
     onResize: (event) => {
-      updateSingleNodeResize(editor, selectedNode, event);
+      const resizeScale = getResizeScale(
+        event,
+        event.datas.anchorClient,
+        event.datas.startDistance
+      );
+
+      if (!(event.datas.resizeSession && Number.isFinite(resizeScale))) {
+        return;
+      }
+
+      editor.updateNodeResizeSession(event.datas.resizeSession, {
+        scale: resizeScale,
+      });
     },
     onResizeEnd: () => {
       restoreHover();
@@ -26,7 +35,19 @@ export const getCanvasResizeHandlers = ({
       queueRefresh();
     },
     onResizeGroup: (event) => {
-      updateGroupResize(editor, visibleSelectedNodeIds, event);
+      const resizeScale = getResizeScale(
+        event,
+        event.datas.anchorClient,
+        event.datas.startDistance
+      );
+
+      if (!(event.datas.resizeSession && Number.isFinite(resizeScale))) {
+        return;
+      }
+
+      editor.updateGroupResizeSession(event.datas.resizeSession, {
+        scale: resizeScale,
+      });
     },
     onResizeGroupEnd: () => {
       restoreHover();
@@ -46,22 +67,19 @@ export const getCanvasResizeHandlers = ({
         return;
       }
 
-      editor.beginHistoryTransaction();
-      suppressHover();
-      const baseNodes = new Map();
+      const groupResizeSession = editor.createGroupResizeSession({
+        anchorCanvas: resizeSession.anchorCanvas,
+        nodeIds: visibleSelectedNodeIds,
+      });
 
-      for (const nodeId of visibleSelectedNodeIds) {
-        const node = editor.getNode(nodeId);
-        if (!node) {
-          continue;
-        }
-
-        baseNodes.set(nodeId, { ...node });
+      if (!groupResizeSession) {
+        return;
       }
 
-      event.datas.anchorCanvas = resizeSession.anchorCanvas;
+      editor.beginHistoryTransaction();
+      suppressHover();
       event.datas.anchorClient = resizeSession.anchorClient;
-      event.datas.baseNodes = baseNodes;
+      event.datas.resizeSession = groupResizeSession;
       event.datas.startDistance = resizeSession.startDistance;
     },
     onResizeStart: (event) => {
@@ -69,7 +87,6 @@ export const getCanvasResizeHandlers = ({
         return;
       }
 
-      const bbox = selectedGeometry?.bbox || estimateBounds(selectedNode);
       const pointer = getResizePointer(event);
       const resizeSession = getResizeSession(
         editor,
@@ -82,13 +99,20 @@ export const getCanvasResizeHandlers = ({
         return;
       }
 
+      const nodeResizeSession = editor.createNodeResizeSession({
+        anchorCanvas: resizeSession.anchorCanvas,
+        direction: event.direction,
+        nodeId: selectedNode.id,
+      });
+
+      if (!nodeResizeSession) {
+        return;
+      }
+
       editor.beginHistoryTransaction();
       suppressHover();
-      event.datas.baseBBox = bbox;
-      event.datas.anchorCanvas = resizeSession.anchorCanvas;
       event.datas.anchorClient = resizeSession.anchorClient;
-      event.datas.baseNode = { ...selectedNode };
-      event.datas.direction = event.direction;
+      event.datas.resizeSession = nodeResizeSession;
       event.datas.startDistance = resizeSession.startDistance;
     },
   };

@@ -17,7 +17,9 @@ const restoreWindow = () => {
 };
 
 const importWebDocumentFiles = () => {
-  return import(`./web-document-files.ts?test=${crypto.randomUUID()}`);
+  return import(
+    `../../../src/platform/web-document-files.ts?test=${crypto.randomUUID()}`
+  );
 };
 
 afterEach(() => {

@@ -27,7 +27,7 @@ The repo is organized as a small Bun workspace so the app and desktop shell stay
 
 ## Release
 
-- Canonical runbook: `docs/release-runbook.md`
+- Canonical runbook: `docs/release/runbook.md`
 - One-command bump: `bun run release:bump patch` (or `minor` / `major` / explicit `X.Y.Z`)
 - AI command (`do a version bump`): `docs/ai-commands/version-bump/README.md`
 - GitHub Release notes export: `bun run release:notes -- --version X.Y.Z`
@@ -175,7 +175,7 @@ PunchPress now ships macOS desktop releases through Electron Builder with:
 - S3-hosted update artifacts in `s3://punchpress-electron-app-209596837609-us-east-1-an`
 - automatic update checks on launch and every 10 minutes in packaged builds
 
-Release setup is documented in [docs/desktop-release.md](./docs/desktop-release.md).
+Release setup is documented in [docs/release/desktop.md](./docs/release/desktop.md).
 
 ---
 
