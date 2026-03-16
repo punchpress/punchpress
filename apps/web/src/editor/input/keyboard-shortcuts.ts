@@ -28,7 +28,7 @@ export const handleEditingShortcutKeyDown = (editor, event, key) => {
     }
 
     event.preventDefault();
-    editor.duplicateSelected();
+    editor.duplicate();
     return true;
   }
 
@@ -46,7 +46,7 @@ export const handleCanvasShortcutKeyDown = (editor, event, key) => {
     }
 
     event.preventDefault();
-    editor.sendSelectedToBack();
+    editor.sendToBack();
     return true;
   }
 
@@ -56,7 +56,7 @@ export const handleCanvasShortcutKeyDown = (editor, event, key) => {
     }
 
     event.preventDefault();
-    editor.bringSelectedToFront();
+    editor.bringToFront();
     return true;
   }
 

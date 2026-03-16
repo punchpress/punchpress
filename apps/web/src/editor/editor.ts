@@ -9,16 +9,13 @@ import {
   serializeDocument as serializeEditorDocument,
 } from "./document/document-actions";
 import {
-  bringNodeToFront as bringEditorNodeToFront,
-  bringSelectedToFront as bringEditorSelectedToFront,
+  bringToFront as bringEditorToFront,
   deleteNode as deleteEditorNode,
   deleteSelected as deleteEditorSelected,
-  duplicateNode as duplicateEditorNode,
-  duplicateSelected as duplicateEditorSelected,
-  sendNodeToBack as sendEditorNodeToBack,
-  sendSelectedToBack as sendEditorSelectedToBack,
+  duplicate as duplicateEditorNodes,
+  sendToBack as sendEditorToBack,
   setNodeOrder as setEditorNodeOrder,
-  toggleNodeVisibility as toggleEditorNodeVisibility,
+  toggleVisibility as toggleEditorVisibility,
   updateNode as updateEditorNode,
   updateNodes as updateEditorNodes,
   updateSelectedNode as updateEditorSelectedNode,
@@ -443,12 +440,8 @@ export class Editor {
     this.currentTool.onNodePointerDown(info);
   }
 
-  duplicateNode(nodeId) {
-    duplicateEditorNode(this, nodeId);
-  }
-
-  duplicateSelected() {
-    duplicateEditorSelected(this);
+  duplicate(nodeId) {
+    duplicateEditorNodes(this, nodeId);
   }
 
   async exportDocument() {
@@ -551,16 +544,12 @@ export class Editor {
     return updateEditorRotateSelection(this, session, options);
   }
 
-  toggleNodeVisibility(nodeId) {
-    toggleEditorNodeVisibility(this, nodeId);
+  toggleVisibility(nodeId) {
+    toggleEditorVisibility(this, nodeId);
   }
 
-  sendNodeToBack(nodeId) {
-    sendEditorNodeToBack(this, nodeId);
-  }
-
-  sendSelectedToBack() {
-    sendEditorSelectedToBack(this);
+  sendToBack(nodeId) {
+    sendEditorToBack(this, nodeId);
   }
 
   startEditing(node) {
@@ -579,12 +568,8 @@ export class Editor {
     updateEditorSelectedNode(this, updater);
   }
 
-  bringNodeToFront(nodeId) {
-    bringEditorNodeToFront(this, nodeId);
-  }
-
-  bringSelectedToFront() {
-    bringEditorSelectedToFront(this);
+  bringToFront(nodeId) {
+    bringEditorToFront(this, nodeId);
   }
 
   isSelected(nodeId) {

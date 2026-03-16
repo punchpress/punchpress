@@ -183,7 +183,7 @@ export const SortableLayerRow = ({ nodeId, previousNodeId, nextNodeId }) => {
                   className={visibilityButtonClassName}
                   onClick={(event) => {
                     event.stopPropagation();
-                    editor.toggleNodeVisibility(nodeId);
+                    editor.toggleVisibility(nodeId);
                   }}
                   onPointerDown={(event) => event.stopPropagation()}
                   tabIndex={-1}
@@ -199,15 +199,13 @@ export const SortableLayerRow = ({ nodeId, previousNodeId, nextNodeId }) => {
             </ContextMenu.Trigger>
 
             <LayerContextMenuPopup>
-              <LayerContextMenuItem
-                onClick={() => editor.duplicateNode(nodeId)}
-              >
+              <LayerContextMenuItem onClick={() => editor.duplicate(nodeId)}>
                 <LayerGlyph icon={Copy01Icon} size={17} strokeWidth={1.7} />
                 Duplicate
                 <MenuShortcut>{LAYER_SHORTCUTS.duplicate}</MenuShortcut>
               </LayerContextMenuItem>
               <LayerContextMenuItem
-                onClick={() => editor.toggleNodeVisibility(nodeId)}
+                onClick={() => editor.toggleVisibility(nodeId)}
               >
                 <LayerGlyph
                   icon={layer.isVisible ? ViewOffIcon : ViewIcon}
@@ -219,7 +217,7 @@ export const SortableLayerRow = ({ nodeId, previousNodeId, nextNodeId }) => {
               <LayerContextMenuSeparator />
               <LayerContextMenuItem
                 disabled={!isMultiSelection && layer.isFrontmost}
-                onClick={() => editor.bringNodeToFront(nodeId)}
+                onClick={() => editor.bringToFront(nodeId)}
               >
                 <LayerGlyph
                   icon={LayerBringToFrontIcon}
@@ -231,7 +229,7 @@ export const SortableLayerRow = ({ nodeId, previousNodeId, nextNodeId }) => {
               </LayerContextMenuItem>
               <LayerContextMenuItem
                 disabled={!isMultiSelection && layer.isBackmost}
-                onClick={() => editor.sendNodeToBack(nodeId)}
+                onClick={() => editor.sendToBack(nodeId)}
               >
                 <LayerGlyph
                   icon={LayerSendToBackIcon}

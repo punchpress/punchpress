@@ -9,7 +9,7 @@ const ARIAL_FONT = {
 } as const;
 
 describe("Editor layer actions", () => {
-  test("bringSelectedToFront keeps grouped layer order stable", () => {
+  test("bringToFront keeps grouped layer order stable", () => {
     const editor = createEditor();
     const backNodeId = createTextNode(editor, {
       text: "Shift back",
@@ -28,7 +28,7 @@ describe("Editor layer actions", () => {
     });
 
     editor.setSelectedNodes([backNodeId, middleNodeId]);
-    editor.bringSelectedToFront();
+    editor.bringToFront();
 
     expect(editor.getDebugDump().nodes.map((node) => node.id)).toEqual([
       frontNodeId,
@@ -41,7 +41,7 @@ describe("Editor layer actions", () => {
     });
   });
 
-  test("duplicateSelected duplicates a grouped selection and selects the duplicates", () => {
+  test("duplicate duplicates a grouped selection and selects the duplicates", () => {
     const editor = createEditor();
     const backNodeId = createTextNode(editor, {
       text: "Shift back",
@@ -60,13 +60,13 @@ describe("Editor layer actions", () => {
     });
 
     editor.setSelectedNodes([backNodeId, middleNodeId]);
-    editor.bringSelectedToFront();
+    editor.bringToFront();
 
     const beforeDump = editor.getDebugDump();
     const beforeBack = getDebugNode(beforeDump, backNodeId);
     const beforeMiddle = getDebugNode(beforeDump, middleNodeId);
 
-    editor.duplicateSelected();
+    editor.duplicate();
 
     const afterDump = editor.getDebugDump();
     const duplicateIds = afterDump.selection.ids;
@@ -104,7 +104,7 @@ describe("Editor layer actions", () => {
     );
   });
 
-  test("toggleNodeVisibility hides a selected layer without clearing selection", () => {
+  test("toggleVisibility hides a selected layer without clearing selection", () => {
     const editor = createEditor();
     const nodeId = createTextNode(editor, {
       text: "Hide me",
@@ -112,7 +112,7 @@ describe("Editor layer actions", () => {
       y: 340,
     });
 
-    editor.toggleNodeVisibility(nodeId);
+    editor.toggleVisibility(nodeId);
 
     const dump = editor.getDebugDump();
     const node = getDebugNode(dump, nodeId);

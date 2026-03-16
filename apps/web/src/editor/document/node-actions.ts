@@ -20,22 +20,21 @@ export const deleteNode = (editor, nodeId) => {
   });
 };
 
-export const duplicateNode = (editor, nodeId) => {
+export const duplicate = (editor, nodeId) => {
   finishEditingIfNeeded(editor);
-  if (isSelected(editor, nodeId)) {
-    duplicateSelected(editor);
+  if (!nodeId || isSelected(editor, nodeId)) {
+    if (editor.selectedNodeIds.length === 0) {
+      return;
+    }
+
+    editor.runDocumentChange(() => {
+      editor.getState().duplicateSelectedNodes();
+    });
     return;
   }
 
   editor.runDocumentChange(() => {
     editor.getState().duplicateNodeById(nodeId);
-  });
-};
-
-export const duplicateSelected = (editor) => {
-  finishEditingIfNeeded(editor);
-  editor.runDocumentChange(() => {
-    editor.getState().duplicateSelectedNodes();
   });
 };
 
@@ -46,29 +45,31 @@ export const setNodeOrder = (editor, nodeIds) => {
   });
 };
 
-export const toggleNodeVisibility = (editor, nodeId) => {
+export const toggleVisibility = (editor, nodeId) => {
   finishEditingIfNeeded(editor);
   editor.runDocumentChange(() => {
     editor.getState().toggleNodeVisibilityById(nodeId);
   });
 };
 
-export const sendNodeToBack = (editor, nodeId) => {
+export const sendToBack = (editor, nodeId) => {
   finishEditingIfNeeded(editor);
-  if (isSelected(editor, nodeId) && editor.selectedNodeIds.length > 1) {
-    sendSelectedToBack(editor);
+  if (
+    !nodeId ||
+    (isSelected(editor, nodeId) && editor.selectedNodeIds.length > 1)
+  ) {
+    if (editor.selectedNodeIds.length === 0) {
+      return;
+    }
+
+    editor.runDocumentChange(() => {
+      editor.getState().sendSelectedNodesToBack();
+    });
     return;
   }
 
   editor.runDocumentChange(() => {
     editor.getState().sendNodeToBack(nodeId);
-  });
-};
-
-export const sendSelectedToBack = (editor) => {
-  finishEditingIfNeeded(editor);
-  editor.runDocumentChange(() => {
-    editor.getState().sendSelectedNodesToBack();
   });
 };
 
@@ -93,21 +94,23 @@ export const updateSelectedNode = (editor, updater) => {
   });
 };
 
-export const bringNodeToFront = (editor, nodeId) => {
+export const bringToFront = (editor, nodeId) => {
   finishEditingIfNeeded(editor);
-  if (isSelected(editor, nodeId) && editor.selectedNodeIds.length > 1) {
-    bringSelectedToFront(editor);
+  if (
+    !nodeId ||
+    (isSelected(editor, nodeId) && editor.selectedNodeIds.length > 1)
+  ) {
+    if (editor.selectedNodeIds.length === 0) {
+      return;
+    }
+
+    editor.runDocumentChange(() => {
+      editor.getState().bringSelectedNodesToFront();
+    });
     return;
   }
 
   editor.runDocumentChange(() => {
     editor.getState().bringNodeToFront(nodeId);
-  });
-};
-
-export const bringSelectedToFront = (editor) => {
-  finishEditingIfNeeded(editor);
-  editor.runDocumentChange(() => {
-    editor.getState().bringSelectedNodesToFront();
   });
 };
