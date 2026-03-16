@@ -154,6 +154,40 @@ describe("Editor.getSelectionFrameKey", () => {
   });
 });
 
+describe("Editor text editing mode", () => {
+  test("switches back to the pointer tool when placing a text node", () => {
+    const editor = new Editor();
+    editor.applyLocalFontCatalog({
+      error: "",
+      fonts: [{ ...AVAILABLE_FONT, id: "arialmt" }],
+      state: "ready",
+    });
+
+    editor.setActiveTool("text");
+    editor.addTextNode({ x: 320, y: 240 });
+
+    expect(editor.activeTool).toBe("pointer");
+    expect(editor.editingNodeId).not.toBeNull();
+    expect(editor.selectedNodeIds).toEqual([editor.editingNodeId]);
+  });
+
+  test("keeps the pointer tool active when opening an existing text node for editing", () => {
+    const editor = new Editor();
+    editor.applyLocalFontCatalog({
+      error: "",
+      fonts: [{ ...AVAILABLE_FONT, id: "arialmt" }],
+      state: "ready",
+    });
+    editor.loadDocument(createDocument("editing-node", "EDIT", AVAILABLE_FONT));
+    editor.setActiveTool("text");
+
+    editor.startEditing(editor.getNode("editing-node"));
+
+    expect(editor.activeTool).toBe("pointer");
+    expect(editor.editingNodeId).toBe("editing-node");
+  });
+});
+
 describe("Editor.getDebugDump", () => {
   test("returns a normalized snapshot of document, node, and selection state", () => {
     const editor = new Editor();

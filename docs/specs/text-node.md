@@ -20,6 +20,7 @@ Text nodes let users place and edit stylized text directly on the canvas.
 - Editing should feel connected to the designed object even when PunchPress uses a simplified editing surface for readability.
 - Edit mode may use a simplified straight preview when that provides more reliable caret and text-selection behavior, as long as the styling stays aligned with the designed text.
 - Edit mode should keep a visible caret so text entry still feels precise and direct.
+- Placing a new text node should enter text edit mode immediately and return the canvas to pointer behavior outside the active text field.
 
 ## Behavior
 

@@ -31,7 +31,7 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
 
       set((state) =>
         withDocumentMutation(state, {
-          activeTool: "text",
+          activeTool: "pointer",
           editingNodeId: node.id,
           editingOriginalText: node.text,
           editingText: node.text,
