@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import {
-  createTextNode,
   getSelectionSnapshot,
   gotoEditor,
+  loadDocumentFixture,
   waitForNodeReady,
 } from "./editor-helpers";
 
@@ -10,17 +10,9 @@ test("clicking, shift-clicking, and escape drive selection through the browser",
   page,
 }) => {
   await gotoEditor(page);
-
-  const firstNodeId = await createTextNode(page, {
-    text: "Select first",
-    x: 520,
-    y: 320,
-  });
-  const secondNodeId = await createTextNode(page, {
-    text: "Select second",
-    x: 760,
-    y: 520,
-  });
+  await loadDocumentFixture(page, "text-node-select.punch");
+  const firstNodeId = "select-first-node";
+  const secondNodeId = "select-second-node";
 
   await waitForNodeReady(page, firstNodeId);
   await waitForNodeReady(page, secondNodeId);

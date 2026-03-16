@@ -1,0 +1,89 @@
+{
+  "version": "1.1",
+  "nodes": [
+    {
+      "id": "marquee-wrapper-first-node",
+      "type": "text",
+      "text": "Top left",
+      "font": {
+        "family": "Arial",
+        "fullName": "Arial",
+        "postscriptName": "ArialMT",
+        "style": "Regular"
+      },
+      "transform": {
+        "x": 560,
+        "y": 260,
+        "rotation": 0,
+        "scaleX": 1,
+        "scaleY": 1
+      },
+      "fontSize": 400,
+      "tracking": 10,
+      "fill": "#ffffff",
+      "stroke": "#000000",
+      "strokeWidth": 12,
+      "visible": true,
+      "warp": {
+        "kind": "arch",
+        "bend": 0.4
+      }
+    },
+    {
+      "id": "marquee-wrapper-second-node",
+      "type": "text",
+      "text": "Middle",
+      "font": {
+        "family": "Arial",
+        "fullName": "Arial",
+        "postscriptName": "ArialMT",
+        "style": "Regular"
+      },
+      "transform": {
+        "x": 860,
+        "y": 470,
+        "rotation": 0,
+        "scaleX": 1,
+        "scaleY": 1
+      },
+      "fontSize": 400,
+      "tracking": 10,
+      "fill": "#ffffff",
+      "stroke": "#000000",
+      "strokeWidth": 12,
+      "visible": true,
+      "warp": {
+        "kind": "arch",
+        "bend": 0.4
+      }
+    },
+    {
+      "id": "marquee-wrapper-third-node",
+      "type": "text",
+      "text": "Bottom left",
+      "font": {
+        "family": "Arial",
+        "fullName": "Arial",
+        "postscriptName": "ArialMT",
+        "style": "Regular"
+      },
+      "transform": {
+        "x": 600,
+        "y": 690,
+        "rotation": 0,
+        "scaleX": 1,
+        "scaleY": 1
+      },
+      "fontSize": 400,
+      "tracking": 10,
+      "fill": "#ffffff",
+      "stroke": "#000000",
+      "strokeWidth": 12,
+      "visible": true,
+      "warp": {
+        "kind": "arch",
+        "bend": 0.4
+      }
+    }
+  ]
+}

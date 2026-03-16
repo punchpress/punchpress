@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
 import {
-  createTextNode,
   getGroupRotationPreviewRect,
   getSelectionSnapshot,
   gotoEditor,
+  loadDocumentFixture,
   pauseForUi,
   rotateSelectionFromCorner,
   rotateSelectionFromCornerWithoutRelease,
@@ -50,12 +50,10 @@ test("rotates a selected text node from the moveable selection", async ({
   page,
 }) => {
   await gotoEditor(page);
+  await loadDocumentFixture(page, "text-node-rotate-single.punch");
+  const nodeId = "rotate-node";
 
-  const nodeId = await createTextNode(page, {
-    text: "Rotate me",
-    x: 600,
-    y: 450,
-  });
+  await page.locator(`[data-node-id="${nodeId}"]`).click();
 
   await waitForNodeReady(page, nodeId);
   await zoomOut(page, 5);
@@ -81,17 +79,9 @@ test("rotates a selected group of text nodes around the shared selection center"
   page,
 }) => {
   await gotoEditor(page);
-
-  const firstNodeId = await createTextNode(page, {
-    text: "Rotate first",
-    x: 520,
-    y: 320,
-  });
-  const secondNodeId = await createTextNode(page, {
-    text: "Rotate second",
-    x: 760,
-    y: 520,
-  });
+  await loadDocumentFixture(page, "text-node-rotate-group.punch");
+  const firstNodeId = "rotate-first-node";
+  const secondNodeId = "rotate-second-node";
 
   await waitForNodeReady(page, firstNodeId);
   await waitForNodeReady(page, secondNodeId);
@@ -161,25 +151,17 @@ test("group rotation preview matches the live node bounds through release", asyn
   page,
 }) => {
   await gotoEditor(page);
-
-  const firstNodeId = await createTextNode(page, {
-    text: "Preview first",
-    x: 520,
-    y: 320,
-  });
-  const secondNodeId = await createTextNode(page, {
-    text: "Preview second",
-    x: 760,
-    y: 520,
-  });
+  await loadDocumentFixture(page, "text-node-rotate-group.punch");
+  const firstNodeId = "rotate-first-node";
+  const secondNodeId = "rotate-second-node";
 
   await waitForNodeReady(page, firstNodeId);
   await waitForNodeReady(page, secondNodeId);
   await zoomOut(page, 5);
   await pauseForUi(page);
 
-  await page.getByRole("button", { name: "Preview first" }).first().click();
-  await shiftClickLayer(page, "Preview second");
+  await page.getByRole("button", { name: "Rotate first" }).first().click();
+  await shiftClickLayer(page, "Rotate second");
   await pauseForUi(page);
 
   await expect

@@ -2,9 +2,9 @@
   "version": "1.1",
   "nodes": [
     {
-      "id": "test-node",
+      "id": "move-node",
       "type": "text",
-      "text": "TEST",
+      "text": "Move me",
       "font": {
         "family": "Arial",
         "fullName": "Arial",
@@ -12,17 +12,17 @@
         "style": "Regular"
       },
       "transform": {
-        "x": 960,
-        "y": 720,
+        "x": 600,
+        "y": 450,
         "rotation": 0,
         "scaleX": 1,
         "scaleY": 1
       },
-      "fontSize": 280,
-      "tracking": 8,
+      "fontSize": 400,
+      "tracking": 10,
       "fill": "#ffffff",
       "stroke": "#000000",
-      "strokeWidth": 10,
+      "strokeWidth": 12,
       "visible": true,
       "warp": {
         "kind": "arch",

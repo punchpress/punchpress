@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import {
-  createTextNode,
   getHoverPreviewRect,
   gotoEditor,
+  loadDocumentFixture,
   panViewportBy,
   waitForNodeReady,
 } from "./editor-helpers";
@@ -11,12 +11,8 @@ test("hover preview stays aligned when the viewport scrolls", async ({
   page,
 }) => {
   await gotoEditor(page);
-
-  const nodeId = await createTextNode(page, {
-    text: "Hover me",
-    x: 620,
-    y: 420,
-  });
+  await loadDocumentFixture(page, "hover-preview.punch");
+  const nodeId = "hover-node";
   const node = await waitForNodeReady(page, nodeId);
 
   await page.keyboard.press("Escape");

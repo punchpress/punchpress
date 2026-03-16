@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
-  createTextNode,
   gotoEditor,
+  loadDocumentFixture,
   serializeDocument,
 } from "./editor-helpers";
 
@@ -9,7 +9,8 @@ test("selecting a different local font updates the selected node", async ({
   page,
 }) => {
   await gotoEditor(page);
-  await createTextNode(page, { text: "FONT TEST", x: 420, y: 360 });
+  await loadDocumentFixture(page, "font-picker.punch");
+  await page.getByRole("button", { name: "FONT TEST" }).first().click();
   const currentFont =
     JSON.parse(await serializeDocument(page)).nodes?.[0]?.font?.fullName ||
     "Arial";
@@ -25,7 +26,13 @@ test("selecting a different local font updates the selected node", async ({
     })
     .toBe("PunchPress Sans");
 
-  await createTextNode(page, { text: "SECOND FONT", x: 620, y: 520 });
+  await page.getByRole("button", { name: "Text (T)" }).click();
+  await page.getByTestId("canvas-stage").click({
+    position: { x: 260, y: 240 },
+  });
+  const textInput = page.getByTestId("canvas-text-input");
+  await textInput.fill("SECOND FONT");
+  await textInput.press("Enter");
 
   await expect
     .poll(async () => {

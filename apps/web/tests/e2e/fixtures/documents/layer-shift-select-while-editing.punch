@@ -1,0 +1,61 @@
+{
+  "version": "1.1",
+  "nodes": [
+    {
+      "id": "shift-editing-node",
+      "type": "text",
+      "text": "Editing node",
+      "font": {
+        "family": "Arial",
+        "fullName": "Arial",
+        "postscriptName": "ArialMT",
+        "style": "Regular"
+      },
+      "transform": {
+        "x": 440,
+        "y": 280,
+        "rotation": 0,
+        "scaleX": 1,
+        "scaleY": 1
+      },
+      "fontSize": 400,
+      "tracking": 10,
+      "fill": "#ffffff",
+      "stroke": "#000000",
+      "strokeWidth": 12,
+      "visible": true,
+      "warp": {
+        "kind": "arch",
+        "bend": 0.4
+      }
+    },
+    {
+      "id": "shift-other-node",
+      "type": "text",
+      "text": "Other node",
+      "font": {
+        "family": "Arial",
+        "fullName": "Arial",
+        "postscriptName": "ArialMT",
+        "style": "Regular"
+      },
+      "transform": {
+        "x": 720,
+        "y": 360,
+        "rotation": 0,
+        "scaleX": 1,
+        "scaleY": 1
+      },
+      "fontSize": 400,
+      "tracking": 10,
+      "fill": "#ffffff",
+      "stroke": "#000000",
+      "strokeWidth": 12,
+      "visible": true,
+      "warp": {
+        "kind": "arch",
+        "bend": 0.4
+      }
+    }
+  ]
+}

@@ -2,9 +2,9 @@
   "version": "1.1",
   "nodes": [
     {
-      "id": "circle-node",
+      "id": "zoom-node",
       "type": "text",
-      "text": "PUNCHPRESS",
+      "text": "Zoom me",
       "font": {
         "family": "Arial",
         "fullName": "Arial",
@@ -12,22 +12,21 @@
         "style": "Regular"
       },
       "transform": {
-        "x": 2250,
-        "y": 2200,
+        "x": 600,
+        "y": 450,
         "rotation": 0,
         "scaleX": 1,
         "scaleY": 1
       },
-      "fontSize": 360,
-      "tracking": 12,
+      "fontSize": 400,
+      "tracking": 10,
       "fill": "#ffffff",
       "stroke": "#000000",
       "strokeWidth": 12,
       "visible": true,
       "warp": {
-        "kind": "circle",
-        "radius": 1400,
-        "sweepDeg": 220
+        "kind": "arch",
+        "bend": 0.4
       }
     }
   ]

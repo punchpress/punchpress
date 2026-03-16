@@ -21,3 +21,6 @@ Use this when the real browser path matters.
 Do not use Playwright to carry the full weight of editor correctness.
 
 If a behavior can be checked directly in `Editor`, prefer `editor-contract`.
+
+Do not spend Playwright tests on primitives like file pickers or setup plumbing
+unless that primitive is itself an important product contract.

@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
 import {
-  createTextNode,
   expectHandleAlignedToNodeCorner,
   getSelectionSnapshot,
   gotoEditor,
+  loadDocumentFixture,
   pauseForUi,
   resizeSelectionFromCorner,
   waitForNodeReady,
@@ -15,12 +15,10 @@ test("resizes a text node and keeps the selection aligned through zoom", async (
   page,
 }) => {
   await gotoEditor(page);
+  await loadDocumentFixture(page, "text-node-resize.punch");
+  const nodeId = "resize-node";
 
-  const nodeId = await createTextNode(page, {
-    text: "Resize me",
-    x: 600,
-    y: 450,
-  });
+  await page.locator(`[data-node-id="${nodeId}"]`).click();
 
   const before = await waitForNodeReady(page, nodeId);
   await pauseForUi(page);

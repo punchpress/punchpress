@@ -1,3 +1,5 @@
+import type { Editor } from "../editor/editor";
+
 export interface DesktopDocumentFileResult {
   contents: string;
   fileHandle: string | null;
@@ -32,6 +34,7 @@ export interface DesktopLocalFont {
 
 declare global {
   interface Window {
+    __PUNCHPRESS_EDITOR__?: Editor;
     electron?: {
       documentCommands?: {
         markReady: () => void;

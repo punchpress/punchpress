@@ -1,0 +1,61 @@
+{
+  "version": "1.1",
+  "nodes": [
+    {
+      "id": "hide-visible-node",
+      "type": "text",
+      "text": "Visible after hide",
+      "font": {
+        "family": "Arial",
+        "fullName": "Arial",
+        "postscriptName": "ArialMT",
+        "style": "Regular"
+      },
+      "transform": {
+        "x": 520,
+        "y": 300,
+        "rotation": 0,
+        "scaleX": 1,
+        "scaleY": 1
+      },
+      "fontSize": 400,
+      "tracking": 10,
+      "fill": "#ffffff",
+      "stroke": "#000000",
+      "strokeWidth": 12,
+      "visible": true,
+      "warp": {
+        "kind": "arch",
+        "bend": 0.4
+      }
+    },
+    {
+      "id": "hide-selected-node",
+      "type": "text",
+      "text": "Hide after select",
+      "font": {
+        "family": "Arial",
+        "fullName": "Arial",
+        "postscriptName": "ArialMT",
+        "style": "Regular"
+      },
+      "transform": {
+        "x": 820,
+        "y": 460,
+        "rotation": 0,
+        "scaleX": 1,
+        "scaleY": 1
+      },
+      "fontSize": 400,
+      "tracking": 10,
+      "fill": "#ffffff",
+      "stroke": "#000000",
+      "strokeWidth": 12,
+      "visible": true,
+      "warp": {
+        "kind": "arch",
+        "bend": 0.4
+      }
+    }
+  ]
+}

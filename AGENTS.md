@@ -46,6 +46,8 @@ Use these standards for new code and touched code during refactors.
 - Prefer a small number of high-signal tests over broad coverage.
 - Add tests for behavior with non-trivial state, geometry, or library integration risk.
 - Skip low-value tests for simple styling tweaks unless the behavior is easy to regress and hard to verify manually.
+- Name test files after the concrete behavior and path under test. Prefer names like `text-node-move` or `layer-shift-select` over vague buckets like `document-io` or `layer-actions`.
+- Use Playwright only for behavior we truly need and cannot cover honestly in `editor-contract`. Do not spend Playwright tests on primitives like file pickers, shell plumbing, or other setup paths when the real product value is elsewhere.
 
 ## Architecture
 

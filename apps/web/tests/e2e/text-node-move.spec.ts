@@ -1,22 +1,20 @@
 import { test } from "@playwright/test";
 import {
-  createTextNode,
   dragNodeBy,
   expectCoordinateShift,
   expectRectShift,
   gotoEditor,
+  loadDocumentFixture,
   pauseForUi,
   waitForNodeReady,
 } from "./editor-helpers";
 
 test("moves a text node around the canvas", async ({ page }) => {
   await gotoEditor(page);
+  await loadDocumentFixture(page, "text-node-move.punch");
+  const nodeId = "move-node";
 
-  const nodeId = await createTextNode(page, {
-    text: "Move me",
-    x: 600,
-    y: 450,
-  });
+  await page.locator(`[data-node-id="${nodeId}"]`).click();
 
   const before = await waitForNodeReady(page, nodeId);
   await pauseForUi(page);

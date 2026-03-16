@@ -1,0 +1,33 @@
+{
+  "version": "1.1",
+  "nodes": [
+    {
+      "id": "hover-node",
+      "type": "text",
+      "text": "Hover me",
+      "font": {
+        "family": "Arial",
+        "fullName": "Arial",
+        "postscriptName": "ArialMT",
+        "style": "Regular"
+      },
+      "transform": {
+        "x": 620,
+        "y": 420,
+        "rotation": 0,
+        "scaleX": 1,
+        "scaleY": 1
+      },
+      "fontSize": 400,
+      "tracking": 10,
+      "fill": "#ffffff",
+      "stroke": "#000000",
+      "strokeWidth": 12,
+      "visible": true,
+      "warp": {
+        "kind": "arch",
+        "bend": 0.4
+      }
+    }
+  ]
+}

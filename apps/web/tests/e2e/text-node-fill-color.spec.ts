@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { createTextNode, getStateSnapshot, gotoEditor } from "./editor-helpers";
+import {
+  getStateSnapshot,
+  gotoEditor,
+  loadDocumentFixture,
+} from "./editor-helpers";
 
 const getFillAndStrokeSection = (page) => {
   return page.locator("section").filter({ hasText: "Fill & Stroke" });
@@ -26,11 +30,9 @@ test("normalizes a typed fill color and applies it to the selected node", async 
   page,
 }) => {
   await gotoEditor(page);
-  const nodeId = await createTextNode(page, {
-    text: "Color",
-    x: 240,
-    y: 240,
-  });
+  await loadDocumentFixture(page, "color-picker-field.punch");
+  const nodeId = "color-node";
+  await page.getByRole("button", { name: "Color" }).first().click();
   const fillInput = getFillColorInput(page);
 
   await expect.poll(() => getSelectedNodeFill(page, nodeId)).toBe("#ffffff");
@@ -46,11 +48,9 @@ test("reverts an invalid fill draft to the last committed color on blur", async 
   page,
 }) => {
   await gotoEditor(page);
-  const nodeId = await createTextNode(page, {
-    text: "Color",
-    x: 240,
-    y: 240,
-  });
+  await loadDocumentFixture(page, "color-picker-field.punch");
+  const nodeId = "color-node";
+  await page.getByRole("button", { name: "Color" }).first().click();
   const fillInput = getFillColorInput(page);
 
   await fillInput.fill("#112233");
@@ -68,11 +68,9 @@ test("updates the selected node when the alpha slider changes", async ({
   page,
 }) => {
   await gotoEditor(page);
-  const nodeId = await createTextNode(page, {
-    text: "Color",
-    x: 240,
-    y: 240,
-  });
+  await loadDocumentFixture(page, "color-picker-field.punch");
+  const nodeId = "color-node";
+  await page.getByRole("button", { name: "Color" }).first().click();
   const fillInput = getFillColorInput(page);
 
   await fillInput.fill("#FF0000");

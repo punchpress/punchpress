@@ -36,6 +36,12 @@ const TEST_FONT_DESCRIPTORS = [
     style: "Regular",
   },
 ];
+const getDocumentFixtureContents = (fileName) => {
+  return readFileSync(
+    new URL(`./fixtures/documents/${fileName}`, import.meta.url),
+    "utf8"
+  );
+};
 
 const installLocalFontMocks = (page) => {
   return page.addInitScript(
@@ -73,13 +79,7 @@ export const gotoEditor = async (page) => {
   await installLocalFontMocks(page);
   await page.goto("/");
   await page.evaluate(() => {
-    return (
-      window as Window & {
-        __PUNCHPRESS_E2E__?: {
-          requestLocalFonts: () => Promise<void>;
-        };
-      }
-    ).__PUNCHPRESS_E2E__?.requestLocalFonts();
+    return window.__PUNCHPRESS_EDITOR__?.requestLocalFonts();
   });
   await expect(page.getByRole("button", { name: "Text (T)" })).toBeVisible();
 };
@@ -90,18 +90,6 @@ export const pauseForUi = async (page, duration = stepDelayMs) => {
   }
 
   await page.waitForTimeout(duration);
-};
-
-export const createTextNode = (page, options) => {
-  return page.evaluate((nextOptions) => {
-    return (
-      window as Window & {
-        __PUNCHPRESS_E2E__: {
-          createTextNode: (options?: Record<string, unknown>) => string;
-        };
-      }
-    ).__PUNCHPRESS_E2E__.createTextNode(nextOptions);
-  }, options);
 };
 
 export const getNodeSnapshot = (page, nodeId) => {
@@ -130,13 +118,7 @@ export const getNodeSnapshot = (page, nodeId) => {
 
 export const getDebugDump = (page) => {
   return page.evaluate(() => {
-    return (
-      window as Window & {
-        __PUNCHPRESS_E2E__?: {
-          getDebugDump: () => Record<string, unknown>;
-        };
-      }
-    ).__PUNCHPRESS_E2E__?.getDebugDump();
+    return window.__PUNCHPRESS_EDITOR__?.getDebugDump();
   });
 };
 
@@ -152,13 +134,18 @@ export const getSelectionSnapshot = (page) => {
 
 export const panViewportBy = (page, delta) => {
   return page.evaluate((nextDelta) => {
-    return (
-      window as Window & {
-        __PUNCHPRESS_E2E__?: {
-          panViewportBy: (delta?: { x?: number; y?: number }) => boolean;
-        };
-      }
-    ).__PUNCHPRESS_E2E__?.panViewportBy(nextDelta);
+    const viewer = window.__PUNCHPRESS_EDITOR__?.viewerRef;
+
+    if (!viewer) {
+      return false;
+    }
+
+    viewer.scrollBy(nextDelta?.x || 0, nextDelta?.y || 0);
+    window.requestAnimationFrame(() => {
+      window.__PUNCHPRESS_EDITOR__?.onViewportChange?.();
+    });
+
+    return true;
   }, delta);
 };
 
@@ -199,67 +186,47 @@ export const getCanvasNodeIds = (page) => {
 
 export const loadDocument = (page, contents) => {
   return page.evaluate((nextContents) => {
-    return (
-      window as Window & {
-        __PUNCHPRESS_E2E__?: {
-          loadDocument: (contents: string) => string | null;
-        };
-      }
-    ).__PUNCHPRESS_E2E__?.loadDocument(nextContents);
+    return window.__PUNCHPRESS_EDITOR__?.loadDocument(nextContents);
   }, contents);
+};
+
+export const resetViewport = (page) => {
+  return page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const viewer = editor?.viewerRef;
+
+    if (!(editor && viewer)) {
+      return false;
+    }
+
+    editor.cancelPendingViewportFocus();
+    viewer.setTo?.({
+      x: 0,
+      y: 0,
+      zoom: 1,
+    });
+    editor.setViewportZoom(1);
+    editor.onViewportChange?.();
+
+    return true;
+  });
+};
+
+export const loadDocumentFixture = async (page, fileName) => {
+  await loadDocument(page, getDocumentFixtureContents(fileName));
+  await resetViewport(page);
 };
 
 export const serializeDocument = (page) => {
   return page.evaluate(() => {
-    return (
-      window as Window & {
-        __PUNCHPRESS_E2E__?: {
-          serializeDocument: () => string;
-        };
-      }
-    ).__PUNCHPRESS_E2E__?.serializeDocument();
+    return window.__PUNCHPRESS_EDITOR__?.serializeDocument();
   });
 };
 
 export const exportDocument = (page) => {
   return page.evaluate(() => {
-    return (
-      window as Window & {
-        __PUNCHPRESS_E2E__?: {
-          exportDocument: () => Promise<string>;
-        };
-      }
-    ).__PUNCHPRESS_E2E__?.exportDocument();
+    return window.__PUNCHPRESS_EDITOR__?.exportDocument();
   });
-};
-
-export const setSelectedText = (page, text) => {
-  return page.evaluate((nextText) => {
-    return (
-      window as Window & {
-        __PUNCHPRESS_E2E__?: {
-          setSelectedText: (text: string) => string | null;
-        };
-      }
-    ).__PUNCHPRESS_E2E__?.setSelectedText(nextText);
-  }, text);
-};
-
-export const setSelectedFont = (page, font) => {
-  return page.evaluate((nextFont) => {
-    return (
-      window as Window & {
-        __PUNCHPRESS_E2E__?: {
-          setSelectedFont: (font: {
-            family: string;
-            fullName: string;
-            postscriptName: string;
-            style: string;
-          }) => string | null;
-        };
-      }
-    ).__PUNCHPRESS_E2E__?.setSelectedFont(nextFont);
-  }, font);
 };
 
 const getHandleCenter = (handle) => {
@@ -332,7 +299,10 @@ export const resizeSelectionFromCorner = async (page, options) => {
 };
 
 export const rotateSelectionFromCorner = async (page, options) => {
-  await dragFromSelectionCorner(page, options);
+  await dragFromSelectionCorner(page, {
+    ...options,
+    offset: options?.offset ?? 20,
+  });
 };
 
 export const rotateSelectionFromCornerWithoutRelease = (page, options) => {

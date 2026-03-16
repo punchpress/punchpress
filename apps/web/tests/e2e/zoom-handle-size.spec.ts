@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import {
-  createTextNode,
   getSelectionSnapshot,
   gotoEditor,
+  loadDocumentFixture,
   pauseForUi,
   waitForNodeReady,
   waitForSelectionHandles,
@@ -11,12 +11,10 @@ import {
 
 test("keeps resize handles the same size while zooming", async ({ page }) => {
   await gotoEditor(page);
+  await loadDocumentFixture(page, "zoom-handle-size.punch");
+  const nodeId = "zoom-node";
 
-  const nodeId = await createTextNode(page, {
-    text: "Zoom me",
-    x: 600,
-    y: 450,
-  });
+  await page.locator(`[data-node-id="${nodeId}"]`).click();
 
   await waitForNodeReady(page, nodeId);
   await pauseForUi(page);
