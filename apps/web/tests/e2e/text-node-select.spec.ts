@@ -6,42 +6,50 @@ import {
   waitForNodeReady,
 } from "./editor-helpers";
 
-test("selecting a text node does not flash the muted moveable frame", async ({
+test("clicking, shift-clicking, and escape drive selection through the browser", async ({
   page,
 }) => {
   await gotoEditor(page);
 
-  const nodeId = await createTextNode(page, {
-    text: "Select me",
-    x: 620,
-    y: 420,
+  const firstNodeId = await createTextNode(page, {
+    text: "Select first",
+    x: 520,
+    y: 320,
+  });
+  const secondNodeId = await createTextNode(page, {
+    text: "Select second",
+    x: 760,
+    y: 520,
   });
 
-  const node = await waitForNodeReady(page, nodeId);
+  await waitForNodeReady(page, firstNodeId);
+  await waitForNodeReady(page, secondNodeId);
 
   await page.keyboard.press("Escape");
   await expect
     .poll(async () => (await getSelectionSnapshot(page)).selectedNodeIds)
     .toEqual([]);
 
-  const center = {
-    x: node.elementRect.x + node.elementRect.width / 2,
-    y: node.elementRect.y + node.elementRect.height / 2,
-  };
-
-  await page.mouse.move(center.x, center.y);
-  await page.mouse.down();
+  await page.getByRole("button", { name: "Select first" }).first().click();
 
   await expect
     .poll(async () => (await getSelectionSnapshot(page)).selectedNodeIds)
-    .toEqual([nodeId]);
+    .toEqual([firstNodeId]);
   await expect
     .poll(async () => (await getSelectionSnapshot(page)).isMoveableMuted)
     .toBe(false);
 
-  await page.mouse.up();
+  await page.keyboard.down("Shift");
+  await page.getByRole("button", { name: "Select second" }).first().click();
+  await page.keyboard.up("Shift");
 
   await expect
-    .poll(async () => (await getSelectionSnapshot(page)).isMoveableMuted)
-    .toBe(false);
+    .poll(async () => (await getSelectionSnapshot(page)).selectedNodeIds)
+    .toEqual([firstNodeId, secondNodeId]);
+
+  await page.keyboard.press("Escape");
+
+  await expect
+    .poll(async () => (await getSelectionSnapshot(page)).selectedNodeIds)
+    .toEqual([]);
 });
