@@ -1,8 +1,8 @@
+import { clamp, toNumber } from "@punchpress/engine";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
-import { clamp, toNumber } from "../../editor/primitives/math";
-import { useEditor } from "../../editor/use-editor";
-import { useEditorValue } from "../../editor/use-editor-value";
+import { useEditor } from "../../editor-react/use-editor";
+import { useEditorValue } from "../../editor-react/use-editor-value";
 import { FieldRow } from "./field-primitives";
 
 export const NodeFieldsWarpInputs = () => {

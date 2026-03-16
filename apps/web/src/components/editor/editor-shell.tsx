@@ -1,4 +1,4 @@
-import { useEditor } from "../../editor/use-editor";
+import { useEditor } from "../../editor-react/use-editor";
 import { Canvas } from "../canvas/canvas";
 import {
   Designer,

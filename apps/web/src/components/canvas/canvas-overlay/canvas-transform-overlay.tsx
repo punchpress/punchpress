@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import Moveable from "react-moveable";
-import { useEditor } from "../../../editor/use-editor";
+import { useEditor } from "../../../editor-react/use-editor";
 import { CanvasGroupRotationPreview } from "./canvas-group-rotation-preview";
 import { getCanvasTransformHandlers } from "./canvas-transform-handlers";
 import { useCanvasTransformEffects } from "./use-canvas-transform-effects";

@@ -1,9 +1,8 @@
 import {
-  getInitialLocalFontCatalog,
-  requestLocalFontCatalog,
-} from "../../platform/local-fonts";
-import { rememberLastUsedFont, resolveDefaultFont } from "../default-font";
-import { createLocalFontDescriptor } from "../local-fonts";
+  createLocalFontDescriptor,
+  type LocalFontCatalogResult,
+} from "@punchpress/punch-schema";
+import { resolveDefaultFont } from "./resolve-default-font";
 
 export const preloadFonts = (editor, nodes = editor.nodes) => {
   editor.fonts.preload(nodes);
@@ -28,24 +27,40 @@ export const getDefaultFont = (editor) => {
 };
 
 export const initializeLocalFonts = async (editor) => {
-  return await editor.loadLocalFontCatalog(() => getInitialLocalFontCatalog());
+  if (!editor.getInitialLocalFontCatalog) {
+    return null;
+  }
+
+  return await editor.loadLocalFontCatalog(() =>
+    editor.getInitialLocalFontCatalog()
+  );
 };
 
 export const requestLocalFonts = async (editor) => {
+  if (!editor.requestLocalFontCatalog) {
+    return null;
+  }
+
   editor.getState().setFontCatalogState("loading");
-  return await editor.loadLocalFontCatalog(() => requestLocalFontCatalog(), {
-    force: true,
-  });
+  return await editor.loadLocalFontCatalog(
+    () => editor.requestLocalFontCatalog(),
+    {
+      force: true,
+    }
+  );
 };
 
 export const setLastUsedFont = (editor, font) => {
   const descriptor = createLocalFontDescriptor(font);
   editor.lastUsedFont = descriptor;
   editor.defaultFont = descriptor;
-  rememberLastUsedFont(descriptor);
+  editor.persistLastUsedFont?.(descriptor);
 };
 
-export const applyLocalFontCatalog = (editor, catalog) => {
+export const applyLocalFontCatalog = (
+  editor,
+  catalog: LocalFontCatalogResult
+) => {
   editor.availableFonts = catalog.fonts;
 
   const preferredFont = resolveDefaultFont(catalog.fonts, editor.lastUsedFont);

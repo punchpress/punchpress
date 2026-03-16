@@ -1,9 +1,3 @@
-import { ChevronDownIcon, SearchIcon } from "lucide-react";
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { selectTriggerVariants } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 import {
   areLocalFontsEqual,
   createLocalFontOption,
@@ -11,9 +5,15 @@ import {
   getLocalFontSearchText,
   type LocalFontCatalogState,
   type LocalFontOption,
-} from "../../editor/local-fonts";
-import { useEditor } from "../../editor/use-editor";
-import { useEditorValue } from "../../editor/use-editor-value";
+} from "@punchpress/punch-schema";
+import { ChevronDownIcon, SearchIcon } from "lucide-react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { selectTriggerVariants } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import { useEditor } from "../../editor-react/use-editor";
+import { useEditorValue } from "../../editor-react/use-editor-value";
 import { FontPickerOptionList } from "./font-picker-option-list";
 
 interface FontPickerProps {

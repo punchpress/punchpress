@@ -1,6 +1,6 @@
-import { buildNodeGeometry } from "../editor/shapes/warp-text/warp-engine";
-import { buildSvgExport } from "../editor/shapes/warp-text/warp-svg-export";
-import type { DesignDocument } from "./schema";
+import type { DesignDocument } from "@punchpress/punch-schema";
+import { buildNodeGeometry } from "../shapes/warp-text/warp-engine";
+import { buildSvgExport } from "../shapes/warp-text/warp-svg-export";
 
 const escapeMetadata = (value: string) => {
   return value

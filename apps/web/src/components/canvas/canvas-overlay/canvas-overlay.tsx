@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useEditor } from "../../../editor/use-editor";
+import { useEditor } from "../../../editor-react/use-editor";
 import { CanvasEditingSelection } from "./canvas-editing-selection";
 import { CanvasHoverPreview } from "./canvas-hover-preview";
 import { CanvasSelectionOverlay } from "./canvas-selection-overlay";

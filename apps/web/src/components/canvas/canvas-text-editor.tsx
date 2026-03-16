@@ -1,8 +1,7 @@
+import { isNodeVisible, toSafeHex } from "@punchpress/engine";
 import { useEffect, useRef } from "react";
-import { toSafeHex } from "../../editor/primitives/math";
-import { isNodeVisible } from "../../editor/shapes/warp-text/model";
-import { useEditor } from "../../editor/use-editor";
-import { useEditorValue } from "../../editor/use-editor-value";
+import { useEditor } from "../../editor-react/use-editor";
+import { useEditorValue } from "../../editor-react/use-editor-value";
 
 const getCaretColor = (fill) => {
   const normalized = toSafeHex(fill).slice(1);

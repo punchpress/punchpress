@@ -1,4 +1,4 @@
-import type { Editor } from "../editor/editor";
+import type { Editor } from "@punchpress/engine";
 
 export interface DesktopDocumentFileResult {
   contents: string;

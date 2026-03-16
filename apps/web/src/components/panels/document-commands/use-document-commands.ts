@@ -1,7 +1,10 @@
+import type { LocalFontDescriptor } from "@punchpress/punch-schema";
+import {
+  DEFAULT_DOCUMENT_BASE_NAME,
+  MissingDocumentFontsError,
+} from "@punchpress/punch-schema";
 import { useEffectEvent, useState } from "react";
 import { showToast } from "@/components/ui/toast";
-import { DEFAULT_DOCUMENT_BASE_NAME } from "@/document/constants";
-import { MissingDocumentFontsError } from "@/document/errors";
 import {
   clearRecentPunchDocumentFiles,
   getDocumentBaseName,
@@ -14,8 +17,7 @@ import {
   savePunchDocumentFile,
   savePunchSvgFile,
 } from "@/platform/web-document-files";
-import type { LocalFontDescriptor } from "../../../editor/local-fonts";
-import { useEditor } from "../../../editor/use-editor";
+import { useEditor } from "../../../editor-react/use-editor";
 import {
   type DocumentCommand,
   formatFontList,

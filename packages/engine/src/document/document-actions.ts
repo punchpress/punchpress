@@ -1,12 +1,12 @@
 import {
   getMissingDocumentFonts,
+  loadDesignDocument,
+  MissingDocumentFontsError,
   replaceMissingDocumentFonts,
-} from "../../document/document-fonts";
-import { MissingDocumentFontsError } from "../../document/errors";
-import { exportDesignDocument } from "../../document/export";
-import { loadDesignDocument } from "../../document/load";
-import { saveDesignDocument } from "../../document/save";
+  saveDesignDocument,
+} from "@punchpress/punch-schema";
 import { finishEditingIfNeeded } from "../editing/editing-actions";
+import { exportDesignDocument } from "./export";
 
 export const getDocument = (editor) => {
   if (editor.editingNodeId) {
@@ -16,8 +16,7 @@ export const getDocument = (editor) => {
   return saveDesignDocument(editor.nodes).document;
 };
 
-export const exportDocument = async (editor) => {
-  await editor.initializeLocalFonts().catch(() => undefined);
+export const exportDocument = (editor) => {
   const missingFonts = getMissingDocumentFonts(
     editor.nodes,
     editor.availableFonts

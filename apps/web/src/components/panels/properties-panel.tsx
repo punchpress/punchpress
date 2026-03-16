@@ -1,5 +1,5 @@
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useEditorValue } from "../../editor/use-editor-value";
+import { useEditorValue } from "../../editor-react/use-editor-value";
 import { NodeFields } from "./warp-text-fields";
 
 export const PropertiesPanel = () => {

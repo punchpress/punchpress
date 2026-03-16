@@ -11,8 +11,8 @@ import {
 import { MenuShortcut } from "@/components/ui/menu";
 import { SortableItem } from "@/components/ui/sortable-list";
 import { cn } from "@/lib/utils";
-import { useEditor } from "../../../editor/use-editor";
-import { useEditorValue } from "../../../editor/use-editor-value";
+import { useEditor } from "../../../editor-react/use-editor";
+import { useEditorValue } from "../../../editor-react/use-editor-value";
 import {
   LAYER_SHORTCUTS,
   LayerContextMenuItem,

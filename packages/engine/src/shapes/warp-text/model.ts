@@ -1,4 +1,4 @@
-import { createLocalFontDescriptor } from "../../local-fonts";
+import { createLocalFontDescriptor } from "@punchpress/punch-schema";
 
 export const createId = () => {
   if (

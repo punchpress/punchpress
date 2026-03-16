@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { Editor } from "../../src/editor/editor";
+import { Editor } from "@punchpress/engine";
 
 const ARIAL_FONT = {
   family: "Arial",

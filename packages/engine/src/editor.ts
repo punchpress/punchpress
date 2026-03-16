@@ -1,6 +1,9 @@
+import {
+  createLocalFontDescriptor,
+  DEFAULT_LOCAL_FONT,
+} from "@punchpress/punch-schema";
 import { UI_ACCENT } from "./constants";
 import { getEditorDebugDump } from "./debug-dump";
-import { getStoredLastUsedFont } from "./default-font";
 import {
   newDocument as createNewEditorDocument,
   exportDocument as exportEditorDocument,
@@ -54,7 +57,6 @@ import {
   handleWindowKeyDown as handleEditorWindowKeyDown,
 } from "./input/keyboard-shortcuts";
 import { disposeEditor, mountEditor } from "./lifecycle/editor-lifecycle";
-import { createLocalFontDescriptor, DEFAULT_LOCAL_FONT } from "./local-fonts";
 import {
   DEFAULT_EDITABLE_FONT_FAMILY,
   FontManager,
@@ -111,18 +113,19 @@ export class Editor {
   constructor({ accent = UI_ACCENT, initialZoom = 1 } = {}) {
     this.accent = accent;
     this.availableFonts = [];
-    this.lastUsedFont = getStoredLastUsedFont();
-    this.defaultFont = createLocalFontDescriptor(
-      this.lastUsedFont || DEFAULT_LOCAL_FONT
-    );
+    this.defaultFont = createLocalFontDescriptor(DEFAULT_LOCAL_FONT);
+    this.getInitialLocalFontCatalog = null;
+    this.lastUsedFont = null;
     this.nodeElements = new Map();
     this.viewerRef = null;
     this.hostRef = null;
+    this.persistLastUsedFont = null;
     this.pendingViewportFocusFrame = null;
+    this.requestLocalFontCatalog = null;
     this.viewportFocusRequest = 0;
     this.store = createEditorStore({
-      defaultFont: this.defaultFont,
       initialZoom,
+      resolveDefaultFont: () => this.defaultFont,
     });
     this.fonts = new FontManager({
       onChange: () => this.store.getState().bumpFontRevision(),
@@ -359,6 +362,23 @@ export class Editor {
 
   get fontCatalogState() {
     return this.getState().fontCatalogState;
+  }
+
+  setDefaultFont(font) {
+    this.defaultFont = createLocalFontDescriptor(font || DEFAULT_LOCAL_FONT);
+  }
+
+  setFontBytesLoader(loadFontBytes) {
+    this.fonts.setFontBytesLoader(loadFontBytes);
+  }
+
+  setLocalFontCatalogLoaders({ getInitialCatalog, requestCatalog }) {
+    this.getInitialLocalFontCatalog = getInitialCatalog || null;
+    this.requestLocalFontCatalog = requestCatalog || null;
+  }
+
+  setLastUsedFontPersistence(persistLastUsedFont) {
+    this.persistLastUsedFont = persistLastUsedFont || null;
   }
 
   async initializeLocalFonts() {

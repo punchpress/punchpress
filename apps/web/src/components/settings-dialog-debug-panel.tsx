@@ -1,7 +1,7 @@
 import { CheckIcon, CopyIcon, RefreshCwIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { useEditor } from "../editor/use-editor";
+import { useEditor } from "../editor-react/use-editor";
 
 const getFormattedDebugDump = (editor) => {
   return JSON.stringify(editor.getDebugDump(), null, 2);

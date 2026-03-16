@@ -1,11 +1,10 @@
 import { describe, expect, test } from "bun:test";
-
 import {
   DocumentParseError,
   DocumentValidationError,
+  parseDesignDocument,
   UnsupportedDocumentVersionError,
-} from "../../../src/document/errors";
-import { parseDesignDocument } from "../../../src/document/load";
+} from "@punchpress/punch-schema";
 
 const VALID_DOCUMENT = {
   version: "1.0",

@@ -1,11 +1,10 @@
-import opentype from "opentype.js";
-import { readLocalFontBytes } from "../../platform/local-fonts";
 import {
   areLocalFontsEqual,
   createLocalFontDescriptor,
   DEFAULT_LOCAL_FONT,
   getLocalFontId,
-} from "../local-fonts";
+} from "@punchpress/punch-schema";
+import opentype from "opentype.js";
 
 const editableFamilyById = new Map<string, string>();
 const loadedEditableFamilies = new Set<string>();
@@ -34,8 +33,12 @@ const getEditableFamilyName = (font) => {
   return family;
 };
 
-const loadFont = async (font) => {
-  const bytes = await readLocalFontBytes(font);
+const loadFont = async (font, loadFontBytes) => {
+  if (!loadFontBytes) {
+    throw new Error("No local font bytes loader is configured.");
+  }
+
+  const bytes = await loadFontBytes(font);
 
   if (!bytes) {
     throw new Error(`Unable to read font bytes for ${font.fullName}.`);
@@ -66,7 +69,12 @@ const ensureEditableFontFamilyLoaded = async (font, bytes) => {
 export class FontManager {
   constructor({ onChange }) {
     this.cache = new Map();
+    this.loadFontBytes = null;
     this.onChange = onChange;
+  }
+
+  setFontBytesLoader(loadFontBytes) {
+    this.loadFontBytes = loadFontBytes;
   }
 
   preload(nodes) {
@@ -127,7 +135,10 @@ export class FontManager {
     const fontId = getLocalFontId(descriptor);
 
     try {
-      const { bytes, font: loadedFont } = await loadFont(descriptor);
+      const { bytes, font: loadedFont } = await loadFont(
+        descriptor,
+        this.loadFontBytes
+      );
       await ensureEditableFontFamilyLoaded(descriptor, bytes);
       this.cache.set(fontId, {
         descriptor,
@@ -156,7 +167,10 @@ export class FontManager {
       return cached.font;
     }
 
-    const { bytes, font: loadedFont } = await loadFont(descriptor);
+    const { bytes, font: loadedFont } = await loadFont(
+      descriptor,
+      this.loadFontBytes
+    );
     await ensureEditableFontFamilyLoaded(descriptor, bytes).catch(
       () => undefined
     );

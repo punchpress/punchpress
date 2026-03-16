@@ -1,11 +1,11 @@
-import { fileOpen, fileSave } from "browser-fs-access";
 import {
   DEFAULT_DOCUMENT_BASE_NAME,
   PUNCH_DOCUMENT_EXTENSION,
   PUNCH_DOCUMENT_MIME_TYPE,
   PUNCH_SVG_EXTENSION,
   PUNCH_SVG_MIME_TYPE,
-} from "../document/constants";
+} from "@punchpress/punch-schema";
+import { fileOpen, fileSave } from "browser-fs-access";
 import {
   clearBrowserRecentDocuments,
   getBrowserRecentDocuments,

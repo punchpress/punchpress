@@ -1,9 +1,8 @@
+import { MAX_ZOOM, MIN_ZOOM, round } from "@punchpress/engine";
 import { useCallback, useEffect, useRef } from "react";
 import InfiniteViewer from "react-infinite-viewer";
-import { MAX_ZOOM, MIN_ZOOM } from "../../editor/constants";
-import { round } from "../../editor/primitives/math";
-import { useEditor } from "../../editor/use-editor";
-import { useEditorValue } from "../../editor/use-editor-value";
+import { useEditor } from "../../editor-react/use-editor";
+import { useEditorValue } from "../../editor-react/use-editor-value";
 import { DesignerFloatingToolbar, DesignerFrame } from "../designer/designer";
 import { CanvasNodes } from "./canvas-nodes";
 import { CanvasOverlay } from "./canvas-overlay/canvas-overlay";

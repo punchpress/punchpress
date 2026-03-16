@@ -1,6 +1,6 @@
-import { isNodeVisible } from "../../../editor/shapes/warp-text/model";
-import { useEditor } from "../../../editor/use-editor";
-import { useEditorValue } from "../../../editor/use-editor-value";
+import { isNodeVisible } from "@punchpress/engine";
+import { useEditor } from "../../../editor-react/use-editor";
+import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { getHostRectFromNodeFrame } from "./canvas-overlay-geometry";
 
 export const CanvasEditingSelection = ({ viewportRevision }) => {

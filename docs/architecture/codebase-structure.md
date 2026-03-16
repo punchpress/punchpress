@@ -1,131 +1,120 @@
 # Codebase Structure
 
-This document describes the current code layout and layer boundaries for the Punchpress editor.
+This document describes the current code layout and layer boundaries for
+Punchpress.
 
-Punchpress is a browser-based design editor. The architecture is inspired by [tldraw](https://github.com/tldraw/tldraw): a plain TypeScript editor class owns state and logic, and React components are thin views that reach into it.
+Punchpress now has a clean package split:
+
+- `packages/engine` owns the headless editor engine
+- `packages/punch-schema` owns the `.punch` format and shared document helpers
+- `apps/web` is a client of those packages
 
 ## Layers
 
-### Layer 1: Editor Core (`apps/web/src/editor/`)
+### Layer 1: Engine Core (`packages/engine/src/`)
 
-The `Editor` class is the brain. It is not a React component — it's a plain TypeScript object with methods and getters. Components never own editor state; they read it from the Editor and call its methods.
+The `Editor` class is the product engine. It owns state, tools, transforms,
+geometry, history, and export behavior. It has no React imports.
 
-```
-editor/
-├── editor.ts                    # Editor class
-├── constants.ts                 # Editor-wide constants (zoom limits, fonts, accent)
-├── state/
-│   └── store.ts                 # Zustand vanilla store (nodes, selection, viewport, editing)
-├── tools/
-│   ├── tool.ts                  # Base Tool class + shortcut routing
-│   ├── pointer-tool.ts          # Select, move, deselect
-│   ├── hand-tool.ts             # Pan (no-op pointer events, just shortcuts)
-│   └── text-tool.ts             # Create text nodes, start editing
+```text
+packages/engine/src/
+├── editor.ts
+├── debug-dump.ts
+├── document/
+├── editing/
+├── fonts/
+├── history/
+├── input/
 ├── managers/
-│   ├── font-manager.ts          # Async font loading + opentype.js cache
-│   └── geometry-manager.ts      # Signature-based geometry cache
 ├── primitives/
-│   ├── math.ts                  # clamp, round, format, toNumber, toSafeHex
-│   ├── dom.ts                   # isInputElement
-│   └── path-geometry.ts         # Bezier flattening, contour operations, bounds
-└── shapes/
-    └── warp-text/
-        ├── model.ts             # createDefaultNode, getDefaultWarp, createId
-        ├── warp-engine.ts       # Glyph layout, arch/wave/circle warps, SVG export
-        └── straight-text-metrics.ts  # Unwarped text bounds (for editing overlay)
+├── queries/
+├── selection/
+├── shapes/
+├── state/store/
+├── tools/
+├── transform/
+└── viewport/
 ```
 
-**Editor class responsibilities:**
-- Owns the Zustand store, FontManager, GeometryManager, and tool instances
-- Provides getters for derived state (`selectedNode`, `editingGeometry`, `editingMetrics`, etc.)
-- Dispatches pointer events to the active tool via `dispatchCanvasPointerDown` / `dispatchNodePointerDown`
-- Handles global keyboard events (delete, tool shortcuts via tools)
-- Manages DOM refs for viewport (InfiniteViewer) and node elements
-- Manages space-press panning state
+### Layer 2: Schema / Document (`packages/punch-schema/src/`)
 
-**Store shape:**
-```
-activeTool        — "pointer" | "hand" | "text"
-editingNodeId     — string | null
-editingOriginalText — string
-editingText       — string
-fontRevision      — number (bumped when fonts load)
-nodes             — array of node objects
-selectedNodeIds   — string[]
-viewport          — { zoom: number }
+This package owns the persistent `.punch` format and schema-adjacent helpers.
+
+```text
+packages/punch-schema/src/
+├── constants.ts
+├── document-fonts.ts
+├── errors.ts
+├── load.ts
+├── local-fonts.ts
+├── migrate.ts
+├── save.ts
+└── schema.ts
 ```
 
-**Tool system:**
-Each tool extends `Tool` and implements `onCanvasPointerDown`, `onNodePointerDown`, and `onKeyDown`. The Editor routes events to `this.currentTool`. Adding a new tool = adding a new file in `tools/`, registering it in the Editor constructor.
+### Layer 3: React Bindings (`apps/web/src/editor-react/`)
 
-**Shape system:**
-Shape-specific logic lives under `shapes/<shape-name>/`. Currently only `warp-text` exists. Each shape has:
-- `model.ts` — Node creation and default values
-- Engine file(s) — Geometry computation, rendering data, export
+These files are the React-specific bridge to the engine.
 
-When adding a new node type (e.g., image, vector shape), create a new folder under `shapes/`.
-
-### Layer 2: React Bindings
-
-Three files bridge the Editor to React:
-
-```
-editor/
-├── editor-provider.tsx    # Creates Editor, provides via context, calls mount/dispose
-├── use-editor.ts          # useEditor() — returns the Editor instance from context
-└── use-editor-value.ts    # useEditorValue(selector) — reactive subscription to store slices
+```text
+apps/web/src/editor-react/
+├── editor-provider.tsx
+├── use-editor.ts
+├── use-editor-value.ts
+└── default-font.ts
 ```
 
-`useEditorValue((editor, state) => ...)` subscribes to the Zustand store with shallow equality. The selector receives both the `editor` instance and the raw store `state`, so it can access getters and computed values.
+`EditorProvider` is also where app-side host capabilities are attached to the
+engine, such as:
 
-### Layer 3: Components (`apps/web/src/components/`)
+- local font discovery
+- font byte loading
+- persisted default font preferences
 
-Components are flat siblings that call `useEditor()` directly. No prop drilling for editor state.
+### Layer 4: Components (`apps/web/src/components/`)
 
-```
-components/
-├── canvas/
-│   ├── canvas.tsx              # InfiniteViewer viewport, pointer dispatch, space-pan
-│   ├── canvas-nodes.tsx        # Maps node IDs → CanvasNode components
-│   ├── canvas-node.tsx         # Single node SVG renderer
-│   ├── canvas-overlay.tsx      # Moveable (drag/resize) + Selecto (lasso select)
-│   ├── canvas-text-editor.tsx  # Inline text input overlay during editing
-│   └── canvas-toolbar.tsx      # Tool buttons + zoom controls
-├── panels/
-│   ├── layers-panel.tsx        # Node list sidebar
-│   ├── properties-panel.tsx    # Selected node properties sidebar
-│   ├── warp-text-fields.tsx    # Property fields for warp text nodes
-│   ├── warp-text-warp-fields.tsx  # Warp-specific sub-fields (arch bend, wave amplitude, etc.)
-│   └── field-primitives.tsx    # Reusable form layout (Section, FieldRow, ColorField)
-├── editor/
-│   └── editor-shell.tsx        # Layout shell (Designer wrapper + 3 panels)
-├── designer/
-│   └── designer.tsx            # Generic layout primitives (frame, panels, floating toolbar)
-├── ui/                         # Design system primitives (button, input, dialog, etc.)
-└── settings-dialog.tsx
-```
+Components render state and forward GUI intent into engine commands. They
+should not own durable editor behavior.
 
-**Component tree:**
-```
-App
-└── ThemeProvider
-    └── EditorProvider
-        └── EditorShell (layout only)
-              ├── Canvas
-              │   ├── CanvasNodes → CanvasNode (per node)
-              │   ├── CanvasTextEditor
-              │   ├── CanvasToolbar
-              │   └── CanvasOverlay
-              ├── LayersPanel
-              └── PropertiesPanel → WarpTextFields → WarpTextWarpFields
-```
+### Layer 5: Platform (`apps/web/src/platform/`)
 
-## Data Flow
+The web app owns browser and desktop-shell boundaries such as:
 
-1. **State changes** go through the Editor: `editor.selectNode(id)`, `editor.updateNode(id, changes)`, `editor.setActiveTool("text")`
-2. **Store updates** trigger Zustand subscriptions
-3. **Components re-render** via `useEditorValue` selectors with shallow equality
-4. **Pointer events** flow through the tool state machine: Canvas calls `editor.dispatchCanvasPointerDown(info)` → Editor forwards to `currentTool.onCanvasPointerDown(info)`
-5. **Keyboard events** are handled globally by the Editor: delete/backspace → `deleteSelected()`, other keys → `currentTool.onKeyDown()`
+- file picker and save flows
+- recent documents
+- browser/Electron local font access
+- Electron command bridges
 
-Current document schema and node fields are documented separately in [Document Model](./document-model.md).
+Those capabilities stay outside `packages/engine`.
+
+## Responsibilities
+
+**Engine responsibilities**
+
+- own the `Editor` API and store
+- own selection, transform, history, geometry, and export behavior
+- expose structured inspection like the debug dump
+- stay free of React and app/platform imports
+
+**Schema responsibilities**
+
+- define `.punch` shape and versioning
+- parse, validate, migrate, and serialize documents
+- provide shared document/font descriptor utilities
+
+**React responsibilities**
+
+- render engine state
+- translate GUI interactions into engine commands
+- attach host capabilities to the engine at runtime
+
+**Platform responsibilities**
+
+- browser/Electron integration
+- file system boundaries
+- local font discovery
+
+## Current Rule
+
+If a piece of code could run in a headless CLI or AI workflow, it belongs in
+`packages/engine` or `packages/punch-schema`, not in `apps/web`.
