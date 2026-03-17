@@ -1,9 +1,19 @@
 import { z } from "zod";
-import { PUNCH_DOCUMENT_VERSION } from "./constants";
+import { PUNCH_DOCUMENT_VERSION, ROOT_PARENT_ID } from "./constants";
 
 const finiteNumber = z.number().refine(Number.isFinite, {
   message: "Expected a finite number.",
 });
+
+const parentIdSchema = z.string().min(1);
+
+const baseNodeSchema = z
+  .object({
+    id: z.string().min(1),
+    parentId: parentIdSchema,
+    visible: z.boolean(),
+  })
+  .strict();
 
 export const transformSchema = z
   .object({
@@ -48,9 +58,8 @@ export const localFontSchema = z
   })
   .strict();
 
-export const textNodeSchema = z
-  .object({
-    id: z.string().min(1),
+export const textNodeSchema = baseNodeSchema
+  .extend({
     type: z.literal("text"),
     text: z.string(),
     font: localFontSchema,
@@ -60,19 +69,32 @@ export const textNodeSchema = z
     fill: z.string().min(1),
     stroke: z.string().min(1).nullable(),
     strokeWidth: finiteNumber,
-    visible: z.boolean(),
     warp: warpSchema,
   })
   .strict();
 
+export const groupNodeSchema = baseNodeSchema
+  .extend({
+    name: z.string().min(1),
+    type: z.literal("group"),
+    transform: transformSchema,
+  })
+  .strict();
+
+export const nodeSchema = z.discriminatedUnion("type", [
+  textNodeSchema,
+  groupNodeSchema,
+]);
+
 export const designDocumentSchema = z
   .object({
     version: z.literal(PUNCH_DOCUMENT_VERSION),
-    nodes: z.array(textNodeSchema),
+    nodes: z.array(nodeSchema),
   })
   .strict()
   .superRefine((document, context) => {
     const seenNodeIds = new Set<string>();
+    const nodeIds = new Set(document.nodes.map((node) => node.id));
 
     for (const [index, node] of document.nodes.entries()) {
       if (seenNodeIds.has(node.id)) {
@@ -85,10 +107,28 @@ export const designDocumentSchema = z
       }
 
       seenNodeIds.add(node.id);
+
+      if (node.parentId === node.id) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Node cannot be its own parent.",
+          path: ["nodes", index, "parentId"],
+        });
+      }
+
+      if (node.parentId !== ROOT_PARENT_ID && !nodeIds.has(node.parentId)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Unknown parent id: ${node.parentId}`,
+          path: ["nodes", index, "parentId"],
+        });
+      }
     }
   });
 
 export type DesignDocument = z.infer<typeof designDocumentSchema>;
+export type GroupNodeDocument = z.infer<typeof groupNodeSchema>;
+export type NodeDocument = z.infer<typeof nodeSchema>;
 export type TextNodeDocument = z.infer<typeof textNodeSchema>;
 export type LocalFontDocument = z.infer<typeof localFontSchema>;
 export type TransformDocument = z.infer<typeof transformSchema>;

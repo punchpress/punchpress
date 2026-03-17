@@ -1,6 +1,14 @@
-import { createId, isNodeVisible } from "../../shapes/warp-text/model";
+import {
+  getSubtreeNodeIds,
+  isDescendantOf,
+} from "../../nodes/node-tree";
+import { isNodeVisible } from "../../shapes/warp-text/model";
 import { finalizeEditingState } from "./editing-state";
-import { mapNodeById } from "./node-mutations";
+import {
+  deleteNodeTreeState,
+  duplicateNodeTreeState,
+  toggleNodeVisibilityTreeState,
+} from "./node-tree-state";
 import { getSelectedNodeIds } from "./selection-state";
 
 export const deleteNodeState = (state, nodeId) => {
@@ -8,7 +16,9 @@ export const deleteNodeState = (state, nodeId) => {
     return {};
   }
 
-  const isEditingNode = state.editingNodeId === nodeId;
+  const deletedNodeIds = new Set(getSubtreeNodeIds(state.nodes, nodeId));
+  const isEditingNode =
+    state.editingNodeId && deletedNodeIds.has(state.editingNodeId);
 
   return {
     activeTool: isEditingNode ? "pointer" : state.activeTool,
@@ -16,10 +26,7 @@ export const deleteNodeState = (state, nodeId) => {
     editingOriginalText: isEditingNode ? "" : state.editingOriginalText,
     editingText: isEditingNode ? "" : state.editingText,
     isHoveringSuppressed: isEditingNode ? false : state.isHoveringSuppressed,
-    nodes: state.nodes.filter((node) => node.id !== nodeId),
-    selectedNodeIds: state.selectedNodeIds.filter(
-      (selectedNodeId) => selectedNodeId !== nodeId
-    ),
+    ...deleteNodeTreeState(state, [nodeId]),
   };
 };
 
@@ -32,7 +39,11 @@ export const deleteNodesState = (state, nodeIds) => {
 
   const selectedNodeIdSet = new Set(selectedNodeIds);
   const isEditingNodeSelected =
-    state.editingNodeId && selectedNodeIdSet.has(state.editingNodeId);
+    state.editingNodeId &&
+    selectedNodeIds.some((nodeId) =>
+      nodeId === state.editingNodeId ||
+      isDescendantOf(state.nodes, state.editingNodeId, nodeId)
+    );
 
   return {
     activeTool: isEditingNodeSelected ? "pointer" : state.activeTool,
@@ -42,10 +53,7 @@ export const deleteNodesState = (state, nodeIds) => {
     isHoveringSuppressed: isEditingNodeSelected
       ? false
       : state.isHoveringSuppressed,
-    nodes: state.nodes.filter((node) => !selectedNodeIdSet.has(node.id)),
-    selectedNodeIds: state.selectedNodeIds.filter(
-      (selectedNodeId) => !selectedNodeIdSet.has(selectedNodeId)
-    ),
+    ...deleteNodeTreeState(state, selectedNodeIds),
   };
 };
 
@@ -61,7 +69,10 @@ export const toggleNodeVisibilityState = (state, nodeId) => {
 
   const nextVisible = !isNodeVisible(targetNode);
   const baseState =
-    !nextVisible && state.editingNodeId === nodeId
+    !nextVisible &&
+    state.editingNodeId &&
+    (state.editingNodeId === nodeId ||
+      isDescendantOf(state.nodes, state.editingNodeId, nodeId))
       ? { ...state, ...finalizeEditingState(state, state.selectedNodeIds) }
       : state;
 
@@ -70,9 +81,7 @@ export const toggleNodeVisibilityState = (state, nodeId) => {
     editingNodeId: baseState.editingNodeId,
     editingOriginalText: baseState.editingOriginalText,
     editingText: baseState.editingText,
-    nodes: mapNodeById(baseState.nodes, nodeId, {
-      visible: nextVisible,
-    }),
+    ...toggleNodeVisibilityTreeState(baseState, nodeId),
     selectedNodeIds: baseState.selectedNodeIds,
   };
 };
@@ -88,34 +97,13 @@ export const duplicateNodesState = (state, nodeIds) => {
     state.editingNodeId && selectedNodeIds.includes(state.editingNodeId)
       ? { ...state, ...finalizeEditingState(state, selectedNodeIds) }
       : state;
-  const selectedNodeIdSet = new Set(selectedNodeIds);
-  const duplicateNodeIds = /** @type {string[]} */ ([]);
-  const nodes = committedState.nodes.flatMap((node) => {
-    if (!selectedNodeIdSet.has(node.id)) {
-      return [node];
-    }
-
-    const duplicateNode = {
-      ...node,
-      id: createId(),
-      transform: {
-        ...node.transform,
-        x: node.transform.x + 120,
-        y: node.transform.y + 120,
-      },
-    };
-
-    duplicateNodeIds.push(duplicateNode.id);
-
-    return [node, duplicateNode];
-  });
+  const duplicatedState = duplicateNodeTreeState(committedState, selectedNodeIds);
 
   return {
     activeTool: committedState.activeTool,
     editingNodeId: committedState.editingNodeId,
     editingOriginalText: committedState.editingOriginalText,
     editingText: committedState.editingText,
-    nodes,
-    selectedNodeIds: duplicateNodeIds,
+    ...duplicatedState,
   };
 };

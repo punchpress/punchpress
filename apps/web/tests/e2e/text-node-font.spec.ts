@@ -3,7 +3,7 @@ import {
   gotoEditor,
   loadDocumentFixture,
   serializeDocument,
-} from "./editor-helpers";
+} from "./helpers/editor";
 
 test("selecting a different local font updates the selected node", async ({
   page,

@@ -14,12 +14,13 @@ const queueOverlayRefresh = (editor) => {
 };
 
 export const beginMoveSelection = (editor, { nodeId, nodeIds } = {}) => {
-  const resolvedNodeIds =
+  const requestedNodeIds =
     nodeIds?.filter((currentNodeId) => editor.getNode(currentNodeId)) ||
     (nodeId
       ? [nodeId].filter((currentNodeId) => editor.getNode(currentNodeId))
       : null) ||
     editor.selectedNodeIds;
+  const resolvedNodeIds = editor.getEffectiveSelectionNodeIds(requestedNodeIds);
 
   if (resolvedNodeIds.length === 0) {
     return null;
@@ -118,11 +119,13 @@ export const moveSelectionBy = (
   editor,
   { queueRefresh = false, x = 0, y = 0 } = {}
 ) => {
-  if (editor.selectedNodeIds.length === 0) {
+  const effectiveSelectedNodeIds = editor.getEffectiveSelectionNodeIds();
+
+  if (effectiveSelectedNodeIds.length === 0) {
     return [];
   }
 
-  editor.updateNodes(editor.selectedNodeIds, (node) => ({
+  editor.updateNodes(effectiveSelectedNodeIds, (node) => ({
     transform: {
       x: round(getNodeX(node) + x, 2),
       y: round(getNodeY(node) + y, 2),
@@ -133,5 +136,5 @@ export const moveSelectionBy = (
     queueOverlayRefresh(editor);
   }
 
-  return editor.selectedNodeIds;
+  return effectiveSelectedNodeIds;
 };

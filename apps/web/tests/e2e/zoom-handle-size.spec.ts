@@ -7,7 +7,7 @@ import {
   waitForNodeReady,
   waitForSelectionHandles,
   zoomIn,
-} from "./editor-helpers";
+} from "./helpers/editor";
 
 test("keeps resize handles the same size while zooming", async ({ page }) => {
   await gotoEditor(page);

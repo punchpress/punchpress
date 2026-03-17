@@ -1,4 +1,7 @@
-import { createLocalFontDescriptor } from "@punchpress/punch-schema";
+import {
+  createLocalFontDescriptor,
+  ROOT_PARENT_ID,
+} from "@punchpress/punch-schema";
 
 export const createId = () => {
   if (
@@ -78,6 +81,7 @@ export const withNodeTransform = (node, transformPatch) => {
 export const createDefaultNode = (font) => {
   return {
     id: createId(),
+    parentId: ROOT_PARENT_ID,
     type: "text",
     text: "YOUR TEXT",
     font: createLocalFontDescriptor(font),

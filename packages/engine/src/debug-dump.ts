@@ -17,6 +17,7 @@ export const getEditorDebugDump = (editor) => {
       version: document.version,
     },
     editing: {
+      focusedGroupId: state.focusedGroupId,
       nodeId: state.editingNodeId,
       originalText: state.editingOriginalText,
       text: state.editingText,
@@ -29,9 +30,6 @@ export const getEditorDebugDump = (editor) => {
 
       return {
         elementRect: toRect(element?.getBoundingClientRect?.()),
-        fill: node.fill,
-        font: { ...node.font },
-        fontSize: node.fontSize,
         frame: toFrame(frame),
         geometry: {
           bbox: toBounds(geometry?.bbox),
@@ -39,15 +37,32 @@ export const getEditorDebugDump = (editor) => {
           ready: Boolean(geometry?.ready),
         },
         id: node.id,
+        parentId: node.parentId,
         rotation: node.transform.rotation,
-        stroke: node.stroke,
-        strokeWidth: node.strokeWidth,
-        text: node.text,
-        tracking: node.tracking,
         transform: { ...node.transform },
         type: node.type,
         visible: node.visible,
-        warp: { ...node.warp },
+        ...(node.type === "text"
+          ? {
+              fill: node.fill,
+              font: { ...node.font },
+              fontSize: node.fontSize,
+              stroke: node.stroke,
+              strokeWidth: node.strokeWidth,
+              text: node.text,
+              tracking: node.tracking,
+              warp: { ...node.warp },
+            }
+          : {
+              fill: null,
+              font: null,
+              fontSize: null,
+              stroke: null,
+              strokeWidth: null,
+              text: "",
+              tracking: null,
+              warp: null,
+            }),
       };
     }),
     selection: {

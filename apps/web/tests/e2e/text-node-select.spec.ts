@@ -4,7 +4,7 @@ import {
   gotoEditor,
   loadDocumentFixture,
   waitForNodeReady,
-} from "./editor-helpers";
+} from "./helpers/editor";
 
 test("clicking, shift-clicking, and escape drive selection through the browser", async ({
   page,

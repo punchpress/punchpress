@@ -1,4 +1,3 @@
-import { isNodeVisible } from "@punchpress/engine";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { getHostRectFromCanvasBounds } from "./canvas-overlay-geometry";
 import { getTransformFlags } from "./canvas-overlay-interactions";
@@ -11,41 +10,50 @@ export const useCanvasTransformState = (
   const editingNodeId = useEditorValue((_, state) => state.editingNodeId);
   const visibleSelectedNodeIds = useEditorValue((editor, state) => {
     return state.selectedNodeIds.filter((nodeId) => {
-      return isNodeVisible(editor.getNode(nodeId));
+      return (
+        editor.isNodeEffectivelyVisible(nodeId) &&
+        Boolean(editor.getNodeFrame(nodeId))
+      );
     });
   });
-  const selectedTargets = useEditorValue((editor, state) => {
-    return state.selectedNodeIds
-      .filter((nodeId) => isNodeVisible(editor.getNode(nodeId)))
-      .map((nodeId) => editor.getNodeElement(nodeId))
-      .filter(Boolean);
+  const effectiveSelectedNodeIds = useEditorValue((editor, state) => {
+    return editor
+      .getEffectiveSelectionNodeIds(state.selectedNodeIds)
+      .filter((nodeId) => editor.isNodeEffectivelyVisible(nodeId));
   });
-
-  const visibleSelectedNodeId = visibleSelectedNodeIds.at(-1) || null;
   const selectedNode = useEditorValue((editor) => {
     if (visibleSelectedNodeIds.length !== 1) {
       return null;
     }
 
-    return editor.getNode(visibleSelectedNodeId);
+    return editor.getNode(visibleSelectedNodeIds[0]);
   });
   const selectedGeometry = useEditorValue((editor) => {
-    if (visibleSelectedNodeIds.length !== 1) {
+    if (
+      !(visibleSelectedNodeIds.length === 1 && selectedNode?.type === "text")
+    ) {
       return null;
     }
 
-    return editor.getNodeGeometry(visibleSelectedNodeId);
+    return editor.getNodeGeometry(visibleSelectedNodeIds[0]);
+  });
+  const selectedTargets = useEditorValue((editor) => {
+    return effectiveSelectedNodeIds
+      .filter((nodeId) => editor.isNodeEffectivelyVisible(nodeId))
+      .map((nodeId) => editor.getNodeElement(nodeId))
+      .filter(Boolean);
   });
   const selectedBounds = useEditorValue((editor) => {
-    return editor.getSelectionBounds(visibleSelectedNodeIds);
+    return editor.getSelectionBounds(effectiveSelectedNodeIds);
   });
   const selectionFrameKey = useEditorValue((editor) => {
-    return editor.getSelectionFrameKey(visibleSelectedNodeIds);
+    return editor.getSelectionFrameKey(effectiveSelectedNodeIds);
   });
 
-  const hostElement = editor.hostRef;
+  const visibleSelectedNodeId = visibleSelectedNodeIds.at(-1) || null;
   const selectedTarget = selectedTargets[0] || null;
-  const hasGroupSelection = visibleSelectedNodeIds.length > 1;
+  const hasGroupSelection =
+    effectiveSelectedNodeIds.length > 1 || selectedNode?.type === "group";
   const groupRotationPreviewRect =
     isGroupRotationPreviewVisible && hasGroupSelection
       ? getHostRectFromCanvasBounds(editor, selectedBounds)
@@ -65,9 +73,10 @@ export const useCanvasTransformState = (
   return {
     activeTool,
     editingNodeId,
+    effectiveSelectedNodeIds,
     groupRotationPreviewRect,
     hasGroupSelection,
-    hostElement,
+    hostElement: editor.hostRef,
     isDraggable,
     isResizable,
     isRotatable,
@@ -77,6 +86,7 @@ export const useCanvasTransformState = (
     selectedTarget,
     selectedTargets,
     selectionFrameKey,
+    visibleSelectedNodeId,
     visibleSelectedNodeIds,
   };
 };

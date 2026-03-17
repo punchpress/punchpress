@@ -59,6 +59,10 @@ export const createEditingStoreActions = (set) => {
 
     startEditing: (node) => {
       set((state) => {
+        if (!(node && node.type === "text")) {
+          return {};
+        }
+
         const baseState =
           state.editingNodeId && state.editingNodeId !== node.id
             ? commitEditingState(state, [node.id])

@@ -38,10 +38,57 @@ export const duplicate = (editor, nodeId) => {
   });
 };
 
-export const setNodeOrder = (editor, nodeIds) => {
+export const groupSelected = (editor) => {
+  finishEditingIfNeeded(editor);
+  if (editor.selectedNodeIds.length < 2) {
+    return;
+  }
+
+  editor.run(() => {
+    editor.getState().groupSelectedNodes();
+  });
+};
+
+export const ungroup = (editor, nodeId) => {
+  finishEditingIfNeeded(editor);
+  const targetNodeId =
+    nodeId && editor.isGroupNode(nodeId) ? nodeId : editor.selectedNodeId;
+
+  if (!(targetNodeId && editor.isGroupNode(targetNodeId))) {
+    return;
+  }
+
+  editor.run(() => {
+    editor.getState().ungroupNodeById(targetNodeId);
+  });
+};
+
+export const setNodeOrder = (editor, nodeIds, parentId) => {
   finishEditingIfNeeded(editor);
   editor.run(() => {
-    editor.getState().setNodeOrder(nodeIds);
+    editor.getState().setNodeOrder(nodeIds, parentId);
+  });
+};
+
+export const renameGroup = (editor, nodeId, name) => {
+  const nextName = typeof name === "string" ? name.trim() : "";
+  const node = editor.getNode(nodeId);
+
+  if (!(node?.type === "group" && nextName.length > 0)) {
+    return;
+  }
+
+  editor.run(() => {
+    editor.getState().updateNodeById(nodeId, (currentNode) => {
+      if (currentNode.type !== "group") {
+        return currentNode;
+      }
+
+      return {
+        ...currentNode,
+        name: nextName,
+      };
+    });
   });
 };
 

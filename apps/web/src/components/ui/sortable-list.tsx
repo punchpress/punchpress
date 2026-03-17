@@ -1,6 +1,7 @@
 import {
   closestCenter,
   DndContext,
+  DragOverlay,
   PointerSensor,
   useSensor,
   useSensors,
@@ -12,6 +13,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useState } from "react";
 
 export const SortableList = ({
   activationDistance = 5,
@@ -20,7 +22,9 @@ export const SortableList = ({
   onReorder,
   onReorderEnd,
   onReorderStart,
+  renderDragOverlay,
 }) => {
+  const [activeId, setActiveId] = useState(null);
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -33,6 +37,7 @@ export const SortableList = ({
     <DndContext
       collisionDetection={closestCenter}
       onDragCancel={() => {
+        setActiveId(null);
         onReorderEnd?.();
       }}
       onDragEnd={({ active, over }) => {
@@ -45,9 +50,11 @@ export const SortableList = ({
           }
         }
 
+        setActiveId(null);
         onReorderEnd?.(active.id);
       }}
       onDragStart={({ active }) => {
+        setActiveId(active.id);
         onReorderStart?.(active.id);
       }}
       sensors={sensors}
@@ -55,6 +62,9 @@ export const SortableList = ({
       <SortableContext items={items} strategy={verticalListSortingStrategy}>
         {children}
       </SortableContext>
+      <DragOverlay>
+        {activeId && renderDragOverlay ? renderDragOverlay(activeId) : null}
+      </DragOverlay>
     </DndContext>
   );
 };
@@ -69,7 +79,7 @@ export const SortableItem = ({ children, id }) => {
     },
     isDragging,
     itemStyle: {
-      transform: CSS.Transform.toString(transform),
+      transform: CSS.Translate.toString(transform),
       transition,
       zIndex: isDragging ? 20 : undefined,
     },

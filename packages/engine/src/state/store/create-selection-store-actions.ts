@@ -16,6 +16,16 @@ export const createSelectionStoreActions = (set) => {
       });
     },
 
+    setFocusedGroupId: (focusedGroupId) => {
+      set((state) => ({
+        focusedGroupId:
+          focusedGroupId &&
+          state.nodes.some((node) => node.id === focusedGroupId)
+            ? focusedGroupId
+            : null,
+      }));
+    },
+
     setHoveringSuppressed: (isHoveringSuppressed) => {
       set((state) => ({
         hoveredNodeId: isHoveringSuppressed ? null : state.hoveredNodeId,

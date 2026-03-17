@@ -3,10 +3,28 @@ import {
   getNodeCssTransform,
   getNodeX,
   getNodeY,
+  round,
 } from "@punchpress/engine";
 import { cn } from "@/lib/utils";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
+import { drillIntoGroupSelection } from "./canvas-group-drill-in";
+
+const getCanvasPoint = (editor, clientX, clientY) => {
+  const viewer = editor.viewerRef;
+  const host = editor.hostRef;
+
+  if (!(viewer && host)) {
+    return { x: 0, y: 0 };
+  }
+
+  const rect = host.getBoundingClientRect();
+
+  return {
+    x: viewer.getScrollLeft() + (clientX - rect.left) / editor.zoom,
+    y: viewer.getScrollTop() + (clientY - rect.top) / editor.zoom,
+  };
+};
 
 export const CanvasNode = ({ nodeId }) => {
   const editor = useEditor();
@@ -32,7 +50,13 @@ export const CanvasNode = ({ nodeId }) => {
         !geometry?.ready && "opacity-50"
       )}
       data-node-id={node.id}
-      onDoubleClick={() => editor.startEditing(node)}
+      onDoubleClick={() => {
+        if (drillIntoGroupSelection(editor, node.id)) {
+          return;
+        }
+
+        editor.startEditing(node);
+      }}
       onPointerDown={(event) => {
         if (event.button !== 0) {
           return;
@@ -42,17 +66,84 @@ export const CanvasNode = ({ nodeId }) => {
           return;
         }
 
+        const selectionTargetNodeId =
+          editor.getSelectionTargetNodeId(node.id) || node.id;
+        const shouldStartDragging = !(
+          event.shiftKey || editor.isSelected(selectionTargetNodeId)
+        );
+
         editor.dispatchNodePointerDown({ event, node });
+
+        if (shouldStartDragging) {
+          const startClientPoint = {
+            x: event.clientX,
+            y: event.clientY,
+          };
+          let previousCanvasPoint = getCanvasPoint(
+            editor,
+            event.clientX,
+            event.clientY
+          );
+          let historyMark: ReturnType<typeof editor.markHistoryStep> = null;
+
+          const handlePointerMove = (moveEvent) => {
+            const movedDistance = Math.hypot(
+              moveEvent.clientX - startClientPoint.x,
+              moveEvent.clientY - startClientPoint.y
+            );
+
+            if (!(historyMark || movedDistance >= 3)) {
+              return;
+            }
+
+            if (!historyMark) {
+              historyMark = editor.markHistoryStep("move selection");
+              editor.setHoveringSuppressed(true);
+            }
+
+            const nextCanvasPoint = getCanvasPoint(
+              editor,
+              moveEvent.clientX,
+              moveEvent.clientY
+            );
+
+            editor.moveSelectionBy({
+              queueRefresh: true,
+              x: round(nextCanvasPoint.x - previousCanvasPoint.x, 2),
+              y: round(nextCanvasPoint.y - previousCanvasPoint.y, 2),
+            });
+
+            previousCanvasPoint = nextCanvasPoint;
+          };
+
+          const handlePointerUp = () => {
+            window.removeEventListener("pointermove", handlePointerMove);
+            window.removeEventListener("pointerup", handlePointerUp);
+            editor.setHoveringSuppressed(false);
+
+            if (historyMark) {
+              editor.commitHistoryStep(historyMark);
+            }
+          };
+
+          window.addEventListener("pointermove", handlePointerMove);
+          window.addEventListener("pointerup", handlePointerUp);
+        }
       }}
       onPointerEnter={() => {
         if (spacePressed || activeTool !== "pointer") {
           return;
         }
 
-        editor.setHoveredNode(node.id);
+        editor.setHoveredNode(
+          editor.getSelectionTargetNodeId(node.id) || node.id
+        );
       }}
       onPointerLeave={() => {
-        if (editor.hoveredNodeId !== node.id) {
+        const hoverTargetNodeId =
+          editor.getSelectionTargetNodeId(node.id) || node.id;
+
+        if (editor.hoveredNodeId !== hoverTargetNodeId) {
           return;
         }
 

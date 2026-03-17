@@ -22,22 +22,38 @@ The goal of the model is not to capture every future feature up front. The goal 
 
 ## Current Schema
 
-This section defines a concrete starting schema based on the current feature set: editable text nodes with optional warp settings.
+This section defines the current schema: editable text nodes plus structural group nodes.
 
 ### Document
 
 ```ts
 type DesignDocumentV1 = {
-  version: "1.1";
-  nodes: TextNode[];
+  version: "1.2";
+  nodes: Node[];
 };
+
+type Node = TextNode | GroupNode;
 ```
 
 Rules:
 
 - `nodes` is an ordered array.
-- Array order is layer order. Later nodes render in front of earlier nodes.
+- Array order is tree order.
+- Parent and child relationships use `parentId`.
+- Root-level nodes use `parentId: "root"`.
 - The document contains only persistent design state.
+
+### Group Node
+
+```ts
+type GroupNode = {
+  id: string;
+  type: "group";
+  parentId: NodeParentId;
+  visible: boolean;
+  transform: Transform;
+};
+```
 
 ### Text Node
 
@@ -45,6 +61,7 @@ Rules:
 type TextNode = {
   id: string;
   type: "text";
+  parentId: NodeParentId;
   text: string;
   font: LocalFont;
   transform: Transform;
@@ -56,6 +73,8 @@ type TextNode = {
   visible: boolean;
   warp: Warp;
 };
+
+type NodeParentId = "root" | string;
 
 type LocalFont = {
   family: string;
@@ -83,6 +102,7 @@ This is intentionally simple:
 
 - `id` is a stable string ID for identity only. It is not the node's semantic role.
 - `type` is explicit.
+- `parentId` expresses hierarchy without nesting child arrays inside the stored document.
 - `text` is the editable source string.
 - `font` stores the resolved local font descriptor used to derive geometry.
 - `transform` holds placement only.
@@ -104,15 +124,29 @@ It does not store transient editor session state or derived renderer data. That 
 
 ## Example Document
 
-This is an example `version: "1.1"` document using the current feature set.
+This is an example `version: "1.2"` document using the current feature set.
 
 ```json
 {
-  "version": "1.1",
+  "version": "1.2",
   "nodes": [
+    {
+      "id": "group_1",
+      "type": "group",
+      "parentId": "root",
+      "visible": true,
+      "transform": {
+        "x": 0,
+        "y": 0,
+        "rotation": 0,
+        "scaleX": 1,
+        "scaleY": 1
+      }
+    },
     {
       "id": "node_1",
       "type": "text",
+      "parentId": "group_1",
       "text": "BROOKLYN",
       "font": {
         "family": "College Block",
@@ -141,6 +175,7 @@ This is an example `version: "1.1"` document using the current feature set.
     {
       "id": "node_2",
       "type": "text",
+      "parentId": "group_1",
       "text": "ATHLETICS",
       "font": {
         "family": "College Block",
@@ -174,6 +209,7 @@ This is an example `version: "1.1"` document using the current feature set.
 The schema above implies a few non-negotiable behaviors:
 
 - The renderer is a pure function of the document.
+- Group membership changes `parentId`, not child arrays embedded in nodes.
 - Editing text updates `text`, not outlined path data.
 - Editing a warp updates `warp`, not baked geometry.
 - Dragging, rotating, and scaling update `transform`, not content fields.

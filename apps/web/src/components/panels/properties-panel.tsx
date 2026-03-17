@@ -34,7 +34,14 @@ export const PropertiesPanel = () => {
           </p>
         )}
 
-        {selectedNode && <NodeFields />}
+        {selectedNode?.type === "group" && (
+          <p className="m-0 text-[var(--designer-text-muted)] text-sm">
+            Group selected. Use the canvas or layers panel to drill in, ungroup,
+            or transform its contents together.
+          </p>
+        )}
+
+        {selectedNode?.type === "text" && <NodeFields />}
       </div>
     </div>
   );

@@ -36,6 +36,18 @@ export const handleEditingShortcutKeyDown = (editor, event, key) => {
 };
 
 export const handleCanvasShortcutKeyDown = (editor, event, key) => {
+  if ((event.metaKey || event.ctrlKey) && !event.altKey && key === "g") {
+    event.preventDefault();
+
+    if (event.shiftKey) {
+      editor.ungroup();
+      return true;
+    }
+
+    editor.groupSelected();
+    return true;
+  }
+
   if (event.metaKey || event.ctrlKey || event.altKey) {
     return false;
   }

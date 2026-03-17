@@ -43,7 +43,6 @@ export const SettingsDialogDebugPanel = ({ isActive }) => {
 
     return nextDump;
   };
-
   const handleCopyDump = async () => {
     try {
       const clipboard = window.navigator?.clipboard;

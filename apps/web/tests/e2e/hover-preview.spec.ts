@@ -5,7 +5,7 @@ import {
   loadDocumentFixture,
   panViewportBy,
   waitForNodeReady,
-} from "./editor-helpers";
+} from "./helpers/editor";
 
 test("hover preview stays aligned when the viewport scrolls", async ({
   page,

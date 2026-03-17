@@ -1,7 +1,6 @@
 import { MAX_ZOOM, MIN_ZOOM } from "../constants";
 import { clamp } from "../primitives/math";
 import { getSelectionBounds } from "../selection/selection-bounds";
-import { isNodeVisible } from "../shapes/warp-text/model";
 
 export const zoomIn = (editor) => {
   const viewer = editor.viewerRef;
@@ -49,7 +48,7 @@ export const scheduleViewportFocus = (editor, nodeIds) => {
     }
 
     const visibleNodeIds = nodeIds.filter((nodeId) => {
-      return isNodeVisible(editor.getNode(nodeId));
+      return editor.isNodeEffectivelyVisible(nodeId);
     });
 
     if (visibleNodeIds.length === 0) {

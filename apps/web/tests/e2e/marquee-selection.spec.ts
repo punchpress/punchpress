@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { getBoundingUnion } from "./helpers/canvas";
 import {
   expectHandleAlignedToNodeCorner,
   getSelectionSnapshot,
@@ -8,8 +9,7 @@ import {
   pauseForUi,
   waitForNodeReady,
   waitForSelectionHandles,
-} from "./editor-helpers";
-import { getBoundingUnion } from "./layer-helpers";
+} from "./helpers/editor";
 
 test("marquee selection moves multiple layers together", async ({ page }) => {
   await gotoEditor(page);

@@ -38,7 +38,7 @@ const TEST_FONT_DESCRIPTORS = [
 ];
 const getDocumentFixtureContents = (fileName) => {
   return readFileSync(
-    new URL(`./fixtures/documents/${fileName}`, import.meta.url),
+    new URL(`../fixtures/documents/${fileName}`, import.meta.url),
     "utf8"
   );
 };

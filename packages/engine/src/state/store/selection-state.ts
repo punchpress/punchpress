@@ -1,3 +1,5 @@
+import { moveNodeBlocksToBoundaryState } from "./node-tree-state";
+
 export const getSelectedNodeIds = (state, nodeIds = state.selectedNodeIds) => {
   if (!(Array.isArray(nodeIds) && nodeIds.length > 0)) {
     return [];
@@ -28,18 +30,5 @@ export const moveNodesToBoundaryState = (state, nodeIds, edge) => {
     return {};
   }
 
-  const selectedNodeIdSet = new Set(selectedNodeIds);
-  const selectedNodes = state.nodes.filter((node) =>
-    selectedNodeIdSet.has(node.id)
-  );
-  const unselectedNodes = state.nodes.filter(
-    (node) => !selectedNodeIdSet.has(node.id)
-  );
-
-  return {
-    nodes:
-      edge === "back"
-        ? [...selectedNodes, ...unselectedNodes]
-        : [...unselectedNodes, ...selectedNodes],
-  };
+  return moveNodeBlocksToBoundaryState(state, selectedNodeIds, edge);
 };

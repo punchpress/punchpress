@@ -6,6 +6,7 @@ export {
   PUNCH_DOCUMENT_VERSION,
   PUNCH_SVG_EXTENSION,
   PUNCH_SVG_MIME_TYPE,
+  ROOT_PARENT_ID,
 } from "./constants";
 export {
   getMissingDocumentFonts,
@@ -41,14 +42,18 @@ export {
 } from "./save";
 export type {
   DesignDocument,
+  GroupNodeDocument,
   LocalFontDocument,
+  NodeDocument,
   TextNodeDocument,
   TransformDocument,
   WarpDocument,
 } from "./schema";
 export {
   designDocumentSchema,
+  groupNodeSchema,
   localFontSchema,
+  nodeSchema,
   textNodeSchema,
   transformSchema,
   warpSchema,

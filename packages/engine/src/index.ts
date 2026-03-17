@@ -28,6 +28,22 @@ export {
   isNodeVisible,
   withNodeTransform,
 } from "./shapes/warp-text/model";
+export { createDefaultGroupNode } from "./shapes/group/model";
+export {
+  getAncestorNodeIds,
+  getChildNodeIds,
+  getChildNodes,
+  getDescendantLeafNodeIds,
+  getEffectiveSelectionNodeIds,
+  getSelectionTargetNodeId,
+  getSubtreeNodeIds,
+  getTreeScopeParentId,
+  isContainerNode,
+  isDescendantOf,
+  isGroupNode,
+  isTextNode,
+  rebuildTreeOrder,
+} from "./nodes/node-tree";
 export {
   estimateBounds,
   inflateBounds,

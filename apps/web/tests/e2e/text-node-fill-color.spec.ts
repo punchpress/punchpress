@@ -3,7 +3,7 @@ import {
   getStateSnapshot,
   gotoEditor,
   loadDocumentFixture,
-} from "./editor-helpers";
+} from "./helpers/editor";
 
 const getFillAndStrokeSection = (page) => {
   return page.locator("section").filter({ hasText: "Fill & Stroke" });

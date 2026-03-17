@@ -1,6 +1,7 @@
 import {
   createLocalFontDescriptor,
   DEFAULT_LOCAL_FONT,
+  ROOT_PARENT_ID,
 } from "@punchpress/punch-schema";
 import { UI_ACCENT } from "./constants";
 import { getEditorDebugDump } from "./debug-dump";
@@ -16,9 +17,12 @@ import {
   deleteNode as deleteEditorNode,
   deleteSelected as deleteEditorSelected,
   duplicate as duplicateEditorNodes,
+  groupSelected as groupEditorSelected,
+  renameGroup as renameEditorGroup,
   sendToBack as sendEditorToBack,
   setNodeOrder as setEditorNodeOrder,
   toggleVisibility as toggleEditorVisibility,
+  ungroup as ungroupEditorNodes,
   updateNode as updateEditorNode,
   updateNodes as updateEditorNodes,
   updateSelectedNode as updateEditorSelectedNode,
@@ -71,7 +75,16 @@ import {
   getSelectionFrameKey as getEditorSelectionFrameKey,
 } from "./queries/node-queries";
 import {
+  getChildNodeIds,
+  getDescendantLeafNodeIds,
+  getEffectiveSelectionNodeIds,
+  getSelectionTargetNodeId,
+  isDescendantOf,
+  isGroupNode,
+} from "./nodes/node-tree";
+import {
   clearSelection as clearEditorSelection,
+  clearSelectionPreservingFocus as clearEditorSelectionPreservingFocus,
   deselect as deselectEditorNode,
   ensureSelected as ensureEditorSelected,
   isSelected as isEditorSelected,
@@ -306,6 +319,10 @@ export class Editor {
     return this.getState().hoveredNodeId;
   }
 
+  get focusedGroupId() {
+    return this.getState().focusedGroupId;
+  }
+
   get isDirty() {
     return this.history.isDirty;
   }
@@ -315,7 +332,7 @@ export class Editor {
   }
 
   get layerNodeIds() {
-    return [...this.nodes].reverse().map((node) => node.id);
+    return [...getChildNodeIds(this.nodes, ROOT_PARENT_ID)].reverse();
   }
 
   get selectedNode() {
@@ -401,6 +418,43 @@ export class Editor {
     return getEditorNode(this, nodeId);
   }
 
+  getChildNodeIds(parentId = ROOT_PARENT_ID) {
+    return getChildNodeIds(this.nodes, parentId);
+  }
+
+  getDescendantLeafNodeIds(nodeId) {
+    return getDescendantLeafNodeIds(this.nodes, nodeId);
+  }
+
+  getEffectiveSelectionNodeIds(nodeIds = this.selectedNodeIds) {
+    return getEffectiveSelectionNodeIds(this.nodes, nodeIds);
+  }
+
+  getSelectionTargetNodeId(nodeId) {
+    return getSelectionTargetNodeId(this.nodes, nodeId, this.focusedGroupId);
+  }
+
+  isDescendantOf(nodeId, ancestorId) {
+    return isDescendantOf(this.nodes, nodeId, ancestorId);
+  }
+
+  isGroupNode(nodeId) {
+    return isGroupNode(this.getNode(nodeId));
+  }
+
+  isNodeEffectivelyVisible(nodeId) {
+    const node = this.getNode(nodeId);
+    if (!node || node.visible === false) {
+      return false;
+    }
+
+    if (node.parentId === ROOT_PARENT_ID) {
+      return true;
+    }
+
+    return this.isNodeEffectivelyVisible(node.parentId);
+  }
+
   getLayerRow(nodeId) {
     return getEditorLayerRow(this, nodeId);
   }
@@ -441,6 +495,10 @@ export class Editor {
     clearEditorSelection(this);
   }
 
+  clearSelectionPreservingFocus() {
+    clearEditorSelectionPreservingFocus(this);
+  }
+
   commitEditing() {
     commitEditorEditing(this);
   }
@@ -463,6 +521,10 @@ export class Editor {
 
   duplicate(nodeId) {
     duplicateEditorNodes(this, nodeId);
+  }
+
+  groupSelected() {
+    groupEditorSelected(this);
   }
 
   async exportDocument() {
@@ -497,12 +559,36 @@ export class Editor {
     toggleEditorSelection(this, nodeId);
   }
 
+  ungroup(nodeId) {
+    ungroupEditorNodes(this, nodeId);
+  }
+
   deselect(nodeId) {
     deselectEditorNode(this, nodeId);
   }
 
   setHoveredNode(nodeId) {
     this.getState().setHoveredNodeId(nodeId);
+  }
+
+  setFocusedGroup(nodeId) {
+    this.getState().setFocusedGroupId(nodeId);
+  }
+
+  exitGroupFocus() {
+    if (!this.focusedGroupId) {
+      return;
+    }
+
+    const currentFocusedGroupId = this.focusedGroupId;
+    const focusedGroup = this.getNode(currentFocusedGroupId);
+    const nextFocusedGroupId =
+      focusedGroup?.parentId && focusedGroup.parentId !== ROOT_PARENT_ID
+        ? focusedGroup.parentId
+        : null;
+
+    this.getState().setFocusedGroupId(nextFocusedGroupId);
+    this.getState().selectNode(currentFocusedGroupId);
   }
 
   setHoveringSuppressed(isHoveringSuppressed) {
@@ -541,8 +627,12 @@ export class Editor {
     return this.selectedNodeId;
   }
 
-  setNodeOrder(nodeIds) {
-    setEditorNodeOrder(this, nodeIds);
+  setNodeOrder(nodeIds, parentId) {
+    setEditorNodeOrder(this, nodeIds, parentId);
+  }
+
+  renameGroup(nodeId, name) {
+    renameEditorGroup(this, nodeId, name);
   }
 
   setViewportZoom(zoom) {

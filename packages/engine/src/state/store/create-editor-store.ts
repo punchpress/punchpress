@@ -26,6 +26,7 @@ export const createEditorStore = ({
     fontCatalogError: "",
     fontCatalogState: "loading",
     fontRevision: 0,
+    focusedGroupId: null,
     hoveredNodeId: null,
     isHoveringSuppressed: false,
     nodes: [],
