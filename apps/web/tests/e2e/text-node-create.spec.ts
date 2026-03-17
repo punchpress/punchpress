@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { getStateSnapshot, gotoEditor, pauseForUi } from "./editor-helpers";
+import { getStateSnapshot, gotoEditor, pauseForUi } from "./helpers/editor";
 
 const helloWorldLayerName = /Hello world/;
 

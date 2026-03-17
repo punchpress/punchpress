@@ -1,4 +1,3 @@
-import { isNodeVisible } from "@punchpress/engine";
 import { useLayoutEffect, useRef } from "react";
 import Selecto from "react-selecto";
 import { useEditor } from "../../../editor-react/use-editor";
@@ -14,8 +13,9 @@ export const CanvasSelectionOverlay = () => {
   const editingNodeId = useEditorValue((_, state) => state.editingNodeId);
   const spacePressed = useEditorValue((_, state) => state.spacePressed);
   const selectedTargets = useEditorValue((editor, state) => {
-    return state.selectedNodeIds
-      .filter((nodeId) => isNodeVisible(editor.getNode(nodeId)))
+    return editor
+      .getEffectiveSelectionNodeIds(state.selectedNodeIds)
+      .filter((nodeId) => editor.isNodeEffectivelyVisible(nodeId))
       .map((nodeId) => editor.getNodeElement(nodeId))
       .filter(Boolean);
   });

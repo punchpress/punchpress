@@ -65,6 +65,46 @@ export const Canvas = () => {
     },
     [editor]
   );
+  const handleCanvasPointerDown = useCallback(
+    (event) => {
+      if (spacePressed || activeTool === "hand") {
+        return;
+      }
+
+      if (
+        !(
+          event.target instanceof Element &&
+          event.target.closest(".canvas-surface")
+        ) ||
+        event.target.closest(
+          [
+            "[data-node-id]",
+            ".canvas-moveable",
+            "[data-testid='canvas-text-input']",
+          ].join(",")
+        )
+      ) {
+        return;
+      }
+
+      const point = getCanvasPoint(
+        viewerRef.current,
+        hostRef.current,
+        event.clientX,
+        event.clientY,
+        zoom
+      );
+
+      editor.dispatchCanvasPointerDown({
+        event,
+        point: {
+          x: round(point.x, 2),
+          y: round(point.y, 2),
+        },
+      });
+    },
+    [activeTool, editor, spacePressed, zoom]
+  );
 
   return (
     <DesignerFrame>
@@ -74,6 +114,7 @@ export const Canvas = () => {
           spacePressed || activeTool === "hand" ? "true" : undefined
         }
         data-tool={activeTool}
+        onPointerDownCapture={handleCanvasPointerDown}
         ref={hostRef}
       >
         <InfiniteViewer
@@ -92,31 +133,6 @@ export const Canvas = () => {
           <div
             className="relative h-full w-full overflow-visible border-0 bg-transparent shadow-none"
             data-testid="canvas-stage"
-            onPointerDown={(event) => {
-              if (event.target !== event.currentTarget) {
-                return;
-              }
-
-              if (spacePressed || activeTool === "hand") {
-                return;
-              }
-
-              const point = getCanvasPoint(
-                viewerRef.current,
-                hostRef.current,
-                event.clientX,
-                event.clientY,
-                zoom
-              );
-
-              editor.dispatchCanvasPointerDown({
-                event,
-                point: {
-                  x: round(point.x, 2),
-                  y: round(point.y, 2),
-                },
-              });
-            }}
           >
             <CanvasNodes />
             <CanvasTextEditor />

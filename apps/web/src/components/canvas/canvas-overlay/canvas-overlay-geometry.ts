@@ -1,5 +1,3 @@
-import { isNodeVisible } from "@punchpress/engine";
-
 export const getTargetClientBounds = (targets) => {
   if (targets.length === 0) {
     return null;
@@ -82,7 +80,8 @@ export const getNodeIdsFromSelectionRect = (editor, rect) => {
   const bottom = rect.bottom ?? rect.top + rect.height;
 
   return editor.nodes
-    .filter((node) => isNodeVisible(node))
+    .filter((node) => node.type === "text")
+    .filter((node) => editor.isNodeEffectivelyVisible(node.id))
     .map((node) => node.id)
     .filter((nodeId) => {
       const element = editor.getNodeElement(nodeId);
@@ -97,5 +96,8 @@ export const getNodeIdsFromSelectionRect = (editor, rect) => {
         Math.min(bottom, elementRect.bottom) - Math.max(top, elementRect.top);
 
       return overlapWidth > 0 && overlapHeight > 0;
-    });
+    })
+    .map((nodeId) => editor.getSelectionTargetNodeId(nodeId))
+    .filter(Boolean)
+    .filter((nodeId, index, values) => values.indexOf(nodeId) === index);
 };

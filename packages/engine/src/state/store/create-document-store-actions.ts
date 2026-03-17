@@ -8,9 +8,14 @@ import {
 import {
   mapNodeById,
   mapNodesByIds,
-  orderNodesByIds,
   withDocumentMutation,
 } from "./node-mutations";
+import {
+  groupNodeTreeState,
+  setChildNodeOrderState,
+  setRootNodeOrderState,
+  ungroupNodeTreeState,
+} from "./node-tree-state";
 import {
   getSelectedNodeIds,
   moveNodesToBoundaryState,
@@ -35,6 +40,7 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
           editingNodeId: node.id,
           editingOriginalText: node.text,
           editingText: node.text,
+          focusedGroupId: null,
           nodes: [...state.nodes, node],
           selectedNodeIds: [node.id],
         })
@@ -84,6 +90,7 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
         editingNodeId: null,
         editingOriginalText: "",
         editingText: "",
+        focusedGroupId: null,
         hoveredNodeId: null,
         isHoveringSuppressed: false,
         nodes: [...nodes],
@@ -119,10 +126,12 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
       });
     },
 
-    setNodeOrder: (orderedIds) => {
+    setNodeOrder: (orderedIds, parentId) => {
       set((state) =>
         withDocumentMutation(state, {
-          nodes: orderNodesByIds(state.nodes, orderedIds),
+          ...(parentId
+            ? setChildNodeOrderState(state, parentId, orderedIds)
+            : setRootNodeOrderState(state, orderedIds)),
         })
       );
     },
@@ -174,6 +183,21 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
           state,
           moveNodesToBoundaryState(state, state.selectedNodeIds, "front")
         );
+      });
+    },
+
+    groupSelectedNodes: () => {
+      set((state) => {
+        return withDocumentMutation(
+          state,
+          groupNodeTreeState(state, state.selectedNodeIds)
+        );
+      });
+    },
+
+    ungroupNodeById: (nodeId) => {
+      set((state) => {
+        return withDocumentMutation(state, ungroupNodeTreeState(state, nodeId));
       });
     },
   };

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { clickEmptyCanvas, getBoundingUnion } from "./helpers/canvas";
 import {
   getSelectionSnapshot,
   getStateSnapshot,
@@ -8,8 +9,7 @@ import {
   pauseForUi,
   waitForNodeReady,
   waitForSelectionHandles,
-} from "./editor-helpers";
-import { clickEmptyCanvas, getBoundingUnion } from "./layer-helpers";
+} from "./helpers/editor";
 
 test("hiding a layer removes it from canvas but keeps it selected", async ({
   page,

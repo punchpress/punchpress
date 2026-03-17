@@ -6,8 +6,9 @@ import {
 } from "./local-fonts";
 
 interface DocumentNode {
-  font: LocalFontDescriptor;
   id: string;
+  type: string;
+  font?: LocalFontDescriptor;
 }
 
 const getAvailableFontsById = (
@@ -29,6 +30,10 @@ export const getMissingDocumentFonts = (
   const missingFontsById = new Map<string, LocalFontDescriptor>();
 
   for (const node of nodes) {
+    if (node.type !== "text" || !node.font) {
+      continue;
+    }
+
     const font = createLocalFontDescriptor(node.font);
     const fontId = getLocalFontId(font);
 
@@ -65,6 +70,10 @@ export const replaceMissingDocumentFonts = <TNode extends DocumentNode>(
   return {
     missingFonts,
     nodes: nodes.map((node) => {
+      if (node.type !== "text" || !node.font) {
+        return node;
+      }
+
       return missingFontIds.has(getLocalFontId(node.font))
         ? {
             ...node,

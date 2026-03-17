@@ -7,7 +7,7 @@ import {
   pauseForUi,
   shiftClickLayer,
   waitForNodeReady,
-} from "./editor-helpers";
+} from "./helpers/editor";
 
 test("shift-click layer selection groups layers in layer order", async ({
   page,

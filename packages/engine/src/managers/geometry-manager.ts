@@ -1,7 +1,12 @@
 import { buildNodeGeometry } from "../shapes/warp-text/warp-engine";
+import { isTextNode } from "../nodes/node-tree";
 import { estimateBounds } from "../shapes/warp-text/warp-layout";
 
 const getGeometrySignature = (node, fontRevision) => {
+  if (!isTextNode(node)) {
+    return `${fontRevision}:${node.id}:${node.type}`;
+  }
+
   return JSON.stringify({
     fontRevision,
     font: node.font,
@@ -14,6 +19,10 @@ const getGeometrySignature = (node, fontRevision) => {
 };
 
 const getFallbackGeometry = (node) => {
+  if (!isTextNode(node)) {
+    return null;
+  }
+
   return {
     bbox: estimateBounds(node),
     id: node.id,
@@ -42,6 +51,12 @@ export class GeometryManager {
     for (const node of nodes) {
       const signature = getGeometrySignature(node, fontRevision);
       const cached = this.cache.get(node.id);
+
+      if (!isTextNode(node)) {
+        nextCache.set(node.id, { geometry: null, signature });
+        geometryById.set(node.id, null);
+        continue;
+      }
 
       if (cached?.signature === signature) {
         nextCache.set(node.id, cached);

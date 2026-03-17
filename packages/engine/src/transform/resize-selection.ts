@@ -30,12 +30,13 @@ export const beginResizeSelection = (
   editor,
   { anchorCanvas, direction, nodeId, nodeIds } = {}
 ) => {
-  const resolvedNodeIds =
+  const requestedNodeIds =
     nodeIds?.filter((currentNodeId) => editor.getNode(currentNodeId)) ||
     (nodeId
       ? [nodeId].filter((currentNodeId) => editor.getNode(currentNodeId))
       : null) ||
     editor.selectedNodeIds;
+  const resolvedNodeIds = editor.getEffectiveSelectionNodeIds(requestedNodeIds);
 
   if (!(resolvedNodeIds.length > 0 && anchorCanvas)) {
     return null;
@@ -124,7 +125,9 @@ export const resizeSelectionFromCorner = (
   editor,
   { corner = "se", scale = 1 } = {}
 ) => {
-  if (editor.selectedNodeIds.length === 0) {
+  const effectiveSelectedNodeIds = editor.getEffectiveSelectionNodeIds();
+
+  if (effectiveSelectedNodeIds.length === 0) {
     return [];
   }
 
@@ -134,8 +137,8 @@ export const resizeSelectionFromCorner = (
     return [];
   }
 
-  if (editor.selectedNodeIds.length === 1) {
-    const selectedNode = editor.selectedNode;
+  if (effectiveSelectedNodeIds.length === 1) {
+    const selectedNode = editor.getNode(effectiveSelectedNodeIds[0]);
     const bbox =
       editor.getNodeGeometry(selectedNode?.id)?.bbox ||
       (selectedNode ? estimateBounds(selectedNode) : null);
@@ -161,14 +164,19 @@ export const resizeSelectionFromCorner = (
   }
 
   const selectionBounds = editor.getSelectionBounds(editor.selectedNodeIds);
+  const selectionNodeIds =
+    effectiveSelectedNodeIds.length > 0
+      ? effectiveSelectedNodeIds
+      : editor.selectedNodeIds;
+  const effectiveSelectionBounds = editor.getSelectionBounds(selectionNodeIds);
 
-  if (!selectionBounds) {
+  if (!effectiveSelectionBounds) {
     return [];
   }
 
   const resizeSession = beginResizeSelection(editor, {
-    anchorCanvas: getResizeAnchorFromBounds(selectionBounds, direction),
-    nodeIds: editor.selectedNodeIds,
+    anchorCanvas: getResizeAnchorFromBounds(effectiveSelectionBounds, direction),
+    nodeIds: effectiveSelectedNodeIds,
   });
 
   return updateResizeSelection(editor, resizeSession, {

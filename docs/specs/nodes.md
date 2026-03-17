@@ -9,6 +9,8 @@ Nodes are the core building blocks of a PunchPress design.
 - Nodes can be selected individually and, where appropriate, moved, resized, rotated, and edited.
 - Nodes remain editable source content inside PunchPress. They should not be prematurely baked into static output.
 - Hiding a node should remove it from view without losing its content or settings.
+- Nodes may be either leaf nodes or container nodes.
+- Container nodes own child layers while still behaving like first-class canvas objects with clear selection, bounds, and transform behavior.
 
 ## Editable Nodes
 
@@ -21,4 +23,5 @@ Nodes are the core building blocks of a PunchPress design.
 ## Growth
 
 - New node types should fit the same mental model: selectable object, clear bounds, direct manipulation, and editable source data where applicable.
+- New container nodes should make their containment behavior explicit in the node contract rather than relying on ad hoc UI-only behavior.
 - PunchPress should feel like one coherent canvas system even as more node types are added.

@@ -1,4 +1,5 @@
-import type { DesignDocument } from "@punchpress/punch-schema";
+import type { DesignDocument, TextNodeDocument } from "@punchpress/punch-schema";
+import { isDescendantOf } from "../nodes/node-tree";
 import { buildNodeGeometry } from "../shapes/warp-text/warp-engine";
 import { buildSvgExport } from "../shapes/warp-text/warp-svg-export";
 
@@ -11,9 +12,21 @@ const escapeMetadata = (value: string) => {
 
 export const exportDesignDocument = async (
   document: DesignDocument,
-  loadFont: (font: DesignDocument["nodes"][number]["font"]) => Promise<unknown>
+  loadFont: (font: TextNodeDocument["font"]) => Promise<unknown>
 ) => {
-  const nodes = document.nodes.filter((node) => node.visible !== false);
+  const nodes = document.nodes.filter((node): node is TextNodeDocument => {
+    if (node.type !== "text" || node.visible === false) {
+      return false;
+    }
+
+    return !document.nodes.some((ancestorNode) => {
+      return (
+        ancestorNode.id !== node.id &&
+        ancestorNode.visible === false &&
+        isDescendantOf(document.nodes, node.id, ancestorNode.id)
+      );
+    });
+  });
   const fontPromises = new Map<string, ReturnType<typeof loadFont>>();
   const geometryById = new Map();
 

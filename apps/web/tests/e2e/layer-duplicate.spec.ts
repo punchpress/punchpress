@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { clickEmptyCanvas } from "./helpers/canvas";
 import {
   getSelectionSnapshot,
   getStateSnapshot,
@@ -6,8 +7,7 @@ import {
   loadDocumentFixture,
   pauseForUi,
   waitForNodeReady,
-} from "./editor-helpers";
-import { clickEmptyCanvas } from "./layer-helpers";
+} from "./helpers/editor";
 
 const DUPLICATE_MENU_ITEM_NAME = /Duplicate/;
 

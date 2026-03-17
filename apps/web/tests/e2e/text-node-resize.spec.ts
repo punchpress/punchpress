@@ -9,7 +9,7 @@ import {
   waitForNodeReady,
   waitForSelectionHandles,
   zoomIn,
-} from "./editor-helpers";
+} from "./helpers/editor";
 
 test("resizes a text node and keeps the selection aligned through zoom", async ({
   page,

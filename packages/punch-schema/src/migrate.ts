@@ -1,4 +1,4 @@
-import { PUNCH_DOCUMENT_VERSION } from "./constants";
+import { PUNCH_DOCUMENT_VERSION, ROOT_PARENT_ID } from "./constants";
 import { UnsupportedDocumentVersionError } from "./errors";
 import { createLocalFontDescriptor } from "./local-fonts";
 
@@ -62,22 +62,81 @@ const migrateV1Document = (value: Record<string, unknown>) => {
   return {
     ...value,
     version: PUNCH_DOCUMENT_VERSION,
-    nodes: nodes.map((node) => {
-      if (!isRecord(node)) {
-        return node;
-      }
+    nodes: withGroupNames(
+      nodes.map((node) => {
+        if (!isRecord(node)) {
+          return node;
+        }
 
-      const { fontUrl: legacyFontUrl, ...nextNode } = node;
-      const fontUrl =
-        typeof legacyFontUrl === "string" && legacyFontUrl.trim().length > 0
-          ? legacyFontUrl
-          : "";
+        const { fontUrl: legacyFontUrl, ...nextNode } = node;
+        const fontUrl =
+          typeof legacyFontUrl === "string" && legacyFontUrl.trim().length > 0
+            ? legacyFontUrl
+            : "";
 
-      return {
-        ...nextNode,
-        font: getLegacyFontName(fontUrl),
-      };
-    }),
+        return {
+          ...nextNode,
+          font: getLegacyFontName(fontUrl),
+          parentId: ROOT_PARENT_ID,
+        };
+      })
+    ),
+  };
+};
+
+const migrateV11Document = (value: Record<string, unknown>) => {
+  const nodes = Array.isArray(value.nodes) ? value.nodes : [];
+
+  return {
+    ...value,
+    version: PUNCH_DOCUMENT_VERSION,
+    nodes: withGroupNames(
+      nodes.map((node) => {
+        if (!isRecord(node)) {
+          return node;
+        }
+
+        return {
+          ...node,
+          parentId:
+            typeof node.parentId === "string" && node.parentId.length > 0
+              ? node.parentId
+              : ROOT_PARENT_ID,
+        };
+      })
+    ),
+  };
+};
+
+const withGroupNames = (nodes: unknown[]) => {
+  let nextGroupIndex = 1;
+
+  return nodes.map((node) => {
+    if (!isRecord(node) || node.type !== "group") {
+      return node;
+    }
+
+    const name =
+      typeof node.name === "string" && node.name.trim().length > 0
+        ? node.name
+        : `Group ${nextGroupIndex}`;
+
+    nextGroupIndex += 1;
+
+    return {
+      ...node,
+      name,
+    };
+  });
+};
+
+const migrateV12Document = (value: Record<string, unknown>) => {
+  const nodes = Array.isArray(value.nodes) ? value.nodes : [];
+
+  return {
+    ...value,
+    version: PUNCH_DOCUMENT_VERSION,
+    nodes: withGroupNames(nodes),
   };
 };
 
@@ -94,6 +153,14 @@ export const migrateDocument = (value: unknown) => {
 
   if (value.version === "1.0") {
     return migrateV1Document(value);
+  }
+
+  if (value.version === "1.1") {
+    return migrateV11Document(value);
+  }
+
+  if (value.version === "1.2") {
+    return migrateV12Document(value);
   }
 
   if (typeof value.version !== "string" || value.version.length === 0) {

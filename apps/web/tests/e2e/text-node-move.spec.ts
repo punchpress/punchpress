@@ -7,7 +7,7 @@ import {
   loadDocumentFixture,
   pauseForUi,
   waitForNodeReady,
-} from "./editor-helpers";
+} from "./helpers/editor";
 
 test("moves a text node around the canvas", async ({ page }) => {
   await gotoEditor(page);

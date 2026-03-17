@@ -27,12 +27,13 @@ const queueOverlayRefresh = (editor) => {
 };
 
 export const beginRotateSelection = (editor, { nodeId, nodeIds } = {}) => {
-  const resolvedNodeIds =
+  const requestedNodeIds =
     nodeIds?.filter((currentNodeId) => editor.getNode(currentNodeId)) ||
     (nodeId
       ? [nodeId].filter((currentNodeId) => editor.getNode(currentNodeId))
       : null) ||
     editor.selectedNodeIds;
+  const resolvedNodeIds = editor.getEffectiveSelectionNodeIds(requestedNodeIds);
 
   if (resolvedNodeIds.length === 0) {
     return null;
@@ -114,12 +115,14 @@ export const rotateSelectionBy = (
   editor,
   { deltaRotation = 0, queueRefresh = true } = {}
 ) => {
-  if (!(editor.selectedNodeIds.length > 0 && Number.isFinite(deltaRotation))) {
+  const effectiveSelectedNodeIds = editor.getEffectiveSelectionNodeIds();
+
+  if (!(effectiveSelectedNodeIds.length > 0 && Number.isFinite(deltaRotation))) {
     return [];
   }
 
   const rotateSession = beginRotateSelection(editor, {
-    nodeIds: editor.selectedNodeIds,
+    nodeIds: effectiveSelectedNodeIds,
   });
 
   return updateRotateSelection(editor, rotateSession, {

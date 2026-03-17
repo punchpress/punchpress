@@ -13,6 +13,8 @@ export const getCanvasRotationHandlers = ({
   suppressHover,
   visibleSelectedNodeIds,
 }) => {
+  const shouldShowGroupRotationPreview = selectedNode?.type !== "group";
+
   return {
     onRotate: (event) => {
       if (!event.datas.rotateSession) {
@@ -51,6 +53,10 @@ export const getCanvasRotationHandlers = ({
       }
       queueRefresh();
 
+      if (!shouldShowGroupRotationPreview) {
+        return;
+      }
+
       if (typeof window === "undefined") {
         setGroupRotationPreviewActive(hostElement, false);
         setIsGroupRotationPreviewVisible(false);
@@ -74,8 +80,12 @@ export const getCanvasRotationHandlers = ({
       event.datas.historyMark = editor.markHistoryStep("rotate selection");
       suppressHover();
       setMoveableMuted(hostElement, true);
-      setGroupRotationPreviewActive(hostElement, true);
-      setIsGroupRotationPreviewVisible(true);
+
+      if (shouldShowGroupRotationPreview) {
+        setGroupRotationPreviewActive(hostElement, true);
+        setIsGroupRotationPreviewVisible(true);
+      }
+
       event.datas.rotateSession = rotateSession;
 
       for (const groupEvent of event.events) {

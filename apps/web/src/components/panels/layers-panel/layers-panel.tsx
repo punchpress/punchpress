@@ -1,20 +1,22 @@
 import { useState } from "react";
-import { SortableList } from "@/components/ui/sortable-list";
+import { SortableItem, SortableList } from "@/components/ui/sortable-list";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { SettingsDialog } from "../../settings-dialog";
 import { useDocumentCommands } from "../document-commands/use-document-commands";
 import { MissingFontsExportDialog } from "../missing-fonts-export-dialog";
 import { UnsavedDocumentDialog } from "../unsaved-document-dialog";
+import { LayerTreeDragGhost } from "./layer-tree-drag-ghost";
+import { LayerTreeRow } from "./layer-tree-row";
 import { LayersMainMenu } from "./layers-main-menu";
 import { getDuplicateRecentDocumentNames } from "./recent-documents";
 import { RecentDocumentsMenu } from "./recent-documents-menu";
-import { SortableLayerRow } from "./sortable-layer-row";
 
 export const LayersPanel = () => {
   const editor = useEditor();
   const layerNodeIds = useEditorValue((editor) => editor.layerNodeIds);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [collapsedGroupIds, setCollapsedGroupIds] = useState(() => new Set());
   const {
     clearRecentDocumentsSafely,
     missingFontsExportDialogProps,
@@ -25,6 +27,19 @@ export const LayersPanel = () => {
   } = useDocumentCommands();
   const duplicateRecentDocumentNames =
     getDuplicateRecentDocumentNames(recentDocuments);
+  const toggleCollapsedGroup = (nodeId) => {
+    setCollapsedGroupIds((currentCollapsedGroupIds) => {
+      const nextCollapsedGroupIds = new Set(currentCollapsedGroupIds);
+
+      if (nextCollapsedGroupIds.has(nodeId)) {
+        nextCollapsedGroupIds.delete(nodeId);
+      } else {
+        nextCollapsedGroupIds.add(nodeId);
+      }
+
+      return nextCollapsedGroupIds;
+    });
+  };
 
   return (
     <>
@@ -55,25 +70,36 @@ export const LayersPanel = () => {
           {layerNodeIds.length > 0 ? (
             <SortableList
               items={layerNodeIds}
-              onReorder={(nextIds) => {
-                editor.setNodeOrder([...nextIds].reverse());
-              }}
-              onReorderEnd={() => {
-                editor.setHoveringSuppressed(false);
-              }}
-              onReorderStart={(nodeId) => {
-                editor.setHoveringSuppressed(true);
-                editor.ensureSelected(nodeId);
-              }}
+              onReorder={(orderedIds) =>
+                editor.setNodeOrder([...orderedIds].reverse())
+              }
+              renderDragOverlay={(nodeId) => (
+                <LayerTreeDragGhost
+                  collapsedGroupIds={collapsedGroupIds}
+                  nodeId={nodeId}
+                />
+              )}
             >
-              {layerNodeIds.map((nodeId, index) => {
+              {layerNodeIds.map((nodeId) => {
                 return (
-                  <SortableLayerRow
-                    key={nodeId}
-                    nextNodeId={layerNodeIds[index + 1] || null}
-                    nodeId={nodeId}
-                    previousNodeId={layerNodeIds[index - 1] || null}
-                  />
+                  <SortableItem id={nodeId} key={nodeId}>
+                    {({
+                      dragHandleProps,
+                      isDragging,
+                      itemStyle,
+                      setItemRef,
+                    }) => (
+                      <LayerTreeRow
+                        collapsedGroupIds={collapsedGroupIds}
+                        dragHandleProps={dragHandleProps}
+                        isDragging={isDragging}
+                        itemStyle={itemStyle}
+                        nodeId={nodeId}
+                        onToggleCollapse={toggleCollapsedGroup}
+                        setItemRef={setItemRef}
+                      />
+                    )}
+                  </SortableItem>
                 );
               })}
             </SortableList>
