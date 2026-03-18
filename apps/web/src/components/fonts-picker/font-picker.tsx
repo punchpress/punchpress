@@ -10,6 +10,11 @@ import { ChevronDownIcon, SearchIcon } from "lucide-react";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { selectTriggerVariants } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useEditor } from "../../editor-react/use-editor";
@@ -62,13 +67,6 @@ export const FontPicker = ({
 
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [dropdownPos, setDropdownPos] = useState<{
-    right: number;
-    top: number;
-  } | null>(null);
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  const triggerRef = useRef<HTMLButtonElement | null>(null);
-  const dropdownRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
 
@@ -89,42 +87,10 @@ export const FontPicker = ({
   useEffect(() => {
     if (!isOpen) {
       setQuery("");
-      setDropdownPos(null);
       return;
-    }
-
-    if (triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      setDropdownPos({
-        top: rect.bottom + 4,
-        right: window.innerWidth - rect.right,
-      });
     }
 
     searchInputRef.current?.focus();
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (
-        !(
-          rootRef.current?.contains(target) ||
-          dropdownRef.current?.contains(target)
-        )
-      ) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-    };
   }, [isOpen]);
 
   const showActionButton =
@@ -138,11 +104,9 @@ export const FontPicker = ({
     : false;
 
   return (
-    <div className="relative" ref={rootRef}>
-      <button
+    <Popover onOpenChange={setIsOpen} open={isOpen}>
+      <PopoverTrigger
         className={cn(selectTriggerVariants(), "min-w-0")}
-        onClick={() => setIsOpen((open) => !open)}
-        ref={triggerRef}
         type="button"
       >
         <span
@@ -158,17 +122,14 @@ export const FontPicker = ({
           {selectedFont ? getLocalFontLabel(selectedFont) : "Choose a font"}
         </span>
         <ChevronDownIcon className="-me-1 size-4.5 opacity-80 sm:size-4" />
-      </button>
+      </PopoverTrigger>
 
       {isOpen ? (
-        <div
-          className="fixed z-50 w-[22rem] max-w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border bg-popover shadow-[0_10px_30px_rgba(0,0,0,0.12)]"
-          ref={dropdownRef}
-          style={
-            dropdownPos
-              ? { top: dropdownPos.top, right: dropdownPos.right }
-              : undefined
-          }
+        <PopoverContent
+          align="end"
+          className="w-[22rem] max-w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl"
+          initialFocus={false}
+          sideOffset={4}
         >
           <div className="border-border border-b px-2 py-2">
             <div className="relative block">
@@ -219,8 +180,8 @@ export const FontPicker = ({
               </Button>
             </div>
           ) : null}
-        </div>
+        </PopoverContent>
       ) : null}
-    </div>
+    </Popover>
   );
 };
