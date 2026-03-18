@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 export const Section = ({ children, className, title }) => {
   return (
     <section className={cn("py-3 first:pt-0 last:pb-0", className)}>
-      <h3 className="mb-2.5 font-semibold text-[12px] text-black/70 tracking-[-0.01em]">
+      <h3 className="mb-2.5 font-semibold text-[12px] text-foreground/70 tracking-[-0.01em]">
         {title}
       </h3>
       <div className="grid gap-2">{children}</div>
@@ -14,7 +14,7 @@ export const Section = ({ children, className, title }) => {
 };
 
 const ROW_GRID = "grid grid-cols-[60px_24px_minmax(0,1fr)] items-center";
-const ROW_LABEL = "select-none text-[12px] text-black/40";
+const ROW_LABEL = "select-none text-[12px] text-foreground/40";
 
 export const FieldRow = ({ action, children, label }) => {
   return (
