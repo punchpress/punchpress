@@ -78,11 +78,11 @@ export const SettingsDialogDebugPanel = ({ isActive }) => {
           {copyState === "copied" ? <CheckIcon /> : <CopyIcon />}
           {copyState === "copied" ? "Copied" : "Copy dump"}
         </Button>
-        <span className="text-muted-foreground text-xs">
-          {copyState === "error"
-            ? "Clipboard access failed. Refresh and copy from the panel content."
-            : "The dump is formatted JSON from Editor.getDebugDump()."}
-        </span>
+        {copyState === "error" ? (
+          <span className="text-muted-foreground text-xs">
+            Clipboard access failed. Refresh and copy from the panel content.
+          </span>
+        ) : null}
       </div>
 
       <div className="overflow-hidden rounded-xl border bg-muted/20">
