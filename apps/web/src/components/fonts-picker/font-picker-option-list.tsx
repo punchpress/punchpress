@@ -7,10 +7,10 @@ import { cn } from "@/lib/utils";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
 
-const LIST_PADDING = 6;
-const MAX_LIST_HEIGHT = 384;
+const LIST_PADDING = 4;
+const MAX_LIST_HEIGHT = 640;
 const OVERSCAN_COUNT = 6;
-const ROW_HEIGHT = 32;
+const ROW_HEIGHT = 44;
 
 interface FontPickerOptionListProps {
   emptyStateCopy: string;
@@ -104,7 +104,7 @@ export const FontPickerOptionList = ({
 
   return (
     <div
-      className="max-h-96 overflow-y-auto"
+      className="max-h-[40rem] overflow-y-auto"
       onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
       ref={scrollRef}
       style={{ height: viewportHeight }}
@@ -160,7 +160,7 @@ const FontPickerOptionRow = ({
   return (
     <button
       className={cn(
-        "flex h-7 max-h-7 w-full items-center overflow-hidden rounded-md px-3 text-left text-sm leading-none outline-none",
+        "flex h-11 max-h-11 w-full items-center overflow-hidden rounded-md px-4 text-left text-[22px] leading-none outline-none",
         isSelected
           ? "bg-accent text-accent-foreground"
           : "text-foreground hover:bg-accent hover:text-accent-foreground"
@@ -170,12 +170,12 @@ const FontPickerOptionRow = ({
     >
       {isLoading ? (
         <span className="flex min-w-0 flex-1 items-center gap-3">
-          <span className="truncate text-muted-foreground">
+          <span className="truncate text-[22px] text-muted-foreground">
             {font.fullName}
           </span>
           <span
             aria-hidden="true"
-            className="h-3 w-14 shrink-0 animate-[var(--animate-skeleton)] rounded-full bg-[length:200%_100%] bg-[linear-gradient(90deg,var(--color-muted),color-mix(in_srgb,var(--color-muted)_70%,white),var(--color-muted))]"
+            className="h-4.5 w-24 shrink-0 animate-[var(--animate-skeleton)] rounded-full bg-[length:200%_100%] bg-[linear-gradient(90deg,var(--color-muted),color-mix(in_srgb,var(--color-muted)_70%,white),var(--color-muted))]"
           />
         </span>
       ) : (
@@ -183,6 +183,7 @@ const FontPickerOptionRow = ({
           className="truncate"
           style={{
             fontFamily: editor.getFontPreviewFamily(font),
+            fontSize: 22,
             lineHeight: 1,
           }}
         >
