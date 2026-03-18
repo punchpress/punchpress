@@ -46,11 +46,14 @@ export const ColorPickerSelection = memo(
           handlePointerUpdate(event.clientX, event.clientY);
         }}
         ref={containerRef}
-        style={{
-          background: `linear-gradient(to top, rgb(0 0 0), transparent), linear-gradient(to right, rgb(255 255 255), hsl(${color.hue} 100% 50%))`,
-        }}
         {...props}
       >
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background: `linear-gradient(to top, rgb(0 0 0), transparent), linear-gradient(to right, rgb(255 255 255), hsl(${color.hue} 100% 50%))`,
+          }}
+        />
         <div
           className="pointer-events-none absolute size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_1px_rgb(0_0_0_/_0.35)]"
           style={{
