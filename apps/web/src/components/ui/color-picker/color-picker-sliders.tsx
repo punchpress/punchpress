@@ -35,9 +35,11 @@ const ColorPickerSlider = ({
       value={[value]}
     >
       <BaseSlider.Control className="flex touch-none select-none data-[orientation=horizontal]:w-full">
-        <BaseSlider.Track className="relative h-3 w-full grow overflow-hidden rounded-full border border-black/6 shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.14)]">
-          {children}
-          <BaseSlider.Indicator className="bg-transparent" />
+        <BaseSlider.Track className="relative h-4 w-full grow">
+          <div className="pointer-events-none absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 overflow-hidden rounded-full border border-black/6 shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.14)]">
+            {children}
+            <BaseSlider.Indicator className="bg-transparent" />
+          </div>
           <BaseSlider.Thumb
             aria-labelledby={thumbId}
             className="block size-4 shrink-0 rounded-full border border-white bg-transparent shadow-[0_0_0_1px_rgb(0_0_0_/_0.24),0_1px_3px_rgb(0_0_0_/_0.2)] outline-none has-focus-visible:ring-[3px] has-focus-visible:ring-ring/24"
