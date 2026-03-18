@@ -286,6 +286,18 @@ textarea,
   }
 }
 
+@keyframes canvas-caret-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+
+  45.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
 .dark {
   --background: color-mix(
     in srgb,
