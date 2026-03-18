@@ -105,7 +105,8 @@
 
   .canvas-edit-selection {
     z-index: 8;
-    border: 1.5px solid color-mix(in srgb, var(--editor-accent) 72%, black);
+    outline: 1.5px solid color-mix(in srgb, var(--editor-accent) 72%, black);
+    outline-offset: 0;
     box-shadow: 0 0 0 1px
       color-mix(in srgb, var(--editor-accent) 16%, transparent);
   }

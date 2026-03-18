@@ -1,16 +1,27 @@
-import { isNodeVisible, toSafeHex } from "@punchpress/engine";
-import { useEffect, useRef } from "react";
+import { isNodeVisible } from "@punchpress/engine";
+import { useEffect, useRef, useState } from "react";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
 
-const getCaretColor = (fill) => {
-  const normalized = toSafeHex(fill).slice(1);
-  const r = Number.parseInt(normalized.slice(0, 2), 16);
-  const g = Number.parseInt(normalized.slice(2, 4), 16);
-  const b = Number.parseInt(normalized.slice(4, 6), 16);
-  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+const measurementCanvas =
+  typeof document === "undefined" ? null : document.createElement("canvas");
+const measurementContext = measurementCanvas?.getContext("2d");
 
-  return luminance > 0.62 ? "#111111" : "#ffffff";
+const clamp = (value, min, max) => {
+  return Math.min(Math.max(value, min), max);
+};
+
+const measureTextWidth = (input, text, tracking) => {
+  if (!measurementContext) {
+    return 0;
+  }
+
+  measurementContext.font = window.getComputedStyle(input).font;
+
+  const width = measurementContext.measureText(text).width;
+  const trackingWidth = Math.max(text.length - 1, 0) * tracking;
+
+  return width + trackingWidth;
 };
 
 export const CanvasTextEditor = () => {
@@ -26,6 +37,28 @@ export const CanvasTextEditor = () => {
   const fontFamily = useEditorValue((editor) => editor.editingFontFamily);
   const ignoreInitialBlurRef = useRef(false);
   const inputRef = useRef(null);
+  const [caretRevision, setCaretRevision] = useState(0);
+  const [selectionRange, setSelectionRange] = useState({ end: 0, start: 0 });
+  const [isCaretSettling, setIsCaretSettling] = useState(true);
+
+  const updateSelectionRange = (input) => {
+    setSelectionRange({
+      end: input.selectionEnd ?? input.value.length,
+      start: input.selectionStart ?? input.value.length,
+    });
+    setCaretRevision((value) => value + 1);
+  };
+
+  const syncSelectionRange = () => {
+    const input = inputRef.current;
+    if (!input) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      updateSelectionRange(input);
+    });
+  };
 
   useEffect(() => {
     if (!editingNode) {
@@ -41,6 +74,11 @@ export const CanvasTextEditor = () => {
     input.focus();
     const caretPosition = input.value.length;
     input.setSelectionRange(caretPosition, caretPosition);
+    setSelectionRange({
+      end: caretPosition,
+      start: caretPosition,
+    });
+    setCaretRevision((value) => value + 1);
 
     const timeoutId = window.setTimeout(() => {
       ignoreInitialBlurRef.current = false;
@@ -52,13 +90,51 @@ export const CanvasTextEditor = () => {
     };
   }, [editingNode]);
 
+  useEffect(() => {
+    setIsCaretSettling(true);
+
+    const timeoutId = window.setTimeout(() => {
+      if (caretRevision < 0) {
+        return;
+      }
+
+      setIsCaretSettling(false);
+    }, 450);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [caretRevision]);
+
   if (!(editingNode && editingFrame)) {
     return null;
   }
 
   const frame = editingFrame.bounds;
   const previewBounds = editingPreviewGeometry?.bbox;
-  const caretColor = getCaretColor(editingNode.fill);
+  const input = inputRef.current;
+  const hasCollapsedSelection = selectionRange.start === selectionRange.end;
+  const caretIndex = hasCollapsedSelection ? selectionRange.end : null;
+  const caretOffset =
+    input && caretIndex !== null
+      ? measureTextWidth(
+          input,
+          editingText.slice(0, caretIndex),
+          editingNode.tracking
+        )
+      : 0;
+  const totalTextWidth = input
+    ? measureTextWidth(input, editingText, editingNode.tracking)
+    : 0;
+  const caretLeft =
+    caretIndex !== null
+      ? clamp(
+          (frame.width - totalTextWidth) / 2 + caretOffset,
+          2,
+          frame.width - 2
+        )
+      : null;
+  const caretHeight = Math.min(frame.height, editingNode.fontSize * 1.05);
 
   return (
     <div
@@ -103,6 +179,23 @@ export const CanvasTextEditor = () => {
         ) : null}
       </svg>
 
+      {caretLeft !== null ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute top-1/2 w-0.5 -translate-x-1/2 -translate-y-1/2"
+          data-testid="canvas-text-caret"
+          style={{
+            animation: isCaretSettling
+              ? "none"
+              : "canvas-caret-blink 1.1s steps(1, end) infinite",
+            backgroundColor: "#ffffff",
+            height: `${caretHeight}px`,
+            left: `${caretLeft}px`,
+            mixBlendMode: "difference",
+          }}
+        />
+      ) : null}
+
       <input
         aria-label="Edit text layer"
         className="block h-full w-full min-w-0 appearance-none border-0 bg-transparent px-0 py-0 text-center font-normal leading-[1.05] shadow-none focus:outline-none"
@@ -115,7 +208,10 @@ export const CanvasTextEditor = () => {
 
           editor.finalizeEditing();
         }}
-        onChange={(event) => editor.setEditingText(event.target.value)}
+        onChange={(event) => {
+          editor.setEditingText(event.target.value);
+          updateSelectionRange(event.currentTarget);
+        }}
         onKeyDown={(event) => {
           if (event.key === "Enter") {
             event.preventDefault();
@@ -128,11 +224,14 @@ export const CanvasTextEditor = () => {
             editor.cancelEditing();
           }
         }}
+        onKeyUp={syncSelectionRange}
         onPointerDown={(event) => event.stopPropagation()}
+        onPointerUp={syncSelectionRange}
+        onSelect={(event) => updateSelectionRange(event.currentTarget)}
         ref={inputRef}
         spellCheck={false}
         style={{
-          caretColor,
+          caretColor: "transparent",
           color: "transparent",
           fontFamily,
           fontSize: `${editingNode.fontSize}px`,
