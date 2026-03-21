@@ -1,7 +1,11 @@
 export const createSelectionStoreActions = (set) => {
   return {
     setActiveTool: (activeTool) => {
-      set({ activeTool });
+      set((state) => ({
+        activeTool,
+        pathEditingNodeId:
+          activeTool === "pointer" ? state.pathEditingNodeId : null,
+      }));
     },
 
     setHoveredNodeId: (nodeId) => {
@@ -23,6 +27,12 @@ export const createSelectionStoreActions = (set) => {
           state.nodes.some((node) => node.id === focusedGroupId)
             ? focusedGroupId
             : null,
+      }));
+    },
+
+    setPathEditingNodeId: (nodeId) => {
+      set(() => ({
+        pathEditingNodeId: nodeId || null,
       }));
     },
 

@@ -30,6 +30,7 @@ export const createEditorStore = ({
     hoveredNodeId: null,
     isHoveringSuppressed: false,
     nodes: [],
+    pathEditingNodeId: null,
     selectedNodeIds: [],
     spacePressed: false,
     viewport: {

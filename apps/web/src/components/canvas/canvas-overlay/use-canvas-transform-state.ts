@@ -8,6 +8,9 @@ export const useCanvasTransformState = (
 ) => {
   const activeTool = useEditorValue((_, state) => state.activeTool);
   const editingNodeId = useEditorValue((_, state) => state.editingNodeId);
+  const pathEditingNodeId = useEditorValue(
+    (_, state) => state.pathEditingNodeId
+  );
   const visibleSelectedNodeIds = useEditorValue((editor, state) => {
     return state.selectedNodeIds.filter((nodeId) => {
       return (
@@ -37,23 +40,34 @@ export const useCanvasTransformState = (
 
     return editor.getNodeGeometry(visibleSelectedNodeIds[0]);
   });
-  const selectedTargets = useEditorValue((editor) => {
-    return effectiveSelectedNodeIds
-      .filter((nodeId) => editor.isNodeEffectivelyVisible(nodeId))
-      .map((nodeId) => editor.getNodeElement(nodeId))
-      .filter(Boolean);
-  });
   const selectedBounds = useEditorValue((editor) => {
     return editor.getSelectionBounds(effectiveSelectedNodeIds);
   });
-  const selectionFrameKey = useEditorValue((editor) => {
-    return editor.getSelectionFrameKey(effectiveSelectedNodeIds);
-  });
+  const selectedTargets = effectiveSelectedNodeIds
+    .filter((nodeId) => editor.isNodeEffectivelyVisible(nodeId))
+    .map((nodeId) => {
+      if (pathEditingNodeId === nodeId) {
+        return editor.getNodeTransformElement(nodeId);
+      }
+
+      return (
+        editor.getNodeTransformElement(nodeId) || editor.getNodeElement(nodeId)
+      );
+    })
+    .filter(Boolean);
+  const selectionFrameKey = editor.getSelectionFrameKey(
+    effectiveSelectedNodeIds
+  );
 
   const visibleSelectedNodeId = visibleSelectedNodeIds.at(-1) || null;
   const selectedTarget = selectedTargets[0] || null;
   const hasGroupSelection =
     effectiveSelectedNodeIds.length > 1 || selectedNode?.type === "group";
+  const isPathEditingSelection = Boolean(
+    !hasGroupSelection &&
+      selectedNode?.id &&
+      pathEditingNodeId === selectedNode.id
+  );
   const groupRotationPreviewRect =
     isGroupRotationPreviewVisible && hasGroupSelection
       ? getHostRectFromCanvasBounds(editor, selectedBounds)
@@ -63,6 +77,7 @@ export const useCanvasTransformState = (
     activeTool,
     editingNodeId,
     hasGroupSelection,
+    isPathEditingSelection,
     selectedBounds,
     selectedGeometry,
     selectedNode,
@@ -78,6 +93,7 @@ export const useCanvasTransformState = (
     hasGroupSelection,
     hostElement: editor.hostRef,
     isDraggable,
+    isPathEditingSelection,
     isResizable,
     isRotatable,
     selectedBounds,

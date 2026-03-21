@@ -51,6 +51,40 @@ const createDocument = (
   });
 };
 
+const createCircleDocument = (id: string, pathPosition?: number) => {
+  return JSON.stringify({
+    nodes: [
+      {
+        fill: "#000000",
+        font: AVAILABLE_FONT,
+        fontSize: 120,
+        id,
+        parentId: "root",
+        stroke: null,
+        strokeWidth: 0,
+        text: "CIRCLE",
+        tracking: 0,
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 100,
+          y: 200,
+        },
+        type: "text",
+        visible: true,
+        warp: {
+          kind: "circle",
+          ...(pathPosition === undefined ? {} : { pathPosition }),
+          radius: 900,
+          sweepDeg: 140,
+        },
+      },
+    ],
+    version: "1.3",
+  });
+};
+
 describe("Editor.loadDocument", () => {
   test("replaces the current document and clears transient selection state", () => {
     const editor = new Editor();
@@ -97,6 +131,19 @@ describe("Editor.loadDocument", () => {
     expect(resolution.missingFonts).toEqual([MISSING_FONT]);
     expect(resolution.replacementFont).toEqual(AVAILABLE_FONT);
     expect(editor.nodes[0]?.font).toEqual(AVAILABLE_FONT);
+  });
+
+  test("fills in the default circle path position when older documents omit it", () => {
+    const editor = new Editor();
+
+    editor.loadDocument(createCircleDocument("circle-node"));
+
+    expect(editor.nodes[0]?.warp).toEqual({
+      kind: "circle",
+      pathPosition: 0,
+      radius: 900,
+      sweepDeg: 140,
+    });
   });
 });
 

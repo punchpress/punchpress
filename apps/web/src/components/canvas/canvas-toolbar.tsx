@@ -47,7 +47,7 @@ export const CanvasToolbar = () => {
   const zoom = useEditorValue((_, state) => state.viewport.zoom);
 
   return (
-    <Toolbar>
+    <Toolbar className="canvas-bottom-toolbar">
       <ToolbarGroup>
         {TOOL_CONFIG.map(({ icon, iconLibrary, id, label, shortcut }) => {
           const Icon = icon;

@@ -46,12 +46,28 @@ export const getTransformFlags = ({
   activeTool,
   editingNodeId,
   hasGroupSelection,
+  isPathEditingSelection,
   selectedBounds,
   selectedGeometry,
   selectedNode,
   selectedTarget,
   selectedTargets,
 }) => {
+  if (isPathEditingSelection) {
+    return {
+      isDraggable: false,
+      isResizable: Boolean(
+        activeTool === "pointer" &&
+          selectedTargets.length > 0 &&
+          selectedTarget &&
+          selectedNode &&
+          selectedGeometry &&
+          !editingNodeId
+      ),
+      isRotatable: false,
+    };
+  }
+
   return {
     isDraggable: Boolean(
       activeTool === "pointer" && selectedTargets.length > 0 && !editingNodeId

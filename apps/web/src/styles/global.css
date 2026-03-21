@@ -226,6 +226,15 @@ textarea,
   cursor: text;
 }
 
+[data-canvas-cursor="text-path-slide"] {
+  cursor: ew-resize;
+}
+
+[data-active-canvas-cursor="text-path-slide"],
+[data-active-canvas-cursor="text-path-slide"] * {
+  cursor: ew-resize !important;
+}
+
 @theme inline {
   --font-heading: var(--font-heading);
   --font-mono: var(--font-mono);

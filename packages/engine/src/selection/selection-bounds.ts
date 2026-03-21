@@ -35,7 +35,8 @@ export const getSelectionBounds = (editor, nodeIds) => {
 };
 
 const getRenderedNodeBounds = (editor, nodeId) => {
-  const element = editor.getNodeElement(nodeId);
+  const element =
+    editor.getNodeTransformElement(nodeId) || editor.getNodeElement(nodeId);
   const host = editor.hostRef;
   const viewer = editor.viewerRef;
 

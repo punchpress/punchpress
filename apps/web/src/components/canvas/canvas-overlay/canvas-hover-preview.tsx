@@ -1,4 +1,4 @@
-import { isNodeVisible } from "@punchpress/engine";
+import { getRenderNodeFrame, isNodeVisible } from "@punchpress/engine";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { getHostRectFromNodeFrame } from "./canvas-overlay-geometry";
@@ -25,7 +25,7 @@ export const CanvasHoverPreview = ({ viewportRevision }) => {
       return null;
     }
 
-    return editor.getNodeFrame(node.id);
+    return getRenderNodeFrame(node, editor.getNodeGeometry(node.id));
   });
 
   const hoveredNodePreviewRect = getHostRectFromNodeFrame(

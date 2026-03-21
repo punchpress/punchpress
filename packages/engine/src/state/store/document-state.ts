@@ -1,7 +1,4 @@
-import {
-  getSubtreeNodeIds,
-  isDescendantOf,
-} from "../../nodes/node-tree";
+import { getSubtreeNodeIds, isDescendantOf } from "../../nodes/node-tree";
 import { isNodeVisible } from "../../shapes/warp-text/model";
 import { finalizeEditingState } from "./editing-state";
 import {
@@ -19,6 +16,8 @@ export const deleteNodeState = (state, nodeId) => {
   const deletedNodeIds = new Set(getSubtreeNodeIds(state.nodes, nodeId));
   const isEditingNode =
     state.editingNodeId && deletedNodeIds.has(state.editingNodeId);
+  const isPathEditingNode =
+    state.pathEditingNodeId && deletedNodeIds.has(state.pathEditingNodeId);
 
   return {
     activeTool: isEditingNode ? "pointer" : state.activeTool,
@@ -26,6 +25,7 @@ export const deleteNodeState = (state, nodeId) => {
     editingOriginalText: isEditingNode ? "" : state.editingOriginalText,
     editingText: isEditingNode ? "" : state.editingText,
     isHoveringSuppressed: isEditingNode ? false : state.isHoveringSuppressed,
+    pathEditingNodeId: isPathEditingNode ? null : state.pathEditingNodeId,
     ...deleteNodeTreeState(state, [nodeId]),
   };
 };
@@ -37,12 +37,19 @@ export const deleteNodesState = (state, nodeIds) => {
     return {};
   }
 
-  const selectedNodeIdSet = new Set(selectedNodeIds);
   const isEditingNodeSelected =
     state.editingNodeId &&
-    selectedNodeIds.some((nodeId) =>
-      nodeId === state.editingNodeId ||
-      isDescendantOf(state.nodes, state.editingNodeId, nodeId)
+    selectedNodeIds.some(
+      (nodeId) =>
+        nodeId === state.editingNodeId ||
+        isDescendantOf(state.nodes, state.editingNodeId, nodeId)
+    );
+  const isPathEditingNodeSelected =
+    state.pathEditingNodeId &&
+    selectedNodeIds.some(
+      (nodeId) =>
+        nodeId === state.pathEditingNodeId ||
+        isDescendantOf(state.nodes, state.pathEditingNodeId, nodeId)
     );
 
   return {
@@ -53,6 +60,9 @@ export const deleteNodesState = (state, nodeIds) => {
     isHoveringSuppressed: isEditingNodeSelected
       ? false
       : state.isHoveringSuppressed,
+    pathEditingNodeId: isPathEditingNodeSelected
+      ? null
+      : state.pathEditingNodeId,
     ...deleteNodeTreeState(state, selectedNodeIds),
   };
 };
@@ -81,6 +91,7 @@ export const toggleNodeVisibilityState = (state, nodeId) => {
     editingNodeId: baseState.editingNodeId,
     editingOriginalText: baseState.editingOriginalText,
     editingText: baseState.editingText,
+    pathEditingNodeId: baseState.pathEditingNodeId,
     ...toggleNodeVisibilityTreeState(baseState, nodeId),
     selectedNodeIds: baseState.selectedNodeIds,
   };
@@ -97,13 +108,17 @@ export const duplicateNodesState = (state, nodeIds) => {
     state.editingNodeId && selectedNodeIds.includes(state.editingNodeId)
       ? { ...state, ...finalizeEditingState(state, selectedNodeIds) }
       : state;
-  const duplicatedState = duplicateNodeTreeState(committedState, selectedNodeIds);
+  const duplicatedState = duplicateNodeTreeState(
+    committedState,
+    selectedNodeIds
+  );
 
   return {
     activeTool: committedState.activeTool,
     editingNodeId: committedState.editingNodeId,
     editingOriginalText: committedState.editingOriginalText,
     editingText: committedState.editingText,
+    pathEditingNodeId: null,
     ...duplicatedState,
   };
 };

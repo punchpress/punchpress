@@ -42,6 +42,7 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
           editingText: node.text,
           focusedGroupId: null,
           nodes: [...state.nodes, node],
+          pathEditingNodeId: null,
           selectedNodeIds: [node.id],
         })
       );
@@ -94,6 +95,7 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
         hoveredNodeId: null,
         isHoveringSuppressed: false,
         nodes: [...nodes],
+        pathEditingNodeId: null,
         selectedNodeIds: [],
         viewport: state.viewport,
       }));

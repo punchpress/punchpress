@@ -59,7 +59,9 @@ export const scheduleViewportFocus = (editor, nodeIds) => {
     const bounds = getSelectionBounds(editor, visibleNodeIds);
     const isReady = visibleNodeIds.every((nodeId) => {
       return Boolean(
-        editor.getNodeElement(nodeId) && editor.getNodeGeometry(nodeId)?.ready
+        (editor.getNodeTransformElement(nodeId) ||
+          editor.getNodeElement(nodeId)) &&
+          editor.getNodeGeometry(nodeId)?.ready
       );
     });
 

@@ -16,7 +16,12 @@ export const CanvasSelectionOverlay = () => {
     return editor
       .getEffectiveSelectionNodeIds(state.selectedNodeIds)
       .filter((nodeId) => editor.isNodeEffectivelyVisible(nodeId))
-      .map((nodeId) => editor.getNodeElement(nodeId))
+      .map((nodeId) => {
+        return (
+          editor.getNodeTransformElement(nodeId) ||
+          editor.getNodeElement(nodeId)
+        );
+      })
       .filter(Boolean);
   });
 
