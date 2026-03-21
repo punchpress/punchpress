@@ -52,6 +52,18 @@ export const handleCanvasShortcutKeyDown = (editor, event, key) => {
     return false;
   }
 
+  if (key === "escape" && editor.pathEditingNodeId) {
+    event.preventDefault();
+    editor.stopPathEditing();
+    return true;
+  }
+
+  if (key === "e" && editor.canEditNodePath()) {
+    event.preventDefault();
+    editor.togglePathEditing();
+    return true;
+  }
+
   if (event.code === "BracketLeft") {
     if (editor.selectedNodeIds.length === 0) {
       return true;

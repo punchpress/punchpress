@@ -29,6 +29,7 @@ export const createEditingStoreActions = (set) => {
         }
 
         return {
+          pathEditingNodeId: null,
           selectedNodeIds: [],
         };
       });
@@ -75,6 +76,7 @@ export const createEditingStoreActions = (set) => {
           editingOriginalText: node.text,
           editingText: node.text,
           isHoveringSuppressed: true,
+          pathEditingNodeId: null,
           selectedNodeIds: [node.id],
         });
       });
@@ -92,6 +94,8 @@ export const createEditingStoreActions = (set) => {
         }
 
         return {
+          pathEditingNodeId:
+            state.pathEditingNodeId === nodeId ? state.pathEditingNodeId : null,
           selectedNodeIds: nextSelectedNodeIds,
         };
       });
@@ -113,6 +117,11 @@ export const createEditingStoreActions = (set) => {
         }
 
         return {
+          pathEditingNodeId:
+            nextSelectedNodeIds.length === 1 &&
+            nextSelectedNodeIds[0] === state.pathEditingNodeId
+              ? state.pathEditingNodeId
+              : null,
           selectedNodeIds: nextSelectedNodeIds,
         };
       });
@@ -138,6 +147,11 @@ export const createEditingStoreActions = (set) => {
         }
 
         return {
+          pathEditingNodeId:
+            nextSelectedNodeIds.length === 1 &&
+            nextSelectedNodeIds[0] === state.pathEditingNodeId
+              ? state.pathEditingNodeId
+              : null,
           selectedNodeIds: nextSelectedNodeIds,
         };
       });

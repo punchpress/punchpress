@@ -17,23 +17,25 @@ export const useCanvasTransformEffects = ({
   selectionFrameKey,
   viewportRevision,
 }) => {
-  const moveable = moveableRef.current;
-
   useLayoutEffect(() => {
+    const moveable = moveableRef.current;
+
     if (!(selectedTargets.length > 0 && moveable && selectionFrameKey)) {
       return;
     }
 
     moveable.updateRect?.();
-  }, [moveable, selectedTargets, selectionFrameKey]);
+  }, [moveableRef, selectedTargets, selectionFrameKey]);
 
   useLayoutEffect(() => {
+    const moveable = moveableRef.current;
+
     if (!(moveable && viewportRevision >= 0)) {
       return;
     }
 
     moveable.updateRect?.();
-  }, [moveable, viewportRevision]);
+  }, [moveableRef, viewportRevision]);
 
   useEffect(() => {
     if (!hostElement) {

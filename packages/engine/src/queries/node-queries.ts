@@ -43,11 +43,11 @@ export const getLayerRow = (editor, nodeId) => {
   const groupLayerIndex =
     groupIndex >= 0 ? groupSiblingIds.length - 1 - groupIndex : -1;
   const isVisible = isNodeEffectivelyVisible(editor, node);
-  const label = isTextNode(node)
-    ? node.text.trim().length > 0
-      ? node.text
-      : `Text ${layerIndex + 1}`
-    : node.name || `Group ${groupLayerIndex + 1}`;
+  let label = node.name || `Group ${groupLayerIndex + 1}`;
+
+  if (isTextNode(node)) {
+    label = node.text.trim().length > 0 ? node.text : `Text ${layerIndex + 1}`;
+  }
 
   return {
     isBackmost: siblingIndex === 0,
@@ -85,7 +85,10 @@ export const getNodeFrame = (editor, nodeId) => {
   }
 
   if (isGroupNode(node)) {
-    const descendantLeafNodeIds = getDescendantLeafNodeIds(editor.nodes, nodeId);
+    const descendantLeafNodeIds = getDescendantLeafNodeIds(
+      editor.nodes,
+      nodeId
+    );
     if (descendantLeafNodeIds.length === 0) {
       return null;
     }
@@ -101,7 +104,9 @@ export const getNodeFrame = (editor, nodeId) => {
     };
   }
 
-  return getEditableNodeFrame(node, getNodeGeometry(editor, nodeId));
+  return getEditableNodeFrame(node, getNodeGeometry(editor, nodeId), {
+    useSelectionBounds: Boolean(editor.getNodeTransformElement(nodeId)),
+  });
 };
 
 export const getSelectionFrameKey = (

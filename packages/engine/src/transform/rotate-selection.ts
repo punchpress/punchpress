@@ -26,6 +26,13 @@ const queueOverlayRefresh = (editor) => {
   });
 };
 
+const getNodeRotateBounds = (editor, nodeId, node) => {
+  const geometry = editor.getNodeGeometry(nodeId);
+  return editor.getNodeTransformElement(nodeId)
+    ? geometry?.selectionBounds || geometry?.bbox || estimateBounds(node)
+    : geometry?.bbox || estimateBounds(node);
+};
+
 export const beginRotateSelection = (editor, { nodeId, nodeIds } = {}) => {
   const requestedNodeIds =
     nodeIds?.filter((currentNodeId) => editor.getNode(currentNodeId)) ||
@@ -43,9 +50,9 @@ export const beginRotateSelection = (editor, { nodeId, nodeIds } = {}) => {
 
   for (const currentNodeId of resolvedNodeIds) {
     const rotatedNode = editor.getNode(currentNodeId);
-    const bbox =
-      editor.getNodeGeometry(currentNodeId)?.bbox ||
-      (rotatedNode ? estimateBounds(rotatedNode) : null);
+    const bbox = rotatedNode
+      ? getNodeRotateBounds(editor, currentNodeId, rotatedNode)
+      : null;
 
     if (!(rotatedNode && bbox)) {
       continue;
@@ -117,7 +124,9 @@ export const rotateSelectionBy = (
 ) => {
   const effectiveSelectedNodeIds = editor.getEffectiveSelectionNodeIds();
 
-  if (!(effectiveSelectedNodeIds.length > 0 && Number.isFinite(deltaRotation))) {
+  if (
+    !(effectiveSelectedNodeIds.length > 0 && Number.isFinite(deltaRotation))
+  ) {
     return [];
   }
 

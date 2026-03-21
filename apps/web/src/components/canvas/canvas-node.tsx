@@ -42,11 +42,16 @@ export const CanvasNode = ({ nodeId }) => {
   const width = Math.max(1, bbox.width);
   const height = Math.max(1, bbox.height);
   const isEditing = editingNodeId === nodeId;
+  const isNodeDraggable =
+    activeTool === "pointer" && !spacePressed && editingNodeId === null;
 
   return (
     <button
       className={cn(
-        "canvas-node absolute block cursor-default appearance-none border-0 bg-transparent p-0",
+        "canvas-node absolute block appearance-none border-0 bg-transparent p-0",
+        isNodeDraggable
+          ? "cursor-grab active:cursor-grabbing"
+          : "cursor-default",
         !geometry?.ready && "opacity-50"
       )}
       data-node-id={node.id}
@@ -68,8 +73,15 @@ export const CanvasNode = ({ nodeId }) => {
 
         const selectionTargetNodeId =
           editor.getSelectionTargetNodeId(node.id) || node.id;
-        const shouldStartDragging = !(
-          event.shiftKey || editor.isSelected(selectionTargetNodeId)
+        const isSelectionTargetSelected = editor.isSelected(
+          selectionTargetNodeId
+        );
+        const shouldDragSelectedPathNode = Boolean(
+          isSelectionTargetSelected && geometry?.selectionBounds
+        );
+        const shouldStartDragging = Boolean(
+          !event.shiftKey &&
+            (!isSelectionTargetSelected || shouldDragSelectedPathNode)
         );
 
         editor.dispatchNodePointerDown({ event, node });

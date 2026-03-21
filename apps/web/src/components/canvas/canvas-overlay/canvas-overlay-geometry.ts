@@ -84,7 +84,8 @@ export const getNodeIdsFromSelectionRect = (editor, rect) => {
     .filter((node) => editor.isNodeEffectivelyVisible(node.id))
     .map((node) => node.id)
     .filter((nodeId) => {
-      const element = editor.getNodeElement(nodeId);
+      const element =
+        editor.getNodeTransformElement(nodeId) || editor.getNodeElement(nodeId);
       if (!element) {
         return false;
       }

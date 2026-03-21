@@ -68,13 +68,6 @@ import {
 import { GeometryManager } from "./managers/geometry-manager";
 import { HistoryManager } from "./managers/history-manager";
 import {
-  getLayerRow as getEditorLayerRow,
-  getNode as getEditorNode,
-  getNodeFrame as getEditorNodeFrame,
-  getNodeGeometry as getEditorNodeGeometry,
-  getSelectionFrameKey as getEditorSelectionFrameKey,
-} from "./queries/node-queries";
-import {
   getChildNodeIds,
   getDescendantLeafNodeIds,
   getEffectiveSelectionNodeIds,
@@ -82,6 +75,13 @@ import {
   isDescendantOf,
   isGroupNode,
 } from "./nodes/node-tree";
+import {
+  getLayerRow as getEditorLayerRow,
+  getNode as getEditorNode,
+  getNodeFrame as getEditorNodeFrame,
+  getNodeGeometry as getEditorNodeGeometry,
+  getSelectionFrameKey as getEditorSelectionFrameKey,
+} from "./queries/node-queries";
 import {
   clearSelection as clearEditorSelection,
   clearSelectionPreservingFocus as clearEditorSelectionPreservingFocus,
@@ -114,6 +114,10 @@ import {
   updateRotateSelection as updateEditorRotateSelection,
 } from "./transform/rotate-selection";
 import {
+  beginTextPathEdit as beginEditorTextPathEdit,
+  updateTextPathEdit as updateEditorTextPathEdit,
+} from "./transform/text-path-edit";
+import {
   cancelPendingViewportFocus as cancelEditorPendingViewportFocus,
   scheduleViewportFocus as scheduleEditorViewportFocus,
   zoomIn as zoomEditorIn,
@@ -130,6 +134,7 @@ export class Editor {
     this.getInitialLocalFontCatalog = null;
     this.lastUsedFont = null;
     this.nodeElements = new Map();
+    this.nodeTransformElements = new Map();
     this.viewerRef = null;
     this.hostRef = null;
     this.persistLastUsedFont = null;
@@ -268,9 +273,11 @@ export class Editor {
 
     return {
       bbox: geometry.bbox,
+      guide: geometry.guide || null,
       id: this.editingPreviewNode.id,
       paths: geometry.paths,
       ready: geometry.ready,
+      selectionBounds: geometry.selectionBounds || null,
     };
   }
 
@@ -323,6 +330,10 @@ export class Editor {
     return this.getState().focusedGroupId;
   }
 
+  get pathEditingNodeId() {
+    return this.getState().pathEditingNodeId;
+  }
+
   get isDirty() {
     return this.history.isDirty;
   }
@@ -351,6 +362,18 @@ export class Editor {
 
   get selectedNodeIds() {
     return this.getState().selectedNodeIds;
+  }
+
+  canEditNodePath(nodeId = this.selectedNodeId) {
+    const node = this.getNode(nodeId);
+    const geometry =
+      node?.type === "text" ? this.getNodeGeometry(nodeId) : null;
+
+    return Boolean(node?.type === "text" && geometry?.guide);
+  }
+
+  isPathEditing(nodeId = this.pathEditingNodeId) {
+    return Boolean(nodeId && this.pathEditingNodeId === nodeId);
   }
 
   get zoom() {
@@ -603,6 +626,10 @@ export class Editor {
     setEditorActiveTool(this, toolId);
   }
 
+  setPathEditingNodeId(nodeId) {
+    this.getState().setPathEditingNodeId(nodeId);
+  }
+
   setEditingText(value) {
     setEditorEditingText(this, value);
   }
@@ -639,6 +666,36 @@ export class Editor {
     this.getState().setViewportZoom(zoom);
   }
 
+  startPathEditing(nodeId = this.selectedNodeId) {
+    if (!this.canEditNodePath(nodeId) || this.editingNodeId) {
+      return false;
+    }
+
+    if (!this.isSelected(nodeId)) {
+      selectEditorNode(this, nodeId);
+    }
+
+    this.getState().setPathEditingNodeId(nodeId);
+    return true;
+  }
+
+  stopPathEditing() {
+    if (!this.pathEditingNodeId) {
+      return false;
+    }
+
+    this.getState().setPathEditingNodeId(null);
+    return true;
+  }
+
+  togglePathEditing(nodeId = this.selectedNodeId) {
+    if (this.isPathEditing(nodeId)) {
+      return this.stopPathEditing();
+    }
+
+    return this.startPathEditing(nodeId);
+  }
+
   moveSelectionBy(options) {
     return moveEditorSelectionBy(this, options);
   }
@@ -673,6 +730,14 @@ export class Editor {
 
   updateRotateSelection(session, options) {
     return updateEditorRotateSelection(this, session, options);
+  }
+
+  beginTextPathEdit(options) {
+    return beginEditorTextPathEdit(this, options);
+  }
+
+  updateTextPathEdit(session, options) {
+    return updateEditorTextPathEdit(this, session, options);
   }
 
   toggleVisibility(nodeId) {
@@ -723,6 +788,14 @@ export class Editor {
     }
   }
 
+  registerNodeTransformElement(nodeId, element) {
+    if (element) {
+      this.nodeTransformElements.set(nodeId, element);
+    } else {
+      this.nodeTransformElements.delete(nodeId);
+    }
+  }
+
   serializeDocument() {
     return serializeEditorDocument(this);
   }
@@ -766,6 +839,10 @@ export class Editor {
 
   getNodeElement(nodeId) {
     return this.nodeElements.get(nodeId) || null;
+  }
+
+  getNodeTransformElement(nodeId) {
+    return this.nodeTransformElements.get(nodeId) || null;
   }
 
   zoomIn() {

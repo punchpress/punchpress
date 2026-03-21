@@ -20,6 +20,7 @@ export const getEditorDebugDump = (editor) => {
       focusedGroupId: state.focusedGroupId,
       nodeId: state.editingNodeId,
       originalText: state.editingOriginalText,
+      pathNodeId: state.pathEditingNodeId,
       text: state.editingText,
     },
     hoveredNodeId: editor.hoveredNodeId,

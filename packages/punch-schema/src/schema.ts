@@ -43,6 +43,7 @@ export const warpSchema = z.discriminatedUnion("kind", [
   z
     .object({
       kind: z.literal("circle"),
+      pathPosition: finiteNumber.default(0),
       radius: finiteNumber,
       sweepDeg: finiteNumber,
     })

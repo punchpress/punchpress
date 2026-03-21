@@ -12,17 +12,16 @@ import { LinkIcon } from "lucide-react";
 import { FontPicker } from "@/components/fonts-picker/font-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
+import {
+  ToggleGroup,
+  Toggle as ToggleGroupItem,
+} from "@/components/ui/toggle-group";
+import { cn } from "@/lib/utils";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
 import { ColorField, FieldRow, PairedRow, Section } from "./field-primitives";
+import { warpIcons } from "./warp-icons";
 import { NodeFieldsWarpInputs } from "./warp-text-warp-fields";
 
 export const NodeFields = () => {
@@ -31,6 +30,13 @@ export const NodeFields = () => {
   const availableFonts = useEditorValue((editor) => editor.availableFonts);
   const fontCatalogState = useEditorValue((editor) => editor.fontCatalogState);
   const fontCatalogError = useEditorValue((editor) => editor.bootstrapError);
+  const hasPathGuide = useEditorValue((editor) => {
+    if (!node) {
+      return false;
+    }
+
+    return Boolean(editor.getNodeGeometry(node.id)?.guide);
+  });
 
   if (!node) {
     return null;
@@ -130,30 +136,55 @@ export const NodeFields = () => {
       </Section>
 
       <Section className="border-black/6 border-t" title="Warp">
-        <FieldRow label="Type">
-          <Select
-            onValueChange={(value) => {
-              if (value) {
-                update({
-                  warp: getDefaultWarp(value),
-                });
-              }
-            }}
-            value={node.warp.kind}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">None</SelectItem>
-              <SelectItem value="arch">Arch</SelectItem>
-              <SelectItem value="wave">Wave</SelectItem>
-              <SelectItem value="circle">Circle</SelectItem>
-            </SelectContent>
-          </Select>
-        </FieldRow>
+        <ToggleGroup
+          className="gap-1.5"
+          onValueChange={(values) => {
+            const next = values[0] ?? "none";
+            update({ warp: getDefaultWarp(next) });
+
+            if (next === "circle") {
+              editor.startPathEditing(node.id);
+              return;
+            }
+
+            if (editor.isPathEditing(node.id)) {
+              editor.stopPathEditing();
+            }
+          }}
+          value={node.warp.kind === "none" ? [] : [node.warp.kind]}
+        >
+          {(["arch", "wave", "circle", "slant"] as const).map((kind) => {
+            const { icon: Icon, label } = warpIcons[kind];
+            const isSlant = kind === "slant";
+            return (
+              <ToggleGroupItem
+                aria-label={label}
+                className={cn(
+                  "[&_svg]:!size-7 h-auto flex-1 px-0 py-2",
+                  isSlant && "cursor-not-allowed opacity-20"
+                )}
+                disabled={isSlant}
+                key={kind}
+                title={isSlant ? "Slant (coming soon)" : label}
+                value={kind}
+              >
+                <Icon />
+              </ToggleGroupItem>
+            );
+          })}
+        </ToggleGroup>
 
         <NodeFieldsWarpInputs />
+
+        {node.warp.kind !== "none" && (
+          <button
+            className="w-full text-center text-[11px] text-foreground/40 transition-colors hover:text-foreground/70"
+            onClick={() => update({ warp: getDefaultWarp("none") })}
+            type="button"
+          >
+            Clear
+          </button>
+        )}
       </Section>
 
       <Section className="border-black/6 border-t" title="Position">
@@ -185,16 +216,18 @@ export const NodeFields = () => {
         </PairedRow>
       </Section>
 
-      <div className="border-black/6 border-t pt-3 [&_[data-slot=button]]:w-full">
-        <Button
-          onClick={() => editor.deleteSelected()}
-          size="sm"
-          type="button"
-          variant="destructive-outline"
-        >
-          Delete
-        </Button>
-      </div>
+      {hasPathGuide ? null : (
+        <div className="border-black/6 border-t pt-3 [&_[data-slot=button]]:w-full">
+          <Button
+            onClick={() => editor.deleteSelected()}
+            size="sm"
+            type="button"
+            variant="destructive-outline"
+          >
+            Delete
+          </Button>
+        </div>
+      )}
     </>
   );
 };

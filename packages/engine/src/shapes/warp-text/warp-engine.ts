@@ -1,10 +1,11 @@
-import { clamp, format } from "../../primitives/math";
+import { format } from "../../primitives/math";
 import {
   contoursToPath,
   getBounds,
   mapContours,
   translateContours,
 } from "../../primitives/path-geometry";
+import { buildCircleTextGeometry } from "./text-path";
 import { estimateBounds, inflateBounds, layoutGlyphs } from "./warp-layout";
 
 const getStrokeInflatedBounds = (node, bbox) => {
@@ -52,7 +53,9 @@ const buildFallbackGeometry = (node) => {
   return {
     paths: [],
     bbox: getStrokeInflatedBounds(node, estimateBounds(node)),
+    guide: null,
     ready: false,
+    selectionBounds: null,
   };
 };
 
@@ -66,9 +69,11 @@ const buildArchGeometry = (layout, node) => {
 
   const warpedContours = applyArchWarp(mergedContours, node.warp.bend);
   return {
+    guide: null,
     paths: [{ key: "shape-0", d: contoursToPath(warpedContours) }],
     bbox: getStrokeInflatedBounds(node, getBounds(warpedContours)),
     ready: true,
+    selectionBounds: null,
   };
 };
 
@@ -87,58 +92,23 @@ const buildWaveGeometry = (layout, node) => {
   );
 
   return {
+    guide: null,
     paths: [{ key: "shape-0", d: contoursToPath(warpedContours) }],
     bbox: getStrokeInflatedBounds(node, getBounds(warpedContours)),
     ready: true,
+    selectionBounds: null,
   };
 };
 
 const buildCircleGeometry = (layout, node) => {
-  const paths =
-    /** @type {Array<{ d: string, key: string, transform?: string }>} */ ([]);
-  const mergedContours =
-    /** @type {ReturnType<typeof commandsToContours>} */ ([]);
-  const totalWidth = Math.max(layout.totalWidth, 1);
-  const radius = Math.max(1, node.warp.radius);
-
-  for (const [index, glyph] of layout.glyphs.entries()) {
-    const centerX = glyph.baseX + glyph.advance / 2;
-    const u = clamp((centerX + totalWidth / 2) / totalWidth, 0, 1);
-    const angleDeg = (u - 0.5) * node.warp.sweepDeg;
-    const angleRad = (angleDeg * Math.PI) / 180;
-
-    const arcX = radius * Math.sin(angleRad);
-    const arcY = radius - radius * Math.cos(angleRad);
-
-    paths.push({
-      key: `glyph-${index}`,
-      d: glyph.path,
-      transform: `translate(${format(arcX)} ${format(arcY)}) rotate(${format(
-        angleDeg
-      )}) translate(${format(-glyph.centerX)} 0)`,
-    });
-
-    mergedContours.push(
-      ...mapContours(glyph.contours, (point) => {
-        const shiftedX = point.x - glyph.centerX;
-        const shiftedY = point.y;
-        const rotatedX =
-          shiftedX * Math.cos(angleRad) - shiftedY * Math.sin(angleRad);
-        const rotatedY =
-          shiftedX * Math.sin(angleRad) + shiftedY * Math.cos(angleRad);
-
-        return {
-          x: rotatedX + arcX,
-          y: rotatedY + arcY,
-        };
-      })
-    );
-  }
+  const geometry = buildCircleTextGeometry(layout, node);
 
   return {
-    paths,
-    bbox: getStrokeInflatedBounds(node, getBounds(mergedContours)),
+    guide: geometry.guide,
+    paths: geometry.paths,
+    bbox: getStrokeInflatedBounds(node, geometry.bbox),
     ready: true,
+    selectionBounds: getStrokeInflatedBounds(node, geometry.selectionBounds),
   };
 };
 
@@ -159,9 +129,11 @@ const buildFlatGeometry = (layout, node) => {
   }
 
   return {
+    guide: null,
     paths,
     bbox: getStrokeInflatedBounds(node, getBounds(mergedContours)),
     ready: true,
+    selectionBounds: null,
   };
 };
 
@@ -180,7 +152,9 @@ export const buildNodeGeometry = (node, font) => {
           width: 40,
           height: 40,
         }),
+        guide: null,
         ready: true,
+        selectionBounds: null,
       };
     }
 

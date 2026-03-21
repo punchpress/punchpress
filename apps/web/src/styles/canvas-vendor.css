@@ -103,6 +103,31 @@
     opacity: 0 !important;
   }
 
+  .canvas-node-toolbar-shell {
+    transform-origin: 50% 100%;
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    transition:
+      opacity 150ms cubic-bezier(0.23, 1, 0.32, 1),
+      transform 150ms cubic-bezier(0.23, 1, 0.32, 1);
+    will-change: opacity, transform;
+  }
+
+  .canvas-node-toolbar[data-phase="open"] .canvas-node-toolbar-shell {
+    @starting-style {
+      opacity: 0;
+      transform: translateY(6px) scale(0.97);
+    }
+  }
+
+  .canvas-node-toolbar[data-phase="closing"] .canvas-node-toolbar-shell {
+    opacity: 0;
+    transform: translateY(4px) scale(0.985);
+    transition:
+      opacity 80ms cubic-bezier(0.16, 1, 0.3, 1),
+      transform 80ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
   .canvas-edit-selection {
     z-index: 8;
     outline: 1.5px solid color-mix(in srgb, var(--editor-accent) 72%, black);
@@ -134,3 +159,4 @@
     @apply rounded;
   }
 }
+

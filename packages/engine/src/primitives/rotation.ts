@@ -61,6 +61,25 @@ export const getNodeWorldPoint = (node, bbox, point) => {
   };
 };
 
+export const getNodeLocalPoint = (node, bbox, point) => {
+  const localCenter = getLocalBoundsCenter(bbox);
+  const worldCenter = getNodeRotationCenter(node, bbox);
+  const scaleX = getNodeScaleX(node) ?? 1;
+  const scaleY = getNodeScaleY(node) ?? 1;
+  const rotation = ((getNodeRotation(node) || 0) * Math.PI) / 180;
+  const offsetX = point.x - worldCenter.x;
+  const offsetY = point.y - worldCenter.y;
+  const unrotatedX =
+    offsetX * Math.cos(-rotation) - offsetY * Math.sin(-rotation);
+  const unrotatedY =
+    offsetX * Math.sin(-rotation) + offsetY * Math.cos(-rotation);
+
+  return {
+    x: localCenter.x + unrotatedX / (scaleX || 1),
+    y: localCenter.y + unrotatedY / (scaleY || 1),
+  };
+};
+
 export const getRotatedNodeUpdate = (
   baseNode,
   bbox,

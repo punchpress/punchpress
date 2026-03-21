@@ -1,5 +1,5 @@
-import { buildNodeGeometry } from "../shapes/warp-text/warp-engine";
 import { isTextNode } from "../nodes/node-tree";
+import { buildNodeGeometry } from "../shapes/warp-text/warp-engine";
 import { estimateBounds } from "../shapes/warp-text/warp-layout";
 
 const getGeometrySignature = (node, fontRevision) => {
@@ -25,9 +25,11 @@ const getFallbackGeometry = (node) => {
 
   return {
     bbox: estimateBounds(node),
+    guide: null,
     id: node.id,
     paths: [],
     ready: false,
+    selectionBounds: null,
   };
 };
 
@@ -87,9 +89,11 @@ export class GeometryManager {
 
       const geometry = {
         bbox: builtGeometry.bbox,
+        guide: builtGeometry.guide || null,
         id: node.id,
         paths: builtGeometry.paths,
         ready: builtGeometry.ready,
+        selectionBounds: builtGeometry.selectionBounds || null,
       };
 
       nextCache.set(node.id, { geometry, signature });

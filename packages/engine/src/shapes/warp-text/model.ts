@@ -24,7 +24,7 @@ export const getDefaultWarp = (kind) => {
   }
 
   if (kind === "circle") {
-    return { kind: "circle", radius: 1100, sweepDeg: 180 };
+    return { kind: "circle", pathPosition: 0, radius: 1100, sweepDeg: 180 };
   }
 
   return { kind: "none" };

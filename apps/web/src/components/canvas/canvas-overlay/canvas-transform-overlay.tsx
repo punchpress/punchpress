@@ -22,6 +22,7 @@ export const CanvasTransformOverlay = ({ viewportRevision }) => {
     hasGroupSelection,
     hostElement,
     isDraggable,
+    isPathEditingSelection,
     isResizable,
     isRotatable,
     selectedBounds,
@@ -67,6 +68,13 @@ export const CanvasTransformOverlay = ({ viewportRevision }) => {
     !editingNodeId &&
     selectedTargets.length > 0 &&
     Boolean(hostElement);
+  let moveableModeKey = "node";
+
+  if (hasGroupSelection) {
+    moveableModeKey = "group";
+  } else if (isPathEditingSelection) {
+    moveableModeKey = "path";
+  }
 
   return (
     <>
@@ -82,6 +90,7 @@ export const CanvasTransformOverlay = ({ viewportRevision }) => {
           }
           hideDefaultLines={Boolean(editingNodeId)}
           keepRatio
+          key={`moveable:${selectedNode?.id || "selection"}:${moveableModeKey}`}
           onClickGroup={({ isDouble, targetIndex }) => {
             if (!(isDouble && selectedNode?.type === "group")) {
               return;

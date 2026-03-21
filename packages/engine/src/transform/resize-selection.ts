@@ -26,6 +26,13 @@ const queueOverlayRefresh = (editor) => {
   });
 };
 
+const getNodeResizeBounds = (editor, nodeId, node) => {
+  const geometry = editor.getNodeGeometry(nodeId);
+  return editor.getNodeTransformElement(nodeId)
+    ? geometry?.selectionBounds || geometry?.bbox || estimateBounds(node)
+    : geometry?.bbox || estimateBounds(node);
+};
+
 export const beginResizeSelection = (
   editor,
   { anchorCanvas, direction, nodeId, nodeIds } = {}
@@ -45,9 +52,9 @@ export const beginResizeSelection = (
   if (resolvedNodeIds.length === 1) {
     const resolvedNodeId = resolvedNodeIds[0];
     const resizedNode = editor.getNode(resolvedNodeId);
-    const bbox =
-      editor.getNodeGeometry(resolvedNodeId)?.bbox ||
-      (resizedNode ? estimateBounds(resizedNode) : null);
+    const bbox = resizedNode
+      ? getNodeResizeBounds(editor, resolvedNodeId, resizedNode)
+      : null;
 
     if (!(resizedNode && bbox && direction)) {
       return null;
@@ -139,9 +146,9 @@ export const resizeSelectionFromCorner = (
 
   if (effectiveSelectedNodeIds.length === 1) {
     const selectedNode = editor.getNode(effectiveSelectedNodeIds[0]);
-    const bbox =
-      editor.getNodeGeometry(selectedNode?.id)?.bbox ||
-      (selectedNode ? estimateBounds(selectedNode) : null);
+    const bbox = selectedNode?.id
+      ? getNodeResizeBounds(editor, selectedNode.id, selectedNode)
+      : null;
 
     if (!(selectedNode && bbox)) {
       return [];
@@ -163,7 +170,6 @@ export const resizeSelectionFromCorner = (
     });
   }
 
-  const selectionBounds = editor.getSelectionBounds(editor.selectedNodeIds);
   const selectionNodeIds =
     effectiveSelectedNodeIds.length > 0
       ? effectiveSelectedNodeIds
@@ -175,7 +181,10 @@ export const resizeSelectionFromCorner = (
   }
 
   const resizeSession = beginResizeSelection(editor, {
-    anchorCanvas: getResizeAnchorFromBounds(effectiveSelectionBounds, direction),
+    anchorCanvas: getResizeAnchorFromBounds(
+      effectiveSelectionBounds,
+      direction
+    ),
     nodeIds: effectiveSelectedNodeIds,
   });
 

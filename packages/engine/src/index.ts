@@ -7,28 +7,8 @@ export {
   UI_ACCENT,
   WARP_TEXT_NODE_KIND,
 } from "./constants";
+export { getRenderNodeFrame } from "./editable-node-frame";
 export { Editor } from "./editor";
-export {
-  isInputElement,
-  shouldIgnoreGlobalShortcutTarget,
-} from "./primitives/dom";
-export { getResizeCorner } from "./primitives/group-resize";
-export { clamp, format, round, toNumber, toSafeHex } from "./primitives/math";
-export {
-  createDefaultNode,
-  createId,
-  getDefaultWarp,
-  getNodeCssTransform,
-  getNodeRotation,
-  getNodeScaleX,
-  getNodeScaleY,
-  getNodeTransform,
-  getNodeX,
-  getNodeY,
-  isNodeVisible,
-  withNodeTransform,
-} from "./shapes/warp-text/model";
-export { createDefaultGroupNode } from "./shapes/group/model";
 export {
   getAncestorNodeIds,
   getChildNodeIds,
@@ -44,6 +24,32 @@ export {
   isTextNode,
   rebuildTreeOrder,
 } from "./nodes/node-tree";
+export {
+  isInputElement,
+  shouldIgnoreGlobalShortcutTarget,
+} from "./primitives/dom";
+export { getResizeCorner } from "./primitives/group-resize";
+export { clamp, format, round, toNumber, toSafeHex } from "./primitives/math";
+export {
+  getNodeLocalPoint,
+  getNodeRotationCenter,
+  getNodeWorldPoint,
+} from "./primitives/rotation";
+export { createDefaultGroupNode } from "./shapes/group/model";
+export {
+  createDefaultNode,
+  createId,
+  getDefaultWarp,
+  getNodeCssTransform,
+  getNodeRotation,
+  getNodeScaleX,
+  getNodeScaleY,
+  getNodeTransform,
+  getNodeX,
+  getNodeY,
+  isNodeVisible,
+  withNodeTransform,
+} from "./shapes/warp-text/model";
 export {
   estimateBounds,
   inflateBounds,

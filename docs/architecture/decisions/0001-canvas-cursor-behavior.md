@@ -23,6 +23,9 @@ The durable rule is:
 - tool and panning state belong at the canvas boundary, not on individual nodes
 - cursor behavior should be derived by CSS selectors from container state
 - node components should not accept tool-specific cursor props just to mirror canvas mode
+- overlay affordances should expose semantic cursor tokens in React land and let
+  shared CSS resolve them
+- engine geometry and guide data should not carry raw CSS cursor strings
 
 ## Rationale
 
@@ -37,6 +40,8 @@ The durable rule is:
 2. In text mode, `.canvas-node` uses `text`.
 3. When `data-panning="true"`, both `.canvas-surface` and `.canvas-node` use `grab`.
 4. If future tools need cursor changes, prefer new container attributes and CSS selectors over new cursor props on `CanvasNode`.
+5. Overlay handles may use semantic `data-canvas-cursor` tokens, but those tokens should still resolve through shared canvas CSS rather than inline `style.cursor`.
+6. If a drag should preserve its cursor while the pointer leaves the original handle, express that as container state such as `data-active-canvas-cursor`.
 
 ## Source of Truth
 
@@ -44,4 +49,6 @@ The current implementation lives in:
 
 - `apps/web/src/components/canvas.tsx`
 - `apps/web/src/components/canvas-node.tsx`
+- `apps/web/src/components/canvas/canvas-cursor-policy.ts`
+- `apps/web/src/components/canvas/canvas-overlay/canvas-text-path-overlay.tsx`
 - `apps/web/src/styles/global.css`

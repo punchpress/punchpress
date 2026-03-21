@@ -3,7 +3,9 @@ import { useEditor } from "../../../editor-react/use-editor";
 import { CanvasEditingSelection } from "./canvas-editing-selection";
 import { CanvasHoverPreview } from "./canvas-hover-preview";
 import { CanvasSelectionOverlay } from "./canvas-selection-overlay";
+import { CanvasTextPathOverlay } from "./canvas-text-path-overlay";
 import { CanvasTransformOverlay } from "./canvas-transform-overlay";
+import { CanvasNodeToolbar } from "./node-toolbar/canvas-node-toolbar";
 
 export const CanvasOverlay = () => {
   const editor = useEditor();
@@ -25,6 +27,8 @@ export const CanvasOverlay = () => {
   return (
     <>
       <CanvasSelectionOverlay />
+      <CanvasNodeToolbar />
+      <CanvasTextPathOverlay viewportRevision={viewportRevision} />
       <CanvasTransformOverlay viewportRevision={viewportRevision} />
       <CanvasEditingSelection viewportRevision={viewportRevision} />
       <CanvasHoverPreview viewportRevision={viewportRevision} />

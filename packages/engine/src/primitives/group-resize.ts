@@ -8,6 +8,28 @@ import {
 import { round } from "./math";
 import { getLocalBoundsCenter, rotateVector } from "./rotation";
 
+const getScaledWarp = (warp, scale) => {
+  if (!warp) {
+    return null;
+  }
+
+  if (warp.kind === "circle") {
+    return {
+      ...warp,
+      radius: round(Math.max(1, warp.radius * scale), 2),
+    };
+  }
+
+  if (warp.kind === "wave") {
+    return {
+      ...warp,
+      amplitude: round(warp.amplitude * scale, 2),
+    };
+  }
+
+  return warp;
+};
+
 export const getResizeCorner = (direction, opposite = false) => {
   const [horizontalDirection, verticalDirection] = opposite
     ? [-direction[0], -direction[1]]
@@ -38,6 +60,7 @@ export const getScaledGroupNodeUpdate = (node, anchor, scale) => {
       x: round(anchor.x + (getNodeX(node) - anchor.x) * scale, 2),
       y: round(anchor.y + (getNodeY(node) - anchor.y) * scale, 2),
     },
+    warp: getScaledWarp(node.warp, scale),
   };
 };
 
@@ -73,5 +96,6 @@ export const getResizedNodeUpdate = (node, bbox, anchor, scale, direction) => {
       x: round(anchor.x - scaledCenter.x - rotatedOffset.x, 2),
       y: round(anchor.y - scaledCenter.y - rotatedOffset.y, 2),
     },
+    warp: getScaledWarp(node.warp, scale),
   };
 };
