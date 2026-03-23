@@ -14,6 +14,7 @@ They exist to preserve product intent while implementation evolves. They are liv
 
 ## Current Specs
 
+- `clipboard.md`
 - `groups.md`
 - `history.md`
 - `nodes.md`

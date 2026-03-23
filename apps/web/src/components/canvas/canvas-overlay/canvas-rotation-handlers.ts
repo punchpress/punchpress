@@ -26,6 +26,7 @@ export const getCanvasRotationHandlers = ({
       });
     },
     onRotateEnd: (event) => {
+      editor.endSelectionRotationInteraction();
       restoreHover();
       setMoveableMuted(hostElement, false);
       if (event.datas.historyMark) {
@@ -46,6 +47,7 @@ export const getCanvasRotationHandlers = ({
       });
     },
     onRotateGroupEnd: (event) => {
+      editor.endSelectionRotationInteraction();
       restoreHover();
       setMoveableMuted(hostElement, false);
       if (event.datas.historyMark) {
@@ -79,6 +81,7 @@ export const getCanvasRotationHandlers = ({
 
       event.datas.historyMark = editor.markHistoryStep("rotate selection");
       suppressHover();
+      editor.beginSelectionRotationInteraction();
       setMoveableMuted(hostElement, true);
 
       if (shouldShowGroupRotationPreview) {
@@ -104,6 +107,7 @@ export const getCanvasRotationHandlers = ({
 
       event.datas.historyMark = editor.markHistoryStep("rotate selection");
       suppressHover();
+      editor.beginSelectionRotationInteraction();
       setMoveableMuted(hostElement, true);
       event.datas.rotateSession = rotateSession;
     },

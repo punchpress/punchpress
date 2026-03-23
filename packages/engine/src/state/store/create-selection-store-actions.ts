@@ -1,8 +1,17 @@
+import { exitPathEditingInteractionState } from "./interaction-state";
+
 export const createSelectionStoreActions = (set) => {
   return {
+    applyInteractionState: (patch) => {
+      set(() => ({
+        ...patch,
+      }));
+    },
+
     setActiveTool: (activeTool) => {
       set((state) => ({
         activeTool,
+        ...(activeTool === "pointer" ? {} : exitPathEditingInteractionState()),
         pathEditingNodeId:
           activeTool === "pointer" ? state.pathEditingNodeId : null,
       }));
@@ -40,6 +49,24 @@ export const createSelectionStoreActions = (set) => {
       set((state) => ({
         hoveredNodeId: isHoveringSuppressed ? null : state.hoveredNodeId,
         isHoveringSuppressed,
+      }));
+    },
+
+    setSelectionDragging: (isSelectionDragging) => {
+      set(() => ({
+        isSelectionDragging,
+      }));
+    },
+
+    setSelectionRotating: (isSelectionRotating) => {
+      set(() => ({
+        isSelectionRotating,
+      }));
+    },
+
+    setTextPathPositioning: (isTextPathPositioning) => {
+      set(() => ({
+        isTextPathPositioning,
       }));
     },
 

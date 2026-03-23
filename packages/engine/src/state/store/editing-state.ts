@@ -1,3 +1,4 @@
+import { resetTransientCanvasInteractionState } from "./interaction-state";
 import { mapNodeById } from "./node-mutations";
 import { getSelectedNodeIds } from "./selection-state";
 
@@ -11,7 +12,7 @@ export const commitEditingState = (
 ) => {
   if (!state.editingNodeId) {
     return {
-      isHoveringSuppressed: false,
+      ...resetTransientCanvasInteractionState(),
       selectedNodeIds: getSelectedNodeIds(state, selectedNodeIds),
     };
   }
@@ -22,7 +23,7 @@ export const commitEditingState = (
     editingNodeId: null,
     editingOriginalText: "",
     editingText: nextText,
-    isHoveringSuppressed: false,
+    ...resetTransientCanvasInteractionState(),
     nodes: mapNodeById(state.nodes, state.editingNodeId, (node) =>
       node.text === nextText ? node : { ...node, text: nextText }
     ),

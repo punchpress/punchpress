@@ -14,12 +14,12 @@ export class TextTool extends Tool {
     this.editor.startEditing(node);
   }
 
-  onKeyDown({ key }) {
+  onKeyDown({ event, key }) {
     if (key === "escape") {
       this.editor.setActiveTool("pointer");
       return true;
     }
 
-    return selectToolFromShortcut(this.editor, key);
+    return selectToolFromShortcut(this.editor, key, event);
   }
 }

@@ -412,7 +412,7 @@ export const shiftClickLayer = async (page, label) => {
   await page.keyboard.up("Shift");
 };
 
-export const dragNodeBy = async (page, nodeId, delta) => {
+export const dragNodeBy = async (page, nodeId, delta, options) => {
   const snapshot = await waitForNodeReady(page, nodeId);
   const rect = snapshot.elementRect;
 
@@ -429,10 +429,20 @@ export const dragNodeBy = async (page, nodeId, delta) => {
     y: start.y + (delta.y || 0),
   };
 
-  await page.mouse.move(start.x, start.y);
-  await page.mouse.down();
-  await page.mouse.move(end.x, end.y, { steps: 12 });
-  await page.mouse.up();
+  if (options?.altKey) {
+    await page.keyboard.down("Alt");
+  }
+
+  try {
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(end.x, end.y, { steps: 12 });
+    await page.mouse.up();
+  } finally {
+    if (options?.altKey) {
+      await page.keyboard.up("Alt");
+    }
+  }
 };
 
 export const waitForNodeReady = async (page, nodeId) => {

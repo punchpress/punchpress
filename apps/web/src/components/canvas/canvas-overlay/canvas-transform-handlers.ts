@@ -21,7 +21,6 @@ export const getCanvasTransformHandlers = ({
       queueRefresh,
       restoreHover,
       selectedNode,
-      suppressHover,
       visibleSelectedNodeIds,
     }),
     ...getCanvasResizeHandlers({

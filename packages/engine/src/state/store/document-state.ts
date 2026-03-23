@@ -1,9 +1,9 @@
 import { getSubtreeNodeIds, isDescendantOf } from "../../nodes/node-tree";
 import { isNodeVisible } from "../../shapes/warp-text/model";
 import { finalizeEditingState } from "./editing-state";
+import { exitPathEditingInteractionState } from "./interaction-state";
 import {
   deleteNodeTreeState,
-  duplicateNodeTreeState,
   toggleNodeVisibilityTreeState,
 } from "./node-tree-state";
 import { getSelectedNodeIds } from "./selection-state";
@@ -24,8 +24,13 @@ export const deleteNodeState = (state, nodeId) => {
     editingNodeId: isEditingNode ? null : state.editingNodeId,
     editingOriginalText: isEditingNode ? "" : state.editingOriginalText,
     editingText: isEditingNode ? "" : state.editingText,
-    isHoveringSuppressed: isEditingNode ? false : state.isHoveringSuppressed,
-    pathEditingNodeId: isPathEditingNode ? null : state.pathEditingNodeId,
+    ...(isEditingNode || isPathEditingNode
+      ? exitPathEditingInteractionState()
+      : {}),
+    isHoveringSuppressed:
+      isEditingNode || isPathEditingNode ? false : state.isHoveringSuppressed,
+    pathEditingNodeId:
+      isEditingNode || isPathEditingNode ? null : state.pathEditingNodeId,
     ...deleteNodeTreeState(state, [nodeId]),
   };
 };
@@ -57,9 +62,13 @@ export const deleteNodesState = (state, nodeIds) => {
     editingNodeId: isEditingNodeSelected ? null : state.editingNodeId,
     editingOriginalText: isEditingNodeSelected ? "" : state.editingOriginalText,
     editingText: isEditingNodeSelected ? "" : state.editingText,
-    isHoveringSuppressed: isEditingNodeSelected
-      ? false
-      : state.isHoveringSuppressed,
+    ...(isEditingNodeSelected || isPathEditingNodeSelected
+      ? exitPathEditingInteractionState()
+      : {}),
+    isHoveringSuppressed:
+      isEditingNodeSelected || isPathEditingNodeSelected
+        ? false
+        : state.isHoveringSuppressed,
     pathEditingNodeId: isPathEditingNodeSelected
       ? null
       : state.pathEditingNodeId,
@@ -94,31 +103,5 @@ export const toggleNodeVisibilityState = (state, nodeId) => {
     pathEditingNodeId: baseState.pathEditingNodeId,
     ...toggleNodeVisibilityTreeState(baseState, nodeId),
     selectedNodeIds: baseState.selectedNodeIds,
-  };
-};
-
-export const duplicateNodesState = (state, nodeIds) => {
-  const selectedNodeIds = getSelectedNodeIds(state, nodeIds);
-
-  if (selectedNodeIds.length === 0) {
-    return {};
-  }
-
-  const committedState =
-    state.editingNodeId && selectedNodeIds.includes(state.editingNodeId)
-      ? { ...state, ...finalizeEditingState(state, selectedNodeIds) }
-      : state;
-  const duplicatedState = duplicateNodeTreeState(
-    committedState,
-    selectedNodeIds
-  );
-
-  return {
-    activeTool: committedState.activeTool,
-    editingNodeId: committedState.editingNodeId,
-    editingOriginalText: committedState.editingOriginalText,
-    editingText: committedState.editingText,
-    pathEditingNodeId: null,
-    ...duplicatedState,
   };
 };

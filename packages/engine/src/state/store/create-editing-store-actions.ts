@@ -1,4 +1,9 @@
 import { commitEditingState, finalizeEditingState } from "./editing-state";
+import {
+  enterTextEditingInteractionState,
+  exitPathEditingInteractionState,
+  resetTransientCanvasInteractionState,
+} from "./interaction-state";
 import { mapNodeById, withDocumentMutation } from "./node-mutations";
 import { getSelectedNodeIds } from "./selection-state";
 
@@ -14,7 +19,7 @@ export const createEditingStoreActions = (set) => {
           editingNodeId: null,
           editingOriginalText: "",
           editingText: state.editingOriginalText,
-          isHoveringSuppressed: false,
+          ...resetTransientCanvasInteractionState(),
           nodes: mapNodeById(state.nodes, state.editingNodeId, {
             text: state.editingOriginalText,
           }),
@@ -29,7 +34,7 @@ export const createEditingStoreActions = (set) => {
         }
 
         return {
-          pathEditingNodeId: null,
+          ...exitPathEditingInteractionState(),
           selectedNodeIds: [],
         };
       });
@@ -75,8 +80,7 @@ export const createEditingStoreActions = (set) => {
           editingNodeId: node.id,
           editingOriginalText: node.text,
           editingText: node.text,
-          isHoveringSuppressed: true,
-          pathEditingNodeId: null,
+          ...enterTextEditingInteractionState(),
           selectedNodeIds: [node.id],
         });
       });
@@ -94,6 +98,9 @@ export const createEditingStoreActions = (set) => {
         }
 
         return {
+          ...(state.pathEditingNodeId === nodeId
+            ? {}
+            : exitPathEditingInteractionState()),
           pathEditingNodeId:
             state.pathEditingNodeId === nodeId ? state.pathEditingNodeId : null,
           selectedNodeIds: nextSelectedNodeIds,
@@ -117,6 +124,10 @@ export const createEditingStoreActions = (set) => {
         }
 
         return {
+          ...(nextSelectedNodeIds.length === 1 &&
+          nextSelectedNodeIds[0] === state.pathEditingNodeId
+            ? {}
+            : exitPathEditingInteractionState()),
           pathEditingNodeId:
             nextSelectedNodeIds.length === 1 &&
             nextSelectedNodeIds[0] === state.pathEditingNodeId
@@ -147,6 +158,10 @@ export const createEditingStoreActions = (set) => {
         }
 
         return {
+          ...(nextSelectedNodeIds.length === 1 &&
+          nextSelectedNodeIds[0] === state.pathEditingNodeId
+            ? {}
+            : exitPathEditingInteractionState()),
           pathEditingNodeId:
             nextSelectedNodeIds.length === 1 &&
             nextSelectedNodeIds[0] === state.pathEditingNodeId

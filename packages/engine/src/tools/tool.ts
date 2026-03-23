@@ -4,7 +4,11 @@ const TOOL_SHORTCUTS = {
   v: "pointer",
 };
 
-export const selectToolFromShortcut = (editor, key) => {
+export const selectToolFromShortcut = (editor, key, event) => {
+  if (event?.metaKey || event?.ctrlKey || event?.altKey) {
+    return false;
+  }
+
   const nextTool = TOOL_SHORTCUTS[key];
   if (!nextTool) {
     return false;

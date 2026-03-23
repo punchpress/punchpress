@@ -1,10 +1,16 @@
 import { round } from "../primitives/math";
-import { getNodeLocalPoint } from "../primitives/rotation";
+import {
+  getLocalPointFromTransformFrame,
+  getNodeTransformForPinnedWorldPoint,
+  getNodeTransformFrame,
+  getWorldPointFromTransformFrame,
+} from "../primitives/rotation";
 import {
   getCircleGuide,
   getCirclePointAngleDeg,
   normalizeLoop,
 } from "../shapes/warp-text/text-path";
+import { buildNodeGeometry } from "../shapes/warp-text/warp-engine";
 import { estimateBounds } from "../shapes/warp-text/warp-layout";
 
 const getEditableCircleState = (editor, nodeId) => {
@@ -21,6 +27,7 @@ const getEditableCircleState = (editor, nodeId) => {
     bbox,
     guide,
     node,
+    transformFrame: getNodeTransformFrame(node, bbox),
   };
 };
 
@@ -31,9 +38,8 @@ const getCirclePointerAngle = (editor, nodeId, pointerCanvas) => {
     return null;
   }
 
-  const localPoint = getNodeLocalPoint(
-    circleState.node,
-    circleState.bbox,
+  const localPoint = getLocalPointFromTransformFrame(
+    circleState.transformFrame,
     pointerCanvas
   );
 
@@ -63,8 +69,13 @@ export const beginTextPathEdit = (
 
     return {
       angleOffsetDeg: circleState.guide.centerAngleDeg - pointerAngleDeg,
+      guideCenterWorld: getWorldPointFromTransformFrame(
+        circleState.transformFrame,
+        circleState.guide.center
+      ),
       mode,
       nodeId,
+      transformFrame: circleState.transformFrame,
     };
   }
 
@@ -82,9 +93,8 @@ export const updateTextPathEdit = (editor, session, { pointerCanvas } = {}) => {
     return null;
   }
 
-  const localPoint = getNodeLocalPoint(
-    circleState.node,
-    circleState.bbox,
+  const localPoint = getLocalPointFromTransformFrame(
+    session.transformFrame || circleState.transformFrame,
     pointerCanvas
   );
 
@@ -103,7 +113,37 @@ export const updateTextPathEdit = (editor, session, { pointerCanvas } = {}) => {
         return node;
       }
 
+      const nextNode = {
+        ...node,
+        warp: {
+          ...node.warp,
+          pathPosition,
+        },
+      };
+      const font = editor.fonts.getLoadedFont(node.font);
+      const nextGeometry =
+        font && nextNode.type === "text"
+          ? buildNodeGeometry(nextNode, font)
+          : {
+              bbox: circleState.bbox,
+              guide: circleState.guide,
+            };
+      const nextTransform = session.guideCenterWorld
+        ? getNodeTransformForPinnedWorldPoint(
+            nextNode,
+            nextGeometry.bbox || circleState.bbox,
+            nextGeometry.guide?.center || circleState.guide.center,
+            session.guideCenterWorld
+          )
+        : null;
+
       return {
+        transform: nextTransform
+          ? {
+              ...node.transform,
+              ...nextTransform,
+            }
+          : undefined,
         warp: {
           ...node.warp,
           pathPosition,

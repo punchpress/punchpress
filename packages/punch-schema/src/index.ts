@@ -1,4 +1,11 @@
-/* biome-ignore lint/performance/noBarrelFile: package root public API */
+// biome-ignore lint/performance/noBarrelFile: package root public API
+export {
+  clipboardContentSchema,
+  PUNCH_CLIPBOARD_HTML_ATTRIBUTE,
+  PUNCH_CLIPBOARD_MIME_TYPE,
+  parseClipboardContent,
+  serializeClipboardContent,
+} from "./clipboard";
 export {
   DEFAULT_DOCUMENT_BASE_NAME,
   PUNCH_DOCUMENT_EXTENSION,
@@ -41,6 +48,7 @@ export {
   serializeDesignDocument,
 } from "./save";
 export type {
+  ClipboardContent,
   DesignDocument,
   GroupNodeDocument,
   LocalFontDocument,

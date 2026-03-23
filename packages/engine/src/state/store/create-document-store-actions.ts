@@ -1,10 +1,15 @@
 import { createDefaultNode } from "../../shapes/warp-text/model";
 import {
+  insertClipboardContentState,
+  pasteClipboardContentState,
+  pasteTextState,
+} from "./clipboard-state";
+import {
   deleteNodeState,
   deleteNodesState,
-  duplicateNodesState,
   toggleNodeVisibilityState,
 } from "./document-state";
+import { exitPathEditingInteractionState } from "./interaction-state";
 import {
   mapNodeById,
   mapNodesByIds,
@@ -67,20 +72,29 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
       });
     },
 
-    duplicateNodeById: (nodeId) => {
+    insertClipboardContent: (content, options) => {
       set((state) => {
         return withDocumentMutation(
           state,
-          duplicateNodesState(state, [nodeId])
+          insertClipboardContentState(state, content, options)
         );
       });
     },
 
-    duplicateSelectedNodes: () => {
+    pasteClipboardContent: (content, offset) => {
       set((state) => {
         return withDocumentMutation(
           state,
-          duplicateNodesState(state, state.selectedNodeIds)
+          pasteClipboardContentState(state, content, { offset })
+        );
+      });
+    },
+
+    pasteText: (text, font, point) => {
+      set((state) => {
+        return withDocumentMutation(
+          state,
+          pasteTextState(state, text, font, point)
         );
       });
     },
@@ -93,7 +107,7 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
         editingText: "",
         focusedGroupId: null,
         hoveredNodeId: null,
-        isHoveringSuppressed: false,
+        ...exitPathEditingInteractionState(),
         nodes: [...nodes],
         pathEditingNodeId: null,
         selectedNodeIds: [],

@@ -9,3 +9,4 @@ Current decisions:
 - [0001: Canvas Cursor Behavior](./0001-canvas-cursor-behavior.md)
 - [0002: Group Rotation Preview](./0002-group-rotation-preview.md)
 - [0003: Transform Interaction Model](./0003-transform-interaction-model.md)
+- [0004: Interaction Ownership Boundary](./0004-interaction-ownership-boundary.md)
