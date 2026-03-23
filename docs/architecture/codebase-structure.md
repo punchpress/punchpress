@@ -24,6 +24,7 @@ packages/engine/src/
 ├── editing/
 ├── fonts/
 ├── history/
+├── interaction/
 ├── input/
 ├── managers/
 ├── primitives/
@@ -93,6 +94,8 @@ Those capabilities stay outside `packages/engine`.
 
 - own the `Editor` API and store
 - own selection, transform, history, geometry, and export behavior
+- own interaction-state boundaries for modes such as text edit, path edit, drag,
+  rotate, and similar canvas states
 - expose structured inspection like the debug dump
 - stay free of React and app/platform imports
 

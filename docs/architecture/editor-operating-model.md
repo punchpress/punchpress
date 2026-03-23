@@ -30,6 +30,9 @@ selection, transforms, geometry, export, and validation.
 React land is a client of the editor. Its job is to render editor state and
 translate GUI interactions into editor commands.
 
+React land may own browser event capture and DOM-specific adapters, but it
+should not become the source of truth for durable interaction behavior.
+
 ### Automation Land
 
 Automation land includes tests, CLI workflows, AI agents, and future
@@ -64,3 +67,8 @@ When adding a feature:
 3. Make the GUI call that command.
 4. Make tests and automation inspect the result through the structured
    inspection surface.
+
+For interaction-heavy features, use this split:
+
+- React owns event capture, DOM hit-testing, and third-party browser library adapters.
+- The editor owns gesture semantics, history boundaries, selection effects, and transform policy.

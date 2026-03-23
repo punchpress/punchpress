@@ -3,6 +3,12 @@ import {
   DEFAULT_LOCAL_FONT,
   ROOT_PARENT_ID,
 } from "@punchpress/punch-schema";
+import {
+  copySelection as copyEditorSelection,
+  pasteClipboardContent as pasteEditorClipboardContent,
+  pasteText as pasteEditorText,
+} from "./clipboard/clipboard-actions";
+import { resetPasteSequence as resetEditorPasteSequence } from "./clipboard/clipboard-placement";
 import { UI_ACCENT } from "./constants";
 import { getEditorDebugDump } from "./debug-dump";
 import {
@@ -60,6 +66,16 @@ import {
   handleSpaceUp as handleEditorSpaceUp,
   handleWindowKeyDown as handleEditorWindowKeyDown,
 } from "./input/keyboard-shortcuts";
+import {
+  beginSelectionDragInteraction as beginEditorSelectionDragInteraction,
+  beginSelectionRotationInteraction as beginEditorSelectionRotationInteraction,
+  beginTextPathPositioningInteraction as beginEditorTextPathPositioningInteraction,
+  endSelectionDragInteraction as endEditorSelectionDragInteraction,
+  endSelectionRotationInteraction as endEditorSelectionRotationInteraction,
+  endTextPathPositioningInteraction as endEditorTextPathPositioningInteraction,
+  startPathEditing as startEditorPathEditing,
+  stopPathEditing as stopEditorPathEditing,
+} from "./interaction/interaction-actions";
 import { disposeEditor, mountEditor } from "./lifecycle/editor-lifecycle";
 import {
   DEFAULT_EDITABLE_FONT_FAMILY,
@@ -114,6 +130,11 @@ import {
   updateRotateSelection as updateEditorRotateSelection,
 } from "./transform/rotate-selection";
 import {
+  beginSelectionDrag as beginEditorSelectionDrag,
+  endSelectionDrag as endEditorSelectionDrag,
+  updateSelectionDrag as updateEditorSelectionDrag,
+} from "./transform/selection-drag";
+import {
   beginTextPathEdit as beginEditorTextPathEdit,
   updateTextPathEdit as updateEditorTextPathEdit,
 } from "./transform/text-path-edit";
@@ -155,6 +176,8 @@ export class Editor {
       ["text", new TextTool(this)],
     ]);
     this.editingHistoryMark = null;
+    this.lastPasteCount = 0;
+    this.lastPasteKey = null;
     this.unsubscribeEditorCommand = null;
     this.unsubscribe = null;
     this.localFontCatalogPromise = null;
@@ -342,6 +365,18 @@ export class Editor {
     return this.getState().isHoveringSuppressed;
   }
 
+  get isSelectionDragging() {
+    return this.getState().isSelectionDragging;
+  }
+
+  get isSelectionRotating() {
+    return this.getState().isSelectionRotating;
+  }
+
+  get isTextPathPositioning() {
+    return this.getState().isTextPathPositioning;
+  }
+
   get layerNodeIds() {
     return [...getChildNodeIds(this.nodes, ROOT_PARENT_ID)].reverse();
   }
@@ -526,6 +561,10 @@ export class Editor {
     commitEditorEditing(this);
   }
 
+  copySelection() {
+    return copyEditorSelection(this);
+  }
+
   deleteSelected() {
     deleteEditorSelected(this);
   }
@@ -618,6 +657,42 @@ export class Editor {
     this.getState().setHoveringSuppressed(isHoveringSuppressed);
   }
 
+  setSelectionDragging(isSelectionDragging) {
+    this.getState().setSelectionDragging(isSelectionDragging);
+  }
+
+  setSelectionRotating(isSelectionRotating) {
+    this.getState().setSelectionRotating(isSelectionRotating);
+  }
+
+  setTextPathPositioning(isTextPathPositioning) {
+    this.getState().setTextPathPositioning(isTextPathPositioning);
+  }
+
+  beginSelectionDragInteraction() {
+    beginEditorSelectionDragInteraction(this);
+  }
+
+  endSelectionDragInteraction() {
+    endEditorSelectionDragInteraction(this);
+  }
+
+  beginSelectionRotationInteraction() {
+    beginEditorSelectionRotationInteraction(this);
+  }
+
+  endSelectionRotationInteraction() {
+    endEditorSelectionRotationInteraction(this);
+  }
+
+  beginTextPathPositioningInteraction() {
+    beginEditorTextPathPositioningInteraction(this);
+  }
+
+  endTextPathPositioningInteraction() {
+    endEditorTextPathPositioningInteraction(this);
+  }
+
   ensureSelected(nodeId) {
     ensureEditorSelected(this, nodeId);
   }
@@ -667,25 +742,11 @@ export class Editor {
   }
 
   startPathEditing(nodeId = this.selectedNodeId) {
-    if (!this.canEditNodePath(nodeId) || this.editingNodeId) {
-      return false;
-    }
-
-    if (!this.isSelected(nodeId)) {
-      selectEditorNode(this, nodeId);
-    }
-
-    this.getState().setPathEditingNodeId(nodeId);
-    return true;
+    return startEditorPathEditing(this, nodeId);
   }
 
   stopPathEditing() {
-    if (!this.pathEditingNodeId) {
-      return false;
-    }
-
-    this.getState().setPathEditingNodeId(null);
-    return true;
+    return stopEditorPathEditing(this);
   }
 
   togglePathEditing(nodeId = this.selectedNodeId) {
@@ -722,6 +783,18 @@ export class Editor {
 
   updateMoveSelection(session, options) {
     return updateEditorMoveSelection(this, session, options);
+  }
+
+  beginSelectionDrag(options) {
+    return beginEditorSelectionDrag(this, options);
+  }
+
+  updateSelectionDrag(session, options) {
+    return updateEditorSelectionDrag(this, session, options);
+  }
+
+  endSelectionDrag(session, options) {
+    return endEditorSelectionDrag(this, session, options);
   }
 
   beginRotateSelection(options) {
@@ -829,6 +902,10 @@ export class Editor {
     this.editingHistoryMark = null;
   }
 
+  resetPasteSequence() {
+    resetEditorPasteSequence(this);
+  }
+
   finishEditingIfNeeded() {
     finishEditorEditingIfNeeded(this);
   }
@@ -863,6 +940,14 @@ export class Editor {
 
   cancelPendingViewportFocus() {
     cancelEditorPendingViewportFocus(this);
+  }
+
+  pasteClipboardContent(content) {
+    pasteEditorClipboardContent(this, content);
+  }
+
+  pasteText(text) {
+    pasteEditorText(this, text);
   }
 
   scheduleViewportFocus(nodeIds) {

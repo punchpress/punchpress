@@ -41,6 +41,7 @@ export const loadDocument = (editor, contents) => {
 
   editor.getState().loadNodes(resolution.nodes);
   editor.resetHistory();
+  editor.resetPasteSequence();
 
   if (typeof window !== "undefined") {
     editor.scheduleViewportFocus(resolution.nodes.map((node) => node.id));
@@ -53,6 +54,7 @@ export const newDocument = (editor) => {
   finishEditingIfNeeded(editor);
   editor.getState().loadNodes([]);
   editor.resetHistory();
+  editor.resetPasteSequence();
 };
 
 export const serializeDocument = (editor) => {

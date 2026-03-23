@@ -42,42 +42,81 @@ export const rotateVector = (vector, rotation) => {
   return rotatePointAround(vector, { x: 0, y: 0 }, rotation);
 };
 
-export const getNodeWorldPoint = (node, bbox, point) => {
+export const getNodeTransformFrame = (node, bbox) => {
   const localCenter = getLocalBoundsCenter(bbox);
-  const worldCenter = getNodeRotationCenter(node, bbox);
-  const scaleX = getNodeScaleX(node) ?? 1;
-  const scaleY = getNodeScaleY(node) ?? 1;
-  const rotatedOffset = rotateVector(
-    {
-      x: (point.x - localCenter.x) * scaleX,
-      y: (point.y - localCenter.y) * scaleY,
-    },
-    getNodeRotation(node) || 0
-  );
 
   return {
-    x: worldCenter.x + rotatedOffset.x,
-    y: worldCenter.y + rotatedOffset.y,
+    localCenter,
+    rotation: getNodeRotation(node) || 0,
+    scaleX: getNodeScaleX(node) ?? 1,
+    scaleY: getNodeScaleY(node) ?? 1,
+    worldCenter: getNodeRotationCenter(node, bbox),
   };
 };
 
-export const getNodeLocalPoint = (node, bbox, point) => {
-  const localCenter = getLocalBoundsCenter(bbox);
-  const worldCenter = getNodeRotationCenter(node, bbox);
-  const scaleX = getNodeScaleX(node) ?? 1;
-  const scaleY = getNodeScaleY(node) ?? 1;
-  const rotation = ((getNodeRotation(node) || 0) * Math.PI) / 180;
-  const offsetX = point.x - worldCenter.x;
-  const offsetY = point.y - worldCenter.y;
+export const getWorldPointFromTransformFrame = (frame, point) => {
+  const rotatedOffset = rotateVector(
+    {
+      x: (point.x - frame.localCenter.x) * frame.scaleX,
+      y: (point.y - frame.localCenter.y) * frame.scaleY,
+    },
+    frame.rotation
+  );
+
+  return {
+    x: frame.worldCenter.x + rotatedOffset.x,
+    y: frame.worldCenter.y + rotatedOffset.y,
+  };
+};
+
+export const getLocalPointFromTransformFrame = (frame, point) => {
+  const rotation = (frame.rotation * Math.PI) / 180;
+  const offsetX = point.x - frame.worldCenter.x;
+  const offsetY = point.y - frame.worldCenter.y;
   const unrotatedX =
     offsetX * Math.cos(-rotation) - offsetY * Math.sin(-rotation);
   const unrotatedY =
     offsetX * Math.sin(-rotation) + offsetY * Math.cos(-rotation);
 
   return {
-    x: localCenter.x + unrotatedX / (scaleX || 1),
-    y: localCenter.y + unrotatedY / (scaleY || 1),
+    x: frame.localCenter.x + unrotatedX / (frame.scaleX || 1),
+    y: frame.localCenter.y + unrotatedY / (frame.scaleY || 1),
   };
+};
+
+export const getNodeTransformForPinnedWorldPoint = (
+  node,
+  bbox,
+  localPoint,
+  worldPoint
+) => {
+  const frame = getNodeTransformFrame(node, bbox);
+  const rotatedOffset = rotateVector(
+    {
+      x: (localPoint.x - frame.localCenter.x) * frame.scaleX,
+      y: (localPoint.y - frame.localCenter.y) * frame.scaleY,
+    },
+    frame.rotation
+  );
+
+  return {
+    x: round(worldPoint.x - frame.localCenter.x - rotatedOffset.x, 2),
+    y: round(worldPoint.y - frame.localCenter.y - rotatedOffset.y, 2),
+  };
+};
+
+export const getNodeWorldPoint = (node, bbox, point) => {
+  return getWorldPointFromTransformFrame(
+    getNodeTransformFrame(node, bbox),
+    point
+  );
+};
+
+export const getNodeLocalPoint = (node, bbox, point) => {
+  return getLocalPointFromTransformFrame(
+    getNodeTransformFrame(node, bbox),
+    point
+  );
 };
 
 export const getRotatedNodeUpdate = (

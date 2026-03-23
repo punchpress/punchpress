@@ -11,6 +11,9 @@ export const useCanvasTransformState = (
   const pathEditingNodeId = useEditorValue(
     (_, state) => state.pathEditingNodeId
   );
+  const isTextPathPositioning = useEditorValue(
+    (_, state) => state.isTextPathPositioning
+  );
   const visibleSelectedNodeIds = useEditorValue((editor, state) => {
     return state.selectedNodeIds.filter((nodeId) => {
       return (
@@ -46,6 +49,10 @@ export const useCanvasTransformState = (
   const selectedTargets = effectiveSelectedNodeIds
     .filter((nodeId) => editor.isNodeEffectivelyVisible(nodeId))
     .map((nodeId) => {
+      if (pathEditingNodeId === nodeId && isTextPathPositioning) {
+        return null;
+      }
+
       if (pathEditingNodeId === nodeId) {
         return editor.getNodeTransformElement(nodeId);
       }

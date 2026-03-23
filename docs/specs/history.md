@@ -20,6 +20,7 @@ editing steps.
 ## What History Tracks
 
 - History tracks document-changing actions.
+- A history step is created when a node is pasted onto the canvas.
 - History does not track temporary UI state such as hover, selection preview, or
   viewport movement.
 

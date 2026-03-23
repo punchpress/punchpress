@@ -6,6 +6,7 @@ import {
   requestLocalFontCatalog,
 } from "../platform/local-fonts";
 import { getStoredLastUsedFont, rememberLastUsedFont } from "./default-font";
+import { useEditorClipboardEvents } from "./use-editor-clipboard-events";
 
 export const EditorContext = createContext(null);
 
@@ -28,6 +29,8 @@ export const EditorProvider = ({ children }) => {
 
     return nextEditor;
   });
+
+  useEditorClipboardEvents(editor);
 
   useEffect(() => {
     editor.mount();

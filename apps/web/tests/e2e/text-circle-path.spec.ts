@@ -4,6 +4,9 @@ import {
   gotoEditor,
   pauseForUi,
   resizeSelectionFromCorner,
+  rotateSelectionFromCorner,
+  rotateSelectionFromCornerWithoutRelease,
+  waitForNodeReady,
 } from "./helpers/editor";
 
 const TEST_FONT = {
@@ -123,6 +126,103 @@ const setViewportZoom = async (page, zoom) => {
   }, zoom);
 };
 
+const getRectCenter = (rect) => {
+  return {
+    x: rect.x + rect.width / 2,
+    y: rect.y + rect.height / 2,
+  };
+};
+
+const getExpectedTextPathGuideScreenPoint = (page, nodeId) => {
+  return page.evaluate((targetNodeId) => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const node = editor?.getNode(targetNodeId);
+    const geometry = editor?.getNodeGeometry(targetNodeId);
+    const host = editor?.hostRef;
+    const viewer = editor?.viewerRef;
+
+    if (
+      !(editor && node && geometry?.bbox && geometry?.guide && host && viewer)
+    ) {
+      return null;
+    }
+
+    const point = geometry.guide.handles.find(
+      (handle) => handle.role === "position"
+    )?.point;
+
+    if (!point) {
+      return null;
+    }
+
+    const bbox = geometry.bbox;
+    const center = {
+      x: (bbox.minX + bbox.maxX) / 2,
+      y: (bbox.minY + bbox.maxY) / 2,
+    };
+    const rotation = ((node.transform.rotation || 0) * Math.PI) / 180;
+    const scaleX = node.transform.scaleX ?? 1;
+    const scaleY = node.transform.scaleY ?? 1;
+    const offset = {
+      x: (point.x - center.x) * scaleX,
+      y: (point.y - center.y) * scaleY,
+    };
+    const worldPoint = {
+      x:
+        node.transform.x +
+        center.x +
+        (offset.x * Math.cos(rotation) - offset.y * Math.sin(rotation)),
+      y:
+        node.transform.y +
+        center.y +
+        (offset.x * Math.sin(rotation) + offset.y * Math.cos(rotation)),
+    };
+    const hostRect = host.getBoundingClientRect();
+    const scrollLeft = viewer.getScrollLeft?.() || 0;
+    const scrollTop = viewer.getScrollTop?.() || 0;
+
+    return {
+      x: hostRect.left + (worldPoint.x - scrollLeft) * editor.zoom,
+      y: hostRect.top + (worldPoint.y - scrollTop) * editor.zoom,
+    };
+  }, nodeId);
+};
+
+const getActualTextPathGuideScreenPoint = (page) => {
+  return page.evaluate(() => {
+    const guideGroup = document.querySelector(
+      '[data-testid="text-path-guide"] g'
+    );
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const node = editor?.getNode("circle-node");
+    const geometry = editor?.getNodeGeometry("circle-node");
+
+    if (!(guideGroup instanceof SVGGElement && geometry?.guide && node)) {
+      return null;
+    }
+
+    const point = geometry.guide.handles.find(
+      (handle) => handle.role === "position"
+    )?.point;
+    const svg = guideGroup.ownerSVGElement;
+    const matrix = guideGroup.getScreenCTM();
+
+    if (!(point && svg && matrix)) {
+      return null;
+    }
+
+    const svgPoint = svg.createSVGPoint();
+    svgPoint.x = point.x;
+    svgPoint.y = point.y;
+    const screenPoint = svgPoint.matrixTransform(matrix);
+
+    return {
+      x: screenPoint.x,
+      y: screenPoint.y,
+    };
+  });
+};
+
 test("resizes the circle path and repositions text along it", async ({
   page,
 }) => {
@@ -178,6 +278,255 @@ test("resizes the circle path and repositions text along it", async ({
 
   expect(positionedNode?.warp?.pathPosition).toBeGreaterThan(0.12);
   expect(positionedNode?.warp?.pathPosition).toBeLessThan(0.38);
+});
+
+test("rotates a circle text node around its selected bounds center", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadCircleDocument(page);
+  await page.locator('.canvas-node[data-node-id="circle-node"]').click();
+  await pauseForUi(page);
+
+  const before = await waitForNodeReady(page, "circle-node");
+  const beforeCenter = getRectCenter(before.elementRect);
+
+  await rotateSelectionFromCorner(page, {
+    drag: { x: 160, y: 100 },
+  });
+  await pauseForUi(page);
+
+  const after = await waitForNodeReady(page, "circle-node");
+  const afterCenter = getRectCenter(after.elementRect);
+
+  expect(Math.abs(after.rotation)).toBeGreaterThan(5);
+  expect(afterCenter.x).toBeCloseTo(beforeCenter.x, 1);
+  expect(afterCenter.y).toBeCloseTo(beforeCenter.y, 1);
+});
+
+test("keeps the circle path overlay aligned after rotating a selected node", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadCircleDocument(page);
+  await page.locator('.canvas-node[data-node-id="circle-node"]').click();
+  await pauseForUi(page);
+
+  const beforeExpected = await getExpectedTextPathGuideScreenPoint(
+    page,
+    "circle-node"
+  );
+  const beforeActual = await getActualTextPathGuideScreenPoint(page);
+
+  expect(beforeExpected).not.toBeNull();
+  expect(beforeActual.x).toBeCloseTo(beforeExpected?.x ?? 0, 1);
+  expect(beforeActual.y).toBeCloseTo(beforeExpected?.y ?? 0, 1);
+
+  await rotateSelectionFromCorner(page, {
+    drag: { x: 160, y: 100 },
+  });
+  await pauseForUi(page);
+
+  const afterExpected = await getExpectedTextPathGuideScreenPoint(
+    page,
+    "circle-node"
+  );
+  const afterActual = await getActualTextPathGuideScreenPoint(page);
+
+  expect(afterExpected).not.toBeNull();
+  expect(afterActual.x).toBeCloseTo(afterExpected?.x ?? 0, 1);
+  expect(afterActual.y).toBeCloseTo(afterExpected?.y ?? 0, 1);
+});
+
+test("hides the circle guide while rotating and restores it after", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadCircleDocument(page);
+  await page.locator('.canvas-node[data-node-id="circle-node"]').click();
+  await pauseForUi(page);
+
+  const guide = page.getByTestId("text-path-guide");
+
+  await expect(guide).toBeVisible();
+
+  await rotateSelectionFromCornerWithoutRelease(page, {
+    drag: { x: 140, y: 90 },
+  });
+
+  await expect(guide).toHaveCount(0);
+
+  await page.mouse.up();
+  await pauseForUi(page);
+
+  await expect(guide).toBeVisible();
+});
+
+test("hides selection bounds while repositioning text on the path", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadCircleDocument(page);
+  await page.locator('.canvas-node[data-node-id="circle-node"]').click();
+  await pauseForUi(page);
+  await page.getByRole("button", { name: "Edit path (E)" }).click();
+  await pauseForUi(page);
+
+  const positionHandle = page.getByTestId("text-path-handle-position");
+  const moveable = page.locator(".canvas-moveable");
+
+  await expect(positionHandle).toBeVisible();
+  await expect(moveable).toHaveCount(1);
+
+  const positionBox = await positionHandle.boundingBox();
+
+  if (!positionBox) {
+    throw new Error("Missing circle position handle bounds");
+  }
+
+  await page.mouse.move(
+    positionBox.x + positionBox.width / 2,
+    positionBox.y + positionBox.height / 2
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    positionBox.x + positionBox.width / 2 + 220,
+    positionBox.y + positionBox.height / 2 + 140,
+    { steps: 16 }
+  );
+
+  await expect(moveable).toHaveCount(0);
+
+  await page.mouse.up();
+  await pauseForUi(page);
+
+  await expect(moveable).toHaveCount(1);
+});
+
+test("keeps the circle guide stable while repositioning text on the path", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadCircleDocument(page);
+  await page.locator('.canvas-node[data-node-id="circle-node"]').click();
+  await pauseForUi(page);
+  await page.getByRole("button", { name: "Edit path (E)" }).click();
+  await pauseForUi(page);
+
+  const positionHandle = page.getByTestId("text-path-handle-position");
+  const guidePath = page.getByTestId("text-path-guide").locator("path").first();
+
+  await expect(positionHandle).toBeVisible();
+  await expect(guidePath).toBeVisible();
+
+  const beforeGuideBox = await guidePath.boundingBox();
+  const positionBox = await positionHandle.boundingBox();
+
+  if (!(beforeGuideBox && positionBox)) {
+    throw new Error("Missing guide or position handle bounds");
+  }
+
+  await page.mouse.move(
+    positionBox.x + positionBox.width / 2,
+    positionBox.y + positionBox.height / 2
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    positionBox.x + positionBox.width / 2 + 220,
+    positionBox.y + positionBox.height / 2 + 140,
+    { steps: 16 }
+  );
+
+  const duringGuideBox = await guidePath.boundingBox();
+
+  if (!duringGuideBox) {
+    throw new Error("Missing guide bounds during path positioning");
+  }
+
+  expect(duringGuideBox.x).toBeCloseTo(beforeGuideBox.x, 1);
+  expect(duringGuideBox.y).toBeCloseTo(beforeGuideBox.y, 1);
+  expect(duringGuideBox.width).toBeCloseTo(beforeGuideBox.width, 1);
+  expect(duringGuideBox.height).toBeCloseTo(beforeGuideBox.height, 1);
+
+  await page.mouse.up();
+});
+
+test("keeps the rotated circle guide stable while repositioning text on the path", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadCircleDocument(page);
+  await page.locator('.canvas-node[data-node-id="circle-node"]').click();
+  await pauseForUi(page);
+
+  await rotateSelectionFromCorner(page, {
+    drag: { x: 160, y: 100 },
+  });
+  await pauseForUi(page);
+
+  await page.getByRole("button", { name: "Edit path (E)" }).click();
+  await pauseForUi(page);
+
+  const positionHandle = page.getByTestId("text-path-handle-position");
+  const guidePath = page.getByTestId("text-path-guide").locator("path").first();
+
+  await expect(positionHandle).toBeVisible();
+  await expect(guidePath).toBeVisible();
+
+  const beforeGuideBox = await guidePath.boundingBox();
+  const positionBox = await positionHandle.boundingBox();
+
+  if (!(beforeGuideBox && positionBox)) {
+    throw new Error("Missing rotated guide or position handle bounds");
+  }
+
+  await page.mouse.move(
+    positionBox.x + positionBox.width / 2,
+    positionBox.y + positionBox.height / 2
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    positionBox.x + positionBox.width / 2 + 220,
+    positionBox.y + positionBox.height / 2 + 140,
+    { steps: 16 }
+  );
+
+  const duringGuideBox = await guidePath.boundingBox();
+
+  if (!duringGuideBox) {
+    throw new Error("Missing rotated guide bounds during path positioning");
+  }
+
+  expect(duringGuideBox.x).toBeCloseTo(beforeGuideBox.x, 1);
+  expect(duringGuideBox.y).toBeCloseTo(beforeGuideBox.y, 1);
+  expect(duringGuideBox.width).toBeCloseTo(beforeGuideBox.width, 1);
+  expect(duringGuideBox.height).toBeCloseTo(beforeGuideBox.height, 1);
+
+  await page.mouse.up();
+});
+
+test("clears hover preview when entering path edit from node hover", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadCircleDocument(page);
+  const node = page.locator('.canvas-node[data-node-id="circle-node"]');
+
+  await node.click();
+  await pauseForUi(page);
+
+  const nodeBox = await node.boundingBox();
+
+  if (!nodeBox) {
+    throw new Error("Missing circle node bounds");
+  }
+
+  await page.mouse.move(nodeBox.x + nodeBox.width / 2, nodeBox.y + 8);
+  await pauseForUi(page);
+  await page.keyboard.press("e");
+  await pauseForUi(page);
+
+  await expect(page.locator(".canvas-hover-preview")).toHaveCount(0);
 });
 
 test("enters path edit mode when circle warp is first applied", async ({

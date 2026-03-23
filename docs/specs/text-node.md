@@ -34,9 +34,14 @@ Text nodes let users place and edit stylized text directly on the canvas.
 - A warped text node remains a text node with normal node selection behavior unless the user explicitly enters path editing.
 - In the default selected state, a path-guided text node should still use the text node's normal selection and transform behavior.
 - A selected path-guided text node may show a subtle preview of its underlying path so the relationship between the text and the path stays legible.
+- That path preview should stay visually aligned with the text while the node is rotated or otherwise transformed.
+- That path preview may be temporarily hidden during an active transform such as rotation when keeping it visible makes the interaction read less clearly.
 - Path editing is a distinct mode from text editing.
 - Path editing should expose path-specific controls without replacing the normal text-editing model.
+- Entering path editing should clear normal hover-only canvas previews that no longer match the path-editing state.
 - When circle warp is first applied to a selected text node, PunchPress should enter path edit mode automatically.
 - A selected path-guided text node should offer a clear `Edit path` affordance and keyboard shortcut to enter or leave path edit mode.
 - While path editing, dragging the text should still move the node on the canvas.
 - While path editing, a dedicated path-position handle should move the text along the path without moving the node itself.
+- Moving text along a path should not make the underlying path itself appear to drift or jitter.
+- While the user is actively dragging a path-position handle, PunchPress may temporarily hide normal selection bounds if those bounds would otherwise jitter distractingly as the text reflows.

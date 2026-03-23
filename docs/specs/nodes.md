@@ -6,6 +6,7 @@ Nodes are the core building blocks of a PunchPress design.
 
 - Every design element on the canvas is a node.
 - Nodes have stable identity, layer order, visibility, and transform.
+- Nodes can be copied and pasted without losing their editable source content, styling, or structure.
 - Nodes can be selected individually and, where appropriate, moved, resized, rotated, and edited.
 - Selected nodes may surface a shared node toolbar with actions that change based on the current selection and mode.
 - Nodes remain editable source content inside PunchPress. They should not be prematurely baked into static output.

@@ -30,7 +30,15 @@ export const CanvasNode = ({ nodeId }) => {
   const editor = useEditor();
   const activeTool = useEditorValue((_, state) => state.activeTool);
   const editingNodeId = useEditorValue((_, state) => state.editingNodeId);
+  const isSelectionDragging = useEditorValue(
+    (_, state) => state.isSelectionDragging
+  );
   const spacePressed = useEditorValue((_, state) => state.spacePressed);
+  const isSelectionTargetSelected = useEditorValue((editor) => {
+    const targetNodeId = editor.getSelectionTargetNodeId(nodeId) || nodeId;
+
+    return editor.isSelected(targetNodeId);
+  });
   const node = useEditorValue((editor) => editor.getNode(nodeId));
   const geometry = useEditorValue((editor) => editor.getNodeGeometry(nodeId));
 
@@ -44,14 +52,23 @@ export const CanvasNode = ({ nodeId }) => {
   const isEditing = editingNodeId === nodeId;
   const isNodeDraggable =
     activeTool === "pointer" && !spacePressed && editingNodeId === null;
+  let cursorClassName = "cursor-default";
+
+  if (isNodeDraggable) {
+    if (isSelectionTargetSelected && isSelectionDragging) {
+      cursorClassName = "cursor-grabbing";
+    } else if (isSelectionTargetSelected) {
+      cursorClassName = "cursor-grab";
+    } else {
+      cursorClassName = "cursor-pointer";
+    }
+  }
 
   return (
     <button
       className={cn(
         "canvas-node absolute block appearance-none border-0 bg-transparent p-0",
-        isNodeDraggable
-          ? "cursor-grab active:cursor-grabbing"
-          : "cursor-default",
+        cursorClassName,
         !geometry?.ready && "opacity-50"
       )}
       data-node-id={node.id}
@@ -71,17 +88,14 @@ export const CanvasNode = ({ nodeId }) => {
           return;
         }
 
-        const selectionTargetNodeId =
-          editor.getSelectionTargetNodeId(node.id) || node.id;
-        const isSelectionTargetSelected = editor.isSelected(
-          selectionTargetNodeId
-        );
         const shouldDragSelectedPathNode = Boolean(
           isSelectionTargetSelected && geometry?.selectionBounds
         );
         const shouldStartDragging = Boolean(
           !event.shiftKey &&
-            (!isSelectionTargetSelected || shouldDragSelectedPathNode)
+            (!isSelectionTargetSelected ||
+              shouldDragSelectedPathNode ||
+              event.altKey)
         );
 
         editor.dispatchNodePointerDown({ event, node });
@@ -96,7 +110,7 @@ export const CanvasNode = ({ nodeId }) => {
             event.clientX,
             event.clientY
           );
-          let historyMark: ReturnType<typeof editor.markHistoryStep> = null;
+          let dragSession: ReturnType<typeof editor.beginSelectionDrag> = null;
 
           const handlePointerMove = (moveEvent) => {
             const movedDistance = Math.hypot(
@@ -104,13 +118,19 @@ export const CanvasNode = ({ nodeId }) => {
               moveEvent.clientY - startClientPoint.y
             );
 
-            if (!(historyMark || movedDistance >= 3)) {
+            if (!(dragSession || movedDistance >= 3)) {
               return;
             }
 
-            if (!historyMark) {
-              historyMark = editor.markHistoryStep("move selection");
-              editor.setHoveringSuppressed(true);
+            if (!dragSession) {
+              dragSession = editor.beginSelectionDrag({
+                duplicate: event.altKey,
+                nodeId: node.id,
+              });
+            }
+
+            if (!dragSession) {
+              return;
             }
 
             const nextCanvasPoint = getCanvasPoint(
@@ -119,27 +139,30 @@ export const CanvasNode = ({ nodeId }) => {
               moveEvent.clientY
             );
 
-            editor.moveSelectionBy({
+            editor.updateSelectionDrag(dragSession, {
+              delta: {
+                x: round(nextCanvasPoint.x - previousCanvasPoint.x, 2),
+                y: round(nextCanvasPoint.y - previousCanvasPoint.y, 2),
+              },
               queueRefresh: true,
-              x: round(nextCanvasPoint.x - previousCanvasPoint.x, 2),
-              y: round(nextCanvasPoint.y - previousCanvasPoint.y, 2),
             });
 
             previousCanvasPoint = nextCanvasPoint;
           };
 
-          const handlePointerUp = () => {
+          const handlePointerEnd = () => {
             window.removeEventListener("pointermove", handlePointerMove);
-            window.removeEventListener("pointerup", handlePointerUp);
-            editor.setHoveringSuppressed(false);
+            window.removeEventListener("pointercancel", handlePointerEnd);
+            window.removeEventListener("pointerup", handlePointerEnd);
 
-            if (historyMark) {
-              editor.commitHistoryStep(historyMark);
+            if (dragSession) {
+              editor.endSelectionDrag(dragSession);
             }
           };
 
           window.addEventListener("pointermove", handlePointerMove);
-          window.addEventListener("pointerup", handlePointerUp);
+          window.addEventListener("pointercancel", handlePointerEnd);
+          window.addEventListener("pointerup", handlePointerEnd);
         }
       }}
       onPointerEnter={() => {

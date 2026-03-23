@@ -1,4 +1,3 @@
-import { getNodeCssTransform } from "@punchpress/engine";
 import { useEffect, useState } from "react";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
@@ -6,7 +5,12 @@ import {
   getTextPathHandleCursorToken,
   setActiveCanvasCursorToken,
 } from "../canvas-cursor-policy";
-import { getHostRectFromCanvasBounds } from "./canvas-overlay-geometry";
+import {
+  getTextPathGuideMatrix,
+  getTextPathHostMetrics,
+  getTextPathTransformTargetStyle,
+  projectTextPathPoint,
+} from "./text-path-overlay-geometry";
 
 const getCanvasPoint = (editor, clientX, clientY) => {
   const viewer = editor.viewerRef;
@@ -24,100 +28,6 @@ const getCanvasPoint = (editor, clientX, clientY) => {
   };
 };
 
-const getHostMetrics = (editor) => {
-  const host = editor.hostRef;
-  const viewer = editor.viewerRef;
-
-  if (!(host && viewer && editor.zoom > 0)) {
-    return null;
-  }
-
-  const scrollLeft = viewer.getScrollLeft?.();
-  const scrollTop = viewer.getScrollTop?.();
-
-  if (!(Number.isFinite(scrollLeft) && Number.isFinite(scrollTop))) {
-    return null;
-  }
-
-  return {
-    height: host.clientHeight,
-    scrollLeft,
-    scrollTop,
-    width: host.clientWidth,
-  };
-};
-
-const getHostTransformMatrix = (node, bbox, metrics, zoom) => {
-  const localCenter = {
-    x: (bbox.minX + bbox.maxX) / 2,
-    y: (bbox.minY + bbox.maxY) / 2,
-  };
-  const worldCenter = {
-    x: node.transform.x + localCenter.x,
-    y: node.transform.y + localCenter.y,
-  };
-  const rotation = ((node.transform.rotation || 0) * Math.PI) / 180;
-  const scaleX = node.transform.scaleX ?? 1;
-  const scaleY = node.transform.scaleY ?? 1;
-  const cos = Math.cos(rotation);
-  const sin = Math.sin(rotation);
-  const a = cos * scaleX * zoom;
-  const b = sin * scaleX * zoom;
-  const c = -sin * scaleY * zoom;
-  const d = cos * scaleY * zoom;
-
-  return {
-    a,
-    b,
-    c,
-    d,
-    e:
-      (worldCenter.x - metrics.scrollLeft) * zoom -
-      (a * localCenter.x + c * localCenter.y),
-    f:
-      (worldCenter.y - metrics.scrollTop) * zoom -
-      (b * localCenter.x + d * localCenter.y),
-  };
-};
-
-const projectPoint = (matrix, point) => {
-  return {
-    x: matrix.a * point.x + matrix.c * point.y + matrix.e,
-    y: matrix.b * point.x + matrix.d * point.y + matrix.f,
-  };
-};
-
-const getTransformTargetStyle = (editor, node, geometry) => {
-  const selectionBounds = geometry.selectionBounds || geometry.bbox;
-  const renderCenter = {
-    x: (geometry.bbox.minX + geometry.bbox.maxX) / 2,
-    y: (geometry.bbox.minY + geometry.bbox.maxY) / 2,
-  };
-  const hostRect = getHostRectFromCanvasBounds(editor, {
-    height: selectionBounds.height,
-    maxX: node.transform.x + selectionBounds.maxX,
-    maxY: node.transform.y + selectionBounds.maxY,
-    minX: node.transform.x + selectionBounds.minX,
-    minY: node.transform.y + selectionBounds.minY,
-    width: selectionBounds.width,
-  });
-
-  if (!hostRect) {
-    return null;
-  }
-
-  return {
-    height: `${hostRect.height}px`,
-    left: `${hostRect.left}px`,
-    top: `${hostRect.top}px`,
-    transform: getNodeCssTransform(node),
-    transformOrigin: `${(renderCenter.x - selectionBounds.minX) * editor.zoom}px ${
-      (renderCenter.y - selectionBounds.minY) * editor.zoom
-    }px`,
-    width: `${hostRect.width}px`,
-  };
-};
-
 const TextPathGuide = ({ guide, isPathEditing, matrixTransform, metrics }) => {
   if (!(guide && metrics && matrixTransform)) {
     return null;
@@ -127,6 +37,7 @@ const TextPathGuide = ({ guide, isPathEditing, matrixTransform, metrics }) => {
     <svg
       aria-hidden="true"
       className="absolute inset-0 h-full w-full overflow-visible"
+      data-testid="text-path-guide"
       height={metrics.height}
       width={metrics.width}
     >
@@ -175,7 +86,7 @@ const TextPathHandles = ({ editor, guide, isPathEditing, matrix, nodeId }) => {
     }
 
     const historyMark = editor.markHistoryStep("move text on path");
-    editor.setHoveringSuppressed(true);
+    editor.beginTextPathPositioningInteraction();
     setActiveCanvasCursorToken(editor.hostRef, cursorToken);
 
     const handlePointerMove = (moveEvent) => {
@@ -188,21 +99,23 @@ const TextPathHandles = ({ editor, guide, isPathEditing, matrix, nodeId }) => {
       });
     };
 
-    const handlePointerUp = () => {
+    const handlePointerEnd = () => {
       window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerUp);
-      editor.setHoveringSuppressed(false);
+      window.removeEventListener("pointercancel", handlePointerEnd);
+      window.removeEventListener("pointerup", handlePointerEnd);
+      editor.endTextPathPositioningInteraction();
       setActiveCanvasCursorToken(editor.hostRef, null);
       editor.commitHistoryStep(historyMark);
     };
 
     window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerEnd);
+    window.addEventListener("pointerup", handlePointerEnd);
   };
 
   return guide.handles.map((handle) => {
     const cursorToken = getTextPathHandleCursorToken(handle.role);
-    const point = projectPoint(matrix, handle.point);
+    const point = projectTextPathPoint(matrix, handle.point);
 
     return (
       <button
@@ -233,6 +146,9 @@ const TextPathHandles = ({ editor, guide, isPathEditing, matrix, nodeId }) => {
 export const CanvasTextPathOverlay = ({ viewportRevision }) => {
   const editor = useEditor();
   const [transformTargetElement, setTransformTargetElement] = useState(null);
+  const isSelectionRotating = useEditorValue(
+    (_, state) => state.isSelectionRotating
+  );
   const pathEditingNodeId = useEditorValue(
     (_, state) => state.pathEditingNodeId
   );
@@ -300,16 +216,16 @@ export const CanvasTextPathOverlay = ({ viewportRevision }) => {
   if (!overlayState) {
     return null;
   }
-  const metrics = overlayState ? getHostMetrics(editor) : null;
+  const metrics = overlayState ? getTextPathHostMetrics(editor) : null;
   const geometry = overlayState?.geometry || null;
   const node = overlayState?.node || null;
   const transformTargetStyle =
     geometry && node && isPathEditing
-      ? getTransformTargetStyle(editor, node, geometry)
+      ? getTextPathTransformTargetStyle(editor, node, geometry)
       : null;
   const matrix =
     geometry && metrics && node
-      ? getHostTransformMatrix(node, geometry.bbox, metrics, editor.zoom)
+      ? getTextPathGuideMatrix(node, geometry, metrics, editor.zoom)
       : null;
   const guide = geometry?.guide || null;
   const matrixTransform = matrix
@@ -330,12 +246,14 @@ export const CanvasTextPathOverlay = ({ viewportRevision }) => {
         />
       ) : null}
 
-      <TextPathGuide
-        guide={guide}
-        isPathEditing={isPathEditing}
-        matrixTransform={matrixTransform}
-        metrics={metrics}
-      />
+      {isSelectionRotating ? null : (
+        <TextPathGuide
+          guide={guide}
+          isPathEditing={isPathEditing}
+          matrixTransform={matrixTransform}
+          metrics={metrics}
+        />
+      )}
 
       <TextPathHandles
         editor={editor}

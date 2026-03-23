@@ -1,3 +1,4 @@
+import { duplicateClipboardContent } from "../clipboard/clipboard-actions";
 import { finishEditingIfNeeded } from "../editing/editing-actions";
 import { isSelected } from "../selection/selection-actions";
 
@@ -27,14 +28,28 @@ export const duplicate = (editor, nodeId) => {
       return;
     }
 
-    editor.run(() => {
-      editor.getState().duplicateSelectedNodes();
+    duplicateClipboardContent(editor, editor.selectedNodeIds);
+    return;
+  }
+
+  duplicateClipboardContent(editor, [nodeId]);
+};
+
+export const duplicateForDrag = (editor, nodeId) => {
+  finishEditingIfNeeded(editor);
+  if (!nodeId || isSelected(editor, nodeId)) {
+    if (editor.selectedNodeIds.length === 0) {
+      return;
+    }
+
+    duplicateClipboardContent(editor, editor.selectedNodeIds, {
+      offset: { x: 0, y: 0 },
     });
     return;
   }
 
-  editor.run(() => {
-    editor.getState().duplicateNodeById(nodeId);
+  duplicateClipboardContent(editor, [nodeId], {
+    offset: { x: 0, y: 0 },
   });
 };
 

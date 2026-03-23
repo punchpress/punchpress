@@ -7,12 +7,16 @@ export const CanvasHoverPreview = ({ viewportRevision }) => {
   const editor = useEditor();
   const activeTool = useEditorValue((_, state) => state.activeTool);
   const editingNodeId = useEditorValue((_, state) => state.editingNodeId);
+  const pathEditingNodeId = useEditorValue(
+    (_, state) => state.pathEditingNodeId
+  );
   const spacePressed = useEditorValue((_, state) => state.spacePressed);
   const hoveredNodePreview = useEditorValue((editor, state) => {
     if (
       spacePressed ||
       activeTool !== "pointer" ||
       editingNodeId ||
+      pathEditingNodeId ||
       state.isHoveringSuppressed ||
       !state.hoveredNodeId ||
       state.selectedNodeIds.includes(state.hoveredNodeId)

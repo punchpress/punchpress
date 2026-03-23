@@ -14,7 +14,7 @@ export class PointerTool extends Tool {
     this.editor.ensureSelected(node.id);
   }
 
-  onKeyDown({ key }) {
+  onKeyDown({ event, key }) {
     if (key === "escape") {
       if (this.editor.focusedGroupId) {
         this.editor.exitGroupFocus();
@@ -29,6 +29,6 @@ export class PointerTool extends Tool {
       return false;
     }
 
-    return selectToolFromShortcut(this.editor, key);
+    return selectToolFromShortcut(this.editor, key, event);
   }
 }
