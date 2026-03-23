@@ -6,3 +6,4 @@
   debug dump
 - [playwright](./playwright.md) — browser-backed tests for UI wiring and visual
   behavior
+- [performance](./performance.md) — shared in-app and CLI benchmark approach

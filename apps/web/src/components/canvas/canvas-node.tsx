@@ -8,6 +8,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
+import { usePerformanceRenderCounter } from "../../performance/use-performance-render-counter";
 import { drillIntoGroupSelection } from "./canvas-group-drill-in";
 
 const getCanvasPoint = (editor, clientX, clientY) => {
@@ -27,6 +28,7 @@ const getCanvasPoint = (editor, clientX, clientY) => {
 };
 
 export const CanvasNode = ({ nodeId }) => {
+  usePerformanceRenderCounter("render.canvas.node");
   const editor = useEditor();
   const activeTool = useEditorValue((_, state) => state.activeTool);
   const editingNodeId = useEditorValue((_, state) => state.editingNodeId);

@@ -1,3 +1,4 @@
+import { measurePerf } from "../perf/perf-hooks";
 import { round } from "../primitives/math";
 import { getNodeX, getNodeY } from "../shapes/warp-text/model";
 import { estimateBounds } from "../shapes/warp-text/warp-layout";
@@ -56,85 +57,89 @@ export const updateMoveSelection = (
   session,
   { dragEvents, left, queueRefresh = false, top } = {}
 ) => {
-  if (!session) {
-    return [];
-  }
-
-  if (
-    session.nodeIds.length === 1 &&
-    Number.isFinite(left) &&
-    Number.isFinite(top)
-  ) {
-    const nodeId = session.nodeIds[0];
-    const bbox = session.baseBBoxes.get(nodeId);
-
-    if (!bbox) {
+  return measurePerf("selection.move.absolute", () => {
+    if (!session) {
       return [];
     }
 
-    editor.updateNode(nodeId, {
-      transform: {
-        x: round(left - bbox.minX, 2),
-        y: round(top - bbox.minY, 2),
-      },
+    if (
+      session.nodeIds.length === 1 &&
+      Number.isFinite(left) &&
+      Number.isFinite(top)
+    ) {
+      const nodeId = session.nodeIds[0];
+      const bbox = session.baseBBoxes.get(nodeId);
+
+      if (!bbox) {
+        return [];
+      }
+
+      editor.updateNode(nodeId, {
+        transform: {
+          x: round(left - bbox.minX, 2),
+          y: round(top - bbox.minY, 2),
+        },
+      });
+
+      if (queueRefresh) {
+        queueOverlayRefresh(editor);
+      }
+
+      return [nodeId];
+    }
+
+    if (!(dragEvents?.length > 0)) {
+      return [];
+    }
+
+    editor.updateNodes(session.nodeIds, (node) => {
+      const dragEvent = dragEvents.find(
+        (item) => item.target?.dataset.nodeId === node.id
+      );
+      const bbox = session.baseBBoxes.get(node.id);
+
+      if (!(dragEvent && bbox)) {
+        return node;
+      }
+
+      return {
+        transform: {
+          x: round(dragEvent.left - bbox.minX, 2),
+          y: round(dragEvent.top - bbox.minY, 2),
+        },
+      };
     });
 
     if (queueRefresh) {
       queueOverlayRefresh(editor);
     }
 
-    return [nodeId];
-  }
-
-  if (!(dragEvents?.length > 0)) {
-    return [];
-  }
-
-  editor.updateNodes(session.nodeIds, (node) => {
-    const dragEvent = dragEvents.find(
-      (item) => item.target?.dataset.nodeId === node.id
-    );
-    const bbox = session.baseBBoxes.get(node.id);
-
-    if (!(dragEvent && bbox)) {
-      return node;
-    }
-
-    return {
-      transform: {
-        x: round(dragEvent.left - bbox.minX, 2),
-        y: round(dragEvent.top - bbox.minY, 2),
-      },
-    };
+    return session.nodeIds;
   });
-
-  if (queueRefresh) {
-    queueOverlayRefresh(editor);
-  }
-
-  return session.nodeIds;
 };
 
 export const moveSelectionBy = (
   editor,
   { queueRefresh = false, x = 0, y = 0 } = {}
 ) => {
-  const effectiveSelectedNodeIds = editor.getEffectiveSelectionNodeIds();
+  return measurePerf("selection.move.by", () => {
+    const effectiveSelectedNodeIds = editor.getEffectiveSelectionNodeIds();
 
-  if (effectiveSelectedNodeIds.length === 0) {
-    return [];
-  }
+    if (effectiveSelectedNodeIds.length === 0) {
+      return [];
+    }
 
-  editor.updateNodes(effectiveSelectedNodeIds, (node) => ({
-    transform: {
-      x: round(getNodeX(node) + x, 2),
-      y: round(getNodeY(node) + y, 2),
-    },
-  }));
+    editor.updateNodes(effectiveSelectedNodeIds, (node) => ({
+      transform: {
+        x: round(getNodeX(node) + x, 2),
+        y: round(getNodeY(node) + y, 2),
+      },
+    }));
 
-  if (queueRefresh) {
-    queueOverlayRefresh(editor);
-  }
+    if (queueRefresh) {
+      queueOverlayRefresh(editor);
+    }
 
-  return effectiveSelectedNodeIds;
+    return effectiveSelectedNodeIds;
+  });
 };

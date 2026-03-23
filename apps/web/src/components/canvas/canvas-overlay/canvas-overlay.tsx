@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useEditor } from "../../../editor-react/use-editor";
+import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
 import { CanvasEditingSelection } from "./canvas-editing-selection";
 import { CanvasHoverPreview } from "./canvas-hover-preview";
 import { CanvasSelectionOverlay } from "./canvas-selection-overlay";
@@ -8,6 +9,7 @@ import { CanvasTransformOverlay } from "./canvas-transform-overlay";
 import { CanvasNodeToolbar } from "./node-toolbar/canvas-node-toolbar";
 
 export const CanvasOverlay = () => {
+  usePerformanceRenderCounter("render.canvas.overlay");
   const editor = useEditor();
   const [viewportRevision, setViewportRevision] = useState(0);
 

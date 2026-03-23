@@ -18,4 +18,5 @@ They exist to preserve product intent while implementation evolves. They are liv
 - `groups.md`
 - `history.md`
 - `nodes.md`
+- `performance-panel.md`
 - `text-node.md`

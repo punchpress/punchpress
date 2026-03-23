@@ -61,7 +61,7 @@ export const LayersPanel = () => {
         <div className="mx-2.5 h-px bg-[var(--designer-border)]" />
 
         <div className="px-3 pt-2.5 pb-1.5">
-          <span className="font-medium text-[11px] text-[var(--designer-text-muted)]">
+          <span className="font-semibold text-[12px] text-foreground/70 tracking-[-0.01em]">
             Layers
           </span>
         </div>
