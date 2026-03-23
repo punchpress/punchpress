@@ -34,10 +34,19 @@ Use this when the browser UI path matters.
 
 See [playwright.md](./playwright.md).
 
+### performance
+
+Use the performance harness when you need repeatable measurements of the real
+render path.
+
+See [performance.md](./performance.md).
+
 ## Default Rule
 
 When changing editor behavior:
 
 1. Start with an `editor-contract` test.
 2. Add a `playwright` test only if the real browser path matters.
-3. Update the relevant `docs/specs/` doc when product behavior changes.
+3. Use the performance harness when the change needs a measurable browser-side
+   performance result.
+4. Update the relevant `docs/specs/` doc when product behavior changes.

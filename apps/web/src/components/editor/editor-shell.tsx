@@ -9,6 +9,7 @@ import {
 } from "../designer/designer";
 import { LayersPanel } from "../panels/layers-panel/layers-panel";
 import { PropertiesPanel } from "../panels/properties-panel";
+import { PerformanceHud } from "../performance/performance-hud";
 import { DesktopUpdateIndicator } from "./desktop-update-indicator";
 
 const SHELL_CHROME_VARS = {
@@ -64,6 +65,8 @@ export const EditorShell = () => {
         <DesignerPanel side="right">
           <PropertiesPanel />
         </DesignerPanel>
+
+        <PerformanceHud />
       </DesignerContent>
     </Designer>
   );

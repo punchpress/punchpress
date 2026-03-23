@@ -4,6 +4,7 @@ import { Dialog, DialogPanel, DialogPopup } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { SettingsDialogAppearancePanel } from "./settings-dialog-appearance-panel";
 import { SettingsDialogDebugPanel } from "./settings-dialog-debug-panel";
+import { SettingsDialogPerformancePanel } from "./settings-dialog-performance-panel";
 
 const NAV_SECTIONS = [
   {
@@ -12,7 +13,10 @@ const NAV_SECTIONS = [
   },
   {
     label: "Developer",
-    items: [{ id: "debug", label: "Debug", icon: BugIcon }],
+    items: [
+      { id: "performance", label: "Performance", icon: BugIcon },
+      { id: "debug", label: "Debug", icon: BugIcon },
+    ],
   },
 ] as const;
 
@@ -20,6 +24,13 @@ const DEFAULT_SECTION_ID = "appearance";
 
 export const SettingsDialog = ({ onOpenChange, open }) => {
   const [activeSectionId, setActiveSectionId] = useState(DEFAULT_SECTION_ID);
+  let sectionContent = <SettingsDialogAppearancePanel />;
+
+  if (activeSectionId === "performance") {
+    sectionContent = <SettingsDialogPerformancePanel />;
+  } else if (activeSectionId === "debug") {
+    sectionContent = <SettingsDialogDebugPanel isActive />;
+  }
 
   useEffect(() => {
     if (open) {
@@ -73,13 +84,7 @@ export const SettingsDialog = ({ onOpenChange, open }) => {
 
             {/* Content */}
             <section className="flex min-h-0 flex-col gap-8 overflow-y-auto px-8 py-7">
-              {activeSectionId === "appearance" ? (
-                <SettingsDialogAppearancePanel />
-              ) : (
-                <SettingsDialogDebugPanel
-                  isActive={activeSectionId === "debug"}
-                />
-              )}
+              {sectionContent}
             </section>
           </div>
         </DialogPanel>

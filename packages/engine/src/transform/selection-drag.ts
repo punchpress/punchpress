@@ -1,5 +1,6 @@
 import { duplicateForDrag } from "../document/node-actions";
 import { finishEditingIfNeeded } from "../editing/editing-actions";
+import { measurePerf } from "../perf/perf-hooks";
 import {
   beginMoveSelection,
   moveSelectionBy,
@@ -16,86 +17,92 @@ export const beginSelectionDrag = (
   editor,
   { duplicate = false, nodeId, nodeIds } = {}
 ) => {
-  finishEditingIfNeeded(editor);
+  return measurePerf("selection.drag.begin", () => {
+    finishEditingIfNeeded(editor);
 
-  const historyMark = editor.markHistoryStep(
-    duplicate ? "duplicate selection" : "move selection"
-  );
+    const historyMark = editor.markHistoryStep(
+      duplicate ? "duplicate selection" : "move selection"
+    );
 
-  if (!historyMark) {
-    return null;
-  }
+    if (!historyMark) {
+      return null;
+    }
 
-  if (duplicate) {
-    duplicateForDrag(editor, nodeId);
-  }
+    if (duplicate) {
+      duplicateForDrag(editor, nodeId);
+    }
 
-  const moveSession = beginMoveSelection(
-    editor,
-    duplicate ? undefined : { nodeId, nodeIds }
-  );
+    const moveSession = beginMoveSelection(
+      editor,
+      duplicate ? undefined : { nodeId, nodeIds }
+    );
 
-  if (!moveSession) {
-    editor.revertToMark(historyMark);
-    return null;
-  }
+    if (!moveSession) {
+      editor.revertToMark(historyMark);
+      return null;
+    }
 
-  editor.setHoveringSuppressed(true);
+    editor.setHoveringSuppressed(true);
 
-  return {
-    changed: duplicate,
-    historyMark,
-    moveSession,
-  };
+    return {
+      changed: duplicate,
+      historyMark,
+      moveSession,
+    };
+  });
 };
 
 export const updateSelectionDrag = (editor, session, options = {}) => {
-  if (!session) {
-    return [];
-  }
-
-  let movedNodeIds: string[] = [];
-
-  if (options.delta) {
-    movedNodeIds = moveSelectionBy(editor, {
-      queueRefresh: options.queueRefresh,
-      x: options.delta.x,
-      y: options.delta.y,
-    });
-  } else if (hasAbsoluteMoveInput(options)) {
-    movedNodeIds = updateMoveSelection(editor, session.moveSession, options);
-  }
-
-  if (movedNodeIds.length > 0) {
-    session.changed = true;
-
-    if (!session.isActive) {
-      editor.beginSelectionDragInteraction();
-      session.isActive = true;
+  return measurePerf("selection.drag.update", () => {
+    if (!session) {
+      return [];
     }
-  }
 
-  return movedNodeIds;
+    let movedNodeIds: string[] = [];
+
+    if (options.delta) {
+      movedNodeIds = moveSelectionBy(editor, {
+        queueRefresh: options.queueRefresh,
+        x: options.delta.x,
+        y: options.delta.y,
+      });
+    } else if (hasAbsoluteMoveInput(options)) {
+      movedNodeIds = updateMoveSelection(editor, session.moveSession, options);
+    }
+
+    if (movedNodeIds.length > 0) {
+      session.changed = true;
+
+      if (!session.isActive) {
+        editor.beginSelectionDragInteraction();
+        session.isActive = true;
+      }
+    }
+
+    return movedNodeIds;
+  });
 };
 
 export const endSelectionDrag = (editor, session, options = {}) => {
-  if (!session) {
-    return false;
-  }
+  return measurePerf("selection.drag.end", () => {
+    if (!session) {
+      return false;
+    }
 
-  if (options.delta || hasAbsoluteMoveInput(options)) {
-    updateSelectionDrag(editor, session, options);
-  }
+    if (options.delta || hasAbsoluteMoveInput(options)) {
+      updateSelectionDrag(editor, session, options);
+    }
 
-  if (session.isActive) {
-    editor.endSelectionDragInteraction();
-  } else {
-    editor.setHoveringSuppressed(false);
-  }
+    if (session.isActive) {
+      editor.endSelectionDragInteraction();
+    } else {
+      editor.setHoveringSuppressed(false);
+    }
 
-  if (options.cancel || !session.changed) {
-    return editor.revertToMark(session.historyMark);
-  }
+    if (options.cancel || !session.changed) {
+      return editor.revertToMark(session.historyMark);
+    }
 
-  return editor.commitHistoryStep(session.historyMark);
+    return editor.commitHistoryStep(session.historyMark);
+  });
 };

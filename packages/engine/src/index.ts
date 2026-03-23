@@ -25,6 +25,11 @@ export {
   rebuildTreeOrder,
 } from "./nodes/node-tree";
 export {
+  incrementPerfCounter,
+  measurePerf,
+  setPerfSink,
+} from "./perf/perf-hooks";
+export {
   isInputElement,
   shouldIgnoreGlobalShortcutTarget,
 } from "./primitives/dom";
