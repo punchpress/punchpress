@@ -23,6 +23,37 @@ The app is the source of truth for performance data. Automation should trigger
 benchmarks in the app and collect the app's structured result rather than
 reimplementing timing logic outside the app.
 
+## Headed Soak Runs
+
+- Use `bun run test:performance:headed` for browser-backed performance runs
+  where the app needs to stay visible while the test is running.
+- Use `bun run test:performance:trace` to stop after the first newly captured
+  slow frame and write a Chrome trace to `.context/performance/`.
+- `apps/web/tests/performance/idle-slow-frame.spec.ts` is the `idle-soak-2min`
+  scenario for the performance HUD by default.
+- The test attaches the final in-app performance snapshot as JSON so slow-frame
+  diagnostics can be inspected after the run.
+- Slow-frame diagnostics should include nearby renderer task activity so idle
+  stalls can be correlated with timers, animation-frame loops, or idle
+  callbacks without immediately reaching for a full browser trace.
+- Set `PUNCHPRESS_STOP_ON_FIRST_SLOW_FRAME=0` if a trace run should continue
+  for the full soak duration instead of stopping after the first reproduced
+  slow frame.
+
+## Desktop Soak Runs
+
+- Use `bun run test:performance:desktop` for an Electron-backed idle soak using
+  the real desktop shell.
+- Use `bun run test:performance:desktop:trace` to run the same soak while
+  capturing an Electron `contentTracing` artifact from the main process.
+- The desktop soak writes its snapshot to
+  `.context/performance/desktop-idle-soak-2min-snapshot.json` by default.
+- The desktop trace run writes its trace to
+  `.context/performance/desktop-idle-soak-2min-trace.json` by default.
+- Desktop runs build the Electron main/preload bundle in Playwright global
+  setup before launching the app. Set `PUNCHPRESS_SKIP_DESKTOP_BUILD=1` to
+  reuse an existing build while iterating.
+
 ## In-App Panel
 
 - The performance panel lives in the app and is reachable from Settings.

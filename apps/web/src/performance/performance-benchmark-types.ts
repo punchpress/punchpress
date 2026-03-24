@@ -30,4 +30,5 @@ export interface PerformanceBenchmarkDefinition {
   label: string;
   run: (context: PerformanceBenchmarkContext) => Promise<void>;
   setup?: (context: PerformanceBenchmarkContext) => Promise<void>;
+  usesScratchDocument?: boolean;
 }

@@ -1,21 +1,22 @@
 import { GaugeIcon, MonitorUpIcon, PlayIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { performanceBenchmarks } from "../../performance/performance-benchmarks";
 import type { PerformanceSummary } from "../../performance/performance-controller";
+import { getRuntimeTaskSummary } from "../../performance/runtime-task-recorder";
+import {
+  getSlowFrameCauseLabel,
+  getSlowFrameSummary,
+  getTaskHotspotSummary,
+  getTimelineEntrySummary,
+} from "../../performance/slow-frame-diagnostics";
 import { usePerformance } from "../../performance/use-performance";
-import { usePerformanceLiveCapture } from "../../performance/use-performance-live-capture";
 import {
   PerformanceBenchmarkConfirmDialog,
   usePerformanceBenchmarkRunner,
 } from "../../performance/use-performance-benchmark-runner";
+import { usePerformanceLiveCapture } from "../../performance/use-performance-live-capture";
+import { PerformanceScenarioSelect } from "./performance-scenario-select";
 
 const formatFrameMs = (value: number) => `${value.toFixed(1)}ms`;
 const formatFps = (value: number) =>
@@ -82,7 +83,12 @@ export const PerformancePanelContent = () => {
     performanceBenchmarks.find(
       (benchmark) => benchmark.id === selectedBenchmarkId
     ) || performanceBenchmarks[0];
+  const benchmarkOptions = performanceBenchmarks.map((benchmark) => ({
+    label: benchmark.label,
+    value: benchmark.id,
+  }));
   const lastResult = state.lastResult;
+  const recentSlowFrames = [...state.recentSlowFrames].reverse().slice(0, 6);
 
   return (
     <div className="flex flex-col gap-4">
@@ -136,32 +142,28 @@ export const PerformancePanelContent = () => {
         <div className="rounded-xl border bg-muted/16 p-4">
           <div className="mb-3 flex items-center gap-2 font-medium text-sm">
             <PlayIcon className="size-4" />
-            Benchmark
+            Scenario
           </div>
           <div className="space-y-3">
-            <Select
+            <PerformanceScenarioSelect
               onValueChange={controller.setSelectedBenchmarkId}
+              options={benchmarkOptions}
               value={selectedBenchmarkId}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {performanceBenchmarks.map((benchmark) => (
-                  <SelectItem key={benchmark.id} value={benchmark.id}>
-                    {benchmark.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            />
 
             <p className="text-muted-foreground text-sm leading-6">
               {selectedBenchmark?.description}
             </p>
 
-            <div className="rounded-lg border border-amber-500/20 bg-amber-50 px-3 py-2 text-[12px] text-amber-700 dark:bg-amber-500/8 dark:text-amber-200">
-              Benchmarks run in a scratch scene inside the live editor.
-            </div>
+            {selectedBenchmark?.usesScratchDocument === false ? (
+              <div className="rounded-lg border border-emerald-500/20 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-700 dark:bg-emerald-500/8 dark:text-emerald-200">
+                This scenario runs against the current live editor state.
+              </div>
+            ) : (
+              <div className="rounded-lg border border-amber-500/20 bg-amber-50 px-3 py-2 text-[12px] text-amber-700 dark:bg-amber-500/8 dark:text-amber-200">
+                This scenario runs in a scratch scene inside the live editor.
+              </div>
+            )}
 
             <div className="flex flex-wrap items-center gap-2">
               <Button
@@ -176,7 +178,7 @@ export const PerformancePanelContent = () => {
                 <GaugeIcon />
                 {state.benchmarkStatus === "running"
                   ? "Running\u2026"
-                  : "Run benchmark"}
+                  : "Run scenario"}
               </Button>
               <span className="text-muted-foreground text-xs">
                 {state.benchmarkMessage || "Ready"}
@@ -202,6 +204,114 @@ export const PerformancePanelContent = () => {
             </dd>
           </dl>
         </div>
+      </div>
+
+      <div className="rounded-xl border bg-muted/16 p-4">
+        <div className="mb-3 font-medium text-sm">Recurring renderer tasks</div>
+        {state.recentTaskHotspots.length === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            No recurring task activity captured yet.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {state.recentTaskHotspots.slice(0, 5).map((hotspot) => (
+              <div
+                className="rounded-lg bg-muted/50 px-3 py-2.5"
+                key={`${hotspot.scheduler}-${hotspot.label}-${hotspot.source || "unknown"}`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="font-medium text-sm">{hotspot.label}</div>
+                  <div className="font-medium text-sm tabular-nums">
+                    {hotspot.totalDurationMs.toFixed(1)}ms
+                  </div>
+                </div>
+                <div className="mt-1 text-muted-foreground text-xs leading-5">
+                  {getTaskHotspotSummary(hotspot)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-xl border bg-muted/16 p-4">
+        <div className="mb-3 font-medium text-sm">Recent slow frames</div>
+        {recentSlowFrames.length === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            No slow-frame diagnostics captured yet.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {recentSlowFrames.map((diagnostic) => (
+              <div
+                className="rounded-lg bg-muted/50 px-3 py-2.5"
+                key={`${diagnostic.frameId}-${diagnostic.timestamp}`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="font-medium text-sm">
+                    {getSlowFrameCauseLabel(diagnostic.cause)}
+                  </div>
+                  <div className="font-medium text-sm tabular-nums">
+                    {diagnostic.durationMs.toFixed(1)}ms
+                  </div>
+                </div>
+                <div className="mt-1 text-muted-foreground text-xs leading-5">
+                  {getSlowFrameSummary(diagnostic)}
+                </div>
+                {diagnostic.timelineEntries.length > 0 ? (
+                  <div className="mt-2 space-y-1">
+                    {diagnostic.timelineEntries
+                      .slice(0, 3)
+                      .map((entry, index) => (
+                        <div
+                          className="rounded bg-background/50 px-2 py-1 text-[11px] text-muted-foreground"
+                          key={`${diagnostic.frameId}-${entry.startTime}-${index}`}
+                        >
+                          {getTimelineEntrySummary(entry)}
+                        </div>
+                      ))}
+                  </div>
+                ) : null}
+                {diagnostic.overlappingTasks.length > 0 ? (
+                  <div className="mt-2 space-y-1">
+                    {diagnostic.overlappingTasks.map((task, index) => (
+                      <div
+                        className="rounded bg-background/50 px-2 py-1 text-[11px] text-muted-foreground"
+                        key={`${diagnostic.frameId}-${task.id}-${task.startedAt}-${index}`}
+                      >
+                        Active during frame: {getRuntimeTaskSummary(task)}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {diagnostic.recentTaskHotspots.length > 0 ? (
+                  <div className="mt-2 space-y-1">
+                    {diagnostic.recentTaskHotspots.map((hotspot, index) => (
+                      <div
+                        className="rounded bg-background/50 px-2 py-1 text-[11px] text-muted-foreground"
+                        key={`${diagnostic.frameId}-${hotspot.scheduler}-${hotspot.label}-${index}`}
+                      >
+                        Recent offender: {getTaskHotspotSummary(hotspot)}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {diagnostic.recentTasks.length > 0 ? (
+                  <div className="mt-2 space-y-1">
+                    {diagnostic.recentTasks.slice(-3).map((task, index) => (
+                      <div
+                        className="rounded bg-background/50 px-2 py-1 text-[11px] text-muted-foreground"
+                        key={`${diagnostic.frameId}-${task.id}-${task.startedAt}-recent-${index}`}
+                      >
+                        Recent task: {getRuntimeTaskSummary(task)}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Last result */}
@@ -305,6 +415,7 @@ export const PerformancePanelContent = () => {
       ) : null}
 
       <PerformanceBenchmarkConfirmDialog
+        benchmarkLabel={selectedBenchmark?.label}
         onConfirm={confirmBenchmarkRun}
         onOpenChange={(open) => {
           if (!open) {

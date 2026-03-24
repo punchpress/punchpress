@@ -10,11 +10,13 @@ import {
 } from "@/components/ui/dialog";
 import { useEditor } from "../editor-react/use-editor";
 import type { PerformanceBenchmarkDefinition } from "./performance-benchmark-types";
-import { usePerformance } from "./use-performance";
+import { usePerformanceController } from "./use-performance-controller";
+import { usePerformanceValue } from "./use-performance-value";
 
 export const usePerformanceBenchmarkRunner = () => {
   const editor = useEditor();
-  const { controller, state } = usePerformance();
+  const controller = usePerformanceController();
+  const benchmarkStatus = usePerformanceValue((state) => state.benchmarkStatus);
   const [pendingBenchmark, setPendingBenchmark] =
     useState<PerformanceBenchmarkDefinition | null>(null);
 
@@ -25,11 +27,11 @@ export const usePerformanceBenchmarkRunner = () => {
   const requestBenchmarkRun = async (
     benchmark: PerformanceBenchmarkDefinition | null | undefined
   ) => {
-    if (!benchmark || state.benchmarkStatus === "running") {
+    if (!benchmark || benchmarkStatus === "running") {
       return;
     }
 
-    if (editor.nodes.length > 0) {
+    if (benchmark.usesScratchDocument !== false && editor.nodes.length > 0) {
       setPendingBenchmark(benchmark);
       return;
     }
@@ -60,10 +62,12 @@ export const usePerformanceBenchmarkRunner = () => {
 };
 
 export const PerformanceBenchmarkConfirmDialog = ({
+  benchmarkLabel,
   onConfirm,
   onOpenChange,
   open,
 }: {
+  benchmarkLabel?: string;
   onConfirm: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
@@ -81,10 +85,12 @@ export const PerformanceBenchmarkConfirmDialog = ({
         showCloseButton={false}
       >
         <DialogHeader>
-          <DialogTitle>Clear the canvas before running benchmark?</DialogTitle>
+          <DialogTitle>
+            Clear the canvas before running {benchmarkLabel || "scenario"}?
+          </DialogTitle>
           <DialogDescription>
-            Benchmarks run in a scratch scene and will clear the current canvas.
-            Any unsaved work on the canvas will be lost.
+            This scenario runs in a scratch scene and will clear the current
+            canvas. Any unsaved work on the canvas will be lost.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="sm:items-center sm:justify-between">

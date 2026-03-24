@@ -1,15 +1,33 @@
-import { setPerfSink, type Editor } from "@punchpress/engine";
+import { type Editor, setPerfSink } from "@punchpress/engine";
+import { LiveFrameBuffer } from "./live-frame-buffer";
+import { LiveFrameSummary } from "./live-frame-summary";
 import type {
   PerformanceBenchmarkContext,
   PerformanceBenchmarkDefinition,
   PerformanceBenchmarkOptions,
   ResolvedPerformanceBenchmarkOptions,
 } from "./performance-benchmark-types";
+import {
+  type RuntimeTaskHotspot,
+  RuntimeTaskRecorder,
+  type RuntimeTaskRun,
+} from "./runtime-task-recorder";
+import {
+  createSlowFrameDiagnostic,
+  type PerformanceTimelineEntry,
+  type SlowFrameDiagnostic,
+} from "./slow-frame-diagnostics";
 
 // Keep enough frames for ~120s at 120fps
 const MAX_RECENT_FRAMES = 14_400;
+const MAX_RECENT_SLOW_FRAMES = 24;
+const MAX_RECENT_TIMELINE_ENTRIES = 120;
 const SLOW_FRAME_THRESHOLD_MS = 16.7;
-const LIVE_PUBLISH_INTERVAL_MS = 200;
+const LIVE_HUD_PUBLISH_INTERVAL_MS = 1000;
+const LIVE_STATE_PUBLISH_INTERVAL_MS = 1000;
+const SLOW_FRAME_TIMELINE_LOOKBACK_MS = 50;
+const SLOW_FRAME_TASK_LOOKBACK_MS = 2000;
+const MAX_SLOW_FRAME_TASKS = 6;
 
 type FrameBuckets = Record<string, number>;
 type FrameCounters = Record<string, number>;
@@ -20,6 +38,15 @@ export interface PerformanceFrameSample {
   durationMs: number;
   id: number;
   timestamp: number;
+}
+
+export interface PerformanceSecondBucket {
+  avgMs: number;
+  frameCount: number;
+  id: number;
+  maxMs: number;
+  mergedBuckets: Record<string, number>;
+  slowCount: number;
 }
 
 export interface PerformanceSummary {
@@ -67,12 +94,24 @@ export interface PerformanceState {
     startMs: number;
   };
   benchmarkStatus: "idle" | "running" | "complete" | "error";
-  frames: PerformanceFrameSample[];
   hudOpen: boolean;
   lastResult: PerformanceBenchmarkResult | null;
+  liveSeconds: PerformanceSecondBucket[];
   liveSummary: PerformanceSummary;
   nodeStats: PerformanceNodeStats;
+  recentSlowFrames: SlowFrameDiagnostic[];
+  recentTaskHotspots: RuntimeTaskHotspot[];
   selectedBenchmarkId: string | null;
+}
+
+export interface PerformanceHudSnapshot {
+  benchmarkElapsedMs: number;
+  benchmarkRange: PerformanceState["benchmarkRange"];
+  isBenchmarkRunning: boolean;
+  lastSlowFrame: SlowFrameDiagnostic | null;
+  liveSeconds: PerformanceSecondBucket[];
+  liveSummary: PerformanceSummary;
+  nodeStats: PerformanceNodeStats;
 }
 
 const getNow = () => {
@@ -124,8 +163,81 @@ const toSummary = (frames: PerformanceFrameSample[]): PerformanceSummary => {
   };
 };
 
-const trimFrames = (frames: PerformanceFrameSample[]) => {
-  return frames.slice(-MAX_RECENT_FRAMES);
+const mergeFrameBuckets = (
+  target: Record<string, number>,
+  nextBuckets: Record<string, number>
+) => {
+  for (const [label, duration] of Object.entries(nextBuckets)) {
+    target[label] = (target[label] || 0) + duration;
+  }
+};
+
+const readStringMetadata = (value: unknown) => {
+  return typeof value === "string" ? value : undefined;
+};
+
+const readNumberMetadata = (value: unknown) => {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
+};
+
+const toTimelineAttribution = (entry: PerformanceEntry) => {
+  if (!("attribution" in entry && Array.isArray(entry.attribution))) {
+    return [];
+  }
+
+  return entry.attribution.map((item) => ({
+    containerId:
+      "containerId" in item ? readStringMetadata(item.containerId) : undefined,
+    containerName:
+      "containerName" in item
+        ? readStringMetadata(item.containerName)
+        : undefined,
+    containerSrc:
+      "containerSrc" in item
+        ? readStringMetadata(item.containerSrc)
+        : undefined,
+    containerType:
+      "containerType" in item
+        ? readStringMetadata(item.containerType)
+        : undefined,
+  }));
+};
+
+const toTimelineScripts = (entry: PerformanceEntry) => {
+  if (!("scripts" in entry && Array.isArray(entry.scripts))) {
+    return [];
+  }
+
+  return entry.scripts.map((script) => ({
+    durationMs:
+      "duration" in script ? readNumberMetadata(script.duration) : undefined,
+    forcedStyleAndLayoutDurationMs:
+      "forcedStyleAndLayoutDuration" in script
+        ? readNumberMetadata(script.forcedStyleAndLayoutDuration)
+        : undefined,
+    invoker:
+      "invoker" in script ? readStringMetadata(script.invoker) : undefined,
+    invokerType:
+      "invokerType" in script
+        ? readStringMetadata(script.invokerType)
+        : undefined,
+    pauseDurationMs:
+      "pauseDuration" in script
+        ? readNumberMetadata(script.pauseDuration)
+        : undefined,
+    sourceCharPosition:
+      "sourceCharPosition" in script
+        ? readNumberMetadata(script.sourceCharPosition)
+        : undefined,
+    sourceFunctionName:
+      "sourceFunctionName" in script
+        ? readStringMetadata(script.sourceFunctionName)
+        : undefined,
+    sourceURL:
+      "sourceURL" in script ? readStringMetadata(script.sourceURL) : undefined,
+  }));
 };
 
 const toSpanSummary = (samples: Map<string, number[]>) => {
@@ -166,13 +278,47 @@ export class PerformanceController {
 
   frameId = 0;
   liveCaptureRetainCount = 0;
+  liveFrameBuffer = new LiveFrameBuffer<PerformanceFrameSample>(
+    MAX_RECENT_FRAMES
+  );
+  liveFrameSummary = new LiveFrameSummary();
+  liveRecentSlowFrameBuffer = new LiveFrameBuffer<SlowFrameDiagnostic>(
+    MAX_RECENT_SLOW_FRAMES
+  );
+  liveRecentTimelineEntryBuffer = new LiveFrameBuffer<PerformanceTimelineEntry>(
+    MAX_RECENT_TIMELINE_ENTRIES
+  );
+  liveRecentSlowFrames: SlowFrameDiagnostic[] = [];
+  liveRecentSlowFramesDirty = false;
+  liveSecondBuffer = new LiveFrameBuffer<PerformanceSecondBucket>(120);
+  liveSecondBuckets: PerformanceSecondBucket[] = [];
+  liveSecondBucketsDirty = false;
   liveFrames: PerformanceFrameSample[] = [];
+  liveFramesDirty = false;
+  hudListeners = new Set<() => void>();
+  hudPublishTimeoutId = 0;
+  hudSnapshot: PerformanceHudSnapshot = {
+    benchmarkElapsedMs: 0,
+    benchmarkRange: null,
+    isBenchmarkRunning: false,
+    lastSlowFrame: null,
+    liveSeconds: [],
+    liveSummary: toSummary([]),
+    nodeStats: {
+      selectedNodeCount: 0,
+      totalNodeCount: 0,
+      visibleTextNodeCount: 0,
+    },
+  };
   liveSummary: PerformanceSummary = toSummary([]);
   listeners = new Set<() => void>();
   pendingBuckets = new Map<string, number>();
   pendingCounters = new Map<string, number>();
   previousTimestamp = 0;
-  publishTimeoutId = 0;
+  statePublishTimeoutId = 0;
+  timelineObserver: PerformanceObserver | null = null;
+  taskRecorder =
+    typeof window !== "undefined" ? new RuntimeTaskRecorder(window) : null;
   rafId = 0;
   runtimeActive = false;
   runningBenchmarkStartedAtMs = 0;
@@ -182,9 +328,11 @@ export class PerformanceController {
     benchmarkMessage: null,
     benchmarkRange: null,
     benchmarkStatus: "idle",
-    frames: [],
     hudOpen: false,
     lastResult: null,
+    recentSlowFrames: [],
+    recentTaskHotspots: [],
+    liveSeconds: [],
     liveSummary: toSummary([]),
     nodeStats: {
       selectedNodeCount: 0,
@@ -202,12 +350,30 @@ export class PerformanceController {
     };
   };
 
+  subscribeHud = (listener: () => void) => {
+    this.hudListeners.add(listener);
+
+    return () => {
+      this.hudListeners.delete(listener);
+    };
+  };
+
   getSnapshot = () => {
     return this.state;
   };
 
+  getHudSnapshot = () => {
+    return this.hudSnapshot;
+  };
+
   notify = () => {
     for (const listener of this.listeners) {
+      listener();
+    }
+  };
+
+  notifyHud = () => {
+    for (const listener of this.hudListeners) {
       listener();
     }
   };
@@ -222,6 +388,16 @@ export class PerformanceController {
       hudOpen,
     };
     this.notify();
+
+    if (hudOpen) {
+      this.flushHudSnapshot();
+      return;
+    }
+
+    if (typeof window !== "undefined" && this.hudPublishTimeoutId) {
+      window.clearTimeout(this.hudPublishTimeoutId);
+      this.hudPublishTimeoutId = 0;
+    }
   };
 
   toggleHud = () => {
@@ -244,7 +420,10 @@ export class PerformanceController {
       }
 
       released = true;
-      this.liveCaptureRetainCount = Math.max(0, this.liveCaptureRetainCount - 1);
+      this.liveCaptureRetainCount = Math.max(
+        0,
+        this.liveCaptureRetainCount - 1
+      );
       this.syncRuntimeActivity();
     };
   };
@@ -277,36 +456,287 @@ export class PerformanceController {
       ...this.state,
       nodeStats,
     };
-    this.notify();
+    this.scheduleStatePublish();
+    this.scheduleHudPublish();
   };
 
-  flushLiveSnapshot = () => {
-    if (this.publishTimeoutId && typeof window !== "undefined") {
-      window.clearTimeout(this.publishTimeoutId);
-      this.publishTimeoutId = 0;
+  getLiveFramesSnapshot = () => {
+    if (!this.liveFramesDirty) {
+      return this.liveFrames;
     }
 
-    this.state = {
-      ...this.state,
-      frames: this.liveFrames,
-      liveSummary: this.liveSummary,
-    };
-    this.notify();
+    this.liveFrames = this.liveFrameBuffer.toArray();
+    this.liveFramesDirty = false;
+
+    return this.liveFrames;
   };
 
-  scheduleLivePublish = () => {
+  getLiveSummarySnapshot = () => {
+    this.liveSummary = this.liveFrameSummary.getSummary(
+      this.getLiveFramesSnapshot()
+    );
+    return this.liveSummary;
+  };
+
+  getLiveSecondBucketsSnapshot = () => {
+    if (!this.liveSecondBucketsDirty) {
+      return this.liveSecondBuckets;
+    }
+
+    this.liveSecondBuckets = this.liveSecondBuffer.toArray();
+    this.liveSecondBucketsDirty = false;
+
+    return this.liveSecondBuckets;
+  };
+
+  getRecentSlowFramesSnapshot = () => {
+    if (!this.liveRecentSlowFramesDirty) {
+      return this.liveRecentSlowFrames;
+    }
+
+    this.liveRecentSlowFrames = this.liveRecentSlowFrameBuffer.toArray();
+    this.liveRecentSlowFramesDirty = false;
+
+    return this.liveRecentSlowFrames;
+  };
+
+  getFrameTimelineEntries = (frame: PerformanceFrameSample) => {
+    const frameStartMs = frame.timestamp - frame.durationMs;
+    const minimumStartTime = Math.max(
+      0,
+      frameStartMs - SLOW_FRAME_TIMELINE_LOOKBACK_MS
+    );
+
+    return this.liveRecentTimelineEntryBuffer.toArray().filter((entry) => {
+      return (
+        entry.startTime < frame.timestamp && entry.endTime > minimumStartTime
+      );
+    });
+  };
+
+  getFrameTaskRuns = (frame: PerformanceFrameSample) => {
+    if (!this.taskRecorder) {
+      return {
+        overlappingTasks: [] as RuntimeTaskRun[],
+        recentTaskHotspots: [] as RuntimeTaskHotspot[],
+        recentTasks: [] as RuntimeTaskRun[],
+      };
+    }
+
+    const frameStartMs = frame.timestamp - frame.durationMs;
+    const taskRuns = this.taskRecorder.getRecentRunsSince(
+      Math.max(0, frame.timestamp - SLOW_FRAME_TASK_LOOKBACK_MS)
+    );
+    const recentTasks = taskRuns.slice(-MAX_SLOW_FRAME_TASKS);
+    const overlappingTasks = taskRuns
+      .filter((task) => {
+        return task.startedAt < frame.timestamp && task.endedAt > frameStartMs;
+      })
+      .slice(-MAX_SLOW_FRAME_TASKS);
+
+    return {
+      overlappingTasks,
+      recentTaskHotspots: this.taskRecorder
+        .getTopHotspots(taskRuns)
+        .slice(0, 3),
+      recentTasks,
+    };
+  };
+
+  getWindowFocus = () => {
+    if (typeof document === "undefined") {
+      return true;
+    }
+
+    return document.hasFocus();
+  };
+
+  getWindowVisibilityState = (): DocumentVisibilityState | "unknown" => {
+    if (typeof document === "undefined") {
+      return "unknown";
+    }
+
+    return document.visibilityState;
+  };
+
+  observeTimelineEntries = () => {
     if (
-      typeof window === "undefined" ||
-      this.publishTimeoutId ||
-      this.state.benchmarkStatus === "running"
+      typeof PerformanceObserver === "undefined" ||
+      this.timelineObserver ||
+      !Array.isArray(PerformanceObserver.supportedEntryTypes)
     ) {
       return;
     }
 
-    this.publishTimeoutId = window.setTimeout(() => {
-      this.publishTimeoutId = 0;
-      this.flushLiveSnapshot();
-    }, LIVE_PUBLISH_INTERVAL_MS);
+    const supportedEntryTypes = PerformanceObserver.supportedEntryTypes.filter(
+      (entryType) =>
+        entryType === "long-animation-frame" || entryType === "longtask"
+    );
+
+    if (supportedEntryTypes.length === 0) {
+      return;
+    }
+
+    this.timelineObserver = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        this.liveRecentTimelineEntryBuffer.append({
+          attribution: toTimelineAttribution(entry),
+          blockingDurationMs:
+            "blockingDuration" in entry
+              ? readNumberMetadata(entry.blockingDuration)
+              : undefined,
+          durationMs: entry.duration,
+          endTime: entry.startTime + entry.duration,
+          entryType: entry.entryType,
+          name: entry.name,
+          scripts: toTimelineScripts(entry),
+          startTime: entry.startTime,
+        });
+      }
+    });
+    this.timelineObserver.observe({
+      entryTypes: supportedEntryTypes,
+    });
+  };
+
+  disconnectTimelineObserver = () => {
+    this.timelineObserver?.disconnect();
+    this.timelineObserver = null;
+  };
+
+  recordSlowFrame = (frame: PerformanceFrameSample) => {
+    if (!(frame.durationMs > SLOW_FRAME_THRESHOLD_MS)) {
+      return;
+    }
+
+    const { overlappingTasks, recentTaskHotspots, recentTasks } =
+      this.getFrameTaskRuns(frame);
+
+    this.liveRecentSlowFrameBuffer.append(
+      createSlowFrameDiagnostic({
+        frame,
+        isFocused: this.getWindowFocus(),
+        overlappingTasks,
+        recentTaskHotspots,
+        recentTasks,
+        timelineEntries: this.getFrameTimelineEntries(frame),
+        visibilityState: this.getWindowVisibilityState(),
+      })
+    );
+    this.liveRecentSlowFramesDirty = true;
+    this.scheduleHudPublish({ immediate: true });
+    this.scheduleStatePublish();
+  };
+
+  recordFrameSecondBucket = (frame: PerformanceFrameSample) => {
+    const secondId = Math.floor(frame.timestamp / 1000);
+    const buckets = this.getLiveSecondBucketsSnapshot();
+    const lastSecondBucket = buckets.at(-1);
+
+    if (!(lastSecondBucket && lastSecondBucket.id === secondId)) {
+      this.liveSecondBuffer.append({
+        avgMs: frame.durationMs,
+        frameCount: 1,
+        id: secondId,
+        maxMs: frame.durationMs,
+        mergedBuckets: { ...frame.buckets },
+        slowCount: frame.durationMs > SLOW_FRAME_THRESHOLD_MS ? 1 : 0,
+      });
+      this.liveSecondBucketsDirty = true;
+      return;
+    }
+
+    const nextFrameCount = lastSecondBucket.frameCount + 1;
+    lastSecondBucket.avgMs =
+      (lastSecondBucket.avgMs * lastSecondBucket.frameCount +
+        frame.durationMs) /
+      nextFrameCount;
+    lastSecondBucket.frameCount = nextFrameCount;
+    lastSecondBucket.maxMs = Math.max(lastSecondBucket.maxMs, frame.durationMs);
+    lastSecondBucket.slowCount +=
+      frame.durationMs > SLOW_FRAME_THRESHOLD_MS ? 1 : 0;
+    mergeFrameBuckets(lastSecondBucket.mergedBuckets, frame.buckets);
+  };
+
+  buildHudSnapshot = (): PerformanceHudSnapshot => {
+    const liveSeconds = this.getLiveSecondBucketsSnapshot();
+    const recentSlowFrames = this.getRecentSlowFramesSnapshot();
+    const liveSummary = this.getLiveSummarySnapshot();
+
+    return {
+      benchmarkElapsedMs: this.state.benchmarkElapsedMs,
+      benchmarkRange: this.state.benchmarkRange,
+      isBenchmarkRunning: this.state.benchmarkStatus === "running",
+      lastSlowFrame: recentSlowFrames.at(-1) || null,
+      liveSeconds,
+      liveSummary,
+      nodeStats: this.state.nodeStats,
+    };
+  };
+
+  flushHudSnapshot = () => {
+    if (this.hudPublishTimeoutId && typeof window !== "undefined") {
+      window.clearTimeout(this.hudPublishTimeoutId);
+      this.hudPublishTimeoutId = 0;
+    }
+
+    this.hudSnapshot = this.buildHudSnapshot();
+    this.notifyHud();
+  };
+
+  flushStateSnapshot = () => {
+    if (this.statePublishTimeoutId && typeof window !== "undefined") {
+      window.clearTimeout(this.statePublishTimeoutId);
+      this.statePublishTimeoutId = 0;
+    }
+
+    const liveSeconds = this.getLiveSecondBucketsSnapshot();
+    const recentSlowFrames = this.getRecentSlowFramesSnapshot();
+    const liveSummary = this.getLiveSummarySnapshot();
+    const recentTaskHotspots = this.taskRecorder?.getTopHotspots() || [];
+
+    this.state = {
+      ...this.state,
+      recentSlowFrames,
+      recentTaskHotspots,
+      liveSeconds,
+      liveSummary,
+    };
+    this.notify();
+  };
+
+  scheduleHudPublish = ({ immediate = false } = {}) => {
+    if (typeof window === "undefined" || !this.state.hudOpen) {
+      return;
+    }
+
+    if (immediate && this.hudPublishTimeoutId) {
+      window.clearTimeout(this.hudPublishTimeoutId);
+      this.hudPublishTimeoutId = 0;
+    }
+
+    if (this.hudPublishTimeoutId) {
+      return;
+    }
+
+    this.hudPublishTimeoutId = window.setTimeout(
+      () => {
+        this.hudPublishTimeoutId = 0;
+        this.flushHudSnapshot();
+      },
+      immediate ? 0 : LIVE_HUD_PUBLISH_INTERVAL_MS
+    );
+  };
+
+  scheduleStatePublish = () => {
+    if (typeof window === "undefined" || this.statePublishTimeoutId) {
+      return;
+    }
+
+    this.statePublishTimeoutId = window.setTimeout(() => {
+      this.statePublishTimeoutId = 0;
+      this.flushStateSnapshot();
+    }, LIVE_STATE_PUBLISH_INTERVAL_MS);
   };
 
   startBenchmarkTimer = () => {
@@ -467,7 +897,8 @@ export class PerformanceController {
     };
     this.notify();
     this.syncRuntimeActivity();
-    this.flushLiveSnapshot();
+    this.flushStateSnapshot();
+    this.flushHudSnapshot();
     this.startBenchmarkTimer();
 
     try {
@@ -522,9 +953,12 @@ export class PerformanceController {
       return result;
     } finally {
       this.stopBenchmarkTimer();
-      editor.newDocument();
-      await this.waitForFrames(1);
-      this.flushLiveSnapshot();
+      if (benchmark.usesScratchDocument !== false) {
+        editor.newDocument();
+        await this.waitForFrames(1);
+      }
+      this.flushStateSnapshot();
+      this.flushHudSnapshot();
       this.syncRuntimeActivity();
     }
   };
@@ -543,14 +977,18 @@ export class PerformanceController {
       this.pendingBuckets.clear();
       this.pendingCounters.clear();
 
-      this.liveFrames = trimFrames([...this.liveFrames, frame]);
-      this.liveSummary = toSummary(this.liveFrames);
+      const evictedFrame = this.liveFrameBuffer.append(frame);
+      this.liveFramesDirty = true;
+      this.liveFrameSummary.append({ evictedFrame, frame });
+      this.recordSlowFrame(frame);
+      this.recordFrameSecondBucket(frame);
 
       if (this.activeCollection) {
         this.activeCollection.frames.push(frame);
       }
 
-      this.scheduleLivePublish();
+      this.scheduleHudPublish();
+      this.scheduleStatePublish();
     }
 
     this.previousTimestamp = timestamp;
@@ -562,12 +1000,14 @@ export class PerformanceController {
       return;
     }
 
+    this.observeTimelineEntries();
     this.rafId = window.requestAnimationFrame(this.handleAnimationFrame);
   };
 
   syncRuntimeActivity = () => {
     const shouldBeActive =
-      this.liveCaptureRetainCount > 0 || this.state.benchmarkStatus === "running";
+      this.liveCaptureRetainCount > 0 ||
+      this.state.benchmarkStatus === "running";
 
     if (shouldBeActive === this.runtimeActive) {
       return;
@@ -580,35 +1020,75 @@ export class PerformanceController {
         incrementCounter: this.incrementCounter,
         recordDuration: this.recordDuration,
       });
+      this.taskRecorder?.install();
       this.start();
       this.notify();
       return;
     }
 
     setPerfSink(null);
+    this.taskRecorder?.uninstall();
     this.stop();
     this.notify();
   };
 
   stop = () => {
-    if (!(typeof window !== "undefined" && this.rafId)) {
+    this.pendingBuckets.clear();
+    this.pendingCounters.clear();
+    this.previousTimestamp = 0;
+
+    if (typeof window === "undefined") {
       return;
     }
 
-    if (this.publishTimeoutId) {
-      window.clearTimeout(this.publishTimeoutId);
-      this.publishTimeoutId = 0;
+    if (this.hudPublishTimeoutId) {
+      window.clearTimeout(this.hudPublishTimeoutId);
+      this.hudPublishTimeoutId = 0;
     }
 
+    if (this.statePublishTimeoutId) {
+      window.clearTimeout(this.statePublishTimeoutId);
+      this.statePublishTimeoutId = 0;
+    }
+
+    this.disconnectTimelineObserver();
     this.stopBenchmarkTimer();
-    window.cancelAnimationFrame(this.rafId);
+    if (this.rafId) {
+      window.cancelAnimationFrame(this.rafId);
+    }
     this.rafId = 0;
-    this.previousTimestamp = 0;
   };
 
   dispose = () => {
     this.liveCaptureRetainCount = 0;
     this.runtimeActive = false;
+    this.liveFrameBuffer.clear();
+    this.liveRecentSlowFrameBuffer.clear();
+    this.liveRecentTimelineEntryBuffer.clear();
+    this.liveRecentSlowFrames = [];
+    this.liveRecentSlowFramesDirty = false;
+    this.liveSecondBuffer.clear();
+    this.liveSecondBuckets = [];
+    this.liveSecondBucketsDirty = false;
+    this.liveFrames = [];
+    this.liveFramesDirty = false;
+    this.liveFrameSummary.clear();
+    this.liveSummary = toSummary([]);
+    this.hudSnapshot = {
+      benchmarkElapsedMs: 0,
+      benchmarkRange: null,
+      isBenchmarkRunning: false,
+      lastSlowFrame: null,
+      liveSeconds: [],
+      liveSummary: toSummary([]),
+      nodeStats: {
+        selectedNodeCount: 0,
+        totalNodeCount: 0,
+        visibleTextNodeCount: 0,
+      },
+    };
+    this.taskRecorder?.clear();
+    this.taskRecorder?.uninstall();
     setPerfSink(null);
     this.stop();
   };

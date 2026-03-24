@@ -1,8 +1,8 @@
 import { useEffect } from "react";
-import { usePerformance } from "./use-performance";
+import { usePerformanceController } from "./use-performance-controller";
 
 export const usePerformanceLiveCapture = (enabled = true) => {
-  const { controller } = usePerformance();
+  const controller = usePerformanceController();
 
   useEffect(() => {
     if (!enabled) {

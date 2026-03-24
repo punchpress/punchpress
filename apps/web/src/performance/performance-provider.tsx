@@ -1,7 +1,10 @@
 import { shouldIgnoreGlobalShortcutTarget } from "@punchpress/engine";
 import { createContext, useEffect, useState } from "react";
 import { useEditor } from "../editor-react/use-editor";
-import { performanceBenchmarks } from "./performance-benchmarks";
+import {
+  findPerformanceBenchmark,
+  performanceBenchmarks,
+} from "./performance-benchmarks";
 import { PerformanceController } from "./performance-controller";
 
 export const PerformanceContext = createContext<PerformanceController | null>(
@@ -56,7 +59,8 @@ export const PerformanceProvider = ({ children }) => {
     });
     const unsubscribeStore = editor.store.subscribe((state) => {
       const nodesChanged = state.nodes !== previousNodes;
-      const selectionChanged = state.selectedNodeIds !== previousSelectedNodeIds;
+      const selectionChanged =
+        state.selectedNodeIds !== previousSelectedNodeIds;
 
       previousNodes = state.nodes;
       previousSelectedNodeIds = state.selectedNodeIds;
@@ -102,6 +106,7 @@ export const PerformanceProvider = ({ children }) => {
       __PUNCHPRESS_PERF__?: {
         getSnapshot: () => ReturnType<PerformanceController["getSnapshot"]>;
         listBenchmarks: () => typeof performanceBenchmarks;
+        setHudOpen: (open: boolean) => void;
         runBenchmark: (
           benchmarkId: string
         ) => ReturnType<PerformanceController["runBenchmark"]>;
@@ -112,10 +117,9 @@ export const PerformanceProvider = ({ children }) => {
     win.__PUNCHPRESS_PERF__ = {
       getSnapshot: controller.getSnapshot,
       listBenchmarks: () => performanceBenchmarks,
+      setHudOpen: controller.setHudOpen,
       runBenchmark: (benchmarkId: string) => {
-        const benchmark = performanceBenchmarks.find(
-          (candidate) => candidate.id === benchmarkId
-        );
+        const benchmark = findPerformanceBenchmark(benchmarkId);
 
         if (!benchmark) {
           throw new Error(`Unknown benchmark: ${benchmarkId}`);
