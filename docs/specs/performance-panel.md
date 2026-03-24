@@ -17,8 +17,22 @@ responsiveness and running repeatable performance checks.
 
 - The panel shows a live view of recent frame timing while the editor is in
   use.
+- The live view should stay lightweight enough that leaving the panel open for
+  a while does not meaningfully distort the editor responsiveness it is meant
+  to measure.
+- The live chart may stay visible for visual feedback, but it should render
+  from pre-aggregated buckets rather than reprocessing raw frame history on
+  every update.
+- The always-on docked HUD should behave like a measurement surface rather
+  than normal app UI: coarse refresh cadence, minimal React involvement, and
+  enough isolation that it does not create the idle spikes it is showing.
 - The live view should make slow frames obvious instead of relying on a single
   aggregate FPS number.
+- The live view should help explain slow frames, including whether they
+  correlate with instrumented editor work, browser timeline events, or a
+  hidden/unfocused window state.
+- The panel should correlate slow frames with recent recurring renderer tasks
+  such as timers, animation-frame loops, or idle callbacks.
 - The panel should break recent frame cost into meaningful categories so users
   can understand where time is going during interaction.
 - The panel should surface enough context to interpret the data, including

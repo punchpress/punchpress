@@ -52,53 +52,78 @@ const waitForGeometryReady = async (
 };
 
 export const textDragBenchmark: PerformanceBenchmarkDefinition = {
-  defaultOptions: {
-    frames: 180,
+  ...createTextDragBenchmark({
+    id: "text-nodes-dragging-50",
+    label: "Text Nodes Dragging (50)",
     nodeCount: 50,
-    stepX: 11,
-    stepY: 3,
-    warmupFrames: 18,
-  },
-  description:
-    "Builds a scratch text scene and drags the selection for a fixed 180-frame pass.",
-  id: "text-drag-grid",
-  label: "Drag Text Grid",
-  setup: async ({ editor, options, waitForFrame, waitForFrames }) => {
-    const nodes = createBenchmarkNodes(options.nodeCount);
-
-    editor.loadDocument(saveDesignDocument(nodes).contents);
-    editor.setSelectedNodes(nodes.map((node) => node.id));
-    await waitForFrame();
-    await waitForGeometryReady(
-      editor,
-      nodes.map((node) => node.id),
-      waitForFrame
-    );
-    await waitForFrames(2);
-  },
-  run: async ({ editor, options, waitForFrame }) => {
-    const dragSession = editor.beginSelectionDrag({
-      nodeIds: editor.selectedNodeIds,
-    });
-
-    if (!dragSession) {
-      throw new Error("Unable to start the drag benchmark session.");
-    }
-
-    try {
-      for (let index = 0; index < options.frames; index += 1) {
-        await waitForFrame();
-
-        editor.updateSelectionDrag(dragSession, {
-          delta: {
-            x: index % 2 === 0 ? options.stepX : -options.stepX * 0.82,
-            y: index % 3 === 0 ? options.stepY : -options.stepY * 0.35,
-          },
-          queueRefresh: true,
-        });
-      }
-    } finally {
-      editor.endSelectionDrag(dragSession);
-    }
-  },
+  }),
 };
+
+export const textDragBenchmarkLarge: PerformanceBenchmarkDefinition =
+  createTextDragBenchmark({
+    id: "text-nodes-dragging-500",
+    label: "Text Nodes Dragging (500)",
+    nodeCount: 500,
+  });
+
+function createTextDragBenchmark({
+  id,
+  label,
+  nodeCount,
+}: {
+  id: string;
+  label: string;
+  nodeCount: number;
+}): PerformanceBenchmarkDefinition {
+  return {
+    defaultOptions: {
+      frames: 180,
+      nodeCount,
+      stepX: 11,
+      stepY: 3,
+      warmupFrames: 18,
+    },
+    description: `Builds a scratch ${nodeCount}-node text scene and drags the selection for a fixed 180-frame pass.`,
+    id,
+    label,
+    setup: async ({ editor, options, waitForFrame, waitForFrames }) => {
+      const nodes = createBenchmarkNodes(options.nodeCount);
+
+      editor.loadDocument(saveDesignDocument(nodes).contents);
+      editor.setSelectedNodes(nodes.map((node) => node.id));
+      await waitForFrame();
+      await waitForGeometryReady(
+        editor,
+        nodes.map((node) => node.id),
+        waitForFrame
+      );
+      await waitForFrames(2);
+    },
+    run: async ({ editor, options, waitForFrame }) => {
+      const dragSession = editor.beginSelectionDrag({
+        nodeIds: editor.selectedNodeIds,
+      });
+
+      if (!dragSession) {
+        throw new Error("Unable to start the drag benchmark session.");
+      }
+
+      try {
+        for (let index = 0; index < options.frames; index += 1) {
+          await waitForFrame();
+
+          editor.updateSelectionDrag(dragSession, {
+            delta: {
+              x: index % 2 === 0 ? options.stepX : -options.stepX * 0.82,
+              y: index % 3 === 0 ? options.stepY : -options.stepY * 0.35,
+            },
+            queueRefresh: true,
+          });
+        }
+      } finally {
+        editor.endSelectionDrag(dragSession);
+      }
+    },
+    usesScratchDocument: true,
+  };
+}

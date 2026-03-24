@@ -1,18 +1,9 @@
-import { useContext, useSyncExternalStore } from "react";
-import { PerformanceContext } from "./performance-provider";
+import { usePerformanceController } from "./use-performance-controller";
+import { usePerformanceValue } from "./use-performance-value";
 
 export const usePerformance = () => {
-  const controller = useContext(PerformanceContext);
-
-  if (!controller) {
-    throw new Error("usePerformance must be used within PerformanceProvider");
-  }
-
-  const state = useSyncExternalStore(
-    controller.subscribe,
-    controller.getSnapshot,
-    controller.getSnapshot
-  );
+  const controller = usePerformanceController();
+  const state = usePerformanceValue((snapshot) => snapshot);
 
   return {
     controller,

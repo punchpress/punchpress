@@ -30,7 +30,12 @@
     "test:editor:watch": "bun test --watch apps/web/tests/editor-contract",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "test:performance": "playwright test --config playwright.performance.config.ts",
+    "test:performance:headed": "playwright test --config playwright.performance.config.ts --headed",
+    "test:performance:trace": "PUNCHPRESS_CAPTURE_CHROME_TRACE=1 playwright test --config playwright.performance.config.ts --headed",
+    "test:performance:desktop": "playwright test --config playwright.desktop-performance.config.ts",
+    "test:performance:desktop:trace": "PUNCHPRESS_CAPTURE_ELECTRON_TRACE=1 playwright test --config playwright.desktop-performance.config.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2"
