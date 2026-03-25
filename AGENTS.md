@@ -2,7 +2,7 @@
 
 AI-powered design tool for Print on Demand. See `README.md` for full product context.
 
-Bun-workspace monorepo: `apps/web` (Vite + React editor), `apps/desktop` (Electrobun shell). Runtime stack is React, Zustand, and opentype.js.
+Bun-workspace monorepo: `packages/engine` (headless editor), `packages/punch-schema` (document schema), `apps/web` (Vite + React editor), and `apps/desktop` (Electron shell). Runtime stack is React, Zustand, and opentype.js.
 
 Use these standards for new code and touched code during refactors.
 
@@ -54,12 +54,13 @@ Use these standards for new code and touched code during refactors.
 See `docs/architecture/codebase-structure.md` for the current code layout and layer rationale.
 See `docs/architecture/editor-operating-model.md` for the conceptual model of editor land, React land, and automation.
 
-The editor follows a three-layer architecture inspired by tldraw:
+The editor follows a five-layer architecture:
 
 1. **Engine core** (`packages/engine/src/`) — Plain TypeScript `Editor` class. Owns state, tools, managers, node logic, transforms, geometry, and export behavior. No React imports.
 2. **Schema/document layer** (`packages/punch-schema/src/`) — `.punch` schema, parse/load/save/migrate helpers, and shared font descriptor utilities.
 3. **React bindings** (`apps/web/src/editor-react/`) — `EditorProvider`, `useEditor()`, and `useEditorValue(selector)` bridge the engine to React.
 4. **Components** (`apps/web/src/components/`) — Flat siblings under `canvas/` and `panels/`. Each calls `useEditor()` directly. No prop drilling for editor state.
+5. **Platform layer** (`apps/web/src/platform/` and desktop shell boundaries) — Browser and Electron capabilities such as file flows, recent documents, local font access, and command bridges.
 
 The editor is the product engine. Put durable behavior in the editor, not in React.
 React is a client of the editor: it renders editor state and translates GUI interactions into editor commands.
