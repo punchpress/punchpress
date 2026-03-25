@@ -21,9 +21,11 @@ export {
   isContainerNode,
   isDescendantOf,
   isGroupNode,
+  isSquareNode,
   isTextNode,
   rebuildTreeOrder,
 } from "./nodes/node-tree";
+export { createDefaultSquareNode } from "./nodes/square/model";
 export {
   createDefaultNode,
   createId,

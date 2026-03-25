@@ -80,7 +80,7 @@ export const getNodeIdsFromSelectionRect = (editor, rect) => {
   const bottom = rect.bottom ?? rect.top + rect.height;
 
   return editor.nodes
-    .filter((node) => node.type === "text")
+    .filter((node) => node.type !== "group")
     .filter((node) => editor.isNodeEffectivelyVisible(node.id))
     .map((node) => node.id)
     .filter((nodeId) => {

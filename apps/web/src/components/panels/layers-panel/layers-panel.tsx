@@ -2,6 +2,7 @@ import { useState } from "react";
 import { SortableItem, SortableList } from "@/components/ui/sortable-list";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
+import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
 import { SettingsDialog } from "../../settings-dialog";
 import { useDocumentCommands } from "../document-commands/use-document-commands";
 import { MissingFontsExportDialog } from "../missing-fonts-export-dialog";
@@ -13,6 +14,7 @@ import { getDuplicateRecentDocumentNames } from "./recent-documents";
 import { RecentDocumentsMenu } from "./recent-documents-menu";
 
 export const LayersPanel = () => {
+  usePerformanceRenderCounter("render.panel.layers");
   const editor = useEditor();
   const layerNodeIds = useEditorValue((editor) => editor.layerNodeIds);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);

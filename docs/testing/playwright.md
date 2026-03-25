@@ -16,6 +16,15 @@ Use this when the real browser path matters.
 - catches bugs at the React, DOM, and browser boundary
 - covers visual problems that do not show up in editor state alone
 
+## Rules Of Thumb
+
+- Use the real visible surface in assertions when possible. Prefer the actual
+  overlay box, guide, or handle the user sees over indirect proxies.
+- When a bug is highly interaction-specific, reproduce the exact user path in
+  the test before fixing it instead of approximating with a simplified setup.
+- Keep browser tests focused on browser truth: geometry, visibility, pointer
+  routing, focus, and coordinate-space correctness.
+
 ## Keep It Narrow
 
 Do not use Playwright to carry the full weight of editor correctness.

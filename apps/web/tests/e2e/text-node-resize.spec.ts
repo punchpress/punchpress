@@ -5,11 +5,66 @@ import {
   gotoEditor,
   loadDocumentFixture,
   pauseForUi,
-  resizeSelectionFromCorner,
   waitForNodeReady,
   waitForSelectionHandles,
   zoomIn,
 } from "./helpers/editor";
+
+const resizeSingleNodeFromCorner = async (page, { corner, drag }) => {
+  await page.evaluate(
+    async ({ corner, drag }) => {
+      const handle = document.querySelector(
+        `.canvas-single-node-transform-overlay .moveable-control.moveable-${corner}`
+      );
+      const rect = handle?.getBoundingClientRect?.();
+
+      if (!(handle instanceof Element && rect)) {
+        throw new Error(`Missing ${corner} single-node resize handle`);
+      }
+
+      const start = {
+        x: rect.x + rect.width / 2,
+        y: rect.y + rect.height / 2,
+      };
+      const end = {
+        x: start.x + (drag?.x || 0),
+        y: start.y + (drag?.y || 0),
+      };
+      const dispatchPointer = (target, type, point, buttons) => {
+        target.dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            button: 0,
+            buttons,
+            clientX: point.x,
+            clientY: point.y,
+            pointerId: 1,
+            pointerType: "mouse",
+          })
+        );
+      };
+
+      dispatchPointer(handle, "pointerdown", start, 1);
+
+      for (let step = 1; step <= 24; step += 1) {
+        const progress = step / 24;
+        dispatchPointer(
+          window,
+          "pointermove",
+          {
+            x: start.x + (end.x - start.x) * progress,
+            y: start.y + (end.y - start.y) * progress,
+          },
+          1
+        );
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+
+      dispatchPointer(window, "pointerup", end, 0);
+    },
+    { corner, drag }
+  );
+};
 
 test("resizes a text node and keeps the selection aligned through zoom", async ({
   page,
@@ -23,7 +78,7 @@ test("resizes a text node and keeps the selection aligned through zoom", async (
   const before = await waitForNodeReady(page, nodeId);
   await pauseForUi(page);
 
-  await resizeSelectionFromCorner(page, {
+  await resizeSingleNodeFromCorner(page, {
     corner: "se",
     drag: { x: 56, y: 56 },
   });
@@ -85,5 +140,51 @@ test("resizes a text node and keeps the selection aligned through zoom", async (
     selectionAtZoom.handles.se,
     afterZoom.elementRect,
     "se"
+  );
+});
+
+test("resizing from the lower-left corner keeps the upper-right corner anchored", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocumentFixture(page, "text-node-move.punch");
+  const nodeId = "move-node";
+
+  await page.locator(`[data-node-id="${nodeId}"]`).click();
+
+  const before = await waitForNodeReady(page, nodeId);
+  await pauseForUi(page);
+
+  await resizeSingleNodeFromCorner(page, {
+    corner: "sw",
+    drag: { x: -56, y: 56 },
+  });
+  await pauseForUi(page);
+
+  const afterResize = await waitForNodeReady(page, nodeId);
+
+  expect(afterResize.fontSize).toBeGreaterThan(before.fontSize);
+  expect(afterResize.elementRect.width).toBeGreaterThan(
+    before.elementRect.width
+  );
+  expect(afterResize.elementRect.height).toBeGreaterThan(
+    before.elementRect.height
+  );
+  expect(afterResize.elementRect.right).toBeCloseTo(
+    before.elementRect.right,
+    1
+  );
+  expect(afterResize.elementRect.top).toBeCloseTo(before.elementRect.top, 1);
+
+  const selection = await waitForSelectionHandles(page);
+  expectHandleAlignedToNodeCorner(
+    selection.handles.ne,
+    afterResize.elementRect,
+    "ne"
+  );
+  expectHandleAlignedToNodeCorner(
+    selection.handles.sw,
+    afterResize.elementRect,
+    "sw"
   );
 });

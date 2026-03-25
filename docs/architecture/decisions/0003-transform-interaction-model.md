@@ -25,26 +25,25 @@ The durable rules are:
 
 ## Visual Rules
 
-- keep react-moveable's stock control box as the base transform UI
+- keep the editor-owned transform box as the base transform UI
 - keep the default rotation cursor for now
-- during drag and rotation, dim the control box to a low-contrast grey state instead of replacing its full interaction model
-- keep that dimming moderate enough that the transform box still reads while interacting
-- for multi-selection rotation specifically, it is acceptable to render a passive preview box during the gesture if that is needed to avoid visible pointerup jumps
+- keep the same corner-handle look across single-node, multi-selection, group, and path-edit transforms
+- keep the live transform box visible during pointer-driven transforms instead of swapping to a separate preview surface
 
 ## Rejected Shortcuts
 
 - do not add heavy snapping or aggressive rounding tricks just to make the box look cleaner if they make transforms feel worse
 - do not animate the live transform box during pointer-driven transforms
 - do not re-enable the stem handle just to simplify tests
-- do not force Moveable to recompute its own rect mid-gesture if that destabilizes pointer behavior
+- do not introduce separate transform surfaces for different selection types if the same editor-owned overlay can cover them honestly
 
 ## Rationale
 
 - A shared model across single and multi-selection transforms makes the editor easier to learn.
 - Corner-perimeter rotation removes the extra visual noise of a dedicated stem handle.
 - Opposite-corner anchored resize preserves spatial intuition for rotated content.
-- Moderate dimming reduces stock Moveable artifacts without hiding the interaction model entirely.
-- The preview-box escape hatch is explicitly allowed only to stabilize group rotation, not as a general custom-transform rewrite.
+- One editor-owned overlay model keeps interaction behavior and styling aligned across node and group transforms.
+- A live overlay that is driven directly from editor geometry removes third-party rect synchronization issues.
 
 ## Testing Guidance
 
@@ -57,5 +56,7 @@ The durable rules are:
 The current implementation lives in:
 
 - `apps/web/src/components/canvas/canvas-overlay.tsx`
+- `apps/web/src/components/canvas/canvas-overlay/canvas-single-node-transform-overlay.tsx`
+- `apps/web/src/components/canvas/canvas-overlay/canvas-multi-node-transform-overlay.tsx`
 - `apps/web/src/styles/canvas-vendor.css`
 - `apps/web/tests/e2e/text-node-rotate.spec.ts`

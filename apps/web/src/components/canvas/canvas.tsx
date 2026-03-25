@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef } from "react";
 import InfiniteViewer from "react-infinite-viewer";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
+import { shouldDisableCanvasOverlay } from "../../performance/performance-url-flags";
 import { DesignerFloatingToolbar, DesignerFrame } from "../designer/designer";
 import { CanvasNodes } from "./canvas-nodes";
 import { CanvasOverlay } from "./canvas-overlay/canvas-overlay";
@@ -29,6 +30,7 @@ export const Canvas = () => {
   const activeTool = useEditorValue((_, state) => state.activeTool);
   const spacePressed = useEditorValue((_, state) => state.spacePressed);
   const zoom = useEditorValue((_, state) => state.viewport.zoom);
+  const shouldRenderOverlay = !shouldDisableCanvasOverlay();
 
   const viewerRef = useRef(null);
   const hostRef = useRef(null);
@@ -143,7 +145,7 @@ export const Canvas = () => {
           <CanvasToolbar />
         </DesignerFloatingToolbar>
 
-        <CanvasOverlay />
+        {shouldRenderOverlay ? <CanvasOverlay /> : null}
       </div>
     </DesignerFrame>
   );

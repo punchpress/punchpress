@@ -1,14 +1,10 @@
 import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
-import { getHostRectFromCanvasBounds } from "./canvas-overlay-geometry";
 import { getTransformFlags } from "./canvas-overlay-interactions";
 
 const EMPTY_PREVIEW = { x: 0, y: 0 };
 
-export const useCanvasTransformState = (
-  editor,
-  isGroupRotationPreviewVisible
-) => {
+export const useCanvasTransformState = (editor) => {
   const activeTool = useEditorValue((_, state) => state.activeTool);
   const editingNodeId = useEditorValue((_, state) => state.editingNodeId);
   const pathEditingNodeId = useEditorValue(
@@ -49,22 +45,6 @@ export const useCanvasTransformState = (
   const selectedBounds = useEditorSurfaceValue((editor) => {
     return editor.getSelectionBounds(effectiveSelectedNodeIds);
   });
-  const selectedTargets = effectiveSelectedNodeIds
-    .filter((nodeId) => editor.isNodeEffectivelyVisible(nodeId))
-    .map((nodeId) => {
-      if (pathEditingNodeId === nodeId && isTextPathPositioning) {
-        return null;
-      }
-
-      if (pathEditingNodeId === nodeId) {
-        return editor.getNodeTransformElement(nodeId);
-      }
-
-      return (
-        editor.getNodeTransformElement(nodeId) || editor.getNodeElement(nodeId)
-      );
-    })
-    .filter(Boolean);
   const selectionFrameKey = useEditorSurfaceValue((editor) => {
     return editor.getSelectionFrameKey(effectiveSelectedNodeIds);
   });
@@ -75,8 +55,6 @@ export const useCanvasTransformState = (
   });
   const zoom = useEditorValue((editor) => editor.zoom);
 
-  const visibleSelectedNodeId = visibleSelectedNodeIds.at(-1) || null;
-  const selectedTarget = selectedTargets[0] || null;
   const hasGroupSelection =
     effectiveSelectedNodeIds.length > 1 || selectedNode?.type === "group";
   const isPathEditingSelection = Boolean(
@@ -84,42 +62,34 @@ export const useCanvasTransformState = (
       selectedNode?.id &&
       pathEditingNodeId === selectedNode.id
   );
-  const groupRotationPreviewRect =
-    isGroupRotationPreviewVisible && hasGroupSelection
-      ? getHostRectFromCanvasBounds(editor, selectedBounds)
-      : null;
 
   const { isDraggable, isResizable, isRotatable } = getTransformFlags({
     activeTool,
     editingNodeId,
     hasGroupSelection,
     isPathEditingSelection,
+    isTextPathPositioning,
     selectedBounds,
     selectedEditCapabilities,
     selectedNode,
-    selectedTarget,
-    selectedTargets,
   });
 
   return {
     activeTool,
     editingNodeId,
     effectiveSelectedNodeIds,
-    groupRotationPreviewRect,
     hasGroupSelection,
     hostElement: editor.hostRef,
     isDraggable,
     isPathEditingSelection,
+    isTextPathPositioning,
     isResizable,
     isRotatable,
     selectedBounds,
     selectedEditCapabilities,
     selectedNode,
-    selectedTarget,
-    selectedTargets,
     selectionPreview,
     selectionFrameKey,
-    visibleSelectedNodeId,
     visibleSelectedNodeIds,
     zoom,
   };

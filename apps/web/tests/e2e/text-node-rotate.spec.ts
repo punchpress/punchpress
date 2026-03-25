@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { clickNodeCenter } from "./helpers/canvas";
 import {
-  getGroupRotationPreviewRect,
   getSelectionSnapshot,
   gotoEditor,
   loadDocumentFixture,
@@ -39,13 +38,105 @@ const expectRectsClose = (before, after, tolerance = 8) => {
   expect(Math.abs(after.bottom - before.bottom)).toBeLessThanOrEqual(tolerance);
 };
 
-const getCombinedRect = (...rects) => {
+const getHandleRect = (handles) => {
+  const corners = ["nw", "ne", "sw", "se"]
+    .map((corner) => handles?.[corner])
+    .filter(Boolean);
+
+  if (corners.length === 0) {
+    return null;
+  }
+
+  const centers = corners.map((handle) => ({
+    x: handle.x + handle.width / 2,
+    y: handle.y + handle.height / 2,
+  }));
+
+  const left = Math.min(...centers.map((point) => point.x));
+  const top = Math.min(...centers.map((point) => point.y));
+  const right = Math.max(...centers.map((point) => point.x));
+  const bottom = Math.max(...centers.map((point) => point.y));
+
   return {
-    bottom: Math.max(...rects.map((rect) => rect.bottom)),
-    left: Math.min(...rects.map((rect) => rect.left)),
-    right: Math.max(...rects.map((rect) => rect.right)),
-    top: Math.min(...rects.map((rect) => rect.top)),
+    bottom,
+    left,
+    right,
+    top,
   };
+};
+
+const getSingleNodeOverlayCorners = (page) => {
+  return page.evaluate(() => {
+    const root = document.querySelector(
+      ".canvas-single-node-transform-overlay"
+    );
+
+    if (!(root instanceof HTMLElement)) {
+      return null;
+    }
+
+    const offsetParent =
+      root.offsetParent instanceof HTMLElement ? root.offsetParent : null;
+    const parentRect = offsetParent?.getBoundingClientRect?.();
+    const transform = window.getComputedStyle(root).transform;
+    const transformOrigin = window.getComputedStyle(root).transformOrigin;
+
+    if (!(parentRect && transformOrigin)) {
+      return null;
+    }
+
+    const matrix =
+      transform && transform !== "none"
+        ? new DOMMatrixReadOnly(transform)
+        : new DOMMatrixReadOnly();
+    const [originXToken, originYToken] = transformOrigin.split(" ");
+    const originX = Number.parseFloat(originXToken);
+    const originY = Number.parseFloat(originYToken);
+    const baseLeft = parentRect.left + root.offsetLeft;
+    const baseTop = parentRect.top + root.offsetTop;
+    const width = root.offsetWidth;
+    const height = root.offsetHeight;
+
+    const projectCorner = (x, y) => {
+      const localX = x - originX;
+      const localY = y - originY;
+
+      return {
+        x:
+          baseLeft + originX + matrix.a * localX + matrix.c * localY + matrix.e,
+        y: baseTop + originY + matrix.b * localX + matrix.d * localY + matrix.f,
+      };
+    };
+
+    const getHandleCenter = (corner) => {
+      const handle = root.querySelector(`.moveable-control.moveable-${corner}`);
+      const rect = handle?.getBoundingClientRect?.();
+
+      if (!rect) {
+        return null;
+      }
+
+      return {
+        x: rect.x + rect.width / 2,
+        y: rect.y + rect.height / 2,
+      };
+    };
+
+    return {
+      handles: {
+        ne: getHandleCenter("ne"),
+        nw: getHandleCenter("nw"),
+        se: getHandleCenter("se"),
+        sw: getHandleCenter("sw"),
+      },
+      corners: {
+        ne: projectCorner(width, 0),
+        nw: projectCorner(0, 0),
+        se: projectCorner(width, height),
+        sw: projectCorner(0, height),
+      },
+    };
+  });
 };
 
 const startSelectionHandleAngleCapture = (page) => {
@@ -157,6 +248,36 @@ test("rotates a selected text node from the moveable selection", async ({
   expect(after.y).toBeCloseTo(before.y, 1);
   expect(afterCenter.x).toBeCloseTo(beforeCenter.x, 1);
   expect(afterCenter.y).toBeCloseTo(beforeCenter.y, 1);
+});
+
+test("keeps single-node handles centered on the overlay corners", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocumentFixture(page, "scaled-text-node.punch");
+  const nodeId = "scaled-node";
+
+  await page.locator(`[data-node-id="${nodeId}"]`).click();
+  await pauseForUi(page);
+  await waitForSelectionHandles(page);
+
+  const snapshot = await getSingleNodeOverlayCorners(page);
+
+  expect(snapshot).not.toBeNull();
+
+  for (const corner of ["nw", "ne", "sw", "se"]) {
+    const handle = snapshot?.handles?.[corner];
+    const overlayCorner = snapshot?.corners?.[corner];
+
+    expect(handle).not.toBeNull();
+    expect(overlayCorner).not.toBeNull();
+    expect(Math.abs((handle?.x || 0) - (overlayCorner?.x || 0))).toBeLessThan(
+      4
+    );
+    expect(Math.abs((handle?.y || 0) - (overlayCorner?.y || 0))).toBeLessThan(
+      4
+    );
+  }
 });
 
 test("rotates a selected group of text nodes around the shared selection center", async ({
@@ -283,7 +404,7 @@ test("rotating an actual group keeps a stable rotated selection box", async ({
   expect(uprightSamplesAfterRotation).toEqual([]);
 });
 
-test("group rotation preview matches the live node bounds through release", async ({
+test("group rotation overlay stays stable through release", async ({
   page,
 }) => {
   await gotoEditor(page);
@@ -305,22 +426,18 @@ test("group rotation preview matches the live node bounds through release", asyn
     .toEqual([firstNodeId, secondNodeId]);
 
   await rotateSelectionFromCornerWithoutRelease(page);
-
-  await expect
-    .poll(async () => Boolean(await getGroupRotationPreviewRect(page)))
-    .toBe(true);
-
-  const previewRect = await getGroupRotationPreviewRect(page);
+  const beforeReleaseSelection = await waitForSelectionHandles(page);
 
   await page.mouse.up();
   await pauseForUi(page);
 
   const afterFirst = await waitForNodeReady(page, firstNodeId);
   const afterSecond = await waitForNodeReady(page, secondNodeId);
-  const combinedRect = getCombinedRect(
-    afterFirst.elementRect,
-    afterSecond.elementRect
-  );
+  const afterReleaseSelection = await waitForSelectionHandles(page);
+  const beforeReleaseRect = getHandleRect(beforeReleaseSelection.handles);
+  const afterReleaseRect = getHandleRect(afterReleaseSelection.handles);
 
-  expectRectsClose(previewRect, combinedRect);
+  expect(afterFirst.elementRect).not.toBeNull();
+  expect(afterSecond.elementRect).not.toBeNull();
+  expectRectsClose(beforeReleaseRect, afterReleaseRect);
 });

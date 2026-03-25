@@ -70,5 +70,12 @@ When adding a feature:
 
 For interaction-heavy features, use this split:
 
-- React owns event capture, DOM hit-testing, and third-party browser library adapters.
-- The editor owns gesture semantics, history boundaries, selection effects, and transform policy.
+- React owns event capture, DOM hit-testing, and browser-only presentation
+  surfaces.
+- The editor owns gesture semantics, history boundaries, selection effects, and
+  transform policy.
+- Hot transform overlays should be driven from editor geometry, not from
+  DOM-target-driven third-party transform abstractions.
+- When motion can be expressed as shell placement, React should keep node
+  content cold and let the renderer update placement through the narrowest
+  possible surface.

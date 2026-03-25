@@ -1,8 +1,10 @@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useEditorValue } from "../../editor-react/use-editor-value";
+import { usePerformanceRenderCounter } from "../../performance/use-performance-render-counter";
 import { NodeFields } from "./warp-text-fields";
 
 export const PropertiesPanel = () => {
+  usePerformanceRenderCounter("render.panel.properties");
   const bootstrapError = useEditorValue((editor) => editor.bootstrapError);
   const bootstrapState = useEditorValue((editor) => editor.bootstrapState);
   const selectedNode = useEditorValue((editor) => {

@@ -51,6 +51,52 @@ const waitForGeometryReady = async (
   }
 };
 
+const getDragPathPoint = (
+  index: number,
+  {
+    frames,
+    stepX,
+    stepY,
+  }: {
+    frames: number;
+    stepX: number;
+    stepY: number;
+  }
+) => {
+  const progress = Math.min(1, Math.max(0, index / Math.max(1, frames)));
+  const loopCount = 1.15;
+  const phase = progress * Math.PI * 2;
+  const angle =
+    progress * Math.PI * 2 * loopCount + Math.sin(phase * 1.3) * 0.18;
+  const radiusScale = 1 + Math.sin(phase * 1.1 - Math.PI / 6) * 0.14;
+  const radiusX = stepX * 16 * radiusScale;
+  const radiusY = stepY * 26 * (0.92 + Math.cos(phase * 0.8) * 0.08);
+  const driftX = Math.sin(phase * 0.7 + 0.3) * stepX * 3.4;
+  const driftY = Math.sin(phase * 1.4 - 0.5) * stepY * 4.8;
+
+  return {
+    x: Math.cos(angle) * radiusX + driftX,
+    y: Math.sin(angle) * radiusY + driftY,
+  };
+};
+
+const getDragDelta = (
+  index: number,
+  options: {
+    frames: number;
+    stepX: number;
+    stepY: number;
+  }
+) => {
+  const previousPoint = getDragPathPoint(index, options);
+  const nextPoint = getDragPathPoint(index + 1, options);
+
+  return {
+    x: nextPoint.x - previousPoint.x,
+    y: nextPoint.y - previousPoint.y,
+  };
+};
+
 export const textDragBenchmark: PerformanceBenchmarkDefinition = {
   ...createTextDragBenchmark({
     id: "text-nodes-dragging-50",
@@ -113,10 +159,7 @@ function createTextDragBenchmark({
           await waitForFrame();
 
           editor.updateSelectionDrag(dragSession, {
-            delta: {
-              x: index % 2 === 0 ? options.stepX : -options.stepX * 0.82,
-              y: index % 3 === 0 ? options.stepY : -options.stepY * 0.35,
-            },
+            delta: getDragDelta(index, options),
             queueRefresh: true,
           });
         }

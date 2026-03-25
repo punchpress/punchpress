@@ -1,4 +1,5 @@
 import { idleSoakBenchmark } from "./benchmarks/idle-soak-benchmark";
+import { squareDragBenchmarkLarge } from "./benchmarks/square-drag-benchmark";
 import {
   textDragBenchmark,
   textDragBenchmarkLarge,
@@ -6,6 +7,7 @@ import {
 
 export const performanceBenchmarks = [
   idleSoakBenchmark,
+  squareDragBenchmarkLarge,
   textDragBenchmark,
   textDragBenchmarkLarge,
 ];

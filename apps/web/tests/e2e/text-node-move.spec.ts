@@ -57,6 +57,59 @@ const getMoveableHandleCenters = (page, rootSelector) => {
   }, rootSelector);
 };
 
+const getActiveSelectionHandleCenters = (page) => {
+  return page.evaluate(() => {
+    const controlBox = document.querySelector(
+      ".moveable-control-box.canvas-moveable"
+    );
+
+    if (!(controlBox instanceof Element)) {
+      return null;
+    }
+
+    return Object.fromEntries(
+      ["nw", "ne", "sw", "se"].map((corner) => {
+        const handle = controlBox.querySelector(
+          `.moveable-control.moveable-${corner}`
+        );
+        const rect = handle?.getBoundingClientRect?.();
+
+        if (!rect) {
+          return [corner, null];
+        }
+
+        return [
+          corner,
+          {
+            x: rect.x + rect.width / 2,
+            y: rect.y + rect.height / 2,
+          },
+        ];
+      })
+    );
+  });
+};
+
+const isActiveSelectionBoxVisible = (page) => {
+  return page.evaluate(() => {
+    const controlBox = document.querySelector(
+      ".canvas-moveable.moveable-control-box"
+    );
+
+    if (!(controlBox instanceof Element)) {
+      return false;
+    }
+
+    const style = window.getComputedStyle(controlBox);
+
+    return (
+      style.display !== "none" &&
+      style.visibility !== "hidden" &&
+      Number.parseFloat(style.opacity || "1") > 0.9
+    );
+  });
+};
+
 const expectHandleCentersToShift = (beforeHandles, afterHandles, delta) => {
   return ["nw", "ne", "sw", "se"].every((corner) => {
     const beforeHandle = beforeHandles?.[corner];
@@ -140,6 +193,57 @@ const expectRectShiftMatchesDelta = (
   );
 };
 
+const samplePostDropSelectionFrames = (page, rootSelector, nodeId) => {
+  return page.evaluate(
+    async ({ nodeId, rootSelector }) => {
+      const getHandleCenters = () => {
+        const controlBox = document.querySelector(rootSelector);
+
+        if (!controlBox) {
+          return null;
+        }
+
+        return Object.fromEntries(
+          ["nw", "ne", "sw", "se"].map((corner) => {
+            const handle = controlBox.querySelector(
+              `.moveable-control.moveable-${corner}`
+            );
+            const rect = handle?.getBoundingClientRect?.();
+
+            if (!rect) {
+              return [corner, null];
+            }
+
+            return [
+              corner,
+              {
+                x: rect.x + rect.width / 2,
+                y: rect.y + rect.height / 2,
+              },
+            ];
+          })
+        );
+      };
+
+      const getNodeRect = () => {
+        return document
+          .querySelector(`[data-node-id="${nodeId}"]`)
+          ?.getBoundingClientRect();
+      };
+
+      const samples = [{ handles: getHandleCenters(), rect: getNodeRect() }];
+
+      for (let index = 0; index < 3; index += 1) {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        samples.push({ handles: getHandleCenters(), rect: getNodeRect() });
+      }
+
+      return samples;
+    },
+    { nodeId, rootSelector }
+  );
+};
+
 test("moves a text node around the canvas", async ({ page }) => {
   await gotoEditor(page);
   await loadDocumentFixture(page, "text-node-move.punch");
@@ -157,6 +261,68 @@ test("moves a text node around the canvas", async ({ page }) => {
 
   expectCoordinateShift(before, after, { x: 140, y: 80 });
   expectRectShift(before.elementRect, after.elementRect, { x: 140, y: 80 });
+});
+
+test("keeps the selection box aligned after dropping a newly created text node", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+
+  await page.keyboard.press("t");
+  await page.getByTestId("canvas-stage").click({
+    position: { x: 400, y: 300 },
+  });
+
+  const textInput = page.getByTestId("canvas-text-input");
+  await textInput.fill("Hello world");
+  await textInput.press("Enter");
+  await pauseForUi(page);
+
+  const createdNode = page.locator("[data-node-id]").first();
+  const createdNodeRect = await createdNode.boundingBox();
+
+  expect(createdNodeRect).not.toBeNull();
+
+  const deselectPoint = {
+    x: (createdNodeRect?.x || 0) + (createdNodeRect?.width || 0) / 2,
+    y: Math.max(140, (createdNodeRect?.y || 0) - 80),
+  };
+
+  await page.mouse.click(deselectPoint.x, deselectPoint.y);
+  await pauseForUi(page);
+
+  const node = createdNode;
+  await node.click();
+
+  const nodeId = await node.getAttribute("data-node-id");
+
+  expect(nodeId).not.toBeNull();
+
+  const before = await waitForNodeReady(page, nodeId);
+
+  await page.mouse.move(
+    before.elementRect.x + before.elementRect.width / 2,
+    before.elementRect.y + before.elementRect.height / 2
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    before.elementRect.x + before.elementRect.width / 2 + 140,
+    before.elementRect.y + before.elementRect.height / 2 + 80,
+    { steps: 12 }
+  );
+  await page.mouse.up();
+
+  const samples = await samplePostDropSelectionFrames(
+    page,
+    ".moveable-control-box.canvas-moveable",
+    nodeId
+  );
+
+  expect(
+    samples.every((sample) =>
+      expectPreviewHandlesAlignedToRect(sample.handles, sample.rect)
+    )
+  ).toBe(true);
 });
 
 test("keeps the selection preview aligned while dragging a text node", async ({
@@ -187,15 +353,15 @@ test("keeps the selection preview aligned while dragging a text node", async ({
 
   await expect
     .poll(async () => {
-      const previewHandles = await getMoveableHandleCenters(
-        page,
-        ".canvas-selection-drag-preview"
-      );
+      const previewHandles = await getActiveSelectionHandleCenters(page);
 
-      return expectHandleCentersToShift(beforeHandles, previewHandles, {
-        x: 140,
-        y: 80,
-      });
+      return (
+        (await isActiveSelectionBoxVisible(page)) &&
+        expectHandleCentersToShift(beforeHandles, previewHandles, {
+          x: 140,
+          y: 80,
+        })
+      );
     })
     .toBe(true);
 
@@ -225,13 +391,11 @@ test("keeps the selection preview aligned with a text node while zoomed out", as
 
   await expect
     .poll(async () => {
-      const previewHandles = await getMoveableHandleCenters(
-        page,
-        ".canvas-selection-drag-preview"
-      );
+      const previewHandles = await getActiveSelectionHandleCenters(page);
       const node = await waitForNodeReady(page, nodeId);
 
       return (
+        (await isActiveSelectionBoxVisible(page)) &&
         expectPreviewHandlesAlignedToRect(
           previewHandles,
           node?.elementRect || null
@@ -278,15 +442,15 @@ test("keeps a rotated selection preview aligned while dragging a text node", asy
 
   await expect
     .poll(async () => {
-      const previewHandles = await getMoveableHandleCenters(
-        page,
-        ".canvas-selection-drag-preview"
-      );
+      const previewHandles = await getActiveSelectionHandleCenters(page);
 
-      return expectHandleCentersToShift(beforeHandles, previewHandles, {
-        x: 140,
-        y: 80,
-      });
+      return (
+        (await isActiveSelectionBoxVisible(page)) &&
+        expectHandleCentersToShift(beforeHandles, previewHandles, {
+          x: 140,
+          y: 80,
+        })
+      );
     })
     .toBe(true);
 
@@ -325,10 +489,7 @@ test("keeps a rotated multiselect preview aligned while dragging text nodes", as
 
   await expect
     .poll(async () => {
-      const previewHandles = await getMoveableHandleCenters(
-        page,
-        ".canvas-selection-drag-preview"
-      );
+      const previewHandles = await getActiveSelectionHandleCenters(page);
 
       return expectHandleCentersToShift(beforeHandles, previewHandles, {
         x: 140,
@@ -368,10 +529,7 @@ test("keeps a multiselect preview aligned with the selected nodes while zoomed o
 
   await expect
     .poll(async () => {
-      const previewHandles = await getMoveableHandleCenters(
-        page,
-        ".canvas-selection-drag-preview"
-      );
+      const previewHandles = await getActiveSelectionHandleCenters(page);
       const firstNode = await waitForNodeReady(page, "rotate-first-node");
       const secondNode = await waitForNodeReady(page, "rotate-second-node");
       const combinedRect = getCombinedRect(

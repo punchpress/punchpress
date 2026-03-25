@@ -27,9 +27,6 @@ test("clicking, shift-clicking, and escape drive selection through the browser",
   await expect
     .poll(async () => (await getSelectionSnapshot(page)).selectedNodeIds)
     .toEqual([firstNodeId]);
-  await expect
-    .poll(async () => (await getSelectionSnapshot(page)).isMoveableMuted)
-    .toBe(false);
 
   await page.keyboard.down("Shift");
   await page.getByRole("button", { name: "Select second" }).first().click();

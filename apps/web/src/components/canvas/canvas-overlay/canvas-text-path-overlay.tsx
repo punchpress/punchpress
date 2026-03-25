@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useEditor } from "../../../editor-react/use-editor";
+import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
 import {
   getTextPathHandleCursorToken,
@@ -152,7 +153,7 @@ export const CanvasTextPathOverlay = ({ viewportRevision }) => {
   const pathEditingNodeId = useEditorValue(
     (_, state) => state.pathEditingNodeId
   );
-  const overlayState = useEditorValue((editor, state) => {
+  const overlayState = useEditorSurfaceValue((editor, state) => {
     if (state.editingNodeId) {
       return null;
     }
@@ -183,6 +184,8 @@ export const CanvasTextPathOverlay = ({ viewportRevision }) => {
     return {
       geometry,
       node,
+      previewDelta:
+        editor.getSelectionPreviewDelta(visibleSelectedNodeIds) || null,
     };
   });
   const nodeId = overlayState?.node.id || null;
@@ -219,13 +222,26 @@ export const CanvasTextPathOverlay = ({ viewportRevision }) => {
   const metrics = overlayState ? getTextPathHostMetrics(editor) : null;
   const geometry = overlayState?.geometry || null;
   const node = overlayState?.node || null;
+  const previewDelta = overlayState?.previewDelta || null;
   const transformTargetStyle =
     geometry && node && isPathEditing
-      ? getTextPathTransformTargetStyle(editor, node, geometry)
+      ? getTextPathTransformTargetStyle(
+          editor,
+          node,
+          geometry,
+          previewDelta,
+          true
+        )
       : null;
   const matrix =
     geometry && metrics && node
-      ? getTextPathGuideMatrix(node, geometry, metrics, editor.zoom)
+      ? getTextPathGuideMatrix(
+          node,
+          geometry,
+          metrics,
+          editor.zoom,
+          previewDelta
+        )
       : null;
   const guide = geometry?.guide || null;
   const matrixTransform = matrix

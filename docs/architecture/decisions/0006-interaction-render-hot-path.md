@@ -21,8 +21,9 @@ That path does not scale, even if the node model itself is clean.
 Hot interaction rendering must follow these rules:
 
 - durable document state and transient interaction preview stay separate
-- drag and similar gestures should prefer one shared visual transform over many
-  per-node updates
+- node content and node placement stay separate
+- active placement should update the smallest possible shell surface rather than
+  rerendering node content
 - hot-path visual motion should update the smallest possible number of DOM
   surfaces
 - React may compose the surfaces, but it should not be the bottleneck for
@@ -38,17 +39,21 @@ For active transforms such as drag:
 
 1. the document remains stable during the gesture
 2. the editor exposes transient preview state
-3. the canvas applies that preview through the cheapest available visual layer
+3. the canvas applies that preview through the cheapest available placement
+   layer
 4. durable node transforms are committed once when the gesture ends
 
-For large selected sets, the preferred visual layer is:
+The default preferred implementation is:
 
-- one selected-layer transform
+- stable node shells and stable node art
+- centralized placement updates for the active shells
+- editor-owned overlays driven from editor geometry
 
 not:
 
-- one per-node transform update if a shared transform can represent the same
-  motion
+- rerendering node content during drag
+- DOM-target-driven third-party transform overlays on the hot path
+- broad store or React fanout for every drag tick
 
 ## Performance Hierarchy
 
@@ -64,7 +69,8 @@ for visible, actively moving content.
 
 ## Consequences
 
-- Multi-selection drag should converge on a shared selected-layer transform.
+- Multi-selection drag should stay cheap without depending on a separate
+  selected-layer architecture unless measurement proves it is necessary.
 - Zoom-sensitive interaction code must define whether a value is in canvas space
   or screen space before applying it.
 - Heavy node types should eventually support simpler visual representation at

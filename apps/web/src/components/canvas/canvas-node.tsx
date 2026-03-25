@@ -1,4 +1,4 @@
-import { estimateBounds, getNodeCssTransform, round } from "@punchpress/engine";
+import { estimateBounds, round } from "@punchpress/engine";
 import { memo } from "react";
 import { cn } from "@/lib/utils";
 import { useEditor } from "../../editor-react/use-editor";
@@ -22,77 +22,51 @@ const getCanvasPoint = (editor, clientX, clientY) => {
   };
 };
 
-const getNodePreviewTransform = (isSelectionTargetSelected) => {
-  return isSelectionTargetSelected
-    ? "translate3d(var(--canvas-selection-preview-x, 0px), var(--canvas-selection-preview-y, 0px), 0)"
-    : "";
-};
+const selectNodeArtState = (editor, state, nodeId) => {
+  const node = editor.getNode(nodeId);
 
-const selectNodeRenderFrame = (editor, nodeId) => {
-  const frame = editor.getNodeRenderFrame(nodeId);
+  if (!node) {
+    return null;
+  }
 
-  return frame
-    ? [
-        frame.bounds.height,
-        frame.bounds.minX,
-        frame.bounds.minY,
-        frame.bounds.width,
-        frame.transform || "",
-      ]
-    : null;
+  const geometry = editor.getNodeRenderGeometry(nodeId);
+  const bbox = geometry?.bbox || estimateBounds(node);
+
+  return {
+    bbox,
+    fill: node.fill,
+    isEditing: state.editingNodeId === nodeId,
+    paths: geometry?.paths || [],
+    ready: Boolean(geometry?.ready),
+    stroke: node.stroke,
+    strokeWidth: node.strokeWidth,
+  };
 };
 
 const CanvasNodeComponent = ({ nodeId }) => {
   usePerformanceRenderCounter("render.canvas.node");
   const editor = useEditor();
   const activeTool = useEditorValue((_, state) => state.activeTool);
-  const editingNodeId = useEditorValue((_, state) => state.editingNodeId);
-  const pathEditingNodeId = useEditorValue(
-    (_, state) => state.pathEditingNodeId
-  );
-  const isSelectionDragging = useEditorValue(
-    (_, state) => state.isSelectionDragging
-  );
-  const selectedNodeIds = useEditorValue((_, state) => state.selectedNodeIds);
   const spacePressed = useEditorValue((_, state) => state.spacePressed);
   const isSelectionTargetSelected = useEditorValue((editor) => {
     const targetNodeId = editor.getSelectionTargetNodeId(nodeId) || nodeId;
 
     return editor.isSelected(targetNodeId);
   });
-  const frame = useEditorValue((editor) =>
-    selectNodeRenderFrame(editor, nodeId)
-  );
-  const node = useEditorValue((editor) => editor.getNode(nodeId));
-  const nodeEditCapabilities = useEditorValue((editor) =>
-    editor.getNodeEditCapabilities(nodeId)
-  );
-  const geometry = useEditorValue((editor) =>
-    editor.getNodeRenderGeometry(nodeId)
+  const artState = useEditorValue((editor, state) =>
+    selectNodeArtState(editor, state, nodeId)
   );
 
-  if (!node) {
+  if (!artState) {
     return null;
   }
 
-  const bbox = geometry?.bbox || estimateBounds(node);
-  const [frameHeight, frameMinX, frameMinY, frameWidth, frameTransform] =
-    frame || [];
-  const width = Math.max(1, frameWidth || bbox.width);
-  const height = Math.max(1, frameHeight || bbox.height);
-  const isEditing = editingNodeId === nodeId;
   const isNodeDraggable =
-    activeTool === "pointer" && !spacePressed && editingNodeId === null;
-  const nodeTransform = frameTransform || getNodeCssTransform(node);
-  const previewTransform = getNodePreviewTransform(isSelectionTargetSelected);
-  const translateX = frameMinX ?? bbox.minX;
-  const translateY = frameMinY ?? bbox.minY;
+    activeTool === "pointer" && !spacePressed && editor.editingNodeId === null;
   let cursorClassName = "cursor-default";
 
   if (isNodeDraggable) {
-    if (isSelectionTargetSelected && isSelectionDragging) {
-      cursorClassName = "cursor-grabbing";
-    } else if (isSelectionTargetSelected) {
+    if (isSelectionTargetSelected) {
       cursorClassName = "cursor-grab";
     } else {
       cursorClassName = "cursor-pointer";
@@ -104,11 +78,19 @@ const CanvasNodeComponent = ({ nodeId }) => {
       className={cn(
         "canvas-node absolute block appearance-none border-0 bg-transparent p-0",
         cursorClassName,
-        !geometry?.ready && "opacity-50"
+        !artState.ready && "opacity-50"
       )}
-      data-node-id={node.id}
+      data-node-id={nodeId}
+      data-selected={isSelectionTargetSelected ? "true" : "false"}
       onDoubleClick={() => {
-        if (drillIntoGroupSelection(editor, node.id)) {
+        if (drillIntoGroupSelection(editor, nodeId)) {
+          return;
+        }
+
+        const node = editor.getNode(nodeId);
+        const nodeEditCapabilities = editor.getNodeEditCapabilities(nodeId);
+
+        if (!(node && nodeEditCapabilities?.canEditText)) {
           return;
         }
 
@@ -123,6 +105,14 @@ const CanvasNodeComponent = ({ nodeId }) => {
           return;
         }
 
+        const node = editor.getNode(nodeId);
+
+        if (!node) {
+          return;
+        }
+
+        const nodeEditCapabilities = editor.getNodeEditCapabilities(nodeId);
+        const pathEditingNodeId = editor.pathEditingNodeId;
         const shouldDragSelectedPathNode = Boolean(
           isSelectionTargetSelected &&
             nodeEditCapabilities?.hasExpandedHitBounds
@@ -143,11 +133,10 @@ const CanvasNodeComponent = ({ nodeId }) => {
         if (shouldStartDragging) {
           event.preventDefault();
           event.stopPropagation();
-          const dragNodeId =
-            editor.getSelectionTargetNodeId(node.id) || node.id;
+          const dragNodeId = editor.getSelectionTargetNodeId(nodeId) || nodeId;
           const dragNodeIds =
-            isSelectionTargetSelected && selectedNodeIds.length > 1
-              ? [...selectedNodeIds]
+            isSelectionTargetSelected && editor.selectedNodeIds.length > 1
+              ? [...editor.selectedNodeIds]
               : undefined;
 
           const startClientPoint = {
@@ -221,12 +210,12 @@ const CanvasNodeComponent = ({ nodeId }) => {
         }
 
         editor.setHoveredNode(
-          editor.getSelectionTargetNodeId(node.id) || node.id
+          editor.getSelectionTargetNodeId(nodeId) || nodeId
         );
       }}
       onPointerLeave={() => {
         const hoverTargetNodeId =
-          editor.getSelectionTargetNodeId(node.id) || node.id;
+          editor.getSelectionTargetNodeId(nodeId) || nodeId;
 
         if (editor.hoveredNodeId !== hoverTargetNodeId) {
           return;
@@ -234,28 +223,21 @@ const CanvasNodeComponent = ({ nodeId }) => {
 
         editor.setHoveredNode(null);
       }}
-      ref={(element) => editor.registerNodeElement(node.id, element)}
-      style={{
-        height: `${height}px`,
-        left: 0,
-        top: 0,
-        transform: nodeTransform
-          ? `translate3d(${translateX}px, ${translateY}px, 0) ${previewTransform} ${nodeTransform}`
-          : `translate3d(${translateX}px, ${translateY}px, 0) ${previewTransform}`,
-        transformOrigin: "center center",
-        width: `${width}px`,
+      ref={(element) => {
+        editor.registerNodeElement(nodeId, element);
       }}
+      style={{ left: 0, top: 0, transformOrigin: "center center" }}
       type="button"
     >
       <CanvasNodeArt
-        bbox={bbox}
-        fill={node.fill}
-        height={height}
-        isEditing={isEditing}
-        paths={geometry?.paths || []}
-        stroke={node.stroke}
-        strokeWidth={node.strokeWidth}
-        width={width}
+        bbox={artState.bbox}
+        fill={artState.fill}
+        height={Math.max(1, artState.bbox.height)}
+        isEditing={artState.isEditing}
+        paths={artState.paths}
+        stroke={artState.stroke}
+        strokeWidth={artState.strokeWidth}
+        width={Math.max(1, artState.bbox.width)}
       />
     </button>
   );

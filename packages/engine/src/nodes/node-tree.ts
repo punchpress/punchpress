@@ -8,6 +8,10 @@ export const isTextNode = (node) => {
   return node?.type === "text";
 };
 
+export const isSquareNode = (node) => {
+  return node?.type === "square";
+};
+
 export const isContainerNode = (node) => {
   return isGroupNode(node);
 };
@@ -45,7 +49,7 @@ export const getChildNodes = (nodes, parentId = ROOT_PARENT_ID) => {
 
 export const getAncestorNodeIds = (nodes, nodeId) => {
   const nodesById = createNodeMap(nodes);
-  const ancestorIds = [];
+  const ancestorIds: string[] = [];
   let currentNode = nodesById.get(nodeId) || null;
 
   while (currentNode && getNodeParentId(currentNode) !== ROOT_PARENT_ID) {
@@ -73,6 +77,22 @@ export const getTreeScopeParentId = (focusedGroupId) => {
   return focusedGroupId || ROOT_PARENT_ID;
 };
 
+const getRootAncestorId = (nodesById, node) => {
+  let currentNode = node;
+
+  while (currentNode && getNodeParentId(currentNode) !== ROOT_PARENT_ID) {
+    const parentNode = nodesById.get(getNodeParentId(currentNode)) || null;
+
+    if (!parentNode) {
+      break;
+    }
+
+    currentNode = parentNode;
+  }
+
+  return currentNode?.id || node?.id || null;
+};
+
 export const getSelectionTargetNodeId = (nodes, nodeId, focusedGroupId) => {
   if (!nodeId) {
     return null;
@@ -93,16 +113,7 @@ export const getSelectionTargetNodeId = (nodes, nodeId, focusedGroupId) => {
   let currentNode = targetNode;
 
   if (focusedGroupId && !isInsideFocusedGroup) {
-    while (currentNode && getNodeParentId(currentNode) !== ROOT_PARENT_ID) {
-      const parentNode = nodesById.get(getNodeParentId(currentNode)) || null;
-      if (!parentNode) {
-        break;
-      }
-
-      currentNode = parentNode;
-    }
-
-    return currentNode?.id || targetNode.id;
+    return getRootAncestorId(nodesById, currentNode) || targetNode.id;
   }
 
   while (currentNode && getNodeParentId(currentNode) !== scopeParentId) {
@@ -119,7 +130,7 @@ export const getSelectionTargetNodeId = (nodes, nodeId, focusedGroupId) => {
 
 export const getSubtreeNodeIds = (nodes, nodeId) => {
   const childIdsByParent = getChildIdsByParent(nodes);
-  const subtreeNodeIds = [];
+  const subtreeNodeIds: string[] = [];
 
   const visit = (currentNodeId) => {
     subtreeNodeIds.push(currentNodeId);
@@ -136,7 +147,7 @@ export const getSubtreeNodeIds = (nodes, nodeId) => {
 
 export const getDescendantLeafNodeIds = (nodes, nodeId) => {
   const nodesById = createNodeMap(nodes);
-  const descendantLeafNodeIds = [];
+  const descendantLeafNodeIds: string[] = [];
 
   for (const currentNodeId of getSubtreeNodeIds(nodes, nodeId)) {
     if (currentNodeId === nodeId) {
@@ -154,7 +165,7 @@ export const getDescendantLeafNodeIds = (nodes, nodeId) => {
 
 export const getEffectiveSelectionNodeIds = (nodes, nodeIds) => {
   const nodesById = createNodeMap(nodes);
-  const effectiveNodeIds = [];
+  const effectiveNodeIds: string[] = [];
 
   for (const nodeId of nodeIds) {
     const node = nodesById.get(nodeId);
@@ -178,7 +189,7 @@ export const getTreeOrderedNodes = (
   childIdsByParent,
   parentId = ROOT_PARENT_ID
 ) => {
-  const orderedNodes = [];
+  const orderedNodes: NonNullable<ReturnType<typeof nodesById.get>>[] = [];
 
   for (const childId of childIdsByParent.get(parentId) || []) {
     const node = nodesById.get(childId);
@@ -187,7 +198,9 @@ export const getTreeOrderedNodes = (
     }
 
     orderedNodes.push(node);
-    orderedNodes.push(...getTreeOrderedNodes(nodesById, childIdsByParent, childId));
+    orderedNodes.push(
+      ...getTreeOrderedNodes(nodesById, childIdsByParent, childId)
+    );
   }
 
   return orderedNodes;
