@@ -1,3 +1,10 @@
+import { buildNodeCapabilityGeometry } from "../nodes/node-capabilities";
+import {
+  getCircleGuide,
+  getCirclePointAngleDeg,
+  normalizeLoop,
+} from "../nodes/text/text-path";
+import { estimateBounds } from "../nodes/text/warp-layout";
 import { round } from "../primitives/math";
 import {
   getLocalPointFromTransformFrame,
@@ -5,13 +12,6 @@ import {
   getNodeTransformFrame,
   getWorldPointFromTransformFrame,
 } from "../primitives/rotation";
-import {
-  getCircleGuide,
-  getCirclePointAngleDeg,
-  normalizeLoop,
-} from "../shapes/warp-text/text-path";
-import { buildNodeGeometry } from "../shapes/warp-text/warp-engine";
-import { estimateBounds } from "../shapes/warp-text/warp-layout";
 
 const getEditableCircleState = (editor, nodeId) => {
   const node = editor.getNode(nodeId);
@@ -123,7 +123,7 @@ export const updateTextPathEdit = (editor, session, { pointerCanvas } = {}) => {
       const font = editor.fonts.getLoadedFont(node.font);
       const nextGeometry =
         font && nextNode.type === "text"
-          ? buildNodeGeometry(nextNode, font)
+          ? buildNodeCapabilityGeometry(nextNode, font)
           : {
               bbox: circleState.bbox,
               guide: circleState.guide,

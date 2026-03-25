@@ -27,10 +27,10 @@ packages/engine/src/
 ├── interaction/
 ├── input/
 ├── managers/
+├── nodes/
 ├── primitives/
 ├── queries/
 ├── selection/
-├── shapes/
 ├── state/store/
 ├── tools/
 ├── transform/

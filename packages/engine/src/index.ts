@@ -7,8 +7,8 @@ export {
   UI_ACCENT,
   WARP_TEXT_NODE_KIND,
 } from "./constants";
-export { getRenderNodeFrame } from "./editable-node-frame";
 export { Editor } from "./editor";
+export { createDefaultGroupNode } from "./nodes/group/model";
 export {
   getAncestorNodeIds,
   getChildNodeIds,
@@ -25,6 +25,25 @@ export {
   rebuildTreeOrder,
 } from "./nodes/node-tree";
 export {
+  createDefaultNode,
+  createId,
+  getDefaultWarp,
+  getNodeCssTransform,
+  getNodeRotation,
+  getNodeScaleX,
+  getNodeScaleY,
+  getNodeTransform,
+  getNodeX,
+  getNodeY,
+  isNodeVisible,
+  withNodeTransform,
+} from "./nodes/text/model";
+export {
+  estimateBounds,
+  inflateBounds,
+  layoutGlyphs,
+} from "./nodes/text/warp-layout";
+export {
   incrementPerfCounter,
   measurePerf,
   setPerfSink,
@@ -40,23 +59,3 @@ export {
   getNodeRotationCenter,
   getNodeWorldPoint,
 } from "./primitives/rotation";
-export { createDefaultGroupNode } from "./shapes/group/model";
-export {
-  createDefaultNode,
-  createId,
-  getDefaultWarp,
-  getNodeCssTransform,
-  getNodeRotation,
-  getNodeScaleX,
-  getNodeScaleY,
-  getNodeTransform,
-  getNodeX,
-  getNodeY,
-  isNodeVisible,
-  withNodeTransform,
-} from "./shapes/warp-text/model";
-export {
-  estimateBounds,
-  inflateBounds,
-  layoutGlyphs,
-} from "./shapes/warp-text/warp-layout";

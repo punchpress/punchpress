@@ -2,8 +2,10 @@ import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import Moveable from "react-moveable";
 import { useEditor } from "../../../editor-react/use-editor";
+import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { drillIntoGroupSelection } from "../canvas-group-drill-in";
 import { CanvasGroupRotationPreview } from "./canvas-group-rotation-preview";
+import { CanvasSelectionDragPreview } from "./canvas-selection-drag-preview";
 import { getCanvasTransformHandlers } from "./canvas-transform-handlers";
 import { useCanvasTransformEffects } from "./use-canvas-transform-effects";
 import { useCanvasTransformState } from "./use-canvas-transform-state";
@@ -26,13 +28,21 @@ export const CanvasTransformOverlay = ({ viewportRevision }) => {
     isResizable,
     isRotatable,
     selectedBounds,
-    selectedGeometry,
+    selectedEditCapabilities,
     selectedNode,
+    selectionPreview,
     selectedTarget,
     selectedTargets,
     selectionFrameKey,
     visibleSelectedNodeIds,
+    zoom,
   } = useCanvasTransformState(editor, isGroupRotationPreviewVisible);
+  const isSelectionDragging = useEditorValue(
+    (_, state) => state.isSelectionDragging
+  );
+  const isSelectionRotating = useEditorValue(
+    (_, state) => state.isSelectionRotating
+  );
   const suppressHover = () => {
     editor.setHoveringSuppressed(true);
   };
@@ -44,6 +54,8 @@ export const CanvasTransformOverlay = ({ viewportRevision }) => {
     activeTool,
     editingNodeId,
     hostElement,
+    isSelectionDragging,
+    isSelectionRotating,
     isGroupRotationPreviewVisible,
     moveableRef,
     selectedTarget,
@@ -57,7 +69,7 @@ export const CanvasTransformOverlay = ({ viewportRevision }) => {
     queueRefresh: queueMoveableRefresh,
     restoreHover,
     selectedBounds,
-    selectedGeometry,
+    selectedEditCapabilities,
     selectedNode,
     setIsGroupRotationPreviewVisible,
     suppressHover,
@@ -116,6 +128,15 @@ export const CanvasTransformOverlay = ({ viewportRevision }) => {
           targets={
             editingNodeId || !hasGroupSelection ? undefined : selectedTargets
           }
+        />
+      ) : null}
+
+      {isSelectionDragging ? (
+        <CanvasSelectionDragPreview
+          delta={selectionPreview}
+          hostElement={hostElement}
+          isVisible={isSelectionDragging}
+          zoom={zoom}
         />
       ) : null}
 

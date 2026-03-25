@@ -4,4 +4,6 @@
 - [Editor Operating Model](./editor-operating-model.md) — Editor land, React land, and automation as clients of the same editor
 - [Editor Extraction Plan](./editor-extraction-plan.md) — Remaining migration work after extracting the engine and schema packages
 - [Document Model](./document-model.md) — Persistent document schema, invariants, and export boundaries
+- [0005: Node Render Contract](./decisions/0005-node-render-contract.md) — Durable node capabilities, frame surfaces, and selection preview ownership
+- [0006: Interaction Render Hot Path](./decisions/0006-interaction-render-hot-path.md) — Principles for keeping active transforms cheap and zoom-safe
 - [Decisions](./decisions/README.md) — Durable architecture decisions

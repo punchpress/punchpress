@@ -4,7 +4,7 @@ import {
   getNodeScaleY,
   getNodeX,
   getNodeY,
-} from "../shapes/warp-text/model";
+} from "../nodes/text/model";
 import { round } from "./math";
 import { getLocalBoundsCenter, rotateVector } from "./rotation";
 

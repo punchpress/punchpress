@@ -11,7 +11,7 @@ import {
   getSubtreeNodeIds,
   getTreeOrderedNodes,
 } from "../../nodes/node-tree";
-import { createDefaultNode, createId } from "../../shapes/warp-text/model";
+import { createDefaultNode, createId } from "../../nodes/text/model";
 import { getSelectedNodeIds } from "./selection-state";
 
 const getClipboardRootNodeIds = (nodes, nodeIds) => {

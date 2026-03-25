@@ -33,6 +33,8 @@
     "test:e2e:ui": "playwright test --ui",
     "test:performance": "playwright test --config playwright.performance.config.ts",
     "test:performance:headed": "playwright test --config playwright.performance.config.ts --headed",
+    "test:performance:benchmark": "bun scripts/performance/run-web-benchmark.ts",
+    "test:performance:benchmark:headed": "bun scripts/performance/run-web-benchmark.ts --headed",
     "test:performance:trace": "PUNCHPRESS_CAPTURE_CHROME_TRACE=1 playwright test --config playwright.performance.config.ts --headed",
     "test:performance:desktop": "playwright test --config playwright.desktop-performance.config.ts",
     "test:performance:desktop:trace": "PUNCHPRESS_CAPTURE_ELECTRON_TRACE=1 playwright test --config playwright.desktop-performance.config.ts"

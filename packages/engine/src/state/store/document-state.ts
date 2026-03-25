@@ -1,5 +1,5 @@
 import { getSubtreeNodeIds, isDescendantOf } from "../../nodes/node-tree";
-import { isNodeVisible } from "../../shapes/warp-text/model";
+import { isNodeVisible } from "../../nodes/text/model";
 import { finalizeEditingState } from "./editing-state";
 import { exitPathEditingInteractionState } from "./interaction-state";
 import {

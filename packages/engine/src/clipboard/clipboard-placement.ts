@@ -1,4 +1,4 @@
-import { estimateBounds } from "../shapes/warp-text/warp-layout";
+import { estimateBounds } from "../nodes/text/warp-layout";
 
 export const PASTE_STEP = 120;
 

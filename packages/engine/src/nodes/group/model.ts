@@ -1,5 +1,5 @@
 import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
-import { createId } from "../warp-text/model";
+import { createId } from "../text/model";
 
 export const getNextGroupName = (nodes) => {
   const groupCount = nodes.filter((node) => node.type === "group").length;

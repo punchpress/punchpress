@@ -48,7 +48,7 @@ export const getTransformFlags = ({
   hasGroupSelection,
   isPathEditingSelection,
   selectedBounds,
-  selectedGeometry,
+  selectedEditCapabilities,
   selectedNode,
   selectedTarget,
   selectedTargets,
@@ -61,7 +61,7 @@ export const getTransformFlags = ({
           selectedTargets.length > 0 &&
           selectedTarget &&
           selectedNode &&
-          selectedGeometry &&
+          selectedEditCapabilities &&
           !editingNodeId
       ),
       isRotatable: false,
@@ -76,13 +76,13 @@ export const getTransformFlags = ({
       activeTool === "pointer" &&
         selectedTargets.length > 0 &&
         (hasGroupSelection ? selectedBounds : selectedTarget) &&
-        (hasGroupSelection || (selectedNode && selectedGeometry)) &&
+        (hasGroupSelection || (selectedNode && selectedEditCapabilities)) &&
         !editingNodeId
     ),
     isRotatable: Boolean(
       activeTool === "pointer" &&
         selectedTargets.length > 0 &&
-        (hasGroupSelection ? selectedBounds : selectedGeometry) &&
+        (hasGroupSelection ? selectedBounds : selectedEditCapabilities) &&
         !editingNodeId
     ),
   };

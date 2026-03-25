@@ -1,10 +1,5 @@
-import {
-  estimateBounds,
-  getNodeCssTransform,
-  getNodeX,
-  getNodeY,
-  round,
-} from "@punchpress/engine";
+import { estimateBounds, getNodeCssTransform, round } from "@punchpress/engine";
+import { memo } from "react";
 import { cn } from "@/lib/utils";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
@@ -27,33 +22,71 @@ const getCanvasPoint = (editor, clientX, clientY) => {
   };
 };
 
-export const CanvasNode = ({ nodeId }) => {
+const getNodePreviewTransform = (isSelectionTargetSelected) => {
+  return isSelectionTargetSelected
+    ? "translate3d(var(--canvas-selection-preview-x, 0px), var(--canvas-selection-preview-y, 0px), 0)"
+    : "";
+};
+
+const selectNodeRenderFrame = (editor, nodeId) => {
+  const frame = editor.getNodeRenderFrame(nodeId);
+
+  return frame
+    ? [
+        frame.bounds.height,
+        frame.bounds.minX,
+        frame.bounds.minY,
+        frame.bounds.width,
+        frame.transform || "",
+      ]
+    : null;
+};
+
+const CanvasNodeComponent = ({ nodeId }) => {
   usePerformanceRenderCounter("render.canvas.node");
   const editor = useEditor();
   const activeTool = useEditorValue((_, state) => state.activeTool);
   const editingNodeId = useEditorValue((_, state) => state.editingNodeId);
+  const pathEditingNodeId = useEditorValue(
+    (_, state) => state.pathEditingNodeId
+  );
   const isSelectionDragging = useEditorValue(
     (_, state) => state.isSelectionDragging
   );
+  const selectedNodeIds = useEditorValue((_, state) => state.selectedNodeIds);
   const spacePressed = useEditorValue((_, state) => state.spacePressed);
   const isSelectionTargetSelected = useEditorValue((editor) => {
     const targetNodeId = editor.getSelectionTargetNodeId(nodeId) || nodeId;
 
     return editor.isSelected(targetNodeId);
   });
+  const frame = useEditorValue((editor) =>
+    selectNodeRenderFrame(editor, nodeId)
+  );
   const node = useEditorValue((editor) => editor.getNode(nodeId));
-  const geometry = useEditorValue((editor) => editor.getNodeGeometry(nodeId));
+  const nodeEditCapabilities = useEditorValue((editor) =>
+    editor.getNodeEditCapabilities(nodeId)
+  );
+  const geometry = useEditorValue((editor) =>
+    editor.getNodeRenderGeometry(nodeId)
+  );
 
   if (!node) {
     return null;
   }
 
   const bbox = geometry?.bbox || estimateBounds(node);
-  const width = Math.max(1, bbox.width);
-  const height = Math.max(1, bbox.height);
+  const [frameHeight, frameMinX, frameMinY, frameWidth, frameTransform] =
+    frame || [];
+  const width = Math.max(1, frameWidth || bbox.width);
+  const height = Math.max(1, frameHeight || bbox.height);
   const isEditing = editingNodeId === nodeId;
   const isNodeDraggable =
     activeTool === "pointer" && !spacePressed && editingNodeId === null;
+  const nodeTransform = frameTransform || getNodeCssTransform(node);
+  const previewTransform = getNodePreviewTransform(isSelectionTargetSelected);
+  const translateX = frameMinX ?? bbox.minX;
+  const translateY = frameMinY ?? bbox.minY;
   let cursorClassName = "cursor-default";
 
   if (isNodeDraggable) {
@@ -91,11 +124,16 @@ export const CanvasNode = ({ nodeId }) => {
         }
 
         const shouldDragSelectedPathNode = Boolean(
-          isSelectionTargetSelected && geometry?.selectionBounds
+          isSelectionTargetSelected &&
+            nodeEditCapabilities?.hasExpandedHitBounds
+        );
+        const canDirectDragSelectedNode = Boolean(
+          isSelectionTargetSelected && pathEditingNodeId !== node.id
         );
         const shouldStartDragging = Boolean(
           !event.shiftKey &&
             (!isSelectionTargetSelected ||
+              canDirectDragSelectedNode ||
               shouldDragSelectedPathNode ||
               event.altKey)
         );
@@ -103,6 +141,15 @@ export const CanvasNode = ({ nodeId }) => {
         editor.dispatchNodePointerDown({ event, node });
 
         if (shouldStartDragging) {
+          event.preventDefault();
+          event.stopPropagation();
+          const dragNodeId =
+            editor.getSelectionTargetNodeId(node.id) || node.id;
+          const dragNodeIds =
+            isSelectionTargetSelected && selectedNodeIds.length > 1
+              ? [...selectedNodeIds]
+              : undefined;
+
           const startClientPoint = {
             x: event.clientX,
             y: event.clientY,
@@ -127,7 +174,8 @@ export const CanvasNode = ({ nodeId }) => {
             if (!dragSession) {
               dragSession = editor.beginSelectionDrag({
                 duplicate: event.altKey,
-                nodeId: node.id,
+                nodeId: dragNodeId,
+                nodeIds: dragNodeIds,
               });
             }
 
@@ -189,14 +237,35 @@ export const CanvasNode = ({ nodeId }) => {
       ref={(element) => editor.registerNodeElement(node.id, element)}
       style={{
         height: `${height}px`,
-        left: `${getNodeX(node) + bbox.minX}px`,
-        top: `${getNodeY(node) + bbox.minY}px`,
-        transform: getNodeCssTransform(node),
+        left: 0,
+        top: 0,
+        transform: nodeTransform
+          ? `translate3d(${translateX}px, ${translateY}px, 0) ${previewTransform} ${nodeTransform}`
+          : `translate3d(${translateX}px, ${translateY}px, 0) ${previewTransform}`,
         transformOrigin: "center center",
         width: `${width}px`,
       }}
       type="button"
     >
+      <CanvasNodeArt
+        bbox={bbox}
+        fill={node.fill}
+        height={height}
+        isEditing={isEditing}
+        paths={geometry?.paths || []}
+        stroke={node.stroke}
+        strokeWidth={node.strokeWidth}
+        width={width}
+      />
+    </button>
+  );
+};
+
+export const CanvasNode = memo(CanvasNodeComponent);
+
+const CanvasNodeArt = memo(
+  ({ bbox, fill, height, isEditing, paths, stroke, strokeWidth, width }) => {
+    return (
       <svg
         aria-label="Warped text node"
         className="block overflow-visible"
@@ -206,25 +275,25 @@ export const CanvasNode = ({ nodeId }) => {
         width={width}
       >
         <g transform={`translate(${-bbox.minX} ${-bbox.minY})`}>
-          {(geometry?.paths || []).map((path) => {
+          {paths.map((path) => {
             return (
               <path
                 d={path.d}
-                fill={node.fill}
+                fill={fill}
                 key={path.key || `${path.transform || "shape"}-${path.d}`}
                 opacity={isEditing ? 0 : 1}
                 paintOrder="stroke fill"
                 pointerEvents="none"
-                stroke={node.stroke}
+                stroke={stroke}
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={node.strokeWidth}
+                strokeWidth={strokeWidth}
                 transform={path.transform || undefined}
               />
             );
           })}
         </g>
       </svg>
-    </button>
-  );
-};
+    );
+  }
+);

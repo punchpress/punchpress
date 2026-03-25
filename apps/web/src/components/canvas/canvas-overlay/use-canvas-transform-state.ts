@@ -1,6 +1,9 @@
+import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { getHostRectFromCanvasBounds } from "./canvas-overlay-geometry";
 import { getTransformFlags } from "./canvas-overlay-interactions";
+
+const EMPTY_PREVIEW = { x: 0, y: 0 };
 
 export const useCanvasTransformState = (
   editor,
@@ -34,16 +37,16 @@ export const useCanvasTransformState = (
 
     return editor.getNode(visibleSelectedNodeIds[0]);
   });
-  const selectedGeometry = useEditorValue((editor) => {
+  const selectedEditCapabilities = useEditorValue((editor) => {
     if (
       !(visibleSelectedNodeIds.length === 1 && selectedNode?.type === "text")
     ) {
       return null;
     }
 
-    return editor.getNodeGeometry(visibleSelectedNodeIds[0]);
+    return editor.getNodeEditCapabilities(visibleSelectedNodeIds[0]);
   });
-  const selectedBounds = useEditorValue((editor) => {
+  const selectedBounds = useEditorSurfaceValue((editor) => {
     return editor.getSelectionBounds(effectiveSelectedNodeIds);
   });
   const selectedTargets = effectiveSelectedNodeIds
@@ -62,9 +65,15 @@ export const useCanvasTransformState = (
       );
     })
     .filter(Boolean);
-  const selectionFrameKey = editor.getSelectionFrameKey(
-    effectiveSelectedNodeIds
-  );
+  const selectionFrameKey = useEditorSurfaceValue((editor) => {
+    return editor.getSelectionFrameKey(effectiveSelectedNodeIds);
+  });
+  const selectionPreview = useEditorSurfaceValue((editor) => {
+    return (
+      editor.getSelectionPreviewDelta(effectiveSelectedNodeIds) || EMPTY_PREVIEW
+    );
+  });
+  const zoom = useEditorValue((editor) => editor.zoom);
 
   const visibleSelectedNodeId = visibleSelectedNodeIds.at(-1) || null;
   const selectedTarget = selectedTargets[0] || null;
@@ -86,7 +95,7 @@ export const useCanvasTransformState = (
     hasGroupSelection,
     isPathEditingSelection,
     selectedBounds,
-    selectedGeometry,
+    selectedEditCapabilities,
     selectedNode,
     selectedTarget,
     selectedTargets,
@@ -104,12 +113,14 @@ export const useCanvasTransformState = (
     isResizable,
     isRotatable,
     selectedBounds,
-    selectedGeometry,
+    selectedEditCapabilities,
     selectedNode,
     selectedTarget,
     selectedTargets,
+    selectionPreview,
     selectionFrameKey,
     visibleSelectedNodeId,
     visibleSelectedNodeIds,
+    zoom,
   };
 };

@@ -26,12 +26,14 @@ export const getEditorDebugDump = (editor) => {
     hoveredNodeId: editor.hoveredNodeId,
     nodes: editor.nodes.map((node) => {
       const geometry = editor.getNodeGeometry(node.id);
+      const renderFrame = editor.getNodeRenderFrame(node.id);
       const frame = editor.getNodeFrame(node.id);
       const element = editor.getNodeElement(node.id);
 
       return {
         elementRect: toRect(element?.getBoundingClientRect?.()),
         frame: toFrame(frame),
+        renderFrame: toFrame(renderFrame),
         geometry: {
           bbox: toBounds(geometry?.bbox),
           pathCount: geometry?.paths?.length || 0,
@@ -74,6 +76,7 @@ export const getEditorDebugDump = (editor) => {
       moveableMuted: Boolean(
         editor.hostRef?.classList.contains("canvas-overlay-moveable-muted")
       ),
+      previewDelta: editor.selectionDragPreview?.delta || null,
       primaryId: editor.selectedNodeId,
     },
     tool: state.activeTool,

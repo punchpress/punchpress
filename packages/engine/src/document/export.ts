@@ -1,7 +1,10 @@
-import type { DesignDocument, TextNodeDocument } from "@punchpress/punch-schema";
+import type {
+  DesignDocument,
+  TextNodeDocument,
+} from "@punchpress/punch-schema";
+import { buildNodeCapabilityGeometry } from "../nodes/node-capabilities";
 import { isDescendantOf } from "../nodes/node-tree";
-import { buildNodeGeometry } from "../shapes/warp-text/warp-engine";
-import { buildSvgExport } from "../shapes/warp-text/warp-svg-export";
+import { buildSvgExport } from "../nodes/text/warp-svg-export";
 
 const escapeMetadata = (value: string) => {
   return value
@@ -36,7 +39,7 @@ export const exportDesignDocument = async (
     }
 
     const font = await fontPromises.get(node.font.postscriptName);
-    geometryById.set(node.id, buildNodeGeometry(node, font));
+    geometryById.set(node.id, buildNodeCapabilityGeometry(node, font));
   }
 
   const svg = buildSvgExport(nodes, geometryById);

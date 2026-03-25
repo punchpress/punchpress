@@ -56,7 +56,7 @@ See `docs/architecture/editor-operating-model.md` for the conceptual model of ed
 
 The editor follows a three-layer architecture inspired by tldraw:
 
-1. **Engine core** (`packages/engine/src/`) — Plain TypeScript `Editor` class. Owns state, tools, managers, shape logic, transforms, geometry, and export behavior. No React imports.
+1. **Engine core** (`packages/engine/src/`) — Plain TypeScript `Editor` class. Owns state, tools, managers, node logic, transforms, geometry, and export behavior. No React imports.
 2. **Schema/document layer** (`packages/punch-schema/src/`) — `.punch` schema, parse/load/save/migrate helpers, and shared font descriptor utilities.
 3. **React bindings** (`apps/web/src/editor-react/`) — `EditorProvider`, `useEditor()`, and `useEditorValue(selector)` bridge the engine to React.
 4. **Components** (`apps/web/src/components/`) — Flat siblings under `canvas/` and `panels/`. Each calls `useEditor()` directly. No prop drilling for editor state.
@@ -72,15 +72,15 @@ Tests, CLI workflows, and AI automation should converge on the same editor comma
 3. **No derived editor state in React hooks.** Put it on the `Editor` class or a manager.
 4. **Components are flat.** Max 1 level of nesting inside `canvas/` or `panels/`.
 5. **Pure logic has no React imports.** Geometry, math, warping, font parsing — none of these need React.
-6. **Shape-specific code goes under `packages/engine/src/shapes/<shape-name>/`.** Don't mix shape logic with editor infrastructure.
+6. **Node-specific code goes under `packages/engine/src/nodes/<node-type>/`.** Don't mix node logic with editor infrastructure.
 7. **Split behavior by capability.** Prefer folders like `document/`, `selection/`, `transform/`, `viewport/`, and `input/` over large mixed-purpose modules.
 8. **Manager is a high bar.** Use a manager only when the code owns durable state, subscriptions, caching, async work, or an external system boundary.
 9. **Favor compound UI families.** Complex controls should live in dedicated folders and expose composable parts instead of one component with many props.
 
 ### Adding a New Node Type
 
-1. Create `packages/engine/src/shapes/<name>/model.ts` with `createDefault<Name>Node()` and default props.
-2. Create `packages/engine/src/shapes/<name>/<name>-engine.ts` for geometry/rendering logic.
+1. Create `packages/engine/src/nodes/<name>/model.ts` with `createDefault<Name>Node()` and default props.
+2. Create `packages/engine/src/nodes/<name>/<name>-engine.ts` for geometry/rendering logic.
 3. Add a tool in `packages/engine/src/tools/<name>-tool.ts` if needed.
 4. Add a renderer component in `components/canvas/`.
 5. Add property fields in `components/panels/`.

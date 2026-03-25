@@ -6,7 +6,6 @@ import {
   getScaledGroupNodeUpdate,
 } from "../primitives/group-resize";
 import { getNodeWorldPoint } from "../primitives/rotation";
-import { estimateBounds } from "../shapes/warp-text/warp-layout";
 
 const CORNER_DIRECTION = {
   ne: [1, -1],
@@ -14,24 +13,6 @@ const CORNER_DIRECTION = {
   se: [1, 1],
   sw: [-1, 1],
 } as const;
-
-const queueOverlayRefresh = (editor) => {
-  if (typeof window === "undefined") {
-    editor.onViewportChange?.();
-    return;
-  }
-
-  window.requestAnimationFrame(() => {
-    editor.onViewportChange?.();
-  });
-};
-
-const getNodeResizeBounds = (editor, nodeId, node) => {
-  const geometry = editor.getNodeGeometry(nodeId);
-  return editor.getNodeTransformElement(nodeId)
-    ? geometry?.selectionBounds || geometry?.bbox || estimateBounds(node)
-    : geometry?.bbox || estimateBounds(node);
-};
 
 export const beginResizeSelection = (
   editor,
@@ -53,7 +34,7 @@ export const beginResizeSelection = (
     const resolvedNodeId = resolvedNodeIds[0];
     const resizedNode = editor.getNode(resolvedNodeId);
     const bbox = resizedNode
-      ? getNodeResizeBounds(editor, resolvedNodeId, resizedNode)
+      ? editor.getNodeTransformBounds(resolvedNodeId)
       : null;
 
     if (!(resizedNode && bbox && direction)) {
@@ -81,11 +62,7 @@ export const beginResizeSelection = (
   };
 };
 
-export const updateResizeSelection = (
-  editor,
-  session,
-  { queueRefresh = false, scale = 1 } = {}
-) => {
+export const updateResizeSelection = (editor, session, { scale = 1 } = {}) => {
   if (!(session && Number.isFinite(scale))) {
     return [];
   }
@@ -104,10 +81,6 @@ export const updateResizeSelection = (
       )
     );
 
-    if (queueRefresh) {
-      queueOverlayRefresh(editor);
-    }
-
     return [nodeId];
   }
 
@@ -120,10 +93,6 @@ export const updateResizeSelection = (
 
     return getScaledGroupNodeUpdate(baseNode, session.anchorCanvas, scale);
   });
-
-  if (queueRefresh) {
-    queueOverlayRefresh(editor);
-  }
 
   return session.nodeIds;
 };
@@ -147,7 +116,7 @@ export const resizeSelectionFromCorner = (
   if (effectiveSelectedNodeIds.length === 1) {
     const selectedNode = editor.getNode(effectiveSelectedNodeIds[0]);
     const bbox = selectedNode?.id
-      ? getNodeResizeBounds(editor, selectedNode.id, selectedNode)
+      ? editor.getNodeTransformBounds(selectedNode.id)
       : null;
 
     if (!(selectedNode && bbox)) {

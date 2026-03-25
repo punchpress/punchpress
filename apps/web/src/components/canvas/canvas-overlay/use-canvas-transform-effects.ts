@@ -10,6 +10,8 @@ export const useCanvasTransformEffects = ({
   activeTool,
   editingNodeId,
   hostElement,
+  isSelectionDragging,
+  isSelectionRotating,
   isGroupRotationPreviewVisible,
   moveableRef,
   selectedTarget,
@@ -20,25 +22,39 @@ export const useCanvasTransformEffects = ({
   useLayoutEffect(() => {
     const moveable = moveableRef.current;
 
-    if (!(selectedTargets.length > 0 && moveable && selectionFrameKey)) {
+    if (
+      !(
+        selectedTargets.length > 0 &&
+        moveable &&
+        selectionFrameKey &&
+        !isSelectionDragging &&
+        !isSelectionRotating
+      )
+    ) {
       return;
     }
 
     moveable.updateRect?.();
-  }, [moveableRef, selectedTargets, selectionFrameKey]);
+  }, [
+    isSelectionDragging,
+    isSelectionRotating,
+    moveableRef,
+    selectedTargets,
+    selectionFrameKey,
+  ]);
 
   useLayoutEffect(() => {
     const moveable = moveableRef.current;
 
-    if (!(moveable && viewportRevision >= 0)) {
+    if (!(moveable && viewportRevision >= 0 && !isSelectionDragging)) {
       return;
     }
 
     moveable.updateRect?.();
-  }, [moveableRef, viewportRevision]);
+  }, [isSelectionDragging, moveableRef, viewportRevision]);
 
   useEffect(() => {
-    if (!hostElement) {
+    if (!hostElement || isSelectionDragging || isSelectionRotating) {
       return;
     }
 
@@ -56,7 +72,28 @@ export const useCanvasTransformEffects = ({
     return () => {
       hostElement.style.removeProperty("--canvas-rotation-offset");
     };
-  }, [hostElement, selectedTarget, selectedTargets]);
+  }, [
+    hostElement,
+    isSelectionDragging,
+    isSelectionRotating,
+    selectedTarget,
+    selectedTargets,
+  ]);
+
+  useEffect(() => {
+    if (!hostElement) {
+      return;
+    }
+
+    hostElement.classList.toggle(
+      "canvas-overlay-preview-dragging",
+      isSelectionDragging
+    );
+
+    return () => {
+      hostElement.classList.remove("canvas-overlay-preview-dragging");
+    };
+  }, [hostElement, isSelectionDragging]);
 
   useEffect(() => {
     if (!hostElement) {

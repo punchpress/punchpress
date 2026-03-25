@@ -16,6 +16,15 @@ export const getCanvasDragHandlers = ({
   selectedNode,
   visibleSelectedNodeIds,
 }) => {
+  const getDragDelta = (event) => {
+    const zoom = editor.zoom || 1;
+
+    return {
+      x: (event.beforeDelta?.[0] || 0) / zoom,
+      y: (event.beforeDelta?.[1] || 0) / zoom,
+    };
+  };
+
   return {
     onDrag: (event) => {
       if (event.datas.skipDrag) {
@@ -28,14 +37,7 @@ export const getCanvasDragHandlers = ({
 
       setMoveableMuted(hostElement, true);
       editor.updateSelectionDrag(event.datas.dragSession, {
-        delta: event.datas.duplicate
-          ? {
-              x: event.beforeDelta[0] || 0,
-              y: event.beforeDelta[1] || 0,
-            }
-          : undefined,
-        left: event.left,
-        top: event.top,
+        delta: getDragDelta(event),
       });
     },
     onDragEnd: (event) => {
@@ -43,15 +45,7 @@ export const getCanvasDragHandlers = ({
         return;
       }
 
-      editor.endSelectionDrag(
-        event.datas.dragSession,
-        event.lastEvent
-          ? {
-              left: event.lastEvent.left,
-              top: event.lastEvent.top,
-            }
-          : undefined
-      );
+      editor.endSelectionDrag(event.datas.dragSession);
       restoreHover();
       setMoveableMuted(hostElement, false);
       queueRefresh();
@@ -70,13 +64,7 @@ export const getCanvasDragHandlers = ({
 
       setMoveableMuted(hostElement, true);
       editor.updateSelectionDrag(dragSession, {
-        delta: event.datas.duplicate
-          ? {
-              x: event.beforeDelta[0] || 0,
-              y: event.beforeDelta[1] || 0,
-            }
-          : undefined,
-        dragEvents: event.events,
+        delta: getDragDelta(event),
       });
     },
     onDragGroupEnd: (event) => {
@@ -86,14 +74,7 @@ export const getCanvasDragHandlers = ({
 
       const dragSession =
         event.datas.dragSession || event.events[0]?.datas?.dragSession;
-      const lastEvents = event.events
-        .map((groupEvent) => groupEvent.lastEvent)
-        .filter(Boolean);
-
-      editor.endSelectionDrag(
-        dragSession,
-        lastEvents.length > 0 ? { dragEvents: lastEvents } : undefined
-      );
+      editor.endSelectionDrag(dragSession);
       restoreHover();
       setMoveableMuted(hostElement, false);
       queueRefresh();

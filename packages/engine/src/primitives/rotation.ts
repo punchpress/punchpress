@@ -4,7 +4,7 @@ import {
   getNodeScaleY,
   getNodeX,
   getNodeY,
-} from "../shapes/warp-text/model";
+} from "../nodes/text/model";
 import { round } from "./math";
 
 export const getLocalBoundsCenter = (bbox) => {
@@ -110,6 +110,31 @@ export const getNodeWorldPoint = (node, bbox, point) => {
     getNodeTransformFrame(node, bbox),
     point
   );
+};
+
+export const getNodeWorldBounds = (node, bbox) => {
+  const frame = getNodeTransformFrame(node, bbox);
+  const corners = [
+    { x: bbox.minX, y: bbox.minY },
+    { x: bbox.maxX, y: bbox.minY },
+    { x: bbox.maxX, y: bbox.maxY },
+    { x: bbox.minX, y: bbox.maxY },
+  ].map((point) => getWorldPointFromTransformFrame(frame, point));
+  const xs = corners.map((point) => point.x);
+  const ys = corners.map((point) => point.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+
+  return {
+    height: maxY - minY,
+    maxX,
+    maxY,
+    minX,
+    minY,
+    width: maxX - minX,
+  };
 };
 
 export const getNodeLocalPoint = (node, bbox, point) => {

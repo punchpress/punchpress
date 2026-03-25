@@ -109,8 +109,8 @@ const getDebugNode = (dump, nodeId) => {
     throw new Error(`Missing node ${nodeId} in debug dump`);
   }
 
-  if (!node.frame) {
-    throw new Error(`Missing frame for node ${nodeId} in debug dump`);
+  if (!node.renderFrame) {
+    throw new Error(`Missing render frame for node ${nodeId} in debug dump`);
   }
 
   return node;
@@ -118,10 +118,10 @@ const getDebugNode = (dump, nodeId) => {
 
 const getNodeCorner = (node, corner) => {
   const localBounds = {
-    maxX: node.frame.bounds.maxX - node.transform.x,
-    maxY: node.frame.bounds.maxY - node.transform.y,
-    minX: node.frame.bounds.minX - node.transform.x,
-    minY: node.frame.bounds.minY - node.transform.y,
+    maxX: node.renderFrame.bounds.maxX - node.transform.x,
+    maxY: node.renderFrame.bounds.maxY - node.transform.y,
+    minX: node.renderFrame.bounds.minX - node.transform.x,
+    minY: node.renderFrame.bounds.minY - node.transform.y,
   };
   const center = {
     x: (localBounds.minX + localBounds.maxX) / 2,

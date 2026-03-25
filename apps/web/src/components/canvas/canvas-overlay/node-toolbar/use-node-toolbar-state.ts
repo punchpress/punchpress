@@ -21,15 +21,15 @@ export const useNodeToolbarState = () => {
       visibleSelectedNodeIds.length === 1
         ? editor.getNode(visibleSelectedNodeIds[0])
         : null;
-    const selectedGeometry = selectedNode
-      ? editor.getNodeGeometry(selectedNode.id)
+    const selectedEditCapabilities = selectedNode
+      ? editor.getNodeEditCapabilities(selectedNode.id)
       : null;
     const isPathEditing = Boolean(
       selectedNode?.id && state.pathEditingNodeId === selectedNode.id
     );
 
     return {
-      hasPathGuide: Boolean(selectedGeometry?.guide),
+      hasPathGuide: Boolean(selectedEditCapabilities?.guide),
       isPathEditing,
       selectedNode,
       selectionKey: `${visibleSelectedNodeIds.join(",")}:${isPathEditing ? "path" : "node"}`,

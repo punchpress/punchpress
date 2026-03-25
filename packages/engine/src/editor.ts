@@ -33,7 +33,6 @@ import {
   updateNodes as updateEditorNodes,
   updateSelectedNode as updateEditorSelectedNode,
 } from "./document/node-actions";
-import { getEditableNodeFrame } from "./editable-node-frame";
 import {
   addTextNode as addEditorTextNode,
   cancelEditing as cancelEditorEditing,
@@ -84,6 +83,10 @@ import {
 import { GeometryManager } from "./managers/geometry-manager";
 import { HistoryManager } from "./managers/history-manager";
 import {
+  buildNodeCapabilityGeometry,
+  getNodeFrameFromGeometry,
+} from "./nodes/node-capabilities";
+import {
   getChildNodeIds,
   getDescendantLeafNodeIds,
   getEffectiveSelectionNodeIds,
@@ -94,9 +97,18 @@ import {
 import {
   getLayerRow as getEditorLayerRow,
   getNode as getEditorNode,
+  getNodeEditCapabilities as getEditorNodeEditCapabilities,
   getNodeFrame as getEditorNodeFrame,
   getNodeGeometry as getEditorNodeGeometry,
+  getNodeHitBounds as getEditorNodeHitBounds,
+  getNodeRenderBounds as getEditorNodeRenderBounds,
+  getNodeRenderFrame as getEditorNodeRenderFrame,
+  getNodeRenderGeometry as getEditorNodeRenderGeometry,
+  getNodeSelectionFrame as getEditorNodeSelectionFrame,
+  getNodeTransformBounds as getEditorNodeTransformBounds,
+  getNodeTransformFrame as getEditorNodeTransformFrame,
   getSelectionFrameKey as getEditorSelectionFrameKey,
+  getSelectionPreviewDelta as getEditorSelectionPreviewDelta,
 } from "./queries/node-queries";
 import {
   clearSelection as clearEditorSelection,
@@ -109,13 +121,13 @@ import {
   toggleSelection as toggleEditorSelection,
 } from "./selection/selection-actions";
 import { getSelectionBounds as getEditorSelectionBounds } from "./selection/selection-bounds";
-import { buildNodeGeometry } from "./shapes/warp-text/warp-engine";
 import { createEditorStore } from "./state/store/create-editor-store";
 import { HandTool } from "./tools/hand-tool";
 import { PointerTool } from "./tools/pointer-tool";
 import { TextTool } from "./tools/text-tool";
 import {
   beginMoveSelection as beginEditorMoveSelection,
+  commitMoveSelection as commitEditorMoveSelection,
   moveSelectionBy as moveEditorSelectionBy,
   updateMoveSelection as updateEditorMoveSelection,
 } from "./transform/move-selection";
@@ -181,6 +193,8 @@ export class Editor {
     this.unsubscribeEditorCommand = null;
     this.unsubscribe = null;
     this.localFontCatalogPromise = null;
+    this.interactionPreviewListeners = new Set();
+    this.interactionPreviewRevision = 0;
     this.history = new HistoryManager({
       applyChange: applyDocumentChange,
       applyState: (nodes) => {
@@ -211,6 +225,7 @@ export class Editor {
     this.handleSpaceDown = this.handleSpaceDown.bind(this);
     this.handleSpaceUp = this.handleSpaceUp.bind(this);
     this.onViewportChange = null;
+    this.selectionDragPreviewState = null;
   }
 
   mount() {
@@ -289,19 +304,10 @@ export class Editor {
       return null;
     }
 
-    const geometry = buildNodeGeometry(
+    return buildNodeCapabilityGeometry(
       this.editingPreviewNode,
       this.editingFont
     );
-
-    return {
-      bbox: geometry.bbox,
-      guide: geometry.guide || null,
-      id: this.editingPreviewNode.id,
-      paths: geometry.paths,
-      ready: geometry.ready,
-      selectionBounds: geometry.selectionBounds || null,
-    };
   }
 
   get editingFrame() {
@@ -309,9 +315,10 @@ export class Editor {
       return null;
     }
 
-    return getEditableNodeFrame(
+    return getNodeFrameFromGeometry(
       this.editingPreviewNode,
-      this.editingPreviewGeometry
+      this.editingPreviewGeometry,
+      "selection"
     );
   }
 
@@ -369,6 +376,10 @@ export class Editor {
     return this.getState().isSelectionDragging;
   }
 
+  get selectionDragPreview() {
+    return this.selectionDragPreviewState;
+  }
+
   get isSelectionRotating() {
     return this.getState().isSelectionRotating;
   }
@@ -400,11 +411,7 @@ export class Editor {
   }
 
   canEditNodePath(nodeId = this.selectedNodeId) {
-    const node = this.getNode(nodeId);
-    const geometry =
-      node?.type === "text" ? this.getNodeGeometry(nodeId) : null;
-
-    return Boolean(node?.type === "text" && geometry?.guide);
+    return Boolean(this.getNodeEditCapabilities(nodeId)?.canEditPath);
   }
 
   isPathEditing(nodeId = this.pathEditingNodeId) {
@@ -521,8 +528,48 @@ export class Editor {
     return getEditorNodeGeometry(this, nodeId);
   }
 
+  getNodeRenderGeometry(nodeId) {
+    return getEditorNodeRenderGeometry(this, nodeId);
+  }
+
+  getNodeRenderFrame(nodeId) {
+    return getEditorNodeRenderFrame(this, nodeId);
+  }
+
+  getNodeRenderBounds(nodeId) {
+    return getEditorNodeRenderBounds(this, nodeId);
+  }
+
+  getNodeHitBounds(nodeId) {
+    return getEditorNodeHitBounds(this, nodeId);
+  }
+
+  getNodeEditCapabilities(nodeId) {
+    return getEditorNodeEditCapabilities(this, nodeId);
+  }
+
+  getNodeSelectionFrame(nodeId) {
+    return getEditorNodeSelectionFrame(this, nodeId);
+  }
+
+  getNodeTransformFrame(nodeId) {
+    return getEditorNodeTransformFrame(this, nodeId);
+  }
+
+  getNodeTransformBounds(nodeId) {
+    return getEditorNodeTransformBounds(this, nodeId);
+  }
+
   getNodeFrame(nodeId) {
     return getEditorNodeFrame(this, nodeId);
+  }
+
+  getSelectionPreviewDelta(nodeIds = this.selectedNodeIds) {
+    return getEditorSelectionPreviewDelta(this, nodeIds);
+  }
+
+  getInteractionPreviewRevision() {
+    return this.interactionPreviewRevision;
   }
 
   getSelectionFrameKey(nodeIds = this.selectedNodeIds) {
@@ -661,8 +708,25 @@ export class Editor {
     this.getState().setSelectionDragging(isSelectionDragging);
   }
 
+  setSelectionDragPreview(selectionDragPreview) {
+    this.selectionDragPreviewState = selectionDragPreview || null;
+    this.interactionPreviewRevision += 1;
+
+    for (const listener of this.interactionPreviewListeners) {
+      listener();
+    }
+  }
+
   setSelectionRotating(isSelectionRotating) {
     this.getState().setSelectionRotating(isSelectionRotating);
+  }
+
+  subscribeInteractionPreview(listener) {
+    this.interactionPreviewListeners.add(listener);
+
+    return () => {
+      this.interactionPreviewListeners.delete(listener);
+    };
   }
 
   setTextPathPositioning(isTextPathPositioning) {
@@ -783,6 +847,10 @@ export class Editor {
 
   updateMoveSelection(session, options) {
     return updateEditorMoveSelection(this, session, options);
+  }
+
+  commitMoveSelection(session) {
+    return commitEditorMoveSelection(this, session);
   }
 
   beginSelectionDrag(options) {

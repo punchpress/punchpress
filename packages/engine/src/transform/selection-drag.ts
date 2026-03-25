@@ -3,7 +3,7 @@ import { finishEditingIfNeeded } from "../editing/editing-actions";
 import { measurePerf } from "../perf/perf-hooks";
 import {
   beginMoveSelection,
-  moveSelectionBy,
+  commitMoveSelection,
   updateMoveSelection,
 } from "./move-selection";
 
@@ -60,13 +60,7 @@ export const updateSelectionDrag = (editor, session, options = {}) => {
 
     let movedNodeIds: string[] = [];
 
-    if (options.delta) {
-      movedNodeIds = moveSelectionBy(editor, {
-        queueRefresh: options.queueRefresh,
-        x: options.delta.x,
-        y: options.delta.y,
-      });
-    } else if (hasAbsoluteMoveInput(options)) {
+    if (options.delta || hasAbsoluteMoveInput(options)) {
       movedNodeIds = updateMoveSelection(editor, session.moveSession, options);
     }
 
@@ -93,14 +87,22 @@ export const endSelectionDrag = (editor, session, options = {}) => {
       updateSelectionDrag(editor, session, options);
     }
 
+    if (options.cancel || !session.changed) {
+      if (session.isActive) {
+        editor.endSelectionDragInteraction();
+      } else {
+        editor.setHoveringSuppressed(false);
+      }
+
+      return editor.revertToMark(session.historyMark);
+    }
+
+    commitMoveSelection(editor, session.moveSession);
+
     if (session.isActive) {
       editor.endSelectionDragInteraction();
     } else {
       editor.setHoveringSuppressed(false);
-    }
-
-    if (options.cancel || !session.changed) {
-      return editor.revertToMark(session.historyMark);
     }
 
     return editor.commitHistoryStep(session.historyMark);

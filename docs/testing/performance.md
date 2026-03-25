@@ -27,6 +27,11 @@ reimplementing timing logic outside the app.
 
 - Use `bun run test:performance:headed` for browser-backed performance runs
   where the app needs to stay visible while the test is running.
+- Use `bun run test:performance:benchmark:headed text-nodes-dragging-500` to
+  run a specific web benchmark in a visible browser window and print its
+  measured summary after the run.
+- Use `bun run test:performance:benchmark text-nodes-dragging-500 --json` when
+  a script or release check needs the structured benchmark result on stdout.
 - Use `bun run test:performance:trace` to stop after the first newly captured
   slow frame and write a Chrome trace to `.context/performance/`.
 - `apps/web/tests/performance/idle-slow-frame.spec.ts` is the `idle-soak-2min`
@@ -88,6 +93,10 @@ Prefer a small number of high-signal benchmarks such as:
   by the app in test or development contexts.
 - The CLI runner should collect JSON results and write them as artifacts for
   local comparison or release checks.
+- `scripts/performance/run-web-benchmark.ts` is the single-command runner for
+  registry-backed web benchmarks such as `text-nodes-dragging-500`.
+- The runner writes `.context/performance/<benchmark-id>-result.json` and
+  `.context/performance/<benchmark-id>-snapshot.json` for each run.
 
 ## Release Checks
 

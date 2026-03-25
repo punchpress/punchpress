@@ -1,10 +1,17 @@
-import { getEditableNodeFrame } from "../editable-node-frame";
 import {
-  getDescendantLeafNodeIds,
-  isGroupNode,
-  isTextNode,
-} from "../nodes/node-tree";
-import { isNodeVisible } from "../shapes/warp-text/model";
+  getNodeEditCapabilities as getNodeSurfaceEditCapabilities,
+  getNodeSurfaceFrame,
+  getNodeSurfaceGeometry,
+  getNodeHitBounds as getNodeSurfaceHitBounds,
+  getNodeSurfaceLocalBounds,
+} from "../nodes/node-capabilities";
+import { isGroupNode, isTextNode } from "../nodes/node-tree";
+import {
+  getNodeCssTransform,
+  getNodeX,
+  getNodeY,
+  isNodeVisible,
+} from "../nodes/text/model";
 
 export const getNode = (editor, nodeId) => {
   if (!nodeId) {
@@ -74,7 +81,29 @@ export const getNodeGeometry = (editor, nodeId) => {
   return editor.geometry.getById(editor.nodes, editor.fontRevision, nodeId);
 };
 
-export const getNodeFrame = (editor, nodeId) => {
+export const getNodeRenderGeometry = (editor, nodeId) => {
+  return getNodeSurfaceGeometry(editor, nodeId);
+};
+
+export const getNodeRenderBounds = (editor, nodeId) => {
+  return getNodeSurfaceLocalBounds(editor, nodeId, "render");
+};
+
+export const getNodeTransformBounds = (editor, nodeId) => {
+  return getNodeSurfaceLocalBounds(editor, nodeId, "transform", {
+    useSelectionBounds: Boolean(editor.getNodeTransformElement(nodeId)),
+  });
+};
+
+export const getNodeHitBounds = (editor, nodeId) => {
+  return getNodeSurfaceHitBounds(editor, nodeId);
+};
+
+export const getNodeEditCapabilities = (editor, nodeId) => {
+  return getNodeSurfaceEditCapabilities(editor, nodeId);
+};
+
+export const getNodeRenderFrame = (editor, nodeId) => {
   if (!nodeId) {
     return null;
   }
@@ -84,38 +113,62 @@ export const getNodeFrame = (editor, nodeId) => {
     return null;
   }
 
-  if (isGroupNode(node)) {
-    const descendantLeafNodeIds = getDescendantLeafNodeIds(
-      editor.nodes,
-      nodeId
-    );
-    if (descendantLeafNodeIds.length === 0) {
-      return null;
-    }
+  return getNodeSurfaceFrame(editor, nodeId, "render");
+};
 
-    const bounds = editor.getSelectionBounds(descendantLeafNodeIds);
-    if (!bounds) {
-      return null;
-    }
-
-    return {
-      bounds,
-      transform: undefined,
-    };
+export const getNodeSelectionFrame = (editor, nodeId) => {
+  if (!nodeId) {
+    return null;
   }
 
-  return getEditableNodeFrame(node, getNodeGeometry(editor, nodeId), {
+  const node = getNode(editor, nodeId);
+  if (!node) {
+    return null;
+  }
+
+  return getNodeSurfaceFrame(editor, nodeId, "selection", {
     useSelectionBounds: Boolean(editor.getNodeTransformElement(nodeId)),
   });
+};
+
+export const getNodeTransformFrame = (editor, nodeId) => {
+  if (!nodeId) {
+    return null;
+  }
+
+  const node = getNode(editor, nodeId);
+  const bounds = getNodeTransformBounds(editor, nodeId);
+
+  if (!(node && bounds)) {
+    return null;
+  }
+
+  return {
+    bounds: {
+      height: bounds.height,
+      maxX: getNodeX(node) + bounds.maxX,
+      maxY: getNodeY(node) + bounds.maxY,
+      minX: getNodeX(node) + bounds.minX,
+      minY: getNodeY(node) + bounds.minY,
+      width: bounds.width,
+    },
+    transform: getNodeCssTransform(node),
+  };
+};
+
+export const getNodeFrame = (editor, nodeId) => {
+  return getNodeSelectionFrame(editor, nodeId);
 };
 
 export const getSelectionFrameKey = (
   editor,
   nodeIds = editor.selectedNodeIds
 ) => {
-  return nodeIds
-    .map((nodeId) => {
-      const frame = getNodeFrame(editor, nodeId);
+  const previewDelta = getSelectionPreviewDelta(editor, nodeIds);
+
+  return [
+    ...nodeIds.map((nodeId) => {
+      const frame = getNodeSelectionFrame(editor, nodeId);
 
       if (!frame) {
         return nodeId;
@@ -126,6 +179,26 @@ export const getSelectionFrameKey = (
         nodeId,
         transform: frame.transform || "",
       });
-    })
-    .join("|");
+    }),
+    JSON.stringify(previewDelta),
+  ].join("|");
+};
+
+export const getSelectionPreviewDelta = (
+  editor,
+  nodeIds = editor.selectedNodeIds
+) => {
+  const preview = editor.selectionDragPreview;
+
+  if (
+    !(
+      preview?.delta &&
+      preview.nodeIds?.length === nodeIds.length &&
+      nodeIds.every((nodeId) => preview.nodeIds.includes(nodeId))
+    )
+  ) {
+    return null;
+  }
+
+  return preview.delta;
 };

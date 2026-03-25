@@ -35,7 +35,7 @@ export const NodeFields = () => {
       return false;
     }
 
-    return Boolean(editor.getNodeGeometry(node.id)?.guide);
+    return Boolean(editor.getNodeEditCapabilities(node.id)?.guide);
   });
 
   if (!node) {

@@ -1,37 +1,7 @@
-import { isTextNode } from "../nodes/node-tree";
-import { buildNodeGeometry } from "../shapes/warp-text/warp-engine";
-import { estimateBounds } from "../shapes/warp-text/warp-layout";
-
-const getGeometrySignature = (node, fontRevision) => {
-  if (!isTextNode(node)) {
-    return `${fontRevision}:${node.id}:${node.type}`;
-  }
-
-  return JSON.stringify({
-    fontRevision,
-    font: node.font,
-    fontSize: node.fontSize,
-    strokeWidth: node.strokeWidth,
-    text: node.text,
-    tracking: node.tracking,
-    warp: node.warp,
-  });
-};
-
-const getFallbackGeometry = (node) => {
-  if (!isTextNode(node)) {
-    return null;
-  }
-
-  return {
-    bbox: estimateBounds(node),
-    guide: null,
-    id: node.id,
-    paths: [],
-    ready: false,
-    selectionBounds: null,
-  };
-};
+import {
+  buildNodeCapabilityGeometry,
+  getNodeGeometrySignature,
+} from "../nodes/node-capabilities";
 
 export class GeometryManager {
   constructor(fontManager) {
@@ -51,10 +21,10 @@ export class GeometryManager {
     const geometryById = new Map();
 
     for (const node of nodes) {
-      const signature = getGeometrySignature(node, fontRevision);
+      const signature = getNodeGeometrySignature(node, fontRevision);
       const cached = this.cache.get(node.id);
 
-      if (!isTextNode(node)) {
+      if (!signature) {
         nextCache.set(node.id, { geometry: null, signature });
         geometryById.set(node.id, null);
         continue;
@@ -66,38 +36,24 @@ export class GeometryManager {
         continue;
       }
 
-      const font = this.fontManager.getLoadedFont(node.font);
-      if (!font) {
-        if (cached?.geometry?.ready) {
-          nextCache.set(node.id, cached);
-          geometryById.set(node.id, cached.geometry);
-          continue;
-        }
+      const font =
+        "font" in node ? this.fontManager.getLoadedFont(node.font) : null;
+      const builtGeometry = buildNodeCapabilityGeometry(node, font);
 
-        const geometry = getFallbackGeometry(node);
-        nextCache.set(node.id, { geometry, signature });
-        geometryById.set(node.id, geometry);
+      if (!builtGeometry) {
+        nextCache.set(node.id, { geometry: null, signature });
+        geometryById.set(node.id, null);
         continue;
       }
 
-      const builtGeometry = buildNodeGeometry(node, font);
       if (!builtGeometry.ready && cached?.geometry?.ready) {
         nextCache.set(node.id, cached);
         geometryById.set(node.id, cached.geometry);
         continue;
       }
 
-      const geometry = {
-        bbox: builtGeometry.bbox,
-        guide: builtGeometry.guide || null,
-        id: node.id,
-        paths: builtGeometry.paths,
-        ready: builtGeometry.ready,
-        selectionBounds: builtGeometry.selectionBounds || null,
-      };
-
-      nextCache.set(node.id, { geometry, signature });
-      geometryById.set(node.id, geometry);
+      nextCache.set(node.id, { geometry: builtGeometry, signature });
+      geometryById.set(node.id, builtGeometry);
     }
 
     this.cache = nextCache;

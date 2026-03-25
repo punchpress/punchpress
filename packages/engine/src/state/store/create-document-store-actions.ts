@@ -1,4 +1,4 @@
-import { createDefaultNode } from "../../shapes/warp-text/model";
+import { createDefaultNode } from "../../nodes/text/model";
 import {
   insertClipboardContentState,
   pasteClipboardContentState,

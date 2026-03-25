@@ -2,7 +2,6 @@ import {
   getNodeRotationCenter,
   getRotatedNodeUpdate,
 } from "../primitives/rotation";
-import { estimateBounds } from "../shapes/warp-text/warp-layout";
 
 const getBoundsCenter = (bounds) => {
   if (!bounds) {
@@ -13,24 +12,6 @@ const getBoundsCenter = (bounds) => {
     x: (bounds.minX + bounds.maxX) / 2,
     y: (bounds.minY + bounds.maxY) / 2,
   };
-};
-
-const queueOverlayRefresh = (editor) => {
-  if (typeof window === "undefined") {
-    editor.onViewportChange?.();
-    return;
-  }
-
-  window.requestAnimationFrame(() => {
-    editor.onViewportChange?.();
-  });
-};
-
-const getNodeRotateBounds = (editor, nodeId, node) => {
-  const geometry = editor.getNodeGeometry(nodeId);
-  return editor.getNodeTransformElement(nodeId)
-    ? geometry?.selectionBounds || geometry?.bbox || estimateBounds(node)
-    : geometry?.bbox || estimateBounds(node);
 };
 
 export const beginRotateSelection = (editor, { nodeId, nodeIds } = {}) => {
@@ -51,7 +32,7 @@ export const beginRotateSelection = (editor, { nodeId, nodeIds } = {}) => {
   for (const currentNodeId of resolvedNodeIds) {
     const rotatedNode = editor.getNode(currentNodeId);
     const bbox = rotatedNode
-      ? getNodeRotateBounds(editor, currentNodeId, rotatedNode)
+      ? editor.getNodeTransformBounds(currentNodeId)
       : null;
 
     if (!(rotatedNode && bbox)) {
@@ -90,7 +71,7 @@ export const beginRotateSelection = (editor, { nodeId, nodeIds } = {}) => {
 export const updateRotateSelection = (
   editor,
   session,
-  { deltaRotation = 0, queueRefresh = false } = {}
+  { deltaRotation = 0 } = {}
 ) => {
   if (!(session && Number.isFinite(deltaRotation))) {
     return [];
@@ -110,10 +91,6 @@ export const updateRotateSelection = (
       deltaRotation
     );
   });
-
-  if (queueRefresh) {
-    queueOverlayRefresh(editor);
-  }
 
   return session.nodeIds;
 };

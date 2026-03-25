@@ -1,5 +1,9 @@
 import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
 import {
+  createDefaultGroupNode,
+  getNextGroupName,
+} from "../../nodes/group/model";
+import {
   createNodeMap,
   getChildIdsByParent,
   getNodeParentId,
@@ -7,10 +11,6 @@ import {
   getTreeOrderedNodes,
   isGroupNode,
 } from "../../nodes/node-tree";
-import {
-  createDefaultGroupNode,
-  getNextGroupName,
-} from "../../shapes/group/model";
 
 const dedupeIds = (nodeIds) => {
   return [...new Set(nodeIds.filter(Boolean))];

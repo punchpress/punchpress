@@ -1,15 +1,10 @@
-import { incrementPerfCounter, measurePerf } from "../perf/perf-hooks";
+import { measurePerf } from "../perf/perf-hooks";
 
 export const getSelectionBounds = (editor, nodeIds) => {
   return measurePerf("selection.bounds", () => {
     const bounds = nodeIds
       .map((nodeId) => {
-        const renderedBounds = getRenderedNodeBounds(editor, nodeId);
-        if (renderedBounds) {
-          return renderedBounds;
-        }
-
-        const frame = editor.getNodeFrame(nodeId);
+        const frame = editor.getNodeSelectionFrame(nodeId);
         if (!frame) {
           return null;
         }
@@ -27,7 +22,7 @@ export const getSelectionBounds = (editor, nodeIds) => {
     const maxX = Math.max(...bounds.map((bbox) => bbox.maxX));
     const maxY = Math.max(...bounds.map((bbox) => bbox.maxY));
 
-    return {
+    const selectionBounds = {
       height: maxY - minY,
       maxX,
       maxY,
@@ -35,33 +30,18 @@ export const getSelectionBounds = (editor, nodeIds) => {
       minY,
       width: maxX - minX,
     };
+
+    const previewDelta = editor.getSelectionPreviewDelta(nodeIds);
+    if (!previewDelta) {
+      return selectionBounds;
+    }
+
+    return {
+      ...selectionBounds,
+      maxX: selectionBounds.maxX + previewDelta.x,
+      maxY: selectionBounds.maxY + previewDelta.y,
+      minX: selectionBounds.minX + previewDelta.x,
+      minY: selectionBounds.minY + previewDelta.y,
+    };
   });
-};
-
-const getRenderedNodeBounds = (editor, nodeId) => {
-  const element =
-    editor.getNodeTransformElement(nodeId) || editor.getNodeElement(nodeId);
-  const host = editor.hostRef;
-  const viewer = editor.viewerRef;
-
-  if (!(element && host && viewer && editor.zoom > 0)) {
-    return null;
-  }
-
-  incrementPerfCounter("dom.rect.reads", 2);
-  const elementRect = element.getBoundingClientRect();
-  const hostRect = host.getBoundingClientRect();
-  const scrollLeft = viewer.getScrollLeft?.();
-  const scrollTop = viewer.getScrollTop?.();
-
-  if (!(Number.isFinite(scrollLeft) && Number.isFinite(scrollTop))) {
-    return null;
-  }
-
-  return {
-    maxX: scrollLeft + (elementRect.right - hostRect.left) / editor.zoom,
-    maxY: scrollTop + (elementRect.bottom - hostRect.top) / editor.zoom,
-    minX: scrollLeft + (elementRect.left - hostRect.left) / editor.zoom,
-    minY: scrollTop + (elementRect.top - hostRect.top) / editor.zoom,
-  };
 };

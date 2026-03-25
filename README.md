@@ -25,6 +25,19 @@ The repo is organized as a small Bun workspace so the app and desktop shell stay
 - `bun run build:desktop:unsigned` builds an unsigned desktop app DMG for local verification.
 - `bun run publish:desktop` builds the macOS release and publishes the updater artifacts to S3.
 
+## Testing
+
+- `bun run test:editor` runs the editor contract tests.
+- `bun run test:e2e` runs the browser E2E suite.
+- `bun run test:performance` runs the default web performance Playwright spec.
+- `bun run test:performance:headed` runs the default web performance spec in a visible browser window.
+- `bun run test:performance:benchmark --list` lists the registered web benchmarks.
+- `bun run test:performance:benchmark text-nodes-dragging-500` runs one web benchmark and prints its summary.
+- `bun run test:performance:benchmark:headed text-nodes-dragging-500` runs one web benchmark in a visible browser window and prints its summary when complete.
+- `bun run test:performance:benchmark --json text-nodes-dragging-500` returns a structured benchmark summary on stdout for scripts or local comparison.
+- Web benchmark artifacts are written to `.context/performance/<benchmark-id>-result.json` and `.context/performance/<benchmark-id>-snapshot.json`.
+- See `docs/testing/performance.md` for the broader performance workflow and trace-based debugging commands.
+
 ## Release
 
 - Canonical runbook: `docs/release/runbook.md`

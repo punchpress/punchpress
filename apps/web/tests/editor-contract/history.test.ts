@@ -61,6 +61,7 @@ describe("Editor history", () => {
       left: beforeNode.frame.bounds.minX + 140,
       top: beforeNode.frame.bounds.minY + 80,
     });
+    editor.commitMoveSelection(moveSession);
     editor.commitHistoryStep(historyMark);
 
     const afterDrag = getDebugNode(editor.getDebugDump(), nodeId);
