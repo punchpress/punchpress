@@ -91,7 +91,7 @@ export const createDefaultNode = (font) => {
     stroke: "#000000",
     strokeWidth: 12,
     visible: true,
-    warp: { kind: "arch", bend: 0.4 },
+    warp: { kind: "none" },
     transform: {
       rotation: 0,
       scaleX: 1,

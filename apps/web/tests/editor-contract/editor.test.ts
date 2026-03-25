@@ -202,6 +202,21 @@ describe("Editor.getSelectionFrameKey", () => {
 });
 
 describe("Editor text editing mode", () => {
+  test("creates new text nodes without a default warp", () => {
+    const editor = new Editor();
+    editor.applyLocalFontCatalog({
+      error: "",
+      fonts: [{ ...AVAILABLE_FONT, id: "arialmt" }],
+      state: "ready",
+    });
+
+    editor.addTextNode({ x: 320, y: 240 });
+
+    expect(editor.selectedNode?.warp).toEqual({
+      kind: "none",
+    });
+  });
+
   test("switches back to the pointer tool when placing a text node", () => {
     const editor = new Editor();
     editor.applyLocalFontCatalog({
@@ -216,6 +231,9 @@ describe("Editor text editing mode", () => {
     expect(editor.activeTool).toBe("pointer");
     expect(editor.editingNodeId).not.toBeNull();
     expect(editor.selectedNodeIds).toEqual([editor.editingNodeId]);
+    expect(editor.selectedNode?.warp).toEqual({
+      kind: "none",
+    });
   });
 
   test("keeps the pointer tool active when opening an existing text node for editing", () => {
