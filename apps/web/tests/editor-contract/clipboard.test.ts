@@ -55,6 +55,9 @@ describe("Editor clipboard", () => {
 
     expect(dump.nodes).toHaveLength(1);
     expect(pastedNode.text).toBe("hello world");
+    expect(pastedNode.warp).toEqual({
+      kind: "none",
+    });
   });
 
   test("repeated paste steps the same clipboard payload forward", () => {
