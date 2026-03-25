@@ -125,7 +125,6 @@ export const getDebugDump = (page) => {
 export const getSelectionSnapshot = (page) => {
   return getDebugDump(page).then((dump) => ({
     handles: dump?.selection?.handleRects || {},
-    isMoveableMuted: Boolean(dump?.selection?.moveableMuted),
     selectedNodeIds: dump?.selection?.ids || [],
     selectedNodeId: dump?.selection?.primaryId || null,
     zoom: dump?.viewport?.zoom || 1,
@@ -316,7 +315,7 @@ export const rotateSelectionFromCornerWithoutRelease = (page, options) => {
 };
 
 export const getGroupRotationPreviewRect = async (page) => {
-  const locator = page.locator(".canvas-group-rotation-preview");
+  const locator = page.locator(".canvas-multi-node-transform-overlay");
 
   if ((await locator.count()) === 0) {
     return null;

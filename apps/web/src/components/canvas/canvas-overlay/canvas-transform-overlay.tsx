@@ -1,146 +1,66 @@
-import { useRef, useState } from "react";
-import { flushSync } from "react-dom";
-import Moveable from "react-moveable";
 import { useEditor } from "../../../editor-react/use-editor";
-import { useEditorValue } from "../../../editor-react/use-editor-value";
-import { drillIntoGroupSelection } from "../canvas-group-drill-in";
-import { CanvasGroupRotationPreview } from "./canvas-group-rotation-preview";
-import { CanvasSelectionDragPreview } from "./canvas-selection-drag-preview";
-import { getCanvasTransformHandlers } from "./canvas-transform-handlers";
-import { useCanvasTransformEffects } from "./use-canvas-transform-effects";
+import { CanvasMultiNodeTransformOverlay } from "./canvas-multi-node-transform-overlay";
+import { CanvasSingleNodeTransformOverlay } from "./canvas-single-node-transform-overlay";
 import { useCanvasTransformState } from "./use-canvas-transform-state";
 
-export const CanvasTransformOverlay = ({ viewportRevision }) => {
-  const editor = useEditor();
-  const moveableRef = useRef(null);
-  const [isGroupRotationPreviewVisible, setIsGroupRotationPreviewVisible] =
-    useState(false);
-
-  const {
-    activeTool,
-    editingNodeId,
-    effectiveSelectedNodeIds,
-    groupRotationPreviewRect,
-    hasGroupSelection,
-    hostElement,
-    isDraggable,
-    isPathEditingSelection,
-    isResizable,
-    isRotatable,
-    selectedBounds,
-    selectedEditCapabilities,
-    selectedNode,
-    selectionPreview,
-    selectedTarget,
-    selectedTargets,
-    selectionFrameKey,
-    visibleSelectedNodeIds,
-    zoom,
-  } = useCanvasTransformState(editor, isGroupRotationPreviewVisible);
-  const isSelectionDragging = useEditorValue(
-    (_, state) => state.isSelectionDragging
-  );
-  const isSelectionRotating = useEditorValue(
-    (_, state) => state.isSelectionRotating
-  );
-  const suppressHover = () => {
-    editor.setHoveringSuppressed(true);
-  };
-  const restoreHover = () => {
-    editor.setHoveringSuppressed(false);
-  };
-
-  const { queueMoveableRefresh } = useCanvasTransformEffects({
-    activeTool,
-    editingNodeId,
-    hostElement,
-    isSelectionDragging,
-    isSelectionRotating,
-    isGroupRotationPreviewVisible,
-    moveableRef,
-    selectedTarget,
-    selectedTargets,
-    selectionFrameKey,
-    viewportRevision,
-  });
-  const moveableHandlers = getCanvasTransformHandlers({
-    editor,
-    hostElement,
-    queueRefresh: queueMoveableRefresh,
-    restoreHover,
-    selectedBounds,
-    selectedEditCapabilities,
-    selectedNode,
-    setIsGroupRotationPreviewVisible,
-    suppressHover,
-    visibleSelectedNodeIds,
-  });
-  const shouldRenderMoveable =
-    activeTool === "pointer" &&
-    !editingNodeId &&
-    selectedTargets.length > 0 &&
-    Boolean(hostElement);
-  let moveableModeKey = "node";
-
-  if (hasGroupSelection) {
-    moveableModeKey = "group";
-  } else if (isPathEditingSelection) {
-    moveableModeKey = "path";
+const getOverlayMode = ({
+  activeTool,
+  editingNodeId,
+  hasGroupSelection,
+  hostElement,
+  isTextPathPositioning,
+  selectedNode,
+  visibleSelectedNodeIds,
+}) => {
+  if (
+    !(
+      activeTool === "pointer" &&
+      !editingNodeId &&
+      hostElement &&
+      !isTextPathPositioning
+    )
+  ) {
+    return null;
   }
 
-  return (
-    <>
-      {shouldRenderMoveable ? (
-        <Moveable
-          className="canvas-moveable"
-          container={hostElement}
-          controlPadding={32}
-          draggable={isDraggable}
-          flushSync={flushSync}
-          hideChildMoveableDefaultLines={
-            hasGroupSelection || Boolean(editingNodeId)
-          }
-          hideDefaultLines={Boolean(editingNodeId)}
-          keepRatio
-          key={`moveable:${selectedNode?.id || "selection"}:${moveableModeKey}`}
-          onClickGroup={({ isDouble, targetIndex }) => {
-            if (!(isDouble && selectedNode?.type === "group")) {
-              return;
-            }
+  if (hasGroupSelection && visibleSelectedNodeIds.length > 0) {
+    return "multi";
+  }
 
-            const childNodeId = effectiveSelectedNodeIds[targetIndex];
-            if (!childNodeId) {
-              return;
-            }
+  return selectedNode?.id ? "single" : null;
+};
 
-            drillIntoGroupSelection(editor, childNodeId);
-          }}
-          {...moveableHandlers}
-          origin={false}
-          ref={moveableRef}
-          renderDirections={["nw", "ne", "sw", "se"]}
-          resizable={isResizable}
-          rootContainer={hostElement}
-          rotatable={isRotatable}
-          rotateAroundControls
-          rotationPosition="none"
-          target={editingNodeId || hasGroupSelection ? null : selectedTarget}
-          targets={
-            editingNodeId || !hasGroupSelection ? undefined : selectedTargets
-          }
-        />
-      ) : null}
+export const CanvasTransformOverlay = () => {
+  const editor = useEditor();
+  const overlayState = useCanvasTransformState(editor);
+  const overlayMode = getOverlayMode(overlayState);
 
-      {isSelectionDragging ? (
-        <CanvasSelectionDragPreview
-          delta={selectionPreview}
-          hostElement={hostElement}
-          isVisible={isSelectionDragging}
-          zoom={zoom}
-        />
-      ) : null}
+  if (overlayMode === "single" && overlayState.selectedNode?.id) {
+    return (
+      <CanvasSingleNodeTransformOverlay
+        isDraggable={overlayState.isDraggable}
+        isResizable={overlayState.isResizable}
+        isRotatable={overlayState.isRotatable}
+        nodeId={overlayState.selectedNode.id}
+      />
+    );
+  }
 
-      <CanvasGroupRotationPreview rect={groupRotationPreviewRect} />
-    </>
-  );
+  if (overlayMode === "multi") {
+    return (
+      <CanvasMultiNodeTransformOverlay
+        isDraggable={overlayState.isDraggable}
+        isResizable={overlayState.isResizable}
+        isRotatable={overlayState.isRotatable}
+        nodeIds={overlayState.visibleSelectedNodeIds}
+        selectedGroupNodeId={
+          overlayState.selectedNode?.type === "group"
+            ? overlayState.selectedNode.id
+            : null
+        }
+      />
+    );
+  }
+
+  return null;
 };

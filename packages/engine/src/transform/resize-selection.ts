@@ -47,6 +47,7 @@ export const beginResizeSelection = (
       baseNode: { ...resizedNode },
       direction: [...direction],
       nodeIds: [resolvedNodeId],
+      pathEditing: editor.isPathEditing(resolvedNodeId),
     };
   }
 
@@ -72,13 +73,19 @@ export const updateResizeSelection = (editor, session, { scale = 1 } = {}) => {
 
     editor.updateNode(
       nodeId,
-      getResizedNodeUpdate(
-        session.baseNode,
-        session.baseBBox,
-        session.anchorCanvas,
-        scale,
-        session.direction
-      )
+      session.pathEditing
+        ? getScaledGroupNodeUpdate(
+            session.baseNode,
+            session.anchorCanvas,
+            scale
+          )
+        : getResizedNodeUpdate(
+            session.baseNode,
+            session.baseBBox,
+            session.anchorCanvas,
+            scale,
+            session.direction
+          )
     );
 
     return [nodeId];

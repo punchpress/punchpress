@@ -1,22 +1,3 @@
-export const queueMoveableRefresh = (moveableRef) => {
-  if (typeof window === "undefined") {
-    moveableRef.current?.updateRect?.();
-    return;
-  }
-
-  window.requestAnimationFrame(() => {
-    moveableRef.current?.updateRect?.();
-  });
-};
-
-export const setMoveableMuted = (hostElement, muted) => {
-  hostElement?.classList.toggle("canvas-overlay-moveable-muted", muted);
-};
-
-export const setGroupRotationPreviewActive = (hostElement, active) => {
-  hostElement?.classList.toggle("canvas-overlay-group-rotating", active);
-};
-
 export const shouldBlockSelectionStart = (target) => {
   if (!(target instanceof Element)) {
     return false;
@@ -47,22 +28,20 @@ export const getTransformFlags = ({
   editingNodeId,
   hasGroupSelection,
   isPathEditingSelection,
+  isTextPathPositioning,
   selectedBounds,
   selectedEditCapabilities,
   selectedNode,
-  selectedTarget,
-  selectedTargets,
 }) => {
   if (isPathEditingSelection) {
     return {
       isDraggable: false,
       isResizable: Boolean(
         activeTool === "pointer" &&
-          selectedTargets.length > 0 &&
-          selectedTarget &&
           selectedNode &&
           selectedEditCapabilities &&
-          !editingNodeId
+          !editingNodeId &&
+          !isTextPathPositioning
       ),
       isRotatable: false,
     };
@@ -70,18 +49,18 @@ export const getTransformFlags = ({
 
   return {
     isDraggable: Boolean(
-      activeTool === "pointer" && selectedTargets.length > 0 && !editingNodeId
+      activeTool === "pointer" &&
+        Boolean(selectedNode || hasGroupSelection) &&
+        !editingNodeId
     ),
     isResizable: Boolean(
       activeTool === "pointer" &&
-        selectedTargets.length > 0 &&
-        (hasGroupSelection ? selectedBounds : selectedTarget) &&
+        (hasGroupSelection ? selectedBounds : selectedNode) &&
         (hasGroupSelection || (selectedNode && selectedEditCapabilities)) &&
         !editingNodeId
     ),
     isRotatable: Boolean(
       activeTool === "pointer" &&
-        selectedTargets.length > 0 &&
         (hasGroupSelection ? selectedBounds : selectedEditCapabilities) &&
         !editingNodeId
     ),

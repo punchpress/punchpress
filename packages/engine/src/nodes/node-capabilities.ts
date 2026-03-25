@@ -1,6 +1,7 @@
 import { getDescendantLeafNodeIds } from "../nodes/node-tree";
 import { getNodeWorldBounds } from "../primitives/rotation";
 import { createDefaultGroupNode } from "./group/model";
+import { createDefaultSquareNode } from "./square/model";
 import {
   createDefaultNode,
   getNodeCssTransform,
@@ -46,8 +47,12 @@ const getTextNodeRenderBounds = (node, geometry) => {
 const getTextNodeSelectionBounds = (
   node,
   geometry,
-  { useSelectionBounds = false } = {}
+  { useGuideBounds = false, useSelectionBounds = false } = {}
 ) => {
+  if (useGuideBounds && geometry?.guide?.bounds) {
+    return geometry.guide.bounds;
+  }
+
   if (useSelectionBounds) {
     return geometry?.selectionBounds || geometry?.bbox || estimateBounds(node);
   }
@@ -209,8 +214,112 @@ const groupNodeCapabilities = {
   type: "group",
 };
 
+const getSquareNodeBounds = (node) => {
+  const strokeInset = Math.max(node.strokeWidth / 2, 0);
+  const halfSize = node.size / 2;
+
+  return {
+    height: node.size + strokeInset * 2,
+    maxX: halfSize + strokeInset,
+    maxY: halfSize + strokeInset,
+    minX: -halfSize - strokeInset,
+    minY: -halfSize - strokeInset,
+    width: node.size + strokeInset * 2,
+  };
+};
+
+const squareNodeCapabilities = {
+  buildGeometry: (node) => {
+    const halfSize = node.size / 2;
+    const bbox = getSquareNodeBounds(node);
+
+    return {
+      bbox,
+      guide: null,
+      id: node.id,
+      paths: [
+        {
+          d: `M ${-halfSize} ${-halfSize} L ${halfSize} ${-halfSize} L ${halfSize} ${halfSize} L ${-halfSize} ${halfSize} Z`,
+          key: "square-0",
+        },
+      ],
+      ready: true,
+      selectionBounds: bbox,
+    };
+  },
+
+  createDefaultNode: () => {
+    return createDefaultSquareNode();
+  },
+
+  getFrameFromGeometry: (node, geometry, surface) => {
+    if (
+      !(
+        surface === "render" ||
+        surface === "selection" ||
+        surface === "transform"
+      )
+    ) {
+      return null;
+    }
+
+    return toTransformedWorldFrame(
+      node,
+      geometry?.bbox || getSquareNodeBounds(node)
+    );
+  },
+
+  getFrame: (editor, nodeId, node, surface) => {
+    const geometry = editor.getNodeGeometry(nodeId);
+
+    return squareNodeCapabilities.getFrameFromGeometry(node, geometry, surface);
+  },
+
+  getGeometrySignature: (node, fontRevision) => {
+    return JSON.stringify({
+      fill: node.fill,
+      fontRevision,
+      size: node.size,
+      stroke: node.stroke,
+      strokeWidth: node.strokeWidth,
+    });
+  },
+
+  getLocalBounds: (editor, nodeId, node, surface) => {
+    if (
+      !(
+        surface === "render" ||
+        surface === "selection" ||
+        surface === "transform"
+      )
+    ) {
+      return null;
+    }
+
+    return editor.getNodeGeometry(nodeId)?.bbox || getSquareNodeBounds(node);
+  },
+
+  getSurfaceGeometry: (editor, nodeId) => {
+    return editor.getNodeGeometry(nodeId);
+  },
+
+  getHitBounds: (editor, nodeId, node) => {
+    return editor.getNodeGeometry(nodeId)?.bbox || getSquareNodeBounds(node);
+  },
+
+  getEditCapabilities: () => ({
+    canEditPath: false,
+    canEditText: false,
+    guide: null,
+    hasExpandedHitBounds: false,
+  }),
+
+  type: "square",
+};
+
 const nodeCapabilitiesByType = {
   group: groupNodeCapabilities,
+  square: squareNodeCapabilities,
   text: textNodeCapabilities,
 };
 

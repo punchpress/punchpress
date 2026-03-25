@@ -34,14 +34,11 @@
   }
 
   .canvas-moveable .moveable-line,
-  .canvas-moveable .moveable-control,
-  .canvas-selection-drag-preview .moveable-line,
-  .canvas-selection-drag-preview .moveable-control {
+  .canvas-moveable .moveable-control {
     background: color-mix(in srgb, var(--editor-accent) 84%, black) !important;
   }
 
-  .canvas-moveable .moveable-control,
-  .canvas-selection-drag-preview .moveable-control {
+  .canvas-moveable .moveable-control {
     width: 18px !important;
     height: 18px !important;
     margin-top: -9px !important;
@@ -50,29 +47,24 @@
     @apply rounded-full border-2 border-white;
   }
 
-  .canvas-moveable .moveable-control.moveable-rotatable,
-  .canvas-selection-drag-preview .moveable-control.moveable-rotatable {
+  .canvas-moveable .moveable-control.moveable-rotatable {
     display: none !important;
   }
 
-  .canvas-moveable .moveable-line,
-  .canvas-selection-drag-preview .moveable-line {
+  .canvas-moveable .moveable-line {
     opacity: 0.7;
   }
 
-  .canvas-moveable .moveable-rotation,
-  .canvas-selection-drag-preview .moveable-rotation {
+  .canvas-moveable .moveable-rotation {
     height: calc(var(--canvas-rotation-offset, 28px) * var(--zoom)) !important;
   }
 
-  .canvas-moveable .moveable-rotation-line,
-  .canvas-selection-drag-preview .moveable-rotation-line {
+  .canvas-moveable .moveable-rotation-line {
     background: color-mix(in srgb, var(--editor-accent) 72%, black) !important;
     opacity: 0.9;
   }
 
-  .canvas-moveable .moveable-rotation-control,
-  .canvas-selection-drag-preview .moveable-rotation-control {
+  .canvas-moveable .moveable-rotation-control {
     width: 20px !important;
     height: 20px !important;
     margin-top: -10px !important;
@@ -88,34 +80,14 @@
       0 6px 14px rgb(23 37 84 / 0.18) !important;
   }
 
-  .canvas-overlay-moveable-muted .canvas-moveable {
-    --canvas-moveable-muted-line: var(--canvas-transform-box-lines);
-    --canvas-moveable-muted-control-fill: var(--canvas-transform-box-handles);
-    --canvas-moveable-muted-border: var(--canvas-transform-box-handles-border);
+  .canvas-single-node-transform-overlay .canvas-single-node-control {
+    margin-top: 0 !important;
+    margin-left: 0 !important;
   }
 
-  .canvas-overlay-moveable-muted .canvas-moveable .moveable-line,
-  .canvas-overlay-moveable-muted .canvas-moveable .moveable-rotation-line {
-    background: var(--canvas-moveable-muted-line) !important;
-    opacity: 1 !important;
-  }
-
-  .canvas-overlay-moveable-muted .canvas-moveable .moveable-control,
-  .canvas-overlay-moveable-muted .canvas-moveable .moveable-rotation-control {
-    background: var(--canvas-moveable-muted-control-fill) !important;
-    border-color: var(--canvas-moveable-muted-border) !important;
-    box-shadow: 0 0 0 1px var(--canvas-transform-box-handles-ring) !important;
-  }
-
-  .canvas-overlay-preview-dragging
-    .moveable-control-box.canvas-moveable:not(
-      .canvas-selection-drag-preview-box
-    ) {
-    opacity: 0 !important;
-  }
-
-  .canvas-overlay-group-rotating .canvas-moveable .moveable-control-box {
-    opacity: 0 !important;
+  .canvas-multi-node-transform-overlay .canvas-multi-node-control {
+    margin-top: 0 !important;
+    margin-left: 0 !important;
   }
 
   .canvas-node-toolbar-shell {
@@ -149,20 +121,6 @@
     outline-offset: 0;
     box-shadow: 0 0 0 1px
       color-mix(in srgb, var(--editor-accent) 16%, transparent);
-  }
-
-  .canvas-group-rotation-preview {
-    z-index: 6;
-    border: 1px solid var(--canvas-transform-preview-box-lines);
-    @apply rounded;
-  }
-
-  .canvas-selection-drag-preview {
-    z-index: 10;
-  }
-
-  .canvas-selection-drag-preview-box {
-    opacity: 1 !important;
   }
 
   .canvas-hover-preview {

@@ -156,12 +156,11 @@ _A brief summary of key architectural decisions for engineers and AI assistants 
 **Composable interaction primitives, not a monolithic framework.** The editor shell is assembled from small, focused, MIT-licensed libraries from the daybrush ecosystem that are designed to work together:
 
 - **react-infinite-viewer** — infinite canvas with zoom, pan, and scrolling
-- **react-moveable** — drag, resize, rotate, scale, snap, and warp handles on any DOM/SVG element
 - **react-selecto** — drag-to-select (lasso) across elements
 
-This gives us a tldraw/Figma-quality interaction feel without depending on a monolithic canvas framework. Moveable wraps whatever we render (SVG paths, images, groups) with interaction chrome. The rendering itself is entirely ours.
+This gives us a tldraw/Figma-quality interaction feel without depending on a monolithic canvas framework. The transform overlay is editor-owned and rendered by our own canvas layer, while the node rendering itself is entirely ours.
 
-**Two-layer editing model (like Illustrator).** Object-level editing (select tool — drag, resize, rotate whole elements) is handled by Moveable. Path-level editing (pen tool / direct selection — edit anchor points and bezier handles) is a separate mode powered by Paper.js. Double-click into an element to enter vector edit mode; click away to return to object mode.
+**Two-layer editing model (like Illustrator).** Object-level editing (select tool — drag, resize, rotate whole elements) is handled by the editor-owned transform overlay. Path-level editing (pen tool / direct selection — edit anchor points and bezier handles) is a separate mode powered by Paper.js. Double-click into an element to enter vector edit mode; click away to return to object mode.
 
 ### Vector editing
 
@@ -200,7 +199,7 @@ Release setup is documented in [docs/release/desktop.md](./docs/release/desktop.
 | Styling | Tailwind CSS | MIT | Design system, dark theme |
 | State | Zustand + Immer + zundo | MIT | Document store, undo/redo, granular subscriptions |
 | Infinite canvas | react-infinite-viewer | MIT | Zoom, pan, scrollable viewport |
-| Object interaction | react-moveable | MIT | Drag, resize, rotate, snap handles |
+| Object interaction | Custom transform overlay | — | Drag, resize, rotate handles driven from editor geometry |
 | Selection | react-selecto | MIT | Lasso / click selection |
 | Vector editing | Paper.js | MIT | Pen tool, bezier handles, boolean ops, path editing |
 | Font engine | opentype.js | MIT | Font loading, glyph outlines, kerning |

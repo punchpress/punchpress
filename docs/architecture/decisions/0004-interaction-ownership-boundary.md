@@ -7,7 +7,7 @@ Date: 2026-03-22
 ## Context
 
 Punchpress is a browser app, so pointer and keyboard events arrive through React
-land and browser-integrated libraries such as Moveable and Selecto.
+land and browser-integrated libraries such as Selecto.
 
 That creates a recurring temptation to let interaction behavior live where the
 events first appear. This is convenient in the moment, but it causes two kinds
@@ -38,7 +38,7 @@ The durable rules are:
   on one editor command or session model rather than duplicate policy in React
   code
 - browser-only concerns such as pointer capture, element refs, clipboard APIs,
-  and Moveable / Selecto integration stay outside the engine
+  and overlay / Selecto integration stay outside the engine
 - durable behavior should be testable through editor-contract tests, while E2E
   tests should focus on browser wiring and visual interaction boundaries
 
@@ -71,4 +71,5 @@ The current implementation lives in:
 - `packages/engine/src/transform/selection-drag.ts`
 - `packages/engine/src/editor.ts`
 - `apps/web/src/components/canvas/canvas-node.tsx`
-- `apps/web/src/components/canvas/canvas-overlay/canvas-drag-handlers.ts`
+- `apps/web/src/components/canvas/canvas-overlay/canvas-single-node-transform-overlay.tsx`
+- `apps/web/src/components/canvas/canvas-overlay/canvas-multi-node-transform-overlay.tsx`

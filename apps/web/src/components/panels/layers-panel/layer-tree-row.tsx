@@ -19,6 +19,7 @@ import { SortableItem, SortableList } from "@/components/ui/sortable-list";
 import { cn } from "@/lib/utils";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
+import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
 import {
   LAYER_SHORTCUTS,
   LayerContextMenuItem,
@@ -319,6 +320,7 @@ export const LayerTreeRow = ({
   onToggleCollapse,
   setItemRef,
 }) => {
+  usePerformanceRenderCounter("render.panel.layer-row");
   const editor = useEditor();
   const renameInputRef = useRef(null);
   const { handleSetItemRef, sortableItemStyle } = useSortableDragStyle({

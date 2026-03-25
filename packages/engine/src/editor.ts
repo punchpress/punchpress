@@ -109,6 +109,7 @@ import {
   getNodeTransformFrame as getEditorNodeTransformFrame,
   getSelectionFrameKey as getEditorSelectionFrameKey,
   getSelectionPreviewDelta as getEditorSelectionPreviewDelta,
+  getSelectionTransformFrame as getEditorSelectionTransformFrame,
 } from "./queries/node-queries";
 import {
   clearSelection as clearEditorSelection,
@@ -195,6 +196,7 @@ export class Editor {
     this.localFontCatalogPromise = null;
     this.interactionPreviewListeners = new Set();
     this.interactionPreviewRevision = 0;
+    this.placementSurfaceListeners = new Set();
     this.history = new HistoryManager({
       applyChange: applyDocumentChange,
       applyState: (nodes) => {
@@ -564,6 +566,10 @@ export class Editor {
     return getEditorNodeFrame(this, nodeId);
   }
 
+  getSelectionTransformFrame(nodeIds = this.selectedNodeIds) {
+    return getEditorSelectionTransformFrame(this, nodeIds);
+  }
+
   getSelectionPreviewDelta(nodeIds = this.selectedNodeIds) {
     return getEditorSelectionPreviewDelta(this, nodeIds);
   }
@@ -710,6 +716,10 @@ export class Editor {
 
   setSelectionDragPreview(selectionDragPreview) {
     this.selectionDragPreviewState = selectionDragPreview || null;
+    this.notifyInteractionPreviewChanged();
+  }
+
+  notifyInteractionPreviewChanged() {
     this.interactionPreviewRevision += 1;
 
     for (const listener of this.interactionPreviewListeners) {
@@ -726,6 +736,20 @@ export class Editor {
 
     return () => {
       this.interactionPreviewListeners.delete(listener);
+    };
+  }
+
+  notifyPlacementSurfaceApplied() {
+    for (const listener of this.placementSurfaceListeners) {
+      listener();
+    }
+  }
+
+  subscribePlacementSurface(listener) {
+    this.placementSurfaceListeners.add(listener);
+
+    return () => {
+      this.placementSurfaceListeners.delete(listener);
     };
   }
 
@@ -930,11 +954,19 @@ export class Editor {
   }
 
   registerNodeTransformElement(nodeId, element) {
+    const currentElement = this.nodeTransformElements.get(nodeId) || null;
+
+    if (currentElement === element) {
+      return;
+    }
+
     if (element) {
       this.nodeTransformElements.set(nodeId, element);
     } else {
       this.nodeTransformElements.delete(nodeId);
     }
+
+    this.notifyInteractionPreviewChanged();
   }
 
   serializeDocument() {
