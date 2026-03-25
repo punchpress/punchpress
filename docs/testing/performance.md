@@ -23,6 +23,16 @@ The app is the source of truth for performance data. Automation should trigger
 benchmarks in the app and collect the app's structured result rather than
 reimplementing timing logic outside the app.
 
+When a benchmark is unexpectedly slow, first distinguish browser limits from
+app overhead:
+
+1. run the real PunchPress benchmark
+2. run a minimal browser-only control scene for the same rough visual workload
+3. disable or isolate major editor surfaces such as overlays and compare again
+
+This prevents chasing the wrong layer when the real bottleneck lives in editor
+infrastructure rather than raw browser rendering.
+
 ## Headed Soak Runs
 
 - Use `bun run test:performance:headed` for browser-backed performance runs
@@ -82,6 +92,7 @@ Prefer a small number of high-signal benchmarks such as:
 - single text-node drag
 - medium multi-node drag
 - large multi-node drag
+- large simple-shape drag as a control benchmark
 - selection or overlay-heavy scenarios once those become important
 
 ## CLI Runner
@@ -105,3 +116,13 @@ Prefer a small number of high-signal benchmarks such as:
   compare the result against defined thresholds or a checked-in baseline.
 - Release gating should focus on a small number of meaningful thresholds rather
   than trying to benchmark every interaction in the product.
+
+## Debugging Workflow
+
+When a benchmark regresses:
+
+1. confirm the regression with the shared benchmark runner
+2. compare against a simpler control benchmark to estimate browser headroom
+3. capture a Chrome trace only after the benchmark shape is understood
+4. isolate large editor surfaces such as overlays before rewriting node
+   rendering or panel code

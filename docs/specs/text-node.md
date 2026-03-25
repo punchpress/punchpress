@@ -44,4 +44,6 @@ Text nodes let users place and edit stylized text directly on the canvas.
 - While path editing, dragging the text should still move the node on the canvas.
 - While path editing, a dedicated path-position handle should move the text along the path without moving the node itself.
 - Moving text along a path should not make the underlying path itself appear to drift or jitter.
+- While path editing, the visible transform/selection box should match the path-editing surface rather than a larger enclosing text bounds box.
+- While path editing, that transform/selection box should stay aligned with the path-editing surface during rotate, move, and resize interactions.
 - While the user is actively dragging a path-position handle, PunchPress may temporarily hide normal selection bounds if those bounds would otherwise jitter distractingly as the text reflows.
