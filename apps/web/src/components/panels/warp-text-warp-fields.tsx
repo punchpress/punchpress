@@ -1,9 +1,13 @@
 import { clamp, toNumber } from "@punchpress/engine";
 import { Input } from "@/components/ui/input";
+import { ScrubSlider } from "@/components/ui/scrub-slider";
 import { Slider } from "@/components/ui/slider";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
 import { FieldRow } from "./field-primitives";
+
+const CIRCLE_RADIUS_RANGE = { min: 1, max: 5000 };
+const CIRCLE_SWEEP_RANGE = { min: -360, max: 360 };
 
 export const NodeFieldsWarpInputs = () => {
   const editor = useEditor();
@@ -108,41 +112,46 @@ export const NodeFieldsWarpInputs = () => {
     return null;
   }
 
+  const setRadius = (value) => {
+    const radius = Math.max(1, toNumber(value, node.warp.radius));
+    update((currentNode) => {
+      return {
+        ...currentNode,
+        warp: { ...currentNode.warp, radius },
+      };
+    });
+  };
+
+  const setSweep = (value) => {
+    const sweepDeg = toNumber(value, node.warp.sweepDeg);
+    update((currentNode) => {
+      return {
+        ...currentNode,
+        warp: { ...currentNode.warp, sweepDeg },
+      };
+    });
+  };
+
   return (
     <>
       <FieldRow label="Radius">
-        <Input
-          nativeInput
-          onChange={(event) => {
-            const radius = Math.max(
-              1,
-              toNumber(event.target.value, node.warp.radius)
-            );
-            update((currentNode) => {
-              return {
-                ...currentNode,
-                warp: { ...currentNode.warp, radius },
-              };
-            });
-          }}
-          type="number"
+        <ScrubSlider
+          ariaLabel="Radius"
+          max={CIRCLE_RADIUS_RANGE.max}
+          min={CIRCLE_RADIUS_RANGE.min}
+          onValueChange={setRadius}
+          step={1}
           value={node.warp.radius}
         />
       </FieldRow>
 
       <FieldRow label="Sweep">
-        <Input
-          nativeInput
-          onChange={(event) => {
-            const sweepDeg = toNumber(event.target.value, node.warp.sweepDeg);
-            update((currentNode) => {
-              return {
-                ...currentNode,
-                warp: { ...currentNode.warp, sweepDeg },
-              };
-            });
-          }}
-          type="number"
+        <ScrubSlider
+          ariaLabel="Sweep"
+          max={CIRCLE_SWEEP_RANGE.max}
+          min={CIRCLE_SWEEP_RANGE.min}
+          onValueChange={setSweep}
+          step={1}
           value={node.warp.sweepDeg}
         />
       </FieldRow>

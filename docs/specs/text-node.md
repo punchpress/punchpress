@@ -28,6 +28,7 @@ Text nodes let users place and edit stylized text directly on the canvas.
 - Committing an edit updates the same text node.
 - Cancelling an edit restores the prior text content.
 - Text remains text throughout editing, transformation, save/load, and normal document workflows.
+- Bounded text style controls such as font size, tracking, stroke width, and circle path settings should support drag scrubbing with direct numeric entry as a fallback.
 - Future typography controls, including finer spacing controls, should carry through to editing mode once they are supported in the product.
 
 ## Path-Guided Text
@@ -45,6 +46,8 @@ Text nodes let users place and edit stylized text directly on the canvas.
 - While path editing, dragging the text should still move the node on the canvas.
 - While path editing, a dedicated path-position handle should move the text along the path without moving the node itself.
 - Moving text along a path should not make the underlying path itself appear to drift or jitter.
+- Circle warp panel scrub controls should stay within their defined UI ranges while dragging, even if the underlying path values were pushed beyond those ranges by another interaction.
+- When a circle warp value starts outside a scrub control's range, dragging back toward the valid range should recover to the nearest bound quickly before continuing with normal linear scrubbing.
 - While path editing, the visible transform/selection box should match the path-editing surface rather than a larger enclosing text bounds box.
 - While path editing, that transform/selection box should stay aligned with the path-editing surface during rotate, move, and resize interactions.
 - While the user is actively dragging a path-position handle, PunchPress may temporarily hide normal selection bounds if those bounds would otherwise jitter distractingly as the text reflows.
