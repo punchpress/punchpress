@@ -8,6 +8,7 @@ import { DesignerFloatingToolbar, DesignerFrame } from "../designer/designer";
 import { CanvasNodes } from "./canvas-nodes";
 import { CanvasOverlay } from "./canvas-overlay/canvas-overlay";
 import { CanvasTextEditor } from "./canvas-text-editor";
+import { startCanvasToolPlacementSession } from "./canvas-tool-placement-session";
 import { CanvasToolbar } from "./canvas-toolbar";
 
 const INITIAL_ZOOM = 1;
@@ -97,12 +98,24 @@ export const Canvas = () => {
         zoom
       );
 
-      editor.dispatchCanvasPointerDown({
+      startCanvasToolPlacementSession({
+        editor,
         event,
-        point: {
-          x: round(point.x, 2),
-          y: round(point.y, 2),
-        },
+        getCanvasPoint: (clientX, clientY) =>
+          getCanvasPoint(
+            viewerRef.current,
+            hostRef.current,
+            clientX,
+            clientY,
+            zoom
+          ),
+        session: editor.dispatchCanvasPointerDown({
+          event,
+          point: {
+            x: round(point.x, 2),
+            y: round(point.y, 2),
+          },
+        }),
       });
     },
     [activeTool, editor, spacePressed, zoom]

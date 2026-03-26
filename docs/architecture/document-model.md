@@ -22,7 +22,7 @@ The goal of the model is not to capture every future feature up front. The goal 
 
 ## Current Schema
 
-This section defines the current schema: editable text nodes plus structural group nodes.
+This section defines the current schema: editable text nodes, parametric basic shape nodes, and structural group nodes.
 
 ### Document
 
@@ -32,7 +32,7 @@ type DesignDocumentV1 = {
   nodes: Node[];
 };
 
-type Node = TextNode | GroupNode;
+type Node = TextNode | ShapeNode | GroupNode;
 ```
 
 Rules:
@@ -98,6 +98,24 @@ type Warp =
   | { kind: "circle"; radius: number; sweepDeg: number };
 ```
 
+### Shape Node
+
+```ts
+type ShapeNode = {
+  id: string;
+  type: "shape";
+  parentId: NodeParentId;
+  shape: "rectangle" | "ellipse" | "star";
+  width: number;
+  height: number;
+  fill: string;
+  stroke: string | null;
+  strokeWidth: number;
+  visible: boolean;
+  transform: Transform;
+};
+```
+
 This is intentionally simple:
 
 - `id` is a stable string ID for identity only. It is not the node's semantic role.
@@ -105,6 +123,7 @@ This is intentionally simple:
 - `parentId` expresses hierarchy without nesting child arrays inside the stored document.
 - `text` is the editable source string.
 - `font` stores the resolved local font descriptor used to derive geometry.
+- `shape` stores the basic shape variant while `width` and `height` stay editable source dimensions.
 - `transform` holds placement only.
 - `warp` is an option on text nodes and holds parametric warp settings only.
 
@@ -173,6 +192,25 @@ This is an example `version: "1.2"` document using the current feature set.
       }
     },
     {
+      "id": "node_shape_1",
+      "type": "shape",
+      "parentId": "group_1",
+      "shape": "rectangle",
+      "width": 2200,
+      "height": 900,
+      "fill": "#1d2940",
+      "stroke": null,
+      "strokeWidth": 0,
+      "visible": true,
+      "transform": {
+        "x": 2250,
+        "y": 2620,
+        "rotation": 0,
+        "scaleX": 1,
+        "scaleY": 1
+      }
+    },
+    {
       "id": "node_2",
       "type": "text",
       "parentId": "group_1",
@@ -211,6 +249,7 @@ The schema above implies a few non-negotiable behaviors:
 - The renderer is a pure function of the document.
 - Group membership changes `parentId`, not child arrays embedded in nodes.
 - Editing text updates `text`, not outlined path data.
+- Editing a basic shape updates parametric fields, not baked path data.
 - Editing a warp updates `warp`, not baked geometry.
 - Dragging, rotating, and scaling update `transform`, not content fields.
 - Export is the only time PunchPress may bake text into paths or flatten geometry for print.

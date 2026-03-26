@@ -1,4 +1,7 @@
-import { estimateBounds } from "../nodes/text/warp-layout";
+import {
+  buildNodeCapabilityGeometry,
+  getNodeFrameFromGeometry,
+} from "../nodes/node-capabilities";
 
 export const PASTE_STEP = 120;
 
@@ -31,55 +34,36 @@ const getViewportBounds = (editor) => {
   };
 };
 
-const getContentBounds = (nodes) => {
-  const textNodes = nodes.filter((node) => node?.type === "text");
-
-  if (textNodes.length === 0) {
+const getNodeContentBounds = (node) => {
+  if (!node || node.type === "group") {
     return null;
   }
 
-  const firstNode = textNodes[0];
-  const firstEstimate = estimateBounds(firstNode);
-  let bounds = {
-    minX: firstNode.transform.x + firstEstimate.minX,
-    minY: firstNode.transform.y + firstEstimate.minY,
-    maxX: firstNode.transform.x + firstEstimate.maxX,
-    maxY: firstNode.transform.y + firstEstimate.maxY,
-    width: firstEstimate.width,
-    height: firstEstimate.height,
-  };
+  const geometry = buildNodeCapabilityGeometry(node, null);
 
-  for (const node of textNodes.slice(1)) {
-    const estimate = estimateBounds(node);
-    const nodeBounds = {
-      minX: node.transform.x + estimate.minX,
-      minY: node.transform.y + estimate.minY,
-      maxX: node.transform.x + estimate.maxX,
-      maxY: node.transform.y + estimate.maxY,
-      width: estimate.width,
-      height: estimate.height,
-    };
+  return getNodeFrameFromGeometry(node, geometry, "transform")?.bounds || null;
+};
 
-    if (!bounds) {
-      bounds = nodeBounds;
-      continue;
-    }
+const getContentBounds = (nodes) => {
+  const bounds = nodes.map(getNodeContentBounds).filter(Boolean);
 
-    const minX = Math.min(bounds.minX, nodeBounds.minX);
-    const minY = Math.min(bounds.minY, nodeBounds.minY);
-    const maxX = Math.max(bounds.maxX, nodeBounds.maxX);
-    const maxY = Math.max(bounds.maxY, nodeBounds.maxY);
-    bounds = {
-      minX,
-      minY,
-      maxX,
-      maxY,
-      width: maxX - minX,
-      height: maxY - minY,
-    };
+  if (bounds.length === 0) {
+    return null;
   }
 
-  return bounds;
+  const minX = Math.min(...bounds.map((bbox) => bbox.minX));
+  const minY = Math.min(...bounds.map((bbox) => bbox.minY));
+  const maxX = Math.max(...bounds.map((bbox) => bbox.maxX));
+  const maxY = Math.max(...bounds.map((bbox) => bbox.maxY));
+
+  return {
+    minX,
+    minY,
+    maxX,
+    maxY,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
 };
 
 const boundsOverlap = (a, b) => {

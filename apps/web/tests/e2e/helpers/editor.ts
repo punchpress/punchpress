@@ -105,12 +105,15 @@ export const getNodeSnapshot = (page, nodeId) => {
       bbox: node.geometry?.bbox || null,
       elementRect: node.elementRect || null,
       fontSize: node.fontSize,
+      height: node.height ?? null,
       id: node.id,
       ready: Boolean(node.geometry?.ready),
       rotation: node.rotation || 0,
+      shape: node.shape ?? null,
       strokeWidth: node.strokeWidth,
       text: node.text,
       tracking: node.tracking,
+      width: node.width ?? null,
       x: node.transform?.x || 0,
       y: node.transform?.y || 0,
     };
@@ -158,8 +161,10 @@ export const getStateSnapshot = (page) => {
         fill: node.fill,
         fontSize: node.fontSize,
         font: node.font,
+        height: node.height ?? null,
         id: node.id,
         rotation: node.rotation || 0,
+        shape: node.shape ?? null,
         stroke: node.stroke,
         strokeWidth: node.strokeWidth,
         text: node.text,
@@ -167,6 +172,7 @@ export const getStateSnapshot = (page) => {
         type: node.type,
         visible: node.visible,
         warp: node.warp,
+        width: node.width ?? null,
         x: node.transform?.x || 0,
         y: node.transform?.y || 0,
       })) || [],
@@ -294,6 +300,34 @@ export const resizeSelectionFromCorner = async (page, options) => {
 
   if (!box) {
     throw new Error(`Missing ${corner} resize handle`);
+  }
+
+  const start = {
+    x: box.x + box.width / 2,
+    y: box.y + box.height / 2,
+  };
+  const end = {
+    x: start.x + drag.x,
+    y: start.y + drag.y,
+  };
+
+  await handle.hover();
+  await page.mouse.down();
+  await page.mouse.move(end.x, end.y, { steps: 24 });
+  await page.mouse.up();
+};
+
+export const resizeSelectionFromEdge = async (page, options) => {
+  const edge = options?.edge || "e";
+  const drag = options?.drag || { x: 80, y: 0 };
+  const handle = page.locator(`.canvas-moveable [data-edge="${edge}"]`);
+
+  await expect(handle).toBeVisible();
+
+  const box = await handle.boundingBox();
+
+  if (!box) {
+    throw new Error(`Missing ${edge} resize edge`);
   }
 
   const start = {

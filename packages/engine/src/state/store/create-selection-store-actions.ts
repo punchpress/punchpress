@@ -39,6 +39,12 @@ export const createSelectionStoreActions = (set) => {
       }));
     },
 
+    setNextShapeKind: (nextShapeKind) => {
+      set(() => ({
+        nextShapeKind,
+      }));
+    },
+
     setPathEditingNodeId: (nodeId) => {
       set(() => ({
         pathEditingNodeId: nodeId || null,

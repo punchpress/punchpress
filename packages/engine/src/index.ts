@@ -8,6 +8,13 @@ export {
   WARP_TEXT_NODE_KIND,
 } from "./constants";
 export { Editor } from "./editor";
+export {
+  getNodePropertySupport,
+  getSelectionProperties,
+  getSelectionPropertiesKey,
+  getSelectionPropertiesSnapshot,
+  setSelectionProperty,
+} from "./inspection/selection-properties";
 export { createDefaultGroupNode } from "./nodes/group/model";
 export {
   getAncestorNodeIds,
@@ -21,11 +28,11 @@ export {
   isContainerNode,
   isDescendantOf,
   isGroupNode,
-  isSquareNode,
+  isShapeNode,
   isTextNode,
   rebuildTreeOrder,
 } from "./nodes/node-tree";
-export { createDefaultSquareNode } from "./nodes/square/model";
+export { createDefaultShapeNode } from "./nodes/shape/model";
 export {
   ARCH_BEND_LIMIT,
   createDefaultNode,

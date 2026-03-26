@@ -59,6 +59,18 @@ export const getResizeAnchorFromBounds = (bounds, direction) => {
 };
 
 export const getScaledGroupNodeUpdate = (node, anchor, scale) => {
+  if (node.type === "shape") {
+    return {
+      height: round(Math.max(1, node.height * scale), 2),
+      strokeWidth: round(Math.max(0, node.strokeWidth * scale), 2),
+      transform: {
+        x: round(anchor.x + (getNodeX(node) - anchor.x) * scale, 2),
+        y: round(anchor.y + (getNodeY(node) - anchor.y) * scale, 2),
+      },
+      width: round(Math.max(1, node.width * scale), 2),
+    };
+  }
+
   return {
     fontSize: round(Math.max(1, node.fontSize * scale), 2),
     strokeWidth: round(Math.max(0, node.strokeWidth * scale), 2),
@@ -95,14 +107,25 @@ export const getResizedNodeUpdate = (node, bbox, anchor, scale, direction) => {
     getNodeRotation(node) || 0
   );
 
+  const transform = {
+    x: round(anchor.x - scaledCenter.x - rotatedOffset.x, 2),
+    y: round(anchor.y - scaledCenter.y - rotatedOffset.y, 2),
+  };
+
+  if (node.type === "shape") {
+    return {
+      height: round(Math.max(1, node.height * scale), 2),
+      strokeWidth: round(Math.max(0, node.strokeWidth * scale), 2),
+      transform,
+      width: round(Math.max(1, node.width * scale), 2),
+    };
+  }
+
   return {
     fontSize: round(Math.max(1, node.fontSize * scale), 2),
     strokeWidth: round(Math.max(0, node.strokeWidth * scale), 2),
     tracking: round(node.tracking * scale, 2),
-    transform: {
-      x: round(anchor.x - scaledCenter.x - rotatedOffset.x, 2),
-      y: round(anchor.y - scaledCenter.y - rotatedOffset.y, 2),
-    },
+    transform,
     warp: getScaledWarp(node.warp, scale),
   };
 };

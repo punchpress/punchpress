@@ -29,6 +29,47 @@ export const getEditorDebugDump = (editor) => {
       const renderFrame = editor.getNodeRenderFrame(node.id);
       const frame = editor.getNodeFrame(node.id);
       const element = editor.getNodeElement(node.id);
+      const nodeDetails = (() => {
+        if (node.type === "text") {
+          return {
+            fill: node.fill,
+            font: { ...node.font },
+            fontSize: node.fontSize,
+            stroke: node.stroke,
+            strokeWidth: node.strokeWidth,
+            text: node.text,
+            tracking: node.tracking,
+            warp: { ...node.warp },
+          };
+        }
+
+        if (node.type === "shape") {
+          return {
+            fill: node.fill,
+            font: null,
+            fontSize: null,
+            height: node.height,
+            shape: node.shape,
+            stroke: node.stroke,
+            strokeWidth: node.strokeWidth,
+            text: "",
+            tracking: null,
+            warp: null,
+            width: node.width,
+          };
+        }
+
+        return {
+          fill: null,
+          font: null,
+          fontSize: null,
+          stroke: null,
+          strokeWidth: null,
+          text: "",
+          tracking: null,
+          warp: null,
+        };
+      })();
 
       return {
         elementRect: toRect(element?.getBoundingClientRect?.()),
@@ -45,27 +86,7 @@ export const getEditorDebugDump = (editor) => {
         transform: { ...node.transform },
         type: node.type,
         visible: node.visible,
-        ...(node.type === "text"
-          ? {
-              fill: node.fill,
-              font: { ...node.font },
-              fontSize: node.fontSize,
-              stroke: node.stroke,
-              strokeWidth: node.strokeWidth,
-              text: node.text,
-              tracking: node.tracking,
-              warp: { ...node.warp },
-            }
-          : {
-              fill: null,
-              font: null,
-              fontSize: null,
-              stroke: null,
-              strokeWidth: null,
-              text: "",
-              tracking: null,
-              warp: null,
-            }),
+        ...nodeDetails,
       };
     }),
     selection: {
@@ -76,6 +97,7 @@ export const getEditorDebugDump = (editor) => {
       previewDelta: editor.selectionDragPreview?.delta || null,
       primaryId: editor.selectedNodeId,
     },
+    nextShapeKind: state.nextShapeKind,
     tool: state.activeTool,
     viewport: {
       zoom: state.viewport.zoom,

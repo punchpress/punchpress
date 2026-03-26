@@ -91,6 +91,68 @@ describe("Editor clipboard", () => {
     expect(secondPasteNode.transform.y).toBeCloseTo(500, 6);
   });
 
+  test("pasteClipboardContent recenters a shape-only payload into the viewport", () => {
+    const editor = createEditor();
+
+    attachViewport(editor);
+    editor.addShapeNode({ x: 5000, y: 5000 }, "rectangle");
+
+    const originalNodeId = editor.selectedNodeId;
+
+    if (!originalNodeId) {
+      throw new Error("Expected a selected shape node");
+    }
+
+    const content = editor.copySelection();
+    editor.pasteClipboardContent(content);
+
+    const dump = editor.getDebugDump();
+    const pastedNode = getDebugNode(dump, dump.selection.primaryId);
+
+    expect(pastedNode.id).not.toBe(originalNodeId);
+    expect(pastedNode.type).toBe("shape");
+    expect(pastedNode.shape).toBe("rectangle");
+    expect(pastedNode.transform.x).toBeCloseTo(500, 6);
+    expect(pastedNode.transform.y).toBeCloseTo(400, 6);
+  });
+
+  test("pasteClipboardContent recenters mixed text and shape payloads using both node bounds", () => {
+    const editor = createEditor();
+
+    attachViewport(editor);
+    const textNodeId = createTextNode(editor, {
+      text: "A",
+      x: 5000,
+      y: 5000,
+    });
+    editor.addShapeNode({ x: 5300, y: 5000 }, "rectangle");
+
+    const shapeNodeId = editor.selectedNodeId;
+
+    if (!shapeNodeId) {
+      throw new Error("Expected a selected shape node");
+    }
+
+    editor.setSelectedNodes([textNodeId, shapeNodeId]);
+
+    const content = editor.copySelection();
+    editor.pasteClipboardContent(content);
+
+    const dump = editor.getDebugDump();
+    const pastedNodes = dump.selection.ids.map((nodeId) =>
+      getDebugNode(dump, nodeId)
+    );
+    const pastedTextNode = pastedNodes.find((node) => node.type === "text");
+    const pastedShapeNode = pastedNodes.find((node) => node.type === "shape");
+
+    expect(pastedTextNode?.id).not.toBe(textNodeId);
+    expect(pastedShapeNode?.id).not.toBe(shapeNodeId);
+    expect(pastedTextNode?.transform.x).toBeCloseTo(480, 6);
+    expect(pastedTextNode?.transform.y).toBeCloseTo(400, 6);
+    expect(pastedShapeNode?.transform.x).toBeCloseTo(780, 6);
+    expect(pastedShapeNode?.transform.y).toBeCloseTo(400, 6);
+  });
+
   test("a fresh copy of the same selection resets the paste step", () => {
     const editor = createEditor();
     const originalNodeId = createTextNode(editor, {
@@ -136,6 +198,20 @@ const createEditor = () => {
   });
 
   return editor;
+};
+
+const attachViewport = (editor) => {
+  editor.hostRef = {
+    getBoundingClientRect: () => ({
+      height: 800,
+      width: 1000,
+    }),
+    querySelector: () => null,
+  };
+  editor.viewerRef = {
+    getScrollLeft: () => 0,
+    getScrollTop: () => 0,
+  };
 };
 
 const createTextNode = (editor, { text, x, y }) => {

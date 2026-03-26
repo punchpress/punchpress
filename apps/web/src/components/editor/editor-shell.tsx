@@ -8,7 +8,7 @@ import {
   DesignerWindowDragRegion,
 } from "../designer/designer";
 import { LayersPanel } from "../panels/layers-panel/layers-panel";
-import { PropertiesPanel } from "../panels/properties-panel";
+import { PropertiesPanel } from "../panels/properties/properties-panel";
 import { PerformanceHud } from "../performance/performance-hud";
 import { DesktopUpdateIndicator } from "./desktop-update-indicator";
 

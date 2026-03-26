@@ -4,9 +4,22 @@ const TOOL_SHORTCUTS = {
   v: "pointer",
 };
 
+const SHAPE_SHORTCUTS = {
+  o: "ellipse",
+  r: "rectangle",
+  s: "star",
+};
+
 export const selectToolFromShortcut = (editor, key, event) => {
   if (event?.metaKey || event?.ctrlKey || event?.altKey) {
     return false;
+  }
+
+  const nextShapeKind = SHAPE_SHORTCUTS[key];
+  if (nextShapeKind) {
+    editor.setNextShapeKind(nextShapeKind);
+    editor.setActiveTool("shape");
+    return true;
   }
 
   const nextTool = TOOL_SHORTCUTS[key];
@@ -24,11 +37,11 @@ export class Tool {
   }
 
   onCanvasPointerDown() {
-    // Base tool implementation intentionally does nothing.
+    return null;
   }
 
   onNodePointerDown({ node, ...info }) {
-    this.onCanvasPointerDown({
+    return this.onCanvasPointerDown({
       ...info,
       node,
       target: {

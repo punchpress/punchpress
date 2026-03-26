@@ -3,6 +3,8 @@ import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { getHostRectFromNodeFrame } from "./canvas-overlay-geometry";
 
+const HOVER_OUTSET_PX = 1;
+
 export const CanvasHoverPreview = ({ viewportRevision }) => {
   const editor = useEditor();
   const activeTool = useEditorValue((_, state) => state.activeTool);
@@ -46,12 +48,12 @@ export const CanvasHoverPreview = ({ viewportRevision }) => {
       className="canvas-hover-preview pointer-events-none absolute"
       data-viewport-revision={viewportRevision}
       style={{
-        height: `${hoveredNodePreviewRect.height}px`,
-        left: `${hoveredNodePreviewRect.left}px`,
-        top: `${hoveredNodePreviewRect.top}px`,
+        height: `${hoveredNodePreviewRect.height + HOVER_OUTSET_PX * 2}px`,
+        left: `${hoveredNodePreviewRect.left - HOVER_OUTSET_PX}px`,
+        top: `${hoveredNodePreviewRect.top - HOVER_OUTSET_PX}px`,
         transform: hoveredNodePreviewRect.transform,
         transformOrigin: "center center",
-        width: `${hoveredNodePreviewRect.width}px`,
+        width: `${hoveredNodePreviewRect.width + HOVER_OUTSET_PX * 2}px`,
       }}
     />
   );
