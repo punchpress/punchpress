@@ -8,11 +8,10 @@ import {
   createLocalFontDescriptor,
   createLocalFontOption,
 } from "@punchpress/punch-schema";
-import { LinkIcon } from "lucide-react";
 import { FontPicker } from "@/components/fonts-picker/font-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Toggle } from "@/components/ui/toggle";
+import { ScrubSlider } from "@/components/ui/scrub-slider";
 import {
   ToggleGroup,
   Toggle as ToggleGroupItem,
@@ -23,6 +22,10 @@ import { useEditorValue } from "../../editor-react/use-editor-value";
 import { ColorField, FieldRow, PairedRow, Section } from "./field-primitives";
 import { warpIcons } from "./warp-icons";
 import { NodeFieldsWarpInputs } from "./warp-text-warp-fields";
+
+const FONT_SIZE_RANGE = { min: 1, max: 2000 };
+const TRACKING_RANGE = { min: -200, max: 400 };
+const STROKE_WIDTH_RANGE = { min: 0, max: 200 };
 
 export const NodeFields = () => {
   const editor = useEditor();
@@ -71,40 +74,31 @@ export const NodeFields = () => {
           />
         </FieldRow>
 
-        <PairedRow
-          action={
-            <Toggle
-              aria-label="Link size and tracking"
-              className="size-6 min-w-6 rounded-md"
-              size="sm"
-            >
-              <LinkIcon className="size-3" />
-            </Toggle>
-          }
-          label="Size"
-        >
-          <Input
-            nativeInput
-            onChange={(event) => {
-              const fontSize = Math.max(
-                1,
-                toNumber(event.target.value, node.fontSize)
-              );
-              update({ fontSize });
+        <FieldRow label="Size">
+          <ScrubSlider
+            ariaLabel="Font size"
+            max={FONT_SIZE_RANGE.max}
+            min={FONT_SIZE_RANGE.min}
+            onValueChange={(fontSize) => {
+              update({
+                fontSize: Math.max(1, toNumber(fontSize, node.fontSize)),
+              });
             }}
-            type="number"
             value={node.fontSize}
           />
-          <Input
-            nativeInput
-            onChange={(event) => {
-              const tracking = toNumber(event.target.value, node.tracking);
-              update({ tracking });
+        </FieldRow>
+
+        <FieldRow label="Tracking">
+          <ScrubSlider
+            ariaLabel="Tracking"
+            max={TRACKING_RANGE.max}
+            min={TRACKING_RANGE.min}
+            onValueChange={(tracking) => {
+              update({ tracking: toNumber(tracking, node.tracking) });
             }}
-            type="number"
             value={node.tracking}
           />
-        </PairedRow>
+        </FieldRow>
       </Section>
 
       <Section className="border-black/6 border-t" title="Fill & Stroke">
@@ -120,16 +114,18 @@ export const NodeFields = () => {
         </FieldRow>
 
         <FieldRow label="Width">
-          <Input
-            nativeInput
-            onChange={(event) => {
-              const strokeWidth = Math.max(
-                0,
-                toNumber(event.target.value, node.strokeWidth)
-              );
-              update({ strokeWidth });
+          <ScrubSlider
+            ariaLabel="Stroke width"
+            max={STROKE_WIDTH_RANGE.max}
+            min={STROKE_WIDTH_RANGE.min}
+            onValueChange={(strokeWidth) => {
+              update({
+                strokeWidth: Math.max(
+                  0,
+                  toNumber(strokeWidth, node.strokeWidth)
+                ),
+              });
             }}
-            type="number"
             value={node.strokeWidth}
           />
         </FieldRow>
