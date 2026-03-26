@@ -16,8 +16,9 @@ import {
 } from "@/components/ui/toolbar";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
+import { ShapeToolbarButton } from "./shape-toolbar-button";
 
-const TOOL_CONFIG = [
+const PRIMARY_TOOL_CONFIG = [
   {
     icon: Cursor01Icon,
     iconLibrary: "hugeicons",
@@ -32,56 +33,28 @@ const TOOL_CONFIG = [
     label: "Hand",
     shortcut: "H",
   },
-  {
-    icon: TextFontIcon,
-    iconLibrary: "hugeicons",
-    id: "text",
-    label: "Text",
-    shortcut: "T",
-  },
 ];
+
+const TEXT_TOOL = {
+  icon: TextFontIcon,
+  iconLibrary: "hugeicons",
+  id: "text",
+  label: "Text",
+  shortcut: "T",
+};
 
 export const CanvasToolbar = () => {
   const editor = useEditor();
-  const activeTool = useEditorValue((_, state) => state.activeTool);
   const zoom = useEditorValue((_, state) => state.viewport.zoom);
 
   return (
     <Toolbar className="canvas-bottom-toolbar">
       <ToolbarGroup>
-        {TOOL_CONFIG.map(({ icon, iconLibrary, id, label, shortcut }) => {
-          const Icon = icon;
-
-          return (
-            <ToolbarButton
-              aria-label={`${label} (${shortcut})`}
-              key={id}
-              render={
-                <Toggle
-                  aria-pressed={activeTool === id}
-                  onPressedChange={(pressed) => {
-                    if (pressed) {
-                      editor.setActiveTool(id);
-                    }
-                  }}
-                  pressed={activeTool === id}
-                />
-              }
-              title={`${label} (${shortcut})`}
-            >
-              {iconLibrary === "lucide" ? (
-                <Icon size={18} strokeWidth={1.8} />
-              ) : (
-                <HugeiconsIcon
-                  color="currentColor"
-                  icon={icon}
-                  size={20}
-                  strokeWidth={1.6}
-                />
-              )}
-            </ToolbarButton>
-          );
+        {PRIMARY_TOOL_CONFIG.map((tool) => {
+          return <ToolButton key={tool.id} {...tool} />;
         })}
+        <ToolButton {...TEXT_TOOL} />
+        <ShapeToolbarButton />
       </ToolbarGroup>
 
       <ToolbarSeparator />
@@ -118,5 +91,40 @@ export const CanvasToolbar = () => {
         </ToolbarButton>
       </ToolbarGroup>
     </Toolbar>
+  );
+};
+
+const ToolButton = ({ icon, iconLibrary, id, label, shortcut }) => {
+  const editor = useEditor();
+  const activeTool = useEditorValue((_, state) => state.activeTool);
+  const Icon = icon;
+
+  return (
+    <ToolbarButton
+      aria-label={`${label} (${shortcut})`}
+      render={
+        <Toggle
+          aria-pressed={activeTool === id}
+          onPressedChange={(pressed) => {
+            if (pressed) {
+              editor.setActiveTool(id);
+            }
+          }}
+          pressed={activeTool === id}
+        />
+      }
+      title={`${label} (${shortcut})`}
+    >
+      {iconLibrary === "lucide" ? (
+        <Icon size={18} strokeWidth={1.8} />
+      ) : (
+        <HugeiconsIcon
+          color="currentColor"
+          icon={icon}
+          size={20}
+          strokeWidth={1.6}
+        />
+      )}
+    </ToolbarButton>
   );
 };

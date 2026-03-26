@@ -8,8 +8,8 @@ export const isTextNode = (node) => {
   return node?.type === "text";
 };
 
-export const isSquareNode = (node) => {
-  return node?.type === "square";
+export const isShapeNode = (node) => {
+  return node?.type === "shape";
 };
 
 export const isContainerNode = (node) => {

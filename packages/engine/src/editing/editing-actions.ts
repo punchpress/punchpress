@@ -1,3 +1,10 @@
+export const addShapeNode = (editor, point, shape) => {
+  finishEditingIfNeeded(editor);
+  editor.run(() => {
+    editor.getState().addShapeNode(point, shape || editor.nextShapeKind);
+  });
+};
+
 export const addTextNode = (editor, point) => {
   finishEditingIfNeeded(editor);
   editor.editingHistoryMark = editor.markHistoryStep("add text");

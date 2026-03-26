@@ -19,12 +19,14 @@ import {
 interface ColorPickerFieldProps {
   className?: string;
   onChange: (value: string) => void;
+  placeholder?: string;
   value?: string | null;
 }
 
 const ColorPickerField = ({
   className,
   onChange,
+  placeholder,
   value,
 }: ColorPickerFieldProps) => {
   const fieldRef = useRef<HTMLDivElement>(null);
@@ -82,12 +84,14 @@ const ColorPickerField = ({
           )}
         >
           <span className="absolute inset-0" style={CHECKERBOARD_STYLE} />
-          <span
-            className="absolute inset-[1px] rounded-[calc(var(--radius-md)-2px)]"
-            style={{
-              backgroundColor: value ?? "#ffffff",
-            }}
-          />
+          {value ? (
+            <span
+              className="absolute inset-[1px] rounded-[calc(var(--radius-md)-2px)]"
+              style={{
+                backgroundColor: value,
+              }}
+            />
+          ) : null}
           <span className="sr-only">Choose color</span>
         </Popover.Trigger>
         <Popover.Portal>
@@ -151,6 +155,7 @@ const ColorPickerField = ({
             onChange(formatStorageColor(nextColor));
           }
         }}
+        placeholder={placeholder}
         value={draftValue}
       />
     </div>

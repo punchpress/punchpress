@@ -6,6 +6,7 @@ import {
   getScaledGroupNodeUpdate,
 } from "../primitives/group-resize";
 import { getNodeWorldPoint } from "../primitives/rotation";
+import { getResizedShapeNodeUpdate } from "../primitives/shape-resize";
 
 const CORNER_DIRECTION = {
   ne: [1, -1],
@@ -16,7 +17,7 @@ const CORNER_DIRECTION = {
 
 export const beginResizeSelection = (
   editor,
-  { anchorCanvas, direction, nodeId, nodeIds } = {}
+  { anchorCanvas, direction, handle, nodeId, nodeIds } = {}
 ) => {
   const requestedNodeIds =
     nodeIds?.filter((currentNodeId) => editor.getNode(currentNodeId)) ||
@@ -37,8 +38,25 @@ export const beginResizeSelection = (
       ? editor.getNodeTransformBounds(resolvedNodeId)
       : null;
 
-    if (!(resizedNode && bbox && direction)) {
+    if (
+      !(
+        resizedNode &&
+        bbox &&
+        (direction || (resizedNode.type === "shape" && handle))
+      )
+    ) {
       return null;
+    }
+
+    if (resizedNode.type === "shape" && handle) {
+      return {
+        anchorCanvas: { ...anchorCanvas },
+        baseBBox: { ...bbox },
+        baseNode: { ...resizedNode },
+        handle,
+        mode: "shape-box",
+        nodeIds: [resolvedNodeId],
+      };
     }
 
     return {
@@ -63,12 +81,39 @@ export const beginResizeSelection = (
   };
 };
 
-export const updateResizeSelection = (editor, session, { scale = 1 } = {}) => {
-  if (!(session && Number.isFinite(scale))) {
+export const updateResizeSelection = (
+  editor,
+  session,
+  { pointCanvas, preserveAspectRatio = false, scale = 1 } = {}
+) => {
+  if (!session) {
     return [];
   }
 
+  if (session.mode === "shape-box") {
+    const nodeId = session.nodeIds[0];
+    const nodeUpdate = getResizedShapeNodeUpdate(
+      session.baseNode,
+      session.baseBBox,
+      session.anchorCanvas,
+      pointCanvas,
+      session.handle,
+      { preserveAspectRatio }
+    );
+
+    if (!nodeUpdate) {
+      return [];
+    }
+
+    editor.updateNode(nodeId, nodeUpdate);
+    return [nodeId];
+  }
+
   if ("direction" in session) {
+    if (!Number.isFinite(scale)) {
+      return [];
+    }
+
     const nodeId = session.nodeIds[0];
 
     editor.updateNode(
@@ -89,6 +134,10 @@ export const updateResizeSelection = (editor, session, { scale = 1 } = {}) => {
     );
 
     return [nodeId];
+  }
+
+  if (!Number.isFinite(scale)) {
+    return [];
   }
 
   editor.updateNodes(session.nodeIds, (node) => {

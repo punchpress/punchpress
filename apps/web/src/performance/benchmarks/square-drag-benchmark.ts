@@ -1,4 +1,4 @@
-import { createDefaultSquareNode } from "@punchpress/engine";
+import { createDefaultShapeNode } from "@punchpress/engine";
 import { saveDesignDocument } from "@punchpress/punch-schema";
 import type { PerformanceBenchmarkDefinition } from "../performance-benchmark-types";
 
@@ -6,14 +6,15 @@ const createBenchmarkNodes = (nodeCount: number) => {
   const columnCount = Math.max(1, Math.ceil(Math.sqrt(nodeCount)));
 
   return Array.from({ length: nodeCount }, (_, index) => {
-    const node = createDefaultSquareNode();
+    const node = createDefaultShapeNode("rectangle");
     const column = index % columnCount;
     const row = Math.floor(index / columnCount);
 
     return {
       ...node,
       fill: "#000000",
-      size: 220,
+      height: 220,
+      shape: "rectangle",
       stroke: null,
       strokeWidth: 0,
       transform: {
@@ -21,6 +22,7 @@ const createBenchmarkNodes = (nodeCount: number) => {
         x: 1150 + column * 340,
         y: 1400 + row * 340,
       },
+      width: 220,
     };
   });
 };
@@ -71,7 +73,7 @@ const getDragDelta = (
   };
 };
 
-export const squareDragBenchmarkLarge: PerformanceBenchmarkDefinition = {
+export const shapeDragBenchmarkLarge: PerformanceBenchmarkDefinition = {
   defaultOptions: {
     frames: 180,
     nodeCount: 500,
@@ -80,9 +82,9 @@ export const squareDragBenchmarkLarge: PerformanceBenchmarkDefinition = {
     warmupFrames: 18,
   },
   description:
-    "Builds a scratch 500-node square scene and drags the selection for a fixed 180-frame pass.",
-  id: "square-nodes-dragging-500",
-  label: "Square Nodes Dragging (500)",
+    "Builds a scratch 500-node rectangle scene and drags the selection for a fixed 180-frame pass.",
+  id: "shape-nodes-dragging-500",
+  label: "Shape Nodes Dragging (500)",
   setup: async ({ editor, options, waitForFrame, waitForFrames }) => {
     const nodes = createBenchmarkNodes(options.nodeCount);
 

@@ -31,6 +31,34 @@ describe("Editor history", () => {
     ]);
   });
 
+  test("undo and redo restore a created shape node", () => {
+    const editor = createEditor();
+
+    editor.setNextShapeKind("ellipse");
+    editor.addShapeNode({
+      x: 320,
+      y: 240,
+    });
+
+    expect(editor.getDebugDump().nodes).toMatchObject([
+      {
+        shape: "ellipse",
+        type: "shape",
+      },
+    ]);
+
+    editor.undo();
+    expect(editor.getDebugDump().nodes).toHaveLength(0);
+
+    editor.redo();
+    expect(editor.getDebugDump().nodes).toMatchObject([
+      {
+        shape: "ellipse",
+        type: "shape",
+      },
+    ]);
+  });
+
   test("a marked drag session records a single history step", () => {
     const editor = createEditor();
     const nodeId = createTextNode(editor, {

@@ -34,6 +34,7 @@ import {
   updateSelectedNode as updateEditorSelectedNode,
 } from "./document/node-actions";
 import {
+  addShapeNode as addEditorShapeNode,
   addTextNode as addEditorTextNode,
   cancelEditing as cancelEditorEditing,
   commitEditing as commitEditorEditing,
@@ -66,6 +67,13 @@ import {
   handleWindowKeyDown as handleEditorWindowKeyDown,
 } from "./input/keyboard-shortcuts";
 import {
+  getNodePropertySupport as getEditorNodePropertySupport,
+  getSelectionProperties as getEditorSelectionProperties,
+  getSelectionPropertiesKey as getEditorSelectionPropertiesKey,
+  getSelectionPropertiesSnapshot as getEditorSelectionPropertiesSnapshot,
+  setSelectionProperty as setEditorSelectionProperty,
+} from "./inspection/selection-properties";
+import {
   beginSelectionDragInteraction as beginEditorSelectionDragInteraction,
   beginSelectionRotationInteraction as beginEditorSelectionRotationInteraction,
   beginTextPathPositioningInteraction as beginEditorTextPathPositioningInteraction,
@@ -94,6 +102,7 @@ import {
   isDescendantOf,
   isGroupNode,
 } from "./nodes/node-tree";
+import { beginNodePlacement as beginEditorNodePlacement } from "./placement/node-placement";
 import {
   getLayerRow as getEditorLayerRow,
   getNode as getEditorNode,
@@ -125,6 +134,7 @@ import { getSelectionBounds as getEditorSelectionBounds } from "./selection/sele
 import { createEditorStore } from "./state/store/create-editor-store";
 import { HandTool } from "./tools/hand-tool";
 import { PointerTool } from "./tools/pointer-tool";
+import { ShapeTool } from "./tools/shape-tool";
 import { TextTool } from "./tools/text-tool";
 import {
   beginMoveSelection as beginEditorMoveSelection,
@@ -186,6 +196,7 @@ export class Editor {
     this.tools = new Map([
       ["pointer", new PointerTool(this)],
       ["hand", new HandTool(this)],
+      ["shape", new ShapeTool(this)],
       ["text", new TextTool(this)],
     ]);
     this.editingHistoryMark = null;
@@ -227,6 +238,7 @@ export class Editor {
     this.handleSpaceDown = this.handleSpaceDown.bind(this);
     this.handleSpaceUp = this.handleSpaceUp.bind(this);
     this.onViewportChange = null;
+    this.selectionPropertiesSnapshotCache = null;
     this.selectionDragPreviewState = null;
   }
 
@@ -244,6 +256,10 @@ export class Editor {
 
   get activeTool() {
     return this.getState().activeTool;
+  }
+
+  get nextShapeKind() {
+    return this.getState().nextShapeKind;
   }
 
   get currentTool() {
@@ -554,6 +570,14 @@ export class Editor {
     return getEditorNodeEditCapabilities(this, nodeId);
   }
 
+  getNodePropertySupport(nodeId) {
+    return getEditorNodePropertySupport(this.getNode(nodeId));
+  }
+
+  setSelectionProperty(propertyId, value, nodeIds = this.selectedNodeIds) {
+    return setEditorSelectionProperty(this, propertyId, value, nodeIds);
+  }
+
   getNodeSelectionFrame(nodeId) {
     return getEditorNodeSelectionFrame(this, nodeId);
   }
@@ -590,6 +614,40 @@ export class Editor {
     return getEditorSelectionBounds(this, nodeIds);
   }
 
+  getSelectionProperties(nodeIds = this.selectedNodeIds) {
+    return getEditorSelectionProperties(this, nodeIds);
+  }
+
+  getSelectionPropertiesKey(nodeIds = this.selectedNodeIds) {
+    return getEditorSelectionPropertiesKey(this, nodeIds);
+  }
+
+  getSelectionPropertiesSnapshot(nodeIds = this.selectedNodeIds) {
+    const state = this.getState();
+    const nodeIdsKey = nodeIds.join("\0");
+    const cachedSnapshot = this.selectionPropertiesSnapshotCache;
+
+    if (
+      cachedSnapshot &&
+      cachedSnapshot.fontRevision === state.fontRevision &&
+      cachedSnapshot.nodeIdsKey === nodeIdsKey &&
+      cachedSnapshot.nodes === state.nodes
+    ) {
+      return cachedSnapshot.snapshot;
+    }
+
+    const snapshot = getEditorSelectionPropertiesSnapshot(this, nodeIds);
+
+    this.selectionPropertiesSnapshotCache = {
+      fontRevision: state.fontRevision,
+      nodeIdsKey,
+      nodes: state.nodes,
+      snapshot,
+    };
+
+    return snapshot;
+  }
+
   getDebugDump() {
     return getEditorDebugDump(this);
   }
@@ -600,6 +658,10 @@ export class Editor {
 
   addTextNode(point) {
     addEditorTextNode(this, point);
+  }
+
+  addShapeNode(point, shape) {
+    addEditorShapeNode(this, point, shape);
   }
 
   cancelEditing() {
@@ -631,11 +693,11 @@ export class Editor {
   }
 
   dispatchCanvasPointerDown(info) {
-    this.currentTool.onCanvasPointerDown(info);
+    return this.currentTool.onCanvasPointerDown(info);
   }
 
   dispatchNodePointerDown(info) {
-    this.currentTool.onNodePointerDown(info);
+    return this.currentTool.onNodePointerDown(info);
   }
 
   duplicate(nodeId) {
@@ -793,6 +855,10 @@ export class Editor {
     setEditorActiveTool(this, toolId);
   }
 
+  setNextShapeKind(shape) {
+    this.getState().setNextShapeKind(shape);
+  }
+
   setPathEditingNodeId(nodeId) {
     this.getState().setPathEditingNodeId(nodeId);
   }
@@ -907,6 +973,10 @@ export class Editor {
 
   updateTextPathEdit(session, options) {
     return updateEditorTextPathEdit(this, session, options);
+  }
+
+  beginNodePlacement(options) {
+    return beginEditorNodePlacement(this, options);
   }
 
   toggleVisibility(nodeId) {

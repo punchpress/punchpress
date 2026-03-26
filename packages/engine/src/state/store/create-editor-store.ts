@@ -32,6 +32,7 @@ export const createEditorStore = ({
     isTextPathPositioning: false,
     isSelectionDragging: false,
     isSelectionRotating: false,
+    nextShapeKind: "rectangle",
     nodes: [],
     pathEditingNodeId: null,
     selectedNodeIds: [],

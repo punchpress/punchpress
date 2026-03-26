@@ -251,6 +251,22 @@ describe("Editor text editing mode", () => {
     });
   });
 
+  test("switches back to the pointer tool when placing a shape node", () => {
+    const editor = new Editor();
+
+    editor.setNextShapeKind("ellipse");
+    editor.setActiveTool("shape");
+    editor.addShapeNode({ x: 320, y: 240 });
+
+    expect(editor.activeTool).toBe("pointer");
+    expect(editor.editingNodeId).toBeNull();
+    expect(editor.selectedNodeIds).toEqual([editor.selectedNodeId]);
+    expect(editor.getNode(editor.selectedNodeId)).toMatchObject({
+      shape: "ellipse",
+      type: "shape",
+    });
+  });
+
   test("keeps the pointer tool active when opening an existing text node for editing", () => {
     const editor = new Editor();
     editor.applyLocalFontCatalog({
@@ -265,6 +281,21 @@ describe("Editor text editing mode", () => {
 
     expect(editor.activeTool).toBe("pointer");
     expect(editor.editingNodeId).toBe("editing-node");
+  });
+});
+
+describe("Editor shape export", () => {
+  test("exports visible shape nodes without requiring fonts", async () => {
+    const editor = new Editor();
+
+    editor.setNextShapeKind("star");
+    editor.addShapeNode({ x: 480, y: 360 });
+
+    const svg = await editor.exportDocument();
+
+    expect(svg).toContain("<path");
+    expect(svg).toContain('fill="#000000"');
+    expect(svg).toContain('"shape":"star"');
   });
 });
 

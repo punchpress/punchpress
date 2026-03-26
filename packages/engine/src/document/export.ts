@@ -3,8 +3,8 @@ import type {
   TextNodeDocument,
 } from "@punchpress/punch-schema";
 import { buildNodeCapabilityGeometry } from "../nodes/node-capabilities";
+import { buildSvgExport } from "../nodes/node-svg-export";
 import { isDescendantOf } from "../nodes/node-tree";
-import { buildSvgExport } from "../nodes/text/warp-svg-export";
 
 const escapeMetadata = (value: string) => {
   return value
@@ -17,8 +17,8 @@ export const exportDesignDocument = async (
   document: DesignDocument,
   loadFont: (font: TextNodeDocument["font"]) => Promise<unknown>
 ) => {
-  const nodes = document.nodes.filter((node): node is TextNodeDocument => {
-    if (node.type !== "text" || node.visible === false) {
+  const nodes = document.nodes.filter((node) => {
+    if (node.type === "group" || node.visible === false) {
       return false;
     }
 
@@ -34,11 +34,15 @@ export const exportDesignDocument = async (
   const geometryById = new Map();
 
   for (const node of nodes) {
-    if (!fontPromises.has(node.font.postscriptName)) {
+    if (node.type === "text" && !fontPromises.has(node.font.postscriptName)) {
       fontPromises.set(node.font.postscriptName, loadFont(node.font));
     }
 
-    const font = await fontPromises.get(node.font.postscriptName);
+    const font =
+      node.type === "text"
+        ? await fontPromises.get(node.font.postscriptName)
+        : null;
+
     geometryById.set(node.id, buildNodeCapabilityGeometry(node, font));
   }
 

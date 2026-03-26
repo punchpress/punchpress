@@ -5,6 +5,7 @@ import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
 import { usePerformanceRenderCounter } from "../../performance/use-performance-render-counter";
 import { drillIntoGroupSelection } from "./canvas-group-drill-in";
+import { startCanvasToolPlacementSession } from "./canvas-tool-placement-session";
 
 const getCanvasPoint = (editor, clientX, clientY) => {
   const viewer = editor.viewerRef;
@@ -41,6 +42,110 @@ const selectNodeArtState = (editor, state, nodeId) => {
     stroke: node.stroke,
     strokeWidth: node.strokeWidth,
   };
+};
+
+const shouldStartNodeDrag = ({
+  editor,
+  event,
+  isSelectionTargetSelected,
+  node,
+  nodeEditCapabilities,
+}) => {
+  const pathEditingNodeId = editor.pathEditingNodeId;
+  const shouldDragSelectedPathNode = Boolean(
+    isSelectionTargetSelected && nodeEditCapabilities?.hasExpandedHitBounds
+  );
+  const canDirectDragSelectedNode = Boolean(
+    isSelectionTargetSelected &&
+      (pathEditingNodeId !== node.id ||
+        !nodeEditCapabilities?.hasExpandedHitBounds)
+  );
+
+  return Boolean(
+    !event.shiftKey &&
+      (!isSelectionTargetSelected ||
+        canDirectDragSelectedNode ||
+        shouldDragSelectedPathNode ||
+        event.altKey)
+  );
+};
+
+const startCanvasNodeDragSession = ({
+  editor,
+  event,
+  isSelectionTargetSelected,
+  nodeId,
+}) => {
+  event.preventDefault();
+  event.stopPropagation();
+  const dragNodeId = editor.getSelectionTargetNodeId(nodeId) || nodeId;
+  const dragNodeIds =
+    isSelectionTargetSelected && editor.selectedNodeIds.length > 1
+      ? [...editor.selectedNodeIds]
+      : undefined;
+  const startClientPoint = {
+    x: event.clientX,
+    y: event.clientY,
+  };
+  let previousCanvasPoint = getCanvasPoint(
+    editor,
+    event.clientX,
+    event.clientY
+  );
+  let dragSession: ReturnType<typeof editor.beginSelectionDrag> = null;
+
+  const handlePointerMove = (moveEvent) => {
+    const movedDistance = Math.hypot(
+      moveEvent.clientX - startClientPoint.x,
+      moveEvent.clientY - startClientPoint.y
+    );
+
+    if (!(dragSession || movedDistance >= 3)) {
+      return;
+    }
+
+    if (!dragSession) {
+      dragSession = editor.beginSelectionDrag({
+        duplicate: event.altKey,
+        nodeId: dragNodeId,
+        nodeIds: dragNodeIds,
+      });
+    }
+
+    if (!dragSession) {
+      return;
+    }
+
+    const nextCanvasPoint = getCanvasPoint(
+      editor,
+      moveEvent.clientX,
+      moveEvent.clientY
+    );
+
+    editor.updateSelectionDrag(dragSession, {
+      delta: {
+        x: round(nextCanvasPoint.x - previousCanvasPoint.x, 2),
+        y: round(nextCanvasPoint.y - previousCanvasPoint.y, 2),
+      },
+      queueRefresh: true,
+    });
+
+    previousCanvasPoint = nextCanvasPoint;
+  };
+
+  const handlePointerEnd = () => {
+    window.removeEventListener("pointermove", handlePointerMove);
+    window.removeEventListener("pointercancel", handlePointerEnd);
+    window.removeEventListener("pointerup", handlePointerEnd);
+
+    if (dragSession) {
+      editor.endSelectionDrag(dragSession);
+    }
+  };
+
+  window.addEventListener("pointermove", handlePointerMove);
+  window.addEventListener("pointercancel", handlePointerEnd);
+  window.addEventListener("pointerup", handlePointerEnd);
 };
 
 const CanvasNodeComponent = ({ nodeId }) => {
@@ -112,98 +217,42 @@ const CanvasNodeComponent = ({ nodeId }) => {
         }
 
         const nodeEditCapabilities = editor.getNodeEditCapabilities(nodeId);
-        const pathEditingNodeId = editor.pathEditingNodeId;
-        const shouldDragSelectedPathNode = Boolean(
-          isSelectionTargetSelected &&
-            nodeEditCapabilities?.hasExpandedHitBounds
-        );
-        const canDirectDragSelectedNode = Boolean(
-          isSelectionTargetSelected &&
-            (pathEditingNodeId !== node.id ||
-              !nodeEditCapabilities?.hasExpandedHitBounds)
-        );
-        const shouldStartDragging = Boolean(
-          !event.shiftKey &&
-            (!isSelectionTargetSelected ||
-              canDirectDragSelectedNode ||
-              shouldDragSelectedPathNode ||
-              event.altKey)
-        );
+        const shouldStartDragging = shouldStartNodeDrag({
+          editor,
+          event,
+          isSelectionTargetSelected,
+          node,
+          nodeEditCapabilities,
+        });
 
-        editor.dispatchNodePointerDown({ event, node });
+        const placementSession = editor.dispatchNodePointerDown({
+          event,
+          node,
+        });
+
+        if (
+          startCanvasToolPlacementSession({
+            editor,
+            event,
+            getCanvasPoint: (clientX, clientY) =>
+              getCanvasPoint(editor, clientX, clientY),
+            session: placementSession,
+          })
+        ) {
+          return;
+        }
+
+        if (activeTool !== "pointer") {
+          return;
+        }
 
         if (shouldStartDragging) {
-          event.preventDefault();
-          event.stopPropagation();
-          const dragNodeId = editor.getSelectionTargetNodeId(nodeId) || nodeId;
-          const dragNodeIds =
-            isSelectionTargetSelected && editor.selectedNodeIds.length > 1
-              ? [...editor.selectedNodeIds]
-              : undefined;
-
-          const startClientPoint = {
-            x: event.clientX,
-            y: event.clientY,
-          };
-          let previousCanvasPoint = getCanvasPoint(
+          startCanvasNodeDragSession({
             editor,
-            event.clientX,
-            event.clientY
-          );
-          let dragSession: ReturnType<typeof editor.beginSelectionDrag> = null;
-
-          const handlePointerMove = (moveEvent) => {
-            const movedDistance = Math.hypot(
-              moveEvent.clientX - startClientPoint.x,
-              moveEvent.clientY - startClientPoint.y
-            );
-
-            if (!(dragSession || movedDistance >= 3)) {
-              return;
-            }
-
-            if (!dragSession) {
-              dragSession = editor.beginSelectionDrag({
-                duplicate: event.altKey,
-                nodeId: dragNodeId,
-                nodeIds: dragNodeIds,
-              });
-            }
-
-            if (!dragSession) {
-              return;
-            }
-
-            const nextCanvasPoint = getCanvasPoint(
-              editor,
-              moveEvent.clientX,
-              moveEvent.clientY
-            );
-
-            editor.updateSelectionDrag(dragSession, {
-              delta: {
-                x: round(nextCanvasPoint.x - previousCanvasPoint.x, 2),
-                y: round(nextCanvasPoint.y - previousCanvasPoint.y, 2),
-              },
-              queueRefresh: true,
-            });
-
-            previousCanvasPoint = nextCanvasPoint;
-          };
-
-          const handlePointerEnd = () => {
-            window.removeEventListener("pointermove", handlePointerMove);
-            window.removeEventListener("pointercancel", handlePointerEnd);
-            window.removeEventListener("pointerup", handlePointerEnd);
-
-            if (dragSession) {
-              editor.endSelectionDrag(dragSession);
-            }
-          };
-
-          window.addEventListener("pointermove", handlePointerMove);
-          window.addEventListener("pointercancel", handlePointerEnd);
-          window.addEventListener("pointerup", handlePointerEnd);
+            event,
+            isSelectionTargetSelected,
+            nodeId,
+          });
         }
       }}
       onPointerEnter={() => {

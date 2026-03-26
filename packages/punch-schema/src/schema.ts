@@ -88,21 +88,25 @@ export const groupNodeSchema = baseNodeSchema
   })
   .strict();
 
-export const squareNodeSchema = baseNodeSchema
+export const shapeKindSchema = z.enum(["rectangle", "ellipse", "star"]);
+
+export const shapeNodeSchema = baseNodeSchema
   .extend({
     fill: z.string().min(1),
-    size: finiteNumber,
+    height: finiteNumber,
+    shape: shapeKindSchema,
     stroke: z.string().min(1).nullable(),
     strokeWidth: finiteNumber,
     transform: transformSchema,
-    type: z.literal("square"),
+    type: z.literal("shape"),
+    width: finiteNumber,
   })
   .strict();
 
 export const nodeSchema = z.discriminatedUnion("type", [
   textNodeSchema,
   groupNodeSchema,
-  squareNodeSchema,
+  shapeNodeSchema,
 ]);
 
 export const designDocumentSchema = z
@@ -148,7 +152,8 @@ export const designDocumentSchema = z
 export type DesignDocument = z.infer<typeof designDocumentSchema>;
 export type GroupNodeDocument = z.infer<typeof groupNodeSchema>;
 export type NodeDocument = z.infer<typeof nodeSchema>;
-export type SquareNodeDocument = z.infer<typeof squareNodeSchema>;
+export type ShapeKindDocument = z.infer<typeof shapeKindSchema>;
+export type ShapeNodeDocument = z.infer<typeof shapeNodeSchema>;
 export type TextNodeDocument = z.infer<typeof textNodeSchema>;
 export type LocalFontDocument = z.infer<typeof localFontSchema>;
 export type TransformDocument = z.infer<typeof transformSchema>;

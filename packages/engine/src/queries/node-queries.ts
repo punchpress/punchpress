@@ -5,7 +5,7 @@ import {
   getNodeHitBounds as getNodeSurfaceHitBounds,
   getNodeSurfaceLocalBounds,
 } from "../nodes/node-capabilities";
-import { isGroupNode, isSquareNode, isTextNode } from "../nodes/node-tree";
+import { isGroupNode, isShapeNode, isTextNode } from "../nodes/node-tree";
 import {
   getNodeCssTransform,
   getNodeRotation,
@@ -61,8 +61,8 @@ export const getLayerRow = (editor, nodeId) => {
 
   if (isTextNode(node)) {
     label = node.text.trim().length > 0 ? node.text : `Text ${layerIndex + 1}`;
-  } else if (isSquareNode(node)) {
-    label = `Square ${layerIndex + 1}`;
+  } else if (isShapeNode(node)) {
+    label = `${node.shape[0].toUpperCase()}${node.shape.slice(1)} ${layerIndex + 1}`;
   }
 
   return {

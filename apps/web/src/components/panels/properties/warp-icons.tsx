@@ -4,6 +4,7 @@ type IconProps = ComponentProps<"svg">;
 
 const defaults: IconProps = {
   "aria-hidden": true,
+  focusable: "false",
   height: 24,
   viewBox: "0 0 512 512",
   width: 24,
@@ -13,7 +14,7 @@ const defaults: IconProps = {
 /** Arch — curved top, flat bottom */
 export const WarpArchIcon = (props: IconProps) => (
   <svg {...defaults} fill="none" {...props}>
-    <title>Arch</title>
+    <title>Arch warp</title>
     <path
       d="M423.75 212.481C284.346 72.1556 137.665 154.012 81.75 212.481L158.863 377C158.863 377 195.023 341.254 258.867 341.254C322.71 341.254 355.65 377 355.65 377L423.75 212.481Z"
       stroke="currentColor"
@@ -31,7 +32,7 @@ export const WarpArchIcon = (props: IconProps) => (
 /** Wave / flag — S-curve warp */
 export const WarpWaveIcon = (props: IconProps) => (
   <svg {...defaults} fill="none" {...props}>
-    <title>Wave</title>
+    <title>Wave warp</title>
     <path
       d="M428 356.267C313.336 235.949 198.673 476.585 84 356.267C84 289.422 84 222.578 84 155.733C198.664 276.051 313.327 35.4147 428 155.733C428 222.578 428 289.422 428 356.267Z"
       stroke="currentColor"
@@ -50,7 +51,7 @@ export const WarpWaveIcon = (props: IconProps) => (
 /** Circle — U-shaped arc with wheels */
 export const WarpCircleIcon = (props: IconProps) => (
   <svg {...defaults} fill="none" {...props}>
-    <title>Circle</title>
+    <title>Circle warp</title>
     <circle cx="115" cy="333" r="39" stroke="currentColor" strokeWidth="40" />
     <circle cx="404" cy="333" r="39" stroke="currentColor" strokeWidth="40" />
     <path
@@ -67,7 +68,7 @@ export const WarpCircleIcon = (props: IconProps) => (
 /** Slant — tilted parallelogram */
 export const WarpSlantIcon = (props: IconProps) => (
   <svg {...defaults} fill="none" {...props}>
-    <title>Slant</title>
+    <title>Slant warp</title>
     <path
       d="M93 427V261.691L414 118V287.547L93 427Z"
       shapeRendering="crispEdges"

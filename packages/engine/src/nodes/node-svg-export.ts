@@ -1,12 +1,12 @@
-import { ARTBOARD_HEIGHT, ARTBOARD_WIDTH } from "../../constants";
-import { format } from "../../primitives/math";
+import { ARTBOARD_HEIGHT, ARTBOARD_WIDTH } from "../constants";
+import { format } from "../primitives/math";
 import {
   getNodeRotation,
   getNodeScaleX,
   getNodeScaleY,
   getNodeX,
   getNodeY,
-} from "./model";
+} from "./text/model";
 
 const getNodeLocalTransform = (node, bbox) => {
   const rotation = getNodeRotation(node) || 0;

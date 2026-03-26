@@ -34,9 +34,7 @@ export const useCanvasTransformState = (editor) => {
     return editor.getNode(visibleSelectedNodeIds[0]);
   });
   const selectedEditCapabilities = useEditorValue((editor) => {
-    if (
-      !(visibleSelectedNodeIds.length === 1 && selectedNode?.type === "text")
-    ) {
+    if (!(visibleSelectedNodeIds.length === 1 && selectedNode?.id)) {
       return null;
     }
 

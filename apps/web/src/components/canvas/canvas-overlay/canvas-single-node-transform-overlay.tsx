@@ -1,4 +1,4 @@
-import { clamp, getResizeCorner } from "@punchpress/engine";
+import { clamp } from "@punchpress/engine";
 import { useMemo, useRef } from "react";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
@@ -40,17 +40,6 @@ const getRectCenter = (rect) => {
   };
 };
 
-const getRectCorner = (rect, corner) => {
-  if (!rect) {
-    return null;
-  }
-
-  return {
-    x: corner.endsWith("e") ? rect.right : rect.left,
-    y: corner.startsWith("s") ? rect.bottom : rect.top,
-  };
-};
-
 const getAngleFromCenter = (center, point) => {
   return (Math.atan2(point.y - center.y, point.x - center.x) * 180) / Math.PI;
 };
@@ -76,31 +65,42 @@ const resizeDirection = {
   sw: [-1, 1] as const,
 };
 
+const oppositeResizeHandle = {
+  e: "w",
+  n: "s",
+  ne: "sw",
+  nw: "se",
+  s: "n",
+  se: "nw",
+  sw: "ne",
+  w: "e",
+} as const;
+
 const getResizeSession = (
   editor,
   handleElements,
-  corner,
+  edgeElements,
+  handle,
   pointer,
   nodeId,
-  transformTargetElement
+  useShapeBoxResize
 ) => {
-  const direction = resizeDirection[corner];
+  const oppositeHandle = oppositeResizeHandle[handle];
+  let anchorElement: HTMLElement | null = null;
 
-  if (!direction) {
+  if (oppositeHandle) {
+    anchorElement =
+      handle.length === 1
+        ? edgeElements.current[oppositeHandle]
+        : handleElements.current[oppositeHandle];
+  }
+  const anchorRect = anchorElement?.getBoundingClientRect?.();
+  const resolvedAnchorClient = anchorRect ? getRectCenter(anchorRect) : null;
+  const direction = handle.length === 2 ? resizeDirection[handle] : null;
+
+  if (!(resolvedAnchorClient && pointer)) {
     return null;
   }
-
-  const oppositeCorner = getResizeCorner(direction, true);
-  const targetAnchorClient = (() => {
-    const targetRect = transformTargetElement?.getBoundingClientRect?.();
-    return getRectCorner(targetRect, oppositeCorner);
-  })();
-  const fallbackAnchorClient = (() => {
-    const anchorElement = handleElements.current[oppositeCorner];
-    const anchorRect = anchorElement?.getBoundingClientRect?.();
-    return anchorRect ? getRectCenter(anchorRect) : null;
-  })();
-  const resolvedAnchorClient = targetAnchorClient || fallbackAnchorClient;
   const resolvedAnchorCanvas = resolvedAnchorClient
     ? getCanvasPoint(editor, resolvedAnchorClient.x, resolvedAnchorClient.y)
     : null;
@@ -111,7 +111,7 @@ const getResizeSession = (
 
   const resizeSession = editor.beginResizeSelection({
     anchorCanvas: resolvedAnchorCanvas,
-    direction,
+    ...(useShapeBoxResize ? { handle } : { direction }),
     nodeId,
   });
 
@@ -173,6 +173,77 @@ const resizeCursorClassName = {
   sw: "cursor-nesw-resize",
 };
 
+const edgeCursorClassName = {
+  e: "cursor-ew-resize",
+  n: "cursor-ns-resize",
+  s: "cursor-ns-resize",
+  w: "cursor-ew-resize",
+};
+
+const EDGE_HIT_SIZE_PX = 20;
+
+const edgeHitAreaStyle = {
+  e: {
+    height: "100%",
+    right: 0,
+    top: 0,
+    transform: "translateX(50%)",
+    width: `${EDGE_HIT_SIZE_PX}px`,
+  },
+  n: {
+    height: `${EDGE_HIT_SIZE_PX}px`,
+    left: 0,
+    top: 0,
+    transform: "translateY(-50%)",
+    width: "100%",
+  },
+  s: {
+    bottom: 0,
+    height: `${EDGE_HIT_SIZE_PX}px`,
+    left: 0,
+    transform: "translateY(50%)",
+    width: "100%",
+  },
+  w: {
+    height: "100%",
+    left: 0,
+    top: 0,
+    transform: "translateX(-50%)",
+    width: `${EDGE_HIT_SIZE_PX}px`,
+  },
+};
+
+const edgeLineStyle = {
+  e: {
+    height: "100%",
+    left: "50%",
+    top: 0,
+    transform: "translateX(-50%)",
+    width: "1.5px",
+  },
+  n: {
+    height: "1.5px",
+    left: 0,
+    top: "50%",
+    transform: "translateY(-50%)",
+    width: "100%",
+  },
+  s: {
+    height: "1.5px",
+    left: 0,
+    top: "50%",
+    transform: "translateY(-50%)",
+    width: "100%",
+  },
+  w: {
+    height: "100%",
+    left: "50%",
+    top: 0,
+    transform: "translateX(-50%)",
+    width: "1.5px",
+  },
+};
+
 export const CanvasSingleNodeTransformOverlay = ({
   isDraggable,
   isResizable,
@@ -183,8 +254,19 @@ export const CanvasSingleNodeTransformOverlay = ({
   const isSelectionDragging = useEditorValue(
     (_, state) => state.isSelectionDragging
   );
+  const isShapeNode = useEditorValue((editor) => {
+    return editor.getNode(nodeId)?.type === "shape";
+  });
   const isPathEditing = useEditorValue((editor, state) => {
     return state.pathEditingNodeId === nodeId && editor.isPathEditing(nodeId);
+  });
+  const edgeElementsRef = useRef<
+    Record<"e" | "n" | "s" | "w", HTMLDivElement | null>
+  >({
+    e: null,
+    n: null,
+    s: null,
+    w: null,
   });
   const handleElementsRef = useRef<
     Record<"ne" | "nw" | "se" | "sw", HTMLButtonElement | null>
@@ -209,9 +291,6 @@ export const CanvasSingleNodeTransformOverlay = ({
       geometry: editor.getNodeGeometry(nodeId),
       node: editor.getNode(nodeId),
     };
-  });
-  const transformTargetElement = useEditorSurfaceValue((editor) => {
-    return isPathEditing ? editor.getNodeTransformElement(nodeId) : null;
   });
 
   const overlayRect = useMemo(() => {
@@ -339,7 +418,7 @@ export const CanvasSingleNodeTransformOverlay = ({
     window.addEventListener("pointerup", handlePointerEnd);
   };
 
-  const startResize = (corner, event) => {
+  const startResize = (handle, event) => {
     if (!(event.button === 0 && isResizable)) {
       return;
     }
@@ -351,10 +430,11 @@ export const CanvasSingleNodeTransformOverlay = ({
     const resizeState = getResizeSession(
       editor,
       handleElementsRef,
-      corner,
+      edgeElementsRef,
+      handle,
       pointer,
       nodeId,
-      transformTargetElement
+      isShapeNode
     );
 
     if (!resizeState) {
@@ -365,6 +445,24 @@ export const CanvasSingleNodeTransformOverlay = ({
     const historyMark = editor.markHistoryStep("resize selection");
 
     const handlePointerMove = (moveEvent) => {
+      if (isShapeNode) {
+        const pointCanvas = getCanvasPoint(
+          editor,
+          moveEvent.clientX,
+          moveEvent.clientY
+        );
+
+        if (!pointCanvas) {
+          return;
+        }
+
+        editor.updateResizeSelection(resizeState.resizeSession, {
+          pointCanvas,
+          preserveAspectRatio: moveEvent.shiftKey,
+        });
+        return;
+      }
+
       const scale = getResizeScale(
         getClientPoint(moveEvent),
         resizeState.anchorClient,
@@ -467,22 +565,30 @@ export const CanvasSingleNodeTransformOverlay = ({
         width: `${overlayRect.width}px`,
       }}
     >
-      <div
-        className="moveable-line absolute top-0 left-0 w-full"
-        style={{ height: "1.5px" }}
-      />
-      <div
-        className="moveable-line absolute bottom-0 left-0 w-full"
-        style={{ height: "1.5px" }}
-      />
-      <div
-        className="moveable-line absolute top-0 left-0 h-full"
-        style={{ width: "1.5px" }}
-      />
-      <div
-        className="moveable-line absolute top-0 right-0 h-full"
-        style={{ width: "1.5px" }}
-      />
+      {(["n", "s", "w", "e"] as const).map((edge) => {
+        return (
+          <div
+            className={`absolute ${isShapeNode ? edgeCursorClassName[edge] : ""}`}
+            data-edge={edge}
+            key={edge}
+            onPointerDown={
+              isShapeNode ? (event) => startResize(edge, event) : undefined
+            }
+            ref={(element) => {
+              edgeElementsRef.current[edge] = element;
+            }}
+            style={{
+              ...edgeHitAreaStyle[edge],
+              pointerEvents: isShapeNode ? "auto" : "none",
+            }}
+          >
+            <div
+              className="moveable-line absolute"
+              style={edgeLineStyle[edge]}
+            />
+          </div>
+        );
+      })}
 
       {(["nw", "ne", "sw", "se"] as const).map((corner) => {
         return (

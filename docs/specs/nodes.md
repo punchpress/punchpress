@@ -9,6 +9,7 @@ Nodes are the core building blocks of a PunchPress design.
 - Nodes can be copied and pasted without losing their editable source content, styling, or structure.
 - Nodes can be selected individually and, where appropriate, moved, resized, rotated, and edited.
 - Selected nodes may surface a shared node toolbar with actions that change based on the current selection and mode.
+- When multiple nodes are selected, the properties panel should show only settings shared by the full selection and should represent differing values as mixed rather than guessing.
 - Nodes remain editable source content inside PunchPress. They should not be prematurely baked into static output.
 - Hiding a node should remove it from view without losing its content or settings.
 - Nodes may be either leaf nodes or container nodes.
@@ -23,9 +24,13 @@ Nodes are the core building blocks of a PunchPress design.
 - The editable frame should stay aligned with the node's visible footprint closely enough that editing never feels detached from the object.
 - Specialized editing affordances should prefer explicit secondary modes over overloading the default selected state when that keeps selection behavior clearer.
 - A node should preserve its normal move, resize, and rotate behavior in the default selected state unless the user has clearly entered a more specific editing mode.
+- Parametric shape nodes should resize directly from their selection bounds, with edge drags changing one dimension and corner drags changing width and height together.
+- Holding `Shift` during a corner resize should preserve the current aspect ratio instead of forcing aspect-ratio lock all the time.
+- Holding `Shift` during shape drag placement should lock the placement box to a 1:1 aspect ratio.
 
 ## Growth
 
 - New node types should fit the same mental model: selectable object, clear bounds, direct manipulation, and editable source data where applicable.
+- Parametric basic shapes should stay one node family with a shape-kind field rather than splintering into separate node types when their interaction model is the same.
 - New container nodes should make their containment behavior explicit in the node contract rather than relying on ad hoc UI-only behavior.
 - PunchPress should feel like one coherent canvas system even as more node types are added.
