@@ -14,7 +14,7 @@ const applyInteractionState = (editor, patch) => {
 };
 
 export const startPathEditing = (editor, nodeId = editor.selectedNodeId) => {
-  if (!editor.canEditNodePath(nodeId) || editor.editingNodeId) {
+  if (!editor.canStartPathEditing(nodeId) || editor.editingNodeId) {
     return false;
   }
 

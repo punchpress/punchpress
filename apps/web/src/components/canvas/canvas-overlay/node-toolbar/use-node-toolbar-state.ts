@@ -30,6 +30,9 @@ export const useNodeToolbarState = () => {
 
     return {
       hasPathGuide: Boolean(selectedEditCapabilities?.guide),
+      hasPathEditingMode: Boolean(
+        selectedEditCapabilities?.requiresPathEditing
+      ),
       isPathEditing,
       selectedNode,
       selectionKey: `${visibleSelectedNodeIds.join(",")}:${isPathEditing ? "path" : "node"}`,

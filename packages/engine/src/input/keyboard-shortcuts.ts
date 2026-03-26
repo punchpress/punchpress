@@ -58,7 +58,7 @@ export const handleCanvasShortcutKeyDown = (editor, event, key) => {
     return true;
   }
 
-  if (key === "e" && editor.canEditNodePath()) {
+  if (key === "e" && editor.canStartPathEditing()) {
     event.preventDefault();
     editor.togglePathEditing();
     return true;

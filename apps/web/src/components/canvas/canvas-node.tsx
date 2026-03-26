@@ -118,7 +118,9 @@ const CanvasNodeComponent = ({ nodeId }) => {
             nodeEditCapabilities?.hasExpandedHitBounds
         );
         const canDirectDragSelectedNode = Boolean(
-          isSelectionTargetSelected && pathEditingNodeId !== node.id
+          isSelectionTargetSelected &&
+            (pathEditingNodeId !== node.id ||
+              !nodeEditCapabilities?.hasExpandedHitBounds)
         );
         const shouldStartDragging = Boolean(
           !event.shiftKey &&

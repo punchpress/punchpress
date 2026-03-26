@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
+  getHandleIconRotationDeg,
   getStateSnapshot,
   gotoEditor,
   pauseForUi,
@@ -300,6 +301,47 @@ test("resizes the circle path and repositions text along it", async ({
 
   expect(positionedNode?.warp?.pathPosition).toBeGreaterThan(0.12);
   expect(positionedNode?.warp?.pathPosition).toBeLessThan(0.38);
+});
+
+test("rotates the circle handle as text moves around the path", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadCircleDocument(page);
+  await page.locator('.canvas-node[data-node-id="circle-node"]').click();
+  await pauseForUi(page);
+  await page.getByRole("button", { name: "Edit path (E)" }).click();
+  await pauseForUi(page);
+
+  const positionHandle = page.getByTestId("text-path-handle-position");
+  const guidePath = page.getByTestId("text-path-guide").locator("path").first();
+
+  await expect(positionHandle).toBeVisible();
+  await expect(guidePath).toBeVisible();
+
+  const positionBox = await positionHandle.boundingBox();
+  const beforeRotationDeg = await getHandleIconRotationDeg(positionHandle);
+
+  if (!positionBox) {
+    throw new Error("Missing circle guide or handle bounds");
+  }
+
+  await page.mouse.move(
+    positionBox.x + positionBox.width / 2,
+    positionBox.y + positionBox.height / 2
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    positionBox.x + positionBox.width / 2 + 220,
+    positionBox.y + positionBox.height / 2 + 140,
+    { steps: 16 }
+  );
+  await page.mouse.up();
+  await pauseForUi(page);
+
+  const afterRotationDeg = await getHandleIconRotationDeg(positionHandle);
+
+  expect(Math.abs(afterRotationDeg - beforeRotationDeg)).toBeGreaterThan(20);
 });
 
 test("does not jump the path edit selection box when resizing after rotate on the real UI path", async ({
@@ -862,8 +904,8 @@ test("moves a selected circle path node by dragging the visible text", async ({
     throw new Error("Missing circle node bounds");
   }
 
-  const startX = nodeBox.x + nodeBox.width / 2;
-  const startY = nodeBox.y + nodeBox.height / 2;
+  const startX = nodeBox.x + nodeBox.width * 0.1;
+  const startY = nodeBox.y + nodeBox.height * 0.78;
 
   await page.mouse.move(startX, startY);
   await page.mouse.down();
@@ -948,8 +990,8 @@ test("moves a circle path node by dragging the visible text while path editing",
     throw new Error("Missing circle node bounds");
   }
 
-  const startX = nodeBox.x + nodeBox.width / 2;
-  const startY = nodeBox.y + nodeBox.height / 2;
+  const startX = nodeBox.x + nodeBox.width * 0.1;
+  const startY = nodeBox.y + nodeBox.height * 0.78;
 
   await page.mouse.move(startX, startY);
   await page.mouse.down();

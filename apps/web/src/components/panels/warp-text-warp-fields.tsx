@@ -1,13 +1,21 @@
-import { clamp, toNumber } from "@punchpress/engine";
-import { Input } from "@/components/ui/input";
+import {
+  ARCH_BEND_LIMIT,
+  clamp,
+  toNumber,
+  WAVE_CYCLES_MAX,
+  WAVE_CYCLES_MIN,
+} from "@punchpress/engine";
 import { ScrubSlider } from "@/components/ui/scrub-slider";
-import { Slider } from "@/components/ui/slider";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
 import { FieldRow } from "./field-primitives";
 
+const ARCH_BEND_RANGE = { min: -ARCH_BEND_LIMIT, max: ARCH_BEND_LIMIT };
 const CIRCLE_RADIUS_RANGE = { min: 1, max: 5000 };
 const CIRCLE_SWEEP_RANGE = { min: -360, max: 360 };
+const WAVE_AMPLITUDE_RANGE = { min: -500, max: 500 };
+const WAVE_CYCLES_RANGE = { min: WAVE_CYCLES_MIN, max: WAVE_CYCLES_MAX };
+const SLANT_RISE_RANGE = { min: -400, max: 400 };
 
 export const NodeFieldsWarpInputs = () => {
   const editor = useEditor();
@@ -21,7 +29,11 @@ export const NodeFieldsWarpInputs = () => {
 
   if (node.warp.kind === "arch") {
     const setBend = (value) => {
-      const bend = clamp(toNumber(value, node.warp.bend), -1, 1);
+      const bend = clamp(
+        toNumber(value, node.warp.bend),
+        -ARCH_BEND_LIMIT,
+        ARCH_BEND_LIMIT
+      );
       update((currentNode) => {
         return {
           ...currentNode,
@@ -32,79 +44,100 @@ export const NodeFieldsWarpInputs = () => {
 
     return (
       <FieldRow label="Bend">
-        <div className="grid grid-cols-[minmax(0,1fr)_64px] items-center gap-2">
-          <Slider
-            className="min-w-0"
-            max={1}
-            min={-1}
-            onValueChange={(value) => {
-              const next = Array.isArray(value) ? value[0] : value;
-              setBend(next);
-            }}
-            step={0.01}
-            value={node.warp.bend}
-          />
-          <Input
-            max={1}
-            min={-1}
-            nativeInput
-            onChange={(event) => {
-              setBend(event.target.value);
-            }}
-            step={0.01}
-            type="number"
-            value={node.warp.bend}
-          />
-        </div>
+        <ScrubSlider
+          ariaLabel="Bend"
+          max={ARCH_BEND_RANGE.max}
+          min={ARCH_BEND_RANGE.min}
+          onValueChange={setBend}
+          step={0.01}
+          value={node.warp.bend}
+        />
       </FieldRow>
     );
   }
 
   if (node.warp.kind === "wave") {
+    const setAmplitude = (value) => {
+      const amplitude = clamp(
+        toNumber(value, node.warp.amplitude),
+        WAVE_AMPLITUDE_RANGE.min,
+        WAVE_AMPLITUDE_RANGE.max
+      );
+      update((currentNode) => {
+        return {
+          ...currentNode,
+          warp: { ...currentNode.warp, amplitude },
+        };
+      });
+    };
+
+    const setCycles = (value) => {
+      const cycles = clamp(
+        toNumber(value, node.warp.cycles),
+        WAVE_CYCLES_RANGE.min,
+        WAVE_CYCLES_RANGE.max
+      );
+      update((currentNode) => {
+        return {
+          ...currentNode,
+          warp: { ...currentNode.warp, cycles },
+        };
+      });
+    };
+
     return (
       <>
         <FieldRow label="Amplitude">
-          <Input
-            nativeInput
-            onChange={(event) => {
-              const amplitude = toNumber(
-                event.target.value,
-                node.warp.amplitude
-              );
-              update((currentNode) => {
-                return {
-                  ...currentNode,
-                  warp: { ...currentNode.warp, amplitude },
-                };
-              });
-            }}
-            type="number"
+          <ScrubSlider
+            ariaLabel="Amplitude"
+            max={WAVE_AMPLITUDE_RANGE.max}
+            min={WAVE_AMPLITUDE_RANGE.min}
+            onValueChange={setAmplitude}
+            step={1}
             value={node.warp.amplitude}
           />
         </FieldRow>
 
         <FieldRow label="Cycles">
-          <Input
-            min={0.1}
-            nativeInput
-            onChange={(event) => {
-              const cycles = Math.max(
-                0.1,
-                toNumber(event.target.value, node.warp.cycles)
-              );
-              update((currentNode) => {
-                return {
-                  ...currentNode,
-                  warp: { ...currentNode.warp, cycles },
-                };
-              });
-            }}
+          <ScrubSlider
+            ariaLabel="Cycles"
+            max={WAVE_CYCLES_RANGE.max}
+            min={WAVE_CYCLES_RANGE.min}
+            onValueChange={setCycles}
             step={0.1}
-            type="number"
             value={node.warp.cycles}
           />
         </FieldRow>
       </>
+    );
+  }
+
+  if (node.warp.kind === "slant") {
+    const setRise = (value) => {
+      const rise = clamp(
+        toNumber(value, node.warp.rise),
+        SLANT_RISE_RANGE.min,
+        SLANT_RISE_RANGE.max
+      );
+      update((currentNode) => {
+        return {
+          ...currentNode,
+          warp: { ...currentNode.warp, rise },
+        };
+      });
+    };
+
+    return (
+      <FieldRow label="Slant">
+        <ScrubSlider
+          ariaLabel="Slant"
+          max={SLANT_RISE_RANGE.max}
+          min={SLANT_RISE_RANGE.min}
+          onValueChange={setRise}
+          step={1}
+          value={node.warp.rise}
+        />
+      </FieldRow>
     );
   }
 

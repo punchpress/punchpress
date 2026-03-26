@@ -36,6 +36,7 @@ const TEST_FONT_DESCRIPTORS = [
     style: "Regular",
   },
 ];
+const HANDLE_ROTATION_DEG_REGEX = /rotate\((-?\d+(?:\.\d+)?)deg\)/;
 const getDocumentFixtureContents = (fileName) => {
   return readFileSync(
     new URL(`../fixtures/documents/${fileName}`, import.meta.url),
@@ -226,6 +227,19 @@ export const exportDocument = (page) => {
   return page.evaluate(() => {
     return window.__PUNCHPRESS_EDITOR__?.exportDocument();
   });
+};
+
+export const getHandleIconRotationDeg = (handle) => {
+  return handle
+    .locator('span[style*="rotate("]')
+    .first()
+    .evaluate((element, regexSource) => {
+      const transform =
+        element instanceof HTMLElement ? element.style.transform : "";
+      const match = transform.match(new RegExp(regexSource));
+
+      return match ? Number.parseFloat(match[1] || "0") : 0;
+    }, HANDLE_ROTATION_DEG_REGEX.source);
 };
 
 const getHandleCenter = (handle) => {

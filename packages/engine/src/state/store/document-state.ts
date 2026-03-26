@@ -8,6 +8,37 @@ import {
 } from "./node-tree-state";
 import { getSelectedNodeIds } from "./selection-state";
 
+const canRemainInPathEditing = (nodes, nodeId) => {
+  if (!nodeId) {
+    return false;
+  }
+
+  const node = nodes.find((entry) => entry.id === nodeId);
+
+  return Boolean(node?.type === "text" && node.warp.kind === "circle");
+};
+
+export const reconcilePathEditingState = (state, nodes) => {
+  if (!state.pathEditingNodeId) {
+    return {
+      nodes,
+    };
+  }
+
+  if (canRemainInPathEditing(nodes, state.pathEditingNodeId)) {
+    return {
+      nodes,
+    };
+  }
+
+  return {
+    ...exitPathEditingInteractionState(),
+    isHoveringSuppressed: false,
+    nodes,
+    pathEditingNodeId: null,
+  };
+};
+
 export const deleteNodeState = (state, nodeId) => {
   if (!nodeId) {
     return {};

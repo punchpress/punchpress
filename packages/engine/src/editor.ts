@@ -416,6 +416,10 @@ export class Editor {
     return Boolean(this.getNodeEditCapabilities(nodeId)?.canEditPath);
   }
 
+  canStartPathEditing(nodeId = this.selectedNodeId) {
+    return Boolean(this.getNodeEditCapabilities(nodeId)?.requiresPathEditing);
+  }
+
   isPathEditing(nodeId = this.pathEditingNodeId) {
     return Boolean(nodeId && this.pathEditingNodeId === nodeId);
   }

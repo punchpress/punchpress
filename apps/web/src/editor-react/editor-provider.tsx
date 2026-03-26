@@ -1,14 +1,13 @@
 import { Editor } from "@punchpress/engine";
-import { createContext, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   getInitialLocalFontCatalog,
   readLocalFontBytes,
   requestLocalFontCatalog,
 } from "../platform/local-fonts";
 import { getStoredLastUsedFont, rememberLastUsedFont } from "./default-font";
+import { EditorContext } from "./editor-context";
 import { useEditorClipboardEvents } from "./use-editor-clipboard-events";
-
-export const EditorContext = createContext(null);
 
 export const EditorProvider = ({ children }) => {
   const [editor] = useState(() => {
