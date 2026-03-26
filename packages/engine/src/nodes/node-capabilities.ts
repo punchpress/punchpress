@@ -8,6 +8,12 @@ import {
   getNodeX,
   getNodeY,
 } from "./text/model";
+import {
+  getArchGuide,
+  getCircleGuide,
+  getSlantGuide,
+  getWaveGuide,
+} from "./text/text-path";
 import { buildNodeGeometry as buildWarpTextGeometry } from "./text/warp-engine";
 import { estimateBounds } from "./text/warp-layout";
 
@@ -44,6 +50,26 @@ const getTextNodeRenderBounds = (node, geometry) => {
   return geometry?.bbox || estimateBounds(node);
 };
 
+const getFallbackTextGuide = (node, bbox) => {
+  if (node.warp.kind === "arch") {
+    return getArchGuide(bbox, node.warp.bend, bbox);
+  }
+
+  if (node.warp.kind === "circle") {
+    return getCircleGuide(node.warp);
+  }
+
+  if (node.warp.kind === "wave") {
+    return getWaveGuide(bbox, node.warp.amplitude, node.warp.cycles, bbox);
+  }
+
+  if (node.warp.kind === "slant") {
+    return getSlantGuide(bbox, node.warp.rise, bbox);
+  }
+
+  return null;
+};
+
 const getTextNodeSelectionBounds = (
   node,
   geometry,
@@ -63,9 +89,11 @@ const getTextNodeSelectionBounds = (
 const textNodeCapabilities = {
   buildGeometry: (node, font) => {
     if (!font) {
+      const bbox = estimateBounds(node);
+
       return {
-        bbox: estimateBounds(node),
-        guide: null,
+        bbox,
+        guide: getFallbackTextGuide(node, bbox),
         id: node.id,
         paths: [],
         ready: false,
@@ -153,12 +181,14 @@ const textNodeCapabilities = {
 
   getEditCapabilities: (editor, nodeId) => {
     const geometry = editor.getNodeGeometry(nodeId);
+    const guide = geometry?.guide || null;
 
     return {
-      canEditPath: Boolean(geometry?.guide),
+      canEditPath: Boolean(guide),
       canEditText: true,
-      guide: geometry?.guide || null,
+      guide,
       hasExpandedHitBounds: Boolean(geometry?.selectionBounds),
+      requiresPathEditing: guide?.kind === "circle",
     };
   },
 
@@ -209,6 +239,7 @@ const groupNodeCapabilities = {
     canEditText: false,
     guide: null,
     hasExpandedHitBounds: false,
+    requiresPathEditing: false,
   }),
 
   type: "group",
@@ -312,6 +343,7 @@ const squareNodeCapabilities = {
     canEditText: false,
     guide: null,
     hasExpandedHitBounds: false,
+    requiresPathEditing: false,
   }),
 
   type: "square",

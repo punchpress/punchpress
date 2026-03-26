@@ -51,3 +51,9 @@ Text nodes let users place and edit stylized text directly on the canvas.
 - While path editing, the visible transform/selection box should match the path-editing surface rather than a larger enclosing text bounds box.
 - While path editing, that transform/selection box should stay aligned with the path-editing surface during rotate, move, and resize interactions.
 - While the user is actively dragging a path-position handle, PunchPress may temporarily hide normal selection bounds if those bounds would otherwise jitter distractingly as the text reflows.
+- Simpler direct-manipulation warps, such as arch bend, wave-style flag adjustments, and slant, may stay inline on selection instead of requiring a separate path-edit mode.
+- Inline warp adjustment controls should still support the full intended expressive range of that warp in both directions.
+- Wave warp cycle adjustments should clamp to a maximum of three cycles.
+- Inline warp handle icons should inherit node rotation so they stay aligned in node space; the circle path position handle remains a special case that also follows the path tangent.
+- Warp handle icons should show a subtle physical spring effect (slight movement in the drag direction) to reinforce that they are being interacted with.
+- The spring effect should only be enabled on handles whose screen position remains static during the adjustment. Handles that move with the node as it changes (e.g., circle path position, wave amplitude, arch bend) should not use the spring effect because the node's own movement already provides sufficient interaction feedback.

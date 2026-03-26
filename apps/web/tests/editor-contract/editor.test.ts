@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { Editor, getDefaultWarp } from "@punchpress/engine";
 import { MissingDocumentFontsError } from "@punchpress/punch-schema";
 
 const AVAILABLE_FONT = {
@@ -202,6 +202,21 @@ describe("Editor.getSelectionFrameKey", () => {
 });
 
 describe("Editor text editing mode", () => {
+  test("uses the updated default wave warp preset", () => {
+    expect(getDefaultWarp("wave")).toEqual({
+      amplitude: 140,
+      cycles: 1,
+      kind: "wave",
+    });
+  });
+
+  test("uses the slant warp preset", () => {
+    expect(getDefaultWarp("slant")).toEqual({
+      kind: "slant",
+      rise: -120,
+    });
+  });
+
   test("creates new text nodes without a default warp", () => {
     const editor = new Editor();
     editor.applyLocalFontCatalog({

@@ -7,6 +7,7 @@ import {
 import {
   deleteNodeState,
   deleteNodesState,
+  reconcilePathEditingState,
   toggleNodeVisibilityState,
 } from "./document-state";
 import { exitPathEditingInteractionState } from "./interaction-state";
@@ -153,23 +154,29 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
     },
 
     updateNodeById: (nodeId, updater) => {
-      set((state) =>
-        withDocumentMutation(state, {
-          nodes: mapNodeById(state.nodes, nodeId, updater),
-        })
-      );
+      set((state) => {
+        const nodes = mapNodeById(state.nodes, nodeId, updater);
+
+        return withDocumentMutation(
+          state,
+          reconcilePathEditingState(state, nodes)
+        );
+      });
     },
 
     updateNodesById: (nodeIds, updater) => {
-      set((state) =>
-        withDocumentMutation(state, {
-          nodes: mapNodesByIds(
-            state.nodes,
-            getSelectedNodeIds(state, nodeIds),
-            updater
-          ),
-        })
-      );
+      set((state) => {
+        const nodes = mapNodesByIds(
+          state.nodes,
+          getSelectedNodeIds(state, nodeIds),
+          updater
+        );
+
+        return withDocumentMutation(
+          state,
+          reconcilePathEditingState(state, nodes)
+        );
+      });
     },
 
     updateSelectedNode: (updater) => {
@@ -178,9 +185,16 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
           return {};
         }
 
-        return withDocumentMutation(state, {
-          nodes: mapNodesByIds(state.nodes, state.selectedNodeIds, updater),
-        });
+        const nodes = mapNodesByIds(
+          state.nodes,
+          state.selectedNodeIds,
+          updater
+        );
+
+        return withDocumentMutation(
+          state,
+          reconcilePathEditingState(state, nodes)
+        );
       });
     },
 

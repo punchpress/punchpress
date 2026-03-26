@@ -1,7 +1,10 @@
 import { clamp, format } from "../../primitives/math";
 import { getBounds, mapContours } from "../../primitives/path-geometry";
+import { WAVE_CYCLES_MIN } from "./model";
 
+const ARCH_GUIDE_SAMPLES = 16;
 const POSITION_HANDLE_OFFSET = 28;
+const WAVE_GUIDE_SAMPLES = 32;
 
 const unionBounds = (a, b) => {
   return {
@@ -11,6 +14,20 @@ const unionBounds = (a, b) => {
     minX: Math.min(a.minX, b.minX),
     minY: Math.min(a.minY, b.minY),
     width: Math.max(a.maxX, b.maxX) - Math.min(a.minX, b.minX),
+  };
+};
+
+const getPointBounds = (points) => {
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+
+  return {
+    height: Math.max(...ys) - Math.min(...ys),
+    maxX: Math.max(...xs),
+    maxY: Math.max(...ys),
+    minX: Math.min(...xs),
+    minY: Math.min(...ys),
+    width: Math.max(...xs) - Math.min(...xs),
   };
 };
 
@@ -34,6 +51,199 @@ export const normalizeAngleDeg = (value) => {
 
 export const getCircleCenterAngleDeg = (warp) => {
   return normalizeLoop(warp.pathPosition) * 360;
+};
+
+const buildGuidePathD = (points) => {
+  if (points.length === 0) {
+    return "";
+  }
+
+  return points
+    .map((point, index) => {
+      return `${index === 0 ? "M" : "L"} ${format(point.x)} ${format(point.y)}`;
+    })
+    .join(" ");
+};
+
+const getArchGuidePoint = (bounds, bend, t, baseY = bounds.minY) => {
+  const centerX = (bounds.minX + bounds.maxX) / 2;
+  const halfWidth = Math.max(bounds.width / 2, 1);
+  const halfHeight = Math.max(bounds.height / 2, 1);
+  const u = t * 2 - 1;
+
+  return {
+    x: centerX + u * halfWidth,
+    y: baseY + bend * (1 - u * u) * halfHeight,
+  };
+};
+
+export const getArchGuide = (bounds, bend, contentBounds = bounds) => {
+  const points = Array.from({ length: ARCH_GUIDE_SAMPLES + 1 }, (_, index) => {
+    return getArchGuidePoint(bounds, bend, index / ARCH_GUIDE_SAMPLES);
+  });
+  const centerPoint = getArchGuidePoint(bounds, bend, 0.5);
+  const guideBounds = getPointBounds(points);
+
+  return {
+    activePathD: buildGuidePathD(points),
+    bendScale: Math.max(bounds.height / 3, 1),
+    bounds: unionBounds(contentBounds, guideBounds),
+    handles: [
+      {
+        key: "bend",
+        point: {
+          x: centerPoint.x,
+          y: centerPoint.y,
+        },
+        role: "bend",
+      },
+    ],
+    kind: "arch",
+    pathD: buildGuidePathD(points),
+  };
+};
+
+export const getSlantGuide = (bounds, rise, contentBounds = bounds) => {
+  const centerY = (bounds.minY + bounds.maxY) / 2;
+  const halfRise = rise / 2;
+  const leftPoint = {
+    x: bounds.minX,
+    y: centerY - halfRise,
+  };
+  const rightPoint = {
+    x: bounds.maxX,
+    y: centerY + halfRise,
+  };
+  const guideBounds = getPointBounds([leftPoint, rightPoint]);
+
+  return {
+    activePathD: buildGuidePathD([leftPoint, rightPoint]),
+    bounds: unionBounds(contentBounds, guideBounds),
+    handles: [
+      {
+        key: "slant",
+        point: rightPoint,
+        role: "slant",
+      },
+    ],
+    kind: "slant",
+    pathD: buildGuidePathD([leftPoint, rightPoint]),
+    slantVector: {
+      x: rightPoint.x - leftPoint.x,
+      y: rightPoint.y - leftPoint.y,
+    },
+    topHandleOffsetY: bounds.minY - centerY,
+  };
+};
+
+const getWaveGuidePoint = (
+  bounds,
+  amplitude,
+  cycles,
+  t,
+  baseY = bounds.minY
+) => {
+  const centerX = (bounds.minX + bounds.maxX) / 2;
+  const halfWidth = Math.max(bounds.width / 2, 1);
+  const u = t * 2 - 1;
+
+  return {
+    x: centerX + u * halfWidth,
+    y: baseY + amplitude * Math.sin(2 * Math.PI * cycles * t),
+  };
+};
+
+const getWaveExtremumTs = (cycles) => {
+  const safeCycles = Math.max(Math.abs(cycles), WAVE_CYCLES_MIN);
+  const extremumCount = Math.max(Math.ceil(safeCycles * 2) + 2, 2);
+  const ts: number[] = [];
+
+  for (let index = 0; index < extremumCount; index += 1) {
+    const t = (1 + index * 2) / (4 * safeCycles);
+
+    if (t >= 0 && t <= 1) {
+      ts.push(t);
+    }
+  }
+
+  return ts.length > 0 ? ts : [0.5];
+};
+
+const getCenterWaveExtremumT = (cycles) => {
+  return getWaveExtremumTs(cycles).reduce((best, t) => {
+    const distanceToCenter = Math.abs(t - 0.5);
+    const bestDistance = Math.abs(best - 0.5);
+
+    if (distanceToCenter < bestDistance) {
+      return t;
+    }
+
+    if (distanceToCenter === bestDistance && t > best) {
+      return t;
+    }
+
+    return best;
+  }, 0.5);
+};
+
+const getRightWaveExtremumT = (cycles) => {
+  return getWaveExtremumTs(cycles).reduce((best, t) => {
+    return t > best ? t : best;
+  }, 0.5);
+};
+
+export const getWaveGuide = (
+  bounds,
+  amplitude,
+  cycles,
+  contentBounds = bounds
+) => {
+  const points = Array.from({ length: WAVE_GUIDE_SAMPLES + 1 }, (_, index) => {
+    return getWaveGuidePoint(
+      bounds,
+      amplitude,
+      cycles,
+      index / WAVE_GUIDE_SAMPLES
+    );
+  });
+  const guideBounds = getPointBounds(points);
+  const centerX = (bounds.minX + bounds.maxX) / 2;
+  const cyclesPoint = getWaveGuidePoint(
+    bounds,
+    amplitude,
+    cycles,
+    getCenterWaveExtremumT(cycles)
+  );
+  const amplitudePoint = getWaveGuidePoint(
+    bounds,
+    amplitude,
+    cycles,
+    getRightWaveExtremumT(cycles)
+  );
+
+  return {
+    activePathD: buildGuidePathD(points),
+    bounds: unionBounds(contentBounds, guideBounds),
+    cycleScale: Math.max(bounds.width / 2, 1),
+    handles: [
+      {
+        key: "cycles",
+        point: cyclesPoint,
+        role: "cycles",
+      },
+      {
+        key: "amplitude",
+        point: amplitudePoint,
+        role: "amplitude",
+      },
+    ],
+    kind: "wave",
+    pathD: buildGuidePathD(points),
+    topHandlePoint: {
+      x: centerX,
+      y: guideBounds.minY,
+    },
+  };
 };
 
 export const getCirclePoint = (radius, angleDeg) => {

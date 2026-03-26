@@ -1,5 +1,11 @@
 const getTextNodeToolbarActions = (editor, state) => {
-  if (!(state.selectedNode?.type === "text" && state.hasPathGuide)) {
+  if (
+    !(
+      state.selectedNode?.type === "text" &&
+      state.hasPathGuide &&
+      state.hasPathEditingMode
+    )
+  ) {
     return [];
   }
 

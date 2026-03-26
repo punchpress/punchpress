@@ -5,7 +5,12 @@ import {
   mapContours,
   translateContours,
 } from "../../primitives/path-geometry";
-import { buildCircleTextGeometry } from "./text-path";
+import {
+  buildCircleTextGeometry,
+  getArchGuide,
+  getSlantGuide,
+  getWaveGuide,
+} from "./text-path";
 import { estimateBounds, inflateBounds, layoutGlyphs } from "./warp-layout";
 
 const getStrokeInflatedBounds = (node, bbox) => {
@@ -49,6 +54,21 @@ export const applyWaveWarp = (contours, amplitude, cycles) => {
   });
 };
 
+export const applySlantWarp = (contours, rise) => {
+  const bounds = getBounds(contours);
+  const centerX = (bounds.minX + bounds.maxX) / 2;
+  const halfWidth = Math.max(bounds.width / 2, 1);
+
+  return mapContours(contours, (point) => {
+    const u = (point.x - centerX) / halfWidth;
+
+    return {
+      x: point.x,
+      y: point.y + (rise * u) / 2,
+    };
+  });
+};
+
 const buildFallbackGeometry = (node) => {
   return {
     paths: [],
@@ -67,11 +87,14 @@ const buildArchGeometry = (layout, node) => {
     mergedContours.push(...translateContours(glyph.contours, glyph.baseX, 0));
   }
 
+  const flatBounds = getBounds(mergedContours);
   const warpedContours = applyArchWarp(mergedContours, node.warp.bend);
+  const warpedBounds = getBounds(warpedContours);
+
   return {
-    guide: null,
+    guide: getArchGuide(flatBounds, node.warp.bend, warpedBounds),
     paths: [{ key: "shape-0", d: contoursToPath(warpedContours) }],
-    bbox: getStrokeInflatedBounds(node, getBounds(warpedContours)),
+    bbox: getStrokeInflatedBounds(node, warpedBounds),
     ready: true,
     selectionBounds: null,
   };
@@ -85,16 +108,44 @@ const buildWaveGeometry = (layout, node) => {
     mergedContours.push(...translateContours(glyph.contours, glyph.baseX, 0));
   }
 
+  const flatBounds = getBounds(mergedContours);
   const warpedContours = applyWaveWarp(
     mergedContours,
     node.warp.amplitude,
     node.warp.cycles
   );
+  const warpedBounds = getBounds(warpedContours);
 
   return {
-    guide: null,
+    guide: getWaveGuide(
+      flatBounds,
+      node.warp.amplitude,
+      node.warp.cycles,
+      warpedBounds
+    ),
     paths: [{ key: "shape-0", d: contoursToPath(warpedContours) }],
-    bbox: getStrokeInflatedBounds(node, getBounds(warpedContours)),
+    bbox: getStrokeInflatedBounds(node, warpedBounds),
+    ready: true,
+    selectionBounds: null,
+  };
+};
+
+const buildSlantGeometry = (layout, node) => {
+  const mergedContours =
+    /** @type {ReturnType<typeof commandsToContours>} */ ([]);
+
+  for (const glyph of layout.glyphs) {
+    mergedContours.push(...translateContours(glyph.contours, glyph.baseX, 0));
+  }
+
+  const flatBounds = getBounds(mergedContours);
+  const warpedContours = applySlantWarp(mergedContours, node.warp.rise);
+  const warpedBounds = getBounds(warpedContours);
+
+  return {
+    guide: getSlantGuide(flatBounds, node.warp.rise, warpedBounds),
+    paths: [{ key: "shape-0", d: contoursToPath(warpedContours) }],
+    bbox: getStrokeInflatedBounds(node, warpedBounds),
     ready: true,
     selectionBounds: null,
   };
@@ -168,6 +219,10 @@ export const buildNodeGeometry = (node, font) => {
 
     if (node.warp.kind === "circle") {
       return buildCircleGeometry(layout, node);
+    }
+
+    if (node.warp.kind === "slant") {
+      return buildSlantGeometry(layout, node);
     }
 
     return buildFlatGeometry(layout, node);

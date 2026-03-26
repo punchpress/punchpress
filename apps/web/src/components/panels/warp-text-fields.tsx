@@ -1,9 +1,4 @@
-import {
-  getDefaultWarp,
-  getNodeX,
-  getNodeY,
-  toNumber,
-} from "@punchpress/engine";
+import { getDefaultWarp, toNumber } from "@punchpress/engine";
 import {
   createLocalFontDescriptor,
   createLocalFontOption,
@@ -19,7 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
-import { ColorField, FieldRow, PairedRow, Section } from "./field-primitives";
+import { ColorField, FieldRow, Section } from "./field-primitives";
 import { warpIcons } from "./warp-icons";
 import { NodeFieldsWarpInputs } from "./warp-text-warp-fields";
 
@@ -133,7 +128,7 @@ export const NodeFields = () => {
 
       <Section className="border-black/6 border-t" title="Warp">
         <ToggleGroup
-          className="gap-1.5"
+          className="grid grid-cols-5 gap-1.5"
           onValueChange={(values) => {
             const next = values[0] ?? "none";
             update({ warp: getDefaultWarp(next) });
@@ -151,17 +146,12 @@ export const NodeFields = () => {
         >
           {(["arch", "wave", "circle", "slant"] as const).map((kind) => {
             const { icon: Icon, label } = warpIcons[kind];
-            const isSlant = kind === "slant";
             return (
               <ToggleGroupItem
                 aria-label={label}
-                className={cn(
-                  "[&_svg]:!size-7 h-auto flex-1 px-0 py-2",
-                  isSlant && "cursor-not-allowed opacity-20"
-                )}
-                disabled={isSlant}
+                className={cn("[&_svg]:!size-7 h-auto px-0 py-2")}
                 key={kind}
-                title={isSlant ? "Slant (coming soon)" : label}
+                title={label}
                 value={kind}
               >
                 <Icon />
@@ -181,35 +171,6 @@ export const NodeFields = () => {
             Clear
           </button>
         )}
-      </Section>
-
-      <Section className="border-black/6 border-t" title="Position">
-        <PairedRow label="Position">
-          <Input
-            nativeInput
-            onChange={(event) =>
-              update({
-                transform: {
-                  x: toNumber(event.target.value, getNodeX(node)),
-                },
-              })
-            }
-            type="number"
-            value={getNodeX(node)}
-          />
-          <Input
-            nativeInput
-            onChange={(event) =>
-              update({
-                transform: {
-                  y: toNumber(event.target.value, getNodeY(node)),
-                },
-              })
-            }
-            type="number"
-            value={getNodeY(node)}
-          />
-        </PairedRow>
       </Section>
 
       {hasPathGuide ? null : (

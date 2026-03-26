@@ -87,6 +87,88 @@ const createPlainTextNode = () => {
   } as const;
 };
 
+const createArchNode = () => {
+  return {
+    fill: "#000000",
+    font: FONT,
+    fontSize: 120,
+    id: "arch-node",
+    parentId: "root",
+    stroke: null,
+    strokeWidth: 0,
+    text: "ARCH",
+    tracking: 0,
+    transform: {
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+      x: 380,
+      y: 220,
+    },
+    type: "text",
+    visible: true,
+    warp: {
+      bend: 0.4,
+      kind: "arch",
+    },
+  } as const;
+};
+
+const createWaveNode = () => {
+  return {
+    fill: "#000000",
+    font: FONT,
+    fontSize: 120,
+    id: "wave-node",
+    parentId: "root",
+    stroke: null,
+    strokeWidth: 0,
+    text: "WAVE",
+    tracking: 0,
+    transform: {
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+      x: 380,
+      y: 220,
+    },
+    type: "text",
+    visible: true,
+    warp: {
+      amplitude: 180,
+      cycles: 2,
+      kind: "wave",
+    },
+  } as const;
+};
+
+const createSlantNode = () => {
+  return {
+    fill: "#000000",
+    font: FONT,
+    fontSize: 120,
+    id: "slant-node",
+    parentId: "root",
+    stroke: null,
+    strokeWidth: 0,
+    text: "SLANT",
+    tracking: 0,
+    transform: {
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+      x: 380,
+      y: 220,
+    },
+    type: "text",
+    visible: true,
+    warp: {
+      kind: "slant",
+      rise: -120,
+    },
+  } as const;
+};
+
 describe("Editor interaction mode boundaries", () => {
   test("startPathEditing clears incompatible transient interaction state", () => {
     const editor = createEditor();
@@ -146,5 +228,64 @@ describe("Editor interaction mode boundaries", () => {
     expect(editor.isSelectionDragging).toBe(false);
     expect(editor.isSelectionRotating).toBe(false);
     expect(editor.isTextPathPositioning).toBe(false);
+  });
+
+  test("startPathEditing is unavailable for inline arch warp controls", () => {
+    const editor = createEditor();
+    const node = createArchNode();
+
+    editor.getState().loadNodes([node]);
+    editor.select(node.id);
+
+    expect(editor.canEditNodePath(node.id)).toBe(true);
+    expect(editor.canStartPathEditing(node.id)).toBe(false);
+    expect(editor.startPathEditing(node.id)).toBe(false);
+    expect(editor.pathEditingNodeId).toBeNull();
+  });
+
+  test("startPathEditing is unavailable for inline wave warp controls", () => {
+    const editor = createEditor();
+    const node = createWaveNode();
+
+    editor.getState().loadNodes([node]);
+    editor.select(node.id);
+
+    expect(editor.canEditNodePath(node.id)).toBe(true);
+    expect(editor.canStartPathEditing(node.id)).toBe(false);
+    expect(editor.startPathEditing(node.id)).toBe(false);
+    expect(editor.pathEditingNodeId).toBeNull();
+  });
+
+  test("startPathEditing is unavailable for inline slant warp controls", () => {
+    const editor = createEditor();
+    const node = createSlantNode();
+
+    editor.getState().loadNodes([node]);
+    editor.select(node.id);
+
+    expect(editor.canEditNodePath(node.id)).toBe(true);
+    expect(editor.canStartPathEditing(node.id)).toBe(false);
+    expect(editor.startPathEditing(node.id)).toBe(false);
+    expect(editor.pathEditingNodeId).toBeNull();
+  });
+
+  test("clearing a circle warp exits path editing", () => {
+    const editor = createEditor();
+    const node = createCircleNode();
+
+    editor.getState().loadNodes([node]);
+    editor.select(node.id);
+
+    expect(editor.startPathEditing(node.id)).toBe(true);
+    expect(editor.isPathEditing(node.id)).toBe(true);
+
+    editor.updateSelectedNode({
+      warp: {
+        kind: "none",
+      },
+    });
+
+    expect(editor.isPathEditing(node.id)).toBe(false);
+    expect(editor.pathEditingNodeId).toBeNull();
   });
 });

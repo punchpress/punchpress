@@ -1,15 +1,12 @@
 import { shouldIgnoreGlobalShortcutTarget } from "@punchpress/engine";
-import { createContext, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useEditor } from "../editor-react/use-editor";
 import {
   findPerformanceBenchmark,
   performanceBenchmarks,
 } from "./performance-benchmarks";
+import { PerformanceContext } from "./performance-context";
 import { PerformanceController } from "./performance-controller";
-
-export const PerformanceContext = createContext<PerformanceController | null>(
-  null
-);
 
 const HUD_SHORTCUT_KEY = "p";
 

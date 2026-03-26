@@ -27,8 +27,10 @@ export {
 } from "./nodes/node-tree";
 export { createDefaultSquareNode } from "./nodes/square/model";
 export {
+  ARCH_BEND_LIMIT,
   createDefaultNode,
   createId,
+  DEFAULT_SLANT_RISE,
   getDefaultWarp,
   getNodeCssTransform,
   getNodeRotation,
@@ -38,6 +40,8 @@ export {
   getNodeX,
   getNodeY,
   isNodeVisible,
+  WAVE_CYCLES_MAX,
+  WAVE_CYCLES_MIN,
   withNodeTransform,
 } from "./nodes/text/model";
 export {

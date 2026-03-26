@@ -3,6 +3,11 @@ import {
   ROOT_PARENT_ID,
 } from "@punchpress/punch-schema";
 
+export const ARCH_BEND_LIMIT = 2;
+export const WAVE_CYCLES_MAX = 3;
+export const WAVE_CYCLES_MIN = 0.1;
+export const DEFAULT_SLANT_RISE = -120;
+
 export const createId = () => {
   if (
     typeof crypto !== "undefined" &&
@@ -20,7 +25,11 @@ export const getDefaultWarp = (kind) => {
   }
 
   if (kind === "wave") {
-    return { kind: "wave", amplitude: 180, cycles: 2 };
+    return { kind: "wave", amplitude: 140, cycles: 1 };
+  }
+
+  if (kind === "slant") {
+    return { kind: "slant", rise: DEFAULT_SLANT_RISE };
   }
 
   if (kind === "circle") {

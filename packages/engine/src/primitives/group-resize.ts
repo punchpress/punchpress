@@ -27,6 +27,13 @@ const getScaledWarp = (warp, scale) => {
     };
   }
 
+  if (warp.kind === "slant") {
+    return {
+      ...warp,
+      rise: round(warp.rise * scale, 2),
+    };
+  }
+
   return warp;
 };
 

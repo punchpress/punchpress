@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { PerformanceContext } from "./performance-provider";
+import { PerformanceContext } from "./performance-context";
 
 export const usePerformanceController = () => {
   const controller = useContext(PerformanceContext);
