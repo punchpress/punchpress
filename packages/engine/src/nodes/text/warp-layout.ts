@@ -5,7 +5,7 @@ export const estimateBounds = (node) => {
     120,
     node.fontSize * Math.max(1, node.text.length * 0.28)
   );
-  const halfHeight = Math.max(90, node.fontSize * 0.7);
+  const halfHeight = Math.max(20, node.fontSize * 0.7);
 
   return {
     minX: -halfWidth,

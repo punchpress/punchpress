@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { Editor, getDefaultWarp } from "@punchpress/engine";
-import { MissingDocumentFontsError } from "@punchpress/punch-schema";
+import {
+  createLocalFontDescriptor,
+  getLocalFontId,
+  MissingDocumentFontsError,
+} from "@punchpress/punch-schema";
 
 const AVAILABLE_FONT = {
   family: "Arial",
@@ -83,6 +87,29 @@ const createCircleDocument = (id: string, pathPosition?: number) => {
     ],
     version: "1.3",
   });
+};
+
+const createFakeLoadedFont = () => {
+  return {
+    charToGlyph: () => ({
+      advanceWidth: 800,
+      getPath: (_x: number, _y: number, fontSize: number) => {
+        const scale = fontSize / 100;
+
+        return {
+          commands: [
+            { type: "M", x: 0, y: -260 * scale },
+            { type: "L", x: 50 * scale, y: -260 * scale },
+            { type: "L", x: 50 * scale, y: 40 * scale },
+            { type: "L", x: 0, y: 40 * scale },
+            { type: "Z" },
+          ],
+          toPathData: () => "",
+        };
+      },
+    }),
+    unitsPerEm: 1000,
+  };
 };
 
 describe("Editor.loadDocument", () => {
@@ -230,6 +257,40 @@ describe("Editor text editing mode", () => {
     expect(editor.selectedNode?.warp).toEqual({
       kind: "none",
     });
+  });
+
+  test("centers new text nodes on the requested point", () => {
+    const editor = new Editor();
+    editor.applyLocalFontCatalog({
+      error: "",
+      fonts: [{ ...AVAILABLE_FONT, id: "arialmt" }],
+      state: "ready",
+    });
+
+    const defaultFont = createLocalFontDescriptor(editor.getDefaultFont());
+    editor.fonts.cache.set(getLocalFontId(defaultFont), {
+      descriptor: defaultFont,
+      font: createFakeLoadedFont(),
+      status: "ready",
+    });
+
+    const point = { x: 320, y: 240 };
+
+    editor.addTextNode(point);
+
+    const frame = editor.selectedNodeId
+      ? editor.getNodeRenderFrame(editor.selectedNodeId)
+      : null;
+
+    expect(frame).not.toBeNull();
+    expect((frame?.bounds.minX! + frame?.bounds.maxX!) / 2).toBeCloseTo(
+      point.x,
+      2
+    );
+    expect((frame?.bounds.minY! + frame?.bounds.maxY!) / 2).toBeCloseTo(
+      point.y,
+      2
+    );
   });
 
   test("switches back to the pointer tool when placing a text node", () => {
