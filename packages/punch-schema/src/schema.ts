@@ -110,11 +110,14 @@ export const vectorHandleSchema = z
   })
   .strict();
 
+export const vectorPointTypeSchema = z.enum(["corner", "smooth"]);
+
 export const vectorSegmentSchema = z
   .object({
     handleIn: vectorHandleSchema,
     handleOut: vectorHandleSchema,
     point: vectorHandleSchema,
+    pointType: vectorPointTypeSchema,
   })
   .strict();
 
@@ -199,4 +202,5 @@ export type VectorContourDocument = z.infer<typeof vectorContourSchema>;
 export type VectorFillRuleDocument = z.infer<typeof vectorFillRuleSchema>;
 export type VectorHandleDocument = z.infer<typeof vectorHandleSchema>;
 export type VectorNodeDocument = z.infer<typeof vectorNodeSchema>;
+export type VectorPointTypeDocument = z.infer<typeof vectorPointTypeSchema>;
 export type VectorSegmentDocument = z.infer<typeof vectorSegmentSchema>;

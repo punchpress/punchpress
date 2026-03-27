@@ -21,6 +21,7 @@ export const getEditorDebugDump = (editor) => {
       nodeId: state.editingNodeId,
       originalText: state.editingOriginalText,
       pathNodeId: state.pathEditingNodeId,
+      pathPoint: state.pathEditingPoint,
       text: state.editingText,
     },
     hoveredNodeId: editor.hoveredNodeId,

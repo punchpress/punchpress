@@ -61,6 +61,7 @@ export type {
   VectorFillRuleDocument,
   VectorHandleDocument,
   VectorNodeDocument,
+  VectorPointTypeDocument,
   VectorSegmentDocument,
   WarpDocument,
 } from "./schema";
@@ -77,6 +78,7 @@ export {
   vectorFillRuleSchema,
   vectorHandleSchema,
   vectorNodeSchema,
+  vectorPointTypeSchema,
   vectorSegmentSchema,
   warpSchema,
 } from "./schema";

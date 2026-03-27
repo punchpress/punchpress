@@ -18,21 +18,25 @@ const createRectangleContour = (
         handleIn: { x: 0, y: 0 },
         handleOut: { x: 0, y: 0 },
         point: { x: -halfWidth, y: -halfHeight },
+        pointType: "corner",
       },
       {
         handleIn: { x: 0, y: 0 },
         handleOut: { x: 0, y: 0 },
         point: { x: halfWidth, y: -halfHeight },
+        pointType: "corner",
       },
       {
         handleIn: { x: 0, y: 0 },
         handleOut: { x: 0, y: 0 },
         point: { x: halfWidth, y: halfHeight },
+        pointType: "corner",
       },
       {
         handleIn: { x: 0, y: 0 },
         handleOut: { x: 0, y: 0 },
         point: { x: -halfWidth, y: halfHeight },
+        pointType: "corner",
       },
     ],
   };

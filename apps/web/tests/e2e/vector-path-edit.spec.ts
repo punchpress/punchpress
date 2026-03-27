@@ -133,9 +133,9 @@ test("dragging a vector anchor edits the node through the paper session", async 
     throw new Error("Missing visible vector node bounds");
   }
 
-  await page.mouse.move(rect.x, rect.y);
+  await page.mouse.move(rect.x + 6, rect.y + 6);
   await page.mouse.down();
-  await page.mouse.move(rect.x - 36, rect.y - 24, { steps: 6 });
+  await page.mouse.move(rect.x - 30, rect.y - 18, { steps: 6 });
   await expect(page.locator(".canvas-selecto .selecto-selection")).toHaveCount(0);
   await page.mouse.up();
   await pauseForUi(page);
@@ -169,6 +169,182 @@ test("dragging a vector anchor edits the node through the paper session", async 
 
   expect(firstPoint?.x).toBeLessThan(-10);
   expect(firstPoint?.y).toBeLessThan(-10);
+});
+
+test("selecting a vector anchor exposes point controls and converts it to smooth", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadVectorDocument(page);
+
+  await clickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+
+  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
+  const rect = await node.boundingBox();
+
+  if (!rect) {
+    throw new Error("Missing visible vector node bounds");
+  }
+
+  await page.mouse.click(rect.x + 6, rect.y + 6);
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => (await getDebugDump(page))?.editing?.pathPoint || null)
+    .toEqual({
+      contourIndex: 0,
+      segmentIndex: 0,
+    });
+
+  await expect(page.getByRole("button", { name: "Corner" })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Smooth" })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Corner" })).toHaveAttribute(
+    "data-active",
+    "true"
+  );
+  await expect(page.getByRole("button", { name: "Smooth" })).toHaveAttribute(
+    "data-active",
+    "false"
+  );
+
+  await page.getByRole("button", { name: "Smooth" }).click();
+  await pauseForUi(page);
+
+  await expect(page.getByRole("button", { name: "Corner" })).toHaveAttribute(
+    "data-active",
+    "false"
+  );
+  await expect(page.getByRole("button", { name: "Smooth" })).toHaveAttribute(
+    "data-active",
+    "true"
+  );
+
+  await expect
+    .poll(async () => {
+      const dump = await getDebugDump(page);
+      const document = dump?.document?.serialized
+        ? JSON.parse(dump.document.serialized)
+        : null;
+      const vectorNode = document?.nodes?.find(
+        (entry) => entry.id === "vector-node"
+      );
+      const segment = vectorNode?.contours?.[0]?.segments?.[0];
+
+      if (!segment) {
+        return null;
+      }
+
+      return {
+        handleInLength: Math.hypot(segment.handleIn.x, segment.handleIn.y),
+        handleOutLength: Math.hypot(segment.handleOut.x, segment.handleOut.y),
+        pointType: segment.pointType,
+      };
+    })
+    .toMatchObject({
+      handleInLength: expect.any(Number),
+      handleOutLength: expect.any(Number),
+      pointType: "smooth",
+    });
+
+  await page.getByRole("button", { name: "Corner" }).click();
+  await pauseForUi(page);
+
+  await expect(page.getByRole("button", { name: "Corner" })).toHaveAttribute(
+    "data-active",
+    "true"
+  );
+  await expect(page.getByRole("button", { name: "Smooth" })).toHaveAttribute(
+    "data-active",
+    "false"
+  );
+
+  await expect
+    .poll(async () => {
+      const dump = await getDebugDump(page);
+      const document = dump?.document?.serialized
+        ? JSON.parse(dump.document.serialized)
+        : null;
+      const vectorNode = document?.nodes?.find(
+        (entry) => entry.id === "vector-node"
+      );
+
+      return vectorNode?.contours?.[0]?.segments?.[0]?.pointType || null;
+    })
+    .toBe("corner");
+});
+
+test("switching between corner anchors retargets the point toolbar actions", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadVectorDocument(page);
+
+  await clickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+
+  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
+  const rect = await node.boundingBox();
+
+  if (!rect) {
+    throw new Error("Missing visible vector node bounds");
+  }
+
+  await page.mouse.click(rect.x + 6, rect.y + 6);
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => (await getDebugDump(page))?.editing?.pathPoint || null)
+    .toEqual({
+      contourIndex: 0,
+      segmentIndex: 0,
+    });
+
+  await page.mouse.click(rect.x + rect.width - 6, rect.y + 6);
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => (await getDebugDump(page))?.editing?.pathPoint || null)
+    .toEqual({
+      contourIndex: 0,
+      segmentIndex: 1,
+    });
+
+  await expect(page.getByRole("button", { name: "Corner" })).toHaveAttribute(
+    "data-active",
+    "true"
+  );
+  await expect(page.getByRole("button", { name: "Smooth" })).toHaveAttribute(
+    "data-active",
+    "false"
+  );
+
+  await page.getByRole("button", { name: "Smooth" }).click();
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => {
+      const dump = await getDebugDump(page);
+      const document = dump?.document?.serialized
+        ? JSON.parse(dump.document.serialized)
+        : null;
+      const vectorNode = document?.nodes?.find(
+        (entry) => entry.id === "vector-node"
+      );
+
+      return {
+        first: vectorNode?.contours?.[0]?.segments?.[0]?.pointType || null,
+        second: vectorNode?.contours?.[0]?.segments?.[1]?.pointType || null,
+      };
+    })
+    .toEqual({
+      first: "corner",
+      second: "smooth",
+    });
 });
 
 test("dragging the vector body in path edit mode moves the node", async ({

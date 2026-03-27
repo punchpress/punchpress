@@ -64,6 +64,7 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
           focusedGroupId: null,
           nodes: [...state.nodes, node],
           pathEditingNodeId: null,
+          pathEditingPoint: null,
           selectedNodeIds: [node.id],
         })
       );
@@ -91,6 +92,7 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
           focusedGroupId: null,
           nodes: [...state.nodes, node],
           pathEditingNodeId: null,
+          pathEditingPoint: null,
           selectedNodeIds: [node.id],
         })
       );
@@ -129,6 +131,7 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
           focusedGroupId: null,
           nodes: [...state.nodes, node],
           pathEditingNodeId: null,
+          pathEditingPoint: null,
           selectedNodeIds: [node.id],
         })
       );
@@ -193,6 +196,7 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
         ...exitPathEditingInteractionState(),
         nodes: [...nodes],
         pathEditingNodeId: null,
+        pathEditingPoint: null,
         selectedNodeIds: [],
         viewport: state.viewport,
       }));

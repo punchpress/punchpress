@@ -62,24 +62,26 @@ const migrateV1Document = (value: Record<string, unknown>) => {
   return {
     ...value,
     version: PUNCH_DOCUMENT_VERSION,
-    nodes: withGroupNames(
-      nodes.map((node) => {
-        if (!isRecord(node)) {
-          return node;
-        }
+    nodes: withVectorPointTypes(
+      withGroupNames(
+        nodes.map((node) => {
+          if (!isRecord(node)) {
+            return node;
+          }
 
-        const { fontUrl: legacyFontUrl, ...nextNode } = node;
-        const fontUrl =
-          typeof legacyFontUrl === "string" && legacyFontUrl.trim().length > 0
-            ? legacyFontUrl
-            : "";
+          const { fontUrl: legacyFontUrl, ...nextNode } = node;
+          const fontUrl =
+            typeof legacyFontUrl === "string" && legacyFontUrl.trim().length > 0
+              ? legacyFontUrl
+              : "";
 
-        return {
-          ...nextNode,
-          font: getLegacyFontName(fontUrl),
-          parentId: ROOT_PARENT_ID,
-        };
-      })
+          return {
+            ...nextNode,
+            font: getLegacyFontName(fontUrl),
+            parentId: ROOT_PARENT_ID,
+          };
+        })
+      )
     ),
   };
 };
@@ -90,20 +92,22 @@ const migrateV11Document = (value: Record<string, unknown>) => {
   return {
     ...value,
     version: PUNCH_DOCUMENT_VERSION,
-    nodes: withGroupNames(
-      nodes.map((node) => {
-        if (!isRecord(node)) {
-          return node;
-        }
+    nodes: withVectorPointTypes(
+      withGroupNames(
+        nodes.map((node) => {
+          if (!isRecord(node)) {
+            return node;
+          }
 
-        return {
-          ...node,
-          parentId:
-            typeof node.parentId === "string" && node.parentId.length > 0
-              ? node.parentId
-              : ROOT_PARENT_ID,
-        };
-      })
+          return {
+            ...node,
+            parentId:
+              typeof node.parentId === "string" && node.parentId.length > 0
+                ? node.parentId
+                : ROOT_PARENT_ID,
+          };
+        })
+      )
     ),
   };
 };
@@ -130,13 +134,51 @@ const withGroupNames = (nodes: unknown[]) => {
   });
 };
 
+const withVectorPointTypes = (nodes: unknown[]) => {
+  return nodes.map((node) => {
+    if (
+      !isRecord(node) ||
+      node.type !== "vector" ||
+      !Array.isArray(node.contours)
+    ) {
+      return node;
+    }
+
+    return {
+      ...node,
+      contours: node.contours.map((contour) => {
+        if (!isRecord(contour) || !Array.isArray(contour.segments)) {
+          return contour;
+        }
+
+        return {
+          ...contour,
+          segments: contour.segments.map((segment) => {
+            if (!isRecord(segment)) {
+              return segment;
+            }
+
+            return {
+              ...segment,
+              pointType:
+                segment.pointType === "smooth" || segment.pointType === "corner"
+                  ? segment.pointType
+                  : "corner",
+            };
+          }),
+        };
+      }),
+    };
+  });
+};
+
 const migrateV12Document = (value: Record<string, unknown>) => {
   const nodes = Array.isArray(value.nodes) ? value.nodes : [];
 
   return {
     ...value,
     version: PUNCH_DOCUMENT_VERSION,
-    nodes: withGroupNames(nodes),
+    nodes: withVectorPointTypes(withGroupNames(nodes)),
   };
 };
 
@@ -144,6 +186,15 @@ const migrateV13Document = (value: Record<string, unknown>) => {
   return {
     ...value,
     version: PUNCH_DOCUMENT_VERSION,
+    nodes: withVectorPointTypes(Array.isArray(value.nodes) ? value.nodes : []),
+  };
+};
+
+const migrateV14Document = (value: Record<string, unknown>) => {
+  return {
+    ...value,
+    version: PUNCH_DOCUMENT_VERSION,
+    nodes: withVectorPointTypes(Array.isArray(value.nodes) ? value.nodes : []),
   };
 };
 
@@ -172,6 +223,10 @@ export const migrateDocument = (value: unknown) => {
 
   if (value.version === "1.3") {
     return migrateV13Document(value);
+  }
+
+  if (value.version === "1.4") {
+    return migrateV14Document(value);
   }
 
   if (typeof value.version !== "string" || value.version.length === 0) {

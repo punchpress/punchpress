@@ -103,6 +103,8 @@ export const createEditingStoreActions = (set) => {
             : exitPathEditingInteractionState()),
           pathEditingNodeId:
             state.pathEditingNodeId === nodeId ? state.pathEditingNodeId : null,
+          pathEditingPoint:
+            state.pathEditingNodeId === nodeId ? state.pathEditingPoint : null,
           selectedNodeIds: nextSelectedNodeIds,
         };
       });
@@ -132,6 +134,11 @@ export const createEditingStoreActions = (set) => {
             nextSelectedNodeIds.length === 1 &&
             nextSelectedNodeIds[0] === state.pathEditingNodeId
               ? state.pathEditingNodeId
+              : null,
+          pathEditingPoint:
+            nextSelectedNodeIds.length === 1 &&
+            nextSelectedNodeIds[0] === state.pathEditingNodeId
+              ? state.pathEditingPoint
               : null,
           selectedNodeIds: nextSelectedNodeIds,
         };
@@ -166,6 +173,11 @@ export const createEditingStoreActions = (set) => {
             nextSelectedNodeIds.length === 1 &&
             nextSelectedNodeIds[0] === state.pathEditingNodeId
               ? state.pathEditingNodeId
+              : null,
+          pathEditingPoint:
+            nextSelectedNodeIds.length === 1 &&
+            nextSelectedNodeIds[0] === state.pathEditingNodeId
+              ? state.pathEditingPoint
               : null,
           selectedNodeIds: nextSelectedNodeIds,
         };

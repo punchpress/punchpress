@@ -54,6 +54,10 @@ export {
 } from "./nodes/text/model";
 export { createDefaultVectorNode } from "./nodes/vector/model";
 export {
+  setVectorPointType,
+  updateVectorPointHandle,
+} from "./nodes/vector/point-edit";
+export {
   estimateBounds,
   inflateBounds,
   layoutGlyphs,

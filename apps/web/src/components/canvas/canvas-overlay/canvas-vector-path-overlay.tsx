@@ -18,6 +18,7 @@ export const CanvasVectorPathOverlay = ({ viewportRevision }) => {
   const pathEditingNodeId = useEditorValue(
     (_, state) => state.pathEditingNodeId
   );
+  const pathEditingPoint = useEditorValue((_, state) => state.pathEditingPoint);
   const spacePressed = useEditorValue((_, state) => state.spacePressed);
   const overlayState = useEditorSurfaceValue((editor, state) => {
     if (state.editingNodeId || !state.pathEditingNodeId) {
@@ -168,10 +169,11 @@ export const CanvasVectorPathOverlay = ({ viewportRevision }) => {
             contours: node.contours,
             matrix,
             metrics,
+            selectedPoint: pathEditingPoint,
           }
         : null
     );
-  }, [isPathEditing, matrix, metrics, node]);
+  }, [isPathEditing, matrix, metrics, node, pathEditingPoint]);
 
   if (!(overlayState && isPathEditing)) {
     return null;

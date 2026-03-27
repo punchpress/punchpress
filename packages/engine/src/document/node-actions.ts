@@ -1,4 +1,5 @@
 import { duplicateClipboardContent } from "../clipboard/clipboard-actions";
+import { setVectorPointType as setVectorPointTypeOnContours } from "../nodes/vector/point-edit";
 import { finishEditingIfNeeded } from "../editing/editing-actions";
 import { isSelected } from "../selection/selection-actions";
 
@@ -175,4 +176,36 @@ export const bringToFront = (editor, nodeId) => {
   editor.run(() => {
     editor.getState().bringNodeToFront(nodeId);
   });
+};
+
+export const setVectorPointType = (
+  editor,
+  nodeId,
+  point,
+  pointType
+) => {
+  const node = editor.getNode(nodeId);
+
+  if (!(node?.type === "vector" && point)) {
+    return false;
+  }
+
+  editor.run(() => {
+    editor.getState().updateNodeById(nodeId, (currentNode) => {
+      if (currentNode.type !== "vector") {
+        return currentNode;
+      }
+
+      return {
+        ...currentNode,
+        contours: setVectorPointTypeOnContours(currentNode.contours, {
+          contourIndex: point.contourIndex,
+          pointType,
+          segmentIndex: point.segmentIndex,
+        }),
+      };
+    });
+  });
+
+  return true;
 };

@@ -34,14 +34,74 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 - Anchor and handle controls should remain visually stable and screen-sized while the user edits the path.
 - Path edits should update the same vector node rather than creating a replacement node.
 
-## Direct Manipulation
+## Anchor Semantics
+
+- Anchor editing should follow familiar Adobe Illustrator conventions by default.
+- The primary anchor types should be `corner` and `smooth`.
+- A `corner` anchor may have zero, one, or two direction handles, and each side may be edited independently.
+- A `smooth` anchor should preserve tangent continuity across the point.
+- A straight point is a point whose direction handles are both collapsed, not a separate anchor type.
+- A one-sided curve point is a valid state, especially at open-path ends and partially converted corners, not a separate primary mode.
+- Symmetric or mirrored handle behavior may exist as a convenience later, but it should not be required as a first-class baseline mode if PunchPress is following Illustrator conventions.
+
+## Point Editing
 
 - Users should be able to move existing anchor points directly on the canvas.
 - Users should be able to adjust bezier handles directly on the canvas.
+- Users should be able to select one or multiple anchor points within path edit mode.
+- Users should be able to select anchor points by click, additive selection, and lasso-style point selection.
+- Path-edit cursors should distinguish point selection/editing from whole-object dragging.
+- Hovering an anchor or bezier handle should communicate point editing, not object movement.
+- Dragging the vector body should continue to use object-drag cursor language such as `grab` and `grabbing`.
 - Open and closed contours should both be editable through the same interaction model.
-- Path editing should eventually support adding points, removing points, splitting segments, and joining compatible path ends.
+- Selecting a single anchor should expose point-specific actions without leaving path edit mode.
+- Selecting multiple anchors should expose only actions that make sense for multi-point edits.
+
+## Point Controls
+
+- When one or more anchor points are selected, PunchPress should provide direct anchor conversion controls consistent with Illustrator-style editing.
+- The baseline point controls should be `Corner` and `Smooth`.
+- `Corner` should allow independent handle editing and sharp directional changes.
+- `Smooth` should preserve continuous curvature through the anchor.
+- `Delete point` should remove the selected anchor while preserving the remaining path when possible.
+- A convenience action to collapse both handles on the selected point may exist later, but one-sided or zero-handle states should primarily come from direct manipulation rather than dedicated mode buttons.
+
+## Modifier Gestures
+
+- Path editing should support a temporary convert-anchor gesture consistent with Illustrator-style workflows.
+- `Alt/Option`-dragging a direction handle should adjust only that side of the point instead of preserving smooth coupling.
+- `Alt/Option` clicking or dragging on a selected point should support converting between corner-like and smooth-like behavior without requiring a persistent tool switch.
+- `Shift` should constrain handle angle when precise alignment is intended.
+- While the Pen tool exists, temporary modifier access to point editing should feel consistent with Illustrator-style pen workflows rather than forcing constant tool switching.
+
+## Path Operations
+
+- Path editing should support adding points on existing segments.
+- Path editing should support deleting selected points without destroying the whole path.
+- Path editing should support cutting or splitting a path at a selected point or segment.
+- Path editing should support joining compatible open endpoints.
+- Path editing should support closing an open path through explicit intent with clear feedback when the user is targeting the starting anchor.
+- Path editing should support reopening or breaking a closed contour at a chosen point later.
+- Joining endpoints should preserve the path as editable vector source geometry and should follow Illustrator-style expectations for corner joins by default.
+
+## Pen Workflow
+
 - Path editing should eventually support creating new paths with a pen-style workflow rather than only editing existing paths.
-- Closing a path should be a deliberate action with clear feedback when the user is targeting the starting anchor.
+- Clicking should place straight points.
+- Click-dragging should place a point and immediately author its direction handles.
+- Continuing from a smooth point should preserve expected tangent behavior.
+- Esc should end the current drawing gesture without exiting the broader vector editing mode unexpectedly.
+- Enter or an equivalent explicit confirm gesture may finish the current path.
+- The Pen workflow should support continuing an open path from either valid endpoint.
+- The Pen workflow should support starting a new contour inside the same vector node when that is the active authoring intent.
+
+## Complete Editor
+
+- A complete point and bezier editor for PunchPress should include point selection, handle editing, point conversion, point insertion, point deletion, path splitting, path joining, and path closing.
+- A complete editor should make it easy to distinguish object transforms from point-level path edits.
+- A complete editor should support keyboard nudging of selected anchor points.
+- A complete editor should support multi-point edits where the requested action has a clear shared meaning.
+- A complete editor should preserve visual and behavioral consistency across direct selection, pen editing, and future text-on-path workflows.
 
 ## Primitives
 

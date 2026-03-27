@@ -188,6 +188,7 @@ export const pasteTextState = (state, text, font, point) => {
     focusedGroupId: null,
     nodes: [...state.nodes, node],
     pathEditingNodeId: null,
+    pathEditingPoint: null,
     selectedNodeIds: [node.id],
   };
 };

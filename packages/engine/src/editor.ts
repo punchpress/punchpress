@@ -32,6 +32,7 @@ import {
   updateNode as updateEditorNode,
   updateNodes as updateEditorNodes,
   updateSelectedNode as updateEditorSelectedNode,
+  setVectorPointType as setEditorVectorPointType,
 } from "./document/node-actions";
 import {
   addShapeNode as addEditorShapeNode,
@@ -383,6 +384,10 @@ export class Editor {
 
   get pathEditingNodeId() {
     return this.getState().pathEditingNodeId;
+  }
+
+  get pathEditingPoint() {
+    return this.getState().pathEditingPoint;
   }
 
   get isDirty() {
@@ -868,6 +873,31 @@ export class Editor {
 
   setPathEditingNodeId(nodeId) {
     this.getState().setPathEditingNodeId(nodeId);
+  }
+
+  setPathEditingPoint(point) {
+    this.getState().setPathEditingPoint(point);
+  }
+
+  getVectorPointType(nodeId, point = this.pathEditingPoint) {
+    const node = this.getNode(nodeId);
+
+    if (!(node?.type === "vector" && point)) {
+      return null;
+    }
+
+    return (
+      node.contours[point.contourIndex]?.segments[point.segmentIndex]?.pointType ||
+      null
+    );
+  }
+
+  setVectorPointType(pointType, nodeId = this.pathEditingNodeId, point = this.pathEditingPoint) {
+    if (!(nodeId && point)) {
+      return false;
+    }
+
+    return setEditorVectorPointType(this, nodeId, point, pointType);
   }
 
   setEditingText(value) {
