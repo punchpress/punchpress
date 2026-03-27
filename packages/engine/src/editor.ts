@@ -167,6 +167,7 @@ import {
   zoomIn as zoomEditorIn,
   zoomOut as zoomEditorOut,
 } from "./viewport/viewport-focus";
+import { zoomViewportFromWheel as zoomEditorViewportFromWheel } from "./viewport/viewport-wheel-zoom";
 
 // Intentional facade: keep the public editor API and durable subsystem wiring
 // here, and move behavior-heavy implementation into capability modules.
@@ -1102,6 +1103,10 @@ export class Editor {
 
   zoomOut() {
     zoomEditorOut(this);
+  }
+
+  zoomViewportFromWheel(options) {
+    return zoomEditorViewportFromWheel(this, options);
   }
 
   handleSpaceDown(event) {
