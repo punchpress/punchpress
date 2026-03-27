@@ -27,15 +27,26 @@ export const useNodeToolbarState = () => {
     const isPathEditing = Boolean(
       selectedNode?.id && state.pathEditingNodeId === selectedNode.id
     );
+    const selectedPathPoint =
+      isPathEditing && state.pathEditingPoint ? state.pathEditingPoint : null;
+    const selectedPointType =
+      selectedNode?.id && selectedPathPoint
+        ? editor.getVectorPointType(selectedNode.id, selectedPathPoint)
+        : null;
+    const pathPointKey = selectedPathPoint
+      ? `${selectedPathPoint.contourIndex}:${selectedPathPoint.segmentIndex}`
+      : "none";
 
     return {
-      hasPathGuide: Boolean(selectedEditCapabilities?.guide),
+      canEditPath: Boolean(selectedEditCapabilities?.canEditPath),
       hasPathEditingMode: Boolean(
         selectedEditCapabilities?.requiresPathEditing
       ),
       isPathEditing,
+      selectedPathPoint,
+      selectedPointType,
       selectedNode,
-      selectionKey: `${visibleSelectedNodeIds.join(",")}:${isPathEditing ? "path" : "node"}`,
+      selectionKey: `${visibleSelectedNodeIds.join(",")}:${isPathEditing ? `path:${pathPointKey}` : "node"}`,
       visibleSelectedNodeIds,
     };
   });

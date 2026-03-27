@@ -8,7 +8,9 @@ const getOverlayMode = ({
   editingNodeId,
   hasGroupSelection,
   hostElement,
+  isPathEditingSelection,
   isTextPathPositioning,
+  selectedEditCapabilities,
   selectedNode,
   visibleSelectedNodeIds,
 }) => {
@@ -19,6 +21,13 @@ const getOverlayMode = ({
       hostElement &&
       !isTextPathPositioning
     )
+  ) {
+    return null;
+  }
+
+  if (
+    isPathEditingSelection &&
+    selectedEditCapabilities?.pathEditingOverlayMode === "replace-transform"
   ) {
     return null;
   }

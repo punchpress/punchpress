@@ -48,6 +48,18 @@ export const createSelectionStoreActions = (set) => {
     setPathEditingNodeId: (nodeId) => {
       set(() => ({
         pathEditingNodeId: nodeId || null,
+        pathEditingPoint: null,
+      }));
+    },
+
+    setPathEditingPoint: (point) => {
+      set(() => ({
+        pathEditingPoint: point
+          ? {
+              contourIndex: point.contourIndex,
+              segmentIndex: point.segmentIndex,
+            }
+          : null,
       }));
     },
 

@@ -22,6 +22,7 @@ const NODE_PROPERTY_IDS = {
     "tracking",
     "warp",
   ],
+  vector: ["fill", "stroke", "strokeWidth", "x", "y"],
 };
 
 export const getNodePropertyIds = (node) => {

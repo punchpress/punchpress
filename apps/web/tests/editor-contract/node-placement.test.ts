@@ -148,4 +148,33 @@ describe("Editor node placement", () => {
       y: 310,
     });
   });
+
+  test("click placement creates and selects a vector node", () => {
+    const editor = new Editor();
+
+    editor.setActiveTool("pen");
+
+    const session = editor.beginNodePlacement({
+      point: { x: 180, y: 260 },
+      type: "vector",
+    });
+
+    expect(session).not.toBeNull();
+    expect(editor.nodes).toHaveLength(0);
+
+    session?.complete({
+      dragDistancePx: 0,
+      point: { x: 180, y: 260 },
+    });
+
+    expect(editor.activeTool).toBe("pointer");
+    expect(editor.selectedNode).toMatchObject({
+      type: "vector",
+    });
+    expect(editor.selectedNodeIds).toEqual([editor.selectedNodeId]);
+    expect(editor.selectedNode?.transform).toMatchObject({
+      x: 180,
+      y: 260,
+    });
+  });
 });

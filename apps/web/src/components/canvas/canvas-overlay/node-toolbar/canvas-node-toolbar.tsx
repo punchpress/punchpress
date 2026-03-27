@@ -40,7 +40,9 @@ export const CanvasNodeToolbar = memo(function CanvasNodeToolbar() {
   const toolbarState = useNodeToolbarState();
   const actions = resolveNodeToolbarActions(editor, toolbarState);
   const presenceKey = `${toolbarState?.selectionKey || "hidden"}:${actions
-    .map((action) => action.id)
+    .map((action) => {
+      return `${action.id}:${action.variant}:${action.isActive ? "active" : "idle"}`;
+    })
     .join(",")}`;
   const presenceState = useNodeToolbarPresence(actions, presenceKey);
   const style = getNodeToolbarStyle(editor);
@@ -51,7 +53,7 @@ export const CanvasNodeToolbar = memo(function CanvasNodeToolbar() {
 
   return (
     <div
-      className="canvas-node-toolbar pointer-events-none absolute z-20"
+      className="canvas-node-toolbar pointer-events-none absolute z-30"
       data-phase={presenceState.phase}
       onPointerDown={(event) => {
         event.preventDefault();
@@ -79,6 +81,7 @@ export const CanvasNodeToolbar = memo(function CanvasNodeToolbar() {
                   ) : null}
                   <Button
                     aria-label={action.title}
+                    data-active={action.isActive ? "true" : "false"}
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();

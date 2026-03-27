@@ -17,6 +17,8 @@ import {
 } from "./text/text-path";
 import { buildNodeGeometry as buildWarpTextGeometry } from "./text/warp-engine";
 import { estimateBounds } from "./text/warp-layout";
+import { createDefaultVectorNode } from "./vector/model";
+import { buildVectorNodeGeometry } from "./vector/vector-engine";
 
 const toWorldFrame = (node, bounds) => {
   if (!bounds) {
@@ -189,8 +191,13 @@ const textNodeCapabilities = {
       canEditText: true,
       guide,
       hasExpandedHitBounds: Boolean(geometry?.selectionBounds),
+      pathEditingOverlayMode: "keep-transform",
       requiresPathEditing: guide?.kind === "circle",
     };
+  },
+
+  canPersistPathEditing: (node) => {
+    return node?.warp?.kind === "circle";
   },
 
   type: "text",
@@ -240,8 +247,11 @@ const groupNodeCapabilities = {
     canEditText: false,
     guide: null,
     hasExpandedHitBounds: false,
+    pathEditingOverlayMode: "keep-transform",
     requiresPathEditing: false,
   }),
+
+  canPersistPathEditing: () => false,
 
   type: "group",
 };
@@ -329,16 +339,84 @@ const shapeNodeCapabilities = {
     canEditText: false,
     guide: null,
     hasExpandedHitBounds: false,
+    pathEditingOverlayMode: "keep-transform",
     requiresPathEditing: false,
   }),
 
+  canPersistPathEditing: () => false,
+
   type: "shape",
+};
+
+const vectorNodeCapabilities = {
+  buildGeometry: (node) => {
+    return buildVectorNodeGeometry(node);
+  },
+
+  createDefaultNode: () => {
+    return createDefaultVectorNode();
+  },
+
+  getFrameFromGeometry: (node, geometry, surface) => {
+    switch (surface) {
+      case "render":
+        return toWorldFrame(node, geometry?.bbox);
+      case "selection":
+      case "transform":
+        return toTransformedWorldFrame(node, geometry?.bbox);
+      default:
+        return null;
+    }
+  },
+
+  getFrame: (editor, nodeId, node, surface) => {
+    const geometry = editor.getNodeGeometry(nodeId);
+
+    return vectorNodeCapabilities.getFrameFromGeometry(node, geometry, surface);
+  },
+
+  getGeometrySignature: (node, fontRevision) => {
+    return JSON.stringify({
+      contours: node.contours,
+      fill: node.fill,
+      fillRule: node.fillRule,
+      fontRevision,
+      stroke: node.stroke,
+      strokeWidth: node.strokeWidth,
+    });
+  },
+
+  getLocalBounds: (editor, nodeId) => {
+    return editor.getNodeGeometry(nodeId)?.bbox || null;
+  },
+
+  getSurfaceGeometry: (editor, nodeId) => {
+    return editor.getNodeGeometry(nodeId);
+  },
+
+  getHitBounds: (editor, nodeId) => {
+    return editor.getNodeGeometry(nodeId)?.bbox || null;
+  },
+
+  getEditCapabilities: () => ({
+    canEditPath: true,
+    canEditText: false,
+    guide: null,
+    hasExpandedHitBounds: false,
+    pathEditingOverlayMode: "replace-transform",
+    requiresPathEditing: true,
+  }),
+
+  canPersistPathEditing: () => true,
+
+  type: "vector",
 };
 
 const nodeCapabilitiesByType = {
   group: groupNodeCapabilities,
   shape: shapeNodeCapabilities,
   text: textNodeCapabilities,
+  vector: vectorNodeCapabilities,
 };
 
 export const getNodeCapabilities = (node) => {
@@ -347,6 +425,10 @@ export const getNodeCapabilities = (node) => {
   }
 
   return nodeCapabilitiesByType[node.type] || null;
+};
+
+export const canNodePersistPathEditing = (node) => {
+  return getNodeCapabilities(node)?.canPersistPathEditing?.(node);
 };
 
 export const getNodeFrameFromGeometry = (

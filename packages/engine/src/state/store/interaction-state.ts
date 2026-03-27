@@ -13,6 +13,7 @@ export const enterTextEditingInteractionState = () => {
     ...resetTransientCanvasInteractionState(),
     isHoveringSuppressed: true,
     pathEditingNodeId: null,
+    pathEditingPoint: null,
   };
 };
 
@@ -20,6 +21,7 @@ export const enterPathEditingInteractionState = (nodeId) => {
   return {
     ...resetTransientCanvasInteractionState(),
     pathEditingNodeId: nodeId || null,
+    pathEditingPoint: null,
   };
 };
 
@@ -27,6 +29,7 @@ export const exitPathEditingInteractionState = () => {
   return {
     ...resetTransientCanvasInteractionState(),
     pathEditingNodeId: null,
+    pathEditingPoint: null,
   };
 };
 

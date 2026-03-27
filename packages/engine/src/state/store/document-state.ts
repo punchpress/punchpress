@@ -1,3 +1,4 @@
+import { canNodePersistPathEditing } from "../../nodes/node-capabilities";
 import { getSubtreeNodeIds, isDescendantOf } from "../../nodes/node-tree";
 import { isNodeVisible } from "../../nodes/text/model";
 import { finalizeEditingState } from "./editing-state";
@@ -15,7 +16,7 @@ const canRemainInPathEditing = (nodes, nodeId) => {
 
   const node = nodes.find((entry) => entry.id === nodeId);
 
-  return Boolean(node?.type === "text" && node.warp.kind === "circle");
+  return canNodePersistPathEditing(node);
 };
 
 export const reconcilePathEditingState = (state, nodes) => {
@@ -36,6 +37,7 @@ export const reconcilePathEditingState = (state, nodes) => {
     isHoveringSuppressed: false,
     nodes,
     pathEditingNodeId: null,
+    pathEditingPoint: null,
   };
 };
 
@@ -62,6 +64,8 @@ export const deleteNodeState = (state, nodeId) => {
       isEditingNode || isPathEditingNode ? false : state.isHoveringSuppressed,
     pathEditingNodeId:
       isEditingNode || isPathEditingNode ? null : state.pathEditingNodeId,
+    pathEditingPoint:
+      isEditingNode || isPathEditingNode ? null : state.pathEditingPoint,
     ...deleteNodeTreeState(state, [nodeId]),
   };
 };
@@ -103,6 +107,9 @@ export const deleteNodesState = (state, nodeIds) => {
     pathEditingNodeId: isPathEditingNodeSelected
       ? null
       : state.pathEditingNodeId,
+    pathEditingPoint: isPathEditingNodeSelected
+      ? null
+      : state.pathEditingPoint,
     ...deleteNodeTreeState(state, selectedNodeIds),
   };
 };
@@ -132,6 +139,7 @@ export const toggleNodeVisibilityState = (state, nodeId) => {
     editingOriginalText: baseState.editingOriginalText,
     editingText: baseState.editingText,
     pathEditingNodeId: baseState.pathEditingNodeId,
+    pathEditingPoint: baseState.pathEditingPoint,
     ...toggleNodeVisibilityTreeState(baseState, nodeId),
     selectedNodeIds: baseState.selectedNodeIds,
   };

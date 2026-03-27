@@ -32,10 +32,12 @@ import {
   updateNode as updateEditorNode,
   updateNodes as updateEditorNodes,
   updateSelectedNode as updateEditorSelectedNode,
+  setVectorPointType as setEditorVectorPointType,
 } from "./document/node-actions";
 import {
   addShapeNode as addEditorShapeNode,
   addTextNode as addEditorTextNode,
+  addVectorNode as addEditorVectorNode,
   cancelEditing as cancelEditorEditing,
   commitEditing as commitEditorEditing,
   finalizeEditing as finalizeEditorEditing,
@@ -133,6 +135,7 @@ import {
 import { getSelectionBounds as getEditorSelectionBounds } from "./selection/selection-bounds";
 import { createEditorStore } from "./state/store/create-editor-store";
 import { HandTool } from "./tools/hand-tool";
+import { PenTool } from "./tools/pen-tool";
 import { PointerTool } from "./tools/pointer-tool";
 import { ShapeTool } from "./tools/shape-tool";
 import { TextTool } from "./tools/text-tool";
@@ -197,6 +200,7 @@ export class Editor {
     this.tools = new Map([
       ["pointer", new PointerTool(this)],
       ["hand", new HandTool(this)],
+      ["pen", new PenTool(this)],
       ["shape", new ShapeTool(this)],
       ["text", new TextTool(this)],
     ]);
@@ -381,6 +385,10 @@ export class Editor {
 
   get pathEditingNodeId() {
     return this.getState().pathEditingNodeId;
+  }
+
+  get pathEditingPoint() {
+    return this.getState().pathEditingPoint;
   }
 
   get isDirty() {
@@ -665,6 +673,10 @@ export class Editor {
     addEditorShapeNode(this, point, shape);
   }
 
+  addVectorNode(point) {
+    addEditorVectorNode(this, point);
+  }
+
   cancelEditing() {
     cancelEditorEditing(this);
   }
@@ -862,6 +874,31 @@ export class Editor {
 
   setPathEditingNodeId(nodeId) {
     this.getState().setPathEditingNodeId(nodeId);
+  }
+
+  setPathEditingPoint(point) {
+    this.getState().setPathEditingPoint(point);
+  }
+
+  getVectorPointType(nodeId, point = this.pathEditingPoint) {
+    const node = this.getNode(nodeId);
+
+    if (!(node?.type === "vector" && point)) {
+      return null;
+    }
+
+    return (
+      node.contours[point.contourIndex]?.segments[point.segmentIndex]?.pointType ||
+      null
+    );
+  }
+
+  setVectorPointType(pointType, nodeId = this.pathEditingNodeId, point = this.pathEditingPoint) {
+    if (!(nodeId && point)) {
+      return false;
+    }
+
+    return setEditorVectorPointType(this, nodeId, point, pointType);
   }
 
   setEditingText(value) {

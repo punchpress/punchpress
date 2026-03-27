@@ -21,6 +21,7 @@ export const getEditorDebugDump = (editor) => {
       nodeId: state.editingNodeId,
       originalText: state.editingOriginalText,
       pathNodeId: state.pathEditingNodeId,
+      pathPoint: state.pathEditingPoint,
       text: state.editingText,
     },
     hoveredNodeId: editor.hoveredNodeId,
@@ -56,6 +57,24 @@ export const getEditorDebugDump = (editor) => {
             tracking: null,
             warp: null,
             width: node.width,
+          };
+        }
+
+        if (node.type === "vector") {
+          return {
+            contours: node.contours.map((contour) => ({
+              closed: contour.closed,
+              segments: contour.segments.length,
+            })),
+            fill: node.fill,
+            fillRule: node.fillRule,
+            font: null,
+            fontSize: null,
+            stroke: node.stroke,
+            strokeWidth: node.strokeWidth,
+            text: "",
+            tracking: null,
+            warp: null,
           };
         }
 

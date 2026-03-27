@@ -35,6 +35,7 @@ export const createEditorStore = ({
     nextShapeKind: "rectangle",
     nodes: [],
     pathEditingNodeId: null,
+    pathEditingPoint: null,
     selectedNodeIds: [],
     spacePressed: false,
     viewport: {

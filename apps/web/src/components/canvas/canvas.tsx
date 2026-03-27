@@ -5,6 +5,7 @@ import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
 import { shouldDisableCanvasOverlay } from "../../performance/performance-url-flags";
 import { DesignerFloatingToolbar, DesignerFrame } from "../designer/designer";
+import { CanvasDotGrid } from "./canvas-dot-grid";
 import { CanvasNodes } from "./canvas-nodes";
 import { CanvasOverlay } from "./canvas-overlay/canvas-overlay";
 import { CanvasTextEditor } from "./canvas-text-editor";
@@ -12,6 +13,7 @@ import { startCanvasToolPlacementSession } from "./canvas-tool-placement-session
 import { CanvasToolbar } from "./canvas-toolbar";
 
 const INITIAL_ZOOM = 1;
+const CANVAS_STAGE_MARGIN = 2400;
 const getCanvasPoint = (viewer, host, clientX, clientY, zoom) => {
   if (!(viewer && host)) {
     return { x: 0, y: 0 };
@@ -145,7 +147,7 @@ export const Canvas = () => {
   return (
     <DesignerFrame>
       <div
-        className="relative flex min-h-0 flex-1"
+        className="canvas-host relative flex min-h-0 flex-1"
         data-panning={
           spacePressed || activeTool === "hand" ? "true" : undefined
         }
@@ -155,8 +157,8 @@ export const Canvas = () => {
         ref={hostRef}
       >
         <InfiniteViewer
-          className="canvas-surface h-full w-full bg-[var(--designer-bg)]"
-          margin={2400}
+          className="canvas-surface relative z-[1] h-full w-full"
+          margin={CANVAS_STAGE_MARGIN}
           onScroll={handleScroll}
           ref={viewerRef}
           threshold={0}
@@ -172,6 +174,12 @@ export const Canvas = () => {
             className="relative h-full w-full overflow-visible border-0 bg-transparent shadow-none"
             data-testid="canvas-stage"
           >
+            <CanvasDotGrid
+              originX={-CANVAS_STAGE_MARGIN}
+              originY={-CANVAS_STAGE_MARGIN}
+              stageMargin={CANVAS_STAGE_MARGIN}
+              zoom={zoom}
+            />
             <CanvasNodes />
             <CanvasTextEditor />
           </div>

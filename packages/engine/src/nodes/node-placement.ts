@@ -8,6 +8,9 @@ const NODE_PLACEMENT_CAPABILITIES = {
   text: {
     mode: "click",
   },
+  vector: {
+    mode: "click",
+  },
 };
 
 export const getNodePlacementCapabilities = (nodeType) => {

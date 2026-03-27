@@ -12,6 +12,10 @@ export const isShapeNode = (node) => {
   return node?.type === "shape";
 };
 
+export const isVectorNode = (node) => {
+  return node?.type === "vector";
+};
+
 export const isContainerNode = (node) => {
   return isGroupNode(node);
 };

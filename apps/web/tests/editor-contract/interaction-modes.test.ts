@@ -169,6 +169,53 @@ const createSlantNode = () => {
   } as const;
 };
 
+const createVectorNode = () => {
+  return {
+    contours: [
+      {
+        closed: true,
+        segments: [
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: -120, y: -90 },
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: 120, y: -90 },
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: 120, y: 90 },
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: -120, y: 90 },
+          },
+        ],
+      },
+    ],
+    fill: "#ffffff",
+    fillRule: "nonzero",
+    id: "vector-node",
+    parentId: "root",
+    stroke: "#000000",
+    strokeWidth: 12,
+    transform: {
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+      x: 380,
+      y: 220,
+    },
+    type: "vector",
+    visible: true,
+  } as const;
+};
+
 describe("Editor interaction mode boundaries", () => {
   test("startPathEditing clears incompatible transient interaction state", () => {
     const editor = createEditor();
@@ -191,6 +238,51 @@ describe("Editor interaction mode boundaries", () => {
     expect(editor.isTextPathPositioning).toBe(false);
   });
 
+  test("vector nodes can enter explicit path editing mode", () => {
+    const editor = createEditor();
+    const node = createVectorNode();
+
+    editor.getState().loadNodes([node]);
+    editor.select(node.id);
+
+    expect(editor.canEditNodePath(node.id)).toBe(true);
+    expect(editor.canStartPathEditing(node.id)).toBe(true);
+    expect(editor.startPathEditing(node.id)).toBe(true);
+    expect(editor.pathEditingNodeId).toBe(node.id);
+  });
+
+  test("vector path editing persists across vector node updates", () => {
+    const editor = createEditor();
+    const node = createVectorNode();
+
+    editor.getState().loadNodes([node]);
+    editor.select(node.id);
+    editor.startPathEditing(node.id);
+
+    editor.updateNode(node.id, {
+      transform: {
+        x: node.transform.x + 40,
+        y: node.transform.y + 20,
+      },
+    });
+
+    expect(editor.pathEditingNodeId).toBe(node.id);
+    expect(editor.isPathEditing(node.id)).toBe(true);
+  });
+
+  test("vector path editing replaces the normal transform overlay", () => {
+    const editor = createEditor();
+    const node = createVectorNode();
+
+    editor.getState().loadNodes([node]);
+
+    expect(editor.getNodeEditCapabilities(node.id)).toMatchObject({
+      canEditPath: true,
+      pathEditingOverlayMode: "replace-transform",
+      requiresPathEditing: true,
+    });
+  });
+
   test("stopPathEditing clears transient path interaction state", () => {
     const editor = createEditor();
     const node = createCircleNode();
@@ -207,6 +299,89 @@ describe("Editor interaction mode boundaries", () => {
     expect(editor.isHoveringSuppressed).toBe(false);
     expect(editor.isTextPathPositioning).toBe(false);
     expect(editor.hoveredNodeId).toBeNull();
+  });
+
+  test("canvas shortcut toggles vector path editing with E", () => {
+    const editor = createEditor();
+    const node = createVectorNode();
+    let prevented = false;
+
+    editor.getState().loadNodes([node]);
+    editor.select(node.id);
+
+    expect(
+      editor.handleCanvasShortcutKeyDown(
+        {
+          altKey: false,
+          code: "KeyE",
+          ctrlKey: false,
+          metaKey: false,
+          preventDefault: () => {
+            prevented = true;
+          },
+        },
+        "e"
+      )
+    ).toBe(true);
+    expect(prevented).toBe(true);
+    expect(editor.pathEditingNodeId).toBe(node.id);
+
+    prevented = false;
+
+    expect(
+      editor.handleCanvasShortcutKeyDown(
+        {
+          altKey: false,
+          code: "KeyE",
+          ctrlKey: false,
+          metaKey: false,
+          preventDefault: () => {
+            prevented = true;
+          },
+        },
+        "e"
+      )
+    ).toBe(true);
+    expect(prevented).toBe(true);
+    expect(editor.pathEditingNodeId).toBeNull();
+  });
+
+  test("groups do not advertise vector-style path editing affordances", () => {
+    const editor = createEditor();
+    const firstNode = {
+      ...createVectorNode(),
+      id: "vector-node-a",
+      transform: {
+        ...createVectorNode().transform,
+        x: 200,
+      },
+    };
+    const secondNode = {
+      ...createVectorNode(),
+      id: "vector-node-b",
+      transform: {
+        ...createVectorNode().transform,
+        x: 400,
+      },
+    };
+
+    editor.getState().loadNodes([firstNode, secondNode]);
+    editor.setSelectedNodes([firstNode.id, secondNode.id]);
+    editor.groupSelected();
+
+    const groupNodeId = editor.selectedNodeId;
+
+    if (!groupNodeId) {
+      throw new Error("Expected grouped selection to produce a selected group");
+    }
+
+    expect(editor.getNode(groupNodeId)?.type).toBe("group");
+    expect(editor.getNodeEditCapabilities(groupNodeId)).toMatchObject({
+      canEditPath: false,
+      pathEditingOverlayMode: "keep-transform",
+      requiresPathEditing: false,
+    });
+    expect(editor.canStartPathEditing(groupNodeId)).toBe(false);
   });
 
   test("startEditing clears path editing and transient interaction state", () => {

@@ -136,6 +136,37 @@ const beginShapePlacement = (editor, { point, shape }) => {
   };
 };
 
+const beginVectorPlacement = (editor, { point }) => {
+  finishEditingIfNeeded(editor);
+
+  const historyMark = editor.markHistoryStep("add vector");
+  if (!historyMark) {
+    return null;
+  }
+
+  return {
+    cancel: () => {
+      editor.setActiveTool("pointer");
+      return editor.revertToMark(historyMark);
+    },
+    complete: () => {
+      const nodeId = editor.getState().addVectorNode(point, {
+        activatePointer: false,
+      });
+
+      if (!nodeId) {
+        editor.revertToMark(historyMark);
+        editor.setActiveTool("pointer");
+        return false;
+      }
+
+      editor.setActiveTool("pointer");
+      return editor.commitHistoryStep(historyMark);
+    },
+    update: () => false,
+  };
+};
+
 export const beginNodePlacement = (editor, { point, shape, type } = {}) => {
   const placementCapabilities = getNodePlacementCapabilities(type);
 
@@ -148,6 +179,10 @@ export const beginNodePlacement = (editor, { point, shape, type } = {}) => {
       point,
       shape: shape || editor.nextShapeKind,
     });
+  }
+
+  if (type === "vector" && placementCapabilities.mode === "click") {
+    return beginVectorPlacement(editor, { point });
   }
 
   return null;
