@@ -7,12 +7,12 @@ import {
 } from "../nodes/node-capabilities";
 import { isGroupNode, isShapeNode, isTextNode } from "../nodes/node-tree";
 import {
-  getNodeCssTransform,
   getNodeRotation,
   getNodeX,
   getNodeY,
   isNodeVisible,
 } from "../nodes/text/model";
+import { getOverlayWorldFrame } from "./overlay-frame";
 import {
   getLocalBoundsCenter,
   getNodeWorldPoint,
@@ -134,9 +134,17 @@ export const getNodeSelectionFrame = (editor, nodeId) => {
     return null;
   }
 
-  return getNodeSurfaceFrame(editor, nodeId, "selection", {
+  if (editor.isPathEditing(nodeId)) {
+    return getNodeSurfaceFrame(editor, nodeId, "selection", {
+      useSelectionBounds: Boolean(editor.getNodeTransformElement(nodeId)),
+    });
+  }
+
+  const bounds = getNodeSurfaceLocalBounds(editor, nodeId, "selection", {
     useSelectionBounds: Boolean(editor.getNodeTransformElement(nodeId)),
   });
+
+  return getOverlayWorldFrame(node, bounds);
 };
 
 export const getNodeTransformFrame = (editor, nodeId) => {
@@ -188,17 +196,7 @@ export const getNodeTransformFrame = (editor, nodeId) => {
     };
   }
 
-  return {
-    bounds: {
-      height: bounds.height,
-      maxX: getNodeX(node) + bounds.maxX,
-      maxY: getNodeY(node) + bounds.maxY,
-      minX: getNodeX(node) + bounds.minX,
-      minY: getNodeY(node) + bounds.minY,
-      width: bounds.width,
-    },
-    transform: getNodeCssTransform(node),
-  };
+  return getOverlayWorldFrame(node, bounds);
 };
 
 export const getNodeFrame = (editor, nodeId) => {

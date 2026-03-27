@@ -30,6 +30,7 @@ export {
   isGroupNode,
   isShapeNode,
   isTextNode,
+  isVectorNode,
   rebuildTreeOrder,
 } from "./nodes/node-tree";
 export { createDefaultShapeNode } from "./nodes/shape/model";
@@ -51,6 +52,7 @@ export {
   WAVE_CYCLES_MIN,
   withNodeTransform,
 } from "./nodes/text/model";
+export { createDefaultVectorNode } from "./nodes/vector/model";
 export {
   estimateBounds,
   inflateBounds,

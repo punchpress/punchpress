@@ -172,7 +172,7 @@ This gives us a polished, high-performance interaction model without depending o
 
 ### Vector editing
 
-**Paper.js** provides the bezier path editing foundation — anchor point manipulation, control handles, path boolean operations (unite, intersect, subtract), path simplification, and SVG import/export. Paper.js renders to a `<canvas>` overlay that activates when entering vector edit mode for a specific element. Edits are written back to the SVG path data in the document store.
+**Paper.js** provides the bezier path editing foundation — anchor point manipulation, control handles, path boolean operations (unite, intersect, subtract), path simplification, and SVG import/export. Paper.js renders to a `<canvas>` overlay that activates when entering vector edit mode for a specific element. PunchPress remains the source of truth and writes edits back into the vector node's editable source geometry.
 
 ### State management
 

@@ -35,10 +35,13 @@ const getNodeLocalTransform = (node, bbox) => {
 };
 
 const buildSvgPathMarkup = (node, path) => {
+  const fill = node.fill ?? "none";
   const stroke = node.stroke ?? "none";
   const transform = path.transform ? ` transform="${path.transform}"` : "";
+  const fillRule =
+    node.type === "vector" ? ` fill-rule="${node.fillRule}"` : "";
 
-  return `<path d="${path.d}"${transform} fill="${node.fill}" stroke="${stroke}" stroke-width="${format(
+  return `<path d="${path.d}"${transform}${fillRule} fill="${fill}" stroke="${stroke}" stroke-width="${format(
     node.strokeWidth
   )}" paint-order="stroke fill" stroke-linejoin="round" stroke-linecap="round"/>`;
 };

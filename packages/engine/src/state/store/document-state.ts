@@ -1,3 +1,4 @@
+import { canNodePersistPathEditing } from "../../nodes/node-capabilities";
 import { getSubtreeNodeIds, isDescendantOf } from "../../nodes/node-tree";
 import { isNodeVisible } from "../../nodes/text/model";
 import { finalizeEditingState } from "./editing-state";
@@ -15,7 +16,7 @@ const canRemainInPathEditing = (nodes, nodeId) => {
 
   const node = nodes.find((entry) => entry.id === nodeId);
 
-  return Boolean(node?.type === "text" && node.warp.kind === "circle");
+  return canNodePersistPathEditing(node);
 };
 
 export const reconcilePathEditingState = (state, nodes) => {

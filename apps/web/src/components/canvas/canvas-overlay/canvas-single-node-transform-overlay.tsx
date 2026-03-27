@@ -3,6 +3,7 @@ import { useMemo, useRef } from "react";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
+import { openCanvasNodeEditingMode } from "../canvas-node-editing";
 import { getHostRectFromNodeFrame } from "./canvas-overlay-geometry";
 import { getTextPathTransformTargetStyle } from "./text-path-overlay-geometry";
 
@@ -348,6 +349,13 @@ export const CanvasSingleNodeTransformOverlay = ({
       return;
     }
 
+    if (event.detail >= 2) {
+      event.preventDefault();
+      event.stopPropagation();
+      openCanvasNodeEditingMode(editor, nodeId);
+      return;
+    }
+
     event.preventDefault();
     event.stopPropagation();
 
@@ -554,6 +562,11 @@ export const CanvasSingleNodeTransformOverlay = ({
   return (
     <div
       className={`canvas-moveable canvas-single-node-transform-overlay moveable-control-box absolute ${cursorClassName}`}
+      onDoubleClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openCanvasNodeEditingMode(editor, nodeId);
+      }}
       onPointerDown={startSelectionDrag}
       style={{
         height: `${overlayRect.height}px`,

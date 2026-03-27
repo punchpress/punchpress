@@ -1,5 +1,6 @@
 const TOOL_SHORTCUTS = {
   h: "hand",
+  p: "pen",
   t: "text",
   v: "pointer",
 };

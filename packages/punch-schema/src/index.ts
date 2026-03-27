@@ -57,6 +57,11 @@ export type {
   ShapeNodeDocument,
   TextNodeDocument,
   TransformDocument,
+  VectorContourDocument,
+  VectorFillRuleDocument,
+  VectorHandleDocument,
+  VectorNodeDocument,
+  VectorSegmentDocument,
   WarpDocument,
 } from "./schema";
 export {
@@ -68,5 +73,10 @@ export {
   shapeNodeSchema,
   textNodeSchema,
   transformSchema,
+  vectorContourSchema,
+  vectorFillRuleSchema,
+  vectorHandleSchema,
+  vectorNodeSchema,
+  vectorSegmentSchema,
   warpSchema,
 } from "./schema";

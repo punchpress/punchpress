@@ -1,11 +1,5 @@
-const getTextNodeToolbarActions = (editor, state) => {
-  if (
-    !(
-      state.selectedNode?.type === "text" &&
-      state.hasPathGuide &&
-      state.hasPathEditingMode
-    )
-  ) {
+const getPathEditingToolbarActions = (editor, state) => {
+  if (!(state.selectedNode && state.canEditPath && state.hasPathEditingMode)) {
     return [];
   }
 
@@ -21,10 +15,6 @@ const getTextNodeToolbarActions = (editor, state) => {
       },
     },
   ];
-};
-
-const NODE_TOOLBAR_ACTIONS = {
-  text: getTextNodeToolbarActions,
 };
 
 const getSharedToolbarActions = (editor, state) => {
@@ -51,10 +41,7 @@ export const resolveNodeToolbarActions = (editor, state) => {
     return [];
   }
 
-  const resolver = state.selectedNode
-    ? NODE_TOOLBAR_ACTIONS[state.selectedNode.type]
-    : null;
-  const nodeActions = resolver ? resolver(editor, state) : [];
+  const nodeActions = getPathEditingToolbarActions(editor, state);
 
   return [...nodeActions, ...getSharedToolbarActions(editor, state)];
 };

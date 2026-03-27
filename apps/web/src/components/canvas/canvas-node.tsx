@@ -1,10 +1,10 @@
-import { estimateBounds, round } from "@punchpress/engine";
+import { round } from "@punchpress/engine";
 import { memo } from "react";
 import { cn } from "@/lib/utils";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
 import { usePerformanceRenderCounter } from "../../performance/use-performance-render-counter";
-import { drillIntoGroupSelection } from "./canvas-group-drill-in";
+import { openCanvasNodeEditingMode } from "./canvas-node-editing";
 import { startCanvasToolPlacementSession } from "./canvas-tool-placement-session";
 
 const getCanvasPoint = (editor, clientX, clientY) => {
@@ -31,11 +31,20 @@ const selectNodeArtState = (editor, state, nodeId) => {
   }
 
   const geometry = editor.getNodeRenderGeometry(nodeId);
-  const bbox = geometry?.bbox || estimateBounds(node);
+  const bbox = geometry?.bbox ||
+    editor.getNodeRenderFrame(nodeId)?.bounds || {
+      height: 0,
+      maxX: 0,
+      maxY: 0,
+      minX: 0,
+      minY: 0,
+      width: 0,
+    };
 
   return {
     bbox,
     fill: node.fill,
+    fillRule: node.type === "vector" ? node.fillRule : undefined,
     isEditing: state.editingNodeId === nodeId,
     paths: geometry?.paths || [],
     ready: Boolean(geometry?.ready),
@@ -188,18 +197,7 @@ const CanvasNodeComponent = ({ nodeId }) => {
       data-node-id={nodeId}
       data-selected={isSelectionTargetSelected ? "true" : "false"}
       onDoubleClick={() => {
-        if (drillIntoGroupSelection(editor, nodeId)) {
-          return;
-        }
-
-        const node = editor.getNode(nodeId);
-        const nodeEditCapabilities = editor.getNodeEditCapabilities(nodeId);
-
-        if (!(node && nodeEditCapabilities?.canEditText)) {
-          return;
-        }
-
-        editor.startEditing(node);
+        openCanvasNodeEditingMode(editor, nodeId);
       }}
       onPointerDown={(event) => {
         if (event.button !== 0) {
@@ -207,6 +205,13 @@ const CanvasNodeComponent = ({ nodeId }) => {
         }
 
         if (spacePressed || activeTool === "hand") {
+          return;
+        }
+
+        if (event.detail >= 2) {
+          event.preventDefault();
+          event.stopPropagation();
+          openCanvasNodeEditingMode(editor, nodeId);
           return;
         }
 
@@ -228,6 +233,7 @@ const CanvasNodeComponent = ({ nodeId }) => {
         const placementSession = editor.dispatchNodePointerDown({
           event,
           node,
+          point: getCanvasPoint(editor, event.clientX, event.clientY),
         });
 
         if (
@@ -283,6 +289,7 @@ const CanvasNodeComponent = ({ nodeId }) => {
       <CanvasNodeArt
         bbox={artState.bbox}
         fill={artState.fill}
+        fillRule={artState.fillRule}
         height={Math.max(1, artState.bbox.height)}
         isEditing={artState.isEditing}
         paths={artState.paths}
@@ -297,10 +304,20 @@ const CanvasNodeComponent = ({ nodeId }) => {
 export const CanvasNode = memo(CanvasNodeComponent);
 
 const CanvasNodeArt = memo(
-  ({ bbox, fill, height, isEditing, paths, stroke, strokeWidth, width }) => {
+  ({
+    bbox,
+    fill,
+    fillRule,
+    height,
+    isEditing,
+    paths,
+    stroke,
+    strokeWidth,
+    width,
+  }) => {
     return (
       <svg
-        aria-label="Warped text node"
+        aria-label="Canvas node"
         className="block overflow-visible"
         height={height}
         role="img"
@@ -312,7 +329,8 @@ const CanvasNodeArt = memo(
             return (
               <path
                 d={path.d}
-                fill={fill}
+                fill={fill || "none"}
+                fillRule={fillRule}
                 key={path.key || `${path.transform || "shape"}-${path.d}`}
                 opacity={isEditing ? 0 : 1}
                 paintOrder="stroke fill"

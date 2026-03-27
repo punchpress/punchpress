@@ -1,5 +1,6 @@
 import { createDefaultShapeNode } from "../../nodes/shape/model";
 import { createDefaultNode } from "../../nodes/text/model";
+import { createDefaultVectorNode } from "../../nodes/vector/model";
 import {
   insertClipboardContentState,
   pasteClipboardContentState,
@@ -93,6 +94,46 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
           selectedNodeIds: [node.id],
         })
       );
+    },
+
+    addVectorNode: (point, options = {}) => {
+      const node = createDefaultVectorNode();
+      const activatePointer = options.activatePointer !== false;
+      const nodePatch = options.patch || null;
+
+      if (point) {
+        node.transform = {
+          ...node.transform,
+          x: point.x,
+          y: point.y,
+        };
+      }
+
+      if (nodePatch) {
+        Object.assign(node, nodePatch);
+
+        if (nodePatch.transform) {
+          node.transform = {
+            ...node.transform,
+            ...nodePatch.transform,
+          };
+        }
+      }
+
+      set((state) =>
+        withDocumentMutation(state, {
+          activeTool: activatePointer ? "pointer" : state.activeTool,
+          editingNodeId: null,
+          editingOriginalText: "",
+          editingText: "",
+          focusedGroupId: null,
+          nodes: [...state.nodes, node],
+          pathEditingNodeId: null,
+          selectedNodeIds: [node.id],
+        })
+      );
+
+      return node.id;
     },
 
     deleteSelected: () => {

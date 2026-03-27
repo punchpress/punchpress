@@ -228,6 +228,173 @@ describe("Editor.getSelectionFrameKey", () => {
   });
 });
 
+describe("Editor.getNodeTransformFrame", () => {
+  test("bakes vector scale into overlay bounds instead of scaling the transform wrapper", () => {
+    const editor = new Editor();
+
+    editor.getState().loadNodes([
+      {
+        contours: [
+          {
+            closed: true,
+            segments: [
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: -100, y: -60 },
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 100, y: -60 },
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 100, y: 60 },
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: -100, y: 60 },
+              },
+            ],
+          },
+        ],
+        fill: "#ffffff",
+        fillRule: "nonzero",
+        id: "scaled-vector-node",
+        parentId: "root",
+        stroke: null,
+        strokeWidth: 0,
+        transform: {
+          rotation: 30,
+          scaleX: 2,
+          scaleY: 0.5,
+          x: 100,
+          y: 200,
+        },
+        type: "vector",
+        visible: true,
+      },
+    ]);
+
+    expect(editor.getNodeTransformFrame("scaled-vector-node")).toEqual({
+      bounds: {
+        height: 60,
+        maxX: 300,
+        maxY: 230,
+        minX: -100,
+        minY: 170,
+        width: 400,
+      },
+      transform: "rotate(30deg)",
+    });
+  });
+
+  test("uses the same overlay-frame normalization for scaled text nodes", () => {
+    const editor = new Editor();
+
+    editor.getState().loadNodes([
+      {
+        fill: "#000000",
+        font: AVAILABLE_FONT,
+        fontSize: 120,
+        id: "scaled-text-node",
+        parentId: "root",
+        stroke: null,
+        strokeWidth: 0,
+        text: "TEST",
+        tracking: 0,
+        transform: {
+          rotation: 20,
+          scaleX: 1.5,
+          scaleY: 0.75,
+          x: 100,
+          y: 200,
+        },
+        type: "text",
+        visible: true,
+        warp: {
+          kind: "none",
+        },
+      },
+    ]);
+
+    const frame = editor.getNodeTransformFrame("scaled-text-node");
+
+    expect(frame?.transform).toBe("rotate(20deg)");
+  });
+});
+
+describe("Editor vector resize behavior", () => {
+  test("keeps vector stroke width stable while object resize changes transform scale", () => {
+    const editor = new Editor();
+
+    editor.getState().loadNodes([
+      {
+        contours: [
+          {
+            closed: true,
+            segments: [
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: -100, y: -60 },
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 100, y: -60 },
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 100, y: 60 },
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: -100, y: 60 },
+              },
+            ],
+          },
+        ],
+        fill: "#ffffff",
+        fillRule: "nonzero",
+        id: "vector-resize-node",
+        parentId: "root",
+        stroke: "#000000",
+        strokeWidth: 12,
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 100,
+          y: 200,
+        },
+        type: "vector",
+        visible: true,
+      },
+    ]);
+
+    editor.select("vector-resize-node");
+    editor.resizeSelectionFromCorner({
+      corner: "se",
+      scale: 1.5,
+    });
+
+    expect(editor.getNode("vector-resize-node")).toMatchObject({
+      strokeWidth: 12,
+      transform: {
+        scaleX: 1.5,
+        scaleY: 1.5,
+      },
+      type: "vector",
+    });
+  });
+});
+
 describe("Editor text editing mode", () => {
   test("uses the updated default wave warp preset", () => {
     expect(getDefaultWarp("wave")).toEqual({
@@ -281,16 +448,12 @@ describe("Editor text editing mode", () => {
     const frame = editor.selectedNodeId
       ? editor.getNodeRenderFrame(editor.selectedNodeId)
       : null;
+    const centerX = frame ? (frame.bounds.minX + frame.bounds.maxX) / 2 : null;
+    const centerY = frame ? (frame.bounds.minY + frame.bounds.maxY) / 2 : null;
 
     expect(frame).not.toBeNull();
-    expect((frame?.bounds.minX! + frame?.bounds.maxX!) / 2).toBeCloseTo(
-      point.x,
-      2
-    );
-    expect((frame?.bounds.minY! + frame?.bounds.maxY!) / 2).toBeCloseTo(
-      point.y,
-      2
-    );
+    expect(centerX).toBeCloseTo(point.x, 2);
+    expect(centerY).toBeCloseTo(point.y, 2);
   });
 
   test("switches back to the pointer tool when placing a text node", () => {
@@ -328,6 +491,51 @@ describe("Editor text editing mode", () => {
     });
   });
 
+  test("switches back to the pointer tool when placing a vector node with the pen tool", () => {
+    const editor = new Editor();
+
+    editor.setActiveTool("pen");
+    const session = editor.dispatchCanvasPointerDown({
+      point: { x: 420, y: 180 },
+    });
+
+    expect(session).not.toBeNull();
+
+    session?.complete({
+      dragDistancePx: 0,
+      point: { x: 420, y: 180 },
+    });
+
+    expect(editor.activeTool).toBe("pointer");
+    expect(editor.editingNodeId).toBeNull();
+    expect(editor.selectedNodeIds).toEqual([editor.selectedNodeId]);
+    expect(editor.getNode(editor.selectedNodeId)).toMatchObject({
+      type: "vector",
+    });
+    expect(editor.getNode(editor.selectedNodeId)?.transform).toMatchObject({
+      x: 420,
+      y: 180,
+    });
+  });
+
+  test("places a default vector with corner anchor points", () => {
+    const editor = new Editor();
+
+    editor.addVectorNode({ x: 420, y: 180 });
+
+    expect(editor.selectedNode).toMatchObject({
+      type: "vector",
+    });
+    expect(
+      editor.selectedNode?.contours[0]?.segments.map((segment) => segment.point)
+    ).toEqual([
+      { x: -120, y: -90 },
+      { x: 120, y: -90 },
+      { x: 120, y: 90 },
+      { x: -120, y: 90 },
+    ]);
+  });
+
   test("keeps the pointer tool active when opening an existing text node for editing", () => {
     const editor = new Editor();
     editor.applyLocalFontCatalog({
@@ -358,6 +566,18 @@ describe("Editor shape export", () => {
     expect(svg).toContain('fill="#000000"');
     expect(svg).toContain('"shape":"star"');
   });
+
+  test("exports visible vector nodes without requiring fonts", async () => {
+    const editor = new Editor();
+
+    editor.addVectorNode({ x: 480, y: 360 });
+
+    const svg = await editor.exportDocument();
+
+    expect(svg).toContain("<path");
+    expect(svg).toContain('fill="#ffffff"');
+    expect(svg).toContain('"type":"vector"');
+  });
 });
 
 describe("Editor.getDebugDump", () => {
@@ -375,7 +595,7 @@ describe("Editor.getDebugDump", () => {
 
     expect(dump.bootstrap.fontCatalogState).toBe("ready");
     expect(dump.document.nodeCount).toBe(1);
-    expect(dump.document.version).toBe("1.3");
+    expect(dump.document.version).toBe("1.4");
     expect(dump.nodes).toHaveLength(1);
     expect(dump.nodes[0]?.id).toBe("debug-node");
     expect(dump.nodes[0]?.text).toBe("DEBUG");

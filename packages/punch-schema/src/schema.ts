@@ -103,10 +103,47 @@ export const shapeNodeSchema = baseNodeSchema
   })
   .strict();
 
+export const vectorHandleSchema = z
+  .object({
+    x: finiteNumber,
+    y: finiteNumber,
+  })
+  .strict();
+
+export const vectorSegmentSchema = z
+  .object({
+    handleIn: vectorHandleSchema,
+    handleOut: vectorHandleSchema,
+    point: vectorHandleSchema,
+  })
+  .strict();
+
+export const vectorContourSchema = z
+  .object({
+    closed: z.boolean(),
+    segments: z.array(vectorSegmentSchema).min(1),
+  })
+  .strict();
+
+export const vectorFillRuleSchema = z.enum(["evenodd", "nonzero"]);
+
+export const vectorNodeSchema = baseNodeSchema
+  .extend({
+    contours: z.array(vectorContourSchema).min(1),
+    fill: z.string().min(1).nullable(),
+    fillRule: vectorFillRuleSchema,
+    stroke: z.string().min(1).nullable(),
+    strokeWidth: finiteNumber,
+    transform: transformSchema,
+    type: z.literal("vector"),
+  })
+  .strict();
+
 export const nodeSchema = z.discriminatedUnion("type", [
   textNodeSchema,
   groupNodeSchema,
   shapeNodeSchema,
+  vectorNodeSchema,
 ]);
 
 export const designDocumentSchema = z
@@ -158,3 +195,8 @@ export type TextNodeDocument = z.infer<typeof textNodeSchema>;
 export type LocalFontDocument = z.infer<typeof localFontSchema>;
 export type TransformDocument = z.infer<typeof transformSchema>;
 export type WarpDocument = z.infer<typeof warpSchema>;
+export type VectorContourDocument = z.infer<typeof vectorContourSchema>;
+export type VectorFillRuleDocument = z.infer<typeof vectorFillRuleSchema>;
+export type VectorHandleDocument = z.infer<typeof vectorHandleSchema>;
+export type VectorNodeDocument = z.infer<typeof vectorNodeSchema>;
+export type VectorSegmentDocument = z.infer<typeof vectorSegmentSchema>;

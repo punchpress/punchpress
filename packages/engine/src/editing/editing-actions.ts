@@ -1,5 +1,6 @@
 import { createDefaultNode } from "../nodes/text/model";
 import { getTextNodePlacementOrigin } from "../nodes/text/text-placement";
+import { createDefaultVectorNode } from "../nodes/vector/model";
 
 export const addShapeNode = (editor, point, shape) => {
   finishEditingIfNeeded(editor);
@@ -21,6 +22,20 @@ export const addTextNode = (editor, point) => {
 
   editor.editingHistoryMark = editor.markHistoryStep("add text");
   editor.getState().addTextNode(placementOrigin, font);
+};
+
+export const addVectorNode = (editor, point) => {
+  finishEditingIfNeeded(editor);
+  const defaultNode = createDefaultVectorNode();
+
+  editor.run(() => {
+    editor.getState().addVectorNode(
+      point || {
+        x: defaultNode.transform.x,
+        y: defaultNode.transform.y,
+      }
+    );
+  });
 };
 
 export const cancelEditing = (editor) => {

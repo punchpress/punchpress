@@ -71,6 +71,17 @@ export const getScaledGroupNodeUpdate = (node, anchor, scale) => {
     };
   }
 
+  if (node.type === "vector") {
+    return {
+      transform: {
+        scaleX: round((node.transform.scaleX ?? 1) * scale, 4),
+        scaleY: round((node.transform.scaleY ?? 1) * scale, 4),
+        x: round(anchor.x + (getNodeX(node) - anchor.x) * scale, 2),
+        y: round(anchor.y + (getNodeY(node) - anchor.y) * scale, 2),
+      },
+    };
+  }
+
   return {
     fontSize: round(Math.max(1, node.fontSize * scale), 2),
     strokeWidth: round(Math.max(0, node.strokeWidth * scale), 2),
@@ -118,6 +129,27 @@ export const getResizedNodeUpdate = (node, bbox, anchor, scale, direction) => {
       strokeWidth: round(Math.max(0, node.strokeWidth * scale), 2),
       transform,
       width: round(Math.max(1, node.width * scale), 2),
+    };
+  }
+
+  if (node.type === "vector") {
+    const nextScaleX = round((node.transform.scaleX ?? 1) * scale, 4);
+    const nextScaleY = round((node.transform.scaleY ?? 1) * scale, 4);
+    const nextRotatedOffset = rotateVector(
+      {
+        x: (fixedCorner.x - localCenter.x) * nextScaleX,
+        y: (fixedCorner.y - localCenter.y) * nextScaleY,
+      },
+      getNodeRotation(node) || 0
+    );
+
+    return {
+      transform: {
+        scaleX: nextScaleX,
+        scaleY: nextScaleY,
+        x: round(anchor.x - localCenter.x - nextRotatedOffset.x, 2),
+        y: round(anchor.y - localCenter.y - nextRotatedOffset.y, 2),
+      },
     };
   }
 

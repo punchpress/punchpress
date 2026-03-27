@@ -6,6 +6,7 @@ import { CanvasHoverPreview } from "./canvas-hover-preview";
 import { CanvasSelectionOverlay } from "./canvas-selection-overlay";
 import { CanvasTextPathOverlay } from "./canvas-text-path-overlay";
 import { CanvasTransformOverlay } from "./canvas-transform-overlay";
+import { CanvasVectorPathOverlay } from "./canvas-vector-path-overlay";
 import { CanvasNodeToolbar } from "./node-toolbar/canvas-node-toolbar";
 
 export const CanvasOverlay = () => {
@@ -31,6 +32,7 @@ export const CanvasOverlay = () => {
       <CanvasSelectionOverlay />
       <CanvasNodeToolbar />
       <CanvasTextPathOverlay viewportRevision={viewportRevision} />
+      <CanvasVectorPathOverlay viewportRevision={viewportRevision} />
       <CanvasTransformOverlay viewportRevision={viewportRevision} />
       <CanvasEditingSelection viewportRevision={viewportRevision} />
       <CanvasHoverPreview viewportRevision={viewportRevision} />

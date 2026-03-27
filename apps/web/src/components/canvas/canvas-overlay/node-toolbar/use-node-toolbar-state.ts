@@ -29,7 +29,7 @@ export const useNodeToolbarState = () => {
     );
 
     return {
-      hasPathGuide: Boolean(selectedEditCapabilities?.guide),
+      canEditPath: Boolean(selectedEditCapabilities?.canEditPath),
       hasPathEditingMode: Boolean(
         selectedEditCapabilities?.requiresPathEditing
       ),

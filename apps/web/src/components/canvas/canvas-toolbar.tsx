@@ -5,7 +5,7 @@ import {
   TextFontIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { HandIcon } from "lucide-react";
+import { HandIcon, PenToolIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/ui/toggle";
 import {
@@ -43,6 +43,14 @@ const TEXT_TOOL = {
   shortcut: "T",
 };
 
+const PEN_TOOL = {
+  icon: PenToolIcon,
+  iconLibrary: "lucide",
+  id: "pen",
+  label: "Pen",
+  shortcut: "P",
+};
+
 export const CanvasToolbar = () => {
   const editor = useEditor();
   const zoom = useEditorValue((_, state) => state.viewport.zoom);
@@ -53,6 +61,7 @@ export const CanvasToolbar = () => {
         {PRIMARY_TOOL_CONFIG.map((tool) => {
           return <ToolButton key={tool.id} {...tool} />;
         })}
+        <ToolButton {...PEN_TOOL} />
         <ToolButton {...TEXT_TOOL} />
         <ShapeToolbarButton />
       </ToolbarGroup>

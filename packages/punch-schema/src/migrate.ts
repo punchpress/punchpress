@@ -140,6 +140,13 @@ const migrateV12Document = (value: Record<string, unknown>) => {
   };
 };
 
+const migrateV13Document = (value: Record<string, unknown>) => {
+  return {
+    ...value,
+    version: PUNCH_DOCUMENT_VERSION,
+  };
+};
+
 export const migrateDocument = (value: unknown) => {
   if (!isRecord(value)) {
     throw new UnsupportedDocumentVersionError(
@@ -161,6 +168,10 @@ export const migrateDocument = (value: unknown) => {
 
   if (value.version === "1.2") {
     return migrateV12Document(value);
+  }
+
+  if (value.version === "1.3") {
+    return migrateV13Document(value);
   }
 
   if (typeof value.version !== "string" || value.version.length === 0) {

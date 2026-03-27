@@ -59,6 +59,24 @@ export const getEditorDebugDump = (editor) => {
           };
         }
 
+        if (node.type === "vector") {
+          return {
+            contours: node.contours.map((contour) => ({
+              closed: contour.closed,
+              segments: contour.segments.length,
+            })),
+            fill: node.fill,
+            fillRule: node.fillRule,
+            font: null,
+            fontSize: null,
+            stroke: node.stroke,
+            strokeWidth: node.strokeWidth,
+            text: "",
+            tracking: null,
+            warp: null,
+          };
+        }
+
         return {
           fill: null,
           font: null,
