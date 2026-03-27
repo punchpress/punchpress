@@ -1,3 +1,6 @@
+import { createDefaultNode } from "../nodes/text/model";
+import { getTextNodePlacementOrigin } from "../nodes/text/text-placement";
+
 export const addShapeNode = (editor, point, shape) => {
   finishEditingIfNeeded(editor);
   editor.run(() => {
@@ -7,8 +10,17 @@ export const addShapeNode = (editor, point, shape) => {
 
 export const addTextNode = (editor, point) => {
   finishEditingIfNeeded(editor);
+  const font = editor.getDefaultFont();
+  const placementOrigin = point
+    ? getTextNodePlacementOrigin(
+        createDefaultNode(font),
+        point,
+        editor.fonts.getLoadedFont(font)
+      )
+    : point;
+
   editor.editingHistoryMark = editor.markHistoryStep("add text");
-  editor.getState().addTextNode(point, editor.getDefaultFont());
+  editor.getState().addTextNode(placementOrigin, font);
 };
 
 export const cancelEditing = (editor) => {

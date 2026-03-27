@@ -94,7 +94,7 @@ export const createDefaultNode = (font) => {
     type: "text",
     text: "YOUR TEXT",
     font: createLocalFontDescriptor(font),
-    fontSize: 400,
+    fontSize: 100,
     tracking: 10,
     fill: "#ffffff",
     stroke: "#000000",

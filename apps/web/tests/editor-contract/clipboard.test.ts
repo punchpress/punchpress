@@ -147,9 +147,9 @@ describe("Editor clipboard", () => {
 
     expect(pastedTextNode?.id).not.toBe(textNodeId);
     expect(pastedShapeNode?.id).not.toBe(shapeNodeId);
-    expect(pastedTextNode?.transform.x).toBeCloseTo(480, 6);
+    expect(pastedTextNode?.transform.x).toBeCloseTo(340, 6);
     expect(pastedTextNode?.transform.y).toBeCloseTo(400, 6);
-    expect(pastedShapeNode?.transform.x).toBeCloseTo(780, 6);
+    expect(pastedShapeNode?.transform.x).toBeCloseTo(640, 6);
     expect(pastedShapeNode?.transform.y).toBeCloseTo(400, 6);
   });
 
