@@ -14,6 +14,7 @@ They exist to preserve product intent while implementation evolves. They are liv
 
 ## Current Specs
 
+- `canvas-navigation.md`
 - `clipboard.md`
 - `groups.md`
 - `history.md`

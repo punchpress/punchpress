@@ -13,9 +13,7 @@ import { startCanvasToolPlacementSession } from "./canvas-tool-placement-session
 import { CanvasToolbar } from "./canvas-toolbar";
 
 const INITIAL_ZOOM = 1;
-const CANVAS_WHEEL_ZOOM_SCALE = 0.0065;
 const CANVAS_STAGE_MARGIN = 2400;
-
 const getCanvasPoint = (viewer, host, clientX, clientY, zoom) => {
   if (!(viewer && host)) {
     return { x: 0, y: 0 };
@@ -68,6 +66,28 @@ export const Canvas = () => {
     (event) => {
       editor.setViewportZoom(event.zoomX);
       editor.onViewportChange?.();
+    },
+    [editor]
+  );
+  const handleCanvasWheel = useCallback(
+    (event) => {
+      if (!(event.metaKey || event.ctrlKey)) {
+        return;
+      }
+
+      const viewer = viewerRef.current;
+      const host = hostRef.current;
+      if (!(viewer && host)) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      editor.zoomViewportFromWheel({
+        clientX: event.clientX,
+        clientY: event.clientY,
+        deltaY: event.deltaY,
+      });
     },
     [editor]
   );
@@ -133,6 +153,7 @@ export const Canvas = () => {
         }
         data-tool={activeTool}
         onPointerDownCapture={handleCanvasPointerDown}
+        onWheelCapture={handleCanvasWheel}
         ref={hostRef}
       >
         <InfiniteViewer
@@ -143,7 +164,7 @@ export const Canvas = () => {
           threshold={0}
           useAutoZoom
           useMouseDrag={spacePressed || activeTool === "hand"}
-          wheelScale={CANVAS_WHEEL_ZOOM_SCALE}
+          useWheelPinch={false}
           useWheelScroll
           wheelPinchKey="meta"
           zoom={zoom}
