@@ -2,6 +2,11 @@ export const CANVAS_CURSOR_TOKENS = {
   textPathBendActive: "text-path-bend-active",
   textPathBend: "text-path-bend",
   textPathSlide: "text-path-slide",
+  vectorPathBodyActive: "vector-path-body-active",
+  vectorPathBody: "vector-path-body",
+  vectorPathInsert: "vector-path-insert",
+  vectorPathPointActive: "vector-path-point-active",
+  vectorPathPoint: "vector-path-point",
 } as const;
 
 export const getTextPathHandleCursorToken = (role) => {
@@ -24,15 +29,51 @@ export const getActiveTextPathHandleCursorToken = (role) => {
   return getTextPathHandleCursorToken(role);
 };
 
-export const setActiveCanvasCursorToken = (hostElement, token) => {
-  if (!hostElement) {
+export const getVectorPathCursorToken = (mode) => {
+  if (mode === "body") {
+    return CANVAS_CURSOR_TOKENS.vectorPathBody;
+  }
+
+  if (mode === "insert") {
+    return CANVAS_CURSOR_TOKENS.vectorPathInsert;
+  }
+
+  if (mode === "point") {
+    return CANVAS_CURSOR_TOKENS.vectorPathPoint;
+  }
+
+  return null;
+};
+
+export const getActiveVectorPathCursorToken = (mode) => {
+  if (mode === "body") {
+    return CANVAS_CURSOR_TOKENS.vectorPathBodyActive;
+  }
+
+  if (mode === "point") {
+    return CANVAS_CURSOR_TOKENS.vectorPathPointActive;
+  }
+
+  return null;
+};
+
+const setCanvasCursorDataset = (element, datasetKey, token) => {
+  if (!element) {
     return;
   }
 
   if (token) {
-    hostElement.dataset.activeCanvasCursor = token;
+    element.dataset[datasetKey] = token;
     return;
   }
 
-  delete hostElement.dataset.activeCanvasCursor;
+  delete element.dataset[datasetKey];
+};
+
+export const setCanvasCursorToken = (element, token) => {
+  setCanvasCursorDataset(element, "canvasCursor", token);
+};
+
+export const setActiveCanvasCursorToken = (hostElement, token) => {
+  setCanvasCursorDataset(hostElement, "activeCanvasCursor", token);
 };

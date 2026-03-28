@@ -51,6 +51,7 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 - Users should be able to select one or multiple anchor points within path edit mode.
 - Users should be able to select anchor points by click, additive selection, and lasso-style point selection.
 - Path-edit cursors should distinguish point selection/editing from whole-object dragging.
+- Hovering or dragging a point should use point-edit cursor language such as `pointer`, not object-move cursors.
 - Hovering an anchor or bezier handle should communicate point editing, not object movement.
 - Dragging the vector body should continue to use object-drag cursor language such as `grab` and `grabbing`.
 - Open and closed contours should both be editable through the same interaction model.
@@ -61,22 +62,23 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 
 - When one or more anchor points are selected, PunchPress should provide direct anchor conversion controls consistent with Illustrator-style editing.
 - The baseline point controls should be `Corner` and `Smooth`.
-- `Corner` should allow independent handle editing and sharp directional changes.
+- `Corner` should collapse the current point's handles immediately, producing a sharp corner that may later gain independent handles through direct manipulation.
 - `Smooth` should preserve continuous curvature through the anchor.
 - `Delete point` should remove the selected anchor while preserving the remaining path when possible.
 - A convenience action to collapse both handles on the selected point may exist later, but one-sided or zero-handle states should primarily come from direct manipulation rather than dedicated mode buttons.
 
 ## Modifier Gestures
 
-- Path editing should support a temporary convert-anchor gesture consistent with Illustrator-style workflows.
 - `Alt/Option`-dragging a direction handle should adjust only that side of the point instead of preserving smooth coupling.
-- `Alt/Option` clicking or dragging on a selected point should support converting between corner-like and smooth-like behavior without requiring a persistent tool switch.
-- `Shift` should constrain handle angle when precise alignment is intended.
+- Temporary modifier-based bezier editing should apply to handle drags without introducing separate anchor click or anchor drag gestures that conflict with standard node manipulation.
+- `Shift` should constrain handle angle when precise alignment is intended, such as snapping to common editing angles.
 - While the Pen tool exists, temporary modifier access to point editing should feel consistent with Illustrator-style pen workflows rather than forcing constant tool switching.
 
 ## Path Operations
 
 - Path editing should support adding points on existing segments.
+- Hovering an insertable segment should communicate point insertion distinctly from point dragging or whole-object dragging.
+- Clicking an insertable segment should add a point at that location and select it immediately.
 - Path editing should support deleting selected points without destroying the whole path.
 - Path editing should support cutting or splitting a path at a selected point or segment.
 - Path editing should support joining compatible open endpoints.

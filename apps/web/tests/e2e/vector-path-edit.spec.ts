@@ -81,6 +81,66 @@ const getViewerScroll = async (page) => {
   });
 };
 
+const getCursorAtPoint = (page, point) => {
+  return page.evaluate(({ x, y }) => {
+    const element = document.elementFromPoint(x, y);
+    return element ? window.getComputedStyle(element).cursor : null;
+  }, point);
+};
+
+const getVectorNodeDocument = async (page, nodeId = "vector-node") => {
+  return page.evaluate((currentNodeId) => {
+    const dump = window.__PUNCHPRESS_EDITOR__?.getDebugDump();
+    const document = dump?.document?.serialized
+      ? JSON.parse(dump.document.serialized)
+      : null;
+
+    return document?.nodes?.find((entry) => entry.id === currentNodeId) || null;
+  }, nodeId);
+};
+
+const getVectorSegmentDocument = async (
+  page,
+  segmentIndex,
+  contourIndex = 0,
+  nodeId = "vector-node"
+) => {
+  const vectorNode = await getVectorNodeDocument(page, nodeId);
+
+  return vectorNode?.contours?.[contourIndex]?.segments?.[segmentIndex] || null;
+};
+
+const getVectorPaperPixel = (page, point) => {
+  return page.evaluate(({ x, y }) => {
+    const canvas = document.querySelector(".canvas-vector-paper");
+
+    if (!(canvas instanceof HTMLCanvasElement)) {
+      return null;
+    }
+
+    const context = canvas.getContext("2d");
+    const rect = canvas.getBoundingClientRect();
+
+    if (!context) {
+      return null;
+    }
+
+    const pixel = context.getImageData(
+      Math.round(x - rect.left),
+      Math.round(y - rect.top),
+      1,
+      1
+    ).data;
+
+    return {
+      a: pixel[3],
+      b: pixel[2],
+      g: pixel[1],
+      r: pixel[0],
+    };
+  }, point);
+};
+
 test("double-clicking a vector node enters path editing", async ({ page }) => {
   await gotoEditor(page);
   await loadVectorDocument(page);
@@ -271,9 +331,23 @@ test("selecting a vector anchor exposes point controls and converts it to smooth
         (entry) => entry.id === "vector-node"
       );
 
-      return vectorNode?.contours?.[0]?.segments?.[0]?.pointType || null;
+      const segment = vectorNode?.contours?.[0]?.segments?.[0];
+
+      if (!segment) {
+        return null;
+      }
+
+      return {
+        handleInLength: Math.hypot(segment.handleIn.x, segment.handleIn.y),
+        handleOutLength: Math.hypot(segment.handleOut.x, segment.handleOut.y),
+        pointType: segment.pointType || null,
+      };
     })
-    .toBe("corner");
+    .toEqual({
+      handleInLength: 0,
+      handleOutLength: 0,
+      pointType: "corner",
+    });
 });
 
 test("switching between corner anchors retargets the point toolbar actions", async ({
@@ -347,6 +421,387 @@ test("switching between corner anchors retargets the point toolbar actions", asy
     });
 });
 
+test("hovering and clicking a vector segment inserts a point", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadVectorDocument(page);
+
+  await clickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+
+  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
+  const rect = await node.boundingBox();
+
+  if (!rect) {
+    throw new Error("Missing visible vector node bounds");
+  }
+
+  const topSegmentPoint = {
+    x: rect.x + rect.width / 2,
+    y: rect.y + 6,
+  };
+
+  await page.mouse.move(topSegmentPoint.x, topSegmentPoint.y);
+  await expect.poll(() => getCursorAtPoint(page, topSegmentPoint)).toBe(
+    "crosshair"
+  );
+
+  await page.mouse.click(topSegmentPoint.x, topSegmentPoint.y);
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => (await getDebugDump(page))?.editing?.pathPoint || null)
+    .toEqual({
+      contourIndex: 0,
+      segmentIndex: 1,
+    });
+
+  await expect
+    .poll(async () => {
+      const vectorNode = await getVectorNodeDocument(page);
+      const segment = vectorNode?.contours?.[0]?.segments?.[1];
+
+      return segment
+        ? {
+            handleInLength: Math.hypot(segment.handleIn.x, segment.handleIn.y),
+            handleOutLength: Math.hypot(segment.handleOut.x, segment.handleOut.y),
+            pointType: segment.pointType || null,
+            segmentCount: vectorNode?.contours?.[0]?.segments?.length || 0,
+            x: segment.point.x,
+            y: segment.point.y,
+          }
+        : null;
+    })
+    .toEqual({
+      handleInLength: 0,
+      handleOutLength: 0,
+      pointType: "corner",
+      segmentCount: 5,
+      x: 100,
+      y: 0,
+    });
+});
+
+test("re-entering path edit mode still allows selecting a smooth point", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadVectorDocument(page);
+
+  await clickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+
+  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
+  const rect = await node.boundingBox();
+
+  if (!rect) {
+    throw new Error("Missing visible vector node bounds");
+  }
+
+  const topRightPoint = {
+    x: rect.x + rect.width - 6,
+    y: rect.y + 6,
+  };
+
+  await page.mouse.click(topRightPoint.x, topRightPoint.y);
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => (await getDebugDump(page))?.editing?.pathPoint || null)
+    .toEqual({
+      contourIndex: 0,
+      segmentIndex: 1,
+    });
+
+  await page.getByRole("button", { name: "Smooth" }).click();
+  await pauseForUi(page);
+
+  await page.keyboard.press("Escape");
+  await pauseForUi(page);
+
+  await clickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+
+  await page.mouse.click(topRightPoint.x, topRightPoint.y);
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => (await getDebugDump(page))?.editing?.pathPoint || null)
+    .toEqual({
+      contourIndex: 0,
+      segmentIndex: 1,
+    });
+});
+
+test("option-dragging a smooth handle breaks coupling and converts the point to corner", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadVectorDocument(page);
+
+  await clickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+
+  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
+  const rect = await node.boundingBox();
+
+  if (!rect) {
+    throw new Error("Missing visible vector node bounds");
+  }
+
+  const topRightPoint = {
+    x: rect.x + rect.width - 6,
+    y: rect.y + 6,
+  };
+
+  await page.mouse.click(topRightPoint.x, topRightPoint.y);
+  await pauseForUi(page);
+  await page.getByRole("button", { name: "Smooth" }).click();
+  await pauseForUi(page);
+
+  const beforeSegment = await getVectorSegmentDocument(page, 1);
+
+  if (!beforeSegment) {
+    throw new Error("Missing selected smooth vector segment");
+  }
+
+  const handleOutPoint = {
+    x: rect.x + beforeSegment.point.x + beforeSegment.handleOut.x,
+    y: rect.y + beforeSegment.point.y + beforeSegment.handleOut.y,
+  };
+
+  await page.keyboard.down("Alt");
+  await page.mouse.move(handleOutPoint.x, handleOutPoint.y);
+  await page.mouse.down();
+  await page.mouse.move(handleOutPoint.x + 42, handleOutPoint.y + 18, {
+    steps: 4,
+  });
+  await page.mouse.up();
+  await page.keyboard.up("Alt");
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => {
+      const segment = await getVectorSegmentDocument(page, 1);
+
+      if (!segment) {
+        return null;
+      }
+
+      return {
+        handleIn: segment.handleIn,
+        handleOut: segment.handleOut,
+        pointType: segment.pointType || "corner",
+      };
+    })
+    .toEqual({
+      handleIn: beforeSegment.handleIn,
+      handleOut: expect.objectContaining({
+        x: expect.any(Number),
+        y: expect.any(Number),
+      }),
+      pointType: "corner",
+    });
+});
+
+test("shift-dragging a handle constrains its angle", async ({ page }) => {
+  await gotoEditor(page);
+  await loadVectorDocument(page);
+
+  await clickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+
+  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
+  const rect = await node.boundingBox();
+
+  if (!rect) {
+    throw new Error("Missing visible vector node bounds");
+  }
+
+  const topRightPoint = {
+    x: rect.x + rect.width - 6,
+    y: rect.y + 6,
+  };
+
+  await page.mouse.click(topRightPoint.x, topRightPoint.y);
+  await pauseForUi(page);
+  await page.getByRole("button", { name: "Smooth" }).click();
+  await pauseForUi(page);
+
+  const segment = await getVectorSegmentDocument(page, 1);
+
+  if (!segment) {
+    throw new Error("Missing selected smooth vector segment");
+  }
+
+  const handleOutPoint = {
+    x: rect.x + segment.point.x + segment.handleOut.x,
+    y: rect.y + segment.point.y + segment.handleOut.y,
+  };
+
+  await page.keyboard.down("Shift");
+  await page.mouse.move(handleOutPoint.x, handleOutPoint.y);
+  await page.mouse.down();
+  await page.mouse.move(handleOutPoint.x + 54, handleOutPoint.y - 26, {
+    steps: 4,
+  });
+  await page.mouse.up();
+  await page.keyboard.up("Shift");
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => {
+      const nextSegment = await getVectorSegmentDocument(page, 1);
+
+      return nextSegment
+        ? {
+            handleIn: nextSegment.handleIn,
+            handleOut: nextSegment.handleOut,
+          }
+        : null;
+    })
+    .toMatchObject({
+      handleIn: {
+        x: expect.any(Number),
+        y: expect.closeTo(0, 1),
+      },
+      handleOut: {
+        x: expect.any(Number),
+        y: expect.closeTo(0, 1),
+      },
+    });
+});
+
+test("deselecting a smooth point hides its visible handles", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadVectorDocument(page);
+
+  await clickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+
+  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
+  const rect = await node.boundingBox();
+
+  if (!rect) {
+    throw new Error("Missing visible vector node bounds");
+  }
+
+  const topRightPoint = {
+    x: rect.x + rect.width - 6,
+    y: rect.y + 6,
+  };
+
+  await page.mouse.click(topRightPoint.x, topRightPoint.y);
+  await pauseForUi(page);
+  await page.getByRole("button", { name: "Smooth" }).click();
+  await pauseForUi(page);
+
+  const vectorNode = await getVectorNodeDocument(page);
+  const segment = vectorNode?.contours?.[0]?.segments?.[1];
+
+  if (!segment) {
+    throw new Error("Missing smoothed vector segment");
+  }
+
+  const handleOutPoint = {
+    x: rect.x + segment.point.x + segment.handleOut.x,
+    y: rect.y + segment.point.y + segment.handleOut.y,
+  };
+
+  await expect
+    .poll(async () => (await getVectorPaperPixel(page, handleOutPoint))?.a || 0)
+    .toBeGreaterThan(0);
+
+  await page.mouse.click(rect.x + rect.width / 2, rect.y + rect.height / 2);
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => (await getDebugDump(page))?.editing?.pathPoint || null)
+    .toBeNull();
+
+  await expect
+    .poll(async () => (await getVectorPaperPixel(page, handleOutPoint))?.a || 0)
+    .toBe(0);
+});
+
+test("selecting another anchor hides the previous smooth point handles", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadVectorDocument(page);
+
+  await clickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+
+  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
+  const rect = await node.boundingBox();
+
+  if (!rect) {
+    throw new Error("Missing visible vector node bounds");
+  }
+
+  const topLeftPoint = {
+    x: rect.x + 6,
+    y: rect.y + 6,
+  };
+  const topRightPoint = {
+    x: rect.x + rect.width - 6,
+    y: rect.y + 6,
+  };
+
+  await page.mouse.click(topRightPoint.x, topRightPoint.y);
+  await pauseForUi(page);
+  await page.getByRole("button", { name: "Smooth" }).click();
+  await pauseForUi(page);
+
+  const vectorNode = await getVectorNodeDocument(page);
+  const segment = vectorNode?.contours?.[0]?.segments?.[1];
+
+  if (!segment) {
+    throw new Error("Missing smoothed vector segment");
+  }
+
+  const handleOutPoint = {
+    x: rect.x + segment.point.x + segment.handleOut.x,
+    y: rect.y + segment.point.y + segment.handleOut.y,
+  };
+
+  await expect
+    .poll(async () => (await getVectorPaperPixel(page, handleOutPoint))?.a || 0)
+    .toBeGreaterThan(0);
+
+  await page.mouse.click(topLeftPoint.x, topLeftPoint.y);
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => (await getDebugDump(page))?.editing?.pathPoint || null)
+    .toEqual({
+      contourIndex: 0,
+      segmentIndex: 0,
+    });
+
+  await expect
+    .poll(async () => (await getVectorPaperPixel(page, handleOutPoint))?.a || 0)
+    .toBe(0);
+});
+
 test("dragging the vector body in path edit mode moves the node", async ({
   page,
 }) => {
@@ -416,6 +871,73 @@ test("dragging the vector body in path edit mode moves the node", async ({
   await expect
     .poll(async () => (await getDebugDump(page))?.editing?.pathNodeId || null)
     .toBe("vector-node");
+});
+
+test("vector path editing uses distinct point and body drag cursors", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadVectorDocument(page);
+
+  await clickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+
+  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
+  const rect = await node.boundingBox();
+
+  if (!rect) {
+    throw new Error("Missing visible vector node bounds");
+  }
+
+  const anchorPoint = {
+    x: rect.x + 6,
+    y: rect.y + 6,
+  };
+  const bodyPoint = {
+    x: rect.x + rect.width / 2,
+    y: rect.y + rect.height / 2,
+  };
+
+  await page.mouse.move(anchorPoint.x, anchorPoint.y);
+  await expect.poll(() => getCursorAtPoint(page, anchorPoint)).toBe("pointer");
+
+  await page.mouse.down();
+  await page.mouse.move(anchorPoint.x - 10, anchorPoint.y - 8, { steps: 4 });
+  await expect
+    .poll(() =>
+      getCursorAtPoint(page, {
+        x: anchorPoint.x - 10,
+        y: anchorPoint.y - 8,
+      })
+    )
+    .toBe("pointer");
+  await page.mouse.up();
+
+  await page.mouse.move(bodyPoint.x, bodyPoint.y);
+  await expect.poll(() => getCursorAtPoint(page, bodyPoint)).toBe("grab");
+
+  await page.mouse.down();
+  await page.mouse.move(bodyPoint.x + 18, bodyPoint.y + 12, { steps: 4 });
+  await expect
+    .poll(() =>
+      getCursorAtPoint(page, {
+        x: bodyPoint.x + 18,
+        y: bodyPoint.y + 12,
+      })
+    )
+    .toBe("grabbing");
+  await page.mouse.up();
+
+  await expect
+    .poll(() =>
+      getCursorAtPoint(page, {
+        x: bodyPoint.x + 18,
+        y: bodyPoint.y + 12,
+      })
+    )
+    .toBe("grab");
 });
 
 test("space-dragging pans the canvas during vector path editing", async ({

@@ -234,6 +234,18 @@ textarea,
   cursor: ns-resize;
 }
 
+[data-canvas-cursor="vector-path-body"] {
+  cursor: grab;
+}
+
+[data-canvas-cursor="vector-path-insert"] {
+  cursor: crosshair;
+}
+
+[data-canvas-cursor="vector-path-point"] {
+  cursor: pointer;
+}
+
 [data-active-canvas-cursor="text-path-slide"],
 [data-active-canvas-cursor="text-path-slide"] * {
   cursor: ew-resize !important;
@@ -247,6 +259,16 @@ textarea,
 [data-active-canvas-cursor="text-path-bend-active"],
 [data-active-canvas-cursor="text-path-bend-active"] * {
   cursor: grabbing !important;
+}
+
+[data-active-canvas-cursor="vector-path-body-active"],
+[data-active-canvas-cursor="vector-path-body-active"] * {
+  cursor: grabbing !important;
+}
+
+[data-active-canvas-cursor="vector-path-point-active"],
+[data-active-canvas-cursor="vector-path-point-active"] * {
+  cursor: pointer !important;
 }
 
 /* Bend handle enter/exit animation — GPU-composited (opacity + transform only) */

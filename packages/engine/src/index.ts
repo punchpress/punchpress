@@ -54,6 +54,13 @@ export {
 } from "./nodes/text/model";
 export { createDefaultVectorNode } from "./nodes/vector/model";
 export {
+  getVectorPathCursorMode,
+  isVectorPathPointRole,
+} from "./nodes/vector/path-edit-interaction";
+export {
+  insertVectorPoint,
+} from "./nodes/vector/point-insert";
+export {
   setVectorPointType,
   updateVectorPointHandle,
 } from "./nodes/vector/point-edit";

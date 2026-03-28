@@ -32,6 +32,7 @@ import {
   updateNode as updateEditorNode,
   updateNodes as updateEditorNodes,
   updateSelectedNode as updateEditorSelectedNode,
+  insertVectorPoint as insertEditorVectorPoint,
   setVectorPointType as setEditorVectorPointType,
 } from "./document/node-actions";
 import {
@@ -899,6 +900,14 @@ export class Editor {
     }
 
     return setEditorVectorPointType(this, nodeId, point, pointType);
+  }
+
+  insertVectorPoint(target, nodeId = this.pathEditingNodeId) {
+    if (!nodeId) {
+      return false;
+    }
+
+    return insertEditorVectorPoint(this, nodeId, target);
   }
 
   setEditingText(value) {
