@@ -84,9 +84,8 @@ export const createMainWindowController = () => {
       minWidth: defaultWindowSize.minWidth,
       minHeight: defaultWindowSize.minHeight,
       title: "PunchPress",
-      titleBarStyle: "hiddenInset",
       frame: false,
-      transparent: true,
+      backgroundColor: "#121212",
       trafficLightPosition: {
         x: 18,
         y: 16,
