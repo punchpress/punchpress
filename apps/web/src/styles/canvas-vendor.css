@@ -3,16 +3,13 @@
     background-color: var(--designer-bg);
   }
 
-  .dark .canvas-host {
-    background-color: color-mix(in srgb, var(--designer-bg) 92%, black);
-  }
-
   .canvas-surface {
-    background-color: transparent;
+    background-color: var(--designer-bg);
   }
 
-  .dark .canvas-surface {
-    background-color: transparent;
+  .canvas-surface .infinite-viewer-wrapper,
+  .canvas-surface .infinite-viewer-scroll-area {
+    background-color: var(--designer-bg);
   }
 
   .canvas-dot-grid {
