@@ -44,9 +44,14 @@ Use these standards for new code and touched code during refactors.
 ## Testing
 
 - Prefer a small number of high-signal tests over broad coverage.
+- Default to test-driven development for bug fixes and feature work: add or update the test first when feasible, observe it fail for the target behavior, then implement the fix and verify it passes.
+- If a test cannot realistically be written first, add it immediately after the implementation in the same task.
+- For reported bugs, prefer a reproducing regression test before the fix and verify the failing-then-passing cycle when practical.
 - Add tests for behavior with non-trivial state, geometry, or library integration risk.
 - Skip low-value tests for simple styling tweaks unless the behavior is easy to regress and hard to verify manually.
 - Name test files after the concrete behavior and path under test. Prefer names like `text-node-move` or `layer-shift-select` over vague buckets like `document-io` or `layer-actions`.
+- Put durable editor behavior in `editor-contract` tests and reserve Playwright for end-to-end interaction wiring, browser behavior, and cases that cannot be covered honestly through the engine surface.
+- Minimize mocks; prefer exercising real editor flows and document state unless an external boundary leaves no reasonable alternative.
 - Use Playwright only for behavior we truly need and cannot cover honestly in `editor-contract`. Do not spend Playwright tests on primitives like file pickers, shell plumbing, or other setup paths when the real product value is elsewhere.
 
 ## Architecture
@@ -91,6 +96,7 @@ Tests, CLI workflows, and AI automation should converge on the same editor comma
 - `docs/architecture/README.md` — Architecture docs index
 - `docs/architecture/codebase-structure.md` — Current editor architecture and file structure
 - `docs/architecture/editor-operating-model.md` — Editor, React, and automation operating model
+- `docs/architecture/vector-editing-operating-model.md` — Engine ownership, Paper overlay responsibilities, and SVG import direction
 - `docs/architecture/editor-extraction-plan.md` — remaining migration work after extracting the engine and schema packages
 - `docs/architecture/document-model.md` — Design recipe schema, invariants, and export boundaries
 - `docs/design/system.md` — UI component system, Base UI policy, COSS UI workflow

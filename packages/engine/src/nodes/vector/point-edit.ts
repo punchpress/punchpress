@@ -41,6 +41,24 @@ const invertHandle = (handle: VectorHandleDocument) => {
   };
 };
 
+const constrainHandleAngle = (handle: VectorHandleDocument) => {
+  const length = getHandleLength(handle);
+
+  if (length <= HANDLE_EPSILON) {
+    return handle;
+  }
+
+  const step = Math.PI / 4;
+  const snappedAngle = Math.round(Math.atan2(handle.y, handle.x) / step) * step;
+  const x = Math.cos(snappedAngle) * length;
+  const y = Math.sin(snappedAngle) * length;
+
+  return {
+    x: Math.abs(x) <= HANDLE_EPSILON ? 0 : x,
+    y: Math.abs(y) <= HANDLE_EPSILON ? 0 : y,
+  };
+};
+
 const getNeighborPoint = (
   contour: VectorContourDocument,
   segmentIndex: number,
@@ -200,6 +218,8 @@ export const setVectorPointType = (
     if (target.pointType === "corner") {
       return {
         ...segment,
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
         pointType: "corner",
       };
     }
@@ -224,38 +244,47 @@ export const setVectorPointType = (
 export const updateVectorPointHandle = (
   contours: VectorContourDocument[],
   target: {
+    constrainAngle?: boolean;
     contourIndex: number;
     handleRole: "handleIn" | "handleOut";
+    preserveSmoothCoupling?: boolean;
     segmentIndex: number;
     value: VectorHandleDocument;
   }
 ) => {
   return mapTargetSegment(contours, target, (segment, contour) => {
+    const nextValue = target.constrainAngle
+      ? constrainHandleAngle(target.value)
+      : target.value;
     const nextSegment = {
       ...segment,
-      [target.handleRole]: target.value,
+      [target.handleRole]: nextValue,
     };
 
     if (segment.pointType !== "smooth") {
       return nextSegment;
     }
 
+    if (target.preserveSmoothCoupling === false) {
+      return {
+        ...nextSegment,
+        pointType: "corner",
+      };
+    }
+
     const oppositeRole =
       target.handleRole === "handleOut" ? "handleIn" : "handleOut";
     const oppositeLength = getHandleLength(segment[oppositeRole]);
 
-    if (oppositeLength <= HANDLE_EPSILON || isZeroHandle(target.value)) {
+    if (oppositeLength <= HANDLE_EPSILON || isZeroHandle(nextValue)) {
       return nextSegment;
     }
 
-    const axis = getSmoothAxis(contour, target.segmentIndex, target.value);
+    const axis = getSmoothAxis(contour, target.segmentIndex, nextValue);
 
     return {
       ...nextSegment,
-      [oppositeRole]: scaleHandle(
-        target.handleRole === "handleOut" ? invertHandle(axis) : axis,
-        oppositeLength
-      ),
+      [oppositeRole]: scaleHandle(invertHandle(axis), oppositeLength),
     };
   });
 };
