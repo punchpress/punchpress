@@ -10,7 +10,7 @@ import {
   UngroupLayersIcon,
   ViewIcon,
   ViewOffIcon,
-} from "@hugeicons/core-free-icons";
+} from "@hugeicons-pro/core-stroke-rounded";
 import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
 import { ChevronDown, ChevronRight, Folder } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";

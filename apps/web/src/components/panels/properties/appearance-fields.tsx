@@ -21,6 +21,7 @@ export const AppearanceFields = ({ fill, stroke, strokeWidth }) => {
               editor.setSelectionProperty("fill", nextFill)
             }
             placeholder={fill.isMixed ? "Mixed" : undefined}
+            stateKey="fill"
             value={fill.isMixed ? null : fill.value}
           />
         </FieldRow>
@@ -33,6 +34,7 @@ export const AppearanceFields = ({ fill, stroke, strokeWidth }) => {
               editor.setSelectionProperty("stroke", nextStroke)
             }
             placeholder={stroke.isMixed ? "Mixed" : undefined}
+            stateKey="stroke"
             value={stroke.isMixed ? null : stroke.value}
           />
         </FieldRow>

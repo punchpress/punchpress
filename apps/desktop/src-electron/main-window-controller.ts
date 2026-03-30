@@ -84,6 +84,9 @@ export const createMainWindowController = () => {
       minWidth: defaultWindowSize.minWidth,
       minHeight: defaultWindowSize.minHeight,
       title: "PunchPress",
+      ...(process.platform === "darwin"
+        ? { titleBarStyle: "hiddenInset" as const }
+        : {}),
       frame: false,
       backgroundColor: "#121212",
       trafficLightPosition: {
@@ -99,6 +102,11 @@ export const createMainWindowController = () => {
         session: sharedSession,
       },
     });
+
+    if (process.platform === "darwin") {
+      nextWindow.setWindowButtonVisibility(true);
+    }
+
     isMainWindowRendererReady = false;
     mainWindow = nextWindow;
 

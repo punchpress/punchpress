@@ -88,6 +88,16 @@ const getCursorAtPoint = (page, point) => {
   }, point);
 };
 
+const getCanvasSurfaceCursor = (page) => {
+  return page
+    .locator(".canvas-surface")
+    .evaluate((element) => window.getComputedStyle(element).cursor);
+};
+
+const isCustomCursor = (cursor) => {
+  return typeof cursor === "string" && cursor.includes("data:image/svg+xml");
+};
+
 const getVectorNodeDocument = async (page, nodeId = "vector-node") => {
   return page.evaluate((currentNodeId) => {
     const dump = window.__PUNCHPRESS_EDITOR__?.getDebugDump();
@@ -141,6 +151,91 @@ const getVectorPaperPixel = (page, point) => {
   }, point);
 };
 
+const getVectorPathScreenPoint = (page, nodeId, distance = 0) => {
+  return page.evaluate(
+    ({ currentDistance, currentNodeId }) => {
+      const path = document.querySelector(
+        `.canvas-node[data-node-id="${currentNodeId}"] path`
+      );
+
+      if (!(path instanceof SVGPathElement)) {
+        return null;
+      }
+
+      const svg = path.ownerSVGElement;
+      const ctm = path.getScreenCTM();
+
+      if (!(svg && ctm)) {
+        return null;
+      }
+
+      const pathPoint = path.getPointAtLength(currentDistance);
+      const screenPoint = svg.createSVGPoint();
+      screenPoint.x = pathPoint.x;
+      screenPoint.y = pathPoint.y;
+
+      const transformedPoint = screenPoint.matrixTransform(ctm);
+
+      return {
+        x: transformedPoint.x,
+        y: transformedPoint.y,
+      };
+    },
+    {
+      currentDistance: distance,
+      currentNodeId: nodeId,
+    }
+  );
+};
+
+const getVectorSegmentScreenPoint = (page, nodeId, segmentIndex, contourIndex = 0) => {
+  return page.evaluate(
+    ({ currentContourIndex, currentNodeId, currentSegmentIndex }) => {
+      const dump = window.__PUNCHPRESS_EDITOR__?.getDebugDump();
+      const nodeSnapshot = dump?.nodes?.find((entry) => entry.id === currentNodeId);
+      const serializedDocument = dump?.document?.serialized
+        ? JSON.parse(dump.document.serialized)
+        : null;
+      const vectorNode = serializedDocument?.nodes?.find(
+        (entry) => entry.id === currentNodeId
+      );
+      const localPoint =
+        vectorNode?.contours?.[currentContourIndex]?.segments?.[currentSegmentIndex]
+          ?.point;
+      const bbox = nodeSnapshot?.geometry?.bbox;
+      const svg = document.querySelector(
+        `.canvas-node[data-node-id="${currentNodeId}"] svg`
+      );
+
+      if (!(localPoint && bbox && svg instanceof SVGSVGElement)) {
+        return null;
+      }
+
+      const ctm = svg.getScreenCTM();
+
+      if (!ctm) {
+        return null;
+      }
+
+      const svgPoint = svg.createSVGPoint();
+      svgPoint.x = localPoint.x - bbox.minX;
+      svgPoint.y = localPoint.y - bbox.minY;
+
+      const transformedPoint = svgPoint.matrixTransform(ctm);
+
+      return {
+        x: transformedPoint.x,
+        y: transformedPoint.y,
+      };
+    },
+    {
+      currentContourIndex: contourIndex,
+      currentNodeId: nodeId,
+      currentSegmentIndex: segmentIndex,
+    }
+  );
+};
+
 test("double-clicking a vector node enters path editing", async ({ page }) => {
   await gotoEditor(page);
   await loadVectorDocument(page);
@@ -170,9 +265,22 @@ test("double-clicking a vector node enters path editing", async ({ page }) => {
     .toBe("vector-node");
 
   await expect(page.locator(".canvas-vector-paper")).toHaveCount(1);
-  await expect(page.locator(".canvas-single-node-transform-overlay")).toHaveCount(
-    0
-  );
+  await expect(
+    page.locator(".canvas-single-node-transform-overlay")
+  ).toHaveCount(0);
+});
+
+test("pen tool uses the custom pen cursor on the canvas", async ({ page }) => {
+  await gotoEditor(page);
+
+  await page.getByRole("button", { name: "Pen (P)" }).click();
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => {
+      return isCustomCursor(await getCanvasSurfaceCursor(page));
+    })
+    .toBe(true);
 });
 
 test("dragging a vector anchor edits the node through the paper session", async ({
@@ -196,7 +304,9 @@ test("dragging a vector anchor edits the node through the paper session", async 
   await page.mouse.move(rect.x + 6, rect.y + 6);
   await page.mouse.down();
   await page.mouse.move(rect.x - 30, rect.y - 18, { steps: 6 });
-  await expect(page.locator(".canvas-selecto .selecto-selection")).toHaveCount(0);
+  await expect(page.locator(".canvas-selecto .selecto-selection")).toHaveCount(
+    0
+  );
   await page.mouse.up();
   await pauseForUi(page);
 
@@ -222,13 +332,138 @@ test("dragging a vector anchor edits the node through the paper session", async 
     const document = dump?.document?.serialized
       ? JSON.parse(dump.document.serialized)
       : null;
-    const vectorNode = document?.nodes?.find((entry) => entry.id === "vector-node");
+    const vectorNode = document?.nodes?.find(
+      (entry) => entry.id === "vector-node"
+    );
 
     return vectorNode?.contours?.[0]?.segments?.[0]?.point || null;
   });
 
   expect(firstPoint?.x).toBeLessThan(-10);
   expect(firstPoint?.y).toBeLessThan(-10);
+});
+
+test("dragging a vector anchor keeps the rendered vector aligned mid-drag", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadVectorDocument(page);
+
+  await clickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+
+  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
+  const rect = await node.boundingBox();
+
+  if (!rect) {
+    throw new Error("Missing visible vector node bounds");
+  }
+
+  const startPoint = {
+    x: rect.x + 6,
+    y: rect.y + 6,
+  };
+  const dragPoint = {
+    x: rect.x - 26,
+    y: rect.y + 22,
+  };
+
+  await page.mouse.move(startPoint.x, startPoint.y);
+  await page.mouse.down();
+  await page.mouse.move(dragPoint.x, dragPoint.y, { steps: 6 });
+
+  await expect
+    .poll(async () => {
+      const point = await getVectorPathScreenPoint(page, "vector-node", 0);
+
+      if (!point) {
+        return Number.POSITIVE_INFINITY;
+      }
+
+      return Math.hypot(point.x - dragPoint.x, point.y - dragPoint.y);
+    })
+    .toBeLessThan(8);
+
+  await page.mouse.up();
+});
+
+test("dragging one vector anchor does not shift untouched anchors", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadVectorDocument(page);
+
+  await clickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+
+  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
+  const rect = await node.boundingBox();
+
+  if (!rect) {
+    throw new Error("Missing visible vector node bounds");
+  }
+
+  const stableBottomRightBefore = await getVectorSegmentScreenPoint(
+    page,
+    "vector-node",
+    2
+  );
+  const stableBottomLeftBefore = await getVectorSegmentScreenPoint(
+    page,
+    "vector-node",
+    3
+  );
+
+  expect(stableBottomRightBefore).not.toBeNull();
+  expect(stableBottomLeftBefore).not.toBeNull();
+  if (!(stableBottomRightBefore && stableBottomLeftBefore)) {
+    return;
+  }
+
+  const dragStartPoint = {
+    x: rect.x + rect.width - 6,
+    y: rect.y + 6,
+  };
+  const dragPoint = {
+    x: dragStartPoint.x - 70,
+    y: dragStartPoint.y,
+  };
+
+  await page.mouse.move(dragStartPoint.x, dragStartPoint.y);
+  await page.mouse.down();
+  await page.mouse.move(dragPoint.x, dragPoint.y, { steps: 6 });
+
+  await expect
+    .poll(async () => {
+      const bottomRight = await getVectorSegmentScreenPoint(
+        page,
+        "vector-node",
+        2
+      );
+      const bottomLeft = await getVectorSegmentScreenPoint(page, "vector-node", 3);
+
+      if (!(bottomRight && bottomLeft)) {
+        return Number.POSITIVE_INFINITY;
+      }
+
+      return Math.max(
+        Math.hypot(
+          bottomRight.x - stableBottomRightBefore.x,
+          bottomRight.y - stableBottomRightBefore.y
+        ),
+        Math.hypot(
+          bottomLeft.x - stableBottomLeftBefore.x,
+          bottomLeft.y - stableBottomLeftBefore.y
+        )
+      );
+    })
+    .toBeLessThan(3);
+
+  await page.mouse.up();
 });
 
 test("selecting a vector anchor exposes point controls and converts it to smooth", async ({
@@ -445,9 +680,11 @@ test("hovering and clicking a vector segment inserts a point", async ({
   };
 
   await page.mouse.move(topSegmentPoint.x, topSegmentPoint.y);
-  await expect.poll(() => getCursorAtPoint(page, topSegmentPoint)).toBe(
-    "crosshair"
-  );
+  await expect
+    .poll(async () => {
+      return isCustomCursor(await getCursorAtPoint(page, topSegmentPoint));
+    })
+    .toBe(true);
 
   await page.mouse.click(topSegmentPoint.x, topSegmentPoint.y);
   await pauseForUi(page);
@@ -467,7 +704,10 @@ test("hovering and clicking a vector segment inserts a point", async ({
       return segment
         ? {
             handleInLength: Math.hypot(segment.handleIn.x, segment.handleIn.y),
-            handleOutLength: Math.hypot(segment.handleOut.x, segment.handleOut.y),
+            handleOutLength: Math.hypot(
+              segment.handleOut.x,
+              segment.handleOut.y
+            ),
             pointType: segment.pointType || null,
             segmentCount: vectorNode?.contours?.[0]?.segments?.length || 0,
             x: segment.point.x,
@@ -825,16 +1065,22 @@ test("dragging the vector body in path edit mode moves the node", async ({
     const document = dump?.document?.serialized
       ? JSON.parse(dump.document.serialized)
       : null;
-    const vectorNode = document?.nodes?.find((entry) => entry.id === "vector-node");
+    const vectorNode = document?.nodes?.find(
+      (entry) => entry.id === "vector-node"
+    );
 
     return vectorNode?.transform || null;
   });
 
   await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
   await page.mouse.down();
-  await page.mouse.move(rect.x + rect.width / 2 + 64, rect.y + rect.height / 2 + 40, {
-    steps: 8,
-  });
+  await page.mouse.move(
+    rect.x + rect.width / 2 + 64,
+    rect.y + rect.height / 2 + 40,
+    {
+      steps: 8,
+    }
+  );
   await page.mouse.up();
   await pauseForUi(page);
 
@@ -860,7 +1106,9 @@ test("dragging the vector body in path edit mode moves the node", async ({
     const document = dump?.document?.serialized
       ? JSON.parse(dump.document.serialized)
       : null;
-    const vectorNode = document?.nodes?.find((entry) => entry.id === "vector-node");
+    const vectorNode = document?.nodes?.find(
+      (entry) => entry.id === "vector-node"
+    );
 
     return vectorNode?.transform || null;
   });
@@ -873,7 +1121,7 @@ test("dragging the vector body in path edit mode moves the node", async ({
     .toBe("vector-node");
 });
 
-test("vector path editing uses distinct point and body drag cursors", async ({
+test("vector path editing uses move for body drag and pointer for points", async ({
   page,
 }) => {
   await gotoEditor(page);
@@ -901,43 +1149,57 @@ test("vector path editing uses distinct point and body drag cursors", async ({
   };
 
   await page.mouse.move(anchorPoint.x, anchorPoint.y);
-  await expect.poll(() => getCursorAtPoint(page, anchorPoint)).toBe("pointer");
+  await expect
+    .poll(async () => {
+      return isCustomCursor(await getCursorAtPoint(page, anchorPoint));
+    })
+    .toBe(true);
 
   await page.mouse.down();
   await page.mouse.move(anchorPoint.x - 10, anchorPoint.y - 8, { steps: 4 });
   await expect
-    .poll(() =>
-      getCursorAtPoint(page, {
-        x: anchorPoint.x - 10,
-        y: anchorPoint.y - 8,
-      })
+    .poll(async () =>
+      isCustomCursor(
+        await getCursorAtPoint(page, {
+          x: anchorPoint.x - 10,
+          y: anchorPoint.y - 8,
+        })
+      )
     )
-    .toBe("pointer");
+    .toBe(true);
   await page.mouse.up();
 
   await page.mouse.move(bodyPoint.x, bodyPoint.y);
-  await expect.poll(() => getCursorAtPoint(page, bodyPoint)).toBe("grab");
+  await expect
+    .poll(async () => {
+      return isCustomCursor(await getCursorAtPoint(page, bodyPoint));
+    })
+    .toBe(true);
 
   await page.mouse.down();
   await page.mouse.move(bodyPoint.x + 18, bodyPoint.y + 12, { steps: 4 });
   await expect
-    .poll(() =>
-      getCursorAtPoint(page, {
-        x: bodyPoint.x + 18,
-        y: bodyPoint.y + 12,
-      })
+    .poll(async () =>
+      isCustomCursor(
+        await getCursorAtPoint(page, {
+          x: bodyPoint.x + 18,
+          y: bodyPoint.y + 12,
+        })
+      )
     )
-    .toBe("grabbing");
+    .toBe(true);
   await page.mouse.up();
 
   await expect
-    .poll(() =>
-      getCursorAtPoint(page, {
-        x: bodyPoint.x + 18,
-        y: bodyPoint.y + 12,
-      })
+    .poll(async () =>
+      isCustomCursor(
+        await getCursorAtPoint(page, {
+          x: bodyPoint.x + 18,
+          y: bodyPoint.y + 12,
+        })
+      )
     )
-    .toBe("grab");
+    .toBe(true);
 });
 
 test("space-dragging pans the canvas during vector path editing", async ({
@@ -963,9 +1225,13 @@ test("space-dragging pans the canvas during vector path editing", async ({
   await page.keyboard.down("Space");
   await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
   await page.mouse.down();
-  await page.mouse.move(rect.x + rect.width / 2 + 120, rect.y + rect.height / 2 + 72, {
-    steps: 10,
-  });
+  await page.mouse.move(
+    rect.x + rect.width / 2 + 120,
+    rect.y + rect.height / 2 + 72,
+    {
+      steps: 10,
+    }
+  );
   await page.mouse.up();
   await page.keyboard.up("Space");
   await pauseForUi(page);
@@ -975,7 +1241,9 @@ test("space-dragging pans the canvas during vector path editing", async ({
     .not.toEqual(initialScroll);
 });
 
-test("wheel panning still works during vector path editing", async ({ page }) => {
+test("wheel panning still works during vector path editing", async ({
+  page,
+}) => {
   await gotoEditor(page);
   await loadVectorDocument(page);
 

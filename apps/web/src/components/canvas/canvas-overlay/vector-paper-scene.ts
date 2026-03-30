@@ -16,10 +16,11 @@ import {
   splitVectorContourAtOffset,
 } from "./vector-paper-point-insert";
 
-const ANCHOR_RADIUS_PX = 9;
+const ANCHOR_RADIUS_PX = 6;
 const GUIDE_STROKE_WIDTH_PX = 1.5;
 const HANDLE_LINE_STROKE_WIDTH_PX = 1.25;
 const HANDLE_RADIUS_PX = 6;
+const SELECTED_ANCHOR_SCALE = 1.2;
 const HIT_TEST_OPTIONS = {
   fill: true,
   stroke: true,
@@ -28,11 +29,22 @@ const HIT_TEST_OPTIONS = {
 
 type VectorSegmentChrome = {
   anchor: paper.Path.Circle;
+  anchorHalo: paper.Path.Circle;
   handleIn: paper.Path.Circle;
+  handleInHalo: paper.Path.Circle;
   handleInLine: paper.Path;
   handleOut: paper.Path.Circle;
+  handleOutHalo: paper.Path.Circle;
   handleOutLine: paper.Path;
 };
+
+type HoveredPoint =
+  | {
+      contourIndex: number;
+      role: "anchor" | "handle-in" | "handle-out";
+      segmentIndex: number;
+    }
+  | null;
 
 type PendingPress =
   | {
@@ -66,15 +78,30 @@ const getSceneStyles = (scope) => {
   const canvas = scope.view.element;
   const accent = resolveCssColor(
     canvas,
-    "var(--editor-accent)",
-    "rgb(99 167 255)"
+    "color-mix(in srgb, var(--editor-accent) 72%, white 8%)",
+    "rgb(86 145 224)"
+  );
+  const background = resolveCssColor(
+    canvas,
+    "var(--background)",
+    "rgb(255 255 255)"
   );
 
   return {
+    backgroundFill: new scope.Color(background),
     accentFill: new scope.Color(accent),
-    anchorSelectedFill: new scope.Color("white"),
-    borderFill: new scope.Color("white"),
     guide: new scope.Color(accent),
+    hoverHalo: (() => {
+      const color = new scope.Color(
+        resolveCssColor(
+          canvas,
+          "color-mix(in srgb, white 18%, var(--editor-accent) 82%)",
+          "rgb(110 165 255)"
+        )
+      );
+      color.alpha = 0.28;
+      return color;
+    })(),
     shadow: new scope.Color(0, 0, 0, 0.18),
   };
 };
@@ -96,9 +123,9 @@ const projectVector = (matrix, point) => {
 const createAnchorItem = (scope, styles, point) => {
   const anchor = new scope.Path.Circle({
     center: point,
-    fillColor: styles.accentFill.clone(),
+    fillColor: styles.backgroundFill.clone(),
     radius: ANCHOR_RADIUS_PX,
-    strokeColor: styles.borderFill.clone(),
+    strokeColor: styles.accentFill.clone(),
     strokeWidth: 2,
   });
 
@@ -112,10 +139,21 @@ const createAnchorItem = (scope, styles, point) => {
 const createHandleItem = (scope, styles, point) => {
   return new scope.Path.Circle({
     center: point,
-    fillColor: styles.borderFill.clone(),
+    fillColor: styles.backgroundFill.clone(),
     radius: HANDLE_RADIUS_PX,
     strokeColor: styles.accentFill.clone(),
     strokeWidth: 2,
+  });
+};
+
+const createHoverHaloItem = (scope, styles, point, radius) => {
+  return new scope.Path.Circle({
+    center: point,
+    fillColor: null,
+    radius,
+    strokeColor: styles.hoverHalo.clone(),
+    strokeWidth: 8,
+    visible: false,
   });
 };
 
@@ -132,6 +170,18 @@ const createHandleLine = (scope, styles, from, to) => {
   return line;
 };
 
+const setItemScale = (item: paper.Item, nextScale: number) => {
+  const currentScale =
+    typeof item.data.currentScale === "number" ? item.data.currentScale : 1;
+
+  if (currentScale === nextScale) {
+    return;
+  }
+
+  item.scale(nextScale / currentScale);
+  item.data.currentScale = nextScale;
+};
+
 const isSamePointSelection = (a, b) => {
   return Boolean(
     a &&
@@ -143,13 +193,16 @@ const isSamePointSelection = (a, b) => {
 
 const refreshSegmentChrome = (segment, chrome, styles, isSelected) => {
   chrome.anchor.position = segment.point;
+  chrome.anchorHalo.position = segment.point;
+  setItemScale(chrome.anchor, isSelected ? SELECTED_ANCHOR_SCALE : 1);
   chrome.anchor.fillColor = isSelected
-    ? styles.anchorSelectedFill.clone()
-    : styles.accentFill.clone();
-  chrome.anchor.strokeColor = isSelected
     ? styles.accentFill.clone()
-    : styles.borderFill.clone();
-  chrome.anchor.strokeWidth = isSelected ? 3 : 2;
+    : styles.backgroundFill.clone();
+  chrome.anchor.strokeColor = isSelected
+    ? styles.backgroundFill.clone()
+    : styles.accentFill.clone();
+  chrome.anchor.strokeWidth = isSelected ? 1.5 : 2;
+  chrome.anchorHalo.visible = false;
 
   const handleInPoint = segment.point.add(segment.handleIn);
   const handleOutPoint = segment.point.add(segment.handleOut);
@@ -159,12 +212,16 @@ const refreshSegmentChrome = (segment, chrome, styles, isSelected) => {
   chrome.handleInLine.segments[0].point = segment.point;
   chrome.handleInLine.segments[1].point = handleInPoint;
   chrome.handleInLine.visible = hasHandleIn;
+  chrome.handleInHalo.position = handleInPoint;
+  chrome.handleInHalo.visible = false;
   chrome.handleIn.position = handleInPoint;
   chrome.handleIn.visible = hasHandleIn;
 
   chrome.handleOutLine.segments[0].point = segment.point;
   chrome.handleOutLine.segments[1].point = handleOutPoint;
   chrome.handleOutLine.visible = hasHandleOut;
+  chrome.handleOutHalo.position = handleOutPoint;
+  chrome.handleOutHalo.visible = false;
   chrome.handleOut.position = handleOutPoint;
   chrome.handleOut.visible = hasHandleOut;
 };
@@ -259,6 +316,7 @@ export const createVectorPaperSession = ({
     paths: [],
     pendingPress: null,
     pendingScene: null,
+    hoveredPoint: null as HoveredPoint,
     selectedPoint: null,
     styles: getSceneStyles(scope),
   };
@@ -273,6 +331,64 @@ export const createVectorPaperSession = ({
 
   const setHoverCursorMode = (mode) => {
     setCanvasCursorToken(canvas, getVectorPathCursorToken(mode));
+  };
+
+  const syncHoveredChrome = () => {
+    state.chrome.forEach((contourChrome) => {
+      contourChrome.forEach((chrome) => {
+        chrome.anchorHalo.visible = false;
+        chrome.handleInHalo.visible = false;
+        chrome.handleOutHalo.visible = false;
+      });
+    });
+
+    const hoveredPoint = state.hoveredPoint;
+
+    if (!hoveredPoint) {
+      scope.view.update();
+      return;
+    }
+
+    const chrome =
+      state.chrome[hoveredPoint.contourIndex]?.[hoveredPoint.segmentIndex];
+
+    if (!chrome) {
+      scope.view.update();
+      return;
+    }
+
+    if (hoveredPoint.role === "anchor") {
+      chrome.anchorHalo.visible = true;
+      scope.view.update();
+      return;
+    }
+
+    if (hoveredPoint.role === "handle-in" && chrome.handleIn.visible) {
+      chrome.handleInHalo.visible = true;
+      scope.view.update();
+      return;
+    }
+
+    if (hoveredPoint.role === "handle-out" && chrome.handleOut.visible) {
+      chrome.handleOutHalo.visible = true;
+    }
+
+    scope.view.update();
+  };
+
+  const setHoveredPoint = (hoveredPoint: HoveredPoint) => {
+    const current = state.hoveredPoint;
+    const isSameHoveredPoint =
+      current?.contourIndex === hoveredPoint?.contourIndex &&
+      current?.segmentIndex === hoveredPoint?.segmentIndex &&
+      current?.role === hoveredPoint?.role;
+
+    if (isSameHoveredPoint) {
+      return;
+    }
+
+    state.hoveredPoint = hoveredPoint;
+    syncHoveredChrome();
   };
 
   const setActiveCursorMode = (mode) => {
@@ -315,6 +431,7 @@ export const createVectorPaperSession = ({
     );
 
     if (updateView) {
+      syncHoveredChrome();
       scope.view.update();
     }
   };
@@ -409,11 +526,33 @@ export const createVectorPaperSession = ({
 
         path.add(new scope.Segment(point, handleIn, handleOut));
 
+        const anchorHalo = createHoverHaloItem(
+          scope,
+          state.styles,
+          point,
+          ANCHOR_RADIUS_PX + 3
+        );
         const anchor = createAnchorItem(scope, state.styles, point);
         const handleInLine = createHandleLine(scope, state.styles, point, point);
         const handleOutLine = createHandleLine(scope, state.styles, point, point);
+        const handleInHalo = createHoverHaloItem(
+          scope,
+          state.styles,
+          point,
+          HANDLE_RADIUS_PX + 3
+        );
         const handleInItem = createHandleItem(scope, state.styles, point);
+        const handleOutHalo = createHoverHaloItem(
+          scope,
+          state.styles,
+          point,
+          HANDLE_RADIUS_PX + 3
+        );
         const handleOutItem = createHandleItem(scope, state.styles, point);
+
+        anchorHalo.insertBelow(anchor);
+        handleInHalo.insertBelow(handleInItem);
+        handleOutHalo.insertBelow(handleOutItem);
 
         anchor.data = {
           contourIndex,
@@ -433,9 +572,12 @@ export const createVectorPaperSession = ({
 
         contourChrome.push({
           anchor,
+          anchorHalo,
           handleIn: handleInItem,
+          handleInHalo,
           handleInLine,
           handleOut: handleOutItem,
+          handleOutHalo,
           handleOutLine,
         });
       });
@@ -459,11 +601,74 @@ export const createVectorPaperSession = ({
       });
     });
 
+    syncHoveredChrome();
     scope.view.update();
   };
 
-  const syncNode = () => {
-    onChange(state.contours);
+  const syncActiveSceneFrame = (scene) => {
+    const { matrix, metrics, selectedPoint } = scene;
+    const canvasElement = scope.view.element;
+
+    canvasElement.width = metrics.width;
+    canvasElement.height = metrics.height;
+    canvasElement.style.width = `${metrics.width}px`;
+    canvasElement.style.height = `${metrics.height}px`;
+    scope.view.viewSize = new scope.Size(metrics.width, metrics.height);
+
+    const paperMatrix = new scope.Matrix(
+      matrix.a,
+      matrix.b,
+      matrix.c,
+      matrix.d,
+      matrix.e,
+      matrix.f
+    );
+    const inverseMatrix = paperMatrix.inverted();
+
+    if (!inverseMatrix) {
+      return;
+    }
+
+    state.inverseMatrix = inverseMatrix;
+    state.matrix = matrix;
+    state.selectedPoint = selectedPoint || null;
+    state.styles = getSceneStyles(scope);
+
+    state.paths.forEach((path, contourIndex) => {
+      path.segments.forEach((segment, segmentIndex) => {
+        const sourceSegment = state.contours[contourIndex]?.segments[segmentIndex];
+
+        if (!sourceSegment) {
+          return;
+        }
+
+        segment.point = projectPoint(state.matrix, sourceSegment.point);
+        segment.handleIn = projectVector(state.matrix, sourceSegment.handleIn);
+        segment.handleOut = projectVector(state.matrix, sourceSegment.handleOut);
+
+        refreshSegmentChrome(
+          segment,
+          state.chrome[contourIndex][segmentIndex],
+          state.styles,
+          isSamePointSelection(state.selectedPoint, {
+            contourIndex,
+            segmentIndex,
+          })
+        );
+      });
+    });
+
+    syncHoveredChrome();
+    scope.view.update();
+  };
+
+  const syncNode = (
+    options: {
+      pinnedLocalPoint?: { x: number; y: number } | null;
+      pinnedWorldPoint?: { x: number; y: number } | null;
+    } = {}
+  ) => {
+    onChange(state.contours, options);
   };
 
   const startNodeDrag = (nativeEvent) => {
@@ -559,6 +764,16 @@ export const createVectorPaperSession = ({
     const role = hit?.item?.data?.role;
     const { bodyHit, insertTarget } = getPathInteraction(point);
 
+    if (isVectorPathPointRole(role)) {
+      setHoveredPoint({
+        contourIndex: hit.item.data.contourIndex,
+        role,
+        segmentIndex: hit.item.data.segmentIndex,
+      });
+    } else {
+      setHoveredPoint(null);
+    }
+
     setHoverCursorMode(
       getVectorPathCursorMode({
         isBodyHit: Boolean(bodyHit),
@@ -573,6 +788,7 @@ export const createVectorPaperSession = ({
     contourIndex,
     segmentIndex,
     point,
+    worldPoint,
     modifiers
   ) => {
     if (!state.inverseMatrix) {
@@ -585,6 +801,8 @@ export const createVectorPaperSession = ({
     if (!currentSegment) {
       return;
     }
+
+    let pinnedLocalPoint = localPoint;
 
     if (role === "anchor") {
       state.contours = mapTargetSegment(
@@ -615,7 +833,10 @@ export const createVectorPaperSession = ({
     }
 
     applySourceSegmentToPaper(contourIndex, segmentIndex, { updateView: true });
-    syncNode();
+    syncNode({
+      pinnedLocalPoint,
+      pinnedWorldPoint: worldPoint,
+    });
   };
 
   const tool = new scope.Tool();
@@ -637,6 +858,11 @@ export const createVectorPaperSession = ({
         type: "point",
       } satisfies PendingPress;
       setSelectedPoint(pointSelection);
+      setHoveredPoint({
+        contourIndex: hit.item.data.contourIndex,
+        role,
+        segmentIndex: hit.item.data.segmentIndex,
+      });
       setHoverCursorMode("point");
       return;
     }
@@ -661,6 +887,7 @@ export const createVectorPaperSession = ({
 
     state.pendingPress = null;
     setSelectedPoint(null);
+    setHoveredPoint(null);
 
     if (!role) {
       onExitPathEditing();
@@ -686,6 +913,7 @@ export const createVectorPaperSession = ({
       state.pendingPress = null;
       state.historyMark = onHistoryStart();
       state.isGeometryDragging = true;
+      setHoveredPoint(null);
       setHoverCursorMode(null);
       setActiveCursorMode("point");
     }
@@ -700,6 +928,9 @@ export const createVectorPaperSession = ({
       contourIndex,
       segmentIndex,
       event.point,
+      event.event
+        ? getCanvasPoint(editor, event.event.clientX, event.event.clientY)
+        : null,
       getDragModifierState(event.event, role)
     );
   };
@@ -749,18 +980,21 @@ export const createVectorPaperSession = ({
   return {
     destroy: () => {
       clearScene();
+      setHoveredPoint(null);
       setHoverCursorMode(null);
       setActiveCursorMode(null);
     },
     render: (scene) => {
       if (!scene) {
         clearScene();
+        setHoveredPoint(null);
         setHoverCursorMode(null);
         return;
       }
 
       if (state.isGeometryDragging) {
         state.pendingScene = scene;
+        syncActiveSceneFrame(scene);
         return;
       }
 

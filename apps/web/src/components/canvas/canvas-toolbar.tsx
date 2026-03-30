@@ -3,7 +3,7 @@ import {
   Cursor01Icon,
   Remove01Icon,
   TextFontIcon,
-} from "@hugeicons/core-free-icons";
+} from "@hugeicons-pro/core-stroke-rounded";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { HandIcon, PenToolIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";

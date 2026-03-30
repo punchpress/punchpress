@@ -2,23 +2,30 @@ import {
   CircleIcon,
   SquareIcon,
   StarIcon,
-} from "@hugeicons/core-free-icons";
+} from "@hugeicons-pro/core-stroke-rounded";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ChevronUpIcon } from "lucide-react";
 import { useRef, useState } from "react";
-import {
-  Menu,
-  MenuItem,
-  MenuPopup,
-  MenuShortcut,
-} from "@/components/ui/menu";
+import { Menu, MenuItem, MenuPopup, MenuShortcut } from "@/components/ui/menu";
 import { cn } from "@/lib/utils";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
 
 const SHAPE_OPTIONS = [
-  { icon: SquareIcon, iconSize: 18, key: "rectangle", label: "Rectangle", shortcut: "R" },
-  { icon: CircleIcon, iconSize: 18, key: "ellipse", label: "Ellipse", shortcut: "O" },
+  {
+    icon: SquareIcon,
+    iconSize: 18,
+    key: "rectangle",
+    label: "Rectangle",
+    shortcut: "R",
+  },
+  {
+    icon: CircleIcon,
+    iconSize: 18,
+    key: "ellipse",
+    label: "Ellipse",
+    shortcut: "O",
+  },
   { icon: StarIcon, iconSize: 18, key: "star", label: "Star", shortcut: "S" },
 ];
 

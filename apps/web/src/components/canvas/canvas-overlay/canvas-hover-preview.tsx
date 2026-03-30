@@ -1,11 +1,10 @@
 import { isNodeVisible } from "@punchpress/engine";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
-import { getHostRectFromNodeFrame } from "./canvas-overlay-geometry";
 
 const HOVER_OUTSET_PX = 1;
 
-export const CanvasHoverPreview = ({ viewportRevision }) => {
+export const CanvasHoverPreview = () => {
   const editor = useEditor();
   const activeTool = useEditorValue((_, state) => state.activeTool);
   const editingNodeId = useEditorValue((_, state) => state.editingNodeId);
@@ -34,26 +33,20 @@ export const CanvasHoverPreview = ({ viewportRevision }) => {
     return editor.getNodeRenderFrame(node.id);
   });
 
-  const hoveredNodePreviewRect = getHostRectFromNodeFrame(
-    editor,
-    hoveredNodePreview
-  );
-
-  if (!hoveredNodePreviewRect) {
+  if (!hoveredNodePreview) {
     return null;
   }
 
   return (
     <div
       className="canvas-hover-preview pointer-events-none absolute"
-      data-viewport-revision={viewportRevision}
       style={{
-        height: `${hoveredNodePreviewRect.height + HOVER_OUTSET_PX * 2}px`,
-        left: `${hoveredNodePreviewRect.left - HOVER_OUTSET_PX}px`,
-        top: `${hoveredNodePreviewRect.top - HOVER_OUTSET_PX}px`,
-        transform: hoveredNodePreviewRect.transform,
+        height: `${hoveredNodePreview.bounds.height + HOVER_OUTSET_PX * 2}px`,
+        transform: hoveredNodePreview.transform
+          ? `translate3d(${hoveredNodePreview.bounds.minX - HOVER_OUTSET_PX}px, ${hoveredNodePreview.bounds.minY - HOVER_OUTSET_PX}px, 0) ${hoveredNodePreview.transform}`
+          : `translate3d(${hoveredNodePreview.bounds.minX - HOVER_OUTSET_PX}px, ${hoveredNodePreview.bounds.minY - HOVER_OUTSET_PX}px, 0)`,
         transformOrigin: "center center",
-        width: `${hoveredNodePreviewRect.width + HOVER_OUTSET_PX * 2}px`,
+        width: `${hoveredNodePreview.bounds.width + HOVER_OUTSET_PX * 2}px`,
       }}
     />
   );

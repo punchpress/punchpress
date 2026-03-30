@@ -1,10 +1,21 @@
 import { clamp } from "@punchpress/engine";
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
+import {
+  getCanvasRotateCursor,
+  getCanvasScaleCursor,
+} from "../canvas-cursor-assets";
 import { drillIntoGroupSelection } from "../canvas-group-drill-in";
 import { getHostRectFromNodeFrame } from "./canvas-overlay-geometry";
+import {
+  getRotateCursorRotationDegrees,
+  getScaleCursorRotationDegrees,
+  getTransformRotationDegrees,
+  type TransformCorner,
+} from "./transform-cursor-angle";
+import { useActiveTransformCursor } from "./use-active-transform-cursor";
 
 const ROTATION_ZONE_SIZE = 56;
 const CORNERS = ["nw", "ne", "sw", "se"] as const;
@@ -24,17 +35,17 @@ const handleTransformStyle = {
 };
 
 const rotationZoneStyle = {
-  ne: { right: -28, top: -28 },
-  nw: { left: -28, top: -28 },
-  se: { bottom: -28, right: -28 },
-  sw: { bottom: -28, left: -28 },
+  ne: { right: -56, top: -56 },
+  nw: { left: -56, top: -56 },
+  se: { bottom: -56, right: -56 },
+  sw: { bottom: -56, left: -56 },
 };
 
 const resizeCursorClassName = {
-  ne: "cursor-nesw-resize",
-  nw: "cursor-nwse-resize",
-  se: "cursor-nwse-resize",
-  sw: "cursor-nesw-resize",
+  ne: "canvas-cursor-scale",
+  nw: "canvas-cursor-scale",
+  se: "canvas-cursor-scale",
+  sw: "canvas-cursor-scale",
 };
 
 const getCanvasPoint = (editor, clientX, clientY) => {
@@ -86,6 +97,15 @@ const normalizeAngleDelta = (angle) => {
   return nextAngle;
 };
 
+const getRotateCursorForCorner = (
+  corner: TransformCorner,
+  nodeRotationDegrees: number
+) => {
+  return getCanvasRotateCursor(
+    getRotateCursorRotationDegrees(corner, nodeRotationDegrees)
+  );
+};
+
 const getResizeScale = (pointer, anchorClient, startDistance) => {
   if (!(pointer && anchorClient && Number.isFinite(startDistance))) {
     return null;
@@ -118,6 +138,11 @@ export const CanvasMultiNodeTransformOverlay = ({
     se: null,
     sw: null,
   });
+  const [activeResizeCorner, setActiveResizeCorner] =
+    useState<TransformCorner | null>(null);
+  const [activeRotateCursor, setActiveRotateCursor] = useState<string | null>(
+    null
+  );
   const frame = useEditorSurfaceValue((editor) => {
     return editor.getSelectionTransformFrame(nodeIds);
   });
@@ -125,16 +150,29 @@ export const CanvasMultiNodeTransformOverlay = ({
   const overlayRect = useMemo(() => {
     return getHostRectFromNodeFrame(editor, frame);
   }, [editor, frame]);
+  const overlayRotationDegrees = useEditorValue((editor) => {
+    const selectionFrame = editor.getSelectionTransformFrame(nodeIds);
+
+    return getTransformRotationDegrees(selectionFrame?.transform);
+  });
+  const activeTransformCursor =
+    activeRotateCursor ??
+    (activeResizeCorner !== null
+        ? getCanvasScaleCursor(
+            getScaleCursorRotationDegrees(
+              activeResizeCorner,
+              overlayRotationDegrees
+            )
+          )
+        : null);
+
+  useActiveTransformCursor(activeTransformCursor);
 
   if (!(overlayRect && nodeIds.length > 0)) {
     return null;
   }
 
-  let cursorClassName = "cursor-default";
-
-  if (isDraggable) {
-    cursorClassName = isSelectionDragging ? "cursor-grabbing" : "cursor-grab";
-  }
+  let cursorClassName = "canvas-cursor-default";
 
   const startSelectionDrag = (event) => {
     if (!(event.button === 0 && isDraggable)) {
@@ -252,6 +290,7 @@ export const CanvasMultiNodeTransformOverlay = ({
       return;
     }
 
+    setActiveResizeCorner(corner);
     editor.setHoveringSuppressed(true);
     const historyMark = editor.markHistoryStep("resize selection");
     const startDistance = Math.max(
@@ -277,6 +316,7 @@ export const CanvasMultiNodeTransformOverlay = ({
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointercancel", handlePointerEnd);
       window.removeEventListener("pointerup", handlePointerEnd);
+      setActiveResizeCorner(null);
       editor.setHoveringSuppressed(false);
 
       if (historyMark) {
@@ -289,7 +329,7 @@ export const CanvasMultiNodeTransformOverlay = ({
     window.addEventListener("pointerup", handlePointerEnd);
   };
 
-  const startRotate = (event) => {
+  const startRotate = (corner: TransformCorner, event) => {
     if (!(event.button === 0 && isRotatable)) {
       return;
     }
@@ -309,6 +349,9 @@ export const CanvasMultiNodeTransformOverlay = ({
     }
 
     const historyMark = editor.markHistoryStep("rotate selection");
+    setActiveRotateCursor(
+      getRotateCursorForCorner(corner, overlayRotationDegrees)
+    );
     editor.setHoveringSuppressed(true);
     editor.beginSelectionRotationInteraction();
 
@@ -325,6 +368,9 @@ export const CanvasMultiNodeTransformOverlay = ({
       const nextAngle = getAngleFromCenter(center, point);
       totalRotation += normalizeAngleDelta(nextAngle - previousAngle);
       previousAngle = nextAngle;
+      setActiveRotateCursor(
+        getRotateCursorForCorner(corner, overlayRotationDegrees + totalRotation)
+      );
 
       editor.updateRotateSelection(rotateSession, {
         deltaRotation: totalRotation,
@@ -336,6 +382,7 @@ export const CanvasMultiNodeTransformOverlay = ({
       window.removeEventListener("pointercancel", handlePointerEnd);
       window.removeEventListener("pointerup", handlePointerEnd);
       editor.endSelectionRotationInteraction();
+      setActiveRotateCursor(null);
       editor.setHoveringSuppressed(false);
 
       if (historyMark) {
@@ -411,11 +458,15 @@ export const CanvasMultiNodeTransformOverlay = ({
           <div key={corner}>
             {isRotatable ? (
               <div
-                className="canvas-rotation-zone canvas-multi-node-rotation-zone absolute cursor-crosshair"
+                className="canvas-rotation-zone canvas-multi-node-rotation-zone canvas-cursor-rotate absolute"
                 data-corner={corner}
-                onPointerDown={startRotate}
+                onPointerDown={(event) => startRotate(corner, event)}
                 style={{
                   ...rotationZoneStyle[corner],
+                  cursor: getRotateCursorForCorner(
+                    corner,
+                    overlayRotationDegrees
+                  ),
                   height: `${ROTATION_ZONE_SIZE}px`,
                   width: `${ROTATION_ZONE_SIZE}px`,
                 }}
@@ -430,6 +481,9 @@ export const CanvasMultiNodeTransformOverlay = ({
               }}
               style={{
                 ...handlePositionStyle[corner],
+                cursor: getCanvasScaleCursor(
+                  getScaleCursorRotationDegrees(corner, overlayRotationDegrees)
+                ),
                 transform: handleTransformStyle[corner],
               }}
               type="button"

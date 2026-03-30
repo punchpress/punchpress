@@ -7,7 +7,7 @@ import {
   TextFontIcon,
   ViewIcon,
   ViewOffIcon,
-} from "@hugeicons/core-free-icons";
+} from "@hugeicons-pro/core-stroke-rounded";
 import { MenuShortcut } from "@/components/ui/menu";
 import { SortableItem } from "@/components/ui/sortable-list";
 import { cn } from "@/lib/utils";

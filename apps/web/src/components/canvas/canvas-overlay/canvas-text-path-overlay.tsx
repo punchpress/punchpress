@@ -1,4 +1,4 @@
-import { CircleArrowDataTransferHorizontalIcon } from "@hugeicons/core-free-icons";
+import { CircleArrowDataTransferHorizontalIcon } from "@hugeicons-pro/core-stroke-rounded";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
 import { useEditor } from "../../../editor-react/use-editor";

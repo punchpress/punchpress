@@ -36,11 +36,12 @@ export const PairedRow = ({ action, children, label }) => {
   );
 };
 
-export const ColorField = ({ onChange, placeholder, value }) => {
+export const ColorField = ({ onChange, placeholder, stateKey, value }) => {
   return (
     <ColorPickerField
       onChange={onChange}
       placeholder={placeholder}
+      stateKey={stateKey}
       value={value}
     />
   );

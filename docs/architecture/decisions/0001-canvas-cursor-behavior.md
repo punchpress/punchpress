@@ -25,6 +25,7 @@ The durable rule is:
 - node components should not accept tool-specific cursor props just to mirror canvas mode
 - overlay affordances should expose semantic cursor tokens in React land and let
   shared CSS resolve them
+- shared CSS may resolve semantic tokens to either keyword cursors or SVG cursor assets
 - engine geometry and guide data should not carry raw CSS cursor strings
 
 ## Rationale
@@ -42,6 +43,7 @@ The durable rule is:
 4. If future tools need cursor changes, prefer new container attributes and CSS selectors over new cursor props on `CanvasNode`.
 5. Overlay handles may use semantic `data-canvas-cursor` tokens, but those tokens should still resolve through shared canvas CSS rather than inline `style.cursor`.
 6. If a drag should preserve its cursor while the pointer leaves the original handle, express that as container state such as `data-active-canvas-cursor`.
+7. Canvas-level cursor assets should be injected as shared CSS variables at the canvas boundary, not attached directly to individual nodes or handles.
 
 ## Source of Truth
 

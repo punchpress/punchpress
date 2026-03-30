@@ -28,9 +28,9 @@ export const ColorPickerSelection = memo(
     );
 
     return (
-      <div
+        <div
         className={cn(
-          "relative aspect-square w-full cursor-crosshair overflow-hidden rounded-xl border shadow-xs/5",
+          "canvas-cursor-default relative aspect-square w-full overflow-hidden rounded-xl border shadow-xs/5",
           className
         )}
         onPointerDown={(event) => {

@@ -32,6 +32,7 @@ import {
   updateNode as updateEditorNode,
   updateNodes as updateEditorNodes,
   updateSelectedNode as updateEditorSelectedNode,
+  updateVectorContours as updateEditorVectorContours,
   insertVectorPoint as insertEditorVectorPoint,
   setVectorPointType as setEditorVectorPointType,
 } from "./document/node-actions";
@@ -1040,6 +1041,10 @@ export class Editor {
 
   updateNode(nodeId, updater) {
     updateEditorNode(this, nodeId, updater);
+  }
+
+  updateVectorContours(nodeId, contours, options) {
+    return updateEditorVectorContours(this, nodeId, contours, options);
   }
 
   updateNodes(nodeIds, updater) {

@@ -7,7 +7,7 @@ import {
   CheckmarkCircle02Icon,
   InformationCircleIcon,
   Loading03Icon,
-} from "@hugeicons/core-free-icons";
+} from "@hugeicons-pro/core-stroke-rounded";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { ReactElement, ReactNode } from "react";
 

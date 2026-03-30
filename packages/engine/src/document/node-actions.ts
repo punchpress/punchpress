@@ -1,4 +1,6 @@
 import { duplicateClipboardContent } from "../clipboard/clipboard-actions";
+import { buildVectorNodeGeometry } from "../nodes/vector/vector-engine";
+import { getNodeTransformForPinnedWorldPoint } from "../primitives/rotation";
 import { insertVectorPoint as insertVectorPointOnContours } from "../nodes/vector/point-insert";
 import { setVectorPointType as setVectorPointTypeOnContours } from "../nodes/vector/point-edit";
 import { finishEditingIfNeeded } from "../editing/editing-actions";
@@ -142,6 +144,60 @@ export const updateNode = (editor, nodeId, updater) => {
   editor.run(() => {
     editor.getState().updateNodeById(nodeId, updater);
   });
+};
+
+export const updateVectorContours = (
+  editor,
+  nodeId,
+  contours,
+  {
+    pinnedLocalPoint = null,
+    pinnedWorldPoint = null,
+  }: {
+    pinnedLocalPoint?: { x: number; y: number } | null;
+    pinnedWorldPoint?: { x: number; y: number } | null;
+  } = {}
+) => {
+  const node = editor.getNode(nodeId);
+
+  if (!(node?.type === "vector" && contours)) {
+    return false;
+  }
+
+  editor.run(() => {
+    editor.getState().updateNodeById(nodeId, (currentNode) => {
+      if (currentNode.type !== "vector") {
+        return currentNode;
+      }
+
+      const nextNode = {
+        ...currentNode,
+        contours,
+      };
+      const nextGeometry = buildVectorNodeGeometry(nextNode);
+      const nextTransform =
+        nextGeometry.bbox && pinnedLocalPoint && pinnedWorldPoint
+          ? getNodeTransformForPinnedWorldPoint(
+              nextNode,
+              nextGeometry.bbox,
+              pinnedLocalPoint,
+              pinnedWorldPoint
+            )
+          : null;
+
+      return {
+        contours,
+        transform: nextTransform
+          ? {
+              ...currentNode.transform,
+              ...nextTransform,
+            }
+          : undefined,
+      };
+    });
+  });
+
+  return true;
 };
 
 export const updateNodes = (editor, nodeIds, updater) => {

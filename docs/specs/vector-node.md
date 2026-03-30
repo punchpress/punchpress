@@ -78,6 +78,7 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 
 - Path editing should support adding points on existing segments.
 - Hovering an insertable segment should communicate point insertion distinctly from point dragging or whole-object dragging.
+- Hovering an insertable segment should use pen-style insertion cursor language rather than a generic crosshair when PunchPress exposes a pen cursor asset.
 - Clicking an insertable segment should add a point at that location and select it immediately.
 - Path editing should support deleting selected points without destroying the whole path.
 - Path editing should support cutting or splitting a path at a selected point or segment.
@@ -90,6 +91,7 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 
 - Path editing should eventually support creating new paths with a pen-style workflow rather than only editing existing paths.
 - Clicking should place straight points.
+- While the Pen tool is active, the canvas placement cursor should use pen-style cursor language rather than a generic crosshair.
 - Click-dragging should place a point and immediately author its direction handles.
 - Continuing from a smooth point should preserve expected tangent behavior.
 - Esc should end the current drawing gesture without exiting the broader vector editing mode unexpectedly.

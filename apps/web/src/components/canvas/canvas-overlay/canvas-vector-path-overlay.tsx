@@ -136,12 +136,12 @@ export const CanvasVectorPathOverlay = ({ viewportRevision }) => {
       canvas: paperCanvasRef.current,
       editor,
       nodeId,
-      onChange: (contours) => {
+      onChange: (contours, options) => {
         if (!nodeId) {
           return;
         }
 
-        editor.updateNode(nodeId, { contours });
+        editor.updateVectorContours(nodeId, contours, options);
       },
       onExitPathEditing: () => {
         editor.stopPathEditing();

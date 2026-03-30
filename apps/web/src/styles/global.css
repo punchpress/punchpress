@@ -215,7 +215,7 @@ textarea,
 
 [data-panning="true"] .canvas-surface,
 [data-panning="true"] .canvas-node {
-  cursor: grab;
+  cursor: var(--canvas-cursor-grab);
 }
 
 [data-tool="text"] .canvas-surface {
@@ -224,6 +224,66 @@ textarea,
 
 [data-tool="text"] .canvas-node {
   cursor: text;
+}
+
+.canvas-cursor-default {
+  cursor: var(--canvas-cursor-default);
+}
+
+.canvas-cursor-pointer {
+  cursor: var(--canvas-cursor-pointer);
+}
+
+[data-slot="color-picker"] {
+  cursor: var(--canvas-cursor-default);
+}
+
+[data-editor-shell-root] button:not(:disabled),
+[data-slot="color-picker"] button:not(:disabled),
+[data-editor-shell-root] [role="button"]:not([aria-disabled="true"]),
+[data-slot="color-picker"] [role="button"]:not([aria-disabled="true"]),
+[data-editor-shell-root] a[href],
+[data-slot="color-picker"] a[href],
+[data-editor-shell-root] .cursor-pointer,
+[data-slot="color-picker"] .cursor-pointer {
+  cursor: var(--canvas-cursor-default);
+}
+
+.canvas-cursor-move {
+  cursor: var(--canvas-cursor-move);
+}
+
+.canvas-cursor-scroll-horizontal {
+  cursor: var(--canvas-cursor-scroll-horizontal);
+}
+
+.canvas-cursor-grab {
+  cursor: var(--canvas-cursor-grab);
+}
+
+.canvas-cursor-grabbing {
+  cursor: var(--canvas-cursor-grabbing);
+}
+
+.canvas-cursor-scale {
+  cursor: var(--canvas-cursor-scale);
+}
+
+.canvas-cursor-rotate {
+  cursor: var(--canvas-cursor-rotate);
+}
+
+.canvas-host .canvas-surface {
+  cursor: var(--canvas-cursor-default);
+}
+
+.canvas-host .canvas-vector-paper {
+  cursor: var(--canvas-cursor-default);
+}
+
+[data-tool="pen"] .canvas-surface,
+[data-tool="pen"] .canvas-node {
+  cursor: var(--canvas-cursor-pen-tool);
 }
 
 [data-canvas-cursor="text-path-slide"] {
@@ -235,15 +295,15 @@ textarea,
 }
 
 [data-canvas-cursor="vector-path-body"] {
-  cursor: grab;
+  cursor: var(--canvas-cursor-move);
 }
 
 [data-canvas-cursor="vector-path-insert"] {
-  cursor: crosshair;
+  cursor: var(--canvas-cursor-pen-tool-add);
 }
 
 [data-canvas-cursor="vector-path-point"] {
-  cursor: pointer;
+  cursor: var(--canvas-cursor-move);
 }
 
 [data-active-canvas-cursor="text-path-slide"],
@@ -258,17 +318,26 @@ textarea,
 
 [data-active-canvas-cursor="text-path-bend-active"],
 [data-active-canvas-cursor="text-path-bend-active"] * {
-  cursor: grabbing !important;
+  cursor: var(--canvas-cursor-grabbing) !important;
 }
 
 [data-active-canvas-cursor="vector-path-body-active"],
 [data-active-canvas-cursor="vector-path-body-active"] * {
-  cursor: grabbing !important;
+  cursor: var(--canvas-cursor-move) !important;
 }
 
 [data-active-canvas-cursor="vector-path-point-active"],
 [data-active-canvas-cursor="vector-path-point-active"] * {
-  cursor: pointer !important;
+  cursor: var(--canvas-cursor-move) !important;
+}
+
+body[data-active-transform-cursor="true"],
+body[data-active-transform-cursor="true"] * {
+  cursor: var(--active-transform-cursor) !important;
+}
+
+body[data-color-picker-open="true"] {
+  cursor: var(--canvas-cursor-default);
 }
 
 /* Bend handle enter/exit animation — GPU-composited (opacity + transform only) */
@@ -434,7 +503,7 @@ textarea,
   --canvas-transform-box-handles: oklch(0.32 0 0);
   --canvas-transform-box-handles-border: oklch(0.42 0 0);
   --canvas-transform-box-handles-ring: oklch(0.42 0 0);
-  --canvas-transform-preview-box-lines: oklch(0.2495 0 0);
+  --canvas-transform-preview-box-lines: oklch(0.31 0 0);
 }
 
 @layer base {

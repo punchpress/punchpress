@@ -130,11 +130,9 @@ export const ScrubSlider = ({
       aria-valuenow={value}
       aria-valuetext={formatValue(value)}
       className={cn(
-        "group relative flex min-h-9 w-full touch-none select-none items-center overflow-hidden rounded-lg border border-transparent bg-muted px-[calc(--spacing(3)-1px)] text-base text-foreground outline-none transition-[border-color,background-color] hover:border-input hover:bg-accent focus-visible:border-ring sm:min-h-8 sm:text-sm dark:bg-input/32 dark:hover:bg-input/64",
+        "canvas-cursor-scroll-horizontal group relative flex min-h-9 w-full touch-none select-none items-center overflow-hidden rounded-lg border border-transparent bg-muted px-[calc(--spacing(3)-1px)] text-base text-foreground outline-none transition-[border-color,background-color] hover:border-input hover:bg-accent focus-visible:border-ring sm:min-h-8 sm:text-sm dark:bg-input/32 dark:hover:bg-input/64",
         disabled && "pointer-events-none opacity-64",
-        isDragging &&
-          "cursor-ew-resize border-input bg-accent dark:bg-input/64",
-        !(disabled || isDragging) && "cursor-ew-resize",
+        isDragging && "border-input bg-accent dark:bg-input/64",
         className
       )}
       data-dragging={isDragging ? "true" : undefined}

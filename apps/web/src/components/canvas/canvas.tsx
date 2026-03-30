@@ -4,9 +4,12 @@ import InfiniteViewer from "react-infinite-viewer";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
 import { shouldDisableCanvasOverlay } from "../../performance/performance-url-flags";
+import { useTheme } from "../../theme/theme-provider";
 import { DesignerFloatingToolbar, DesignerFrame } from "../designer/designer";
+import { getCanvasCursorStyle } from "./canvas-cursor-assets";
 import { CanvasDotGrid } from "./canvas-dot-grid";
 import { CanvasNodes } from "./canvas-nodes";
+import { CanvasHoverPreview } from "./canvas-overlay/canvas-hover-preview";
 import { CanvasOverlay } from "./canvas-overlay/canvas-overlay";
 import { CanvasTextEditor } from "./canvas-text-editor";
 import { startCanvasToolPlacementSession } from "./canvas-tool-placement-session";
@@ -29,6 +32,7 @@ const getCanvasPoint = (viewer, host, clientX, clientY, zoom) => {
 
 export const Canvas = () => {
   const editor = useEditor();
+  useTheme();
   const activeTool = useEditorValue((_, state) => state.activeTool);
   const spacePressed = useEditorValue((_, state) => state.spacePressed);
   const zoom = useEditorValue((_, state) => state.viewport.zoom);
@@ -155,6 +159,7 @@ export const Canvas = () => {
         onPointerDownCapture={handleCanvasPointerDown}
         onWheelCapture={handleCanvasWheel}
         ref={hostRef}
+        style={getCanvasCursorStyle()}
       >
         <InfiniteViewer
           className="canvas-surface relative z-[1] h-full w-full"
@@ -180,6 +185,7 @@ export const Canvas = () => {
               stageMargin={CANVAS_STAGE_MARGIN}
               zoom={zoom}
             />
+            <CanvasHoverPreview />
             <CanvasNodes />
             <CanvasTextEditor />
           </div>

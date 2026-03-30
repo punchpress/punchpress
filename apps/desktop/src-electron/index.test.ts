@@ -34,6 +34,7 @@ class FakeBrowserWindow {
   loadURL = mock(async () => undefined);
   options: Record<string, unknown>;
   restore = mock(() => undefined);
+  setWindowButtonVisibility = mock((_visible: boolean) => undefined);
   show = mock(() => undefined);
   webContents = {
     send: mock((_channel: string, _payload?: unknown) => undefined),
@@ -453,5 +454,23 @@ describe("desktop index bootstrap", () => {
 
     expect(quitAndInstallUpdateMock).toHaveBeenCalledTimes(1);
     expect(appQuitMock).not.toHaveBeenCalled();
+  });
+
+  test("shows native window buttons for the frameless desktop shell on macOS", async () => {
+    await importDesktopIndex();
+    await flushTasks();
+
+    const mainWindow = createdWindows[0];
+
+    expect(mainWindow).toBeDefined();
+
+    if (process.platform === "darwin") {
+      expect(mainWindow.options.titleBarStyle).toBe("hiddenInset");
+      expect(mainWindow.setWindowButtonVisibility).toHaveBeenCalledWith(true);
+      return;
+    }
+
+    expect(mainWindow.options.titleBarStyle).toBeUndefined();
+    expect(mainWindow.setWindowButtonVisibility).not.toHaveBeenCalled();
   });
 });

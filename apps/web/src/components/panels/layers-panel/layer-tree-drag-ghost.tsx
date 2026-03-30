@@ -2,7 +2,7 @@ import {
   TextFontIcon,
   ViewIcon,
   ViewOffIcon,
-} from "@hugeicons/core-free-icons";
+} from "@hugeicons-pro/core-stroke-rounded";
 import { Folder } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEditorValue } from "../../../editor-react/use-editor-value";

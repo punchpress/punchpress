@@ -1,19 +1,27 @@
 "use client";
 
-import { Slider as BaseSlider } from "@base-ui/react/slider";
-import { type ComponentProps, type ReactNode, useId } from "react";
+import { type HTMLAttributes, type ReactNode, useId } from "react";
 import { cn } from "@/lib/utils";
 import { useColorPicker } from "./color-picker-context";
 import { CHECKERBOARD_STYLE, getOpaqueColor } from "./color-picker-utils";
 
-interface ColorPickerSliderProps {
+interface ColorPickerSliderProps extends HTMLAttributes<HTMLDivElement> {
   children?: ReactNode;
-  className?: string;
   max: number;
   min: number;
   onValueChange: (value: number) => void;
   value: number;
 }
+
+const SLIDER_THUMB_SIZE = 16;
+
+const getSliderPercent = (value: number, min: number, max: number) => {
+  if (max <= min) {
+    return 0;
+  }
+
+  return ((value - min) / (max - min)) * 100;
+};
 
 const ColorPickerSlider = ({
   children,
@@ -22,45 +30,49 @@ const ColorPickerSlider = ({
   min,
   onValueChange,
   value,
+  ...props
 }: ColorPickerSliderProps) => {
   const thumbId = useId();
+  const clampedValue = Math.min(max, Math.max(min, value));
+  const percent = getSliderPercent(clampedValue, min, max);
+  const halfThumbSize = SLIDER_THUMB_SIZE / 2;
 
   return (
-    <BaseSlider.Root
-      className={cn("data-[orientation=horizontal]:w-full", className)}
-      max={max}
-      min={min}
-      onValueChange={(nextValue) => onValueChange(nextValue[0] ?? min)}
-      thumbAlignment="edge"
-      value={[value]}
-    >
-      <BaseSlider.Control className="flex touch-none select-none data-[orientation=horizontal]:w-full">
-        <BaseSlider.Track className="relative h-4 w-full grow">
-          <div className="pointer-events-none absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 overflow-hidden rounded-full border border-black/6 shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.14)]">
-            {children}
-            <BaseSlider.Indicator className="bg-transparent" />
-          </div>
-          <BaseSlider.Thumb
-            aria-labelledby={thumbId}
-            className="block size-4 shrink-0 rounded-full border border-white bg-transparent shadow-[0_0_0_1px_rgb(0_0_0_/_0.24),0_1px_3px_rgb(0_0_0_/_0.2)] outline-none has-focus-visible:ring-[3px] has-focus-visible:ring-ring/24"
-            index={0}
-          />
-        </BaseSlider.Track>
-      </BaseSlider.Control>
+    <div className={cn("w-full", className)} {...props}>
+      <div className="relative h-4 w-full">
+        <div className="pointer-events-none absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 overflow-hidden rounded-full border border-black/6 shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.14)]">
+          {children}
+        </div>
+        <div
+          className="pointer-events-none absolute top-1/2 z-10 block size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-transparent shadow-[0_0_0_1px_rgb(0_0_0_/_0.24),0_1px_3px_rgb(0_0_0_/_0.2)]"
+          style={{
+            left: `clamp(${halfThumbSize}px, ${percent}%, calc(100% - ${halfThumbSize}px))`,
+          }}
+        />
+        <input
+          aria-labelledby={thumbId}
+          className="absolute inset-0 z-20 m-0 h-full w-full appearance-none bg-transparent opacity-0"
+          max={max}
+          min={min}
+          onChange={(event) =>
+            onValueChange(Number.parseFloat(event.currentTarget.value))
+          }
+          step="any"
+          type="range"
+          value={clampedValue}
+        />
+      </div>
       <span className="sr-only" id={thumbId}>
         Color picker slider
       </span>
-    </BaseSlider.Root>
+    </div>
   );
 };
 
 export const ColorPickerHue = ({
   className,
   ...props
-}: Omit<
-  ComponentProps<typeof BaseSlider.Root>,
-  "children" | "max" | "min"
->) => {
+}: HTMLAttributes<HTMLDivElement>) => {
   const { color, updateColor } = useColorPicker();
 
   return (
@@ -80,10 +92,7 @@ export const ColorPickerHue = ({
 export const ColorPickerAlpha = ({
   className,
   ...props
-}: Omit<
-  ComponentProps<typeof BaseSlider.Root>,
-  "children" | "max" | "min"
->) => {
+}: HTMLAttributes<HTMLDivElement>) => {
   const { color, updateColor } = useColorPicker();
 
   return (

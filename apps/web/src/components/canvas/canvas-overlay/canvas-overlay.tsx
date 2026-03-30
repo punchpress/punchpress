@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useEditor } from "../../../editor-react/use-editor";
 import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
 import { CanvasEditingSelection } from "./canvas-editing-selection";
-import { CanvasHoverPreview } from "./canvas-hover-preview";
 import { CanvasSelectionOverlay } from "./canvas-selection-overlay";
 import { CanvasTextPathOverlay } from "./canvas-text-path-overlay";
 import { CanvasTransformOverlay } from "./canvas-transform-overlay";
@@ -35,7 +34,6 @@ export const CanvasOverlay = () => {
       <CanvasVectorPathOverlay viewportRevision={viewportRevision} />
       <CanvasTransformOverlay viewportRevision={viewportRevision} />
       <CanvasEditingSelection viewportRevision={viewportRevision} />
-      <CanvasHoverPreview viewportRevision={viewportRevision} />
     </>
   );
 };

@@ -177,15 +177,7 @@ const CanvasNodeComponent = ({ nodeId }) => {
 
   const isNodeDraggable =
     activeTool === "pointer" && !spacePressed && editor.editingNodeId === null;
-  let cursorClassName = "cursor-default";
-
-  if (isNodeDraggable) {
-    if (isSelectionTargetSelected) {
-      cursorClassName = "cursor-grab";
-    } else {
-      cursorClassName = "cursor-pointer";
-    }
-  }
+  let cursorClassName = "canvas-cursor-default";
 
   return (
     <button
