@@ -20,6 +20,7 @@ const ANCHOR_RADIUS_PX = 6;
 const GUIDE_STROKE_WIDTH_PX = 1.5;
 const HANDLE_LINE_STROKE_WIDTH_PX = 1.25;
 const HANDLE_RADIUS_PX = 6;
+const HANDLE_HOVER_RADIUS_PX = HANDLE_RADIUS_PX + 5;
 const SELECTED_ANCHOR_SCALE = 1.2;
 const HIT_TEST_OPTIONS = {
   fill: true,
@@ -27,7 +28,7 @@ const HIT_TEST_OPTIONS = {
   tolerance: 10,
 };
 
-type VectorSegmentChrome = {
+interface VectorSegmentChrome {
   anchor: paper.Path.Circle;
   anchorHalo: paper.Path.Circle;
   handleIn: paper.Path.Circle;
@@ -36,15 +37,13 @@ type VectorSegmentChrome = {
   handleOut: paper.Path.Circle;
   handleOutHalo: paper.Path.Circle;
   handleOutLine: paper.Path;
-};
+}
 
-type HoveredPoint =
-  | {
-      contourIndex: number;
-      role: "anchor" | "handle-in" | "handle-out";
-      segmentIndex: number;
-    }
-  | null;
+type HoveredPoint = {
+  contourIndex: number;
+  role: "anchor" | "handle-in" | "handle-out";
+  segmentIndex: number;
+} | null;
 
 type PendingPress =
   | {
@@ -334,13 +333,13 @@ export const createVectorPaperSession = ({
   };
 
   const syncHoveredChrome = () => {
-    state.chrome.forEach((contourChrome) => {
-      contourChrome.forEach((chrome) => {
+    for (const contourChrome of state.chrome) {
+      for (const chrome of contourChrome) {
         chrome.anchorHalo.visible = false;
         chrome.handleInHalo.visible = false;
         chrome.handleOutHalo.visible = false;
-      });
-    });
+      }
+    }
 
     const hoveredPoint = state.hoveredPoint;
 
@@ -451,7 +450,10 @@ export const createVectorPaperSession = ({
       : null;
 
     if (previousPoint) {
-      applySourceSegmentToPaper(previousPoint.contourIndex, previousPoint.segmentIndex);
+      applySourceSegmentToPaper(
+        previousPoint.contourIndex,
+        previousPoint.segmentIndex
+      );
     }
 
     if (state.selectedPoint) {
@@ -533,20 +535,30 @@ export const createVectorPaperSession = ({
           ANCHOR_RADIUS_PX + 3
         );
         const anchor = createAnchorItem(scope, state.styles, point);
-        const handleInLine = createHandleLine(scope, state.styles, point, point);
-        const handleOutLine = createHandleLine(scope, state.styles, point, point);
+        const handleInLine = createHandleLine(
+          scope,
+          state.styles,
+          point,
+          point
+        );
+        const handleOutLine = createHandleLine(
+          scope,
+          state.styles,
+          point,
+          point
+        );
         const handleInHalo = createHoverHaloItem(
           scope,
           state.styles,
           point,
-          HANDLE_RADIUS_PX + 3
+          HANDLE_HOVER_RADIUS_PX
         );
         const handleInItem = createHandleItem(scope, state.styles, point);
         const handleOutHalo = createHoverHaloItem(
           scope,
           state.styles,
           point,
-          HANDLE_RADIUS_PX + 3
+          HANDLE_HOVER_RADIUS_PX
         );
         const handleOutItem = createHandleItem(scope, state.styles, point);
 
@@ -636,7 +648,8 @@ export const createVectorPaperSession = ({
 
     state.paths.forEach((path, contourIndex) => {
       path.segments.forEach((segment, segmentIndex) => {
-        const sourceSegment = state.contours[contourIndex]?.segments[segmentIndex];
+        const sourceSegment =
+          state.contours[contourIndex]?.segments[segmentIndex];
 
         if (!sourceSegment) {
           return;
@@ -644,7 +657,10 @@ export const createVectorPaperSession = ({
 
         segment.point = projectPoint(state.matrix, sourceSegment.point);
         segment.handleIn = projectVector(state.matrix, sourceSegment.handleIn);
-        segment.handleOut = projectVector(state.matrix, sourceSegment.handleOut);
+        segment.handleOut = projectVector(
+          state.matrix,
+          sourceSegment.handleOut
+        );
 
         refreshSegmentChrome(
           segment,
@@ -802,7 +818,7 @@ export const createVectorPaperSession = ({
       return;
     }
 
-    let pinnedLocalPoint = localPoint;
+    const pinnedLocalPoint = localPoint;
 
     if (role === "anchor") {
       state.contours = mapTargetSegment(
@@ -842,7 +858,6 @@ export const createVectorPaperSession = ({
   const tool = new scope.Tool();
 
   tool.onMouseDown = (event) => {
-    const nativeEvent = event.event;
     const hit = getInteractiveHit(scope, event.point);
     const role = hit?.item?.data?.role;
     const { bodyHit, insertTarget } = getPathInteraction(event.point);
@@ -900,7 +915,10 @@ export const createVectorPaperSession = ({
       return;
     }
 
-    if (state.pendingPress?.type === "body" || state.pendingPress?.type === "insert") {
+    if (
+      state.pendingPress?.type === "body" ||
+      state.pendingPress?.type === "insert"
+    ) {
       state.pendingPress = null;
 
       if (event.event) {

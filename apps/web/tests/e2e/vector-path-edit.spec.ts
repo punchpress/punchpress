@@ -66,7 +66,7 @@ const loadVectorDocument = async (page) => {
   });
 };
 
-const getViewerScroll = async (page) => {
+const getViewerScroll = (page) => {
   return page.evaluate(() => {
     const viewer = window.__PUNCHPRESS_EDITOR__?.viewerRef;
 
@@ -98,7 +98,7 @@ const isCustomCursor = (cursor) => {
   return typeof cursor === "string" && cursor.includes("data:image/svg+xml");
 };
 
-const getVectorNodeDocument = async (page, nodeId = "vector-node") => {
+const getVectorNodeDocument = (page, nodeId = "vector-node") => {
   return page.evaluate((currentNodeId) => {
     const dump = window.__PUNCHPRESS_EDITOR__?.getDebugDump();
     const document = dump?.document?.serialized
@@ -188,11 +188,18 @@ const getVectorPathScreenPoint = (page, nodeId, distance = 0) => {
   );
 };
 
-const getVectorSegmentScreenPoint = (page, nodeId, segmentIndex, contourIndex = 0) => {
+const getVectorSegmentScreenPoint = (
+  page,
+  nodeId,
+  segmentIndex,
+  contourIndex = 0
+) => {
   return page.evaluate(
     ({ currentContourIndex, currentNodeId, currentSegmentIndex }) => {
       const dump = window.__PUNCHPRESS_EDITOR__?.getDebugDump();
-      const nodeSnapshot = dump?.nodes?.find((entry) => entry.id === currentNodeId);
+      const nodeSnapshot = dump?.nodes?.find(
+        (entry) => entry.id === currentNodeId
+      );
       const serializedDocument = dump?.document?.serialized
         ? JSON.parse(dump.document.serialized)
         : null;
@@ -200,8 +207,9 @@ const getVectorSegmentScreenPoint = (page, nodeId, segmentIndex, contourIndex = 
         (entry) => entry.id === currentNodeId
       );
       const localPoint =
-        vectorNode?.contours?.[currentContourIndex]?.segments?.[currentSegmentIndex]
-          ?.point;
+        vectorNode?.contours?.[currentContourIndex]?.segments?.[
+          currentSegmentIndex
+        ]?.point;
       const bbox = nodeSnapshot?.geometry?.bbox;
       const svg = document.querySelector(
         `.canvas-node[data-node-id="${currentNodeId}"] svg`
@@ -444,7 +452,11 @@ test("dragging one vector anchor does not shift untouched anchors", async ({
         "vector-node",
         2
       );
-      const bottomLeft = await getVectorSegmentScreenPoint(page, "vector-node", 3);
+      const bottomLeft = await getVectorSegmentScreenPoint(
+        page,
+        "vector-node",
+        3
+      );
 
       if (!(bottomRight && bottomLeft)) {
         return Number.POSITIVE_INFINITY;
@@ -921,6 +933,61 @@ test("shift-dragging a handle constrains its angle", async ({ page }) => {
         y: expect.closeTo(0, 1),
       },
     });
+});
+
+test("hovering a vector handle expands the hover halo beyond the idle handle", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadVectorDocument(page);
+
+  await clickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+
+  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
+  const rect = await node.boundingBox();
+
+  if (!rect) {
+    throw new Error("Missing visible vector node bounds");
+  }
+
+  const topRightPoint = {
+    x: rect.x + rect.width - 6,
+    y: rect.y + 6,
+  };
+
+  await page.mouse.click(topRightPoint.x, topRightPoint.y);
+  await pauseForUi(page);
+  await page.getByRole("button", { name: "Smooth" }).click();
+  await pauseForUi(page);
+
+  const segment = await getVectorSegmentDocument(page, 1);
+
+  if (!segment) {
+    throw new Error("Missing selected smooth vector segment");
+  }
+
+  const handleOutPoint = {
+    x: rect.x + segment.point.x + segment.handleOut.x,
+    y: rect.y + segment.point.y + segment.handleOut.y,
+  };
+  const haloProbePoint = {
+    x: handleOutPoint.x + 14,
+    y: handleOutPoint.y,
+  };
+
+  await expect
+    .poll(async () => (await getVectorPaperPixel(page, haloProbePoint))?.a || 0)
+    .toBe(0);
+
+  await page.mouse.move(handleOutPoint.x, handleOutPoint.y);
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => (await getVectorPaperPixel(page, haloProbePoint))?.a || 0)
+    .toBeGreaterThan(0);
 });
 
 test("deselecting a smooth point hides its visible handles", async ({
