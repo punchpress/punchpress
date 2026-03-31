@@ -34,6 +34,9 @@ test("uses a visible caret color in dark mode while editing text", async ({
         mixBlendMode: styles.mixBlendMode,
       };
     });
+  const inputCursor = await textInput.evaluate((element) => {
+    return window.getComputedStyle(element).cursor;
+  });
   const editingSelectionStyles = await page
     .locator(".canvas-edit-selection")
     .evaluate((element) => {
@@ -53,6 +56,7 @@ test("uses a visible caret color in dark mode while editing text", async ({
     backgroundColor: "rgb(255, 255, 255)",
     mixBlendMode: "difference",
   });
+  expect(inputCursor).toContain("data:image/svg+xml");
   expect(editingSelectionStyles).toEqual({
     borderTopWidth: "0px",
     outlineStyle: "solid",
@@ -60,9 +64,7 @@ test("uses a visible caret color in dark mode while editing text", async ({
   expect(inputBlendMode).toBe("normal");
 });
 
-test("uses the same caret blend source in light mode", async ({
-  page,
-}) => {
+test("uses the same caret blend source in light mode", async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem("punchpress-theme", "light");
   });

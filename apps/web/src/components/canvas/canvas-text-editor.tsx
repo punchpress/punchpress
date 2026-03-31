@@ -233,6 +233,7 @@ export const CanvasTextEditor = () => {
         style={{
           caretColor: "transparent",
           color: "transparent",
+          cursor: "var(--canvas-cursor-text)",
           fontFamily,
           fontSize: `${editingNode.fontSize}px`,
           letterSpacing: `${editingNode.tracking}px`,

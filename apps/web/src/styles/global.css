@@ -218,20 +218,24 @@ textarea,
   cursor: var(--canvas-cursor-grab);
 }
 
-[data-tool="text"] .canvas-surface {
-  cursor: crosshair;
-}
-
 [data-tool="text"] .canvas-node {
-  cursor: text;
+  cursor: var(--canvas-cursor-text);
 }
 
 .canvas-cursor-default {
   cursor: var(--canvas-cursor-default);
 }
 
+.canvas-cursor-add {
+  cursor: var(--canvas-cursor-add);
+}
+
 .canvas-cursor-pointer {
   cursor: var(--canvas-cursor-pointer);
+}
+
+.canvas-cursor-text {
+  cursor: var(--canvas-cursor-text);
 }
 
 [data-slot="color-picker"] {
@@ -281,9 +285,20 @@ textarea,
   cursor: var(--canvas-cursor-default);
 }
 
+.canvas-host[data-tool="shape"] .canvas-surface,
+.canvas-host[data-tool="pen"] .canvas-surface,
+.canvas-host[data-tool="text"] .canvas-surface {
+  cursor: var(--canvas-cursor-add);
+}
+
+.canvas-host[data-tool="shape"] .canvas-node,
+.canvas-host[data-tool="pen"] .canvas-node {
+  cursor: var(--canvas-cursor-add);
+}
+
 [data-tool="pen"] .canvas-surface,
 [data-tool="pen"] .canvas-node {
-  cursor: var(--canvas-cursor-pen-tool);
+  cursor: var(--canvas-cursor-add);
 }
 
 [data-canvas-cursor="text-path-slide"] {

@@ -5,6 +5,11 @@ import {
   waitForNodeReady,
 } from "./helpers/editor";
 
+const CURSOR_SVG_VALUE_PATTERN = /url\("data:image\/svg\+xml,([^"]+)"\)/;
+const CURSOR_SVG_WIDTH_PATTERN = /width="(\d+)"/;
+const CURSOR_SVG_HEIGHT_PATTERN = /height="(\d+)"/;
+const CURSOR_ROTATION_PATTERN = /rotate\((-?\d+(?:\.\d+)?) 12 12\)/;
+
 const getNodeCursor = (page, nodeId) => {
   return page.locator(`[data-node-id="${nodeId}"]`).evaluate((element) => {
     return window.getComputedStyle(element).cursor;
@@ -32,16 +37,7 @@ const getCanvasCursorSvg = (page, variableName) => {
       return null;
     }
 
-    const cursorValue = host.style.getPropertyValue(currentVariableName);
-    const cursorMatch = cursorValue.match(
-      /url\("data:image\/svg\+xml,([^"]+)"\)/
-    );
-
-    if (!cursorMatch) {
-      return null;
-    }
-
-    return decodeURIComponent(cursorMatch[1]);
+    return host.style.getPropertyValue(currentVariableName);
   }, variableName);
 };
 
@@ -50,7 +46,7 @@ const getCursorSvgFromValue = (cursor) => {
     return null;
   }
 
-  const cursorMatch = cursor.match(/url\("data:image\/svg\+xml,([^"]+)"\)/);
+  const cursorMatch = cursor.match(CURSOR_SVG_VALUE_PATTERN);
 
   if (!cursorMatch) {
     return null;
@@ -59,12 +55,30 @@ const getCursorSvgFromValue = (cursor) => {
   return decodeURIComponent(cursorMatch[1]);
 };
 
+const getCursorSvgSize = (svg) => {
+  if (typeof svg !== "string") {
+    return null;
+  }
+
+  const widthMatch = svg.match(CURSOR_SVG_WIDTH_PATTERN);
+  const heightMatch = svg.match(CURSOR_SVG_HEIGHT_PATTERN);
+
+  if (!(widthMatch && heightMatch)) {
+    return null;
+  }
+
+  return {
+    height: Number.parseInt(heightMatch[1] || "0", 10),
+    width: Number.parseInt(widthMatch[1] || "0", 10),
+  };
+};
+
 const getCursorRotationDegrees = (svg) => {
   if (typeof svg !== "string") {
     return 0;
   }
 
-  const rotationMatch = svg.match(/rotate\((-?\d+(?:\.\d+)?) 12 12\)/);
+  const rotationMatch = svg.match(CURSOR_ROTATION_PATTERN);
 
   return rotationMatch ? Number.parseFloat(rotationMatch[1] || "0") : 0;
 };
@@ -72,9 +86,7 @@ const getCursorRotationDegrees = (svg) => {
 const normalizeRotationDegrees = (rotationDegrees) => {
   const normalizedRotation = rotationDegrees % 360;
 
-  return normalizedRotation < 0
-    ? normalizedRotation + 360
-    : normalizedRotation;
+  return normalizedRotation < 0 ? normalizedRotation + 360 : normalizedRotation;
 };
 
 const getRotationDistance = (firstRotationDegrees, secondRotationDegrees) => {
@@ -104,15 +116,38 @@ test("uses contrasting fill and stroke colors for custom cursors", async ({
 }) => {
   await gotoEditor(page);
 
-  const defaultSvg = await getCanvasCursorSvg(page, "--canvas-cursor-default");
-  const moveSvg = await getCanvasCursorSvg(page, "--canvas-cursor-move");
-  const rotateSvg = await getCanvasCursorSvg(page, "--canvas-cursor-rotate");
-  const scaleSvg = await getCanvasCursorSvg(page, "--canvas-cursor-scale");
+  const addSvg = getCursorSvgFromValue(
+    await getCanvasCursorSvg(page, "--canvas-cursor-add")
+  );
+  const defaultSvg = getCursorSvgFromValue(
+    await getCanvasCursorSvg(page, "--canvas-cursor-default")
+  );
+  const moveSvg = getCursorSvgFromValue(
+    await getCanvasCursorSvg(page, "--canvas-cursor-move")
+  );
+  const rotateSvg = getCursorSvgFromValue(
+    await getCanvasCursorSvg(page, "--canvas-cursor-rotate")
+  );
+  const scaleSvg = getCursorSvgFromValue(
+    await getCanvasCursorSvg(page, "--canvas-cursor-scale")
+  );
+  const textSvg = getCursorSvgFromValue(
+    await getCanvasCursorSvg(page, "--canvas-cursor-text")
+  );
 
+  expect(addSvg).toContain('fill="#111111"');
+  expect(addSvg).toContain('flood-color="#ffffff"');
+  expect(addSvg).toContain("<feGaussianBlur");
   expect(defaultSvg).toContain('fill="#111111"');
   expect(defaultSvg).toContain('flood-color="#ffffff"');
   expect(defaultSvg).toContain("<feGaussianBlur");
   expect(defaultSvg).not.toContain('opacity="0.4"');
+  expect(getCursorSvgSize(defaultSvg)).toEqual({ width: 21, height: 21 });
+  expect(textSvg).toContain('fill="#111111"');
+  expect(textSvg).toContain('flood-color="#ffffff"');
+  expect(textSvg).toContain("<feGaussianBlur");
+  expect(textSvg).toEqual(expect.stringContaining('width="33"'));
+  expect(textSvg).toEqual(expect.stringContaining('height="33"'));
 
   expect(moveSvg).toContain('fill="#111111"');
   expect(moveSvg).toContain('stroke="#ffffff"');
@@ -125,6 +160,31 @@ test("uses contrasting fill and stroke colors for custom cursors", async ({
   expect(rotateSvg).toContain('fill="#111111"');
   expect(rotateSvg).toContain('flood-color="#ffffff"');
   expect(rotateSvg).toContain("<feGaussianBlur");
+});
+
+test("uses the add cursor on the canvas surface while placement tools are armed", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+
+  const addSvg = getCursorSvgFromValue(
+    await getCanvasCursorSvg(page, "--canvas-cursor-add")
+  );
+  const getSurfaceCursor = () => {
+    return page
+      .locator(".canvas-surface")
+      .evaluate((element) => window.getComputedStyle(element).cursor);
+  };
+
+  await page.keyboard.press("r");
+  await expect
+    .poll(async () => getCursorSvgFromValue(await getSurfaceCursor()))
+    .toBe(addSvg);
+
+  await page.keyboard.press("t");
+  await expect
+    .poll(async () => getCursorSvgFromValue(await getSurfaceCursor()))
+    .toBe(addSvg);
 });
 
 test("uses the move cursor for both unselected and selected node hover", async ({
@@ -422,7 +482,9 @@ test("keeps the rotate cursor locked while rotation is in progress", async ({
       const cursorRotationDegrees = getCursorRotationDegrees(svg);
       const nodeRotationDegrees = await getSelectedNodeRotation(page, nodeId);
 
-      return getRotationDistance(cursorRotationDegrees, nodeRotationDegrees) < 3;
+      return (
+        getRotationDistance(cursorRotationDegrees, nodeRotationDegrees) < 3
+      );
     })
     .toBe(true);
 
