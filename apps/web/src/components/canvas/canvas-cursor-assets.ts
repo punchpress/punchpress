@@ -1,3 +1,4 @@
+import type { IconSvgElement } from "@hugeicons/react";
 import {
   Cursor02Icon as Cursor02DuotoneIcon,
   CursorMove02Icon,
@@ -7,12 +8,13 @@ import {
   PenToolAddIcon,
 } from "@hugeicons-pro/core-duotone-rounded";
 import {
+  Add01Icon,
   ArrowDiagonalIcon,
   ArrowMoveLeftDownIcon,
   Cursor02Icon as Cursor02SolidIcon,
+  CursorTextIcon,
   ScrollHorizontalIcon,
 } from "@hugeicons-pro/core-solid-rounded";
-import type { IconSvgElement } from "@hugeicons/react";
 import type { CSSProperties } from "react";
 
 type CursorIconStyle =
@@ -66,7 +68,10 @@ const scaleCursorSize = (size: number) => {
   return Math.round(size * CURSOR_GLOBALS.sizeMultiplier);
 };
 
+const DEFAULT_CURSOR_SIZE = scaleCursorSize(17);
+const ADD_CURSOR_SIZE = scaleCursorSize(24);
 const BASE_CURSOR_SIZE = scaleCursorSize(19);
+const TEXT_CURSOR_SIZE = scaleCursorSize(26);
 const MOVE_CURSOR_SIZE = scaleCursorSize(25);
 const HAND_CURSOR_SIZE = scaleCursorSize(25);
 const ROTATE_CURSOR_SIZE = scaleCursorSize(23);
@@ -87,7 +92,23 @@ const CURSOR_CONFIGS = {
     rotateDegrees: 0,
     scale: 1,
     scaleOrigin: "center",
-    size: BASE_CURSOR_SIZE,
+    size: DEFAULT_CURSOR_SIZE,
+    strokeColor: "#ffffff",
+  },
+  add: {
+    fallback: "crosshair",
+    fillColor: "#111111",
+    hotspot: { x: 15, y: 15 },
+    icon: Add01Icon,
+    iconStyle: "solid-outline-blur",
+    outlineAlphaBoost: 3.4,
+    outlineColor: "#ffffff",
+    outlineScale: 0.72,
+    outlineWidth: 0,
+    rotateDegrees: 0,
+    scale: 0.9,
+    scaleOrigin: "center",
+    size: ADD_CURSOR_SIZE,
     strokeColor: "#ffffff",
   },
   grab: {
@@ -180,6 +201,22 @@ const CURSOR_CONFIGS = {
     size: BASE_CURSOR_SIZE,
     strokeColor: "#ffffff",
   },
+  text: {
+    fallback: "text",
+    fillColor: "#111111",
+    hotspot: { x: 15, y: 17 },
+    icon: CursorTextIcon,
+    iconStyle: "solid-outline-blur",
+    outlineAlphaBoost: 3.4,
+    outlineColor: "#ffffff",
+    outlineScale: 0.72,
+    outlineWidth: 0,
+    rotateDegrees: 0,
+    scale: 0.8,
+    scaleOrigin: "center",
+    size: TEXT_CURSOR_SIZE,
+    strokeColor: "#ffffff",
+  },
   pointer: {
     fallback: "pointer",
     fillColor: "#111111",
@@ -259,6 +296,7 @@ export const getCanvasRotateCursor = (rotationDegrees = 0) => {
 
 export const getCanvasCursorStyle = () =>
   ({
+    "--canvas-cursor-add": createCanvasCursorFromConfig(CURSOR_CONFIGS.add),
     "--canvas-cursor-default": createCanvasCursorFromConfig(
       CURSOR_CONFIGS.default
     ),
@@ -273,6 +311,7 @@ export const getCanvasCursorStyle = () =>
     "--canvas-cursor-pen-tool-add": createCanvasCursorFromConfig(
       CURSOR_CONFIGS.penToolAdd
     ),
+    "--canvas-cursor-text": createCanvasCursorFromConfig(CURSOR_CONFIGS.text),
     "--canvas-cursor-pointer": createCanvasCursorFromConfig(
       CURSOR_CONFIGS.pointer
     ),
@@ -281,7 +320,7 @@ export const getCanvasCursorStyle = () =>
     "--canvas-cursor-scroll-horizontal": createCanvasCursorFromConfig(
       CURSOR_CONFIGS.scrollHorizontal
     ),
-  } as CSSProperties);
+  }) as CSSProperties;
 
 function createCanvasCursorFactory(config: CursorConfig) {
   const cache = new Map<string, string>();
@@ -749,7 +788,5 @@ function resolveMoveDecoration(moveDecoration?: MoveDecorationConfig) {
 function normalizeRotationDegrees(rotationDegrees: number) {
   const normalizedRotation = rotationDegrees % 360;
 
-  return normalizedRotation < 0
-    ? normalizedRotation + 360
-    : normalizedRotation;
+  return normalizedRotation < 0 ? normalizedRotation + 360 : normalizedRotation;
 }
