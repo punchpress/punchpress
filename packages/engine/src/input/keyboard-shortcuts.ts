@@ -35,7 +35,28 @@ export const handleEditingShortcutKeyDown = (editor, event, key) => {
   return false;
 };
 
+const handleDeleteShortcutKeyDown = (editor, event, key) => {
+  if (key !== "backspace" && key !== "delete") {
+    return false;
+  }
+
+  event.preventDefault();
+
+  if (!editor.deleteVectorPoint()) {
+    editor.deleteSelected();
+  }
+
+  return true;
+};
+
 export const handleCanvasShortcutKeyDown = (editor, event, key) => {
+  const currentTool = editor.currentTool;
+  const toolOwnsEscape = Boolean(
+    key === "escape" &&
+      editor.activeTool === "pen" &&
+      currentTool?.hasActiveSession?.()
+  );
+
   if ((event.metaKey || event.ctrlKey) && !event.altKey && key === "g") {
     event.preventDefault();
 
@@ -52,7 +73,7 @@ export const handleCanvasShortcutKeyDown = (editor, event, key) => {
     return false;
   }
 
-  if (key === "escape" && editor.pathEditingNodeId) {
+  if (key === "escape" && editor.pathEditingNodeId && !toolOwnsEscape) {
     event.preventDefault();
     editor.stopPathEditing();
     return true;
@@ -84,13 +105,7 @@ export const handleCanvasShortcutKeyDown = (editor, event, key) => {
     return true;
   }
 
-  if (key === "backspace" || key === "delete") {
-    event.preventDefault();
-    editor.deleteSelected();
-    return true;
-  }
-
-  return false;
+  return handleDeleteShortcutKeyDown(editor, event, key);
 };
 
 export const handleWindowKeyDown = (editor, event) => {

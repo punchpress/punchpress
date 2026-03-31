@@ -41,6 +41,22 @@ const invertHandle = (handle: VectorHandleDocument) => {
   };
 };
 
+const cloneHandle = (handle: VectorHandleDocument) => {
+  return {
+    x: handle.x,
+    y: handle.y,
+  };
+};
+
+const cloneSegment = (segment: VectorContourDocument["segments"][number]) => {
+  return {
+    ...segment,
+    handleIn: cloneHandle(segment.handleIn),
+    handleOut: cloneHandle(segment.handleOut),
+    point: cloneHandle(segment.point),
+  };
+};
+
 const constrainHandleAngle = (handle: VectorHandleDocument) => {
   const length = getHandleLength(handle);
 
@@ -89,7 +105,10 @@ const getDefaultSmoothHandleLength = (
     return 24;
   }
 
-  const distances = [getNeighborPoint(contour, segmentIndex, -1), getNeighborPoint(contour, segmentIndex, 1)]
+  const distances = [
+    getNeighborPoint(contour, segmentIndex, -1),
+    getNeighborPoint(contour, segmentIndex, 1),
+  ]
     .filter(Boolean)
     .map((point) => {
       return Math.hypot(point.x - segment.point.x, point.y - segment.point.y);
@@ -287,4 +306,57 @@ export const updateVectorPointHandle = (
       [oppositeRole]: scaleHandle(invertHandle(axis), oppositeLength),
     };
   });
+};
+
+export const deleteVectorPoint = (
+  contours: VectorContourDocument[],
+  target: {
+    contourIndex: number;
+    segmentIndex: number;
+  }
+) => {
+  const contour = contours[target.contourIndex];
+
+  if (!contour?.segments[target.segmentIndex]) {
+    return {
+      contours,
+      selectedPoint: null,
+    };
+  }
+
+  const nextSegments = contour.segments
+    .filter((_, segmentIndex) => {
+      return segmentIndex !== target.segmentIndex;
+    })
+    .map(cloneSegment);
+  const nextContours = contours.flatMap((currentContour, contourIndex) => {
+    if (contourIndex !== target.contourIndex) {
+      return [currentContour];
+    }
+
+    if (nextSegments.length === 0) {
+      return [];
+    }
+
+    return [
+      {
+        ...currentContour,
+        segments: nextSegments,
+      },
+    ];
+  });
+
+  return {
+    contours: nextContours,
+    selectedPoint:
+      nextSegments.length > 0
+        ? {
+            contourIndex: target.contourIndex,
+            segmentIndex: Math.min(
+              target.segmentIndex,
+              nextSegments.length - 1
+            ),
+          }
+        : null,
+  };
 };

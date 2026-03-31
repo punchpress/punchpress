@@ -22,19 +22,20 @@ import {
   bringToFront as bringEditorToFront,
   deleteNode as deleteEditorNode,
   deleteSelected as deleteEditorSelected,
+  deleteVectorPoint as deleteEditorVectorPoint,
   duplicate as duplicateEditorNodes,
   groupSelected as groupEditorSelected,
+  insertVectorPoint as insertEditorVectorPoint,
   renameGroup as renameEditorGroup,
   sendToBack as sendEditorToBack,
   setNodeOrder as setEditorNodeOrder,
+  setVectorPointType as setEditorVectorPointType,
   toggleVisibility as toggleEditorVisibility,
   ungroup as ungroupEditorNodes,
   updateNode as updateEditorNode,
   updateNodes as updateEditorNodes,
   updateSelectedNode as updateEditorSelectedNode,
   updateVectorContours as updateEditorVectorContours,
-  insertVectorPoint as insertEditorVectorPoint,
-  setVectorPointType as setEditorVectorPointType,
 } from "./document/node-actions";
 import {
   addShapeNode as addEditorShapeNode,
@@ -617,6 +618,14 @@ export class Editor {
     return this.interactionPreviewRevision;
   }
 
+  getPenPreviewState() {
+    return this.tools.get("pen")?.getPreviewState?.() || null;
+  }
+
+  getPenHoverState() {
+    return this.tools.get("pen")?.getHoverState?.() || null;
+  }
+
   getSelectionFrameKey(nodeIds = this.selectedNodeIds) {
     return getEditorSelectionFrameKey(this, nodeIds);
   }
@@ -703,12 +712,31 @@ export class Editor {
     deleteEditorSelected(this);
   }
 
+  deleteVectorPoint(
+    nodeId = this.pathEditingNodeId,
+    point = this.pathEditingPoint
+  ) {
+    if (!(nodeId && point)) {
+      return false;
+    }
+
+    return deleteEditorVectorPoint(this, nodeId, point);
+  }
+
   deleteNode(nodeId) {
     deleteEditorNode(this, nodeId);
   }
 
   dispatchCanvasPointerDown(info) {
     return this.currentTool.onCanvasPointerDown(info);
+  }
+
+  dispatchCanvasPointerLeave(info) {
+    return this.currentTool.onCanvasPointerLeave(info);
+  }
+
+  dispatchCanvasPointerMove(info) {
+    return this.currentTool.onCanvasPointerMove(info);
   }
 
   dispatchNodePointerDown(info) {
@@ -890,12 +918,16 @@ export class Editor {
     }
 
     return (
-      node.contours[point.contourIndex]?.segments[point.segmentIndex]?.pointType ||
-      null
+      node.contours[point.contourIndex]?.segments[point.segmentIndex]
+        ?.pointType || null
     );
   }
 
-  setVectorPointType(pointType, nodeId = this.pathEditingNodeId, point = this.pathEditingPoint) {
+  setVectorPointType(
+    pointType,
+    nodeId = this.pathEditingNodeId,
+    point = this.pathEditingPoint
+  ) {
     if (!(nodeId && point)) {
       return false;
     }

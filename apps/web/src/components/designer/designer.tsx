@@ -201,7 +201,7 @@ export const DesignerFloatingToolbar = ({ children, className, ...props }) => {
   return (
     <div
       className={cn(
-        "absolute bottom-4 left-1/2 z-[9] -translate-x-1/2",
+        "absolute bottom-4 left-1/2 z-[25] -translate-x-1/2",
         className
       )}
       {...props}

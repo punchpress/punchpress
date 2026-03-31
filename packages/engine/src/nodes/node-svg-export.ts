@@ -43,7 +43,7 @@ const buildSvgPathMarkup = (node, path) => {
 
   return `<path d="${path.d}"${transform}${fillRule} fill="${fill}" stroke="${stroke}" stroke-width="${format(
     node.strokeWidth
-  )}" paint-order="stroke fill" stroke-linejoin="round" stroke-linecap="round"/>`;
+  )}" paint-order="fill stroke" stroke-linejoin="round" stroke-linecap="round"/>`;
 };
 
 export const buildSvgExport = (nodes, geometryById) => {

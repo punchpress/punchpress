@@ -168,6 +168,12 @@
   --code: var(--color-white);
   --code-foreground: var(--foreground);
   --code-highlight: --alpha(var(--color-black) / 4%);
+  --canvas-handle-accent: #165dfc;
+  --canvas-handle-accent-soft: color-mix(
+    in srgb,
+    var(--canvas-handle-accent) 72%,
+    black
+  );
   --canvas-transform-box-lines: oklch(0.92 0 0);
   --canvas-transform-box-handles: oklch(0.85 0 0);
   --canvas-transform-box-handles-border: oklch(0.75 0 0);
@@ -253,6 +259,10 @@ textarea,
   cursor: var(--canvas-cursor-default);
 }
 
+.canvas-host .canvas-node {
+  cursor: var(--canvas-cursor-default);
+}
+
 .canvas-cursor-move {
   cursor: var(--canvas-cursor-move);
 }
@@ -286,19 +296,30 @@ textarea,
 }
 
 .canvas-host[data-tool="shape"] .canvas-surface,
-.canvas-host[data-tool="pen"] .canvas-surface,
 .canvas-host[data-tool="text"] .canvas-surface {
   cursor: var(--canvas-cursor-add);
 }
 
-.canvas-host[data-tool="shape"] .canvas-node,
-.canvas-host[data-tool="pen"] .canvas-node {
+.canvas-host[data-tool="shape"] .canvas-node {
   cursor: var(--canvas-cursor-add);
 }
 
 [data-tool="pen"] .canvas-surface,
-[data-tool="pen"] .canvas-node {
-  cursor: var(--canvas-cursor-add);
+[data-tool="pen"] .canvas-node,
+[data-tool="pen"] .canvas-node * {
+  cursor: var(--canvas-cursor-pen-tool) !important;
+}
+
+[data-tool="pen"][data-pen-hover-intent="delete"] .canvas-surface,
+[data-tool="pen"][data-pen-hover-intent="delete"] .canvas-node,
+[data-tool="pen"][data-pen-hover-intent="delete"] .canvas-node * {
+  cursor: var(--canvas-cursor-pen-tool-minus) !important;
+}
+
+[data-tool="pen"][data-pen-hover-intent="add"] .canvas-surface,
+[data-tool="pen"][data-pen-hover-intent="add"] .canvas-node,
+[data-tool="pen"][data-pen-hover-intent="add"] .canvas-node * {
+  cursor: var(--canvas-cursor-pen-tool-add) !important;
 }
 
 [data-canvas-cursor="text-path-slide"] {
@@ -310,7 +331,7 @@ textarea,
 }
 
 [data-canvas-cursor="vector-path-body"] {
-  cursor: var(--canvas-cursor-move);
+  cursor: var(--canvas-cursor-default);
 }
 
 [data-canvas-cursor="vector-path-insert"] {
@@ -318,7 +339,7 @@ textarea,
 }
 
 [data-canvas-cursor="vector-path-point"] {
-  cursor: var(--canvas-cursor-move);
+  cursor: var(--canvas-cursor-default);
 }
 
 [data-active-canvas-cursor="text-path-slide"],
@@ -338,12 +359,12 @@ textarea,
 
 [data-active-canvas-cursor="vector-path-body-active"],
 [data-active-canvas-cursor="vector-path-body-active"] * {
-  cursor: var(--canvas-cursor-move) !important;
+  cursor: var(--canvas-cursor-default) !important;
 }
 
 [data-active-canvas-cursor="vector-path-point-active"],
 [data-active-canvas-cursor="vector-path-point-active"] * {
-  cursor: var(--canvas-cursor-move) !important;
+  cursor: var(--canvas-cursor-default) !important;
 }
 
 body[data-active-transform-cursor="true"],

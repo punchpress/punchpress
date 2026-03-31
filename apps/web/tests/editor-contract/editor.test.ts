@@ -491,7 +491,7 @@ describe("Editor text editing mode", () => {
     });
   });
 
-  test("switches back to the pointer tool when placing a vector node with the pen tool", () => {
+  test("keeps the pen tool active while starting a vector path", () => {
     const editor = new Editor();
 
     editor.setActiveTool("pen");
@@ -506,7 +506,7 @@ describe("Editor text editing mode", () => {
       point: { x: 420, y: 180 },
     });
 
-    expect(editor.activeTool).toBe("pointer");
+    expect(editor.activeTool).toBe("pen");
     expect(editor.editingNodeId).toBeNull();
     expect(editor.selectedNodeIds).toEqual([editor.selectedNodeId]);
     expect(editor.getNode(editor.selectedNodeId)).toMatchObject({
@@ -516,6 +516,7 @@ describe("Editor text editing mode", () => {
       x: 420,
       y: 180,
     });
+    expect(editor.pathEditingNodeId).toBe(editor.selectedNodeId);
   });
 
   test("places a default vector with corner anchor points", () => {
