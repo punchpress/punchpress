@@ -43,6 +43,7 @@ const GUIDE_STROKE_WIDTH_PX = 1.5;
 const HANDLE_LINE_STROKE_WIDTH_PX = 1.25;
 const HANDLE_RADIUS_PX = 6;
 const PREVIEW_DASH_ARRAY = [8, 6];
+const HANDLE_HOVER_RADIUS_PX = HANDLE_RADIUS_PX + 5;
 const SELECTED_ANCHOR_SCALE = 1.2;
 const HIT_TEST_OPTIONS = {
   fill: true,
@@ -829,14 +830,14 @@ export const createVectorPaperSession = ({
           scope,
           state.styles,
           point,
-          HANDLE_RADIUS_PX + 3
+          HANDLE_HOVER_RADIUS_PX
         );
         const handleInItem = createHandleItem(scope, state.styles, point);
         const handleOutHalo = createHoverHaloItem(
           scope,
           state.styles,
           point,
-          HANDLE_RADIUS_PX + 3
+          HANDLE_HOVER_RADIUS_PX
         );
         const handleOutItem = createHandleItem(scope, state.styles, point);
 

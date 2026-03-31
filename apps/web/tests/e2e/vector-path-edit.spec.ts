@@ -131,7 +131,6 @@ const loadOpenVectorDocument = async (page) => {
     return true;
   });
 };
-
 const getViewerScroll = (page) => {
   return page.evaluate(() => {
     const viewer = window.__PUNCHPRESS_EDITOR__?.viewerRef;
@@ -1879,6 +1878,61 @@ test("shift-dragging a handle constrains its angle", async ({ page }) => {
         y: expect.closeTo(0, 1),
       },
     });
+});
+
+test("hovering a vector handle expands the hover halo beyond the idle handle", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadVectorDocument(page);
+
+  await clickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+
+  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
+  const rect = await node.boundingBox();
+
+  if (!rect) {
+    throw new Error("Missing visible vector node bounds");
+  }
+
+  const topRightPoint = {
+    x: rect.x + rect.width - 6,
+    y: rect.y + 6,
+  };
+
+  await page.mouse.click(topRightPoint.x, topRightPoint.y);
+  await pauseForUi(page);
+  await page.getByRole("button", { name: "Smooth" }).click();
+  await pauseForUi(page);
+
+  const segment = await getVectorSegmentDocument(page, 1);
+
+  if (!segment) {
+    throw new Error("Missing selected smooth vector segment");
+  }
+
+  const handleOutPoint = {
+    x: rect.x + segment.point.x + segment.handleOut.x,
+    y: rect.y + segment.point.y + segment.handleOut.y,
+  };
+  const haloProbePoint = {
+    x: handleOutPoint.x + 14,
+    y: handleOutPoint.y,
+  };
+
+  await expect
+    .poll(async () => (await getVectorPaperPixel(page, haloProbePoint))?.a || 0)
+    .toBe(0);
+
+  await page.mouse.move(handleOutPoint.x, handleOutPoint.y);
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => (await getVectorPaperPixel(page, haloProbePoint))?.a || 0)
+    .toBeGreaterThan(0);
 });
 
 test("deselecting a smooth point hides its visible handles", async ({
