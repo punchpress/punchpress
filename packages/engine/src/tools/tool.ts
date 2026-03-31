@@ -37,8 +37,36 @@ export class Tool {
     this.editor = editor;
   }
 
+  getPreviewState() {
+    return null;
+  }
+
+  getHoverState() {
+    return null;
+  }
+
+  hasActiveSession() {
+    return false;
+  }
+
   onCanvasPointerDown() {
     return null;
+  }
+
+  onCanvasPointerLeave() {
+    return false;
+  }
+
+  onCanvasPointerMove() {
+    return false;
+  }
+
+  onActivate() {
+    return false;
+  }
+
+  onDeactivate() {
+    return false;
   }
 
   onNodePointerDown({ node, ...info }) {

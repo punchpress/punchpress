@@ -6,6 +6,7 @@ import { useEditorValue } from "../../editor-react/use-editor-value";
 import { usePerformanceRenderCounter } from "../../performance/use-performance-render-counter";
 import { openCanvasNodeEditingMode } from "./canvas-node-editing";
 import { startCanvasToolPlacementSession } from "./canvas-tool-placement-session";
+import { getVectorPathPaintOrder } from "./vector-paint-order";
 
 const getCanvasPoint = (editor, clientX, clientY) => {
   const viewer = editor.viewerRef;
@@ -175,9 +176,7 @@ const CanvasNodeComponent = ({ nodeId }) => {
     return null;
   }
 
-  const isNodeDraggable =
-    activeTool === "pointer" && !spacePressed && editor.editingNodeId === null;
-  let cursorClassName = "canvas-cursor-default";
+  const cursorClassName = "canvas-cursor-default";
 
   return (
     <button
@@ -325,7 +324,7 @@ const CanvasNodeArt = memo(
                 fillRule={fillRule}
                 key={path.key || `${path.transform || "shape"}-${path.d}`}
                 opacity={isEditing ? 0 : 1}
-                paintOrder="stroke fill"
+                paintOrder={getVectorPathPaintOrder()}
                 pointerEvents="none"
                 stroke={stroke}
                 strokeLinecap="round"

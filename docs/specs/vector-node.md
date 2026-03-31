@@ -81,8 +81,10 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 - Hovering an insertable segment should use pen-style insertion cursor language rather than a generic crosshair when PunchPress exposes a pen cursor asset.
 - Clicking an insertable segment should add a point at that location and select it immediately.
 - Path editing should support deleting selected points without destroying the whole path.
+- While path editing is active and one anchor is selected, `Delete` or `Backspace` should delete that anchor before falling back to whole-object deletion behavior.
 - Path editing should support cutting or splitting a path at a selected point or segment.
 - Path editing should support joining compatible open endpoints.
+- Dragging an open endpoint onto the opposite endpoint of the same contour in path edit mode should snap and close the contour.
 - Path editing should support closing an open path through explicit intent with clear feedback when the user is targeting the starting anchor.
 - Path editing should support reopening or breaking a closed contour at a chosen point later.
 - Joining endpoints should preserve the path as editable vector source geometry and should follow Illustrator-style expectations for corner joins by default.
@@ -94,6 +96,8 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 - While the Pen tool is active, the canvas placement cursor should use pen-style cursor language rather than a generic crosshair.
 - Click-dragging should place a point and immediately author its direction handles.
 - Continuing from a smooth point should preserve expected tangent behavior.
+- While the Pen tool hovers a non-endpoint anchor on an editable path, it may expose delete-anchor behavior, but open endpoints should continue to prioritize continue-path and close-path intent.
+- While the Pen tool hovers an insertable segment on an editable path, it should expose add-anchor behavior without forcing a switch back to the pointer tool.
 - Esc should end the current drawing gesture without exiting the broader vector editing mode unexpectedly.
 - Enter or an equivalent explicit confirm gesture may finish the current path.
 - The Pen workflow should support continuing an open path from either valid endpoint.
@@ -118,6 +122,9 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 
 - Fill and stroke styling should remain attached to the vector node, not to temporary editing UI.
 - Changing fill, stroke, stroke width, or fill rule should not reduce editability of the path.
+- A vector node should eventually support stroke alignment controls such as `Inner`, `Center`, and `Outer` where that behavior is meaningful.
+- `Center` stroke alignment should remain the baseline default unless the user explicitly chooses a different alignment mode later.
+- `Inner` and `Outer` stroke alignment should feel consistent with Illustrator-style expectations for closed vector shapes.
 - Object resize should scale vector stroke visually with the rest of the object by default.
 - This Illustrator-style default should be treated as the baseline vector behavior for PunchPress unless a future control explicitly opts a node into a different stroke-scaling mode.
 - Future controls may allow users to opt into non-scaling stroke behavior when a design calls for it.

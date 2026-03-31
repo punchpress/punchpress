@@ -4,8 +4,6 @@ import {
   CursorMove02Icon,
   CursorPointer01Icon,
   HandGrabIcon,
-  PenTool03Icon,
-  PenToolAddIcon,
 } from "@hugeicons-pro/core-duotone-rounded";
 import {
   Add01Icon,
@@ -13,6 +11,9 @@ import {
   ArrowMoveLeftDownIcon,
   Cursor02Icon as Cursor02SolidIcon,
   CursorTextIcon,
+  PenTool03Icon,
+  PenToolAddIcon,
+  PenToolMinusIcon,
   ScrollHorizontalIcon,
 } from "@hugeicons-pro/core-solid-rounded";
 import type { CSSProperties } from "react";
@@ -174,10 +175,10 @@ const CURSOR_CONFIGS = {
     fillColor: "#111111",
     hotspot: { x: 6, y: 20 },
     icon: PenTool03Icon,
-    iconStyle: "duotone",
-    outlineAlphaBoost: 1,
+    iconStyle: "solid-outline-blur",
+    outlineAlphaBoost: 3.4,
     outlineColor: "#ffffff",
-    outlineScale: 1,
+    outlineScale: 0.72,
     outlineWidth: 0,
     rotateDegrees: 0,
     scale: 1,
@@ -190,10 +191,26 @@ const CURSOR_CONFIGS = {
     fillColor: "#111111",
     hotspot: { x: 6, y: 21 },
     icon: PenToolAddIcon,
-    iconStyle: "duotone",
-    outlineAlphaBoost: 1,
+    iconStyle: "solid-outline-blur",
+    outlineAlphaBoost: 3.4,
     outlineColor: "#ffffff",
-    outlineScale: 1,
+    outlineScale: 0.72,
+    outlineWidth: 0,
+    rotateDegrees: 0,
+    scale: 1,
+    scaleOrigin: "center",
+    size: BASE_CURSOR_SIZE,
+    strokeColor: "#ffffff",
+  },
+  penToolMinus: {
+    fallback: "crosshair",
+    fillColor: "#111111",
+    hotspot: { x: 6, y: 21 },
+    icon: PenToolMinusIcon,
+    iconStyle: "solid-outline-blur",
+    outlineAlphaBoost: 3.4,
+    outlineColor: "#ffffff",
+    outlineScale: 0.72,
     outlineWidth: 0,
     rotateDegrees: 0,
     scale: 1,
@@ -310,6 +327,9 @@ export const getCanvasCursorStyle = () =>
     ),
     "--canvas-cursor-pen-tool-add": createCanvasCursorFromConfig(
       CURSOR_CONFIGS.penToolAdd
+    ),
+    "--canvas-cursor-pen-tool-minus": createCanvasCursorFromConfig(
+      CURSOR_CONFIGS.penToolMinus
     ),
     "--canvas-cursor-text": createCanvasCursorFromConfig(CURSOR_CONFIGS.text),
     "--canvas-cursor-pointer": createCanvasCursorFromConfig(

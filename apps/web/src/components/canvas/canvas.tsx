@@ -30,6 +30,26 @@ const getCanvasPoint = (viewer, host, clientX, clientY, zoom) => {
   };
 };
 
+const syncHostPenHoverIntent = (host, activeTool, editor) => {
+  if (!(host instanceof HTMLElement)) {
+    return;
+  }
+
+  if (activeTool !== "pen") {
+    delete host.dataset.penHoverIntent;
+    return;
+  }
+
+  const nextIntent = editor.getPenHoverState()?.intent;
+
+  if (nextIntent) {
+    host.dataset.penHoverIntent = nextIntent;
+    return;
+  }
+
+  delete host.dataset.penHoverIntent;
+};
+
 export const Canvas = () => {
   const editor = useEditor();
   useTheme();
@@ -65,6 +85,10 @@ export const Canvas = () => {
       editor.hostRef = null;
     };
   }, [editor]);
+
+  useEffect(() => {
+    syncHostPenHoverIntent(hostRef.current, activeTool, editor);
+  }, [activeTool, editor]);
 
   const handleScroll = useCallback(
     (event) => {
@@ -144,6 +168,54 @@ export const Canvas = () => {
           },
         }),
       });
+      syncHostPenHoverIntent(hostRef.current, activeTool, editor);
+    },
+    [activeTool, editor, spacePressed, zoom]
+  );
+  const handleCanvasPointerLeave = useCallback(() => {
+    if (activeTool !== "pen") {
+      return;
+    }
+
+    editor.dispatchCanvasPointerLeave({});
+    syncHostPenHoverIntent(hostRef.current, activeTool, editor);
+  }, [activeTool, editor]);
+  const handleCanvasPointerMove = useCallback(
+    (event) => {
+      if (spacePressed || activeTool !== "pen" || event.buttons !== 0) {
+        return;
+      }
+
+      if (!(event.target instanceof Element)) {
+        editor.dispatchCanvasPointerLeave({ event });
+        return;
+      }
+
+      if (
+        !event.target.closest(
+          [".canvas-surface", ".canvas-node", ".canvas-vector-paper"].join(",")
+        )
+      ) {
+        editor.dispatchCanvasPointerLeave({ event });
+        return;
+      }
+
+      const point = getCanvasPoint(
+        viewerRef.current,
+        hostRef.current,
+        event.clientX,
+        event.clientY,
+        zoom
+      );
+
+      editor.dispatchCanvasPointerMove({
+        event,
+        point: {
+          x: round(point.x, 2),
+          y: round(point.y, 2),
+        },
+      });
+      syncHostPenHoverIntent(hostRef.current, activeTool, editor);
     },
     [activeTool, editor, spacePressed, zoom]
   );
@@ -157,6 +229,8 @@ export const Canvas = () => {
         }
         data-tool={activeTool}
         onPointerDownCapture={handleCanvasPointerDown}
+        onPointerLeave={handleCanvasPointerLeave}
+        onPointerMoveCapture={handleCanvasPointerMove}
         onWheelCapture={handleCanvasWheel}
         ref={hostRef}
         style={getCanvasCursorStyle()}

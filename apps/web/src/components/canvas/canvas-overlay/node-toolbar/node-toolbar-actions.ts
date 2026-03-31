@@ -24,13 +24,31 @@ const getPathEditingToolbarActions = (editor, state) => {
   ) {
     actions.unshift(
       {
+        id: "delete-point",
+        isActive: false,
+        label: "Delete point",
+        shortcutLabel: "Del",
+        title: "Delete point (Delete)",
+        variant: "ghost",
+        onSelect: () => {
+          editor.deleteVectorPoint(
+            state.selectedNode.id,
+            state.selectedPathPoint
+          );
+        },
+      },
+      {
         id: "set-point-corner",
         isActive: state.selectedPointType === "corner",
         label: "Corner",
         title: "Convert point to corner",
         variant: state.selectedPointType === "corner" ? "secondary" : "ghost",
         onSelect: () => {
-          editor.setVectorPointType("corner", state.selectedNode.id, state.selectedPathPoint);
+          editor.setVectorPointType(
+            "corner",
+            state.selectedNode.id,
+            state.selectedPathPoint
+          );
         },
       },
       {
@@ -40,7 +58,11 @@ const getPathEditingToolbarActions = (editor, state) => {
         title: "Convert point to smooth",
         variant: state.selectedPointType === "smooth" ? "secondary" : "ghost",
         onSelect: () => {
-          editor.setVectorPointType("smooth", state.selectedNode.id, state.selectedPathPoint);
+          editor.setVectorPointType(
+            "smooth",
+            state.selectedNode.id,
+            state.selectedPathPoint
+          );
         },
       }
     );
@@ -50,7 +72,7 @@ const getPathEditingToolbarActions = (editor, state) => {
 };
 
 const getSharedToolbarActions = (editor, state) => {
-  if (state.visibleSelectedNodeIds.length === 0) {
+  if (state.visibleSelectedNodeIds.length === 0 || state.selectedPathPoint) {
     return [];
   }
 

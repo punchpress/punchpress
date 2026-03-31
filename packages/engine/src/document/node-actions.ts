@@ -1,9 +1,12 @@
 import { duplicateClipboardContent } from "../clipboard/clipboard-actions";
+import { finishEditingIfNeeded } from "../editing/editing-actions";
+import {
+  deleteVectorPoint as deleteVectorPointOnContours,
+  setVectorPointType as setVectorPointTypeOnContours,
+} from "../nodes/vector/point-edit";
+import { insertVectorPoint as insertVectorPointOnContours } from "../nodes/vector/point-insert";
 import { buildVectorNodeGeometry } from "../nodes/vector/vector-engine";
 import { getNodeTransformForPinnedWorldPoint } from "../primitives/rotation";
-import { insertVectorPoint as insertVectorPointOnContours } from "../nodes/vector/point-insert";
-import { setVectorPointType as setVectorPointTypeOnContours } from "../nodes/vector/point-edit";
-import { finishEditingIfNeeded } from "../editing/editing-actions";
 import { isSelected } from "../selection/selection-actions";
 
 export const deleteSelected = (editor) => {
@@ -235,12 +238,7 @@ export const bringToFront = (editor, nodeId) => {
   });
 };
 
-export const setVectorPointType = (
-  editor,
-  nodeId,
-  point,
-  pointType
-) => {
+export const setVectorPointType = (editor, nodeId, point, pointType) => {
   const node = editor.getNode(nodeId);
 
   if (!(node?.type === "vector" && point)) {
@@ -267,11 +265,7 @@ export const setVectorPointType = (
   return true;
 };
 
-export const insertVectorPoint = (
-  editor,
-  nodeId,
-  target
-) => {
+export const insertVectorPoint = (editor, nodeId, target) => {
   const node = editor.getNode(nodeId);
 
   if (!(node?.type === "vector" && target)) {
@@ -293,6 +287,40 @@ export const insertVectorPoint = (
       contourIndex: target.contourIndex,
       segmentIndex: target.segmentIndex,
     });
+  });
+
+  return true;
+};
+
+export const deleteVectorPoint = (editor, nodeId, point) => {
+  const node = editor.getNode(nodeId);
+
+  if (!(node?.type === "vector" && point)) {
+    return false;
+  }
+
+  const result = deleteVectorPointOnContours(node.contours, {
+    contourIndex: point.contourIndex,
+    segmentIndex: point.segmentIndex,
+  });
+
+  editor.run(() => {
+    if (result.contours.length === 0) {
+      editor.getState().deleteNodeById(nodeId);
+      return;
+    }
+
+    editor.getState().updateNodeById(nodeId, (currentNode) => {
+      if (currentNode.type !== "vector") {
+        return currentNode;
+      }
+
+      return {
+        ...currentNode,
+        contours: result.contours,
+      };
+    });
+    editor.getState().setPathEditingPoint(result.selectedPoint);
   });
 
   return true;

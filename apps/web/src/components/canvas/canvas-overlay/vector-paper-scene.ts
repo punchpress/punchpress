@@ -11,15 +11,38 @@ import {
   setCanvasCursorToken,
 } from "../canvas-cursor-policy";
 import {
+  closeVectorContourByDraggingEndpoint,
+  getVectorDraggedEndpointPreviewPoint,
+  getVectorEndpointCloseTarget,
+  shouldSnapVectorEndpointClose,
+} from "./vector-endpoint-close";
+import { getVectorBezierHandleAppearance } from "./vector-handle-appearance";
+import {
+  getVectorAnchorHoverHaloRadiusPx,
+  getVectorHoverHaloFillAlpha,
+  getVectorHoverHaloStrokeWidthPx,
+} from "./vector-hover-halo";
+import {
   createLocalContourPath,
   findVectorPathInsertTarget,
   splitVectorContourAtOffset,
 } from "./vector-paper-point-insert";
+import {
+  getPenPreviewEndpoint,
+  getPenPreviewHandleAppearance,
+  getPenPreviewHandleIn,
+  getPenPreviewHandleOut,
+  type PenPreviewState,
+  shouldShowPenPreviewGhostAnchor,
+  shouldShowPenPreviewHandles,
+} from "./vector-pen-preview";
 
 const ANCHOR_RADIUS_PX = 6;
+const ENDPOINT_CLOSE_SNAP_DISTANCE_PX = 14;
 const GUIDE_STROKE_WIDTH_PX = 1.5;
 const HANDLE_LINE_STROKE_WIDTH_PX = 1.25;
 const HANDLE_RADIUS_PX = 6;
+const PREVIEW_DASH_ARRAY = [8, 6];
 const SELECTED_ANCHOR_SCALE = 1.2;
 const HIT_TEST_OPTIONS = {
   fill: true,
@@ -27,7 +50,7 @@ const HIT_TEST_OPTIONS = {
   tolerance: 10,
 };
 
-type VectorSegmentChrome = {
+interface VectorSegmentChrome {
   anchor: paper.Path.Circle;
   anchorHalo: paper.Path.Circle;
   handleIn: paper.Path.Circle;
@@ -36,15 +59,20 @@ type VectorSegmentChrome = {
   handleOut: paper.Path.Circle;
   handleOutHalo: paper.Path.Circle;
   handleOutLine: paper.Path;
-};
+}
 
-type HoveredPoint =
-  | {
-      contourIndex: number;
-      role: "anchor" | "handle-in" | "handle-out";
-      segmentIndex: number;
-    }
-  | null;
+type HoveredPoint = {
+  contourIndex: number;
+  role: "anchor" | "handle-in" | "handle-out";
+  segmentIndex: number;
+} | null;
+
+type PenHoverTarget = {
+  contourIndex: number;
+  intent: "add" | "close" | "continue" | "delete";
+  role: "anchor" | "segment";
+  segmentIndex: number;
+} | null;
 
 type PendingPress =
   | {
@@ -63,6 +91,13 @@ type PendingPress =
       type: "body";
     };
 
+type EndpointCloseTarget = {
+  contourIndex: number;
+  point: { x: number; y: number };
+  role: "anchor";
+  segmentIndex: number;
+} | null;
+
 const roundDelta = (value) => Math.round(value * 100) / 100;
 
 const resolveCssColor = (canvas, value, fallback) => {
@@ -78,8 +113,8 @@ const getSceneStyles = (scope) => {
   const canvas = scope.view.element;
   const accent = resolveCssColor(
     canvas,
-    "color-mix(in srgb, var(--editor-accent) 72%, white 8%)",
-    "rgb(86 145 224)"
+    "var(--canvas-handle-accent)",
+    "#165DFC"
   );
   const background = resolveCssColor(
     canvas,
@@ -120,6 +155,8 @@ const projectVector = (matrix, point) => {
   );
 };
 
+const getZeroPoint = () => new paper.Point(0, 0);
+
 const createAnchorItem = (scope, styles, point) => {
   const anchor = new scope.Path.Circle({
     center: point,
@@ -137,22 +174,65 @@ const createAnchorItem = (scope, styles, point) => {
 };
 
 const createHandleItem = (scope, styles, point) => {
+  const bezierHandleAppearance = getVectorBezierHandleAppearance();
   return new scope.Path.Circle({
     center: point,
-    fillColor: styles.backgroundFill.clone(),
-    radius: HANDLE_RADIUS_PX,
-    strokeColor: styles.accentFill.clone(),
-    strokeWidth: 2,
+    fillColor: styles.accentFill.clone(),
+    radius: bezierHandleAppearance.radiusPx,
+    strokeColor: null,
+    strokeWidth: 0,
   });
 };
 
+const createPreviewAnchorItem = (scope, styles, point) => {
+  const anchor = new scope.Path.Circle({
+    center: point,
+    fillColor: styles.backgroundFill.clone(),
+    radius: ANCHOR_RADIUS_PX,
+    strokeColor: styles.accentFill.clone(),
+    strokeWidth: 2,
+    visible: false,
+  });
+
+  anchor.fillColor.alpha = 0.65;
+  anchor.strokeColor.alpha = 0.7;
+
+  return anchor;
+};
+
+const createPreviewHandleItem = (scope, styles, point) => {
+  const previewHandleAppearance = getPenPreviewHandleAppearance();
+  const handle = new scope.Path.Circle({
+    center: point,
+    fillColor: styles.accentFill.clone(),
+    radius: previewHandleAppearance.radiusPx,
+    strokeColor: null,
+    visible: false,
+  });
+
+  handle.visible = false;
+  handle.fillColor.alpha =
+    previewHandleAppearance.fillMode === "solid" ? 1 : 0.65;
+  return handle;
+};
+
+const createPreviewHandleLine = (scope, styles, point) => {
+  const line = createHandleLine(scope, styles, point, point);
+  line.visible = false;
+  line.strokeColor.alpha = 0.5;
+  return line;
+};
+
 const createHoverHaloItem = (scope, styles, point, radius) => {
+  const fillColor = styles.hoverHalo.clone();
+  fillColor.alpha = getVectorHoverHaloFillAlpha();
+
   return new scope.Path.Circle({
     center: point,
-    fillColor: null,
+    fillColor,
     radius,
-    strokeColor: styles.hoverHalo.clone(),
-    strokeWidth: 8,
+    strokeColor: null,
+    strokeWidth: getVectorHoverHaloStrokeWidthPx(),
     visible: false,
   });
 };
@@ -180,6 +260,13 @@ const setItemScale = (item: paper.Item, nextScale: number) => {
 
   item.scale(nextScale / currentScale);
   item.data.currentScale = nextScale;
+};
+
+const applyHandleItemAppearance = (handle, styles) => {
+  handle.fillColor = styles.accentFill.clone();
+  handle.fillColor.alpha = 1;
+  handle.strokeColor = null;
+  handle.strokeWidth = 0;
 };
 
 const isSamePointSelection = (a, b) => {
@@ -215,6 +302,7 @@ const refreshSegmentChrome = (segment, chrome, styles, isSelected) => {
   chrome.handleInHalo.position = handleInPoint;
   chrome.handleInHalo.visible = false;
   chrome.handleIn.position = handleInPoint;
+  applyHandleItemAppearance(chrome.handleIn, styles);
   chrome.handleIn.visible = hasHandleIn;
 
   chrome.handleOutLine.segments[0].point = segment.point;
@@ -223,6 +311,7 @@ const refreshSegmentChrome = (segment, chrome, styles, isSelected) => {
   chrome.handleOutHalo.position = handleOutPoint;
   chrome.handleOutHalo.visible = false;
   chrome.handleOut.position = handleOutPoint;
+  applyHandleItemAppearance(chrome.handleOut, styles);
   chrome.handleOut.visible = hasHandleOut;
 };
 
@@ -307,16 +396,24 @@ export const createVectorPaperSession = ({
     chrome: [],
     contours: [],
     dragCanvasPoint: null,
+    endpointCloseTarget: null as EndpointCloseTarget,
     historyMark: null,
     inverseMatrix: null,
     isGeometryDragging: false,
     localPaths: [],
     matrix: null,
     nodeDragSession: null,
+    previewAnchor: null as paper.Path.Circle | null,
+    previewHandleIn: null as paper.Path.Circle | null,
+    previewHandleInLine: null as paper.Path | null,
+    previewHandleOut: null as paper.Path.Circle | null,
+    previewHandleOutLine: null as paper.Path | null,
     paths: [],
     pendingPress: null,
     pendingScene: null,
+    penHover: null as PenHoverTarget,
     hoveredPoint: null as HoveredPoint,
+    previewPath: null as paper.Path | null,
     selectedPoint: null,
     styles: getSceneStyles(scope),
   };
@@ -326,6 +423,13 @@ export const createVectorPaperSession = ({
     state.chrome = [];
     state.localPaths = [];
     state.paths = [];
+    state.previewAnchor = null;
+    state.previewHandleIn = null;
+    state.previewHandleInLine = null;
+    state.previewHandleOut = null;
+    state.previewHandleOutLine = null;
+    state.previewPath = null;
+    state.penHover = null;
     scope.view.update();
   };
 
@@ -334,15 +438,15 @@ export const createVectorPaperSession = ({
   };
 
   const syncHoveredChrome = () => {
-    state.chrome.forEach((contourChrome) => {
-      contourChrome.forEach((chrome) => {
+    for (const contourChrome of state.chrome) {
+      for (const chrome of contourChrome) {
         chrome.anchorHalo.visible = false;
         chrome.handleInHalo.visible = false;
         chrome.handleOutHalo.visible = false;
-      });
-    });
+      }
+    }
 
-    const hoveredPoint = state.hoveredPoint;
+    const hoveredPoint = state.hoveredPoint || state.penHover;
 
     if (!hoveredPoint) {
       scope.view.update();
@@ -451,7 +555,10 @@ export const createVectorPaperSession = ({
       : null;
 
     if (previousPoint) {
-      applySourceSegmentToPaper(previousPoint.contourIndex, previousPoint.segmentIndex);
+      applySourceSegmentToPaper(
+        previousPoint.contourIndex,
+        previousPoint.segmentIndex
+      );
     }
 
     if (state.selectedPoint) {
@@ -465,8 +572,180 @@ export const createVectorPaperSession = ({
     scope.view.update();
   };
 
+  const setEndpointCloseTarget = (target: EndpointCloseTarget) => {
+    const current = state.endpointCloseTarget;
+    const isSameTarget =
+      current?.contourIndex === target?.contourIndex &&
+      current?.segmentIndex === target?.segmentIndex;
+
+    if (isSameTarget) {
+      return;
+    }
+
+    state.endpointCloseTarget = target;
+    setHoveredPoint(target);
+  };
+
+  const ensurePreviewChrome = () => {
+    if (!state.previewPath) {
+      state.previewPath = new scope.Path({
+        dashArray: PREVIEW_DASH_ARRAY,
+        fillColor: null,
+        insert: true,
+        strokeCap: "round",
+        strokeJoin: "round",
+        strokeWidth: GUIDE_STROKE_WIDTH_PX,
+        visible: false,
+      });
+      state.previewPath.sendToBack();
+    }
+
+    if (!state.previewAnchor) {
+      state.previewAnchor = createPreviewAnchorItem(
+        scope,
+        state.styles,
+        getZeroPoint()
+      );
+    }
+
+    if (!state.previewHandleIn) {
+      state.previewHandleIn = createPreviewHandleItem(
+        scope,
+        state.styles,
+        getZeroPoint()
+      );
+    }
+
+    if (!state.previewHandleOut) {
+      state.previewHandleOut = createPreviewHandleItem(
+        scope,
+        state.styles,
+        getZeroPoint()
+      );
+    }
+
+    if (!state.previewHandleInLine) {
+      state.previewHandleInLine = createPreviewHandleLine(
+        scope,
+        state.styles,
+        getZeroPoint()
+      );
+    }
+
+    if (!state.previewHandleOutLine) {
+      state.previewHandleOutLine = createPreviewHandleLine(
+        scope,
+        state.styles,
+        getZeroPoint()
+      );
+    }
+  };
+
+  const stylePreviewChrome = () => {
+    state.previewPath.strokeColor = state.styles.guide.clone();
+    state.previewPath.strokeColor.alpha = 0.75;
+    state.previewAnchor.fillColor = state.styles.backgroundFill.clone();
+    state.previewAnchor.strokeColor = state.styles.accentFill.clone();
+    state.previewAnchor.fillColor.alpha = 0.65;
+    state.previewAnchor.strokeColor.alpha = 0.7;
+    state.previewHandleIn.fillColor = state.styles.accentFill.clone();
+    state.previewHandleIn.fillColor.alpha = 1;
+    state.previewHandleOut.fillColor = state.styles.accentFill.clone();
+    state.previewHandleOut.fillColor.alpha = 1;
+    state.previewHandleInLine.strokeColor = state.styles.guide.clone();
+    state.previewHandleInLine.strokeColor.alpha = 0.5;
+    state.previewHandleOutLine.strokeColor = state.styles.guide.clone();
+    state.previewHandleOutLine.strokeColor.alpha = 0.5;
+  };
+
+  const hidePreviewChrome = () => {
+    state.previewPath.visible = false;
+    state.previewAnchor.visible = false;
+    state.previewHandleIn.visible = false;
+    state.previewHandleOut.visible = false;
+    state.previewHandleInLine.visible = false;
+    state.previewHandleOutLine.visible = false;
+  };
+
+  const syncPreviewPath = (preview: PenPreviewState | null) => {
+    ensurePreviewChrome();
+    stylePreviewChrome();
+
+    if (!(preview && state.matrix)) {
+      hidePreviewChrome();
+      return;
+    }
+
+    const contour = state.contours[preview.contourIndex];
+
+    if (!(contour && contour.segments.length > 0 && !contour.closed)) {
+      hidePreviewChrome();
+      return;
+    }
+
+    const lastSegment = contour.segments.at(-1);
+
+    if (!lastSegment) {
+      hidePreviewChrome();
+      return;
+    }
+
+    const endpoint = getPenPreviewEndpoint(contour, preview);
+
+    if (!endpoint) {
+      hidePreviewChrome();
+      return;
+    }
+
+    const handleIn = getPenPreviewHandleIn(contour, preview) || {
+      x: 0,
+      y: 0,
+    };
+    const handleOut = getPenPreviewHandleOut(preview) || { x: 0, y: 0 };
+
+    state.previewPath.removeSegments();
+    state.previewPath.add(
+      new scope.Segment(
+        projectPoint(state.matrix, lastSegment.point),
+        getZeroPoint(),
+        projectVector(state.matrix, lastSegment.handleOut)
+      )
+    );
+    state.previewPath.add(
+      new scope.Segment(
+        projectPoint(state.matrix, endpoint),
+        projectVector(state.matrix, handleIn),
+        getZeroPoint()
+      )
+    );
+    state.previewPath.visible = true;
+
+    const previewAnchorPoint = projectPoint(state.matrix, endpoint);
+    const previewHandleInPoint = previewAnchorPoint.add(
+      projectVector(state.matrix, handleIn)
+    );
+    const previewHandleOutPoint = previewAnchorPoint.add(
+      projectVector(state.matrix, handleOut)
+    );
+    const shouldShowPreviewHandles = shouldShowPenPreviewHandles(preview);
+
+    state.previewAnchor.position = previewAnchorPoint;
+    state.previewAnchor.visible = shouldShowPenPreviewGhostAnchor(preview);
+    state.previewHandleIn.position = previewHandleInPoint;
+    state.previewHandleIn.visible = shouldShowPreviewHandles;
+    state.previewHandleOut.position = previewHandleOutPoint;
+    state.previewHandleOut.visible = shouldShowPreviewHandles;
+    state.previewHandleInLine.segments[0].point = previewAnchorPoint;
+    state.previewHandleInLine.segments[1].point = previewHandleInPoint;
+    state.previewHandleInLine.visible = shouldShowPreviewHandles;
+    state.previewHandleOutLine.segments[0].point = previewAnchorPoint;
+    state.previewHandleOutLine.segments[1].point = previewHandleOutPoint;
+    state.previewHandleOutLine.visible = shouldShowPreviewHandles;
+  };
+
   const renderScene = (scene) => {
-    const { contours, matrix, metrics, selectedPoint } = scene;
+    const { contours, matrix, metrics, penHover, penPreview, selectedPoint } =
+      scene;
     const canvasElement = scope.view.element;
 
     canvasElement.width = metrics.width;
@@ -493,6 +772,7 @@ export const createVectorPaperSession = ({
     state.contours = contours;
     state.inverseMatrix = inverseMatrix;
     state.matrix = matrix;
+    state.penHover = penHover || null;
     state.selectedPoint = selectedPoint || null;
     state.styles = getSceneStyles(scope);
 
@@ -530,11 +810,21 @@ export const createVectorPaperSession = ({
           scope,
           state.styles,
           point,
-          ANCHOR_RADIUS_PX + 3
+          getVectorAnchorHoverHaloRadiusPx()
         );
         const anchor = createAnchorItem(scope, state.styles, point);
-        const handleInLine = createHandleLine(scope, state.styles, point, point);
-        const handleOutLine = createHandleLine(scope, state.styles, point, point);
+        const handleInLine = createHandleLine(
+          scope,
+          state.styles,
+          point,
+          point
+        );
+        const handleOutLine = createHandleLine(
+          scope,
+          state.styles,
+          point,
+          point
+        );
         const handleInHalo = createHoverHaloItem(
           scope,
           state.styles,
@@ -601,12 +891,13 @@ export const createVectorPaperSession = ({
       });
     });
 
+    syncPreviewPath(penPreview);
     syncHoveredChrome();
     scope.view.update();
   };
 
   const syncActiveSceneFrame = (scene) => {
-    const { matrix, metrics, selectedPoint } = scene;
+    const { matrix, metrics, penHover, penPreview, selectedPoint } = scene;
     const canvasElement = scope.view.element;
 
     canvasElement.width = metrics.width;
@@ -631,12 +922,14 @@ export const createVectorPaperSession = ({
 
     state.inverseMatrix = inverseMatrix;
     state.matrix = matrix;
+    state.penHover = penHover || null;
     state.selectedPoint = selectedPoint || null;
     state.styles = getSceneStyles(scope);
 
     state.paths.forEach((path, contourIndex) => {
       path.segments.forEach((segment, segmentIndex) => {
-        const sourceSegment = state.contours[contourIndex]?.segments[segmentIndex];
+        const sourceSegment =
+          state.contours[contourIndex]?.segments[segmentIndex];
 
         if (!sourceSegment) {
           return;
@@ -644,7 +937,10 @@ export const createVectorPaperSession = ({
 
         segment.point = projectPoint(state.matrix, sourceSegment.point);
         segment.handleIn = projectVector(state.matrix, sourceSegment.handleIn);
-        segment.handleOut = projectVector(state.matrix, sourceSegment.handleOut);
+        segment.handleOut = projectVector(
+          state.matrix,
+          sourceSegment.handleOut
+        );
 
         refreshSegmentChrome(
           segment,
@@ -658,6 +954,7 @@ export const createVectorPaperSession = ({
       });
     });
 
+    syncPreviewPath(penPreview);
     syncHoveredChrome();
     scope.view.update();
   };
@@ -802,9 +1099,57 @@ export const createVectorPaperSession = ({
       return;
     }
 
-    let pinnedLocalPoint = localPoint;
+    const pinnedLocalPoint = localPoint;
 
     if (role === "anchor") {
+      const endpointCloseTarget = getVectorEndpointCloseTarget(state.contours, {
+        contourIndex,
+        segmentIndex,
+      });
+
+      if (endpointCloseTarget && state.matrix) {
+        const projectedTargetPoint = projectPoint(
+          state.matrix,
+          endpointCloseTarget.point
+        );
+
+        if (
+          shouldSnapVectorEndpointClose(
+            {
+              x: projectedTargetPoint.x,
+              y: projectedTargetPoint.y,
+            },
+            {
+              x: point.x,
+              y: point.y,
+            },
+            ENDPOINT_CLOSE_SNAP_DISTANCE_PX
+          )
+        ) {
+          setEndpointCloseTarget({
+            ...endpointCloseTarget,
+            role: "anchor",
+          });
+        } else {
+          setEndpointCloseTarget(null);
+        }
+      } else {
+        setEndpointCloseTarget(null);
+      }
+
+      const previewPoint = getVectorDraggedEndpointPreviewPoint(
+        state.contours,
+        {
+          contourIndex,
+          segmentIndex,
+        },
+        {
+          x: localPoint.x,
+          y: localPoint.y,
+        },
+        state.endpointCloseTarget
+      );
+
       state.contours = mapTargetSegment(
         state.contours,
         { contourIndex, segmentIndex },
@@ -812,13 +1157,14 @@ export const createVectorPaperSession = ({
           return {
             ...segment,
             point: {
-              x: localPoint.x,
-              y: localPoint.y,
+              x: previewPoint.x,
+              y: previewPoint.y,
             },
           };
         }
       );
     } else {
+      setEndpointCloseTarget(null);
       state.contours = updateVectorPointHandle(state.contours, {
         constrainAngle: modifiers.constrainAngle,
         contourIndex,
@@ -834,7 +1180,13 @@ export const createVectorPaperSession = ({
 
     applySourceSegmentToPaper(contourIndex, segmentIndex, { updateView: true });
     syncNode({
-      pinnedLocalPoint,
+      pinnedLocalPoint:
+        role === "anchor"
+          ? {
+              x: localPoint.x,
+              y: localPoint.y,
+            }
+          : pinnedLocalPoint,
       pinnedWorldPoint: worldPoint,
     });
   };
@@ -842,7 +1194,6 @@ export const createVectorPaperSession = ({
   const tool = new scope.Tool();
 
   tool.onMouseDown = (event) => {
-    const nativeEvent = event.event;
     const hit = getInteractiveHit(scope, event.point);
     const role = hit?.item?.data?.role;
     const { bodyHit, insertTarget } = getPathInteraction(event.point);
@@ -900,7 +1251,10 @@ export const createVectorPaperSession = ({
       return;
     }
 
-    if (state.pendingPress?.type === "body" || state.pendingPress?.type === "insert") {
+    if (
+      state.pendingPress?.type === "body" ||
+      state.pendingPress?.type === "insert"
+    ) {
       state.pendingPress = null;
 
       if (event.event) {
@@ -913,6 +1267,7 @@ export const createVectorPaperSession = ({
       state.pendingPress = null;
       state.historyMark = onHistoryStart();
       state.isGeometryDragging = true;
+      setEndpointCloseTarget(null);
       setHoveredPoint(null);
       setHoverCursorMode(null);
       setActiveCursorMode("point");
@@ -959,8 +1314,25 @@ export const createVectorPaperSession = ({
       return;
     }
 
+    if (
+      state.activeDrag.role === "anchor" &&
+      state.endpointCloseTarget &&
+      state.endpointCloseTarget.contourIndex === state.activeDrag.contourIndex
+    ) {
+      const closeResult = closeVectorContourByDraggingEndpoint(state.contours, {
+        contourIndex: state.activeDrag.contourIndex,
+        draggedSegmentIndex: state.activeDrag.segmentIndex,
+        targetSegmentIndex: state.endpointCloseTarget.segmentIndex,
+      });
+
+      state.contours = closeResult.contours;
+      setSelectedPoint(closeResult.selectedPoint);
+      syncNode();
+    }
+
     state.activeDrag = null;
     state.isGeometryDragging = false;
+    setEndpointCloseTarget(null);
     setActiveCursorMode(null);
 
     if (state.historyMark) {
@@ -983,6 +1355,11 @@ export const createVectorPaperSession = ({
       setHoveredPoint(null);
       setHoverCursorMode(null);
       setActiveCursorMode(null);
+      tool.onMouseDown = null;
+      tool.onMouseDrag = null;
+      tool.onMouseMove = null;
+      tool.onMouseUp = null;
+      tool.remove?.();
     },
     render: (scene) => {
       if (!scene) {

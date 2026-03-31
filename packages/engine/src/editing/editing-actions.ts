@@ -59,11 +59,23 @@ export const setActiveTool = (editor, toolId) => {
     return;
   }
 
+  const previousToolId = editor.activeTool;
+
+  if (toolId !== editor.activeTool) {
+    editor.currentTool.onDeactivate?.();
+  }
+
   if (toolId !== "text" && editor.editingNodeId) {
     finalizeEditing(editor);
   }
 
   editor.getState().setActiveTool(toolId);
+
+  if (toolId !== previousToolId) {
+    editor.currentTool.onActivate?.({
+      previousToolId,
+    });
+  }
 };
 
 export const setEditingText = (editor, value) => {

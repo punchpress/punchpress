@@ -52,23 +52,22 @@ export {
   WAVE_CYCLES_MIN,
   withNodeTransform,
 } from "./nodes/text/model";
+export {
+  estimateBounds,
+  inflateBounds,
+  layoutGlyphs,
+} from "./nodes/text/warp-layout";
+export { VECTOR_ANCHOR_INTERACTION_RADIUS_PX } from "./nodes/vector/interaction-constants";
 export { createDefaultVectorNode } from "./nodes/vector/model";
 export {
   getVectorPathCursorMode,
   isVectorPathPointRole,
 } from "./nodes/vector/path-edit-interaction";
 export {
-  insertVectorPoint,
-} from "./nodes/vector/point-insert";
-export {
   setVectorPointType,
   updateVectorPointHandle,
 } from "./nodes/vector/point-edit";
-export {
-  estimateBounds,
-  inflateBounds,
-  layoutGlyphs,
-} from "./nodes/text/warp-layout";
+export { insertVectorPoint } from "./nodes/vector/point-insert";
 export {
   incrementPerfCounter,
   measurePerf,
