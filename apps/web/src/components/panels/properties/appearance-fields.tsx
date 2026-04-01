@@ -5,7 +5,12 @@ import { NumberField } from "./number-field";
 
 const STROKE_WIDTH_RANGE = { min: 0, max: 200 };
 
-export const AppearanceFields = ({ fill, stroke, strokeWidth }) => {
+export const AppearanceFields = ({
+  fill,
+  stroke,
+  strokeWidth,
+  withTopBorder = true,
+}) => {
   const editor = useEditor();
 
   if (!(fill || stroke || strokeWidth)) {
@@ -13,7 +18,10 @@ export const AppearanceFields = ({ fill, stroke, strokeWidth }) => {
   }
 
   return (
-    <Section className="border-black/6 border-t" title="Fill & Stroke">
+    <Section
+      className={withTopBorder ? "border-black/6 border-t" : undefined}
+      title="Fill & Stroke"
+    >
       {fill ? (
         <FieldRow label="Fill">
           <ColorField

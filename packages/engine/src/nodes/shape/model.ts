@@ -6,7 +6,7 @@ const SHAPE_DEFAULTS = {
     height: 180,
     width: 240,
   },
-  rectangle: {
+  polygon: {
     height: 180,
     width: 280,
   },
@@ -16,14 +16,16 @@ const SHAPE_DEFAULTS = {
   },
 };
 
-export const createDefaultShapeNode = (shape = "rectangle") => {
-  const size = SHAPE_DEFAULTS[shape] || SHAPE_DEFAULTS.rectangle;
+export const createDefaultShapeNode = (shape = "polygon") => {
+  const size = SHAPE_DEFAULTS[shape] || SHAPE_DEFAULTS.polygon;
 
   return {
+    cornerRadius: 0,
     fill: "#000000",
     height: size.height,
     id: createId(),
     parentId: ROOT_PARENT_ID,
+    points: undefined,
     shape,
     stroke: null,
     strokeWidth: 0,

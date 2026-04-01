@@ -1,16 +1,13 @@
+import { GROUP_NODE_PLACEMENT_CAPABILITIES } from "./group/group-placement";
+import { SHAPE_NODE_PLACEMENT_CAPABILITIES } from "./shape/shape-placement";
+import { TEXT_NODE_PLACEMENT_CAPABILITIES } from "./text/text-placement-capabilities";
+import { VECTOR_NODE_PLACEMENT_CAPABILITIES } from "./vector/vector-placement";
+
 const NODE_PLACEMENT_CAPABILITIES = {
-  group: {
-    mode: "none",
-  },
-  shape: {
-    mode: "box-drag",
-  },
-  text: {
-    mode: "click",
-  },
-  vector: {
-    mode: "click",
-  },
+  group: GROUP_NODE_PLACEMENT_CAPABILITIES,
+  shape: SHAPE_NODE_PLACEMENT_CAPABILITIES,
+  text: TEXT_NODE_PLACEMENT_CAPABILITIES,
+  vector: VECTOR_NODE_PLACEMENT_CAPABILITIES,
 };
 
 export const getNodePlacementCapabilities = (nodeType) => {

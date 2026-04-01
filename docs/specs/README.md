@@ -20,4 +20,6 @@ They exist to preserve product intent while implementation evolves. They are liv
 - `history.md`
 - `nodes.md`
 - `performance-panel.md`
+- `shape-node.md`
 - `text-node.md`
+- `vector-node.md`

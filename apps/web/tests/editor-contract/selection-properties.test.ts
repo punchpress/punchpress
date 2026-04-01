@@ -10,11 +10,34 @@ const AVAILABLE_FONT = {
 
 const createShapeNode = (id: string) => {
   return {
+    cornerRadius: 24,
     fill: "#000000",
     height: 160,
     id,
     parentId: "root",
-    shape: "rectangle",
+    shape: "polygon",
+    stroke: null,
+    strokeWidth: 0,
+    transform: {
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+      x: 600,
+      y: 450,
+    },
+    type: "shape",
+    visible: true,
+    width: 260,
+  } as const;
+};
+
+const createEllipseShapeNode = (id: string) => {
+  return {
+    fill: "#000000",
+    height: 160,
+    id,
+    parentId: "root",
+    shape: "ellipse",
     stroke: null,
     strokeWidth: 0,
     transform: {
@@ -67,6 +90,7 @@ describe("Editor selection properties", () => {
 
     expect(selectionProperties.selectionKind).toBe("single");
     expect(Object.keys(selectionProperties.properties).sort()).toEqual([
+      "cornerRadius",
       "fill",
       "height",
       "shape",
@@ -76,9 +100,21 @@ describe("Editor selection properties", () => {
       "x",
       "y",
     ]);
-    expect(selectionProperties.properties.shape?.value).toBe("rectangle");
+    expect(selectionProperties.properties.cornerRadius?.value).toBe(24);
+    expect(selectionProperties.properties.shape?.value).toBe("polygon");
     expect(selectionProperties.properties.width?.value).toBe(260);
     expect(selectionProperties.properties.text).toBeUndefined();
+  });
+
+  test("does not expose corner radius for a non-polygon shape", () => {
+    const editor = new Editor();
+
+    editor.getState().loadNodes([createEllipseShapeNode("ellipse-node")]);
+    editor.select("ellipse-node");
+
+    const selectionProperties = editor.getSelectionProperties();
+
+    expect(selectionProperties.properties.cornerRadius).toBeUndefined();
   });
 
   test("exposes only shared appearance properties for a text and shape multi-selection", () => {
@@ -141,5 +177,21 @@ describe("Editor selection properties", () => {
 
     expect(didApply).toBe(true);
     expect(editor.getNode("shape-node")?.transform.x).toBe(720);
+  });
+
+  test("applies polygon corner radius through selection properties", () => {
+    const editor = new Editor();
+
+    editor.getState().loadNodes([createShapeNode("shape-node")]);
+    editor.select("shape-node");
+
+    const didApply = editor.setSelectionProperty("cornerRadius", 36);
+
+    expect(didApply).toBe(true);
+    expect(editor.getNode("shape-node")).toMatchObject({
+      cornerRadius: 36,
+      shape: "polygon",
+      type: "shape",
+    });
   });
 });

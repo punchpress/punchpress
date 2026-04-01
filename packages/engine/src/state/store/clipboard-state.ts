@@ -189,6 +189,7 @@ export const pasteTextState = (state, text, font, point) => {
     nodes: [...state.nodes, node],
     pathEditingNodeId: null,
     pathEditingPoint: null,
+    pathEditingPoints: [],
     selectedNodeIds: [node.id],
   };
 };

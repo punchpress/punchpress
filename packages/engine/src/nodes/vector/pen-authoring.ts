@@ -1,3 +1,5 @@
+import { getUniformVectorCornerRadius } from "./vector-corner-controls";
+
 const cloneHandle = (handle) => {
   return {
     x: handle.x,
@@ -103,6 +105,8 @@ export const replacePenContourSegment = (
 };
 
 export const closePenContour = (contours, contourIndex) => {
+  const inheritedCornerRadius = getUniformVectorCornerRadius(contours);
+
   return contours.map((contour, index) => {
     if (index !== contourIndex) {
       return contour;
@@ -111,7 +115,22 @@ export const closePenContour = (contours, contourIndex) => {
     return {
       ...contour,
       closed: true,
-      segments: contour.segments.map(cloneSegment),
+      segments: contour.segments.map((segment, segmentIndex) => {
+        const nextSegment = cloneSegment(segment);
+
+        if (
+          typeof inheritedCornerRadius === "number" &&
+          (segmentIndex === 0 || segmentIndex === contour.segments.length - 1) &&
+          nextSegment.pointType === "corner"
+        ) {
+          return {
+            ...nextSegment,
+            cornerRadius: inheritedCornerRadius,
+          };
+        }
+
+        return nextSegment;
+      }),
     };
   });
 };

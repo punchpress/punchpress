@@ -95,7 +95,7 @@ describe("Editor clipboard", () => {
     const editor = createEditor();
 
     attachViewport(editor);
-    editor.addShapeNode({ x: 5000, y: 5000 }, "rectangle");
+    editor.addShapeNode({ x: 5000, y: 5000 }, "polygon");
 
     const originalNodeId = editor.selectedNodeId;
 
@@ -111,7 +111,7 @@ describe("Editor clipboard", () => {
 
     expect(pastedNode.id).not.toBe(originalNodeId);
     expect(pastedNode.type).toBe("shape");
-    expect(pastedNode.shape).toBe("rectangle");
+    expect(pastedNode.shape).toBe("polygon");
     expect(pastedNode.transform.x).toBeCloseTo(500, 6);
     expect(pastedNode.transform.y).toBeCloseTo(400, 6);
   });
@@ -125,7 +125,7 @@ describe("Editor clipboard", () => {
       x: 5000,
       y: 5000,
     });
-    editor.addShapeNode({ x: 5300, y: 5000 }, "rectangle");
+    editor.addShapeNode({ x: 5300, y: 5000 }, "polygon");
 
     const shapeNodeId = editor.selectedNodeId;
 

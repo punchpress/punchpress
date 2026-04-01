@@ -5,7 +5,7 @@ describe("shape box resize", () => {
   test("resizes a shape from the east edge without changing its height", () => {
     const editor = new Editor();
 
-    editor.addShapeNode({ x: 400, y: 300 }, "rectangle");
+    editor.addShapeNode({ x: 400, y: 300 }, "polygon");
 
     const nodeId = editor.selectedNodeId;
     const node = nodeId ? editor.getNode(nodeId) : null;

@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { useEditor } from "../../../editor-react/use-editor";
 import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
 import { AppearanceFields } from "./appearance-fields";
+import { PathCornerFields } from "./path-corner-fields";
+import { PathPointFields } from "./path-point-fields";
 import { ShapeFields } from "./shape-fields";
 import { TextFields } from "./text-fields";
 import { TextWarpFields } from "./text-warp-fields";
@@ -11,7 +13,17 @@ import { usePropertiesPanelState } from "./use-properties-panel-state";
 export const PropertiesPanel = () => {
   usePerformanceRenderCounter("render.panel.properties");
   const editor = useEditor();
-  const { bootstrapError, bootstrapState, selectionProperties } =
+  const {
+    bootstrapError,
+    bootstrapState,
+    pathCornerRadiusSummary,
+    pathPointCornerMax,
+    pathPointCornerRadius,
+    selectedNode: pointSelectedNode,
+    selectedPathPoint,
+    selectionProperties,
+    showsPathPointCornerRadius,
+  } =
     usePropertiesPanelState();
   const hasAppearanceFields = Boolean(
     selectionProperties.properties.fill ||
@@ -19,6 +31,17 @@ export const PropertiesPanel = () => {
       selectionProperties.properties.strokeWidth
   );
   const selectedNode = selectionProperties.selectedNode;
+  const showsPathCornerRadiusSummary = Boolean(
+    pointSelectedNode?.type === "vector" &&
+      !showsPathPointCornerRadius &&
+      pathCornerRadiusSummary
+  );
+  const hasFieldsBeforeAppearance = Boolean(
+    selectedNode?.type === "text" ||
+      selectedNode?.type === "shape" ||
+      showsPathPointCornerRadius ||
+      showsPathCornerRadiusSummary
+  );
 
   if (
     selectionProperties.selectionKind === "none" &&
@@ -38,30 +61,33 @@ export const PropertiesPanel = () => {
           </Alert>
         )}
 
-        {selectionProperties.selectionKind === "multi" && (
-          <p className="m-0 text-[var(--designer-text-muted)] text-sm">
-            {selectionProperties.selectedCount} layers selected. Shared
-            properties below apply to the full selection.
-          </p>
-        )}
-
-        {selectionProperties.selectionKind === "group" && (
-          <p className="m-0 text-[var(--designer-text-muted)] text-sm">
-            Group selected. Use the canvas or layers panel to drill in, ungroup,
-            or transform its contents together.
-          </p>
-        )}
-
         {selectedNode?.type === "text" ? (
           <TextFields node={selectedNode} />
         ) : null}
 
         {selectedNode?.type === "shape" ? (
           <ShapeFields
+            cornerRadius={selectionProperties.properties.cornerRadius}
             height={selectionProperties.properties.height}
             node={selectedNode}
             shape={selectionProperties.properties.shape}
             width={selectionProperties.properties.width}
+          />
+        ) : null}
+
+        {showsPathPointCornerRadius ? (
+          <PathPointFields
+            cornerMax={pathPointCornerMax}
+            cornerRadius={pathPointCornerRadius}
+            selectedNode={pointSelectedNode}
+            selectedPathPoint={selectedPathPoint}
+          />
+        ) : null}
+
+        {showsPathCornerRadiusSummary ? (
+          <PathCornerFields
+            cornerSummary={pathCornerRadiusSummary}
+            selectedNode={pointSelectedNode}
           />
         ) : null}
 
@@ -70,11 +96,12 @@ export const PropertiesPanel = () => {
             fill={selectionProperties.properties.fill}
             stroke={selectionProperties.properties.stroke}
             strokeWidth={selectionProperties.properties.strokeWidth}
+            withTopBorder={hasFieldsBeforeAppearance}
           />
         ) : null}
 
         {selectedNode?.type === "text" ? (
-          <TextWarpFields node={selectedNode} />
+          <TextWarpFields node={selectedNode} withTopBorder={hasAppearanceFields} />
         ) : null}
 
         {selectionProperties.canDelete ? (

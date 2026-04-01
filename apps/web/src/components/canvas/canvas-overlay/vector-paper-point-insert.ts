@@ -24,8 +24,9 @@ const toDocumentHandle = (point) => {
   };
 };
 
-const toDocumentSegment = (segment, pointType) => {
+const toDocumentSegment = (segment, pointType, previousSegment) => {
   return {
+    cornerRadius: previousSegment?.cornerRadius,
     handleIn: toDocumentHandle(segment.handleIn),
     handleOut: toDocumentHandle(segment.handleOut),
     point: toDocumentHandle(segment.point),
@@ -85,13 +86,18 @@ export const splitVectorContourAtOffset = (scope, contour, target) => {
     segmentIndex: insertedIndex,
     segments: path.segments.map((segment, index) => {
       if (index < insertedIndex) {
-        return toDocumentSegment(segment, contour.segments[index]?.pointType || "corner");
+        return toDocumentSegment(
+          segment,
+          contour.segments[index]?.pointType || "corner",
+          contour.segments[index]
+        );
       }
 
       if (index > insertedIndex) {
         return toDocumentSegment(
           segment,
-          contour.segments[index - 1]?.pointType || "corner"
+          contour.segments[index - 1]?.pointType || "corner",
+          contour.segments[index - 1]
         );
       }
 

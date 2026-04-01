@@ -22,6 +22,7 @@ export const getEditorDebugDump = (editor) => {
       originalText: state.editingOriginalText,
       pathNodeId: state.pathEditingNodeId,
       pathPoint: state.pathEditingPoint,
+      pathPoints: state.pathEditingPoints,
       text: state.editingText,
     },
     hoveredNodeId: editor.hoveredNodeId,
@@ -46,6 +47,7 @@ export const getEditorDebugDump = (editor) => {
 
         if (node.type === "shape") {
           return {
+            cornerRadius: node.cornerRadius ?? 0,
             fill: node.fill,
             font: null,
             fontSize: null,

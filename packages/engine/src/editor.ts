@@ -22,21 +22,35 @@ import {
   bringToFront as bringEditorToFront,
   deleteNode as deleteEditorNode,
   deleteSelected as deleteEditorSelected,
+  deletePathPoint as deleteEditorPathPoint,
   deleteVectorPoint as deleteEditorVectorPoint,
   duplicate as duplicateEditorNodes,
   groupSelected as groupEditorSelected,
+  getPathPointType as getEditorPathPointType,
+  insertPathPoint as insertEditorPathPoint,
   insertVectorPoint as insertEditorVectorPoint,
+  moveSelectedPathPointsBy as moveEditorSelectedPathPointsBy,
   renameGroup as renameEditorGroup,
   sendToBack as sendEditorToBack,
+  setPathPointType as setEditorPathPointType,
   setNodeOrder as setEditorNodeOrder,
   setVectorPointType as setEditorVectorPointType,
   toggleVisibility as toggleEditorVisibility,
   ungroup as ungroupEditorNodes,
   updateNode as updateEditorNode,
   updateNodes as updateEditorNodes,
+  updateEditablePath as updateEditorEditablePath,
   updateSelectedNode as updateEditorSelectedNode,
   updateVectorContours as updateEditorVectorContours,
 } from "./document/node-actions";
+import {
+  canRoundPathPoint as canEditorRoundPathPoint,
+  getPathCornerRadiusSummary as getEditorPathCornerRadiusSummary,
+  getPathPointCornerControl as getEditorPathPointCornerControl,
+  getPathPointCornerRadius as getEditorPathPointCornerRadius,
+  setPathCornerRadius as setEditorPathCornerRadius,
+  setPathPointCornerRadius as setEditorPathPointCornerRadius,
+} from "./document/path-corner-actions";
 import {
   addShapeNode as addEditorShapeNode,
   addTextNode as addEditorTextNode,
@@ -110,6 +124,7 @@ import {
 import { beginNodePlacement as beginEditorNodePlacement } from "./placement/node-placement";
 import {
   getLayerRow as getEditorLayerRow,
+  getEditablePathSession as getEditorEditablePathSession,
   getNode as getEditorNode,
   getNodeEditCapabilities as getEditorNodeEditCapabilities,
   getNodeFrame as getEditorNodeFrame,
@@ -394,6 +409,10 @@ export class Editor {
     return this.getState().pathEditingPoint;
   }
 
+  get pathEditingPoints() {
+    return this.getState().pathEditingPoints;
+  }
+
   get isDirty() {
     return this.history.isDirty;
   }
@@ -582,6 +601,10 @@ export class Editor {
     return getEditorNodeEditCapabilities(this, nodeId);
   }
 
+  getEditablePathSession(nodeId = this.pathEditingNodeId) {
+    return getEditorEditablePathSession(this, nodeId);
+  }
+
   getNodePropertySupport(nodeId) {
     return getEditorNodePropertySupport(this.getNode(nodeId));
   }
@@ -721,6 +744,17 @@ export class Editor {
     }
 
     return deleteEditorVectorPoint(this, nodeId, point);
+  }
+
+  deletePathPoint(
+    nodeId = this.pathEditingNodeId,
+    point = this.pathEditingPoint
+  ) {
+    if (!(nodeId && point)) {
+      return false;
+    }
+
+    return deleteEditorPathPoint(this, nodeId, point);
   }
 
   deleteNode(nodeId) {
@@ -910,6 +944,10 @@ export class Editor {
     this.getState().setPathEditingPoint(point);
   }
 
+  setPathEditingPoints(points, primaryPoint = null) {
+    this.getState().setPathEditingPoints(points, primaryPoint);
+  }
+
   getVectorPointType(nodeId, point = this.pathEditingPoint) {
     const node = this.getNode(nodeId);
 
@@ -921,6 +959,52 @@ export class Editor {
       node.contours[point.contourIndex]?.segments[point.segmentIndex]
         ?.pointType || null
     );
+  }
+
+  getPathPointType(nodeId = this.pathEditingNodeId, point = this.pathEditingPoint) {
+    if (!(nodeId && point)) {
+      return null;
+    }
+
+    return getEditorPathPointType(this, nodeId, point);
+  }
+
+  canRoundPathPoint(nodeId = this.pathEditingNodeId, point = this.pathEditingPoint) {
+    if (!(nodeId && point)) {
+      return false;
+    }
+
+    return canEditorRoundPathPoint(this, nodeId, point);
+  }
+
+  getPathPointCornerRadius(
+    nodeId = this.pathEditingNodeId,
+    point = this.pathEditingPoint
+  ) {
+    if (!(nodeId && point)) {
+      return 0;
+    }
+
+    return getEditorPathPointCornerRadius(this, nodeId, point);
+  }
+
+  getPathPointCornerControl(
+    nodeId = this.pathEditingNodeId,
+    point = this.pathEditingPoint
+  ) {
+    if (!(nodeId && point)) {
+      return null;
+    }
+
+    return getEditorPathPointCornerControl(this, nodeId, point);
+  }
+
+  getPathCornerRadiusSummary(nodeId = this.pathEditingNodeId) {
+    if (!nodeId) {
+      return null;
+    }
+
+    return getEditorPathCornerRadiusSummary(this, nodeId);
   }
 
   setVectorPointType(
@@ -935,12 +1019,60 @@ export class Editor {
     return setEditorVectorPointType(this, nodeId, point, pointType);
   }
 
+  setPathPointType(
+    pointType,
+    nodeId = this.pathEditingNodeId,
+    point = this.pathEditingPoint
+  ) {
+    if (!(nodeId && point)) {
+      return false;
+    }
+
+    return setEditorPathPointType(this, nodeId, point, pointType);
+  }
+
+  setPathPointCornerRadius(
+    cornerRadius,
+    nodeId = this.pathEditingNodeId,
+    point = this.pathEditingPoint
+  ) {
+    if (!(nodeId && point)) {
+      return false;
+    }
+
+    return setEditorPathPointCornerRadius(this, nodeId, point, cornerRadius);
+  }
+
+  setPathCornerRadius(cornerRadius, nodeId = this.pathEditingNodeId) {
+    if (!nodeId) {
+      return false;
+    }
+
+    return setEditorPathCornerRadius(this, nodeId, cornerRadius);
+  }
+
   insertVectorPoint(target, nodeId = this.pathEditingNodeId) {
     if (!nodeId) {
       return false;
     }
 
     return insertEditorVectorPoint(this, nodeId, target);
+  }
+
+  insertPathPoint(target, nodeId = this.pathEditingNodeId) {
+    if (!nodeId) {
+      return false;
+    }
+
+    return insertEditorPathPoint(this, nodeId, target);
+  }
+
+  moveSelectedPathPointsBy(delta, nodeId = this.pathEditingNodeId) {
+    if (!(nodeId && delta)) {
+      return false;
+    }
+
+    return moveEditorSelectedPathPointsBy(this, nodeId, delta);
   }
 
   setEditingText(value) {
@@ -1077,6 +1209,10 @@ export class Editor {
 
   updateVectorContours(nodeId, contours, options) {
     return updateEditorVectorContours(this, nodeId, contours, options);
+  }
+
+  updateEditablePath(nodeId, contours, options) {
+    return updateEditorEditablePath(this, nodeId, contours, options);
   }
 
   updateNodes(nodeIds, updater) {

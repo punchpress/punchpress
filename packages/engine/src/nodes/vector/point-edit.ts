@@ -253,6 +253,7 @@ export const setVectorPointType = (
 
     return {
       ...segment,
+      cornerRadius: undefined,
       handleIn: scaleHandle(invertHandle(axis), handleInLength),
       handleOut: scaleHandle(axis, handleOutLength),
       pointType: "smooth",
@@ -277,6 +278,7 @@ export const updateVectorPointHandle = (
       : target.value;
     const nextSegment = {
       ...segment,
+      cornerRadius: undefined,
       [target.handleRole]: nextValue,
     };
 

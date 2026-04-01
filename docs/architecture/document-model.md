@@ -105,7 +105,7 @@ type ShapeNode = {
   id: string;
   type: "shape";
   parentId: NodeParentId;
-  shape: "rectangle" | "ellipse" | "star";
+  shape: "polygon" | "ellipse" | "star";
   width: number;
   height: number;
   fill: string;
@@ -123,7 +123,7 @@ This is intentionally simple:
 - `parentId` expresses hierarchy without nesting child arrays inside the stored document.
 - `text` is the editable source string.
 - `font` stores the resolved local font descriptor used to derive geometry.
-- `shape` stores the basic shape variant while `width` and `height` stay editable source dimensions.
+- `shape` stores the live shape family while `width` and `height` stay editable source dimensions.
 - `transform` holds placement only.
 - `warp` is an option on text nodes and holds parametric warp settings only.
 
@@ -195,7 +195,7 @@ This is an example `version: "1.2"` document using the current feature set.
       "id": "node_shape_1",
       "type": "shape",
       "parentId": "group_1",
-      "shape": "rectangle",
+      "shape": "polygon",
       "width": 2200,
       "height": 900,
       "fill": "#1d2940",

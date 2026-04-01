@@ -31,6 +31,7 @@ export const stopPathEditing = (editor) => {
     return false;
   }
 
+  editor.currentTool.onPathEditingStopped?.();
   applyInteractionState(editor, exitPathEditingInteractionState());
   return true;
 };

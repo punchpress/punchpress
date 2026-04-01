@@ -7,28 +7,30 @@ import {
   getTextPathHostMetrics,
   getTextPathTransformTargetStyle,
 } from "./text-path-overlay-geometry";
-import { createVectorPaperSession } from "./vector-paper-scene";
+import { createVectorPathSession } from "./vector-path-backend";
 
 const getVectorPathOverlayScene = ({
+  editablePathSession,
   isPathEditing,
   matrix,
   metrics,
   node,
-  pathEditingPoint,
   penHover,
   penPreview,
 }) => {
-  if (!(isPathEditing && node && matrix && metrics)) {
+  if (!(editablePathSession && isPathEditing && node && matrix && metrics)) {
     return null;
   }
 
   return {
-    contours: node.contours,
+    contours: editablePathSession.contours,
+    interactionPolicy: editablePathSession.interactionPolicy,
     matrix,
     metrics,
     penHover,
     penPreview,
-    selectedPoint: pathEditingPoint,
+    selectedPoints: editablePathSession.selectedPoints,
+    selectedPoint: editablePathSession.selectedPoint,
   };
 };
 
@@ -43,16 +45,23 @@ export const CanvasVectorPathOverlay = ({ viewportRevision }) => {
   const pathEditingNodeId = useEditorValue(
     (_, state) => state.pathEditingNodeId
   );
-  const pathEditingPoint = useEditorValue((_, state) => state.pathEditingPoint);
   const spacePressed = useEditorValue((_, state) => state.spacePressed);
   const overlayState = useEditorSurfaceValue((editor, state) => {
     if (state.editingNodeId || !state.pathEditingNodeId) {
       return null;
     }
 
-    const node = editor.getNode(state.pathEditingNodeId);
+    const editablePathSession = editor.getEditablePathSession(
+      state.pathEditingNodeId
+    );
 
-    if (node?.type !== "vector" || !editor.isNodeEffectivelyVisible(node.id)) {
+    if (editablePathSession?.backend !== "vector-path") {
+      return null;
+    }
+
+    const node = editor.getNode(editablePathSession.nodeId);
+
+    if (!(node && editor.isNodeEffectivelyVisible(node.id))) {
       return null;
     }
 
@@ -66,6 +75,7 @@ export const CanvasVectorPathOverlay = ({ viewportRevision }) => {
     const penHover = editor.getPenHoverState();
 
     return {
+      editablePathSession,
       geometry,
       node,
       penHover: penHover?.nodeId === node.id ? penHover : null,
@@ -80,6 +90,7 @@ export const CanvasVectorPathOverlay = ({ viewportRevision }) => {
   const isPathEditing = Boolean(nodeId && pathEditingNodeId === nodeId);
   const isPanning = spacePressed || activeTool === "hand";
   const isPenToolActive = activeTool === "pen";
+  const editablePathSession = overlayState?.editablePathSession || null;
   const geometry = overlayState?.geometry || null;
   const node = overlayState?.node || null;
   const penHover = overlayState?.penHover || null;
@@ -107,11 +118,11 @@ export const CanvasVectorPathOverlay = ({ viewportRevision }) => {
         )
       : null;
   const scene = getVectorPathOverlayScene({
+    editablePathSession,
     isPathEditing,
     matrix,
     metrics,
     node,
-    pathEditingPoint,
     penHover,
     penPreview,
   });
@@ -179,7 +190,7 @@ export const CanvasVectorPathOverlay = ({ viewportRevision }) => {
       return;
     }
 
-    const session = createVectorPaperSession({
+    const session = createVectorPathSession({
       canvas: paperCanvasElement,
       editor,
       nodeId,
@@ -188,7 +199,7 @@ export const CanvasVectorPathOverlay = ({ viewportRevision }) => {
           return;
         }
 
-        editor.updateVectorContours(nodeId, contours, options);
+        editor.updateEditablePath(nodeId, contours, options);
       },
       onExitPathEditing: () => {
         editor.stopPathEditing();

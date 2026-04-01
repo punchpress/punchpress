@@ -32,10 +32,11 @@ export const createEditorStore = ({
     isTextPathPositioning: false,
     isSelectionDragging: false,
     isSelectionRotating: false,
-    nextShapeKind: "rectangle",
+    nextShapeKind: "polygon",
     nodes: [],
     pathEditingNodeId: null,
     pathEditingPoint: null,
+    pathEditingPoints: [],
     selectedNodeIds: [],
     spacePressed: false,
     viewport: {

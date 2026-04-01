@@ -15,6 +15,7 @@ import { getNodeLocalPoint, getNodeWorldPoint } from "../primitives/rotation";
 import { selectToolFromShortcut, Tool } from "./tool";
 
 const DRAG_THRESHOLD_PX = 3;
+const PEN_HANDLE_DRAG_THRESHOLD_PX = 6;
 const POINT_EPSILON = 0.5;
 const SEGMENT_INSERT_INTERACTION_TOLERANCE_PX = 10;
 
@@ -393,6 +394,10 @@ export class PenTool extends Tool {
     return didFinish || didClearIdleHover;
   }
 
+  onPathEditingStopped() {
+    return this.finishAuthoringSession({ commit: true });
+  }
+
   onKeyDown({ event, key }) {
     if (key === "escape" || key === "enter") {
       if (this.hasActiveSession()) {
@@ -508,7 +513,7 @@ export class PenTool extends Tool {
         closePenContour(nextContours, session.contourIndex)
       );
       this.editor.stopPathEditing();
-      return this.finishAuthoringSession({ commit: true });
+      return true;
     }
 
     const nextPointType = draft.dragHandle ? "smooth" : "corner";
@@ -1036,7 +1041,7 @@ export class PenTool extends Tool {
     }
 
     const draft = session.draft;
-    const isDragging = dragDistancePx >= DRAG_THRESHOLD_PX;
+    const isDragging = dragDistancePx >= PEN_HANDLE_DRAG_THRESHOLD_PX;
 
     if (draft.kind === "first-point") {
       const localPoint = getNodeLocalPoint(node, bbox, point);

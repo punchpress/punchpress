@@ -24,7 +24,9 @@ Nodes are the core building blocks of a PunchPress design.
 - The editable frame should stay aligned with the node's visible footprint closely enough that editing never feels detached from the object.
 - Selection and transform handles should remain screen-sized and visually consistent even when a node's durable data represents resize through transform scale.
 - Specialized editing affordances should prefer explicit secondary modes over overloading the default selected state when that keeps selection behavior clearer.
+- Shape editing should enter through an explicit secondary mode when the user intends to manipulate a live shape beyond normal object transforms.
 - Vector path editing should enter through an explicit secondary mode such as double-click or an `Edit path` action rather than replacing normal object selection by default.
+- While a shape node is in live shape editing, PunchPress should hide the normal node transform box so the shape anchors and shape-specific controls become the primary editing affordances.
 - While a vector node is in path edit mode, PunchPress should hide the normal node transform box so the vector anchors become the primary editing affordance.
 - While path editing is active, canvas marquee selection should stay suppressed so path manipulation does not surface unrelated selection UI.
 - A node should preserve its normal move, resize, and rotate behavior in the default selected state unless the user has clearly entered a more specific editing mode.
@@ -36,6 +38,9 @@ Nodes are the core building blocks of a PunchPress design.
 
 - New node types should fit the same mental model: selectable object, clear bounds, direct manipulation, and editable source data where applicable.
 - Parametric basic shapes should stay one node family with a shape-kind field rather than splintering into separate node types when their interaction model is the same.
+- Shape nodes should behave like constrained vectors that may expose path-like editing affordances while they still retain meaningful live shape controls.
+- Shape nodes should preserve their own live shape family while they remain shape nodes instead of changing between multiple live shape families as an intermediate step.
+- Shape nodes should own their own conversion boundary to vector nodes instead of converting to plain vectors on every shape edit.
 - Vector nodes should preserve editable source geometry rather than treating SVG path strings as the only durable source of truth.
 - Vector editing may use a specialized editing subsystem, but PunchPress remains the durable owner of the node model and writes edits back into editable vector source geometry rather than flattening them into one-off UI state.
 - New container nodes should make their containment behavior explicit in the node contract rather than relying on ad hoc UI-only behavior.

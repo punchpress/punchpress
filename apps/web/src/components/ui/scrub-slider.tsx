@@ -9,6 +9,7 @@ interface ScrubSliderProps {
   ariaLabel?: string;
   className?: string;
   disabled?: boolean;
+  displayValue?: string | null;
   formatValue?: (value: number) => string;
   max: number;
   min: number;
@@ -28,6 +29,7 @@ export const ScrubSlider = ({
   ariaLabel,
   className,
   disabled = false,
+  displayValue = null,
   formatValue = format,
   max,
   min,
@@ -128,7 +130,7 @@ export const ScrubSlider = ({
       aria-valuemax={Number.isFinite(max) ? max : undefined}
       aria-valuemin={Number.isFinite(min) ? min : undefined}
       aria-valuenow={value}
-      aria-valuetext={formatValue(value)}
+      aria-valuetext={displayValue || formatValue(value)}
       className={cn(
         "canvas-cursor-scroll-horizontal group relative flex min-h-9 w-full touch-none select-none items-center overflow-hidden rounded-lg border border-transparent bg-muted px-[calc(--spacing(3)-1px)] text-base text-foreground outline-none transition-[border-color,background-color] hover:border-input hover:bg-accent focus-visible:border-ring sm:min-h-8 sm:text-sm dark:bg-input/32 dark:hover:bg-input/64",
         disabled && "pointer-events-none opacity-64",
@@ -280,7 +282,7 @@ export const ScrubSlider = ({
         />
       ) : (
         <span className="pointer-events-none relative z-10 ml-auto truncate font-medium tabular-nums tracking-[-0.01em]">
-          {formatValue(value)}
+          {displayValue && !isDragging ? displayValue : formatValue(value)}
         </span>
       )}
     </div>

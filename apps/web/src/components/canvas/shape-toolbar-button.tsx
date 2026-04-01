@@ -15,7 +15,7 @@ const SHAPE_OPTIONS = [
   {
     icon: SquareIcon,
     iconSize: 18,
-    key: "rectangle",
+    key: "polygon",
     label: "Rectangle",
     shortcut: "R",
   },

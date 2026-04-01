@@ -22,7 +22,7 @@ const WAVE_AMPLITUDE_RANGE = { min: -500, max: 500 };
 const WAVE_CYCLES_RANGE = { min: WAVE_CYCLES_MIN, max: WAVE_CYCLES_MAX };
 const SLANT_RISE_RANGE = { min: -400, max: 400 };
 
-export const TextWarpFields = ({ node }) => {
+export const TextWarpFields = ({ node, withTopBorder = true }) => {
   const editor = useEditor();
 
   if (!node) {
@@ -30,7 +30,10 @@ export const TextWarpFields = ({ node }) => {
   }
 
   return (
-    <Section className="border-black/6 border-t" title="Warp">
+    <Section
+      className={withTopBorder ? "border-black/6 border-t" : undefined}
+      title="Warp"
+    >
       <ToggleGroup
         className="grid grid-cols-5 gap-1.5"
         onValueChange={(values) => {
