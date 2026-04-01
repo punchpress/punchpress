@@ -38,6 +38,7 @@ export const reconcilePathEditingState = (state, nodes) => {
     nodes,
     pathEditingNodeId: null,
     pathEditingPoint: null,
+    pathEditingPoints: [],
   };
 };
 
@@ -66,6 +67,8 @@ export const deleteNodeState = (state, nodeId) => {
       isEditingNode || isPathEditingNode ? null : state.pathEditingNodeId,
     pathEditingPoint:
       isEditingNode || isPathEditingNode ? null : state.pathEditingPoint,
+    pathEditingPoints:
+      isEditingNode || isPathEditingNode ? [] : state.pathEditingPoints,
     ...deleteNodeTreeState(state, [nodeId]),
   };
 };
@@ -110,6 +113,9 @@ export const deleteNodesState = (state, nodeIds) => {
     pathEditingPoint: isPathEditingNodeSelected
       ? null
       : state.pathEditingPoint,
+    pathEditingPoints: isPathEditingNodeSelected
+      ? []
+      : state.pathEditingPoints,
     ...deleteNodeTreeState(state, selectedNodeIds),
   };
 };
@@ -140,6 +146,7 @@ export const toggleNodeVisibilityState = (state, nodeId) => {
     editingText: baseState.editingText,
     pathEditingNodeId: baseState.pathEditingNodeId,
     pathEditingPoint: baseState.pathEditingPoint,
+    pathEditingPoints: baseState.pathEditingPoints,
     ...toggleNodeVisibilityTreeState(baseState, nodeId),
     selectedNodeIds: baseState.selectedNodeIds,
   };

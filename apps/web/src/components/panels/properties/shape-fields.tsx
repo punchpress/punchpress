@@ -7,14 +7,15 @@ import { useEditor } from "../../../editor-react/use-editor";
 import { FieldRow, PairedRow, Section } from "./field-primitives";
 
 const SHAPE_SIZE_RANGE = { min: 1, max: 5000 };
+const CORNER_RADIUS_RANGE = { min: 0, max: 1000 };
 
 const SHAPE_OPTIONS = [
-  { label: "Rect", value: "rectangle" },
+  { label: "Poly", value: "polygon" },
   { label: "Oval", value: "ellipse" },
   { label: "Star", value: "star" },
 ];
 
-export const ShapeFields = ({ height, node, shape, width }) => {
+export const ShapeFields = ({ cornerRadius, height, node, shape, width }) => {
   const editor = useEditor();
 
   if (!(node && shape && width && height)) {
@@ -70,6 +71,20 @@ export const ShapeFields = ({ height, node, shape, width }) => {
           value={height.value ?? node.height}
         />
       </FieldRow>
+
+      {cornerRadius ? (
+        <FieldRow label="Corners">
+          <ScrubSlider
+            ariaLabel="Polygon corner radius"
+            max={CORNER_RADIUS_RANGE.max}
+            min={CORNER_RADIUS_RANGE.min}
+            onValueChange={(nextCornerRadius) => {
+              editor.setSelectionProperty("cornerRadius", nextCornerRadius);
+            }}
+            value={cornerRadius.value ?? node.cornerRadius ?? 0}
+          />
+        </FieldRow>
+      ) : null}
     </Section>
   );
 };

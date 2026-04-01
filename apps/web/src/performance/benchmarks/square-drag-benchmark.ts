@@ -6,7 +6,7 @@ const createBenchmarkNodes = (nodeCount: number) => {
   const columnCount = Math.max(1, Math.ceil(Math.sqrt(nodeCount)));
 
   return Array.from({ length: nodeCount }, (_, index) => {
-    const node = createDefaultShapeNode("rectangle");
+    const node = createDefaultShapeNode("polygon");
     const column = index % columnCount;
     const row = Math.floor(index / columnCount);
 
@@ -14,7 +14,7 @@ const createBenchmarkNodes = (nodeCount: number) => {
       ...node,
       fill: "#000000",
       height: 220,
-      shape: "rectangle",
+      shape: "polygon",
       stroke: null,
       strokeWidth: 0,
       transform: {
@@ -82,7 +82,7 @@ export const shapeDragBenchmarkLarge: PerformanceBenchmarkDefinition = {
     warmupFrames: 18,
   },
   description:
-    "Builds a scratch 500-node rectangle scene and drags the selection for a fixed 180-frame pass.",
+    "Builds a scratch 500-node polygon scene and drags the selection for a fixed 180-frame pass.",
   id: "shape-nodes-dragging-500",
   label: "Shape Nodes Dragging (500)",
   setup: async ({ editor, options, waitForFrame, waitForFrames }) => {

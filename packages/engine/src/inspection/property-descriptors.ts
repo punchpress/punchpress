@@ -40,6 +40,14 @@ const heightDescriptor = createPropertyDescriptor({
   setValue: (_node, value) => ({ height: value }),
 });
 
+const cornerRadiusDescriptor = createPropertyDescriptor({
+  getValue: (node) => node.cornerRadius ?? 0,
+  id: "cornerRadius",
+  setValue: (_node, value) => ({
+    cornerRadius: Math.max(0, value),
+  }),
+});
+
 const shapeDescriptor = createPropertyDescriptor({
   getValue: (node) => node.shape,
   id: "shape",
@@ -92,6 +100,7 @@ const yDescriptor = createPropertyDescriptor({
 });
 
 const PROPERTY_DESCRIPTORS = {
+  cornerRadius: cornerRadiusDescriptor,
   fill: fillStyleDescriptor,
   font: fontDescriptor,
   fontSize: fontSizeDescriptor,

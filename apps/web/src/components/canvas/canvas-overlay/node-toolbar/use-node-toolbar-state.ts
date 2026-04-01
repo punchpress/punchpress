@@ -28,10 +28,14 @@ export const useNodeToolbarState = () => {
       selectedNode?.id && state.pathEditingNodeId === selectedNode.id
     );
     const selectedPathPoint =
-      isPathEditing && state.pathEditingPoint ? state.pathEditingPoint : null;
+      isPathEditing &&
+      state.pathEditingPoints.length === 1 &&
+      state.pathEditingPoint
+        ? state.pathEditingPoint
+        : null;
     const selectedPointType =
       selectedNode?.id && selectedPathPoint
-        ? editor.getVectorPointType(selectedNode.id, selectedPathPoint)
+        ? editor.getPathPointType(selectedNode.id, selectedPathPoint)
         : null;
     const pathPointKey = selectedPathPoint
       ? `${selectedPathPoint.contourIndex}:${selectedPathPoint.segmentIndex}`

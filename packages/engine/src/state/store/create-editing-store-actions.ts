@@ -105,6 +105,8 @@ export const createEditingStoreActions = (set) => {
             state.pathEditingNodeId === nodeId ? state.pathEditingNodeId : null,
           pathEditingPoint:
             state.pathEditingNodeId === nodeId ? state.pathEditingPoint : null,
+          pathEditingPoints:
+            state.pathEditingNodeId === nodeId ? state.pathEditingPoints : [],
           selectedNodeIds: nextSelectedNodeIds,
         };
       });
@@ -140,6 +142,11 @@ export const createEditingStoreActions = (set) => {
             nextSelectedNodeIds[0] === state.pathEditingNodeId
               ? state.pathEditingPoint
               : null,
+          pathEditingPoints:
+            nextSelectedNodeIds.length === 1 &&
+            nextSelectedNodeIds[0] === state.pathEditingNodeId
+              ? state.pathEditingPoints
+              : [],
           selectedNodeIds: nextSelectedNodeIds,
         };
       });
@@ -179,6 +186,11 @@ export const createEditingStoreActions = (set) => {
             nextSelectedNodeIds[0] === state.pathEditingNodeId
               ? state.pathEditingPoint
               : null,
+          pathEditingPoints:
+            nextSelectedNodeIds.length === 1 &&
+            nextSelectedNodeIds[0] === state.pathEditingNodeId
+              ? state.pathEditingPoints
+              : [],
           selectedNodeIds: nextSelectedNodeIds,
         };
       });

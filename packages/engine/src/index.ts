@@ -63,6 +63,8 @@ export {
   getVectorPathCursorMode,
   isVectorPathPointRole,
 } from "./nodes/vector/path-edit-interaction";
+export { getVectorPointCornerControl } from "./nodes/vector/vector-corner-controls";
+export { getUniformVectorCornerRadius } from "./nodes/vector/vector-corner-controls";
 export {
   setVectorPointType,
   updateVectorPointHandle,

@@ -42,7 +42,7 @@ const handleDeleteShortcutKeyDown = (editor, event, key) => {
 
   event.preventDefault();
 
-  if (!editor.deleteVectorPoint()) {
+  if (!editor.deletePathPoint()) {
     editor.deleteSelected();
   }
 

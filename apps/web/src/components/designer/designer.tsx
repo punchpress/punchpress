@@ -95,7 +95,7 @@ export const DesignerPanel = ({
   return (
     <aside
       className={cn(
-        "absolute z-10 hidden md:block md:w-[240px] lg:w-[280px]",
+        "absolute z-30 hidden md:block md:w-[240px] lg:w-[280px]",
         side === "left" ? "left-4" : "right-4",
         className
       )}

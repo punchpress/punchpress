@@ -1,3 +1,4 @@
+import { getUniformVectorCornerRadius } from "@punchpress/engine";
 import type { VectorContourDocument } from "@punchpress/punch-schema";
 
 const cloneHandle = (handle) => {
@@ -113,6 +114,7 @@ export const closeVectorContourByDraggingEndpoint = (
   }
 ) => {
   const contour = contours[contourIndex];
+  const inheritedCornerRadius = getUniformVectorCornerRadius(contours);
 
   if (!(contour && !contour.closed && contour.segments.length > 1)) {
     return {
@@ -140,6 +142,11 @@ export const closeVectorContourByDraggingEndpoint = (
       if (targetSegmentIndex === 0) {
         return {
           ...cloneSegment(segment),
+          ...(typeof inheritedCornerRadius === "number"
+            ? {
+                cornerRadius: inheritedCornerRadius,
+              }
+            : null),
           handleIn: cloneHandle(draggedSegment.handleIn),
           pointType: "corner",
         };
@@ -147,6 +154,11 @@ export const closeVectorContourByDraggingEndpoint = (
 
       return {
         ...cloneSegment(segment),
+        ...(typeof inheritedCornerRadius === "number"
+          ? {
+              cornerRadius: inheritedCornerRadius,
+            }
+          : null),
         handleOut: cloneHandle(draggedSegment.handleOut),
         pointType: "corner",
       };

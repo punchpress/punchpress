@@ -36,14 +36,23 @@ import {
   shouldShowPenPreviewGhostAnchor,
   shouldShowPenPreviewHandles,
 } from "./vector-pen-preview";
+import {
+  getVectorCornerRadiusFromWidgetDrag,
+  getVectorCornerWidgetGeometry,
+} from "./vector-corner-widget-geometry";
 
 const ANCHOR_RADIUS_PX = 6;
+const CORNER_WIDGET_RADIUS_PX = 5;
+const CORNER_WIDGET_HALO_RADIUS_PX = 10;
 const ENDPOINT_CLOSE_SNAP_DISTANCE_PX = 14;
 const GUIDE_STROKE_WIDTH_PX = 1.5;
 const HANDLE_LINE_STROKE_WIDTH_PX = 1.25;
 const HANDLE_RADIUS_PX = 6;
 const PREVIEW_DASH_ARRAY = [8, 6];
 const HANDLE_HOVER_RADIUS_PX = HANDLE_RADIUS_PX + 5;
+const SELECTION_MARQUEE_DASH_ARRAY = [6, 4];
+const SELECTION_MARQUEE_THRESHOLD_PX = 4;
+const PATH_POINT_DRAG_THRESHOLD_PX = 4;
 const SELECTED_ANCHOR_SCALE = 1.2;
 const HIT_TEST_OPTIONS = {
   fill: true,
@@ -62,9 +71,15 @@ interface VectorSegmentChrome {
   handleOutLine: paper.Path;
 }
 
+interface CornerWidgetChrome {
+  handle: paper.Path.Circle;
+  halo: paper.Path.Circle;
+  line: paper.Path;
+}
+
 type HoveredPoint = {
   contourIndex: number;
-  role: "anchor" | "handle-in" | "handle-out";
+  role: "anchor" | "corner-radius" | "handle-in" | "handle-out";
   segmentIndex: number;
 } | null;
 
@@ -77,10 +92,23 @@ type PenHoverTarget = {
 
 type PendingPress =
   | {
+      additive: boolean;
+      origin: paper.Point;
+      type: "empty";
+    }
+  | {
+      origin: paper.Point;
       contourIndex: number;
       role: "anchor" | "handle-in" | "handle-out";
       segmentIndex: number;
       type: "point";
+    }
+  | {
+      origin: paper.Point;
+      contourIndex: number;
+      role: "corner-radius";
+      segmentIndex: number;
+      type: "corner-radius";
     }
   | {
       contourIndex: number;
@@ -185,6 +213,23 @@ const createHandleItem = (scope, styles, point) => {
   });
 };
 
+const createCornerWidgetItem = (scope, styles, point) => {
+  const widget = new scope.Path.Circle({
+    center: point,
+    fillColor: styles.backgroundFill.clone(),
+    radius: CORNER_WIDGET_RADIUS_PX,
+    strokeColor: styles.accentFill.clone(),
+    strokeWidth: 2,
+    visible: false,
+  });
+
+  widget.shadowBlur = 4;
+  widget.shadowColor = styles.shadow;
+  widget.shadowOffset = new scope.Point(0, 1);
+
+  return widget;
+};
+
 const createPreviewAnchorItem = (scope, styles, point) => {
   const anchor = new scope.Path.Circle({
     center: point,
@@ -279,7 +324,71 @@ const isSamePointSelection = (a, b) => {
   );
 };
 
-const refreshSegmentChrome = (segment, chrome, styles, isSelected) => {
+const getPointSelectionKey = (point) => {
+  return `${point.contourIndex}:${point.segmentIndex}`;
+};
+
+const isPointSelectionIncluded = (points, point) => {
+  return points.some((currentPoint) => isSamePointSelection(currentPoint, point));
+};
+
+const normalizePointSelections = (points, primaryPoint = null) => {
+  const normalizedPoints = [];
+  const seenKeys = new Set();
+
+  for (const point of points || []) {
+    if (
+      !point ||
+      typeof point.contourIndex !== "number" ||
+      typeof point.segmentIndex !== "number"
+    ) {
+      continue;
+    }
+
+    const key = getPointSelectionKey(point);
+
+    if (seenKeys.has(key)) {
+      continue;
+    }
+
+    seenKeys.add(key);
+    normalizedPoints.push({
+      contourIndex: point.contourIndex,
+      segmentIndex: point.segmentIndex,
+    });
+  }
+
+  const normalizedPrimaryPoint =
+    primaryPoint &&
+    typeof primaryPoint.contourIndex === "number" &&
+    typeof primaryPoint.segmentIndex === "number"
+      ? {
+          contourIndex: primaryPoint.contourIndex,
+          segmentIndex: primaryPoint.segmentIndex,
+        }
+      : null;
+
+  if (!(normalizedPrimaryPoint && isPointSelectionIncluded(normalizedPoints, normalizedPrimaryPoint))) {
+    return {
+      points: normalizedPoints,
+      primaryPoint:
+        normalizedPoints.length === 1 ? normalizedPoints[0] : null,
+    };
+  }
+
+  return {
+    points: normalizedPoints,
+    primaryPoint: normalizedPrimaryPoint,
+  };
+};
+
+const refreshSegmentChrome = (
+  segment,
+  chrome,
+  styles,
+  isSelected,
+  isPrimarySelected
+) => {
   chrome.anchor.position = segment.point;
   chrome.anchorHalo.position = segment.point;
   setItemScale(chrome.anchor, isSelected ? SELECTED_ANCHOR_SCALE : 1);
@@ -294,8 +403,8 @@ const refreshSegmentChrome = (segment, chrome, styles, isSelected) => {
 
   const handleInPoint = segment.point.add(segment.handleIn);
   const handleOutPoint = segment.point.add(segment.handleOut);
-  const hasHandleIn = isSelected && segment.handleIn.length > 0.01;
-  const hasHandleOut = isSelected && segment.handleOut.length > 0.01;
+  const hasHandleIn = isPrimarySelected && segment.handleIn.length > 0.01;
+  const hasHandleOut = isPrimarySelected && segment.handleOut.length > 0.01;
 
   chrome.handleInLine.segments[0].point = segment.point;
   chrome.handleInLine.segments[1].point = handleInPoint;
@@ -347,6 +456,7 @@ const getInteractiveHit = (scope, point) => {
 
   return (
     hits.find((hit) => isVectorPathPointRole(hit?.item?.data?.role)) ||
+    hits.find((hit) => hit?.item?.data?.role === "corner-radius") ||
     hits.find((hit) => hit?.item?.data?.role === "path") ||
     null
   );
@@ -380,6 +490,31 @@ const mapTargetSegment = (contours, target, mapper) => {
   });
 };
 
+const offsetEditablePathPoints = (contours, points, delta) => {
+  const pointKeys = new Set(
+    (points || []).map((point) => getPointSelectionKey(point))
+  );
+
+  return contours.map((contour, contourIndex) => {
+    return {
+      ...contour,
+      segments: contour.segments.map((segment, segmentIndex) => {
+        if (!pointKeys.has(`${contourIndex}:${segmentIndex}`)) {
+          return segment;
+        }
+
+        return {
+          ...segment,
+          point: {
+            x: segment.point.x + (delta.x || 0),
+            y: segment.point.y + (delta.y || 0),
+          },
+        };
+      }),
+    };
+  });
+};
+
 export const createVectorPaperSession = ({
   canvas,
   editor,
@@ -395,6 +530,8 @@ export const createVectorPaperSession = ({
   const state = {
     activeDrag: null,
     chrome: [],
+    cornerWidget: null as CornerWidgetChrome | null,
+    cornerWidgetGeometry: null,
     contours: [],
     dragCanvasPoint: null,
     endpointCloseTarget: null as EndpointCloseTarget,
@@ -415,13 +552,27 @@ export const createVectorPaperSession = ({
     penHover: null as PenHoverTarget,
     hoveredPoint: null as HoveredPoint,
     previewPath: null as paper.Path | null,
+    interactionPolicy: {
+      canInsertPoint: true,
+    },
+    selectedPoints: [],
     selectedPoint: null,
+    selectionMarquee: null as
+      | {
+          additive: boolean;
+          current: paper.Point;
+          origin: paper.Point;
+        }
+      | null,
+    selectionMarqueePath: null as paper.Path.Rectangle | null,
     styles: getSceneStyles(scope),
   };
 
   const clearScene = () => {
     scope.project.clear();
     state.chrome = [];
+    state.cornerWidget = null;
+    state.cornerWidgetGeometry = null;
     state.localPaths = [];
     state.paths = [];
     state.previewAnchor = null;
@@ -431,11 +582,169 @@ export const createVectorPaperSession = ({
     state.previewHandleOutLine = null;
     state.previewPath = null;
     state.penHover = null;
+    state.selectionMarquee = null;
+    state.selectionMarqueePath = null;
     scope.view.update();
   };
 
   const setHoverCursorMode = (mode) => {
     setCanvasCursorToken(canvas, getVectorPathCursorToken(mode));
+  };
+
+  const ensureCornerWidget = () => {
+    if (state.cornerWidget) {
+      return state.cornerWidget;
+    }
+
+    const line = createHandleLine(
+      scope,
+      state.styles,
+      getZeroPoint(),
+      getZeroPoint()
+    );
+    const halo = createHoverHaloItem(
+      scope,
+      state.styles,
+      getZeroPoint(),
+      CORNER_WIDGET_HALO_RADIUS_PX
+    );
+    const handle = createCornerWidgetItem(
+      scope,
+      state.styles,
+      getZeroPoint()
+    );
+
+    line.visible = false;
+    halo.visible = false;
+    handle.visible = false;
+    halo.insertBelow(handle);
+
+    state.cornerWidget = {
+      handle,
+      halo,
+      line,
+    };
+
+    return state.cornerWidget;
+  };
+
+  const ensureSelectionMarquee = () => {
+    if (state.selectionMarqueePath) {
+      return state.selectionMarqueePath;
+    }
+
+    const fillColor = state.styles.hoverHalo.clone();
+    fillColor.alpha = 0.12;
+    const strokeColor = state.styles.guide.clone();
+    strokeColor.alpha = 0.7;
+
+    state.selectionMarqueePath = new scope.Path.Rectangle({
+      dashArray: SELECTION_MARQUEE_DASH_ARRAY,
+      fillColor,
+      insert: true,
+      point: getZeroPoint(),
+      size: new scope.Size(0, 0),
+      strokeColor,
+      strokeWidth: 1,
+      visible: false,
+    });
+
+    return state.selectionMarqueePath;
+  };
+
+  const hideSelectionMarquee = () => {
+    state.selectionMarquee = null;
+
+    if (!state.selectionMarqueePath) {
+      return;
+    }
+
+    state.selectionMarqueePath.visible = false;
+  };
+
+  const syncSelectionMarquee = () => {
+    const marquee = state.selectionMarquee;
+
+    if (!marquee) {
+      hideSelectionMarquee();
+      return;
+    }
+
+    const path = ensureSelectionMarquee();
+    const rectangle = new scope.Rectangle(marquee.origin, marquee.current);
+
+    path.removeSegments();
+    path.addSegments([
+      rectangle.topLeft,
+      rectangle.topRight,
+      rectangle.bottomRight,
+      rectangle.bottomLeft,
+    ]);
+    path.closed = true;
+    path.visible = true;
+  };
+
+  const hideCornerWidget = () => {
+    state.cornerWidgetGeometry = null;
+
+    if (!state.cornerWidget) {
+      return;
+    }
+
+    state.cornerWidget.handle.visible = false;
+    state.cornerWidget.halo.visible = false;
+    state.cornerWidget.line.visible = false;
+  };
+
+  const syncCornerWidget = () => {
+    const selectedPoint = state.selectedPoint;
+    const currentRadius =
+      selectedPoint && nodeId
+        ? editor.getPathPointCornerRadius(nodeId, selectedPoint)
+        : 0;
+    const geometry =
+      state.selectedPoints.length === 1 &&
+      selectedPoint &&
+      state.matrix &&
+      nodeId &&
+      editor.canRoundPathPoint(nodeId, selectedPoint)
+        ? getVectorCornerWidgetGeometry({
+            contours: state.contours,
+            currentRadius,
+            matrix: state.matrix,
+            point: selectedPoint,
+          })
+        : null;
+
+    if (!geometry) {
+      hideCornerWidget();
+      return;
+    }
+
+    const widget = ensureCornerWidget();
+
+    state.cornerWidgetGeometry = geometry;
+    widget.handle.position = new scope.Point(geometry.center.x, geometry.center.y);
+    widget.handle.visible = true;
+    widget.handle.data = {
+      contourIndex: selectedPoint.contourIndex,
+      role: "corner-radius",
+      segmentIndex: selectedPoint.segmentIndex,
+    };
+
+    widget.halo.position = widget.handle.position;
+    widget.halo.visible =
+      state.hoveredPoint?.role === "corner-radius" &&
+      isSamePointSelection(state.hoveredPoint, selectedPoint);
+
+    widget.line.segments[0].point = new scope.Point(
+      geometry.anchor.x,
+      geometry.anchor.y
+    );
+    widget.line.segments[1].point = widget.handle.position;
+    widget.line.visible = true;
+    widget.line.strokeColor = state.styles.guide.clone();
+    widget.line.strokeColor.alpha = 0.5;
   };
 
   const syncHoveredChrome = () => {
@@ -447,9 +756,24 @@ export const createVectorPaperSession = ({
       }
     }
 
+    if (state.cornerWidget) {
+      state.cornerWidget.halo.visible = false;
+    }
+
     const hoveredPoint = state.hoveredPoint || state.penHover;
 
     if (!hoveredPoint) {
+      if (state.cornerWidget) {
+        state.cornerWidget.halo.visible = false;
+      }
+      scope.view.update();
+      return;
+    }
+
+    if (hoveredPoint.role === "corner-radius") {
+      if (state.cornerWidget) {
+        state.cornerWidget.halo.visible = true;
+      }
       scope.view.update();
       return;
     }
@@ -529,6 +853,10 @@ export const createVectorPaperSession = ({
       segment,
       chrome,
       state.styles,
+      isPointSelectionIncluded(state.selectedPoints, {
+        contourIndex,
+        segmentIndex,
+      }),
       isSamePointSelection(state.selectedPoint, {
         contourIndex,
         segmentIndex,
@@ -541,36 +869,46 @@ export const createVectorPaperSession = ({
     }
   };
 
-  const setSelectedPoint = (point) => {
-    const previousPoint = state.selectedPoint;
+  const setSelectedPoints = (points, primaryPoint = null) => {
+    const normalizedSelection = normalizePointSelections(points, primaryPoint);
+    const previousPoints = state.selectedPoints;
+    const previousPrimaryPoint = state.selectedPoint;
+    const nextPoints = normalizedSelection.points;
+    const nextPrimaryPoint = normalizedSelection.primaryPoint;
+    const samePrimaryPoint = isSamePointSelection(
+      previousPrimaryPoint,
+      nextPrimaryPoint
+    );
+    const samePoints =
+      previousPoints.length === nextPoints.length &&
+      previousPoints.every((point, index) =>
+        isSamePointSelection(point, nextPoints[index])
+      );
 
-    if (isSamePointSelection(previousPoint, point)) {
+    if (samePrimaryPoint && samePoints) {
       return;
     }
 
-    state.selectedPoint = point
-      ? {
-          contourIndex: point.contourIndex,
-          segmentIndex: point.segmentIndex,
-        }
-      : null;
+    state.selectedPoints = nextPoints;
+    state.selectedPoint = nextPrimaryPoint;
 
-    if (previousPoint) {
-      applySourceSegmentToPaper(
-        previousPoint.contourIndex,
-        previousPoint.segmentIndex
-      );
+    const pointsToRefresh = new Map();
+
+    for (const point of [...previousPoints, ...nextPoints]) {
+      pointsToRefresh.set(getPointSelectionKey(point), point);
     }
 
-    if (state.selectedPoint) {
-      applySourceSegmentToPaper(
-        state.selectedPoint.contourIndex,
-        state.selectedPoint.segmentIndex
-      );
+    for (const point of pointsToRefresh.values()) {
+      applySourceSegmentToPaper(point.contourIndex, point.segmentIndex);
     }
 
-    editor.setPathEditingPoint(state.selectedPoint);
+    editor.setPathEditingPoints(nextPoints, nextPrimaryPoint);
+    syncCornerWidget();
     scope.view.update();
+  };
+
+  const setSelectedPoint = (point) => {
+    setSelectedPoints(point ? [point] : [], point);
   };
 
   const setEndpointCloseTarget = (target: EndpointCloseTarget) => {
@@ -745,8 +1083,16 @@ export const createVectorPaperSession = ({
   };
 
   const renderScene = (scene) => {
-    const { contours, matrix, metrics, penHover, penPreview, selectedPoint } =
-      scene;
+    const {
+      contours,
+      interactionPolicy,
+      matrix,
+      metrics,
+      penHover,
+      penPreview,
+      selectedPoints,
+      selectedPoint,
+    } = scene;
     const canvasElement = scope.view.element;
 
     canvasElement.width = metrics.width;
@@ -771,9 +1117,13 @@ export const createVectorPaperSession = ({
     }
 
     state.contours = contours;
+    state.interactionPolicy = interactionPolicy || {
+      canInsertPoint: true,
+    };
     state.inverseMatrix = inverseMatrix;
     state.matrix = matrix;
     state.penHover = penHover || null;
+    state.selectedPoints = selectedPoints || [];
     state.selectedPoint = selectedPoint || null;
     state.styles = getSceneStyles(scope);
 
@@ -884,6 +1234,10 @@ export const createVectorPaperSession = ({
           segment,
           state.chrome[contourIndex][segmentIndex],
           state.styles,
+          isPointSelectionIncluded(state.selectedPoints, {
+            contourIndex,
+            segmentIndex,
+          }),
           isSamePointSelection(state.selectedPoint, {
             contourIndex,
             segmentIndex,
@@ -893,12 +1247,21 @@ export const createVectorPaperSession = ({
     });
 
     syncPreviewPath(penPreview);
+    syncCornerWidget();
     syncHoveredChrome();
     scope.view.update();
   };
 
   const syncActiveSceneFrame = (scene) => {
-    const { matrix, metrics, penHover, penPreview, selectedPoint } = scene;
+    const {
+      interactionPolicy,
+      matrix,
+      metrics,
+      penHover,
+      penPreview,
+      selectedPoints,
+      selectedPoint,
+    } = scene;
     const canvasElement = scope.view.element;
 
     canvasElement.width = metrics.width;
@@ -922,8 +1285,12 @@ export const createVectorPaperSession = ({
     }
 
     state.inverseMatrix = inverseMatrix;
+    state.interactionPolicy = interactionPolicy || {
+      canInsertPoint: true,
+    };
     state.matrix = matrix;
     state.penHover = penHover || null;
+    state.selectedPoints = selectedPoints || [];
     state.selectedPoint = selectedPoint || null;
     state.styles = getSceneStyles(scope);
 
@@ -947,6 +1314,10 @@ export const createVectorPaperSession = ({
           segment,
           state.chrome[contourIndex][segmentIndex],
           state.styles,
+          isPointSelectionIncluded(state.selectedPoints, {
+            contourIndex,
+            segmentIndex,
+          }),
           isSamePointSelection(state.selectedPoint, {
             contourIndex,
             segmentIndex,
@@ -956,6 +1327,7 @@ export const createVectorPaperSession = ({
     });
 
     syncPreviewPath(penPreview);
+    syncCornerWidget();
     syncHoveredChrome();
     scope.view.update();
   };
@@ -984,7 +1356,7 @@ export const createVectorPaperSession = ({
 
     setHoverCursorMode(null);
     setActiveCursorMode("body");
-    setSelectedPoint(null);
+    setSelectedPoints([], null);
     return true;
   };
 
@@ -1033,7 +1405,9 @@ export const createVectorPaperSession = ({
 
     return {
       bodyHit: findPathBodyHit(state.localPaths, localPoint),
-      insertTarget: findVectorPathInsertTarget(state.localPaths, localPoint),
+      insertTarget: state.interactionPolicy.canInsertPoint
+        ? findVectorPathInsertTarget(state.localPaths, localPoint)
+        : null,
     };
   };
 
@@ -1050,11 +1424,11 @@ export const createVectorPaperSession = ({
       return false;
     }
 
-    return editor.insertVectorPoint(insertion, nodeId);
+    return editor.insertPathPoint(insertion, nodeId);
   };
 
   const updateCursor = (point) => {
-    if (state.nodeDragSession || state.activeDrag) {
+    if (state.nodeDragSession || state.activeDrag || state.selectionMarquee) {
       return;
     }
 
@@ -1063,6 +1437,12 @@ export const createVectorPaperSession = ({
     const { bodyHit, insertTarget } = getPathInteraction(point);
 
     if (isVectorPathPointRole(role)) {
+      setHoveredPoint({
+        contourIndex: hit.item.data.contourIndex,
+        role,
+        segmentIndex: hit.item.data.segmentIndex,
+      });
+    } else if (role === "corner-radius") {
       setHoveredPoint({
         contourIndex: hit.item.data.contourIndex,
         role,
@@ -1079,6 +1459,39 @@ export const createVectorPaperSession = ({
         role,
       })
     );
+  };
+
+  const getAnchorSelectionsInRectangle = (from, to) => {
+    if (!state.matrix) {
+      return [];
+    }
+
+    const minX = Math.min(from.x, to.x);
+    const maxX = Math.max(from.x, to.x);
+    const minY = Math.min(from.y, to.y);
+    const maxY = Math.max(from.y, to.y);
+
+    return state.contours.flatMap((contour, contourIndex) => {
+      return contour.segments.flatMap((segment, segmentIndex) => {
+        const point = projectPoint(state.matrix, segment.point);
+
+        if (
+          point.x < minX ||
+          point.x > maxX ||
+          point.y < minY ||
+          point.y > maxY
+        ) {
+          return [];
+        }
+
+        return [
+          {
+            contourIndex,
+            segmentIndex,
+          },
+        ];
+      });
+    });
   };
 
   const updateDraggedGeometry = (
@@ -1103,6 +1516,51 @@ export const createVectorPaperSession = ({
     const pinnedLocalPoint = localPoint;
 
     if (role === "anchor") {
+      const selectedAnchorPoints =
+        state.selectedPoints.length > 1 &&
+        isPointSelectionIncluded(state.selectedPoints, {
+          contourIndex,
+          segmentIndex,
+        })
+          ? state.selectedPoints
+          : [
+              {
+                contourIndex,
+                segmentIndex,
+              },
+            ];
+
+      if (selectedAnchorPoints.length > 1) {
+        const delta = {
+          x: localPoint.x - currentSegment.point.x,
+          y: localPoint.y - currentSegment.point.y,
+        };
+
+        setEndpointCloseTarget(null);
+        state.contours = offsetEditablePathPoints(
+          state.contours,
+          selectedAnchorPoints,
+          delta
+        );
+
+        for (const selectedPoint of selectedAnchorPoints) {
+          applySourceSegmentToPaper(
+            selectedPoint.contourIndex,
+            selectedPoint.segmentIndex
+          );
+        }
+
+        syncHoveredChrome();
+        syncNode({
+          pinnedLocalPoint: {
+            x: localPoint.x,
+            y: localPoint.y,
+          },
+          pinnedWorldPoint: worldPoint,
+        });
+        return;
+      }
+
       const endpointCloseTarget = getVectorEndpointCloseTarget(state.contours, {
         contourIndex,
         segmentIndex,
@@ -1192,12 +1650,54 @@ export const createVectorPaperSession = ({
     });
   };
 
+  const updateDraggedCornerRadius = (contourIndex, segmentIndex, point) => {
+    const geometry = getVectorCornerWidgetGeometry({
+      contours: state.contours,
+      matrix: state.matrix,
+      point: {
+        contourIndex,
+        segmentIndex,
+      },
+    });
+
+    if (!geometry) {
+      return;
+    }
+
+    const nextCornerRadius = roundDelta(
+      getVectorCornerRadiusFromWidgetDrag(geometry, {
+        x: point.x,
+        y: point.y,
+      })
+    );
+    const pathPoint = {
+      contourIndex,
+      segmentIndex,
+    };
+
+    if (!editor.setPathPointCornerRadius(nextCornerRadius, nodeId, pathPoint)) {
+      return;
+    }
+
+    const nextSession = editor.getEditablePathSession(nodeId);
+
+    if (nextSession?.backend !== "vector-path") {
+      return;
+    }
+
+    state.contours = nextSession.contours;
+    syncCornerWidget();
+    syncHoveredChrome();
+    scope.view.update();
+  };
+
   const tool = new scope.Tool();
 
   tool.onMouseDown = (event) => {
     const hit = getInteractiveHit(scope, event.point);
     const role = hit?.item?.data?.role;
     const { bodyHit, insertTarget } = getPathInteraction(event.point);
+    const isAdditiveSelection = Boolean(event.event?.shiftKey);
 
     if (role === "anchor" || role === "handle-in" || role === "handle-out") {
       const pointSelection = {
@@ -1205,9 +1705,58 @@ export const createVectorPaperSession = ({
         segmentIndex: hit.item.data.segmentIndex,
       };
 
+      if (role === "anchor" && isAdditiveSelection) {
+        const nextSelectedPoints = isPointSelectionIncluded(
+          state.selectedPoints,
+          pointSelection
+        )
+          ? state.selectedPoints.filter((currentPoint) => {
+              return !isSamePointSelection(currentPoint, pointSelection);
+            })
+          : [...state.selectedPoints, pointSelection];
+        const nextPrimaryPoint =
+          nextSelectedPoints.length === 1 ? nextSelectedPoints[0] : null;
+
+        setSelectedPoints(nextSelectedPoints, nextPrimaryPoint);
+        setHoveredPoint({
+          contourIndex: hit.item.data.contourIndex,
+          role,
+          segmentIndex: hit.item.data.segmentIndex,
+        });
+        setHoverCursorMode("point");
+        return;
+      }
+
       state.pendingPress = {
         ...hit.item.data,
+        origin: event.point.clone(),
         type: "point",
+      } satisfies PendingPress;
+      setSelectedPoints(
+        isPointSelectionIncluded(state.selectedPoints, pointSelection)
+          ? state.selectedPoints
+          : [pointSelection],
+        pointSelection
+      );
+      setHoveredPoint({
+        contourIndex: hit.item.data.contourIndex,
+        role,
+        segmentIndex: hit.item.data.segmentIndex,
+      });
+      setHoverCursorMode("point");
+      return;
+    }
+
+    if (role === "corner-radius") {
+      const pointSelection = {
+        contourIndex: hit.item.data.contourIndex,
+        segmentIndex: hit.item.data.segmentIndex,
+      };
+
+      state.pendingPress = {
+        ...hit.item.data,
+        origin: event.point.clone(),
+        type: "corner-radius",
       } satisfies PendingPress;
       setSelectedPoint(pointSelection);
       setHoveredPoint({
@@ -1238,17 +1787,42 @@ export const createVectorPaperSession = ({
     }
 
     state.pendingPress = null;
-    setSelectedPoint(null);
     setHoveredPoint(null);
-
-    if (!role) {
-      onExitPathEditing();
-    }
+    state.pendingPress = {
+      additive: isAdditiveSelection,
+      origin: event.point.clone(),
+      type: "empty",
+    } satisfies PendingPress;
   };
 
   tool.onMouseDrag = (event) => {
     if (state.nodeDragSession && event.event) {
       updateNodeDrag(event.event);
+      return;
+    }
+
+    if (state.pendingPress?.type === "empty") {
+      if (
+        !state.selectionMarquee &&
+        event.point.getDistance(state.pendingPress.origin) >=
+          SELECTION_MARQUEE_THRESHOLD_PX
+      ) {
+        state.selectionMarquee = {
+          additive: state.pendingPress.additive,
+          current: event.point.clone(),
+          origin: state.pendingPress.origin.clone(),
+        };
+        syncSelectionMarquee();
+        setHoveredPoint(null);
+        setHoverCursorMode(null);
+      }
+
+      if (state.selectionMarquee) {
+        state.selectionMarquee.current = event.point.clone();
+        syncSelectionMarquee();
+        scope.view.update();
+      }
+
       return;
     }
 
@@ -1263,7 +1837,12 @@ export const createVectorPaperSession = ({
       }
     }
 
-    if (state.pendingPress?.type === "point" && !state.activeDrag) {
+    if (
+      state.pendingPress?.type === "point" &&
+      !state.activeDrag &&
+      event.point.getDistance(state.pendingPress.origin) >=
+        PATH_POINT_DRAG_THRESHOLD_PX
+    ) {
       state.activeDrag = state.pendingPress;
       state.pendingPress = null;
       state.historyMark = onHistoryStart();
@@ -1274,7 +1853,31 @@ export const createVectorPaperSession = ({
       setActiveCursorMode("point");
     }
 
+    if (
+      state.pendingPress?.type === "corner-radius" &&
+      !state.activeDrag &&
+      event.point.getDistance(state.pendingPress.origin) >=
+        PATH_POINT_DRAG_THRESHOLD_PX
+    ) {
+      state.activeDrag = state.pendingPress;
+      state.pendingPress = null;
+      state.historyMark = onHistoryStart();
+      state.isGeometryDragging = true;
+      setHoveredPoint(null);
+      setHoverCursorMode(null);
+      setActiveCursorMode("point");
+    }
+
     if (!state.activeDrag) {
+      return;
+    }
+
+    if (state.activeDrag.type === "corner-radius") {
+      updateDraggedCornerRadius(
+        state.activeDrag.contourIndex,
+        state.activeDrag.segmentIndex,
+        event.point
+      );
       return;
     }
 
@@ -1292,6 +1895,10 @@ export const createVectorPaperSession = ({
   };
 
   tool.onMouseMove = (event) => {
+    if (state.selectionMarquee) {
+      return;
+    }
+
     updateCursor(event.point);
   };
 
@@ -1306,9 +1913,28 @@ export const createVectorPaperSession = ({
 
     state.pendingPress = null;
 
+    if (state.selectionMarquee) {
+      const selectedPointsInBox = getAnchorSelectionsInRectangle(
+        state.selectionMarquee.origin,
+        state.selectionMarquee.current
+      );
+      const nextSelectedPoints = state.selectionMarquee.additive
+        ? [...state.selectedPoints, ...selectedPointsInBox]
+        : selectedPointsInBox;
+      const nextPrimaryPoint =
+        nextSelectedPoints.length === 1 ? nextSelectedPoints[0] : null;
+
+      setSelectedPoints(nextSelectedPoints, nextPrimaryPoint);
+      hideSelectionMarquee();
+      updateCursor(event.point);
+      return;
+    }
+
     if (!state.activeDrag) {
       if (pendingPress?.type === "insert") {
         insertPointAtTarget(pendingPress);
+      } else if (pendingPress?.type === "empty" && !pendingPress.additive) {
+        onExitPathEditing();
       }
 
       updateCursor(event.point);
@@ -1316,6 +1942,7 @@ export const createVectorPaperSession = ({
     }
 
     if (
+      state.activeDrag.type === "point" &&
       state.activeDrag.role === "anchor" &&
       state.endpointCloseTarget &&
       state.endpointCloseTarget.contourIndex === state.activeDrag.contourIndex

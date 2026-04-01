@@ -33,7 +33,7 @@
       "id": "shape-node",
       "type": "shape",
       "parentId": "root",
-      "shape": "rectangle",
+      "shape": "polygon",
       "width": 260,
       "height": 160,
       "fill": "#000000",

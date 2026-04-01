@@ -1,4 +1,5 @@
 import { exitPathEditingInteractionState } from "./interaction-state";
+import { normalizePathPointSelection } from "./path-point-selection";
 
 export const createSelectionStoreActions = (set) => {
   return {
@@ -53,17 +54,21 @@ export const createSelectionStoreActions = (set) => {
       set(() => ({
         pathEditingNodeId: nodeId || null,
         pathEditingPoint: null,
+        pathEditingPoints: [],
       }));
     },
 
     setPathEditingPoint: (point) => {
+      const nextSelection = normalizePathPointSelection(point ? [point] : []);
+
       set(() => ({
-        pathEditingPoint: point
-          ? {
-              contourIndex: point.contourIndex,
-              segmentIndex: point.segmentIndex,
-            }
-          : null,
+        ...nextSelection,
+      }));
+    },
+
+    setPathEditingPoints: (points, primaryPoint = null) => {
+      set(() => ({
+        ...normalizePathPointSelection(points, primaryPoint),
       }));
     },
 

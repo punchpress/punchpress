@@ -1,69 +1,5 @@
 import { commandsToContours, getBounds } from "../../primitives/path-geometry";
-
-const addPoint = (point, offset) => {
-  return {
-    x: point.x + offset.x,
-    y: point.y + offset.y,
-  };
-};
-
-const hasHandle = (handle) => {
-  return Boolean(handle && (handle.x !== 0 || handle.y !== 0));
-};
-
-const getSegmentCommand = (currentSegment, nextSegment) => {
-  const control1 = addPoint(currentSegment.point, currentSegment.handleOut);
-  const control2 = addPoint(nextSegment.point, nextSegment.handleIn);
-  const usesCurve =
-    hasHandle(currentSegment.handleOut) || hasHandle(nextSegment.handleIn);
-
-  if (!usesCurve) {
-    return {
-      type: "L",
-      x: nextSegment.point.x,
-      y: nextSegment.point.y,
-    };
-  }
-
-  return {
-    type: "C",
-    x: nextSegment.point.x,
-    x1: control1.x,
-    x2: control2.x,
-    y: nextSegment.point.y,
-    y1: control1.y,
-    y2: control2.y,
-  };
-};
-
-const getContourCommands = (contour) => {
-  if (!contour.segments.length) {
-    return [];
-  }
-
-  const [firstSegment, ...restSegments] = contour.segments;
-  const commands = [
-    {
-      type: "M",
-      x: firstSegment.point.x,
-      y: firstSegment.point.y,
-    },
-  ];
-
-  let previousSegment = firstSegment;
-
-  for (const segment of restSegments) {
-    commands.push(getSegmentCommand(previousSegment, segment));
-    previousSegment = segment;
-  }
-
-  if (contour.closed) {
-    commands.push(getSegmentCommand(previousSegment, firstSegment));
-    commands.push({ type: "Z" });
-  }
-
-  return commands;
-};
+import { getVectorContourCommands } from "./vector-corners";
 
 const formatCoordinate = (value) => {
   const roundedValue = Math.round(value * 1000) / 1000;
@@ -96,7 +32,7 @@ const commandsToPathData = (commands) => {
 
 export const buildVectorNodeGeometry = (node) => {
   const paths = node.contours.map((contour, index) => {
-    const commands = getContourCommands(contour);
+    const commands = getVectorContourCommands(contour);
 
     return {
       commands,

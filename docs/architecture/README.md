@@ -2,7 +2,7 @@
 
 - [Codebase Structure](./codebase-structure.md) — Current code layout, layer boundaries, and editor ownership
 - [Editor Operating Model](./editor-operating-model.md) — Editor land, React land, and automation as clients of the same editor
-- [Vector Editing Operating Model](./vector-editing-operating-model.md) — Engine ownership, Paper overlay responsibilities, and SVG import direction
+- [Vector Path Editing Operating Model](./vector-editing-operating-model.md) — Engine ownership, vector path backend boundaries, shape/vector editing policy, and SVG import direction
 - [Editor Extraction Plan](./editor-extraction-plan.md) — Remaining migration work after extracting the engine and schema packages
 - [Document Model](./document-model.md) — Persistent document schema, invariants, and export boundaries
 - [0005: Node Render Contract](./decisions/0005-node-render-contract.md) — Durable node capabilities, frame surfaces, and selection preview ownership

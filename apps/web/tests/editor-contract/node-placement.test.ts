@@ -9,7 +9,7 @@ describe("Editor node placement", () => {
 
     const session = editor.beginNodePlacement({
       point: { x: 120, y: 240 },
-      shape: "rectangle",
+      shape: "polygon",
       type: "shape",
     });
 
@@ -23,7 +23,7 @@ describe("Editor node placement", () => {
     expect(editor.activeTool).toBe("pointer");
     expect(editor.selectedNode).toMatchObject({
       height: 180,
-      shape: "rectangle",
+      shape: "polygon",
       type: "shape",
       width: 280,
     });
@@ -40,7 +40,7 @@ describe("Editor node placement", () => {
 
     const session = editor.beginNodePlacement({
       point: { x: 150, y: 200 },
-      shape: "rectangle",
+      shape: "polygon",
       type: "shape",
     });
 
@@ -69,7 +69,7 @@ describe("Editor node placement", () => {
     expect(editor.activeTool).toBe("pointer");
     expect(editor.selectedNode).toMatchObject({
       height: 220,
-      shape: "rectangle",
+      shape: "polygon",
       type: "shape",
       width: 210,
     });
@@ -120,7 +120,7 @@ describe("Editor node placement", () => {
 
     const session = editor.beginNodePlacement({
       point: { x: 150, y: 200 },
-      shape: "rectangle",
+      shape: "polygon",
       type: "shape",
     });
 
@@ -139,7 +139,7 @@ describe("Editor node placement", () => {
 
     expect(editor.selectedNode).toMatchObject({
       height: 220,
-      shape: "rectangle",
+      shape: "polygon",
       type: "shape",
       width: 220,
     });

@@ -1,5 +1,6 @@
 import {
   getNodeEditCapabilities as getNodeSurfaceEditCapabilities,
+  getNodeEditablePathSession as getNodeSurfaceEditablePathSession,
   getNodeSurfaceFrame,
   getNodeSurfaceGeometry,
   getNodeHitBounds as getNodeSurfaceHitBounds,
@@ -109,6 +110,10 @@ export const getNodeHitBounds = (editor, nodeId) => {
 
 export const getNodeEditCapabilities = (editor, nodeId) => {
   return getNodeSurfaceEditCapabilities(editor, nodeId);
+};
+
+export const getEditablePathSession = (editor, nodeId) => {
+  return getNodeSurfaceEditablePathSession(editor, nodeId);
 };
 
 export const getNodeRenderFrame = (editor, nodeId) => {

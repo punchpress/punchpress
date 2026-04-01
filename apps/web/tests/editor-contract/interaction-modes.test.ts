@@ -251,6 +251,67 @@ describe("Editor interaction mode boundaries", () => {
     expect(editor.pathEditingNodeId).toBe(node.id);
   });
 
+  test("vector nodes expose an editable path session for the vector path backend", () => {
+    const editor = createEditor();
+    const node = createVectorNode();
+
+    editor.getState().loadNodes([node]);
+    editor.select(node.id);
+    editor.startPathEditing(node.id);
+    editor.setPathEditingPoints(
+      [
+        {
+          contourIndex: 0,
+          segmentIndex: 1,
+        },
+        {
+          contourIndex: 0,
+          segmentIndex: 3,
+        },
+      ],
+      {
+        contourIndex: 0,
+        segmentIndex: 1,
+      }
+    );
+
+    expect(editor.getEditablePathSession(node.id)).toEqual({
+      backend: "vector-path",
+      contours: node.contours,
+      interactionPolicy: {
+        canInsertPoint: true,
+      },
+      nodeId: node.id,
+      nodeType: "vector",
+      selectedPoints: [
+        {
+          contourIndex: 0,
+          segmentIndex: 1,
+        },
+        {
+          contourIndex: 0,
+          segmentIndex: 3,
+        },
+      ],
+      selectedPoint: {
+        contourIndex: 0,
+        segmentIndex: 1,
+      },
+    });
+  });
+
+  test("text guide path editing does not expose a vector path session", () => {
+    const editor = createEditor();
+    const node = createCircleNode();
+
+    editor.getState().loadNodes([node]);
+    mockCircleGuideGeometry(editor, node);
+    editor.select(node.id);
+    editor.startPathEditing(node.id);
+
+    expect(editor.getEditablePathSession(node.id)).toBeNull();
+  });
+
   test("vector path editing persists across vector node updates", () => {
     const editor = createEditor();
     const node = createVectorNode();
@@ -268,6 +329,36 @@ describe("Editor interaction mode boundaries", () => {
 
     expect(editor.pathEditingNodeId).toBe(node.id);
     expect(editor.isPathEditing(node.id)).toBe(true);
+  });
+
+  test("updateEditablePath updates vector node contours through the shared path interface", () => {
+    const editor = createEditor();
+    const node = createVectorNode();
+    const nextContours = [
+      {
+        ...node.contours[0],
+        segments: node.contours[0].segments.map((segment, segmentIndex) => {
+          if (segmentIndex !== 0) {
+            return segment;
+          }
+
+          return {
+            ...segment,
+            point: {
+              x: segment.point.x - 40,
+              y: segment.point.y - 20,
+            },
+          };
+        }),
+      },
+    ];
+
+    editor.getState().loadNodes([node]);
+
+    expect(editor.updateEditablePath(node.id, nextContours)).toBe(true);
+    expect(editor.getNode(node.id)).toMatchObject({
+      contours: nextContours,
+    });
   });
 
   test("vector path editing replaces the normal transform overlay", () => {
@@ -291,6 +382,12 @@ describe("Editor interaction mode boundaries", () => {
     mockCircleGuideGeometry(editor, node);
     editor.select(node.id);
     editor.startPathEditing(node.id);
+    editor.setPathEditingPoints([
+      {
+        contourIndex: 0,
+        segmentIndex: 0,
+      },
+    ]);
     editor.beginTextPathPositioningInteraction();
 
     editor.stopPathEditing();
@@ -299,6 +396,7 @@ describe("Editor interaction mode boundaries", () => {
     expect(editor.isHoveringSuppressed).toBe(false);
     expect(editor.isTextPathPositioning).toBe(false);
     expect(editor.hoveredNodeId).toBeNull();
+    expect(editor.pathEditingPoints).toEqual([]);
   });
 
   test("canvas shortcut toggles vector path editing with E", () => {

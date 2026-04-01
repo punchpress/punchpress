@@ -88,12 +88,21 @@ export const groupNodeSchema = baseNodeSchema
   })
   .strict();
 
-export const shapeKindSchema = z.enum(["rectangle", "ellipse", "star"]);
+export const shapeKindSchema = z.enum(["polygon", "ellipse", "star"]);
+
+export const shapePointSchema = z
+  .object({
+    x: finiteNumber,
+    y: finiteNumber,
+  })
+  .strict();
 
 export const shapeNodeSchema = baseNodeSchema
   .extend({
+    cornerRadius: finiteNumber.optional(),
     fill: z.string().min(1),
     height: finiteNumber,
+    points: z.array(shapePointSchema).min(3).optional(),
     shape: shapeKindSchema,
     stroke: z.string().min(1).nullable(),
     strokeWidth: finiteNumber,
@@ -114,6 +123,7 @@ export const vectorPointTypeSchema = z.enum(["corner", "smooth"]);
 
 export const vectorSegmentSchema = z
   .object({
+    cornerRadius: finiteNumber.optional(),
     handleIn: vectorHandleSchema,
     handleOut: vectorHandleSchema,
     point: vectorHandleSchema,
@@ -193,6 +203,7 @@ export type DesignDocument = z.infer<typeof designDocumentSchema>;
 export type GroupNodeDocument = z.infer<typeof groupNodeSchema>;
 export type NodeDocument = z.infer<typeof nodeSchema>;
 export type ShapeKindDocument = z.infer<typeof shapeKindSchema>;
+export type ShapePointDocument = z.infer<typeof shapePointSchema>;
 export type ShapeNodeDocument = z.infer<typeof shapeNodeSchema>;
 export type TextNodeDocument = z.infer<typeof textNodeSchema>;
 export type LocalFontDocument = z.infer<typeof localFontSchema>;

@@ -9,7 +9,7 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 - A vector node supports fill, stroke, stroke width, and fill-rule behavior as durable node properties.
 - A vector node may contain one or more contours, including open paths, closed paths, and compound path-like structures.
 - A vector node should stay editable after save, load, copy, paste, duplicate, transform, and export workflows.
-- A vector node should be able to represent both freeform pen-drawn paths and primitive-based vector shapes.
+- A vector node should represent freeform path geometry and converted live shapes whose editing no longer maps cleanly to a live shape model.
 - By default, vector object behavior should follow familiar Adobe Illustrator-style conventions unless PunchPress intentionally chooses to diverge for a clear product reason.
 
 ## Selection And Transform
@@ -49,7 +49,9 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 - Users should be able to move existing anchor points directly on the canvas.
 - Users should be able to adjust bezier handles directly on the canvas.
 - Users should be able to select one or multiple anchor points within path edit mode.
-- Users should be able to select anchor points by click, additive selection, and lasso-style point selection.
+- Users should be able to select anchor points by click, additive selection, and marquee-style point selection.
+- Dragging one selected anchor should move the full selected anchor set together.
+- While path editing is active, marquee selection should target path points rather than whole nodes.
 - Path-edit cursors should distinguish point selection/editing from whole-object dragging.
 - Hovering or dragging a point should use point-edit cursor language such as `pointer`, not object-move cursors.
 - Hovering an anchor or bezier handle should communicate point editing, not object movement.
@@ -111,12 +113,15 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 - A complete editor should support multi-point edits where the requested action has a clear shared meaning.
 - A complete editor should preserve visual and behavioral consistency across direct selection, pen editing, and future text-on-path workflows.
 
-## Primitives
+## Relationship To Shape Nodes
 
-- PunchPress should support primitive vector starters such as rectangle, ellipse, line, polygon, and star.
-- Primitive vector starters should remain vector nodes rather than a separate long-term node family.
-- A primitive should be editable as ordinary vector geometry once the user enters path-edit mode.
-- PunchPress may preserve primitive-friendly creation defaults even after the node becomes freely editable vector geometry.
+- Shape nodes and vector nodes should feel like part of one coherent vector editing system even though they are distinct node families.
+- A shape should convert into a vector node when the user performs topology-changing edits or other operations that no longer fit that shape node's current live shape family.
+- A converted shape should preserve its visible geometry and styling as it becomes a vector node.
+- Vector nodes should not promise shape-specific controls such as corner radius once the object no longer has a clear live shape meaning.
+- Vector nodes should support corner-rounding controls on eligible corner anchors, but that is a vector-corner feature rather than a polygon-shape-wide live control.
+- While path editing a vector with no anchor selected, the properties panel should expose one bulk corner-radius control for all eligible corners.
+- If eligible vector corners do not all share the same radius, that bulk control should show a mixed state until the user applies a new value.
 
 ## Styling And Geometry
 

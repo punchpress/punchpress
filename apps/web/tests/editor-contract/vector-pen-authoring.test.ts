@@ -234,6 +234,25 @@ describe("vector pen authoring", () => {
     expect(segment?.handleOut).toEqual({ x: 50, y: 30 });
   });
 
+  test("tiny pen drag on the first point still creates a corner point", () => {
+    const editor = new Editor();
+
+    editor.setActiveTool("pen");
+    dragPen(editor, { x: 200, y: 160 }, { x: 204, y: 163 });
+
+    const node = editor.selectedNode;
+
+    if (node?.type !== "vector") {
+      throw new Error("Expected a vector node after pen placement.");
+    }
+
+    const segment = node.contours[0]?.segments[0];
+
+    expect(segment?.pointType).toBe("corner");
+    expect(segment?.handleIn).toEqual({ x: 0, y: 0 });
+    expect(segment?.handleOut).toEqual({ x: 0, y: 0 });
+  });
+
   test("dragging a following point creates a smooth anchor with incoming and outgoing handles", () => {
     const editor = new Editor();
 
@@ -257,6 +276,26 @@ describe("vector pen authoring", () => {
     expect(secondSegment?.handleOut).toEqual({ x: 40, y: 30 });
   });
 
+  test("tiny pen drag on a following point still creates a corner point", () => {
+    const editor = new Editor();
+
+    editor.setActiveTool("pen");
+    clickPen(editor, { x: 200, y: 160 });
+    dragPen(editor, { x: 260, y: 180 }, { x: 264, y: 183 });
+
+    const node = editor.selectedNode;
+
+    if (node?.type !== "vector") {
+      throw new Error("Expected the authored path to remain a vector node.");
+    }
+
+    const secondSegment = node.contours[0]?.segments[1];
+
+    expect(secondSegment?.pointType).toBe("corner");
+    expect(secondSegment?.handleIn).toEqual({ x: 0, y: 0 });
+    expect(secondSegment?.handleOut).toEqual({ x: 0, y: 0 });
+  });
+
   test("escape finishes the current pen path so the next click starts a new vector", () => {
     const editor = new Editor();
 
@@ -269,6 +308,31 @@ describe("vector pen authoring", () => {
     expect(pressKey(editor, "Escape", "Escape")).toBe(true);
     expect(editor.activeTool).toBe("pen");
     expect(editor.pathEditingNodeId).toBe(firstNodeId);
+
+    clickPen(editor, { x: 360, y: 260 });
+
+    expect(editor.nodes).toHaveLength(2);
+    expect(editor.selectedNodeId).not.toBe(firstNodeId);
+    expect(editor.pathEditingPoint).toEqual({
+      contourIndex: 0,
+      segmentIndex: 0,
+    });
+  });
+
+  test("exiting path editing with E finishes the active pen path so the next click starts a new vector", () => {
+    const editor = new Editor();
+
+    editor.setActiveTool("pen");
+    clickPen(editor, { x: 200, y: 160 });
+    clickPen(editor, { x: 260, y: 160 });
+    clickPen(editor, { x: 260, y: 220 });
+
+    const firstNodeId = editor.selectedNodeId;
+
+    expect(pressKey(editor, "E", "KeyE")).toBe(true);
+    expect(editor.activeTool).toBe("pen");
+    expect(editor.pathEditingNodeId).toBeNull();
+    expect(editor.pathEditingPoint).toBeNull();
 
     clickPen(editor, { x: 360, y: 260 });
 

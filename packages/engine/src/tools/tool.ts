@@ -7,7 +7,7 @@ const TOOL_SHORTCUTS = {
 
 const SHAPE_SHORTCUTS = {
   o: "ellipse",
-  r: "rectangle",
+  r: "polygon",
   s: "star",
 };
 
@@ -66,6 +66,10 @@ export class Tool {
   }
 
   onDeactivate() {
+    return false;
+  }
+
+  onPathEditingStopped() {
     return false;
   }
 

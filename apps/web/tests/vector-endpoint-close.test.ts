@@ -166,4 +166,74 @@ describe("vector endpoint close", () => {
       },
     ]);
   });
+
+  test("closing a uniformly rounded open contour applies that radius to the new closing corner", () => {
+    const contour = createOpenContour();
+    contour.segments[0] = {
+      ...contour.segments[0],
+      handleOut: { x: 0, y: 0 },
+      pointType: "corner",
+    };
+    contour.segments[1] = {
+      ...contour.segments[1],
+      cornerRadius: 14,
+      handleIn: { x: 0, y: 0 },
+      handleOut: { x: 0, y: 0 },
+      pointType: "corner",
+    };
+    contour.segments[2] = {
+      ...contour.segments[2],
+      handleIn: { x: 0, y: 0 },
+    };
+
+    const result = closeVectorContourByDraggingEndpoint([contour], {
+      contourIndex: 0,
+      draggedSegmentIndex: 2,
+      targetSegmentIndex: 0,
+    });
+
+    expect(result.contours[0]?.segments[0]?.cornerRadius).toBe(14);
+  });
+
+  test("closing a mixed-radius open contour does not invent a new inherited radius", () => {
+    const contour = {
+      closed: false,
+      segments: [
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 0, y: 0 },
+          pointType: "corner" as const,
+        },
+        {
+          cornerRadius: 14,
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 60, y: 40 },
+          pointType: "corner" as const,
+        },
+        {
+          cornerRadius: 28,
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 120, y: 10 },
+          pointType: "corner" as const,
+        },
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 180, y: 40 },
+          pointType: "corner" as const,
+        },
+      ],
+    };
+
+    const result = closeVectorContourByDraggingEndpoint([contour], {
+      contourIndex: 0,
+      draggedSegmentIndex: 3,
+      targetSegmentIndex: 0,
+    });
+
+    expect(result.contours[0]?.segments[0]?.cornerRadius).toBeUndefined();
+  });
 });
