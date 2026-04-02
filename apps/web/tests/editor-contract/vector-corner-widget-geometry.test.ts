@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   getVectorCornerRadiusFromWidgetDrag,
   getVectorCornerWidgetGeometry,
-} from "../../src/components/canvas/canvas-overlay/vector-corner-widget-geometry";
+} from "../../src/components/canvas/canvas-overlay/vector-path/corner-widget-geometry";
 
 const createRectangleContours = () => {
   return [

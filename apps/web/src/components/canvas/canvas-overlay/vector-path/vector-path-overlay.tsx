@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useEditor } from "../../../editor-react/use-editor";
-import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
-import { useEditorValue } from "../../../editor-react/use-editor-value";
+import { useEditor } from "../../../../editor-react/use-editor";
+import { useEditorSurfaceValue } from "../../../../editor-react/use-editor-surface-value";
+import { useEditorValue } from "../../../../editor-react/use-editor-value";
 import {
   getTextPathGuideMatrix,
   getTextPathHostMetrics,
   getTextPathTransformTargetStyle,
-} from "./text-path-overlay-geometry";
-import { createVectorPathSession } from "./vector-path-backend";
+} from "../text-path-overlay-geometry";
+import { createVectorPathSession } from "./backend";
 
 const getVectorPathOverlayScene = ({
   editablePathSession,

@@ -19,30 +19,10 @@ import {
   serializeDocument as serializeEditorDocument,
 } from "./document/document-actions";
 import {
-  bringToFront as bringEditorToFront,
-  deleteNode as deleteEditorNode,
-  deleteSelected as deleteEditorSelected,
-  deletePathPoint as deleteEditorPathPoint,
-  deleteVectorPoint as deleteEditorVectorPoint,
-  duplicate as duplicateEditorNodes,
-  groupSelected as groupEditorSelected,
-  getPathPointType as getEditorPathPointType,
-  insertPathPoint as insertEditorPathPoint,
-  insertVectorPoint as insertEditorVectorPoint,
-  moveSelectedPathPointsBy as moveEditorSelectedPathPointsBy,
-  renameGroup as renameEditorGroup,
-  sendToBack as sendEditorToBack,
-  setPathPointType as setEditorPathPointType,
-  setNodeOrder as setEditorNodeOrder,
-  setVectorPointType as setEditorVectorPointType,
-  toggleVisibility as toggleEditorVisibility,
-  ungroup as ungroupEditorNodes,
-  updateNode as updateEditorNode,
-  updateNodes as updateEditorNodes,
   updateEditablePath as updateEditorEditablePath,
-  updateSelectedNode as updateEditorSelectedNode,
   updateVectorContours as updateEditorVectorContours,
-} from "./document/node-actions";
+  moveSelectedPathPointsBy as moveEditorSelectedPathPointsBy,
+} from "./document/path/editable-path-actions";
 import {
   canRoundPathPoint as canEditorRoundPathPoint,
   getPathCornerRadiusSummary as getEditorPathCornerRadiusSummary,
@@ -50,7 +30,31 @@ import {
   getPathPointCornerRadius as getEditorPathPointCornerRadius,
   setPathCornerRadius as setEditorPathCornerRadius,
   setPathPointCornerRadius as setEditorPathPointCornerRadius,
-} from "./document/path-corner-actions";
+} from "./document/path/path-corner-actions";
+import {
+  deletePathPoint as deleteEditorPathPoint,
+  deleteVectorPoint as deleteEditorVectorPoint,
+  getPathPointType as getEditorPathPointType,
+  insertPathPoint as insertEditorPathPoint,
+  insertVectorPoint as insertEditorVectorPoint,
+  setPathPointType as setEditorPathPointType,
+  setVectorPointType as setEditorVectorPointType,
+} from "./document/path/path-point-actions";
+import {
+  bringToFront as bringEditorToFront,
+  deleteNode as deleteEditorNode,
+  deleteSelected as deleteEditorSelected,
+  duplicate as duplicateEditorNodes,
+  groupSelected as groupEditorSelected,
+  renameGroup as renameEditorGroup,
+  sendToBack as sendEditorToBack,
+  setNodeOrder as setEditorNodeOrder,
+  toggleVisibility as toggleEditorVisibility,
+  ungroup as ungroupEditorNodes,
+  updateNode as updateEditorNode,
+  updateNodes as updateEditorNodes,
+  updateSelectedNode as updateEditorSelectedNode,
+} from "./document/node-actions";
 import {
   addShapeNode as addEditorShapeNode,
   addTextNode as addEditorTextNode,
@@ -85,6 +89,7 @@ import {
   handleSpaceUp as handleEditorSpaceUp,
   handleWindowKeyDown as handleEditorWindowKeyDown,
 } from "./input/keyboard-shortcuts";
+import { getPathEditingInspectorState as getEditorPathEditingInspectorState } from "./inspection/path/path-edit-inspector";
 import {
   getNodePropertySupport as getEditorNodePropertySupport,
   getSelectionProperties as getEditorSelectionProperties,
@@ -1005,6 +1010,10 @@ export class Editor {
     }
 
     return getEditorPathCornerRadiusSummary(this, nodeId);
+  }
+
+  getPathEditingInspectorState(nodeId = this.selectedNodeId) {
+    return getEditorPathEditingInspectorState(this, nodeId);
   }
 
   setVectorPointType(

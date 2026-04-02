@@ -6,77 +6,28 @@ import {
   replacePenContourSegment,
   reversePenContour,
 } from "../nodes/vector/pen-authoring";
-import {
-  findVectorPathInsertTarget,
-  splitVectorContourAtParameter,
-} from "../nodes/vector/point-insert";
 import { round } from "../primitives/math";
 import { getNodeLocalPoint, getNodeWorldPoint } from "../primitives/rotation";
+import {
+  getExistingPointActionNode,
+  getSelectedEndpointContinuationTarget,
+  resolveContinuationTarget,
+  resolveDeletePointTarget,
+  resolveInsertPointTarget,
+} from "./pen-existing-point-actions";
+import {
+  DRAG_THRESHOLD_PX,
+  PEN_HANDLE_DRAG_THRESHOLD_PX,
+  createPlacementSession,
+  getContourSegmentCount,
+  getZeroHandle,
+  isSamePoint,
+  roundHandle,
+  type PenAuthoringSession,
+  type PenDraftPlacement,
+  type PenHoverState,
+} from "./pen-tool-types";
 import { selectToolFromShortcut, Tool } from "./tool";
-
-const DRAG_THRESHOLD_PX = 3;
-const PEN_HANDLE_DRAG_THRESHOLD_PX = 6;
-const POINT_EPSILON = 0.5;
-const SEGMENT_INSERT_INTERACTION_TOLERANCE_PX = 10;
-
-const getContourSegmentCount = (node, contourIndex) => {
-  if (node?.type !== "vector") {
-    return 0;
-  }
-
-  return node.contours[contourIndex]?.segments.length || 0;
-};
-
-const getZeroHandle = () => ({ x: 0, y: 0 });
-
-const isSamePoint = (a, b) => {
-  return Math.hypot(a.x - b.x, a.y - b.y) <= POINT_EPSILON;
-};
-
-const roundHandle = (handle) => {
-  return {
-    x: round(handle.x, 2),
-    y: round(handle.y, 2),
-  };
-};
-
-interface PenDraftPlacement {
-  anchorCanvasPoint: { x: number; y: number };
-  anchorLocalPoint: { x: number; y: number };
-  dragHandle: { x: number; y: number } | null;
-  kind: "first-point" | "next-point";
-  target: null | {
-    segmentIndex: number;
-    type: "start-anchor";
-  };
-}
-
-interface PenAuthoringSession {
-  contourIndex: number;
-  draft: PenDraftPlacement | null;
-  hasAuthoredChange: boolean;
-  hasPlacedInitialPoint: boolean;
-  historyMark: unknown;
-  hoverPoint: { x: number; y: number } | null;
-  hoverTarget: PenDraftPlacement["target"];
-  nodeId: string;
-}
-
-interface PenHoverState {
-  contourIndex: number;
-  intent: "add" | "close" | "continue" | "delete";
-  nodeId: string;
-  role: "anchor" | "segment";
-  segmentIndex: number;
-}
-
-const createPlacementSession = (onCancel, onComplete, onUpdate) => {
-  return {
-    cancel: onCancel,
-    complete: onComplete,
-    update: onUpdate,
-  };
-};
 
 export class PenTool extends Tool {
   authoringSession: PenAuthoringSession | null;
@@ -194,54 +145,7 @@ export class PenTool extends Tool {
   }
 
   getSelectedEndpointContinuationTarget() {
-    const nodeId = this.editor.pathEditingNodeId;
-    const point = this.editor.pathEditingPoint;
-
-    if (!(nodeId && point)) {
-      return null;
-    }
-
-    const node = this.editor.getNode(nodeId);
-
-    if (
-      !(
-        node?.type === "vector" &&
-        this.editor.selectedNodeId === nodeId &&
-        this.editor.isSelected(nodeId)
-      )
-    ) {
-      return null;
-    }
-
-    const contour = node.contours[point.contourIndex];
-
-    if (!(contour && !contour.closed && contour.segments.length > 0)) {
-      return null;
-    }
-
-    if (point.segmentIndex === 0) {
-      return {
-        node,
-        target: {
-          contourIndex: point.contourIndex,
-          endpoint: "start" as const,
-          segmentIndex: 0,
-        },
-      };
-    }
-
-    if (point.segmentIndex === contour.segments.length - 1) {
-      return {
-        node,
-        target: {
-          contourIndex: point.contourIndex,
-          endpoint: "end" as const,
-          segmentIndex: point.segmentIndex,
-        },
-      };
-    }
-
-    return null;
+    return getSelectedEndpointContinuationTarget(this.editor);
   }
 
   startSelectedEndpointContinuationSession() {
@@ -330,17 +234,7 @@ export class PenTool extends Tool {
   }
 
   getExistingPointActionNode(nodeId) {
-    if (!nodeId) {
-      return null;
-    }
-
-    const node = this.editor.getNode(nodeId);
-
-    if (!(node?.type === "vector" && this.editor.isSelected(node.id))) {
-      return null;
-    }
-
-    return node;
+    return getExistingPointActionNode(this.editor, nodeId);
   }
 
   onCanvasPointerLeave() {
@@ -785,173 +679,15 @@ export class PenTool extends Tool {
   }
 
   resolveContinuationTarget(node, point) {
-    if (!(node?.type === "vector" && this.editor.isSelected(node.id))) {
-      return null;
-    }
-
-    const bbox = this.editor.getNodeGeometry(node.id)?.bbox;
-
-    if (!bbox) {
-      return null;
-    }
-
-    const closeDistance =
-      VECTOR_ANCHOR_INTERACTION_RADIUS_PX / Math.max(this.editor.zoom || 1, 1);
-    let closestTarget: null | {
-      contourIndex: number;
-      endpoint: "end" | "start";
-      segmentIndex: number;
-    } = null;
-    let closestDistance = Number.POSITIVE_INFINITY;
-
-    for (const [contourIndex, contour] of node.contours.entries()) {
-      if (contour.closed || contour.segments.length === 0) {
-        continue;
-      }
-
-      const startWorldPoint = getNodeWorldPoint(
-        node,
-        bbox,
-        contour.segments[0].point
-      );
-      const endSegmentIndex = contour.segments.length - 1;
-      const endWorldPoint = getNodeWorldPoint(
-        node,
-        bbox,
-        contour.segments[endSegmentIndex].point
-      );
-
-      for (const candidate of [
-        {
-          distance: Math.hypot(
-            point.x - startWorldPoint.x,
-            point.y - startWorldPoint.y
-          ),
-          endpoint: "start" as const,
-          segmentIndex: 0,
-        },
-        {
-          distance: Math.hypot(
-            point.x - endWorldPoint.x,
-            point.y - endWorldPoint.y
-          ),
-          endpoint: "end" as const,
-          segmentIndex: endSegmentIndex,
-        },
-      ]) {
-        if (
-          candidate.distance > closeDistance ||
-          candidate.distance >= closestDistance
-        ) {
-          continue;
-        }
-
-        closestDistance = candidate.distance;
-        closestTarget = {
-          contourIndex,
-          endpoint: candidate.endpoint,
-          segmentIndex: candidate.segmentIndex,
-        };
-      }
-    }
-
-    return closestTarget;
+    return resolveContinuationTarget(this.editor, node, point);
   }
 
   resolveDeletePointTarget(node, point) {
-    if (
-      !(
-        node?.type === "vector" &&
-        this.editor.isSelected(node.id) &&
-        this.editor.pathEditingNodeId === node.id
-      )
-    ) {
-      return null;
-    }
-
-    const bbox = this.editor.getNodeGeometry(node.id)?.bbox;
-
-    if (!bbox) {
-      return null;
-    }
-
-    const closeDistance =
-      VECTOR_ANCHOR_INTERACTION_RADIUS_PX / Math.max(this.editor.zoom || 1, 1);
-    let closestTarget: null | {
-      contourIndex: number;
-      segmentIndex: number;
-    } = null;
-    let closestDistance = Number.POSITIVE_INFINITY;
-
-    for (const [contourIndex, contour] of node.contours.entries()) {
-      for (const [segmentIndex, segment] of contour.segments.entries()) {
-        const isEndpoint =
-          !contour.closed &&
-          (segmentIndex === 0 || segmentIndex === contour.segments.length - 1);
-
-        if (isEndpoint) {
-          continue;
-        }
-
-        const worldPoint = getNodeWorldPoint(node, bbox, segment.point);
-        const distance = Math.hypot(
-          point.x - worldPoint.x,
-          point.y - worldPoint.y
-        );
-
-        if (distance > closeDistance || distance >= closestDistance) {
-          continue;
-        }
-
-        closestDistance = distance;
-        closestTarget = {
-          contourIndex,
-          segmentIndex,
-        };
-      }
-    }
-
-    return closestTarget;
+    return resolveDeletePointTarget(this.editor, node, point);
   }
 
   resolveInsertPointTarget(node, point) {
-    if (
-      !(
-        node?.type === "vector" &&
-        this.editor.isSelected(node.id) &&
-        this.editor.pathEditingNodeId === node.id
-      )
-    ) {
-      return null;
-    }
-
-    const bbox = this.editor.getNodeGeometry(node.id)?.bbox;
-
-    if (!bbox) {
-      return null;
-    }
-
-    const interactionScale = Math.max(
-      Math.abs(node.transform.scaleX || 1),
-      Math.abs(node.transform.scaleY || 1),
-      0.001
-    );
-    const localPoint = getNodeLocalPoint(node, bbox, point);
-    const target = findVectorPathInsertTarget(
-      node.contours,
-      localPoint,
-      SEGMENT_INSERT_INTERACTION_TOLERANCE_PX /
-        (Math.max(this.editor.zoom || 1, 1) * interactionScale)
-    );
-
-    if (!target) {
-      return null;
-    }
-
-    return splitVectorContourAtParameter(
-      node.contours[target.contourIndex],
-      target
-    );
+    return resolveInsertPointTarget(this.editor, node, point);
   }
 
   startContinuationSession(node, target) {

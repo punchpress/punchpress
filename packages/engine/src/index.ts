@@ -8,6 +8,7 @@ export {
   WARP_TEXT_NODE_KIND,
 } from "./constants";
 export { Editor } from "./editor";
+export { offsetEditablePathPoints } from "./document/path/editable-path-actions";
 export {
   getNodePropertySupport,
   getSelectionProperties,
@@ -86,3 +87,10 @@ export {
   getNodeRotationCenter,
   getNodeWorldPoint,
 } from "./primitives/rotation";
+export {
+  includesPathPoint,
+  isSamePathPoint,
+  normalizePathPoint,
+  normalizePathPointSelection,
+  toPathPointKey,
+} from "./state/store/path/path-point-selection";
