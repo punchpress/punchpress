@@ -1,6 +1,7 @@
 import {
   getVectorPathCursorMode,
   isVectorPathPointRole,
+  offsetEditablePathPoints,
   updateVectorPointHandle,
 } from "@punchpress/engine";
 import paper from "paper";
@@ -9,73 +10,69 @@ import {
   getVectorPathCursorToken,
   setActiveCanvasCursorToken,
   setCanvasCursorToken,
-} from "../canvas-cursor-policy";
+} from "../../canvas-cursor-policy";
 import {
   closeVectorContourByDraggingEndpoint,
   getVectorDraggedEndpointPreviewPoint,
   getVectorEndpointCloseTarget,
   shouldSnapVectorEndpointClose,
-} from "./vector-endpoint-close";
-import { getVectorBezierHandleAppearance } from "./vector-handle-appearance";
-import {
-  getVectorAnchorHoverHaloRadiusPx,
-  getVectorHoverHaloFillAlpha,
-  getVectorHoverHaloStrokeWidthPx,
-} from "./vector-hover-halo";
+} from "./endpoint-close";
 import {
   createLocalContourPath,
   findVectorPathInsertTarget,
   splitVectorContourAtOffset,
-} from "./vector-paper-point-insert";
+} from "./paper-point-insert";
+import {
+  findPathBodyHit,
+  getDragModifierState,
+  getInteractiveHit,
+} from "./paper-session-interaction";
+import {
+  getAnchorSelectionsInRectangle,
+  getPointSelectionKey,
+  isPointSelectionIncluded,
+  isSamePointSelection,
+  normalizePointSelections,
+} from "./paper-session-selection";
+import {
+  CORNER_WIDGET_HALO_RADIUS_PX,
+  GUIDE_STROKE_WIDTH_PX,
+  HANDLE_HOVER_RADIUS_PX,
+  PREVIEW_DASH_ARRAY,
+  createAnchorItem,
+  createCornerWidgetItem,
+  createHandleItem,
+  createHandleLine,
+  createHoverHaloItem,
+  createPreviewAnchorItem,
+  createPreviewHandleItem,
+  createPreviewHandleLine,
+  getSceneStyles,
+  getVectorAnchorHoverHaloRadiusPx,
+  getZeroPoint,
+  projectPoint,
+  projectVector,
+  refreshSegmentChrome,
+  type CornerWidgetChrome,
+  type VectorSegmentChrome,
+} from "./paper-session-render";
 import {
   getPenPreviewEndpoint,
-  getPenPreviewHandleAppearance,
   getPenPreviewHandleIn,
   getPenPreviewHandleOut,
   type PenPreviewState,
   shouldShowPenPreviewGhostAnchor,
   shouldShowPenPreviewHandles,
-} from "./vector-pen-preview";
+} from "./pen-preview";
 import {
   getVectorCornerRadiusFromWidgetDrag,
   getVectorCornerWidgetGeometry,
-} from "./vector-corner-widget-geometry";
+} from "./corner-widget-geometry";
 
-const ANCHOR_RADIUS_PX = 6;
-const CORNER_WIDGET_RADIUS_PX = 5;
-const CORNER_WIDGET_HALO_RADIUS_PX = 10;
 const ENDPOINT_CLOSE_SNAP_DISTANCE_PX = 14;
-const GUIDE_STROKE_WIDTH_PX = 1.5;
-const HANDLE_LINE_STROKE_WIDTH_PX = 1.25;
-const HANDLE_RADIUS_PX = 6;
-const PREVIEW_DASH_ARRAY = [8, 6];
-const HANDLE_HOVER_RADIUS_PX = HANDLE_RADIUS_PX + 5;
 const SELECTION_MARQUEE_DASH_ARRAY = [6, 4];
 const SELECTION_MARQUEE_THRESHOLD_PX = 4;
 const PATH_POINT_DRAG_THRESHOLD_PX = 4;
-const SELECTED_ANCHOR_SCALE = 1.2;
-const HIT_TEST_OPTIONS = {
-  fill: true,
-  stroke: true,
-  tolerance: 10,
-};
-
-interface VectorSegmentChrome {
-  anchor: paper.Path.Circle;
-  anchorHalo: paper.Path.Circle;
-  handleIn: paper.Path.Circle;
-  handleInHalo: paper.Path.Circle;
-  handleInLine: paper.Path;
-  handleOut: paper.Path.Circle;
-  handleOutHalo: paper.Path.Circle;
-  handleOutLine: paper.Path;
-}
-
-interface CornerWidgetChrome {
-  handle: paper.Path.Circle;
-  halo: paper.Path.Circle;
-  line: paper.Path;
-}
 
 type HoveredPoint = {
   contourIndex: number;
@@ -129,302 +126,6 @@ type EndpointCloseTarget = {
 
 const roundDelta = (value) => Math.round(value * 100) / 100;
 
-const resolveCssColor = (canvas, value, fallback) => {
-  const probe = document.createElement("div");
-  probe.style.color = value;
-  canvas.parentElement?.appendChild(probe);
-  const resolved = getComputedStyle(probe).color;
-  probe.remove();
-  return resolved || fallback;
-};
-
-const getSceneStyles = (scope) => {
-  const canvas = scope.view.element;
-  const accent = resolveCssColor(
-    canvas,
-    "var(--canvas-handle-accent)",
-    "#165DFC"
-  );
-  const background = resolveCssColor(
-    canvas,
-    "var(--background)",
-    "rgb(255 255 255)"
-  );
-
-  return {
-    backgroundFill: new scope.Color(background),
-    accentFill: new scope.Color(accent),
-    guide: new scope.Color(accent),
-    hoverHalo: (() => {
-      const color = new scope.Color(
-        resolveCssColor(
-          canvas,
-          "color-mix(in srgb, white 18%, var(--editor-accent) 82%)",
-          "rgb(110 165 255)"
-        )
-      );
-      color.alpha = 0.28;
-      return color;
-    })(),
-    shadow: new scope.Color(0, 0, 0, 0.18),
-  };
-};
-
-const projectPoint = (matrix, point) => {
-  return new paper.Point(
-    matrix.a * point.x + matrix.c * point.y + matrix.e,
-    matrix.b * point.x + matrix.d * point.y + matrix.f
-  );
-};
-
-const projectVector = (matrix, point) => {
-  return new paper.Point(
-    matrix.a * point.x + matrix.c * point.y,
-    matrix.b * point.x + matrix.d * point.y
-  );
-};
-
-const getZeroPoint = () => new paper.Point(0, 0);
-
-const createAnchorItem = (scope, styles, point) => {
-  const anchor = new scope.Path.Circle({
-    center: point,
-    fillColor: styles.backgroundFill.clone(),
-    radius: ANCHOR_RADIUS_PX,
-    strokeColor: styles.accentFill.clone(),
-    strokeWidth: 2,
-  });
-
-  anchor.shadowBlur = 4;
-  anchor.shadowColor = styles.shadow;
-  anchor.shadowOffset = new scope.Point(0, 1);
-
-  return anchor;
-};
-
-const createHandleItem = (scope, styles, point) => {
-  const bezierHandleAppearance = getVectorBezierHandleAppearance();
-  return new scope.Path.Circle({
-    center: point,
-    fillColor: styles.accentFill.clone(),
-    radius: bezierHandleAppearance.radiusPx,
-    strokeColor: null,
-    strokeWidth: 0,
-  });
-};
-
-const createCornerWidgetItem = (scope, styles, point) => {
-  const widget = new scope.Path.Circle({
-    center: point,
-    fillColor: styles.backgroundFill.clone(),
-    radius: CORNER_WIDGET_RADIUS_PX,
-    strokeColor: styles.accentFill.clone(),
-    strokeWidth: 2,
-    visible: false,
-  });
-
-  widget.shadowBlur = 4;
-  widget.shadowColor = styles.shadow;
-  widget.shadowOffset = new scope.Point(0, 1);
-
-  return widget;
-};
-
-const createPreviewAnchorItem = (scope, styles, point) => {
-  const anchor = new scope.Path.Circle({
-    center: point,
-    fillColor: styles.backgroundFill.clone(),
-    radius: ANCHOR_RADIUS_PX,
-    strokeColor: styles.accentFill.clone(),
-    strokeWidth: 2,
-    visible: false,
-  });
-
-  anchor.fillColor.alpha = 0.65;
-  anchor.strokeColor.alpha = 0.7;
-
-  return anchor;
-};
-
-const createPreviewHandleItem = (scope, styles, point) => {
-  const previewHandleAppearance = getPenPreviewHandleAppearance();
-  const handle = new scope.Path.Circle({
-    center: point,
-    fillColor: styles.accentFill.clone(),
-    radius: previewHandleAppearance.radiusPx,
-    strokeColor: null,
-    visible: false,
-  });
-
-  handle.visible = false;
-  handle.fillColor.alpha =
-    previewHandleAppearance.fillMode === "solid" ? 1 : 0.65;
-  return handle;
-};
-
-const createPreviewHandleLine = (scope, styles, point) => {
-  const line = createHandleLine(scope, styles, point, point);
-  line.visible = false;
-  line.strokeColor.alpha = 0.5;
-  return line;
-};
-
-const createHoverHaloItem = (scope, styles, point, radius) => {
-  const fillColor = styles.hoverHalo.clone();
-  fillColor.alpha = getVectorHoverHaloFillAlpha();
-
-  return new scope.Path.Circle({
-    center: point,
-    fillColor,
-    radius,
-    strokeColor: null,
-    strokeWidth: getVectorHoverHaloStrokeWidthPx(),
-    visible: false,
-  });
-};
-
-const createHandleLine = (scope, styles, from, to) => {
-  const line = new scope.Path({
-    segments: [from, to],
-    strokeCap: "round",
-    strokeColor: styles.guide.clone(),
-    strokeWidth: HANDLE_LINE_STROKE_WIDTH_PX,
-  });
-
-  line.strokeColor.alpha = 0.6;
-
-  return line;
-};
-
-const setItemScale = (item: paper.Item, nextScale: number) => {
-  const currentScale =
-    typeof item.data.currentScale === "number" ? item.data.currentScale : 1;
-
-  if (currentScale === nextScale) {
-    return;
-  }
-
-  item.scale(nextScale / currentScale);
-  item.data.currentScale = nextScale;
-};
-
-const applyHandleItemAppearance = (handle, styles) => {
-  handle.fillColor = styles.accentFill.clone();
-  handle.fillColor.alpha = 1;
-  handle.strokeColor = null;
-  handle.strokeWidth = 0;
-};
-
-const isSamePointSelection = (a, b) => {
-  return Boolean(
-    a &&
-      b &&
-      a.contourIndex === b.contourIndex &&
-      a.segmentIndex === b.segmentIndex
-  );
-};
-
-const getPointSelectionKey = (point) => {
-  return `${point.contourIndex}:${point.segmentIndex}`;
-};
-
-const isPointSelectionIncluded = (points, point) => {
-  return points.some((currentPoint) => isSamePointSelection(currentPoint, point));
-};
-
-const normalizePointSelections = (points, primaryPoint = null) => {
-  const normalizedPoints = [];
-  const seenKeys = new Set();
-
-  for (const point of points || []) {
-    if (
-      !point ||
-      typeof point.contourIndex !== "number" ||
-      typeof point.segmentIndex !== "number"
-    ) {
-      continue;
-    }
-
-    const key = getPointSelectionKey(point);
-
-    if (seenKeys.has(key)) {
-      continue;
-    }
-
-    seenKeys.add(key);
-    normalizedPoints.push({
-      contourIndex: point.contourIndex,
-      segmentIndex: point.segmentIndex,
-    });
-  }
-
-  const normalizedPrimaryPoint =
-    primaryPoint &&
-    typeof primaryPoint.contourIndex === "number" &&
-    typeof primaryPoint.segmentIndex === "number"
-      ? {
-          contourIndex: primaryPoint.contourIndex,
-          segmentIndex: primaryPoint.segmentIndex,
-        }
-      : null;
-
-  if (!(normalizedPrimaryPoint && isPointSelectionIncluded(normalizedPoints, normalizedPrimaryPoint))) {
-    return {
-      points: normalizedPoints,
-      primaryPoint:
-        normalizedPoints.length === 1 ? normalizedPoints[0] : null,
-    };
-  }
-
-  return {
-    points: normalizedPoints,
-    primaryPoint: normalizedPrimaryPoint,
-  };
-};
-
-const refreshSegmentChrome = (
-  segment,
-  chrome,
-  styles,
-  isSelected,
-  isPrimarySelected
-) => {
-  chrome.anchor.position = segment.point;
-  chrome.anchorHalo.position = segment.point;
-  setItemScale(chrome.anchor, isSelected ? SELECTED_ANCHOR_SCALE : 1);
-  chrome.anchor.fillColor = isSelected
-    ? styles.accentFill.clone()
-    : styles.backgroundFill.clone();
-  chrome.anchor.strokeColor = isSelected
-    ? styles.backgroundFill.clone()
-    : styles.accentFill.clone();
-  chrome.anchor.strokeWidth = isSelected ? 1.5 : 2;
-  chrome.anchorHalo.visible = false;
-
-  const handleInPoint = segment.point.add(segment.handleIn);
-  const handleOutPoint = segment.point.add(segment.handleOut);
-  const hasHandleIn = isPrimarySelected && segment.handleIn.length > 0.01;
-  const hasHandleOut = isPrimarySelected && segment.handleOut.length > 0.01;
-
-  chrome.handleInLine.segments[0].point = segment.point;
-  chrome.handleInLine.segments[1].point = handleInPoint;
-  chrome.handleInLine.visible = hasHandleIn;
-  chrome.handleInHalo.position = handleInPoint;
-  chrome.handleInHalo.visible = false;
-  chrome.handleIn.position = handleInPoint;
-  applyHandleItemAppearance(chrome.handleIn, styles);
-  chrome.handleIn.visible = hasHandleIn;
-
-  chrome.handleOutLine.segments[0].point = segment.point;
-  chrome.handleOutLine.segments[1].point = handleOutPoint;
-  chrome.handleOutLine.visible = hasHandleOut;
-  chrome.handleOutHalo.position = handleOutPoint;
-  chrome.handleOutHalo.visible = false;
-  chrome.handleOut.position = handleOutPoint;
-  applyHandleItemAppearance(chrome.handleOut, styles);
-  chrome.handleOut.visible = hasHandleOut;
-};
-
 const getCanvasPoint = (editor, clientX, clientY) => {
   const viewer = editor.viewerRef;
   const host = editor.hostRef;
@@ -438,36 +139,6 @@ const getCanvasPoint = (editor, clientX, clientY) => {
   return {
     x: viewer.getScrollLeft() + (clientX - rect.left) / editor.zoom,
     y: viewer.getScrollTop() + (clientY - rect.top) / editor.zoom,
-  };
-};
-
-const findPathBodyHit = (paths, point) => {
-  const directPathHit = paths.find((path) => path.hitTest(point));
-
-  if (directPathHit) {
-    return directPathHit;
-  }
-
-  return paths.find((path) => path.closed && path.contains(point)) || null;
-};
-
-const getInteractiveHit = (scope, point) => {
-  const hits = scope.project.hitTestAll(point, HIT_TEST_OPTIONS);
-
-  return (
-    hits.find((hit) => isVectorPathPointRole(hit?.item?.data?.role)) ||
-    hits.find((hit) => hit?.item?.data?.role === "corner-radius") ||
-    hits.find((hit) => hit?.item?.data?.role === "path") ||
-    null
-  );
-};
-
-const getDragModifierState = (nativeEvent, role) => {
-  const isHandle = role === "handle-in" || role === "handle-out";
-
-  return {
-    constrainAngle: Boolean(isHandle && nativeEvent?.shiftKey),
-    preserveSmoothCoupling: !(isHandle && nativeEvent?.altKey),
   };
 };
 
@@ -485,31 +156,6 @@ const mapTargetSegment = (contours, target, mapper) => {
         }
 
         return mapper(segment);
-      }),
-    };
-  });
-};
-
-const offsetEditablePathPoints = (contours, points, delta) => {
-  const pointKeys = new Set(
-    (points || []).map((point) => getPointSelectionKey(point))
-  );
-
-  return contours.map((contour, contourIndex) => {
-    return {
-      ...contour,
-      segments: contour.segments.map((segment, segmentIndex) => {
-        if (!pointKeys.has(`${contourIndex}:${segmentIndex}`)) {
-          return segment;
-        }
-
-        return {
-          ...segment,
-          point: {
-            x: segment.point.x + (delta.x || 0),
-            y: segment.point.y + (delta.y || 0),
-          },
-        };
       }),
     };
   });
@@ -1461,39 +1107,6 @@ export const createVectorPaperSession = ({
     );
   };
 
-  const getAnchorSelectionsInRectangle = (from, to) => {
-    if (!state.matrix) {
-      return [];
-    }
-
-    const minX = Math.min(from.x, to.x);
-    const maxX = Math.max(from.x, to.x);
-    const minY = Math.min(from.y, to.y);
-    const maxY = Math.max(from.y, to.y);
-
-    return state.contours.flatMap((contour, contourIndex) => {
-      return contour.segments.flatMap((segment, segmentIndex) => {
-        const point = projectPoint(state.matrix, segment.point);
-
-        if (
-          point.x < minX ||
-          point.x > maxX ||
-          point.y < minY ||
-          point.y > maxY
-        ) {
-          return [];
-        }
-
-        return [
-          {
-            contourIndex,
-            segmentIndex,
-          },
-        ];
-      });
-    });
-  };
-
   const updateDraggedGeometry = (
     role,
     contourIndex,
@@ -1915,6 +1528,8 @@ export const createVectorPaperSession = ({
 
     if (state.selectionMarquee) {
       const selectedPointsInBox = getAnchorSelectionsInRectangle(
+        state.contours,
+        state.matrix,
         state.selectionMarquee.origin,
         state.selectionMarquee.current
       );

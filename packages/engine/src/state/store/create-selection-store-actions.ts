@@ -1,5 +1,5 @@
 import { exitPathEditingInteractionState } from "./interaction-state";
-import { normalizePathPointSelection } from "./path-point-selection";
+import { normalizePathPointSelection } from "./path/path-point-selection";
 
 export const createSelectionStoreActions = (set) => {
   return {

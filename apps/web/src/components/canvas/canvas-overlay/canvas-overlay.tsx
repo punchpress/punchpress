@@ -5,7 +5,7 @@ import { CanvasEditingSelection } from "./canvas-editing-selection";
 import { CanvasSelectionOverlay } from "./canvas-selection-overlay";
 import { CanvasTextPathOverlay } from "./canvas-text-path-overlay";
 import { CanvasTransformOverlay } from "./canvas-transform-overlay";
-import { CanvasVectorPathOverlay } from "./canvas-vector-path-overlay";
+import { CanvasVectorPathOverlay } from "./vector-path/vector-path-overlay";
 import { CanvasNodeToolbar } from "./node-toolbar/canvas-node-toolbar";
 
 export const CanvasOverlay = () => {

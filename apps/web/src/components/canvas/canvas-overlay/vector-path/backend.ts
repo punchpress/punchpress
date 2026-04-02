@@ -1,4 +1,4 @@
-import { createVectorPaperSession } from "./vector-paper-scene";
+import { createVectorPaperSession } from "./paper-session";
 
 export const createVectorPathSession = (options) => {
   return createVectorPaperSession(options);

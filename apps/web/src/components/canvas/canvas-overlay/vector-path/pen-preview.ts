@@ -1,4 +1,4 @@
-import { getVectorBezierHandleAppearance } from "./vector-handle-appearance";
+import { getVectorBezierHandleAppearance } from "./handle-appearance";
 
 interface VectorPoint {
   x: number;

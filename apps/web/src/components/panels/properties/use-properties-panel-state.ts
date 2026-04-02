@@ -6,42 +6,20 @@ export const usePropertiesPanelState = () => {
       state.selectedNodeIds.length === 1
         ? editor.getNode(state.selectedNodeIds[0])
         : null;
-    const isSelectedPathPointActive = Boolean(
-      selectedNode?.id &&
-        state.pathEditingNodeId === selectedNode.id &&
-        state.pathEditingPoints.length === 1 &&
-        state.pathEditingPoint
-    );
-    const selectedPathPoint = isSelectedPathPointActive
-      ? state.pathEditingPoint
-      : null;
-    const selectedPathPointCanRound = Boolean(
-      selectedNode?.id &&
-        selectedPathPoint &&
-        editor.canRoundPathPoint(selectedNode.id, selectedPathPoint)
+    const pathEditingInspectorState = editor.getPathEditingInspectorState(
+      selectedNode?.id || null
     );
 
     return {
       bootstrapError: editor.bootstrapError,
       bootstrapState: editor.bootstrapState,
-      pathCornerRadiusSummary:
-        selectedNode?.id &&
-        !selectedPathPointCanRound
-          ? editor.getPathCornerRadiusSummary(selectedNode.id)
-          : null,
-      pathPointCornerRadius:
-        selectedNode?.id && selectedPathPoint
-          ? editor.getPathPointCornerRadius(selectedNode.id, selectedPathPoint)
-          : 0,
-      pathPointCornerMax:
-        selectedNode?.id && selectedPathPoint
-          ? (editor.getPathPointCornerControl(selectedNode.id, selectedPathPoint)
-              ?.maxRadius ?? 0)
-          : 0,
+      pathCornerRadiusSummary: pathEditingInspectorState.pathCornerRadiusSummary,
+      pathPointCornerMax: pathEditingInspectorState.pathPointCornerMax,
+      pathPointCornerRadius: pathEditingInspectorState.pathPointCornerRadius,
       selectedNode,
-      selectedPathPoint,
+      selectedPathPoint: pathEditingInspectorState.selectedPathPoint,
       showsPathPointCornerRadius:
-        selectedPathPointCanRound,
+        pathEditingInspectorState.showsPathPointCornerRadius,
       selectionPropertiesSnapshot: editor.getSelectionPropertiesSnapshot(
         state.selectedNodeIds
       ),

@@ -2,14 +2,14 @@ import {
   canRoundShapePoint,
   getShapeCornerRadiusSummary,
   getShapePointCornerControl,
-} from "../nodes/shape/shape-engine";
+} from "../../nodes/shape/shape-engine";
 import {
   canRoundVectorPoint,
   getVectorCornerRadiusSummary,
   getVectorPointCornerControl,
   setAllVectorPointCornerRadii,
   setVectorPointCornerRadius,
-} from "../nodes/vector/vector-corner-controls";
+} from "../../nodes/vector/vector-corner-controls";
 
 const getScopedCornerPoints = (editor, nodeId) => {
   return editor.pathEditingNodeId === nodeId && editor.pathEditingPoints.length > 0
