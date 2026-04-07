@@ -1248,6 +1248,47 @@ test("pen mode uses the minus cursor and deletes interior anchors without affect
     });
 });
 
+test("pen hover tooltip states the click action for anchors", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadOpenVectorDocument(page);
+
+  await clickNodeCenter(page, "open-vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "open-vector-node");
+  await pauseForUi(page);
+  await page.getByRole("button", { name: "Pen (P)" }).click();
+  await pauseForUi(page);
+
+  const interiorAnchor = await getVectorSegmentScreenPoint(
+    page,
+    "open-vector-node",
+    1
+  );
+  const endpoint = await getVectorSegmentScreenPoint(
+    page,
+    "open-vector-node",
+    2
+  );
+
+  if (!(interiorAnchor && endpoint)) {
+    throw new Error("Missing vector hover points for pen tooltip test");
+  }
+
+  await page.mouse.move(interiorAnchor.x, interiorAnchor.y);
+  await pauseForUi(page);
+  await expect(page.getByTestId("canvas-pen-hover-tooltip")).toContainText(
+    "Delete Point"
+  );
+
+  await page.mouse.move(endpoint.x, endpoint.y);
+  await pauseForUi(page);
+  await expect(page.getByTestId("canvas-pen-hover-tooltip")).toContainText(
+    "Continue Path"
+  );
+});
+
 test("pen mode accepts slightly off-center interior anchor clicks within the hover halo", async ({
   page,
 }) => {

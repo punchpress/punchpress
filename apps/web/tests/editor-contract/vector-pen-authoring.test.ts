@@ -606,6 +606,7 @@ describe("vector pen authoring", () => {
       contourIndex: 0,
       intent: "continue",
       nodeId,
+      point: { x: 140, y: 0 },
       role: "anchor",
       segmentIndex: 2,
     });
@@ -616,6 +617,7 @@ describe("vector pen authoring", () => {
       contourIndex: 0,
       intent: "delete",
       nodeId,
+      point: { x: 80, y: 60 },
       role: "anchor",
       segmentIndex: 1,
     });

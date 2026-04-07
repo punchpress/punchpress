@@ -99,3 +99,4 @@ export {
   normalizePathPointSelection,
   toPathPointKey,
 } from "./state/store/path/path-point-selection";
+export type { PenHoverIntent, PenHoverState } from "./tools/pen-tool-types";
