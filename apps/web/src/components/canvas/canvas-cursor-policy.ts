@@ -9,6 +9,13 @@ export const CANVAS_CURSOR_TOKENS = {
   vectorPathPoint: "vector-path-point",
 } as const;
 
+export interface CanvasCursorCompanion {
+  kind: "label";
+  offsetX?: number;
+  offsetY?: number;
+  text: string;
+}
+
 export const getTextPathHandleCursorToken = (role) => {
   if (role === "bend" || role === "amplitude" || role === "slant") {
     return CANVAS_CURSOR_TOKENS.textPathBend;

@@ -1,5 +1,5 @@
 import { MAX_ZOOM, MIN_ZOOM, round } from "@punchpress/engine";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import InfiniteViewer from "react-infinite-viewer";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
@@ -7,10 +7,12 @@ import { shouldDisableCanvasOverlay } from "../../performance/performance-url-fl
 import { useTheme } from "../../theme/theme-provider";
 import { DesignerFloatingToolbar, DesignerFrame } from "../designer/designer";
 import { getCanvasCursorStyle } from "./canvas-cursor-assets";
+import { CanvasCursorCompanion } from "./canvas-cursor-companion";
 import { CanvasDotGrid } from "./canvas-dot-grid";
 import { CanvasNodes } from "./canvas-nodes";
 import { CanvasHoverPreview } from "./canvas-overlay/canvas-hover-preview";
 import { CanvasOverlay } from "./canvas-overlay/canvas-overlay";
+import { resolveVectorPenHoverAction } from "./canvas-overlay/vector-path/pen-hover";
 import { CanvasTextEditor } from "./canvas-text-editor";
 import { startCanvasToolPlacementSession } from "./canvas-tool-placement-session";
 import { CanvasToolbar } from "./canvas-toolbar";
@@ -30,24 +32,26 @@ const getCanvasPoint = (viewer, host, clientX, clientY, zoom) => {
   };
 };
 
-const syncHostPenHoverIntent = (host, activeTool, editor) => {
+const syncHostPenCursorMode = (host, activeTool, editor) => {
   if (!(host instanceof HTMLElement)) {
     return;
   }
 
   if (activeTool !== "pen") {
-    delete host.dataset.penHoverIntent;
+    delete host.dataset.penCursorMode;
     return;
   }
 
-  const nextIntent = editor.getPenHoverState()?.intent;
+  const nextCursorMode = resolveVectorPenHoverAction(
+    editor.getPenHoverState()
+  )?.cursorMode;
 
-  if (nextIntent) {
-    host.dataset.penHoverIntent = nextIntent;
+  if (nextCursorMode && nextCursorMode !== "default") {
+    host.dataset.penCursorMode = nextCursorMode;
     return;
   }
 
-  delete host.dataset.penHoverIntent;
+  delete host.dataset.penCursorMode;
 };
 
 export const Canvas = () => {
@@ -60,15 +64,21 @@ export const Canvas = () => {
 
   const viewerRef = useRef(null);
   const hostRef = useRef(null);
+  const [hostElement, setHostElement] = useState<HTMLDivElement | null>(null);
+
+  const handleHostRef = useCallback((nextHostElement) => {
+    hostRef.current = nextHostElement;
+    setHostElement(nextHostElement);
+  }, []);
 
   useEffect(() => {
     const viewer = viewerRef.current;
-    if (!viewer) {
+    if (!(viewer && hostElement)) {
       return;
     }
 
     editor.viewerRef = viewer;
-    editor.hostRef = hostRef.current;
+    editor.hostRef = hostElement;
 
     const rafId = window.requestAnimationFrame(() => {
       viewer.setTo?.({
@@ -84,10 +94,10 @@ export const Canvas = () => {
       editor.viewerRef = null;
       editor.hostRef = null;
     };
-  }, [editor]);
+  }, [editor, hostElement]);
 
   useEffect(() => {
-    syncHostPenHoverIntent(hostRef.current, activeTool, editor);
+    syncHostPenCursorMode(hostRef.current, activeTool, editor);
   }, [activeTool, editor]);
 
   const handleScroll = useCallback(
@@ -168,7 +178,7 @@ export const Canvas = () => {
           },
         }),
       });
-      syncHostPenHoverIntent(hostRef.current, activeTool, editor);
+      syncHostPenCursorMode(hostRef.current, activeTool, editor);
     },
     [activeTool, editor, spacePressed, zoom]
   );
@@ -178,7 +188,7 @@ export const Canvas = () => {
     }
 
     editor.dispatchCanvasPointerLeave({});
-    syncHostPenHoverIntent(hostRef.current, activeTool, editor);
+    syncHostPenCursorMode(hostRef.current, activeTool, editor);
   }, [activeTool, editor]);
   const handleCanvasPointerMove = useCallback(
     (event) => {
@@ -215,7 +225,7 @@ export const Canvas = () => {
           y: round(point.y, 2),
         },
       });
-      syncHostPenHoverIntent(hostRef.current, activeTool, editor);
+      syncHostPenCursorMode(hostRef.current, activeTool, editor);
     },
     [activeTool, editor, spacePressed, zoom]
   );
@@ -232,7 +242,7 @@ export const Canvas = () => {
         onPointerLeave={handleCanvasPointerLeave}
         onPointerMoveCapture={handleCanvasPointerMove}
         onWheelCapture={handleCanvasWheel}
-        ref={hostRef}
+        ref={handleHostRef}
         style={getCanvasCursorStyle()}
       >
         <InfiniteViewer
@@ -268,6 +278,8 @@ export const Canvas = () => {
         <DesignerFloatingToolbar>
           <CanvasToolbar />
         </DesignerFloatingToolbar>
+
+        <CanvasCursorCompanion hostElement={hostElement} />
 
         {shouldRenderOverlay ? <CanvasOverlay /> : null}
       </div>

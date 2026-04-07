@@ -310,15 +310,15 @@ textarea,
   cursor: var(--canvas-cursor-pen-tool) !important;
 }
 
-[data-tool="pen"][data-pen-hover-intent="delete"] .canvas-surface,
-[data-tool="pen"][data-pen-hover-intent="delete"] .canvas-node,
-[data-tool="pen"][data-pen-hover-intent="delete"] .canvas-node * {
+[data-tool="pen"][data-pen-cursor-mode="minus"] .canvas-surface,
+[data-tool="pen"][data-pen-cursor-mode="minus"] .canvas-node,
+[data-tool="pen"][data-pen-cursor-mode="minus"] .canvas-node * {
   cursor: var(--canvas-cursor-pen-tool-minus) !important;
 }
 
-[data-tool="pen"][data-pen-hover-intent="add"] .canvas-surface,
-[data-tool="pen"][data-pen-hover-intent="add"] .canvas-node,
-[data-tool="pen"][data-pen-hover-intent="add"] .canvas-node * {
+[data-tool="pen"][data-pen-cursor-mode="add"] .canvas-surface,
+[data-tool="pen"][data-pen-cursor-mode="add"] .canvas-node,
+[data-tool="pen"][data-pen-cursor-mode="add"] .canvas-node * {
   cursor: var(--canvas-cursor-pen-tool-add) !important;
 }
 
@@ -397,6 +397,10 @@ body[data-color-picker-open="true"] {
   .bend-handle-visible,
   .bend-handle-hidden {
     transition-duration: 0ms;
+  }
+
+  .canvas-cursor-companion-label {
+    transition-duration: 0ms !important;
   }
 }
 

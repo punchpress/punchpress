@@ -86,10 +86,23 @@ export class PenTool extends Tool {
     const session = this.getActiveAuthoringSession();
 
     if (session?.hoverTarget?.type === "start-anchor") {
+      const node = this.editor.getNode(session.nodeId);
+      const contour =
+        node?.type === "vector" ? node.contours[session.contourIndex] : null;
+      const point = contour?.segments[session.hoverTarget.segmentIndex]?.point;
+
+      if (!point) {
+        return null;
+      }
+
       return {
         contourIndex: session.contourIndex,
         intent: "close",
         nodeId: session.nodeId,
+        point: {
+          x: round(point.x, 2),
+          y: round(point.y, 2),
+        },
         role: "anchor",
         segmentIndex: session.hoverTarget.segmentIndex,
       } satisfies PenHoverState;
@@ -551,26 +564,63 @@ export class PenTool extends Tool {
     let nextIdleHoverTarget: PenHoverState | null = null;
 
     if (continuationTarget && node?.type === "vector") {
+      const hoverPoint =
+        node.contours[continuationTarget.contourIndex]?.segments[
+          continuationTarget.segmentIndex
+        ]?.point;
+
+      if (!hoverPoint) {
+        return false;
+      }
+
       nextIdleHoverTarget = {
         contourIndex: continuationTarget.contourIndex,
         intent: "continue" as const,
         nodeId: node.id,
+        point: {
+          x: round(hoverPoint.x, 2),
+          y: round(hoverPoint.y, 2),
+        },
         role: "anchor" as const,
         segmentIndex: continuationTarget.segmentIndex,
       };
     } else if (deletePointTarget && node?.type === "vector") {
+      const hoverPoint =
+        node.contours[deletePointTarget.contourIndex]?.segments[
+          deletePointTarget.segmentIndex
+        ]?.point;
+
+      if (!hoverPoint) {
+        return false;
+      }
+
       nextIdleHoverTarget = {
         contourIndex: deletePointTarget.contourIndex,
         intent: "delete" as const,
         nodeId: node.id,
+        point: {
+          x: round(hoverPoint.x, 2),
+          y: round(hoverPoint.y, 2),
+        },
         role: "anchor" as const,
         segmentIndex: deletePointTarget.segmentIndex,
       };
     } else if (insertPointTarget && node?.type === "vector") {
+      const hoverPoint =
+        insertPointTarget.segments[insertPointTarget.segmentIndex]?.point;
+
+      if (!hoverPoint) {
+        return false;
+      }
+
       nextIdleHoverTarget = {
         contourIndex: insertPointTarget.contourIndex,
         intent: "add" as const,
         nodeId: node.id,
+        point: {
+          x: round(hoverPoint.x, 2),
+          y: round(hoverPoint.y, 2),
+        },
         role: "segment" as const,
         segmentIndex: insertPointTarget.segmentIndex,
       };

@@ -100,6 +100,9 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 - Click-dragging should place a point and immediately author its direction handles.
 - Tiny unintended screen-space jitter, especially at higher zoom, should still place a straight point until the authored handle reaches a meaningful canvas-space length.
 - Continuing from a smooth point should preserve expected tangent behavior.
+- Pen hover affordances should be action-specific and should only appear when the click result is deterministic for the current target.
+- The same hover treatment should not ambiguously stand for close-path, continue-path, delete-point, and add-point outcomes.
+- When the Pen tool resolves a hover target to a concrete action such as `Close path`, `Continue path`, `Delete point`, or `Add point`, PunchPress should surface that action immediately near the target rather than leaving the click result implicit.
 - While the Pen tool hovers a non-endpoint anchor on an editable path, it may expose delete-anchor behavior, but open endpoints should continue to prioritize continue-path and close-path intent.
 - While the Pen tool hovers an insertable segment on an editable path, it should expose add-anchor behavior without forcing a switch back to the pointer tool.
 - Esc should end the current drawing gesture without exiting the broader vector editing mode unexpectedly.

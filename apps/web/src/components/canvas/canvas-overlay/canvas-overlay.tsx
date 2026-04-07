@@ -5,8 +5,8 @@ import { CanvasEditingSelection } from "./canvas-editing-selection";
 import { CanvasSelectionOverlay } from "./canvas-selection-overlay";
 import { CanvasTextPathOverlay } from "./canvas-text-path-overlay";
 import { CanvasTransformOverlay } from "./canvas-transform-overlay";
-import { CanvasVectorPathOverlay } from "./vector-path/vector-path-overlay";
 import { CanvasNodeToolbar } from "./node-toolbar/canvas-node-toolbar";
+import { CanvasVectorPathOverlay } from "./vector-path/vector-path-overlay";
 
 export const CanvasOverlay = () => {
   usePerformanceRenderCounter("render.canvas.overlay");

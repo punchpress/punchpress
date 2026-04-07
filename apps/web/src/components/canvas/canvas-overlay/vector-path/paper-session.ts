@@ -102,6 +102,7 @@ type HoveredPoint = {
 type PenHoverTarget = {
   contourIndex: number;
   intent: "add" | "close" | "continue" | "delete";
+  point: { x: number; y: number };
   role: "anchor" | "segment";
   segmentIndex: number;
 } | null;
