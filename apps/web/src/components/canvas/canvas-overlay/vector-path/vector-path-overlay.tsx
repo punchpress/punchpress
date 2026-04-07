@@ -8,9 +8,13 @@ import {
   getTextPathTransformTargetStyle,
 } from "../text-path-overlay-geometry";
 import { createVectorPathSession } from "./backend";
+import type { VectorCornerDragSession } from "./vector-corner-drag-session";
+import { VectorCornerRadiusHandles } from "./vector-corner-radius-handle";
 
 const getVectorPathOverlayScene = ({
+  activeDragSession,
   editablePathSession,
+  hoveredCornerHandlePoint,
   isPathEditing,
   matrix,
   metrics,
@@ -23,14 +27,80 @@ const getVectorPathOverlayScene = ({
   }
 
   return {
+    activeDragSession,
     contours: editablePathSession.contours,
+    hoveredCornerHandlePoint,
     interactionPolicy: editablePathSession.interactionPolicy,
     matrix,
     metrics,
+    nodeStrokeWidth: node.strokeWidth,
     penHover,
     penPreview,
     selectedPoints: editablePathSession.selectedPoints,
     selectedPoint: editablePathSession.selectedPoint,
+  };
+};
+
+const getVectorPathOverlayRenderState = ({
+  activeDragSession,
+  activeTool,
+  editor,
+  hoveredCornerHandlePoint,
+  overlayState,
+  pathEditingNodeId,
+  spacePressed,
+}) => {
+  const nodeId = overlayState?.node.id || null;
+  const isPathEditing = Boolean(nodeId && pathEditingNodeId === nodeId);
+  const isPanning = spacePressed || activeTool === "hand";
+  const isPenToolActive = activeTool === "pen";
+  const editablePathSession = overlayState?.editablePathSession || null;
+  const geometry = overlayState?.geometry || null;
+  const node = overlayState?.node || null;
+  const penHover = overlayState?.penHover || null;
+  const penPreview = overlayState?.penPreview || null;
+  const previewDelta = overlayState?.previewDelta || null;
+  const metrics = overlayState ? getTextPathHostMetrics(editor) : null;
+  const transformTargetStyle =
+    geometry && node && isPathEditing
+      ? getTextPathTransformTargetStyle(
+          editor,
+          node,
+          geometry,
+          previewDelta,
+          true
+        )
+      : null;
+  const matrix =
+    geometry && metrics && node
+      ? getTextPathGuideMatrix(
+          node,
+          geometry,
+          metrics,
+          editor.zoom,
+          previewDelta
+        )
+      : null;
+  const scene = getVectorPathOverlayScene({
+    activeDragSession,
+    editablePathSession,
+    hoveredCornerHandlePoint,
+    isPathEditing,
+    matrix,
+    metrics,
+    node,
+    penHover,
+    penPreview,
+  });
+
+  return {
+    isPathEditing,
+    isPanning,
+    isPenToolActive,
+    node,
+    nodeId,
+    scene,
+    transformTargetStyle,
   };
 };
 
@@ -40,6 +110,10 @@ export const CanvasVectorPathOverlay = ({ viewportRevision }) => {
   const sceneRef = useRef(null);
   const [paperCanvasElement, setPaperCanvasElement] =
     useState<HTMLCanvasElement | null>(null);
+  const [hoveredCornerHandlePoint, setHoveredCornerHandlePoint] =
+    useState(null);
+  const [activeDragSession, setActiveDragSession] =
+    useState<VectorCornerDragSession | null>(null);
   const [transformTargetElement, setTransformTargetElement] = useState(null);
   const activeTool = useEditorValue((_, state) => state.activeTool);
   const pathEditingNodeId = useEditorValue(
@@ -86,45 +160,22 @@ export const CanvasVectorPathOverlay = ({ viewportRevision }) => {
       previewDelta: editor.getSelectionPreviewDelta([node.id]) || null,
     };
   });
-  const nodeId = overlayState?.node.id || null;
-  const isPathEditing = Boolean(nodeId && pathEditingNodeId === nodeId);
-  const isPanning = spacePressed || activeTool === "hand";
-  const isPenToolActive = activeTool === "pen";
-  const editablePathSession = overlayState?.editablePathSession || null;
-  const geometry = overlayState?.geometry || null;
-  const node = overlayState?.node || null;
-  const penHover = overlayState?.penHover || null;
-  const penPreview = overlayState?.penPreview || null;
-  const previewDelta = overlayState?.previewDelta || null;
-  const metrics = overlayState ? getTextPathHostMetrics(editor) : null;
-  const transformTargetStyle =
-    geometry && node && isPathEditing
-      ? getTextPathTransformTargetStyle(
-          editor,
-          node,
-          geometry,
-          previewDelta,
-          true
-        )
-      : null;
-  const matrix =
-    geometry && metrics && node
-      ? getTextPathGuideMatrix(
-          node,
-          geometry,
-          metrics,
-          editor.zoom,
-          previewDelta
-        )
-      : null;
-  const scene = getVectorPathOverlayScene({
-    editablePathSession,
+  const {
     isPathEditing,
-    matrix,
-    metrics,
+    isPanning,
+    isPenToolActive,
     node,
-    penHover,
-    penPreview,
+    nodeId,
+    scene,
+    transformTargetStyle,
+  } = getVectorPathOverlayRenderState({
+    activeDragSession,
+    activeTool,
+    editor,
+    hoveredCornerHandlePoint,
+    overlayState,
+    pathEditingNodeId,
+    spacePressed,
   });
 
   sceneRef.current = scene;
@@ -247,6 +298,18 @@ export const CanvasVectorPathOverlay = ({ viewportRevision }) => {
       <canvas
         className="canvas-vector-paper absolute inset-0 h-full w-full"
         ref={setPaperCanvasElement}
+      />
+
+      <VectorCornerRadiusHandles
+        activeDragSession={activeDragSession}
+        contours={scene?.contours || null}
+        editor={editor}
+        hoveredPoint={scene?.hoveredCornerHandlePoint || null}
+        matrix={scene?.matrix || null}
+        nodeId={node?.id || null}
+        onDragStateChange={setActiveDragSession}
+        onHoverChange={setHoveredCornerHandlePoint}
+        selectedPoints={scene?.selectedPoints || []}
       />
     </div>
   );

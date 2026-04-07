@@ -35,6 +35,7 @@ export const buildVectorNodeGeometry = (node) => {
     const commands = getVectorContourCommands(contour);
 
     return {
+      closed: contour.closed,
       commands,
       d: commandsToPathData(commands),
       key: `vector-${index}`,

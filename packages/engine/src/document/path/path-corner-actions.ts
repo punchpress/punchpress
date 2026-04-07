@@ -5,6 +5,7 @@ import {
 } from "../../nodes/shape/shape-engine";
 import {
   canRoundVectorPoint,
+  getStableVectorCornerRadiusMax,
   getVectorCornerRadiusSummary,
   getVectorPointCornerControl,
   setAllVectorPointCornerRadii,
@@ -12,7 +13,8 @@ import {
 } from "../../nodes/vector/vector-corner-controls";
 
 const getScopedCornerPoints = (editor, nodeId) => {
-  return editor.pathEditingNodeId === nodeId && editor.pathEditingPoints.length > 0
+  return editor.pathEditingNodeId === nodeId &&
+    editor.pathEditingPoints.length > 0
     ? editor.pathEditingPoints
     : null;
 };
@@ -73,6 +75,27 @@ export const getPathCornerRadiusSummary = (editor, nodeId) => {
   }
 
   return getVectorCornerRadiusSummary(
+    node.contours,
+    getScopedCornerPoints(editor, nodeId)
+  );
+};
+
+export const getPathCornerRadiusStableMax = (editor, nodeId) => {
+  const node = editor.getNode(nodeId);
+
+  if (!node) {
+    return 0;
+  }
+
+  if (node.type === "shape") {
+    return getShapeCornerRadiusSummary(node)?.max || 0;
+  }
+
+  if (node.type !== "vector") {
+    return 0;
+  }
+
+  return getStableVectorCornerRadiusMax(
     node.contours,
     getScopedCornerPoints(editor, nodeId)
   );

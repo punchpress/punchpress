@@ -7,8 +7,8 @@ export {
   UI_ACCENT,
   WARP_TEXT_NODE_KIND,
 } from "./constants";
-export { Editor } from "./editor";
 export { offsetEditablePathPoints } from "./document/path/editable-path-actions";
+export { Editor } from "./editor";
 export {
   getNodePropertySupport,
   getSelectionProperties,
@@ -64,13 +64,18 @@ export {
   getVectorPathCursorMode,
   isVectorPathPointRole,
 } from "./nodes/vector/path-edit-interaction";
-export { getVectorPointCornerControl } from "./nodes/vector/vector-corner-controls";
-export { getUniformVectorCornerRadius } from "./nodes/vector/vector-corner-controls";
 export {
   setVectorPointType,
   updateVectorPointHandle,
 } from "./nodes/vector/point-edit";
 export { insertVectorPoint } from "./nodes/vector/point-insert";
+export {
+  getStableVectorCornerRadiusMax,
+  getUniformVectorCornerRadius,
+  getVectorPointCornerControl,
+  setAllVectorPointCornerRadii,
+  setVectorPointCornerRadius,
+} from "./nodes/vector/vector-corner-controls";
 export {
   incrementPerfCounter,
   measurePerf,

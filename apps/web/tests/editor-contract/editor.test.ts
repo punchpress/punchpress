@@ -579,6 +579,67 @@ describe("Editor shape export", () => {
     expect(svg).toContain('fill="#ffffff"');
     expect(svg).toContain('"type":"vector"');
   });
+
+  test("exports open vector contours without fill", async () => {
+    const editor = new Editor();
+
+    editor.getState().loadNodes([
+      {
+        contours: [
+          {
+            closed: false,
+            segments: [
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: -120, y: -90 },
+                pointType: "corner",
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 120, y: -90 },
+                pointType: "corner",
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 120, y: 90 },
+                pointType: "corner",
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: -120, y: 90 },
+                pointType: "corner",
+              },
+            ],
+          },
+        ],
+        fill: "#ffffff",
+        fillRule: "nonzero",
+        id: "open-vector-node",
+        parentId: "root",
+        stroke: "#000000",
+        strokeWidth: 12,
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 480,
+          y: 360,
+        },
+        type: "vector",
+        visible: true,
+      },
+    ]);
+
+    const svg = await editor.exportDocument();
+
+    expect(svg).toContain('fill="none"');
+    expect(svg).toContain('stroke="#000000"');
+    expect(svg).toContain('"closed":false');
+  });
 });
 
 describe("Editor.getDebugDump", () => {

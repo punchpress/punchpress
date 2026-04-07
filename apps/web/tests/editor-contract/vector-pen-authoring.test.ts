@@ -54,7 +54,8 @@ const clickPenNode = (
 const dragPen = (
   editor: Editor,
   startPoint: { x: number; y: number },
-  endPoint: { x: number; y: number }
+  endPoint: { x: number; y: number },
+  { dragDistancePx }: { dragDistancePx?: number } = {}
 ) => {
   const session = editor.dispatchCanvasPointerDown({ point: startPoint });
 
@@ -62,20 +63,18 @@ const dragPen = (
     throw new Error("Expected the pen tool to create a placement session.");
   }
 
+  const resolvedDragDistancePx =
+    dragDistancePx ||
+    Math.hypot(endPoint.x - startPoint.x, endPoint.y - startPoint.y);
+
   session.update({
-    dragDistancePx: Math.hypot(
-      endPoint.x - startPoint.x,
-      endPoint.y - startPoint.y
-    ),
+    dragDistancePx: resolvedDragDistancePx,
     point: endPoint,
   });
 
   if (
     session.complete({
-      dragDistancePx: Math.hypot(
-        endPoint.x - startPoint.x,
-        endPoint.y - startPoint.y
-      ),
+      dragDistancePx: resolvedDragDistancePx,
       point: endPoint,
     }) !== true
   ) {
@@ -253,6 +252,49 @@ describe("vector pen authoring", () => {
     expect(segment?.handleOut).toEqual({ x: 0, y: 0 });
   });
 
+  test("near-click pen drag on the first point still creates a corner point", () => {
+    const editor = new Editor();
+
+    editor.setActiveTool("pen");
+    dragPen(editor, { x: 200, y: 160 }, { x: 208, y: 166 });
+
+    const node = editor.selectedNode;
+
+    if (node?.type !== "vector") {
+      throw new Error("Expected a vector node after pen placement.");
+    }
+
+    const segment = node.contours[0]?.segments[0];
+
+    expect(segment?.pointType).toBe("corner");
+    expect(segment?.handleIn).toEqual({ x: 0, y: 0 });
+    expect(segment?.handleOut).toEqual({ x: 0, y: 0 });
+  });
+
+  test("first-point smoothing uses authored handle length instead of raw drag distance", () => {
+    const editor = new Editor();
+
+    editor.setActiveTool("pen");
+    dragPen(
+      editor,
+      { x: 200, y: 160 },
+      { x: 204, y: 163 },
+      { dragDistancePx: 8 }
+    );
+
+    const node = editor.selectedNode;
+
+    if (node?.type !== "vector") {
+      throw new Error("Expected a vector node after pen placement.");
+    }
+
+    const segment = node.contours[0]?.segments[0];
+
+    expect(segment?.pointType).toBe("corner");
+    expect(segment?.handleIn).toEqual({ x: 0, y: 0 });
+    expect(segment?.handleOut).toEqual({ x: 0, y: 0 });
+  });
+
   test("dragging a following point creates a smooth anchor with incoming and outgoing handles", () => {
     const editor = new Editor();
 
@@ -282,6 +324,51 @@ describe("vector pen authoring", () => {
     editor.setActiveTool("pen");
     clickPen(editor, { x: 200, y: 160 });
     dragPen(editor, { x: 260, y: 180 }, { x: 264, y: 183 });
+
+    const node = editor.selectedNode;
+
+    if (node?.type !== "vector") {
+      throw new Error("Expected the authored path to remain a vector node.");
+    }
+
+    const secondSegment = node.contours[0]?.segments[1];
+
+    expect(secondSegment?.pointType).toBe("corner");
+    expect(secondSegment?.handleIn).toEqual({ x: 0, y: 0 });
+    expect(secondSegment?.handleOut).toEqual({ x: 0, y: 0 });
+  });
+
+  test("near-click pen drag on a following point still creates a corner point", () => {
+    const editor = new Editor();
+
+    editor.setActiveTool("pen");
+    clickPen(editor, { x: 200, y: 160 });
+    dragPen(editor, { x: 260, y: 180 }, { x: 268, y: 186 });
+
+    const node = editor.selectedNode;
+
+    if (node?.type !== "vector") {
+      throw new Error("Expected the authored path to remain a vector node.");
+    }
+
+    const secondSegment = node.contours[0]?.segments[1];
+
+    expect(secondSegment?.pointType).toBe("corner");
+    expect(secondSegment?.handleIn).toEqual({ x: 0, y: 0 });
+    expect(secondSegment?.handleOut).toEqual({ x: 0, y: 0 });
+  });
+
+  test("follow-up smoothing uses authored handle length instead of raw drag distance", () => {
+    const editor = new Editor();
+
+    editor.setActiveTool("pen");
+    clickPen(editor, { x: 200, y: 160 });
+    dragPen(
+      editor,
+      { x: 260, y: 180 },
+      { x: 264, y: 183 },
+      { dragDistancePx: 8 }
+    );
 
     const node = editor.selectedNode;
 

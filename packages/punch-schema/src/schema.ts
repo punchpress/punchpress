@@ -123,7 +123,6 @@ export const vectorPointTypeSchema = z.enum(["corner", "smooth"]);
 
 export const vectorSegmentSchema = z
   .object({
-    cornerRadius: finiteNumber.optional(),
     handleIn: vectorHandleSchema,
     handleOut: vectorHandleSchema,
     point: vectorHandleSchema,

@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
   getVectorCornerRadiusFromWidgetDrag,
+  getVectorCornerRadiusFromWidgetDragDelta,
+  getVectorCornerWidgetDisplayGeometry,
   getVectorCornerWidgetGeometry,
 } from "../../src/components/canvas/canvas-overlay/vector-path/corner-widget-geometry";
 
@@ -13,6 +15,48 @@ const createRectangleContours = () => {
           handleIn: { x: 0, y: 0 },
           handleOut: { x: 0, y: 0 },
           point: { x: -120, y: -90 },
+          pointType: "corner" as const,
+        },
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 120, y: -90 },
+          pointType: "corner" as const,
+        },
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 120, y: 90 },
+          pointType: "corner" as const,
+        },
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: -120, y: 90 },
+          pointType: "corner" as const,
+        },
+      ],
+    },
+  ];
+};
+
+const createImportedRoundedCornerContours = () => {
+  const handleLength = 13.254_833_995_939_045;
+
+  return [
+    {
+      closed: true,
+      segments: [
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: -handleLength },
+          point: { x: -120, y: -66 },
+          pointType: "corner" as const,
+        },
+        {
+          handleIn: { x: -handleLength, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: -96, y: -90 },
           pointType: "corner" as const,
         },
         {
@@ -93,10 +137,9 @@ describe("vector corner widget geometry", () => {
             targetRadius * distancePerRadius * geometry.pixelsPerLocalUnit),
     };
 
-    expect(getVectorCornerRadiusFromWidgetDrag(geometry, dragPoint)).toBeCloseTo(
-      targetRadius,
-      6
-    );
+    expect(
+      getVectorCornerRadiusFromWidgetDrag(geometry, dragPoint)
+    ).toBeCloseTo(targetRadius, 6);
 
     const farPoint = {
       x:
@@ -111,6 +154,86 @@ describe("vector corner widget geometry", () => {
       geometry.maxRadius,
       6
     );
+  });
+
+  test("maps drag delta from the initial handle position without rebasing to moved geometry", () => {
+    const geometry = getVectorCornerWidgetGeometry({
+      contours: createRectangleContours(),
+      matrix: identityMatrix,
+      point: {
+        contourIndex: 0,
+        segmentIndex: 0,
+      },
+    });
+
+    if (!geometry) {
+      throw new Error("Expected corner widget geometry");
+    }
+
+    const startPoint = geometry.center;
+    const targetRadius = 24;
+    const distancePerRadius = 1 / Math.sin(geometry.cornerAngle / 2);
+    const dragPoint = {
+      x:
+        startPoint.x +
+        geometry.direction.x *
+          (targetRadius * distancePerRadius * geometry.pixelsPerLocalUnit),
+      y:
+        startPoint.y +
+        geometry.direction.y *
+          (targetRadius * distancePerRadius * geometry.pixelsPerLocalUnit),
+    };
+
+    expect(
+      getVectorCornerRadiusFromWidgetDragDelta(geometry, startPoint, dragPoint)
+    ).toBeCloseTo(targetRadius, 6);
+    expect(
+      getVectorCornerRadiusFromWidgetDragDelta(geometry, startPoint, startPoint)
+    ).toBeCloseTo(0, 6);
+  });
+
+  test("can render the active drag handle from pointer-down geometry across a broader shared max", () => {
+    const geometry = getVectorCornerWidgetGeometry({
+      contours: createRectangleContours(),
+      matrix: identityMatrix,
+      point: {
+        contourIndex: 0,
+        segmentIndex: 0,
+      },
+    });
+
+    if (!geometry) {
+      throw new Error("Expected corner widget geometry");
+    }
+
+    const displayGeometry = getVectorCornerWidgetDisplayGeometry(
+      geometry,
+      geometry.maxRadius + 24,
+      geometry.maxRadius + 24
+    );
+
+    expect(displayGeometry).not.toBeNull();
+    expect(
+      (displayGeometry?.center.x || 0) - geometry.center.x
+    ).toBeGreaterThan(0);
+    expect(displayGeometry?.currentRadius).toBeCloseTo(
+      geometry.maxRadius + 24,
+      6
+    );
+  });
+
+  test("exposes widget geometry for an imported rounded corner trim point", () => {
+    const geometry = getVectorCornerWidgetGeometry({
+      contours: createImportedRoundedCornerContours(),
+      matrix: identityMatrix,
+      point: {
+        contourIndex: 0,
+        segmentIndex: 0,
+      },
+    });
+
+    expect(geometry).not.toBeNull();
+    expect(geometry?.currentRadius).toBeCloseTo(24, 3);
   });
 
   test("uses the geometric corner max for the widget range", () => {

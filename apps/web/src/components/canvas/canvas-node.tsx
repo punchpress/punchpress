@@ -54,6 +54,10 @@ const selectNodeArtState = (editor, state, nodeId) => {
   };
 };
 
+const getCanvasNodePathFill = (path, fill) => {
+  return path.closed === false ? "none" : fill || "none";
+};
+
 const shouldStartNodeDrag = ({
   editor,
   event,
@@ -320,7 +324,7 @@ const CanvasNodeArt = memo(
             return (
               <path
                 d={path.d}
-                fill={fill || "none"}
+                fill={getCanvasNodePathFill(path, fill)}
                 fillRule={fillRule}
                 key={path.key || `${path.transform || "shape"}-${path.d}`}
                 opacity={isEditing ? 0 : 1}

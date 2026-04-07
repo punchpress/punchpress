@@ -16,16 +16,15 @@ import {
   resolveInsertPointTarget,
 } from "./pen-existing-point-actions";
 import {
-  DRAG_THRESHOLD_PX,
-  PEN_HANDLE_DRAG_THRESHOLD_PX,
   createPlacementSession,
+  DRAG_THRESHOLD_PX,
   getContourSegmentCount,
   getZeroHandle,
   isSamePoint,
-  roundHandle,
+  PEN_HANDLE_LENGTH_THRESHOLD,
   type PenAuthoringSession,
-  type PenDraftPlacement,
   type PenHoverState,
+  roundHandle,
 } from "./pen-tool-types";
 import { selectToolFromShortcut, Tool } from "./tool";
 
@@ -137,10 +136,10 @@ export class PenTool extends Tool {
 
     return createPlacementSession(
       () => this.cancelDraftPlacement(),
-      ({ dragDistancePx = 0, point: nextPoint } = {}) =>
-        this.completeDraftPlacement(nextPoint || point, dragDistancePx),
-      ({ dragDistancePx = 0, point: nextPoint } = {}) =>
-        this.updateDraftPlacement(nextPoint || point, dragDistancePx)
+      ({ point: nextPoint } = {}) =>
+        this.completeDraftPlacement(nextPoint || point),
+      ({ point: nextPoint } = {}) =>
+        this.updateDraftPlacement(nextPoint || point)
     );
   }
 
@@ -361,7 +360,7 @@ export class PenTool extends Tool {
     return true;
   }
 
-  completeDraftPlacement(point, dragDistancePx) {
+  completeDraftPlacement(point) {
     const session = this.getActiveAuthoringSession();
 
     if (!(session?.draft && point)) {
@@ -377,7 +376,7 @@ export class PenTool extends Tool {
       return false;
     }
 
-    this.updateDraftPlacement(point, dragDistancePx);
+    this.updateDraftPlacement(point);
 
     const draft = session.draft;
     session.draft = null;
@@ -760,7 +759,7 @@ export class PenTool extends Tool {
     );
   }
 
-  updateDraftPlacement(point, dragDistancePx) {
+  updateDraftPlacement(point) {
     const session = this.getActiveAuthoringSession();
 
     if (!(session?.draft && point)) {
@@ -777,7 +776,11 @@ export class PenTool extends Tool {
     }
 
     const draft = session.draft;
-    const isDragging = dragDistancePx >= PEN_HANDLE_DRAG_THRESHOLD_PX;
+    const canvasHandleLength = Math.hypot(
+      point.x - draft.anchorCanvasPoint.x,
+      point.y - draft.anchorCanvasPoint.y
+    );
+    const isDragging = canvasHandleLength >= PEN_HANDLE_LENGTH_THRESHOLD;
 
     if (draft.kind === "first-point") {
       const localPoint = getNodeLocalPoint(node, bbox, point);
