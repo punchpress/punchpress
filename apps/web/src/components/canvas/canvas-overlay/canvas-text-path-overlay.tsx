@@ -1,5 +1,5 @@
-import { CircleArrowDataTransferHorizontalIcon } from "@hugeicons-pro/core-stroke-rounded";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { CircleArrowDataTransferHorizontalIcon } from "@hugeicons-pro/core-stroke-rounded";
 import { useEffect, useState } from "react";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
@@ -9,6 +9,10 @@ import {
   getTextPathHandleCursorToken,
   setActiveCanvasCursorToken,
 } from "../canvas-cursor-policy";
+import {
+  FANCY_CANVAS_HANDLE_BUTTON_CLASS,
+  FANCY_CANVAS_HANDLE_ICON_CLASS,
+} from "./canvas-handle-icon-styles";
 import {
   getTextPathGuideMatrix,
   getTextPathHostMetrics,
@@ -27,8 +31,7 @@ const POSITION_HANDLE_SCREEN_OFFSET =
 const WAVE_HANDLE_PAIR_GAP = 8;
 const WAVE_HANDLE_PAIR_OFFSET =
   BEND_HANDLE_ICON_SIZE / 2 + WAVE_HANDLE_PAIR_GAP / 2;
-const INLINE_WARP_HANDLE_ICON_CLASS =
-  "absolute top-1/2 left-1/2 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center text-white drop-shadow-[0_4px_10px_rgba(5,8,15,0.42)] transition-[color,transform,filter] duration-150 ease-out group-hover:scale-110 group-hover:text-[#63a7ff] group-active:scale-95 group-active:text-[#2f80ff] group-active:drop-shadow-[0_2px_6px_rgba(5,8,15,0.3)]";
+const INLINE_WARP_HANDLE_ICON_CLASS = FANCY_CANVAS_HANDLE_ICON_CLASS;
 const POSITION_HANDLE_ICON_CLASS = INLINE_WARP_HANDLE_ICON_CLASS;
 
 const getBoundsCenter = (bounds) => {
@@ -443,8 +446,8 @@ const TextPathHandles = ({
 
     return (
       <button
-        className={`group pointer-events-auto absolute rounded-full border-0 bg-transparent p-0 shadow-none ${
-          isInlineWarpHandle ? "h-11 w-11" : "h-4 w-4"
+        className={`${FANCY_CANVAS_HANDLE_BUTTON_CLASS} ${
+          isInlineWarpHandle ? "" : "h-4 w-4"
         }`}
         data-canvas-cursor={cursorToken || undefined}
         data-testid={`text-path-handle-${handle.key}`}

@@ -33,7 +33,10 @@ export const includesPathPoint = (points, point) => {
 };
 
 export const normalizePathPointSelection = (points, primaryPoint = null) => {
-  const normalizedPoints = [];
+  const normalizedPoints: Array<{
+    contourIndex: number;
+    segmentIndex: number;
+  }> = [];
   const seenKeys = new Set();
 
   for (const point of points || []) {
@@ -57,7 +60,8 @@ export const normalizePathPointSelection = (points, primaryPoint = null) => {
 
   if (!normalizedPrimaryPoint) {
     return {
-      pathEditingPoint: normalizedPoints[0] || null,
+      pathEditingPoint:
+        normalizedPoints.length === 1 ? normalizedPoints[0] || null : null,
       pathEditingPoints: normalizedPoints,
     };
   }

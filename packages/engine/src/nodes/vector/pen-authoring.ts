@@ -1,4 +1,7 @@
-import { getUniformVectorCornerRadius } from "./vector-corner-controls";
+import {
+  getUniformVectorCornerRadius,
+  setVectorPointCornerRadius,
+} from "./vector-corner-controls";
 
 const cloneHandle = (handle) => {
   return {
@@ -106,8 +109,7 @@ export const replacePenContourSegment = (
 
 export const closePenContour = (contours, contourIndex) => {
   const inheritedCornerRadius = getUniformVectorCornerRadius(contours);
-
-  return contours.map((contour, index) => {
+  const closedContours = contours.map((contour, index) => {
     if (index !== contourIndex) {
       return contour;
     }
@@ -115,24 +117,45 @@ export const closePenContour = (contours, contourIndex) => {
     return {
       ...contour,
       closed: true,
-      segments: contour.segments.map((segment, segmentIndex) => {
-        const nextSegment = cloneSegment(segment);
-
-        if (
-          typeof inheritedCornerRadius === "number" &&
-          (segmentIndex === 0 || segmentIndex === contour.segments.length - 1) &&
-          nextSegment.pointType === "corner"
-        ) {
-          return {
-            ...nextSegment,
-            cornerRadius: inheritedCornerRadius,
-          };
-        }
-
-        return nextSegment;
-      }),
+      segments: contour.segments.map(cloneSegment),
     };
   });
+
+  if (typeof inheritedCornerRadius !== "number") {
+    return closedContours;
+  }
+
+  const contour = closedContours[contourIndex];
+
+  if (!contour) {
+    return closedContours;
+  }
+
+  let nextContours = closedContours;
+
+  for (const point of [
+    {
+      contourIndex,
+      segmentIndex: contour.segments.length - 1,
+    },
+    {
+      contourIndex,
+      segmentIndex: 0,
+    },
+  ]) {
+    if (
+      nextContours[point.contourIndex]?.segments[point.segmentIndex]
+        ?.pointType !== "corner"
+    ) {
+      continue;
+    }
+
+    nextContours =
+      setVectorPointCornerRadius(nextContours, point, inheritedCornerRadius) ||
+      nextContours;
+  }
+
+  return nextContours;
 };
 
 export const reversePenContour = (contours, contourIndex) => {

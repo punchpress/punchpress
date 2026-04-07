@@ -307,6 +307,35 @@ const getVectorSegmentDocument = async (
   return vectorNode?.contours?.[contourIndex]?.segments?.[segmentIndex] || null;
 };
 
+const getVectorPointCornerRadius = (
+  page,
+  segmentIndex,
+  contourIndex = 0,
+  nodeId = "vector-node"
+) => {
+  return page.evaluate(
+    ({ currentContourIndex, currentNodeId, currentSegmentIndex }) => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
+
+      if (!editor) {
+        return 0;
+      }
+
+      return (
+        editor.getPathPointCornerRadius(currentNodeId, {
+          contourIndex: currentContourIndex,
+          segmentIndex: currentSegmentIndex,
+        }) || 0
+      );
+    },
+    {
+      currentContourIndex: contourIndex,
+      currentNodeId: nodeId,
+      currentSegmentIndex: segmentIndex,
+    }
+  );
+};
+
 const getVectorPaperPixel = (page, point) => {
   return page.evaluate(({ x, y }) => {
     const canvas = document.querySelector(".canvas-vector-paper");
@@ -499,6 +528,7 @@ const getVectorCornerWidgetScreenPoint = (
 ) => {
   return page.evaluate(
     ({ currentContourIndex, currentNodeId, currentSegmentIndex }) => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
       const dump = window.__PUNCHPRESS_EDITOR__?.getDebugDump();
       const nodeSnapshot = dump?.nodes?.find(
         (entry) => entry.id === currentNodeId
@@ -576,7 +606,10 @@ const getVectorCornerWidgetScreenPoint = (
           y: dy / length,
         };
       };
-      const previousDirection = getDirection(segment.point, previousSegment.point);
+      const previousDirection = getDirection(
+        segment.point,
+        previousSegment.point
+      );
       const nextDirection = getDirection(segment.point, nextSegment.point);
 
       if (!(previousDirection && nextDirection)) {
@@ -642,8 +675,13 @@ const getVectorCornerWidgetScreenPoint = (
         y: projectedBisector.y / pixelsPerLocalUnit,
       };
       const distancePerRadius = 1 / Math.sin(cornerAngle / 2);
+      const currentRadius =
+        editor.getPathPointCornerRadius(currentNodeId, {
+          contourIndex: currentContourIndex,
+          segmentIndex: currentSegmentIndex,
+        }) || 0;
       const distancePx =
-        20 + (segment.cornerRadius || 0) * distancePerRadius * pixelsPerLocalUnit;
+        30 + currentRadius * distancePerRadius * pixelsPerLocalUnit;
 
       return {
         direction: screenDirection,
@@ -659,7 +697,12 @@ const getVectorCornerWidgetScreenPoint = (
   );
 };
 
-const getEditablePathPointScreenPoint = (page, nodeId, segmentIndex, contourIndex = 0) => {
+const getEditablePathPointScreenPoint = (
+  page,
+  nodeId,
+  segmentIndex,
+  contourIndex = 0
+) => {
   return page.evaluate(
     ({ currentContourIndex, currentNodeId, currentSegmentIndex }) => {
       const editor = window.__PUNCHPRESS_EDITOR__;
@@ -669,8 +712,9 @@ const getEditablePathPointScreenPoint = (page, nodeId, segmentIndex, contourInde
       );
       const session = editor?.getEditablePathSession?.(currentNodeId);
       const localPoint =
-        session?.contours?.[currentContourIndex]?.segments?.[currentSegmentIndex]
-          ?.point;
+        session?.contours?.[currentContourIndex]?.segments?.[
+          currentSegmentIndex
+        ]?.point;
       const bbox = nodeSnapshot?.geometry?.bbox;
       const svg = document.querySelector(
         `.canvas-node[data-node-id="${currentNodeId}"] svg`
@@ -790,7 +834,10 @@ const getEditablePathCornerWidgetScreenPoint = (
           y: dy / length,
         };
       };
-      const previousDirection = getDirection(segment.point, previousSegment.point);
+      const previousDirection = getDirection(
+        segment.point,
+        previousSegment.point
+      );
       const nextDirection = getDirection(segment.point, nextSegment.point);
 
       if (!(previousDirection && nextDirection)) {
@@ -857,7 +904,7 @@ const getEditablePathCornerWidgetScreenPoint = (
       };
       const distancePerRadius = 1 / Math.sin(cornerAngle / 2);
       const distancePx =
-        20 + (currentRadius || 0) * distancePerRadius * pixelsPerLocalUnit;
+        30 + (currentRadius || 0) * distancePerRadius * pixelsPerLocalUnit;
 
       return {
         direction: screenDirection,
@@ -1492,7 +1539,8 @@ test("shift-clicking path points selects multiple anchors and dragging one moves
 
   await expect
     .poll(async () => {
-      const segments = (await getVectorNodeDocument(page))?.contours?.[0]?.segments;
+      const segments = (await getVectorNodeDocument(page))?.contours?.[0]
+        ?.segments;
 
       return segments?.slice(0, 2).map((segment) => segment.point) || [];
     })
@@ -1575,7 +1623,9 @@ test("dragging the live corner widget updates vector corner radius", async ({
 
   await expect
     .poll(async () => {
-      return Boolean(await getVectorCornerWidgetScreenPoint(page, "vector-node", 0));
+      return Boolean(
+        await getVectorCornerWidgetScreenPoint(page, "vector-node", 0)
+      );
     })
     .toBe(true);
 
@@ -1589,14 +1639,7 @@ test("dragging the live corner widget updates vector corner radius", async ({
     throw new Error("Missing vector corner widget");
   }
 
-  await expect
-    .poll(async () => {
-      return getVectorPaperRingAlphaTotal(page, widgetPoint, {
-        maxRadius: 12,
-        minRadius: 4,
-      });
-    })
-    .toBeGreaterThan(4000);
+  await expect(page.getByTestId("path-corner-radius-handle")).toBeVisible();
 
   await page.mouse.move(widgetPoint.x, widgetPoint.y);
   await page.mouse.down();
@@ -1609,10 +1652,87 @@ test("dragging the live corner widget updates vector corner radius", async ({
   await pauseForUi(page);
 
   await expect
-    .poll(async () => {
-      return (await getVectorSegmentDocument(page, 0))?.cornerRadius || 0;
-    })
+    .poll(() => getVectorPointCornerRadius(page, 0))
     .toBeGreaterThan(0);
+});
+
+test("multi-selected corner points each show a radius handle and dragging one rounds the selected points", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadVectorDocument(page);
+
+  await clickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+
+  const firstPoint = await getVectorSegmentScreenPoint(page, "vector-node", 0);
+  const secondPoint = await getVectorSegmentScreenPoint(page, "vector-node", 1);
+
+  if (!(firstPoint && secondPoint)) {
+    throw new Error("Missing vector anchor points for multi-corner handles");
+  }
+
+  await page.mouse.click(firstPoint.x, firstPoint.y);
+  await page.keyboard.down("Shift");
+  await page.mouse.click(secondPoint.x, secondPoint.y);
+  await page.keyboard.up("Shift");
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => {
+      return (await getDebugDump(page))?.editing?.pathPoints || [];
+    })
+    .toEqual([
+      {
+        contourIndex: 0,
+        segmentIndex: 0,
+      },
+      {
+        contourIndex: 0,
+        segmentIndex: 1,
+      },
+    ]);
+
+  await expect(page.getByTestId("path-corner-radius-handle")).toHaveCount(2);
+
+  const secondWidgetPoint = await getVectorCornerWidgetScreenPoint(
+    page,
+    "vector-node",
+    1
+  );
+
+  if (!secondWidgetPoint) {
+    throw new Error("Missing second vector corner widget");
+  }
+
+  await page.mouse.move(secondWidgetPoint.x, secondWidgetPoint.y);
+  await page.mouse.down();
+  await page.mouse.move(
+    secondWidgetPoint.x + secondWidgetPoint.direction.x * 36,
+    secondWidgetPoint.y + secondWidgetPoint.direction.y * 36,
+    { steps: 8 }
+  );
+  await page.mouse.up();
+  await pauseForUi(page);
+
+  await expect
+    .poll(() => getVectorPointCornerRadius(page, 0))
+    .toBeGreaterThan(0);
+
+  await expect
+    .poll(() => getVectorPointCornerRadius(page, 1))
+    .toBeGreaterThan(0);
+
+  await expect
+    .poll(async () => {
+      const firstCornerRadius = await getVectorPointCornerRadius(page, 0);
+      const secondCornerRadius = await getVectorPointCornerRadius(page, 1);
+
+      return Math.abs(firstCornerRadius - secondCornerRadius) <= 0.01;
+    })
+    .toBe(true);
 });
 
 test("polygon shape points show the live corner widget and update shape corner radius", async ({
@@ -1669,6 +1789,8 @@ test("polygon shape points show the live corner widget and update shape corner r
   if (!widgetPoint) {
     throw new Error("Missing polygon shape corner widget");
   }
+
+  await expect(page.getByTestId("path-corner-radius-handle")).toBeVisible();
 
   await page.mouse.move(widgetPoint.x, widgetPoint.y);
   await page.mouse.down();
@@ -1744,11 +1866,12 @@ test("properties panel shows mixed path corner radius and can apply one value to
   await pauseForUi(page);
 
   await expect
-    .poll(async () => {
-      const segments = (await getVectorNodeDocument(page, "vector-node"))?.contours?.[0]
-        ?.segments;
-
-      return segments?.map((segment) => segment.cornerRadius ?? 0) || [];
+    .poll(() => {
+      return Promise.all(
+        [0, 1, 2, 3].map((segmentIndex) => {
+          return getVectorPointCornerRadius(page, segmentIndex);
+        })
+      );
     })
     .toEqual([1, 1, 1, 1]);
 });
@@ -1811,11 +1934,12 @@ test("properties panel scopes path corner radius to the selected path points", a
   await pauseForUi(page);
 
   await expect
-    .poll(async () => {
-      const segments = (await getVectorNodeDocument(page, "vector-node"))?.contours?.[0]
-        ?.segments;
-
-      return segments?.map((segment) => segment.cornerRadius ?? 0) || [];
+    .poll(() => {
+      return Promise.all(
+        [0, 1, 2, 3].map((segmentIndex) => {
+          return getVectorPointCornerRadius(page, segmentIndex);
+        })
+      );
     })
     .toEqual([1, 1, 30, 0]);
 });

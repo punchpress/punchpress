@@ -21,7 +21,6 @@ export const getInteractiveHit = (scope, point) => {
 
   return (
     hits.find((hit) => isVectorPathPointRole(hit?.item?.data?.role)) ||
-    hits.find((hit) => hit?.item?.data?.role === "corner-radius") ||
     hits.find((hit) => hit?.item?.data?.role === "path") ||
     null
   );

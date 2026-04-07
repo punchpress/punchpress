@@ -33,10 +33,6 @@ export const useNodeToolbarState = () => {
       state.pathEditingPoint
         ? state.pathEditingPoint
         : null;
-    const selectedPointType =
-      selectedNode?.id && selectedPathPoint
-        ? editor.getPathPointType(selectedNode.id, selectedPathPoint)
-        : null;
     const pathPointKey = selectedPathPoint
       ? `${selectedPathPoint.contourIndex}:${selectedPathPoint.segmentIndex}`
       : "none";
@@ -48,7 +44,6 @@ export const useNodeToolbarState = () => {
       ),
       isPathEditing,
       selectedPathPoint,
-      selectedPointType,
       selectedNode,
       selectionKey: `${visibleSelectedNodeIds.join(",")}:${isPathEditing ? `path:${pathPointKey}` : "node"}`,
       visibleSelectedNodeIds,

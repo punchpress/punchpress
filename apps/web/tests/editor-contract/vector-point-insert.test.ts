@@ -106,13 +106,14 @@ describe("vector point insertion", () => {
     );
 
     const node = editor.getNode("vector-node");
-    const segment = node?.type === "vector" ? node.contours[0]?.segments[1] : null;
+    const segment =
+      node?.type === "vector" ? node.contours[0]?.segments[1] : null;
 
     expect(didInsert).toBe(true);
     expect(node?.type).toBe("vector");
-    expect(node?.type === "vector" ? node.contours[0]?.segments.length : 0).toBe(
-      5
-    );
+    expect(
+      node?.type === "vector" ? node.contours[0]?.segments.length : 0
+    ).toBe(5);
     expect(segment?.point).toEqual({ x: 100, y: 0 });
     expect(segment?.handleIn).toEqual({ x: 0, y: 0 });
     expect(segment?.handleOut).toEqual({ x: 0, y: 0 });
@@ -123,7 +124,7 @@ describe("vector point insertion", () => {
     });
   });
 
-  test("inserting a point inherits the uniform vector corner radius", () => {
+  test("inserting a point on a straight segment does not invent a live corner radius", () => {
     const editor = new Editor();
 
     editor.loadDocument(
@@ -133,10 +134,6 @@ describe("vector point insertion", () => {
             contours: [
               {
                 ...createRectangleContour(),
-                segments: createRectangleContour().segments.map((segment) => ({
-                  ...segment,
-                  cornerRadius: 18,
-                })),
               },
             ],
             fill: "#000000",
@@ -168,7 +165,6 @@ describe("vector point insertion", () => {
         segmentIndex: 1,
         segments: [
           {
-            cornerRadius: 18,
             handleIn: { x: 0, y: 0 },
             handleOut: { x: 0, y: 0 },
             point: { x: 0, y: 0 },
@@ -181,21 +177,18 @@ describe("vector point insertion", () => {
             pointType: "corner",
           },
           {
-            cornerRadius: 18,
             handleIn: { x: 0, y: 0 },
             handleOut: { x: 0, y: 0 },
             point: { x: 200, y: 0 },
             pointType: "corner",
           },
           {
-            cornerRadius: 18,
             handleIn: { x: 0, y: 0 },
             handleOut: { x: 0, y: 0 },
             point: { x: 200, y: 120 },
             pointType: "corner",
           },
           {
-            cornerRadius: 18,
             handleIn: { x: 0, y: 0 },
             handleOut: { x: 0, y: 0 },
             point: { x: 0, y: 120 },
@@ -207,98 +200,20 @@ describe("vector point insertion", () => {
     );
 
     const node = editor.getNode("vector-node");
-    const segment = node?.type === "vector" ? node.contours[0]?.segments[1] : null;
+    const segment =
+      node?.type === "vector" ? node.contours[0]?.segments[1] : null;
 
-    expect(segment?.cornerRadius).toBe(18);
-  });
-
-  test("inserting a point does not inherit a mixed vector corner radius", () => {
-    const editor = new Editor();
-
-    editor.loadDocument(
-      JSON.stringify({
-        nodes: [
-          {
-            contours: [
-              {
-                ...createRectangleContour(),
-                segments: createRectangleContour().segments.map(
-                  (segment, index) => ({
-                    ...segment,
-                    ...(index === 0 ? { cornerRadius: 12 } : {}),
-                    ...(index === 2 ? { cornerRadius: 30 } : {}),
-                  })
-                ),
-              },
-            ],
-            fill: "#000000",
-            fillRule: "nonzero",
-            id: "vector-node",
-            parentId: "root",
-            stroke: null,
-            strokeWidth: 0,
-            transform: {
-              rotation: 0,
-              scaleX: 1,
-              scaleY: 1,
-              x: 320,
-              y: 220,
-            },
-            type: "vector",
-            visible: true,
-          },
-        ],
-        version: "1.5",
-      })
+    expect(
+      node?.type === "vector" ? node.contours[0]?.segments.length : 0
+    ).toBe(5);
+    expect(segment ? Object.hasOwn(segment, "cornerRadius") : false).toBe(
+      false
     );
-
-    editor.setPathEditingNodeId("vector-node");
-
-    editor.insertVectorPoint(
-      {
+    expect(
+      editor.getPathPointCornerRadius("vector-node", {
         contourIndex: 0,
         segmentIndex: 1,
-        segments: [
-          {
-            cornerRadius: 12,
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: 0, y: 0 },
-            pointType: "corner",
-          },
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: 100, y: 0 },
-            pointType: "corner",
-          },
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: 200, y: 0 },
-            pointType: "corner",
-          },
-          {
-            cornerRadius: 30,
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: 200, y: 120 },
-            pointType: "corner",
-          },
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: 0, y: 120 },
-            pointType: "corner",
-          },
-        ],
-      },
-      "vector-node"
-    );
-
-    const node = editor.getNode("vector-node");
-    const segment = node?.type === "vector" ? node.contours[0]?.segments[1] : null;
-
-    expect(segment?.cornerRadius).toBeUndefined();
+      })
+    ).toBe(0);
   });
 });

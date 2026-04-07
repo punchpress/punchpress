@@ -7,8 +7,6 @@ import {
 import { getPenPreviewHandleAppearance } from "./pen-preview";
 
 const ANCHOR_RADIUS_PX = 6;
-const CORNER_WIDGET_RADIUS_PX = 5;
-export const CORNER_WIDGET_HALO_RADIUS_PX = 10;
 export const GUIDE_STROKE_WIDTH_PX = 1.5;
 const HANDLE_LINE_STROKE_WIDTH_PX = 1.25;
 const HANDLE_RADIUS_PX = 6;
@@ -25,12 +23,6 @@ export interface VectorSegmentChrome {
   handleOut: paper.Path.Circle;
   handleOutHalo: paper.Path.Circle;
   handleOutLine: paper.Path;
-}
-
-export interface CornerWidgetChrome {
-  halo: paper.Path.Circle;
-  handle: paper.Path.Circle;
-  line: paper.Path;
 }
 
 const resolveCssColor = (canvas, value, fallback) => {
@@ -54,8 +46,36 @@ export const getSceneStyles = (scope) => {
     "var(--background)",
     "rgb(255 255 255)"
   );
+  const destructive = resolveCssColor(
+    canvas,
+    "var(--destructive)",
+    "rgb(239 68 68)"
+  );
 
   return {
+    destructiveFill: new scope.Color(destructive),
+    destructiveHalo: (() => {
+      const color = new scope.Color(
+        resolveCssColor(
+          canvas,
+          "color-mix(in srgb, white 18%, var(--destructive) 82%)",
+          "rgb(255 122 147)"
+        )
+      );
+      color.alpha = 0.42;
+      return color;
+    })(),
+    destructiveHighlight: (() => {
+      const color = new scope.Color(
+        resolveCssColor(
+          canvas,
+          "color-mix(in srgb, white 6%, var(--destructive) 94%)",
+          "rgb(255 69 104)"
+        )
+      );
+      color.alpha = 0.98;
+      return color;
+    })(),
     backgroundFill: new scope.Color(background),
     accentFill: new scope.Color(accent),
     guide: new scope.Color(accent),
@@ -125,23 +145,6 @@ export const createHandleItem = (scope, styles, point) => {
     strokeColor: null,
     strokeWidth: 0,
   });
-};
-
-export const createCornerWidgetItem = (scope, styles, point) => {
-  const widget = new scope.Path.Circle({
-    center: point,
-    fillColor: styles.backgroundFill.clone(),
-    radius: CORNER_WIDGET_RADIUS_PX,
-    strokeColor: styles.accentFill.clone(),
-    strokeWidth: 2,
-    visible: false,
-  });
-
-  widget.shadowBlur = 4;
-  widget.shadowColor = styles.shadow;
-  widget.shadowOffset = new scope.Point(0, 1);
-
-  return widget;
 };
 
 export const createPreviewAnchorItem = (scope, styles, point) => {
@@ -228,7 +231,7 @@ export const refreshSegmentChrome = (
   chrome,
   styles,
   isSelected,
-  isPrimarySelected
+  showBezierHandles = false
 ) => {
   chrome.anchor.position = segment.point;
   chrome.anchorHalo.position = segment.point;
@@ -244,8 +247,8 @@ export const refreshSegmentChrome = (
 
   const handleInPoint = segment.point.add(segment.handleIn);
   const handleOutPoint = segment.point.add(segment.handleOut);
-  const hasHandleIn = isPrimarySelected && segment.handleIn.length > 0.01;
-  const hasHandleOut = isPrimarySelected && segment.handleOut.length > 0.01;
+  const hasHandleIn = showBezierHandles && segment.handleIn.length > 0.01;
+  const hasHandleOut = showBezierHandles && segment.handleOut.length > 0.01;
 
   chrome.handleInLine.segments[0].point = segment.point;
   chrome.handleInLine.segments[1].point = handleInPoint;
@@ -265,5 +268,3 @@ export const refreshSegmentChrome = (
   applyHandleItemAppearance(chrome.handleOut, styles);
   chrome.handleOut.visible = hasHandleOut;
 };
-
-export { getVectorAnchorHoverHaloRadiusPx } from "./hover-halo";

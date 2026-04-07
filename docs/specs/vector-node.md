@@ -57,6 +57,7 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 - Hovering an anchor or bezier handle should communicate point editing, not object movement.
 - Dragging the vector body should continue to use object-drag cursor language such as `grab` and `grabbing`.
 - Open and closed contours should both be editable through the same interaction model.
+- Open contours should remain visually open on canvas and export rather than being filled across an implied closing edge.
 - Selecting a single anchor should expose point-specific actions without leaving path edit mode.
 - Selecting multiple anchors should expose only actions that make sense for multi-point edits.
 
@@ -97,6 +98,7 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 - Clicking should place straight points.
 - While the Pen tool is active, the canvas placement cursor should use pen-style cursor language rather than a generic crosshair.
 - Click-dragging should place a point and immediately author its direction handles.
+- Tiny unintended screen-space jitter, especially at higher zoom, should still place a straight point until the authored handle reaches a meaningful canvas-space length.
 - Continuing from a smooth point should preserve expected tangent behavior.
 - While the Pen tool hovers a non-endpoint anchor on an editable path, it may expose delete-anchor behavior, but open endpoints should continue to prioritize continue-path and close-path intent.
 - While the Pen tool hovers an insertable segment on an editable path, it should expose add-anchor behavior without forcing a switch back to the pointer tool.
@@ -120,8 +122,23 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 - A converted shape should preserve its visible geometry and styling as it becomes a vector node.
 - Vector nodes should not promise shape-specific controls such as corner radius once the object no longer has a clear live shape meaning.
 - Vector nodes should support corner-rounding controls on eligible corner anchors, but that is a vector-corner feature rather than a polygon-shape-wide live control.
+- Vector corner-rounding should behave as live bezier geometry that remains editable when the path contains the canonical rounded-corner trim-point pattern, whether authored in PunchPress or imported.
+- A sharp vector corner should round by materializing that same canonical trim-point pattern rather than by storing separate corner-radius metadata on the path.
+- The trim points created by vector corner-rounding should remain corner points with independent handles, so users can still collapse them back to a sharp corner with the `Corner` action.
+- Point conversion controls such as `Corner` and `Smooth` should read as conversion actions, not as persistent mutually-exclusive mode toggles.
+- Open-path endpoints should remain ineligible for vector corner rounding until the contour is explicitly closed.
+- While path editing a vector with no anchor selected, PunchPress should show on-canvas corner-radius handles for all eligible live corners.
+- Once one or more anchors are selected, PunchPress should show on-canvas corner-radius handles only for the selected logical corners.
+- While the user is actively dragging a corner-radius handle, PunchPress should keep only the dragged corner handle visible until the drag ends.
+- Dragging a corner-radius handle with no anchor selection should adjust all eligible live corners together.
+- Dragging a corner-radius handle with anchor selection should adjust only the selected logical corners.
+- During an active corner-radius drag, the applied rounding should track the pointer direction monotonically rather than rebasing against the already-mutated path on each move.
 - While path editing a vector with no anchor selected, the properties panel should expose one bulk corner-radius control for all eligible corners.
 - If eligible vector corners do not all share the same radius, that bulk control should show a mixed state until the user applies a new value.
+- Corner-radius edits should clamp to the largest stable editable radius for the affected closed shape rather than pushing the path into an uneditable corner state.
+- While the user is actively dragging a corner-radius handle, corners that have reached the current drag limit may show a subdued red warning highlight on the rounded segment.
+- If the dragged corner reaches its own local limit before the broader drag scope is exhausted, that dragged corner should still show the red warning highlight.
+- When that warning is active, the dragged corner-radius handle should share the same red warning treatment so the limit state is obvious at the point of interaction.
 
 ## Styling And Geometry
 

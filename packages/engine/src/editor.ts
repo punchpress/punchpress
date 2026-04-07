@@ -19,28 +19,6 @@ import {
   serializeDocument as serializeEditorDocument,
 } from "./document/document-actions";
 import {
-  updateEditablePath as updateEditorEditablePath,
-  updateVectorContours as updateEditorVectorContours,
-  moveSelectedPathPointsBy as moveEditorSelectedPathPointsBy,
-} from "./document/path/editable-path-actions";
-import {
-  canRoundPathPoint as canEditorRoundPathPoint,
-  getPathCornerRadiusSummary as getEditorPathCornerRadiusSummary,
-  getPathPointCornerControl as getEditorPathPointCornerControl,
-  getPathPointCornerRadius as getEditorPathPointCornerRadius,
-  setPathCornerRadius as setEditorPathCornerRadius,
-  setPathPointCornerRadius as setEditorPathPointCornerRadius,
-} from "./document/path/path-corner-actions";
-import {
-  deletePathPoint as deleteEditorPathPoint,
-  deleteVectorPoint as deleteEditorVectorPoint,
-  getPathPointType as getEditorPathPointType,
-  insertPathPoint as insertEditorPathPoint,
-  insertVectorPoint as insertEditorVectorPoint,
-  setPathPointType as setEditorPathPointType,
-  setVectorPointType as setEditorVectorPointType,
-} from "./document/path/path-point-actions";
-import {
   bringToFront as bringEditorToFront,
   deleteNode as deleteEditorNode,
   deleteSelected as deleteEditorSelected,
@@ -55,6 +33,30 @@ import {
   updateNodes as updateEditorNodes,
   updateSelectedNode as updateEditorSelectedNode,
 } from "./document/node-actions";
+import {
+  moveSelectedPathPointsBy as moveEditorSelectedPathPointsBy,
+  updateEditablePath as updateEditorEditablePath,
+  updateVectorContours as updateEditorVectorContours,
+} from "./document/path/editable-path-actions";
+import {
+  canRoundPathPoint as canEditorRoundPathPoint,
+  getPathCornerRadiusStableMax as getEditorPathCornerRadiusStableMax,
+  getPathCornerRadiusSummary as getEditorPathCornerRadiusSummary,
+  getPathPointCornerControl as getEditorPathPointCornerControl,
+  getPathPointCornerRadius as getEditorPathPointCornerRadius,
+  setPathCornerRadius as setEditorPathCornerRadius,
+  setPathPointCornerRadius as setEditorPathPointCornerRadius,
+} from "./document/path/path-corner-actions";
+import {
+  deletePathPoint as deleteEditorPathPoint,
+  deletePathPoints as deleteEditorPathPoints,
+  deleteVectorPoint as deleteEditorVectorPoint,
+  getPathPointType as getEditorPathPointType,
+  insertPathPoint as insertEditorPathPoint,
+  insertVectorPoint as insertEditorVectorPoint,
+  setPathPointType as setEditorPathPointType,
+  setVectorPointType as setEditorVectorPointType,
+} from "./document/path/path-point-actions";
 import {
   addShapeNode as addEditorShapeNode,
   addTextNode as addEditorTextNode,
@@ -128,8 +130,8 @@ import {
 } from "./nodes/node-tree";
 import { beginNodePlacement as beginEditorNodePlacement } from "./placement/node-placement";
 import {
-  getLayerRow as getEditorLayerRow,
   getEditablePathSession as getEditorEditablePathSession,
+  getLayerRow as getEditorLayerRow,
   getNode as getEditorNode,
   getNodeEditCapabilities as getEditorNodeEditCapabilities,
   getNodeFrame as getEditorNodeFrame,
@@ -762,6 +764,17 @@ export class Editor {
     return deleteEditorPathPoint(this, nodeId, point);
   }
 
+  deletePathPoints(
+    nodeId = this.pathEditingNodeId,
+    points = this.pathEditingPoints
+  ) {
+    if (!(nodeId && points?.length > 0)) {
+      return false;
+    }
+
+    return deleteEditorPathPoints(this, nodeId, points);
+  }
+
   deleteNode(nodeId) {
     deleteEditorNode(this, nodeId);
   }
@@ -966,7 +979,10 @@ export class Editor {
     );
   }
 
-  getPathPointType(nodeId = this.pathEditingNodeId, point = this.pathEditingPoint) {
+  getPathPointType(
+    nodeId = this.pathEditingNodeId,
+    point = this.pathEditingPoint
+  ) {
     if (!(nodeId && point)) {
       return null;
     }
@@ -974,7 +990,10 @@ export class Editor {
     return getEditorPathPointType(this, nodeId, point);
   }
 
-  canRoundPathPoint(nodeId = this.pathEditingNodeId, point = this.pathEditingPoint) {
+  canRoundPathPoint(
+    nodeId = this.pathEditingNodeId,
+    point = this.pathEditingPoint
+  ) {
     if (!(nodeId && point)) {
       return false;
     }
@@ -1010,6 +1029,14 @@ export class Editor {
     }
 
     return getEditorPathCornerRadiusSummary(this, nodeId);
+  }
+
+  getPathCornerRadiusStableMax(nodeId = this.pathEditingNodeId) {
+    if (!nodeId) {
+      return 0;
+    }
+
+    return getEditorPathCornerRadiusStableMax(this, nodeId);
   }
 
   getPathEditingInspectorState(nodeId = this.selectedNodeId) {

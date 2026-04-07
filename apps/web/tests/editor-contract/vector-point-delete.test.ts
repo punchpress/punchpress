@@ -168,6 +168,64 @@ describe("vector point delete", () => {
     });
   });
 
+  test("delete removes all selected vector path points", () => {
+    const editor = new Editor();
+    const node = createVectorNode([createRectangleContour()]);
+
+    editor.getState().loadNodes([node]);
+    editor.select(node.id);
+    editor.startPathEditing(node.id);
+    editor.setPathEditingPoints(
+      [
+        {
+          contourIndex: 0,
+          segmentIndex: 1,
+        },
+        {
+          contourIndex: 0,
+          segmentIndex: 2,
+        },
+      ],
+      {
+        contourIndex: 0,
+        segmentIndex: 2,
+      }
+    );
+
+    const result = pressDelete(editor);
+
+    expect(result).toEqual({
+      handled: true,
+      prevented: true,
+    });
+
+    const nextNode = editor.getNode(node.id);
+
+    if (nextNode?.type !== "vector") {
+      throw new Error(
+        "Expected the vector node to remain after multi-point delete."
+      );
+    }
+
+    expect(nextNode.contours[0]?.segments).toHaveLength(2);
+    expect(
+      nextNode.contours[0]?.segments.map((segment) => segment.point)
+    ).toEqual([
+      { x: -120, y: -90 },
+      { x: -120, y: 90 },
+    ]);
+    expect(editor.pathEditingPoints).toEqual([
+      {
+        contourIndex: 0,
+        segmentIndex: 1,
+      },
+    ]);
+    expect(editor.pathEditingPoint).toEqual({
+      contourIndex: 0,
+      segmentIndex: 1,
+    });
+  });
+
   test("delete removes the vector node when its last remaining point is deleted", () => {
     const editor = new Editor();
     const node = createVectorNode([

@@ -17,11 +17,7 @@ const getPathEditingToolbarActions = (editor, state) => {
     },
   ];
 
-  if (
-    state.isPathEditing &&
-    state.selectedNode &&
-    state.selectedPathPoint
-  ) {
+  if (state.isPathEditing && state.selectedNode && state.selectedPathPoint) {
     actions.unshift(
       {
         id: "delete-point",
@@ -39,10 +35,10 @@ const getPathEditingToolbarActions = (editor, state) => {
       },
       {
         id: "set-point-corner",
-        isActive: state.selectedPointType === "corner",
+        isActive: false,
         label: "Corner",
         title: "Convert point to corner",
-        variant: state.selectedPointType === "corner" ? "secondary" : "ghost",
+        variant: "ghost",
         onSelect: () => {
           editor.setPathPointType(
             "corner",
@@ -53,10 +49,10 @@ const getPathEditingToolbarActions = (editor, state) => {
       },
       {
         id: "set-point-smooth",
-        isActive: state.selectedPointType === "smooth",
+        isActive: false,
         label: "Smooth",
         title: "Convert point to smooth",
-        variant: state.selectedPointType === "smooth" ? "secondary" : "ghost",
+        variant: "ghost",
         onSelect: () => {
           editor.setPathPointType(
             "smooth",

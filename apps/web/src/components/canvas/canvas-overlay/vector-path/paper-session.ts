@@ -17,6 +17,7 @@ import {
   getVectorEndpointCloseTarget,
   shouldSnapVectorEndpointClose,
 } from "./endpoint-close";
+import { getVectorAnchorHoverHaloRadiusPx } from "./hover-halo";
 import {
   createLocalContourPath,
   findVectorPathInsertTarget,
@@ -28,34 +29,30 @@ import {
   getInteractiveHit,
 } from "./paper-session-interaction";
 import {
-  getAnchorSelectionsInRectangle,
-  getPointSelectionKey,
-  isPointSelectionIncluded,
-  isSamePointSelection,
-  normalizePointSelections,
-} from "./paper-session-selection";
-import {
-  CORNER_WIDGET_HALO_RADIUS_PX,
-  GUIDE_STROKE_WIDTH_PX,
-  HANDLE_HOVER_RADIUS_PX,
-  PREVIEW_DASH_ARRAY,
   createAnchorItem,
-  createCornerWidgetItem,
   createHandleItem,
   createHandleLine,
   createHoverHaloItem,
   createPreviewAnchorItem,
   createPreviewHandleItem,
   createPreviewHandleLine,
+  GUIDE_STROKE_WIDTH_PX,
   getSceneStyles,
-  getVectorAnchorHoverHaloRadiusPx,
   getZeroPoint,
+  HANDLE_HOVER_RADIUS_PX,
+  PREVIEW_DASH_ARRAY,
   projectPoint,
   projectVector,
   refreshSegmentChrome,
-  type CornerWidgetChrome,
   type VectorSegmentChrome,
 } from "./paper-session-render";
+import {
+  getAnchorSelectionsInRectangle,
+  getPointSelectionKey,
+  isPointSelectionIncluded,
+  isSamePointSelection,
+  normalizePointSelections,
+} from "./paper-session-selection";
 import {
   getPenPreviewEndpoint,
   getPenPreviewHandleIn,
@@ -64,19 +61,41 @@ import {
   shouldShowPenPreviewGhostAnchor,
   shouldShowPenPreviewHandles,
 } from "./pen-preview";
+import type { VectorCornerDragSession } from "./vector-corner-drag-session";
 import {
-  getVectorCornerRadiusFromWidgetDrag,
-  getVectorCornerWidgetGeometry,
-} from "./corner-widget-geometry";
+  getHoveredVectorCornerCurveSegment,
+  getMaxedVectorCornerCurveSegments,
+} from "./vector-corner-radius-points";
+import { shouldShowBezierHandlesForPoint } from "./vector-path-selection-chrome";
 
 const ENDPOINT_CLOSE_SNAP_DISTANCE_PX = 14;
+const HOVERED_CORNER_CURVE_FALLBACK_STROKE_WIDTH_PX = 12;
 const SELECTION_MARQUEE_DASH_ARRAY = [6, 4];
 const SELECTION_MARQUEE_THRESHOLD_PX = 4;
 const PATH_POINT_DRAG_THRESHOLD_PX = 4;
+const MAXED_CORNER_OUTER_STROKE_PX = 6;
+const MAXED_CORNER_INNER_STROKE_SCALE = 0.78;
+const roundDelta = (value) => Math.round(value * 100) / 100;
+
+const getRenderedStrokeWidthPx = (matrix, strokeWidth = 0) => {
+  const projectedXScale = Math.hypot(matrix.a, matrix.b);
+  const projectedYScale = Math.hypot(matrix.c, matrix.d);
+  const averageScale = (projectedXScale + projectedYScale) / 2;
+
+  if (!Number.isFinite(averageScale) || averageScale <= 0) {
+    return HOVERED_CORNER_CURVE_FALLBACK_STROKE_WIDTH_PX;
+  }
+
+  if (!(strokeWidth > 0)) {
+    return HOVERED_CORNER_CURVE_FALLBACK_STROKE_WIDTH_PX;
+  }
+
+  return strokeWidth * averageScale;
+};
 
 type HoveredPoint = {
   contourIndex: number;
-  role: "anchor" | "corner-radius" | "handle-in" | "handle-out";
+  role: "anchor" | "handle-in" | "handle-out";
   segmentIndex: number;
 } | null;
 
@@ -101,13 +120,6 @@ type PendingPress =
       type: "point";
     }
   | {
-      origin: paper.Point;
-      contourIndex: number;
-      role: "corner-radius";
-      segmentIndex: number;
-      type: "corner-radius";
-    }
-  | {
       contourIndex: number;
       curveIndex: number;
       offset: number;
@@ -123,8 +135,6 @@ type EndpointCloseTarget = {
   role: "anchor";
   segmentIndex: number;
 } | null;
-
-const roundDelta = (value) => Math.round(value * 100) / 100;
 
 const getCanvasPoint = (editor, clientX, clientY) => {
   const viewer = editor.viewerRef;
@@ -175,9 +185,8 @@ export const createVectorPaperSession = ({
 
   const state = {
     activeDrag: null,
+    activeDragSession: null as VectorCornerDragSession | null,
     chrome: [],
-    cornerWidget: null as CornerWidgetChrome | null,
-    cornerWidgetGeometry: null,
     contours: [],
     dragCanvasPoint: null,
     endpointCloseTarget: null as EndpointCloseTarget,
@@ -197,19 +206,21 @@ export const createVectorPaperSession = ({
     pendingScene: null,
     penHover: null as PenHoverTarget,
     hoveredPoint: null as HoveredPoint,
+    hoveredCornerHandlePoint: null,
+    hoveredCurvePath: null as paper.Path | null,
+    maxedCurvePaths: [] as paper.Path[],
+    nodeStrokeWidth: 0,
     previewPath: null as paper.Path | null,
     interactionPolicy: {
       canInsertPoint: true,
     },
     selectedPoints: [],
     selectedPoint: null,
-    selectionMarquee: null as
-      | {
-          additive: boolean;
-          current: paper.Point;
-          origin: paper.Point;
-        }
-      | null,
+    selectionMarquee: null as {
+      additive: boolean;
+      current: paper.Point;
+      origin: paper.Point;
+    } | null,
     selectionMarqueePath: null as paper.Path.Rectangle | null,
     styles: getSceneStyles(scope),
   };
@@ -217,8 +228,6 @@ export const createVectorPaperSession = ({
   const clearScene = () => {
     scope.project.clear();
     state.chrome = [];
-    state.cornerWidget = null;
-    state.cornerWidgetGeometry = null;
     state.localPaths = [];
     state.paths = [];
     state.previewAnchor = null;
@@ -226,6 +235,9 @@ export const createVectorPaperSession = ({
     state.previewHandleInLine = null;
     state.previewHandleOut = null;
     state.previewHandleOutLine = null;
+    state.hoveredCornerHandlePoint = null;
+    state.hoveredCurvePath = null;
+    state.maxedCurvePaths = [];
     state.previewPath = null;
     state.penHover = null;
     state.selectionMarquee = null;
@@ -235,43 +247,6 @@ export const createVectorPaperSession = ({
 
   const setHoverCursorMode = (mode) => {
     setCanvasCursorToken(canvas, getVectorPathCursorToken(mode));
-  };
-
-  const ensureCornerWidget = () => {
-    if (state.cornerWidget) {
-      return state.cornerWidget;
-    }
-
-    const line = createHandleLine(
-      scope,
-      state.styles,
-      getZeroPoint(),
-      getZeroPoint()
-    );
-    const halo = createHoverHaloItem(
-      scope,
-      state.styles,
-      getZeroPoint(),
-      CORNER_WIDGET_HALO_RADIUS_PX
-    );
-    const handle = createCornerWidgetItem(
-      scope,
-      state.styles,
-      getZeroPoint()
-    );
-
-    line.visible = false;
-    halo.visible = false;
-    handle.visible = false;
-    halo.insertBelow(handle);
-
-    state.cornerWidget = {
-      handle,
-      halo,
-      line,
-    };
-
-    return state.cornerWidget;
   };
 
   const ensureSelectionMarquee = () => {
@@ -330,67 +305,164 @@ export const createVectorPaperSession = ({
     path.visible = true;
   };
 
-  const hideCornerWidget = () => {
-    state.cornerWidgetGeometry = null;
-
-    if (!state.cornerWidget) {
-      return;
+  const ensureHoveredCurvePath = () => {
+    if (state.hoveredCurvePath) {
+      return state.hoveredCurvePath;
     }
 
-    state.cornerWidget.handle.visible = false;
-    state.cornerWidget.halo.visible = false;
-    state.cornerWidget.line.visible = false;
+    const path = new scope.Path({
+      fillColor: null,
+      insert: true,
+      strokeCap: "round",
+      strokeColor: state.styles.accentFill.clone(),
+      strokeJoin: "round",
+      strokeWidth: HOVERED_CORNER_CURVE_FALLBACK_STROKE_WIDTH_PX,
+      visible: false,
+    });
+
+    path.strokeColor.alpha = 0.7;
+    state.hoveredCurvePath = path;
+    return path;
   };
 
-  const syncCornerWidget = () => {
-    const selectedPoint = state.selectedPoint;
-    const currentRadius =
-      selectedPoint && nodeId
-        ? editor.getPathPointCornerRadius(nodeId, selectedPoint)
-        : 0;
-    const geometry =
-      state.selectedPoints.length === 1 &&
-      selectedPoint &&
-      state.matrix &&
-      nodeId &&
-      editor.canRoundPathPoint(nodeId, selectedPoint)
-        ? getVectorCornerWidgetGeometry({
-            contours: state.contours,
-            currentRadius,
-            matrix: state.matrix,
-            point: selectedPoint,
-          })
-        : null;
+  const clearMaxedCurveHighlights = () => {
+    for (const path of state.maxedCurvePaths) {
+      path.remove();
+    }
+    state.maxedCurvePaths = [];
+  };
 
-    if (!geometry) {
-      hideCornerWidget();
+  const syncMaxedCurveHighlights = () => {
+    const maxedSegments = getMaxedVectorCornerCurveSegments(
+      state.contours,
+      state.selectedPoints,
+      state.activeDragSession?.maxRadius ?? null,
+      state.activeDragSession
+    );
+
+    clearMaxedCurveHighlights();
+
+    if (!(state.activeDragSession && maxedSegments.length > 0 && state.matrix)) {
       return;
     }
 
-    const widget = ensureCornerWidget();
+    state.maxedCurvePaths = maxedSegments.flatMap((maxedSegment) => {
+      const contour = state.contours[maxedSegment.contourIndex];
+      const startSegment = contour?.segments?.[maxedSegment.startIndex];
+      const endSegment = contour?.segments?.[maxedSegment.endIndex];
 
-    state.cornerWidgetGeometry = geometry;
-    widget.handle.position = new scope.Point(geometry.center.x, geometry.center.y);
-    widget.handle.visible = true;
-    widget.handle.data = {
-      contourIndex: selectedPoint.contourIndex,
-      role: "corner-radius",
-      segmentIndex: selectedPoint.segmentIndex,
-    };
+      if (!(startSegment && endSegment)) {
+        return [];
+      }
 
-    widget.halo.position = widget.handle.position;
-    widget.halo.visible =
-      state.hoveredPoint?.role === "corner-radius" &&
-      isSamePointSelection(state.hoveredPoint, selectedPoint);
+      const renderedStrokeWidth = getRenderedStrokeWidthPx(
+        state.matrix,
+        state.nodeStrokeWidth
+      );
+      const outerPath = new scope.Path({
+        fillColor: null,
+        insert: true,
+        strokeCap: "round",
+        strokeColor: state.styles.destructiveHalo.clone(),
+        strokeJoin: "round",
+        strokeWidth: renderedStrokeWidth + MAXED_CORNER_OUTER_STROKE_PX,
+      });
+      const innerPath = new scope.Path({
+        fillColor: null,
+        insert: true,
+        strokeCap: "round",
+        strokeColor: state.styles.destructiveHighlight.clone(),
+        strokeJoin: "round",
+        strokeWidth: Math.max(
+          4,
+          renderedStrokeWidth * MAXED_CORNER_INNER_STROKE_SCALE
+        ),
+      });
 
-    widget.line.segments[0].point = new scope.Point(
-      geometry.anchor.x,
-      geometry.anchor.y
+      outerPath.add(
+        new scope.Segment(
+          projectPoint(state.matrix, startSegment.point),
+          projectVector(state.matrix, startSegment.handleIn),
+          projectVector(state.matrix, startSegment.handleOut)
+        )
+      );
+      outerPath.add(
+        new scope.Segment(
+          projectPoint(state.matrix, endSegment.point),
+          projectVector(state.matrix, endSegment.handleIn),
+          projectVector(state.matrix, endSegment.handleOut)
+        )
+      );
+      innerPath.add(
+        new scope.Segment(
+          projectPoint(state.matrix, startSegment.point),
+          projectVector(state.matrix, startSegment.handleIn),
+          projectVector(state.matrix, startSegment.handleOut)
+        )
+      );
+      innerPath.add(
+        new scope.Segment(
+          projectPoint(state.matrix, endSegment.point),
+          projectVector(state.matrix, endSegment.handleIn),
+          projectVector(state.matrix, endSegment.handleOut)
+        )
+      );
+
+      return [outerPath, innerPath];
+    });
+  };
+
+  const syncHoveredCurveHighlight = () => {
+    const hoveredSegment = getHoveredVectorCornerCurveSegment(
+      state.contours,
+      state.hoveredCornerHandlePoint
     );
-    widget.line.segments[1].point = widget.handle.position;
-    widget.line.visible = true;
-    widget.line.strokeColor = state.styles.guide.clone();
-    widget.line.strokeColor.alpha = 0.5;
+
+    if (!(hoveredSegment && state.matrix)) {
+      if (state.hoveredCurvePath) {
+        state.hoveredCurvePath.visible = false;
+      }
+      return;
+    }
+
+    const contour = state.contours[hoveredSegment.contourIndex];
+    const startSegment = contour?.segments?.[hoveredSegment.startIndex];
+    const endSegment = contour?.segments?.[hoveredSegment.endIndex];
+
+    if (!(startSegment && endSegment)) {
+      if (state.hoveredCurvePath) {
+        state.hoveredCurvePath.visible = false;
+      }
+      return;
+    }
+
+    const path = ensureHoveredCurvePath();
+    path.strokeWidth = getRenderedStrokeWidthPx(
+      state.matrix,
+      state.nodeStrokeWidth
+    );
+    path.removeSegments();
+    path.add(
+      new scope.Segment(
+        projectPoint(state.matrix, startSegment.point),
+        projectVector(state.matrix, startSegment.handleIn),
+        projectVector(state.matrix, startSegment.handleOut)
+      )
+    );
+    path.add(
+      new scope.Segment(
+        projectPoint(state.matrix, endSegment.point),
+        projectVector(state.matrix, endSegment.handleIn),
+        projectVector(state.matrix, endSegment.handleOut)
+      )
+    );
+    path.visible = true;
+  };
+
+  const syncCurveHighlightsAndUpdate = () => {
+    syncMaxedCurveHighlights();
+    syncHoveredCurveHighlight();
+    scope.view.update();
   };
 
   const syncHoveredChrome = () => {
@@ -402,25 +474,10 @@ export const createVectorPaperSession = ({
       }
     }
 
-    if (state.cornerWidget) {
-      state.cornerWidget.halo.visible = false;
-    }
-
     const hoveredPoint = state.hoveredPoint || state.penHover;
 
     if (!hoveredPoint) {
-      if (state.cornerWidget) {
-        state.cornerWidget.halo.visible = false;
-      }
-      scope.view.update();
-      return;
-    }
-
-    if (hoveredPoint.role === "corner-radius") {
-      if (state.cornerWidget) {
-        state.cornerWidget.halo.visible = true;
-      }
-      scope.view.update();
+      syncCurveHighlightsAndUpdate();
       return;
     }
 
@@ -428,19 +485,19 @@ export const createVectorPaperSession = ({
       state.chrome[hoveredPoint.contourIndex]?.[hoveredPoint.segmentIndex];
 
     if (!chrome) {
-      scope.view.update();
+      syncCurveHighlightsAndUpdate();
       return;
     }
 
     if (hoveredPoint.role === "anchor") {
       chrome.anchorHalo.visible = true;
-      scope.view.update();
+      syncCurveHighlightsAndUpdate();
       return;
     }
 
     if (hoveredPoint.role === "handle-in" && chrome.handleIn.visible) {
       chrome.handleInHalo.visible = true;
-      scope.view.update();
+      syncCurveHighlightsAndUpdate();
       return;
     }
 
@@ -448,7 +505,7 @@ export const createVectorPaperSession = ({
       chrome.handleOutHalo.visible = true;
     }
 
-    scope.view.update();
+    syncCurveHighlightsAndUpdate();
   };
 
   const setHoveredPoint = (hoveredPoint: HoveredPoint) => {
@@ -495,24 +552,48 @@ export const createVectorPaperSession = ({
     segment.handleIn = projectVector(state.matrix, sourceSegment.handleIn);
     segment.handleOut = projectVector(state.matrix, sourceSegment.handleOut);
 
+    const pointSelection = {
+      contourIndex,
+      segmentIndex,
+    };
+
     refreshSegmentChrome(
       segment,
       chrome,
       state.styles,
-      isPointSelectionIncluded(state.selectedPoints, {
-        contourIndex,
-        segmentIndex,
-      }),
-      isSamePointSelection(state.selectedPoint, {
-        contourIndex,
-        segmentIndex,
-      })
+      isPointSelectionIncluded(state.selectedPoints, pointSelection),
+      shouldShowBezierHandlesForPoint(
+        editor,
+        nodeId,
+        state.selectedPoint,
+        pointSelection
+      )
     );
 
     if (updateView) {
       syncHoveredChrome();
       scope.view.update();
     }
+  };
+
+  const refreshPathSegmentChrome = (contourIndex, segmentIndex, segment) => {
+    const pointSelection = {
+      contourIndex,
+      segmentIndex,
+    };
+
+    refreshSegmentChrome(
+      segment,
+      state.chrome[contourIndex][segmentIndex],
+      state.styles,
+      isPointSelectionIncluded(state.selectedPoints, pointSelection),
+      shouldShowBezierHandlesForPoint(
+        editor,
+        nodeId,
+        state.selectedPoint,
+        pointSelection
+      )
+    );
   };
 
   const setSelectedPoints = (points, primaryPoint = null) => {
@@ -549,7 +630,6 @@ export const createVectorPaperSession = ({
     }
 
     editor.setPathEditingPoints(nextPoints, nextPrimaryPoint);
-    syncCornerWidget();
     scope.view.update();
   };
 
@@ -730,10 +810,13 @@ export const createVectorPaperSession = ({
 
   const renderScene = (scene) => {
     const {
+      activeDragSession,
       contours,
+      hoveredCornerHandlePoint,
       interactionPolicy,
       matrix,
       metrics,
+      nodeStrokeWidth,
       penHover,
       penPreview,
       selectedPoints,
@@ -763,11 +846,14 @@ export const createVectorPaperSession = ({
     }
 
     state.contours = contours;
+    state.activeDragSession = activeDragSession || null;
+    state.hoveredCornerHandlePoint = hoveredCornerHandlePoint || null;
     state.interactionPolicy = interactionPolicy || {
       canInsertPoint: true,
     };
     state.inverseMatrix = inverseMatrix;
     state.matrix = matrix;
+    state.nodeStrokeWidth = nodeStrokeWidth || 0;
     state.penHover = penHover || null;
     state.selectedPoints = selectedPoints || [];
     state.selectedPoint = selectedPoint || null;
@@ -876,35 +962,25 @@ export const createVectorPaperSession = ({
 
     state.paths.forEach((path, contourIndex) => {
       path.segments.forEach((segment, segmentIndex) => {
-        refreshSegmentChrome(
-          segment,
-          state.chrome[contourIndex][segmentIndex],
-          state.styles,
-          isPointSelectionIncluded(state.selectedPoints, {
-            contourIndex,
-            segmentIndex,
-          }),
-          isSamePointSelection(state.selectedPoint, {
-            contourIndex,
-            segmentIndex,
-          })
-        );
+        refreshPathSegmentChrome(contourIndex, segmentIndex, segment);
       });
     });
 
     syncPreviewPath(penPreview);
-    syncCornerWidget();
     syncHoveredChrome();
     scope.view.update();
   };
 
   const syncActiveSceneFrame = (scene) => {
     const {
+      activeDragSession,
       interactionPolicy,
       matrix,
       metrics,
+      nodeStrokeWidth,
       penHover,
       penPreview,
+      hoveredCornerHandlePoint,
       selectedPoints,
       selectedPoint,
     } = scene;
@@ -934,7 +1010,10 @@ export const createVectorPaperSession = ({
     state.interactionPolicy = interactionPolicy || {
       canInsertPoint: true,
     };
+    state.activeDragSession = activeDragSession || null;
     state.matrix = matrix;
+    state.nodeStrokeWidth = nodeStrokeWidth || 0;
+    state.hoveredCornerHandlePoint = hoveredCornerHandlePoint || null;
     state.penHover = penHover || null;
     state.selectedPoints = selectedPoints || [];
     state.selectedPoint = selectedPoint || null;
@@ -956,24 +1035,11 @@ export const createVectorPaperSession = ({
           sourceSegment.handleOut
         );
 
-        refreshSegmentChrome(
-          segment,
-          state.chrome[contourIndex][segmentIndex],
-          state.styles,
-          isPointSelectionIncluded(state.selectedPoints, {
-            contourIndex,
-            segmentIndex,
-          }),
-          isSamePointSelection(state.selectedPoint, {
-            contourIndex,
-            segmentIndex,
-          })
-        );
+        refreshPathSegmentChrome(contourIndex, segmentIndex, segment);
       });
     });
 
     syncPreviewPath(penPreview);
-    syncCornerWidget();
     syncHoveredChrome();
     scope.view.update();
   };
@@ -1083,12 +1149,6 @@ export const createVectorPaperSession = ({
     const { bodyHit, insertTarget } = getPathInteraction(point);
 
     if (isVectorPathPointRole(role)) {
-      setHoveredPoint({
-        contourIndex: hit.item.data.contourIndex,
-        role,
-        segmentIndex: hit.item.data.segmentIndex,
-      });
-    } else if (role === "corner-radius") {
       setHoveredPoint({
         contourIndex: hit.item.data.contourIndex,
         role,
@@ -1263,47 +1323,6 @@ export const createVectorPaperSession = ({
     });
   };
 
-  const updateDraggedCornerRadius = (contourIndex, segmentIndex, point) => {
-    const geometry = getVectorCornerWidgetGeometry({
-      contours: state.contours,
-      matrix: state.matrix,
-      point: {
-        contourIndex,
-        segmentIndex,
-      },
-    });
-
-    if (!geometry) {
-      return;
-    }
-
-    const nextCornerRadius = roundDelta(
-      getVectorCornerRadiusFromWidgetDrag(geometry, {
-        x: point.x,
-        y: point.y,
-      })
-    );
-    const pathPoint = {
-      contourIndex,
-      segmentIndex,
-    };
-
-    if (!editor.setPathPointCornerRadius(nextCornerRadius, nodeId, pathPoint)) {
-      return;
-    }
-
-    const nextSession = editor.getEditablePathSession(nodeId);
-
-    if (nextSession?.backend !== "vector-path") {
-      return;
-    }
-
-    state.contours = nextSession.contours;
-    syncCornerWidget();
-    syncHoveredChrome();
-    scope.view.update();
-  };
-
   const tool = new scope.Tool();
 
   tool.onMouseDown = (event) => {
@@ -1351,27 +1370,6 @@ export const createVectorPaperSession = ({
           : [pointSelection],
         pointSelection
       );
-      setHoveredPoint({
-        contourIndex: hit.item.data.contourIndex,
-        role,
-        segmentIndex: hit.item.data.segmentIndex,
-      });
-      setHoverCursorMode("point");
-      return;
-    }
-
-    if (role === "corner-radius") {
-      const pointSelection = {
-        contourIndex: hit.item.data.contourIndex,
-        segmentIndex: hit.item.data.segmentIndex,
-      };
-
-      state.pendingPress = {
-        ...hit.item.data,
-        origin: event.point.clone(),
-        type: "corner-radius",
-      } satisfies PendingPress;
-      setSelectedPoint(pointSelection);
       setHoveredPoint({
         contourIndex: hit.item.data.contourIndex,
         role,
@@ -1466,31 +1464,7 @@ export const createVectorPaperSession = ({
       setActiveCursorMode("point");
     }
 
-    if (
-      state.pendingPress?.type === "corner-radius" &&
-      !state.activeDrag &&
-      event.point.getDistance(state.pendingPress.origin) >=
-        PATH_POINT_DRAG_THRESHOLD_PX
-    ) {
-      state.activeDrag = state.pendingPress;
-      state.pendingPress = null;
-      state.historyMark = onHistoryStart();
-      state.isGeometryDragging = true;
-      setHoveredPoint(null);
-      setHoverCursorMode(null);
-      setActiveCursorMode("point");
-    }
-
     if (!state.activeDrag) {
-      return;
-    }
-
-    if (state.activeDrag.type === "corner-radius") {
-      updateDraggedCornerRadius(
-        state.activeDrag.contourIndex,
-        state.activeDrag.segmentIndex,
-        event.point
-      );
       return;
     }
 

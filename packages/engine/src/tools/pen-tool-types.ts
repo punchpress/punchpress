@@ -1,7 +1,7 @@
 import { round } from "../primitives/math";
 
 export const DRAG_THRESHOLD_PX = 3;
-export const PEN_HANDLE_DRAG_THRESHOLD_PX = 6;
+export const PEN_HANDLE_LENGTH_THRESHOLD = 12;
 export const POINT_EPSILON = 0.5;
 export const SEGMENT_INSERT_INTERACTION_TOLERANCE_PX = 10;
 
