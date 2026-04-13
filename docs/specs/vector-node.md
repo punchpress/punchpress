@@ -73,6 +73,7 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 ## Modifier Gestures
 
 - `Alt/Option`-dragging a direction handle should adjust only that side of the point instead of preserving smooth coupling.
+- `Alt/Option`-dragging an anchor in path edit mode should convert that anchor to a smooth point and pull out mirrored direction handles from the anchor in the same gesture.
 - Temporary modifier-based bezier editing should apply to handle drags without introducing separate anchor click or anchor drag gestures that conflict with standard node manipulation.
 - `Shift` should constrain handle angle when precise alignment is intended, such as snapping to common editing angles.
 - While the Pen tool exists, temporary modifier access to point editing should feel consistent with Illustrator-style pen workflows rather than forcing constant tool switching.
@@ -82,7 +83,10 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 - Path editing should support adding points on existing segments.
 - Hovering an insertable segment should communicate point insertion distinctly from point dragging or whole-object dragging.
 - Hovering an insertable segment should use pen-style insertion cursor language rather than a generic crosshair when PunchPress exposes a pen cursor asset.
+- Hovering an insertable segment with the Pen tool should treat the full visible segment as insertable rather than limiting insertion to a special midpoint hotspot.
+- When the Pen tool exposes add-point intent on a segment, PunchPress should show a ghost anchor at the exact insertion location before the click.
 - Clicking an insertable segment should add a point at that location and select it immediately.
+- Press-dragging from an insertable segment with the Pen tool should insert the point first and then author its handles in the same gesture.
 - Path editing should support deleting selected points without destroying the whole path.
 - While path editing is active and one anchor is selected, `Delete` or `Backspace` should delete that anchor before falling back to whole-object deletion behavior.
 - Path editing should support cutting or splitting a path at a selected point or segment.
@@ -105,6 +109,7 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 - When the Pen tool resolves a hover target to a concrete action such as `Close path`, `Continue path`, `Delete point`, or `Add point`, PunchPress should surface that action immediately near the target rather than leaving the click result implicit.
 - While the Pen tool hovers a non-endpoint anchor on an editable path, it may expose delete-anchor behavior, but open endpoints should continue to prioritize continue-path and close-path intent.
 - While the Pen tool hovers an insertable segment on an editable path, it should expose add-anchor behavior without forcing a switch back to the pointer tool.
+- Closing a contour with the Pen tool should keep the vector in path edit mode with the closing anchor selected rather than dropping the user back to plain object selection.
 - Esc should end the current drawing gesture without exiting the broader vector editing mode unexpectedly.
 - Enter or an equivalent explicit confirm gesture may finish the current path.
 - The Pen workflow should support continuing an open path from either valid endpoint.
@@ -131,6 +136,7 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 - Point conversion controls such as `Corner` and `Smooth` should read as conversion actions, not as persistent mutually-exclusive mode toggles.
 - Open-path endpoints should remain ineligible for vector corner rounding until the contour is explicitly closed.
 - While path editing a vector with no anchor selected, PunchPress should show on-canvas corner-radius handles for all eligible live corners.
+- While the Pen tool is the active cursor mode, PunchPress should suppress vector corner-radius handles and favor point-authoring affordances instead.
 - Once one or more anchors are selected, PunchPress should show on-canvas corner-radius handles only for the selected logical corners.
 - While the user is actively dragging a corner-radius handle, PunchPress should keep only the dragged corner handle visible until the drag ends.
 - Dragging a corner-radius handle with no anchor selection should adjust all eligible live corners together.

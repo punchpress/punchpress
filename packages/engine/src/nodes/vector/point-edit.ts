@@ -260,6 +260,38 @@ export const setVectorPointType = (
   });
 };
 
+export const authorVectorPointHandlesFromAnchorDrag = (
+  contours: VectorContourDocument[],
+  target: {
+    constrainAngle?: boolean;
+    contourIndex: number;
+    segmentIndex: number;
+    value: VectorHandleDocument;
+  }
+) => {
+  return mapTargetSegment(contours, target, (segment) => {
+    const nextHandle = target.constrainAngle
+      ? constrainHandleAngle(target.value)
+      : target.value;
+
+    if (isZeroHandle(nextHandle)) {
+      return {
+        ...segment,
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        pointType: "corner",
+      };
+    }
+
+    return {
+      ...segment,
+      handleIn: invertHandle(nextHandle),
+      handleOut: nextHandle,
+      pointType: "smooth",
+    };
+  });
+};
+
 export const updateVectorPointHandle = (
   contours: VectorContourDocument[],
   target: {

@@ -1,4 +1,6 @@
 import {
+  authorVectorPointHandlesFromAnchorDrag,
+  isPointerDistanceAtLeast,
   getVectorPathCursorMode,
   isVectorPathPointRole,
   offsetEditablePathPoints,
@@ -1190,6 +1192,34 @@ export const createVectorPaperSession = ({
     const pinnedLocalPoint = localPoint;
 
     if (role === "anchor") {
+      if (modifiers.convertAnchorToSmooth) {
+        setEndpointCloseTarget(null);
+        state.contours = authorVectorPointHandlesFromAnchorDrag(
+          state.contours,
+          {
+            constrainAngle: modifiers.constrainAngle,
+            contourIndex,
+            segmentIndex,
+            value: {
+              x: localPoint.x - currentSegment.point.x,
+              y: localPoint.y - currentSegment.point.y,
+            },
+          }
+        );
+
+        applySourceSegmentToPaper(contourIndex, segmentIndex, {
+          updateView: true,
+        });
+        syncNode({
+          pinnedLocalPoint: {
+            x: localPoint.x,
+            y: localPoint.y,
+          },
+          pinnedWorldPoint: worldPoint,
+        });
+        return;
+      }
+
       const selectedAnchorPoints =
         state.selectedPoints.length > 1 &&
         isPointSelectionIncluded(state.selectedPoints, {
@@ -1416,8 +1446,11 @@ export const createVectorPaperSession = ({
     if (state.pendingPress?.type === "empty") {
       if (
         !state.selectionMarquee &&
-        event.point.getDistance(state.pendingPress.origin) >=
+        isPointerDistanceAtLeast(
+          state.pendingPress.origin,
+          event.point,
           SELECTION_MARQUEE_THRESHOLD_PX
+        )
       ) {
         state.selectionMarquee = {
           additive: state.pendingPress.additive,
@@ -1452,8 +1485,11 @@ export const createVectorPaperSession = ({
     if (
       state.pendingPress?.type === "point" &&
       !state.activeDrag &&
-      event.point.getDistance(state.pendingPress.origin) >=
+      isPointerDistanceAtLeast(
+        state.pendingPress.origin,
+        event.point,
         PATH_POINT_DRAG_THRESHOLD_PX
+      )
     ) {
       state.activeDrag = state.pendingPress;
       state.pendingPress = null;

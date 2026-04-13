@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Editor } from "@punchpress/engine";
+import { getNodeWorldPoint } from "../../../../packages/engine/src/primitives/rotation";
 
 const clickPen = (editor: Editor, point: { x: number; y: number }) => {
   const session = editor.dispatchCanvasPointerDown({ point });
@@ -840,6 +841,370 @@ describe("vector pen authoring", () => {
     });
   });
 
+  test("pen clicking an off-center spot on a segment inserts the point at that hovered location", () => {
+    const editor = new Editor();
+
+    editor.loadDocument(
+      JSON.stringify({
+        nodes: [
+          {
+            contours: [
+              {
+                closed: true,
+                segments: [
+                  {
+                    handleIn: { x: 0, y: 0 },
+                    handleOut: { x: 0, y: 0 },
+                    point: { x: 0, y: 0 },
+                    pointType: "corner",
+                  },
+                  {
+                    handleIn: { x: 0, y: 0 },
+                    handleOut: { x: 0, y: 0 },
+                    point: { x: 200, y: 0 },
+                    pointType: "corner",
+                  },
+                  {
+                    handleIn: { x: 0, y: 0 },
+                    handleOut: { x: 0, y: 0 },
+                    point: { x: 200, y: 120 },
+                    pointType: "corner",
+                  },
+                  {
+                    handleIn: { x: 0, y: 0 },
+                    handleOut: { x: 0, y: 0 },
+                    point: { x: 0, y: 120 },
+                    pointType: "corner",
+                  },
+                ],
+              },
+            ],
+            fill: "#000000",
+            fillRule: "nonzero",
+            id: "vector-node",
+            parentId: "root",
+            stroke: null,
+            strokeWidth: 0,
+            transform: {
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+              x: 320,
+              y: 220,
+            },
+            type: "vector",
+            visible: true,
+          },
+        ],
+        version: "1.5",
+      })
+    );
+
+    editor.select("vector-node");
+    editor.startPathEditing("vector-node");
+    editor.setActiveTool("pen");
+
+    const vectorNode = editor.getNode("vector-node");
+    const bbox = editor.getNodeGeometry("vector-node")?.bbox;
+
+    if (!(vectorNode?.type === "vector" && bbox)) {
+      throw new Error("Expected vector geometry for off-center insertion.");
+    }
+
+    const firstWorldPoint = getNodeWorldPoint(
+      vectorNode,
+      bbox,
+      vectorNode.contours[0].segments[0].point
+    );
+    const secondWorldPoint = getNodeWorldPoint(
+      vectorNode,
+      bbox,
+      vectorNode.contours[0].segments[1].point
+    );
+    const quarterPoint = {
+      x: firstWorldPoint.x + (secondWorldPoint.x - firstWorldPoint.x) * 0.25,
+      y: firstWorldPoint.y + (secondWorldPoint.y - firstWorldPoint.y) * 0.25,
+    };
+
+    const session = editor.dispatchNodePointerDown({
+      node: editor.getNode("vector-node"),
+      point: quarterPoint,
+    });
+
+    if (!session) {
+      throw new Error(
+        "Expected off-center pen segment insertion to create a placement session."
+      );
+    }
+
+    expect(
+      session.complete({
+        dragDistancePx: 0,
+        point: quarterPoint,
+      })
+    ).toBe(true);
+
+    const node = editor.getNode("vector-node");
+    const segment =
+      node?.type === "vector" ? node.contours[0]?.segments[1] : null;
+
+    expect(node?.type).toBe("vector");
+    expect(
+      node?.type === "vector" ? node.contours[0]?.segments.length : 0
+    ).toBe(5);
+    expect(segment?.point).toEqual({ x: 50, y: 0 });
+    expect(editor.pathEditingPoint).toEqual({
+      contourIndex: 0,
+      segmentIndex: 1,
+    });
+  });
+
+  test("pen hover updates the add-point target while moving along the same segment", () => {
+    const editor = new Editor();
+
+    editor.loadDocument(
+      JSON.stringify({
+        nodes: [
+          {
+            contours: [
+              {
+                closed: true,
+                segments: [
+                  {
+                    handleIn: { x: 0, y: 0 },
+                    handleOut: { x: 0, y: 0 },
+                    point: { x: 0, y: 0 },
+                    pointType: "corner",
+                  },
+                  {
+                    handleIn: { x: 0, y: 0 },
+                    handleOut: { x: 0, y: 0 },
+                    point: { x: 200, y: 0 },
+                    pointType: "corner",
+                  },
+                  {
+                    handleIn: { x: 0, y: 0 },
+                    handleOut: { x: 0, y: 0 },
+                    point: { x: 200, y: 120 },
+                    pointType: "corner",
+                  },
+                  {
+                    handleIn: { x: 0, y: 0 },
+                    handleOut: { x: 0, y: 0 },
+                    point: { x: 0, y: 120 },
+                    pointType: "corner",
+                  },
+                ],
+              },
+            ],
+            fill: "#000000",
+            fillRule: "nonzero",
+            id: "vector-node",
+            parentId: "root",
+            stroke: null,
+            strokeWidth: 0,
+            transform: {
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+              x: 320,
+              y: 220,
+            },
+            type: "vector",
+            visible: true,
+          },
+        ],
+        version: "1.5",
+      })
+    );
+
+    editor.select("vector-node");
+    editor.startPathEditing("vector-node");
+    editor.setActiveTool("pen");
+
+    const vectorNode = editor.getNode("vector-node");
+    const bbox = editor.getNodeGeometry("vector-node")?.bbox;
+
+    if (!(vectorNode?.type === "vector" && bbox)) {
+      throw new Error("Expected vector geometry for insert hover.");
+    }
+
+    const firstWorldPoint = getNodeWorldPoint(
+      vectorNode,
+      bbox,
+      vectorNode.contours[0].segments[0].point
+    );
+    const secondWorldPoint = getNodeWorldPoint(
+      vectorNode,
+      bbox,
+      vectorNode.contours[0].segments[1].point
+    );
+
+    movePen(editor, {
+      x: firstWorldPoint.x + (secondWorldPoint.x - firstWorldPoint.x) * 0.25,
+      y: firstWorldPoint.y,
+    });
+
+    expect(editor.getPenHoverState()).toEqual({
+      contourIndex: 0,
+      intent: "add",
+      nodeId: "vector-node",
+      point: { x: 50, y: 0 },
+      role: "segment",
+      segmentIndex: 1,
+    });
+
+    movePen(editor, {
+      x: firstWorldPoint.x + (secondWorldPoint.x - firstWorldPoint.x) * 0.75,
+      y: firstWorldPoint.y,
+    });
+
+    expect(editor.getPenHoverState()).toEqual({
+      contourIndex: 0,
+      intent: "add",
+      nodeId: "vector-node",
+      point: { x: 150, y: 0 },
+      role: "segment",
+      segmentIndex: 1,
+    });
+  });
+
+  test("dragging on a segment with the pen inserts a smooth point and authors handles", () => {
+    const editor = new Editor();
+
+    editor.loadDocument(
+      JSON.stringify({
+        nodes: [
+          {
+            contours: [
+              {
+                closed: true,
+                segments: [
+                  {
+                    handleIn: { x: 0, y: 0 },
+                    handleOut: { x: 0, y: 0 },
+                    point: { x: 0, y: 0 },
+                    pointType: "corner",
+                  },
+                  {
+                    handleIn: { x: 0, y: 0 },
+                    handleOut: { x: 0, y: 0 },
+                    point: { x: 200, y: 0 },
+                    pointType: "corner",
+                  },
+                  {
+                    handleIn: { x: 0, y: 0 },
+                    handleOut: { x: 0, y: 0 },
+                    point: { x: 200, y: 120 },
+                    pointType: "corner",
+                  },
+                  {
+                    handleIn: { x: 0, y: 0 },
+                    handleOut: { x: 0, y: 0 },
+                    point: { x: 0, y: 120 },
+                    pointType: "corner",
+                  },
+                ],
+              },
+            ],
+            fill: "#000000",
+            fillRule: "nonzero",
+            id: "vector-node",
+            parentId: "root",
+            stroke: null,
+            strokeWidth: 0,
+            transform: {
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+              x: 320,
+              y: 220,
+            },
+            type: "vector",
+            visible: true,
+          },
+        ],
+        version: "1.5",
+      })
+    );
+
+    editor.select("vector-node");
+    editor.startPathEditing("vector-node");
+    editor.setActiveTool("pen");
+
+    const vectorNode = editor.getNode("vector-node");
+    const bbox = editor.getNodeGeometry("vector-node")?.bbox;
+
+    if (!(vectorNode?.type === "vector" && bbox)) {
+      throw new Error("Expected vector geometry for dragged insertion.");
+    }
+
+    const firstWorldPoint = getNodeWorldPoint(
+      vectorNode,
+      bbox,
+      vectorNode.contours[0].segments[0].point
+    );
+    const secondWorldPoint = getNodeWorldPoint(
+      vectorNode,
+      bbox,
+      vectorNode.contours[0].segments[1].point
+    );
+    const quarterPoint = {
+      x: firstWorldPoint.x + (secondWorldPoint.x - firstWorldPoint.x) * 0.25,
+      y: firstWorldPoint.y + (secondWorldPoint.y - firstWorldPoint.y) * 0.25,
+    };
+    const dragEndPoint = {
+      x: quarterPoint.x + 40,
+      y: quarterPoint.y - 30,
+    };
+
+    const session = editor.dispatchNodePointerDown({
+      node: editor.getNode("vector-node"),
+      point: quarterPoint,
+    });
+
+    if (!session) {
+      throw new Error(
+        "Expected dragged pen segment insertion to create a placement session."
+      );
+    }
+
+    session.update({
+      dragDistancePx: Math.hypot(
+        dragEndPoint.x - quarterPoint.x,
+        dragEndPoint.y - quarterPoint.y
+      ),
+      point: dragEndPoint,
+    });
+
+    expect(
+      session.complete({
+        dragDistancePx: Math.hypot(
+          dragEndPoint.x - quarterPoint.x,
+          dragEndPoint.y - quarterPoint.y
+        ),
+        point: dragEndPoint,
+      })
+    ).toBe(true);
+
+    const node = editor.getNode("vector-node");
+    const segment =
+      node?.type === "vector" ? node.contours[0]?.segments[1] : null;
+
+    expect(node?.type).toBe("vector");
+    expect(
+      node?.type === "vector" ? node.contours[0]?.segments.length : 0
+    ).toBe(5);
+    expect(segment?.point).toEqual({ x: 50, y: 0 });
+    expect(segment?.pointType).toBe("smooth");
+    expect(segment?.handleIn).toEqual({ x: -40, y: 30 });
+    expect(segment?.handleOut).toEqual({ x: 40, y: -30 });
+    expect(editor.pathEditingPoint).toEqual({
+      contourIndex: 0,
+      segmentIndex: 1,
+    });
+  });
+
   test("dragging onto the starting anchor closes the contour with a smooth incoming handle", () => {
     const editor = new Editor();
 
@@ -863,6 +1228,11 @@ describe("vector pen authoring", () => {
       handleIn: { x: 40, y: 40 },
       pointType: "smooth",
     });
+    expect(editor.pathEditingNodeId).toBe(nodeId);
+    expect(editor.pathEditingPoint).toEqual({
+      contourIndex: 0,
+      segmentIndex: 0,
+    });
   });
 
   test("clicking the starting anchor closes the active contour", () => {
@@ -878,8 +1248,11 @@ describe("vector pen authoring", () => {
 
     expect(editor.nodes).toHaveLength(1);
     expect(editor.activeTool).toBe("pen");
-    expect(editor.pathEditingNodeId).toBeNull();
-    expect(editor.pathEditingPoint).toBeNull();
+    expect(editor.pathEditingNodeId).toBe(nodeId);
+    expect(editor.pathEditingPoint).toEqual({
+      contourIndex: 0,
+      segmentIndex: 0,
+    });
 
     const node = editor.getNode(nodeId);
 

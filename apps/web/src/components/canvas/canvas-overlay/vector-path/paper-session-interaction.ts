@@ -27,10 +27,15 @@ export const getInteractiveHit = (scope, point) => {
 };
 
 export const getDragModifierState = (nativeEvent, role) => {
+  const isAnchor = role === "anchor";
   const isHandle = role === "handle-in" || role === "handle-out";
+  const convertAnchorToSmooth = Boolean(isAnchor && nativeEvent?.altKey);
 
   return {
-    constrainAngle: Boolean(isHandle && nativeEvent?.shiftKey),
+    constrainAngle: Boolean(
+      nativeEvent?.shiftKey && (isHandle || convertAnchorToSmooth)
+    ),
+    convertAnchorToSmooth,
     preserveSmoothCoupling: !(isHandle && nativeEvent?.altKey),
   };
 };

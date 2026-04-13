@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Editor } from "@punchpress/engine";
 import {
+  authorVectorPointHandlesFromAnchorDrag,
   setVectorPointType,
   updateVectorPointHandle,
 } from "../../../../packages/engine/src/nodes/vector/point-edit";
@@ -53,6 +54,22 @@ describe("vector point editing", () => {
     expect(Math.hypot(segment!.handleOut.x, segment!.handleOut.y)).toBeGreaterThan(
       1
     );
+  });
+
+  test("dragging a corner anchor with the convert gesture creates mirrored handles", () => {
+    const nextContours = authorVectorPointHandlesFromAnchorDrag(
+      [createRectangleContour()],
+      {
+        contourIndex: 0,
+        segmentIndex: 0,
+        value: { x: 54, y: 18 },
+      }
+    );
+    const segment = nextContours[0]?.segments[0];
+
+    expect(segment?.pointType).toBe("smooth");
+    expect(segment?.handleIn).toEqual({ x: -54, y: -18 });
+    expect(segment?.handleOut).toEqual({ x: 54, y: 18 });
   });
 
   test("converting a smooth point to corner collapses both handles", () => {

@@ -1,4 +1,8 @@
 import { round } from "../primitives/math";
+import {
+  isPointerDistanceAtLeast,
+  isPointerDistanceWithin,
+} from "../primitives/pointer-distance";
 
 export const DRAG_THRESHOLD_PX = 3;
 export const PEN_HANDLE_LENGTH_THRESHOLD = 12;
@@ -48,7 +52,7 @@ export const getContourSegmentCount = (node, contourIndex) => {
 export const getZeroHandle = () => ({ x: 0, y: 0 });
 
 export const isSamePoint = (a, b) => {
-  return Math.hypot(a.x - b.x, a.y - b.y) <= POINT_EPSILON;
+  return isPointerDistanceWithin(a, b, POINT_EPSILON);
 };
 
 export const roundHandle = (handle) => {
@@ -56,6 +60,28 @@ export const roundHandle = (handle) => {
     x: round(handle.x, 2),
     y: round(handle.y, 2),
   };
+};
+
+export const getPenDragHandle = ({
+  anchorCanvasPoint,
+  anchorLocalPoint,
+  currentCanvasPoint,
+  currentLocalPoint,
+}) => {
+  if (
+    !isPointerDistanceAtLeast(
+      anchorCanvasPoint,
+      currentCanvasPoint,
+      PEN_HANDLE_LENGTH_THRESHOLD
+    )
+  ) {
+    return null;
+  }
+
+  return roundHandle({
+    x: currentLocalPoint.x - anchorLocalPoint.x,
+    y: currentLocalPoint.y - anchorLocalPoint.y,
+  });
 };
 
 export const createPlacementSession = (onCancel, onComplete, onUpdate) => {
