@@ -1,3 +1,5 @@
+import { getPointerDistancePx } from "@punchpress/engine";
+
 export const startCanvasToolPlacementSession = ({
   editor,
   event,
@@ -34,10 +36,10 @@ export const startCanvasToolPlacementSession = ({
   };
 
   const getDragDistancePx = (nextEvent) => {
-    return Math.hypot(
-      nextEvent.clientX - startClientPoint.x,
-      nextEvent.clientY - startClientPoint.y
-    );
+    return getPointerDistancePx(startClientPoint, {
+      x: nextEvent.clientX,
+      y: nextEvent.clientY,
+    });
   };
 
   const handlePointerMove = (moveEvent) => {

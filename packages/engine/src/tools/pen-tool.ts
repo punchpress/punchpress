@@ -19,9 +19,9 @@ import {
   createPlacementSession,
   DRAG_THRESHOLD_PX,
   getContourSegmentCount,
+  getPenDragHandle,
   getZeroHandle,
   isSamePoint,
-  PEN_HANDLE_LENGTH_THRESHOLD,
   type PenAuthoringSession,
   type PenHoverState,
   roundHandle,
@@ -233,15 +233,21 @@ export class PenTool extends Tool {
       return null;
     }
 
+    const insertPlacement = this.startInsertPointPlacement(
+      targetNode,
+      insertPointTarget
+    );
+
+    if (!insertPlacement) {
+      return null;
+    }
+
     return createPlacementSession(
-      () => false,
-      ({ dragDistancePx = 0 } = {}) =>
-        this.completeInsertPointPlacement(
-          targetNode.id,
-          insertPointTarget,
-          dragDistancePx
-        ),
-      () => false
+      () => this.cancelInsertPointPlacement(insertPlacement),
+      ({ point: nextPoint = point } = {}) =>
+        this.completeInsertPointPlacement(insertPlacement, nextPoint),
+      ({ point: nextPoint = point } = {}) =>
+        this.updateInsertPointPlacement(insertPlacement, nextPoint)
     );
   }
 
@@ -418,8 +424,10 @@ export class PenTool extends Tool {
         node.id,
         closePenContour(nextContours, session.contourIndex)
       );
-      this.editor.stopPathEditing();
-      return true;
+      return this.finishClosedContour(session, {
+        contourIndex: session.contourIndex,
+        segmentIndex: draft.target.segmentIndex,
+      });
     }
 
     const nextPointType = draft.dragHandle ? "smooth" : "corner";
@@ -451,6 +459,19 @@ export class PenTool extends Tool {
       segmentIndex: contour.segments.length,
     });
     this.editor.notifyInteractionPreviewChanged();
+    return true;
+  }
+
+  finishClosedContour(session, selectedPoint) {
+    this.authoringSession = null;
+    this.idleHoverTarget = null;
+    this.editor.setPathEditingPoint(selectedPoint || null);
+    this.editor.notifyInteractionPreviewChanged();
+
+    if (session.historyMark) {
+      return this.editor.commitHistoryStep(session.historyMark);
+    }
+
     return true;
   }
 
@@ -632,7 +653,9 @@ export class PenTool extends Tool {
         nextIdleHoverTarget?.contourIndex ||
       this.idleHoverTarget?.intent !== nextIdleHoverTarget?.intent ||
       this.idleHoverTarget?.role !== nextIdleHoverTarget?.role ||
-      this.idleHoverTarget?.segmentIndex !== nextIdleHoverTarget?.segmentIndex;
+      this.idleHoverTarget?.segmentIndex !== nextIdleHoverTarget?.segmentIndex ||
+      this.idleHoverTarget?.point.x !== nextIdleHoverTarget?.point.x ||
+      this.idleHoverTarget?.point.y !== nextIdleHoverTarget?.point.y;
 
     if (!didChange) {
       return false;
@@ -659,20 +682,97 @@ export class PenTool extends Tool {
     return true;
   }
 
-  completeInsertPointPlacement(nodeId, target, dragDistancePx) {
-    if (dragDistancePx >= DRAG_THRESHOLD_PX) {
-      return false;
+  startInsertPointPlacement(node, target) {
+    const bbox = this.editor.getNodeGeometry(node.id)?.bbox;
+    const insertedPoint = target.segments[target.segmentIndex]?.point;
+    const historyMark = this.editor.markHistoryStep("edit vector path");
+
+    if (!(bbox && insertedPoint && historyMark)) {
+      return null;
     }
 
-    const didInsert = this.editor.insertVectorPoint(target, nodeId);
+    const anchorCanvasPoint = getNodeWorldPoint(node, bbox, insertedPoint);
+    const didInsert = this.editor.insertVectorPoint(target, node.id);
 
     if (!didInsert) {
-      return false;
+      this.editor.revertToMark(historyMark);
+      return null;
+    }
+
+    const insertedNode = this.editor.getNode(node.id);
+
+    if (insertedNode?.type !== "vector") {
+      this.editor.revertToMark(historyMark);
+      return null;
     }
 
     this.idleHoverTarget = null;
     this.editor.notifyInteractionPreviewChanged();
-    return true;
+
+    return {
+      anchorCanvasPoint,
+      anchorLocalPoint: insertedPoint,
+      baseContours: insertedNode.contours,
+      historyMark,
+      nodeId: node.id,
+      point: {
+        contourIndex: target.contourIndex,
+        segmentIndex: target.segmentIndex,
+      },
+    };
+  }
+
+  getInsertPlacementContours(placement, point) {
+    const node = this.editor.getNode(placement.nodeId);
+    const bbox = this.editor.getNodeGeometry(placement.nodeId)?.bbox;
+
+    if (!(node?.type === "vector" && bbox && point)) {
+      return placement.baseContours;
+    }
+
+    const currentLocalPoint = getNodeLocalPoint(node, bbox, point);
+    const dragHandle = getPenDragHandle({
+      anchorCanvasPoint: placement.anchorCanvasPoint,
+      anchorLocalPoint: placement.anchorLocalPoint,
+      currentCanvasPoint: point,
+      currentLocalPoint,
+    });
+
+    if (!dragHandle) {
+      return placement.baseContours;
+    }
+
+    return replacePenContourSegment(placement.baseContours, {
+      contourIndex: placement.point.contourIndex,
+      handleIn: {
+        x: -dragHandle.x,
+        y: -dragHandle.y,
+      },
+      handleOut: dragHandle,
+      pointType: "smooth",
+      segmentIndex: placement.point.segmentIndex,
+    });
+  }
+
+  updateInsertPointPlacement(placement, point) {
+    const nextContours = this.getInsertPlacementContours(placement, point);
+
+    return this.editor.updateVectorContours(placement.nodeId, nextContours, {
+      pinnedLocalPoint: placement.anchorLocalPoint,
+      pinnedWorldPoint: placement.anchorCanvasPoint,
+    });
+  }
+
+  cancelInsertPointPlacement(placement) {
+    return this.editor.revertToMark(placement.historyMark);
+  }
+
+  completeInsertPointPlacement(placement, point) {
+    if (!this.updateInsertPointPlacement(placement, point)) {
+      return false;
+    }
+
+    return this.editor.commitHistoryStep(placement.historyMark);
   }
 
   startAuthoringSession(point) {
@@ -826,20 +926,15 @@ export class PenTool extends Tool {
     }
 
     const draft = session.draft;
-    const canvasHandleLength = Math.hypot(
-      point.x - draft.anchorCanvasPoint.x,
-      point.y - draft.anchorCanvasPoint.y
-    );
-    const isDragging = canvasHandleLength >= PEN_HANDLE_LENGTH_THRESHOLD;
+    const localPoint = getNodeLocalPoint(node, bbox, point);
 
     if (draft.kind === "first-point") {
-      const localPoint = getNodeLocalPoint(node, bbox, point);
-      const nextHandle = isDragging
-        ? roundHandle({
-            x: localPoint.x - draft.anchorLocalPoint.x,
-            y: localPoint.y - draft.anchorLocalPoint.y,
-          })
-        : null;
+      const nextHandle = getPenDragHandle({
+        anchorCanvasPoint: draft.anchorCanvasPoint,
+        anchorLocalPoint: draft.anchorLocalPoint,
+        currentCanvasPoint: point,
+        currentLocalPoint: localPoint,
+      });
 
       draft.dragHandle = nextHandle;
 
@@ -862,14 +957,12 @@ export class PenTool extends Tool {
       return true;
     }
 
-    const localPoint = getNodeLocalPoint(node, bbox, point);
-
-    draft.dragHandle = isDragging
-      ? roundHandle({
-          x: localPoint.x - draft.anchorLocalPoint.x,
-          y: localPoint.y - draft.anchorLocalPoint.y,
-        })
-      : null;
+    draft.dragHandle = getPenDragHandle({
+      anchorCanvasPoint: draft.anchorCanvasPoint,
+      anchorLocalPoint: draft.anchorLocalPoint,
+      currentCanvasPoint: point,
+      currentLocalPoint: localPoint,
+    });
     draft.target = this.resolveCloseTarget(
       node,
       bbox,

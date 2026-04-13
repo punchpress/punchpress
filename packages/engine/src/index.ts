@@ -65,6 +65,7 @@ export {
   isVectorPathPointRole,
 } from "./nodes/vector/path-edit-interaction";
 export {
+  authorVectorPointHandlesFromAnchorDrag,
   setVectorPointType,
   updateVectorPointHandle,
 } from "./nodes/vector/point-edit";
@@ -92,6 +93,11 @@ export {
   getNodeRotationCenter,
   getNodeWorldPoint,
 } from "./primitives/rotation";
+export {
+  getPointerDistancePx,
+  isPointerDistanceAtLeast,
+  isPointerDistanceWithin,
+} from "./primitives/pointer-distance";
 export {
   includesPathPoint,
   isSamePathPoint,

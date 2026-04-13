@@ -95,6 +95,10 @@ const getCurvePointAt = (
     return null;
   }
 
+  if (isStraightLineCurve(points)) {
+    return lerpPoint(points.p0, points.p3, t);
+  }
+
   const q0 = lerpPoint(points.p0, points.p1, t);
   const q1 = lerpPoint(points.p1, points.p2, t);
   const q2 = lerpPoint(points.p2, points.p3, t);

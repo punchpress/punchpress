@@ -994,6 +994,8 @@ test("clicking the action-bar pen button preserves vector path editing", async (
       selectedNodeIds: ["vector-node"],
     });
 
+  await expect(page.getByTestId("path-corner-radius-handle")).toHaveCount(4);
+
   await page.getByRole("button", { name: "Pen (P)" }).click();
   await pauseForUi(page);
 
@@ -1012,6 +1014,8 @@ test("clicking the action-bar pen button preserves vector path editing", async (
       pathNodeId: "vector-node",
       selectedNodeIds: ["vector-node"],
     });
+
+  await expect(page.getByTestId("path-corner-radius-handle")).toHaveCount(0);
 });
 
 test("selecting an open endpoint then clicking pen continues that path", async ({
@@ -1287,6 +1291,162 @@ test("pen hover tooltip states the click action for anchors", async ({
   await expect(page.getByTestId("canvas-pen-hover-tooltip")).toContainText(
     "Continue Path"
   );
+});
+
+test("pen hover shows add-point feedback and inserts at an off-center segment location", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadVectorDocument(page);
+
+  await clickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+  await page.getByRole("button", { name: "Pen (P)" }).click();
+  await pauseForUi(page);
+
+  const firstPoint = await getVectorSegmentScreenPoint(page, "vector-node", 0);
+  const secondPoint = await getVectorSegmentScreenPoint(page, "vector-node", 1);
+
+  if (!(firstPoint && secondPoint)) {
+    throw new Error("Missing vector segment screen points for add-point hover");
+  }
+
+  const quarterPoint = {
+    x: firstPoint.x + (secondPoint.x - firstPoint.x) * 0.25,
+    y: firstPoint.y + (secondPoint.y - firstPoint.y) * 0.25,
+  };
+
+  await page.mouse.move(quarterPoint.x, quarterPoint.y);
+  await pauseForUi(page);
+
+  await expect(page.getByTestId("canvas-pen-hover-tooltip")).toContainText(
+    "Add Point"
+  );
+  await expect(
+    page.getByTestId("canvas-pen-insert-ghost-anchor")
+  ).toBeVisible();
+
+  const ghostAnchor = page.getByTestId("canvas-pen-insert-ghost-anchor");
+  const ghostBox = await ghostAnchor.boundingBox();
+
+  if (!ghostBox) {
+    throw new Error("Missing visible pen insert ghost anchor");
+  }
+
+  expect(Math.abs(ghostBox.x + ghostBox.width / 2 - quarterPoint.x)).toBeLessThan(
+    3
+  );
+  expect(
+    Math.abs(ghostBox.y + ghostBox.height / 2 - quarterPoint.y)
+  ).toBeLessThan(3);
+
+  const threeQuarterPoint = {
+    x: firstPoint.x + (secondPoint.x - firstPoint.x) * 0.75,
+    y: firstPoint.y + (secondPoint.y - firstPoint.y) * 0.75,
+  };
+
+  await page.mouse.move(threeQuarterPoint.x, threeQuarterPoint.y);
+  await pauseForUi(page);
+
+  const movedGhostBox = await ghostAnchor.boundingBox();
+
+  if (!movedGhostBox) {
+    throw new Error("Missing moved pen insert ghost anchor");
+  }
+
+  expect(
+    Math.abs(movedGhostBox.x + movedGhostBox.width / 2 - threeQuarterPoint.x)
+  ).toBeLessThan(3);
+  expect(
+    Math.abs(movedGhostBox.y + movedGhostBox.height / 2 - threeQuarterPoint.y)
+  ).toBeLessThan(3);
+
+  await page.mouse.click(quarterPoint.x, quarterPoint.y);
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => {
+      const vectorNode = await getVectorNodeDocument(page, "vector-node");
+
+      return {
+        pathPoint: (await getDebugDump(page))?.editing?.pathPoint || null,
+        point: vectorNode?.contours?.[0]?.segments?.[1]?.point || null,
+        segmentCount: vectorNode?.contours?.[0]?.segments?.length || 0,
+      };
+    })
+    .toEqual({
+      pathPoint: {
+        contourIndex: 0,
+        segmentIndex: 1,
+      },
+      point: {
+        x: 50,
+        y: 0,
+      },
+      segmentCount: 5,
+    });
+});
+
+test("dragging on a segment with pen inserts a smooth point and authors handles", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadVectorDocument(page);
+
+  await clickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+  await page.getByRole("button", { name: "Pen (P)" }).click();
+  await pauseForUi(page);
+
+  const firstPoint = await getVectorSegmentScreenPoint(page, "vector-node", 0);
+  const secondPoint = await getVectorSegmentScreenPoint(page, "vector-node", 1);
+
+  if (!(firstPoint && secondPoint)) {
+    throw new Error("Missing vector segment screen points for dragged add-point");
+  }
+
+  const quarterPoint = {
+    x: firstPoint.x + (secondPoint.x - firstPoint.x) * 0.25,
+    y: firstPoint.y,
+  };
+  const dragEndPoint = {
+    x: quarterPoint.x + 40,
+    y: quarterPoint.y - 30,
+  };
+
+  await page.mouse.move(quarterPoint.x, quarterPoint.y);
+  await page.mouse.down();
+  await page.mouse.move(dragEndPoint.x, dragEndPoint.y, { steps: 8 });
+  await page.mouse.up();
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => {
+      const vectorNode = await getVectorNodeDocument(page, "vector-node");
+
+      return {
+        pathPoint: (await getDebugDump(page))?.editing?.pathPoint || null,
+        segment: vectorNode?.contours?.[0]?.segments?.[1] || null,
+        segmentCount: vectorNode?.contours?.[0]?.segments?.length || 0,
+      };
+    })
+    .toEqual({
+      pathPoint: {
+        contourIndex: 0,
+        segmentIndex: 1,
+      },
+      segment: {
+        handleIn: { x: -40, y: 30 },
+        handleOut: { x: 40, y: -30 },
+        point: { x: 50, y: 0 },
+        pointType: "smooth",
+      },
+      segmentCount: 5,
+    });
 });
 
 test("pen mode accepts slightly off-center interior anchor clicks within the hover halo", async ({
@@ -2221,14 +2381,13 @@ test("selecting a vector anchor exposes point controls and converts it to smooth
   await doubleClickNodeCenter(page, "vector-node");
   await pauseForUi(page);
 
-  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
-  const rect = await node.boundingBox();
+  const anchorPoint = await getVectorSegmentScreenPoint(page, "vector-node", 0);
 
-  if (!rect) {
-    throw new Error("Missing visible vector node bounds");
+  if (!anchorPoint) {
+    throw new Error("Missing vector anchor point for point controls test");
   }
 
-  await page.mouse.click(rect.x + 6, rect.y + 6);
+  await page.mouse.click(anchorPoint.x, anchorPoint.y);
   await pauseForUi(page);
 
   await expect
@@ -2238,28 +2397,15 @@ test("selecting a vector anchor exposes point controls and converts it to smooth
       segmentIndex: 0,
     });
 
-  await expect(page.getByRole("button", { name: "Corner" })).toHaveCount(1);
-  await expect(page.getByRole("button", { name: "Smooth" })).toHaveCount(1);
-  await expect(page.getByRole("button", { name: "Corner" })).toHaveAttribute(
-    "data-active",
-    "true"
-  );
-  await expect(page.getByRole("button", { name: "Smooth" })).toHaveAttribute(
-    "data-active",
-    "false"
-  );
+  await expect(
+    page.getByRole("button", { name: "Convert point to corner" })
+  ).toHaveCount(1);
+  await expect(
+    page.getByRole("button", { name: "Convert point to smooth" })
+  ).toHaveCount(1);
 
-  await page.getByRole("button", { name: "Smooth" }).click();
+  await page.getByRole("button", { name: "Convert point to smooth" }).click();
   await pauseForUi(page);
-
-  await expect(page.getByRole("button", { name: "Corner" })).toHaveAttribute(
-    "data-active",
-    "false"
-  );
-  await expect(page.getByRole("button", { name: "Smooth" })).toHaveAttribute(
-    "data-active",
-    "true"
-  );
 
   await expect
     .poll(async () => {
@@ -2288,17 +2434,8 @@ test("selecting a vector anchor exposes point controls and converts it to smooth
       pointType: "smooth",
     });
 
-  await page.getByRole("button", { name: "Corner" }).click();
+  await page.getByRole("button", { name: "Convert point to corner" }).click();
   await pauseForUi(page);
-
-  await expect(page.getByRole("button", { name: "Corner" })).toHaveAttribute(
-    "data-active",
-    "true"
-  );
-  await expect(page.getByRole("button", { name: "Smooth" })).toHaveAttribute(
-    "data-active",
-    "false"
-  );
 
   await expect
     .poll(async () => {
@@ -2329,6 +2466,56 @@ test("selecting a vector anchor exposes point controls and converts it to smooth
     });
 });
 
+test("option-dragging a corner anchor converts it to smooth and authors mirrored handles", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadVectorDocument(page);
+
+  await clickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+
+  const anchorPoint = await getVectorSegmentScreenPoint(page, "vector-node", 1);
+
+  if (!anchorPoint) {
+    throw new Error("Missing vector anchor point for convert drag test");
+  }
+
+  await page.keyboard.down("Alt");
+  await page.mouse.move(anchorPoint.x, anchorPoint.y);
+  await page.mouse.down();
+  await page.mouse.move(anchorPoint.x + 42, anchorPoint.y + 18, {
+    steps: 4,
+  });
+  await page.mouse.up();
+  await page.keyboard.up("Alt");
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => {
+      const segment = await getVectorSegmentDocument(page, 1);
+
+      if (!segment) {
+        return null;
+      }
+
+      return {
+        handleIn: segment.handleIn,
+        handleOut: segment.handleOut,
+        point: segment.point,
+        pointType: segment.pointType || "corner",
+      };
+    })
+    .toEqual({
+      handleIn: { x: -42, y: -18 },
+      handleOut: { x: 42, y: 18 },
+      point: { x: 200, y: 0 },
+      pointType: "smooth",
+    });
+});
+
 test("selecting a vector anchor exposes Delete point and removes the anchor", async ({
   page,
 }) => {
@@ -2340,14 +2527,13 @@ test("selecting a vector anchor exposes Delete point and removes the anchor", as
   await doubleClickNodeCenter(page, "vector-node");
   await pauseForUi(page);
 
-  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
-  const rect = await node.boundingBox();
+  const anchorPoint = await getVectorSegmentScreenPoint(page, "vector-node", 1);
 
-  if (!rect) {
-    throw new Error("Missing visible vector node bounds");
+  if (!anchorPoint) {
+    throw new Error("Missing vector anchor point for delete test");
   }
 
-  await page.mouse.click(rect.x + rect.width - 6, rect.y + 6);
+  await page.mouse.click(anchorPoint.x, anchorPoint.y);
   await pauseForUi(page);
 
   await expect(page.getByRole("button", { name: "Delete point" })).toHaveCount(
@@ -2396,14 +2582,22 @@ test("switching between corner anchors retargets the point toolbar actions", asy
   await doubleClickNodeCenter(page, "vector-node");
   await pauseForUi(page);
 
-  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
-  const rect = await node.boundingBox();
+  const firstAnchorPoint = await getVectorSegmentScreenPoint(
+    page,
+    "vector-node",
+    0
+  );
+  const secondAnchorPoint = await getVectorSegmentScreenPoint(
+    page,
+    "vector-node",
+    1
+  );
 
-  if (!rect) {
-    throw new Error("Missing visible vector node bounds");
+  if (!(firstAnchorPoint && secondAnchorPoint)) {
+    throw new Error("Missing vector anchor points for retargeting test");
   }
 
-  await page.mouse.click(rect.x + 6, rect.y + 6);
+  await page.mouse.click(firstAnchorPoint.x, firstAnchorPoint.y);
   await pauseForUi(page);
 
   await expect
@@ -2413,7 +2607,7 @@ test("switching between corner anchors retargets the point toolbar actions", asy
       segmentIndex: 0,
     });
 
-  await page.mouse.click(rect.x + rect.width - 6, rect.y + 6);
+  await page.mouse.click(secondAnchorPoint.x, secondAnchorPoint.y);
   await pauseForUi(page);
 
   await expect
@@ -2423,16 +2617,7 @@ test("switching between corner anchors retargets the point toolbar actions", asy
       segmentIndex: 1,
     });
 
-  await expect(page.getByRole("button", { name: "Corner" })).toHaveAttribute(
-    "data-active",
-    "true"
-  );
-  await expect(page.getByRole("button", { name: "Smooth" })).toHaveAttribute(
-    "data-active",
-    "false"
-  );
-
-  await page.getByRole("button", { name: "Smooth" }).click();
+  await page.getByRole("button", { name: "Convert point to smooth" }).click();
   await pauseForUi(page);
 
   await expect
@@ -2723,6 +2908,63 @@ test("after escaping a finished pen path, clicking away paints the new path prev
   expect(await getVectorOverlayInkCountAroundTarget(page)).toBeGreaterThan(0);
 });
 
+test("closing a pen-authored contour keeps path editing active", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+
+  await page.keyboard.press("p");
+  await page.mouse.click(300, 260);
+  await page.mouse.move(360, 260);
+  await page.mouse.click(360, 260);
+  await page.mouse.move(300, 260);
+  await page.mouse.click(300, 260);
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => {
+      const dump = await getDebugDump(page);
+      const pathNodeId = dump?.editing?.pathNodeId || null;
+
+      return {
+        activeTool: dump?.tool || null,
+        hasPathNodeId: Boolean(pathNodeId),
+        pathPoint: dump?.editing?.pathPoint || null,
+        selectionIncludesPathNode: pathNodeId
+          ? (dump?.selection?.ids || []).includes(pathNodeId)
+          : false,
+      };
+    })
+    .toEqual({
+      activeTool: "pen",
+      hasPathNodeId: true,
+      pathPoint: {
+        contourIndex: 0,
+        segmentIndex: 0,
+      },
+      selectionIncludesPathNode: true,
+    });
+
+  await expect
+    .poll(async () => {
+      const dump = await getDebugDump(page);
+      const pathNodeId = dump?.editing?.pathNodeId || null;
+
+      return {
+        hasPathNodeId: Boolean(pathNodeId),
+        selectionIncludesPathNode: pathNodeId
+          ? (dump?.selection?.ids || []).includes(pathNodeId)
+          : false,
+        vectorPaperCount: await page.locator(".canvas-vector-paper").count(),
+      };
+    })
+    .toEqual({
+      hasPathNodeId: true,
+      selectionIncludesPathNode: true,
+      vectorPaperCount: 1,
+    });
+});
+
 test("re-entering path edit mode still allows selecting a smooth point", async ({
   page,
 }) => {
@@ -2734,17 +2976,11 @@ test("re-entering path edit mode still allows selecting a smooth point", async (
   await doubleClickNodeCenter(page, "vector-node");
   await pauseForUi(page);
 
-  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
-  const rect = await node.boundingBox();
+  const topRightPoint = await getVectorSegmentScreenPoint(page, "vector-node", 1);
 
-  if (!rect) {
-    throw new Error("Missing visible vector node bounds");
+  if (!topRightPoint) {
+    throw new Error("Missing vector anchor point for re-entry test");
   }
-
-  const topRightPoint = {
-    x: rect.x + rect.width - 6,
-    y: rect.y + 6,
-  };
 
   await page.mouse.click(topRightPoint.x, topRightPoint.y);
   await pauseForUi(page);
@@ -2756,7 +2992,7 @@ test("re-entering path edit mode still allows selecting a smooth point", async (
       segmentIndex: 1,
     });
 
-  await page.getByRole("button", { name: "Smooth" }).click();
+  await page.getByRole("button", { name: "Convert point to smooth" }).click();
   await pauseForUi(page);
 
   await page.keyboard.press("Escape");
@@ -2789,21 +3025,15 @@ test("option-dragging a smooth handle breaks coupling and converts the point to 
   await doubleClickNodeCenter(page, "vector-node");
   await pauseForUi(page);
 
-  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
-  const rect = await node.boundingBox();
+  const topRightPoint = await getVectorSegmentScreenPoint(page, "vector-node", 1);
 
-  if (!rect) {
-    throw new Error("Missing visible vector node bounds");
+  if (!topRightPoint) {
+    throw new Error("Missing vector anchor point for smooth handle test");
   }
-
-  const topRightPoint = {
-    x: rect.x + rect.width - 6,
-    y: rect.y + 6,
-  };
 
   await page.mouse.click(topRightPoint.x, topRightPoint.y);
   await pauseForUi(page);
-  await page.getByRole("button", { name: "Smooth" }).click();
+  await page.getByRole("button", { name: "Convert point to smooth" }).click();
   await pauseForUi(page);
 
   const beforeSegment = await getVectorSegmentDocument(page, 1);
@@ -2813,8 +3043,8 @@ test("option-dragging a smooth handle breaks coupling and converts the point to 
   }
 
   const handleOutPoint = {
-    x: rect.x + beforeSegment.point.x + beforeSegment.handleOut.x,
-    y: rect.y + beforeSegment.point.y + beforeSegment.handleOut.y,
+    x: topRightPoint.x + beforeSegment.handleOut.x,
+    y: topRightPoint.y + beforeSegment.handleOut.y,
   };
 
   await page.keyboard.down("Alt");
@@ -2874,7 +3104,7 @@ test("shift-dragging a handle constrains its angle", async ({ page }) => {
 
   await page.mouse.click(topRightPoint.x, topRightPoint.y);
   await pauseForUi(page);
-  await page.getByRole("button", { name: "Smooth" }).click();
+  await page.getByRole("button", { name: "Convert point to smooth" }).click();
   await pauseForUi(page);
 
   const segment = await getVectorSegmentDocument(page, 1);
@@ -2946,7 +3176,7 @@ test("hovering a vector handle expands the hover halo beyond the idle handle", a
 
   await page.mouse.click(topRightPoint.x, topRightPoint.y);
   await pauseForUi(page);
-  await page.getByRole("button", { name: "Smooth" }).click();
+  await page.getByRole("button", { name: "Convert point to smooth" }).click();
   await pauseForUi(page);
 
   const segment = await getVectorSegmentDocument(page, 1);
@@ -3001,7 +3231,7 @@ test("deselecting a smooth point hides its visible handles", async ({
 
   await page.mouse.click(topRightPoint.x, topRightPoint.y);
   await pauseForUi(page);
-  await page.getByRole("button", { name: "Smooth" }).click();
+  await page.getByRole("button", { name: "Convert point to smooth" }).click();
   await pauseForUi(page);
 
   const vectorNode = await getVectorNodeDocument(page);
@@ -3061,7 +3291,7 @@ test("selecting another anchor hides the previous smooth point handles", async (
 
   await page.mouse.click(topRightPoint.x, topRightPoint.y);
   await pauseForUi(page);
-  await page.getByRole("button", { name: "Smooth" }).click();
+  await page.getByRole("button", { name: "Convert point to smooth" }).click();
   await pauseForUi(page);
 
   const vectorNode = await getVectorNodeDocument(page);

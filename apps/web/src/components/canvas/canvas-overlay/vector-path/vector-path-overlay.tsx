@@ -8,6 +8,7 @@ import {
   getTextPathTransformTargetStyle,
 } from "../text-path-overlay-geometry";
 import { createVectorPathSession } from "./backend";
+import { PenInsertGhostAnchor } from "./pen-insert-ghost-anchor";
 import type { VectorCornerDragSession } from "./vector-corner-drag-session";
 import { VectorCornerRadiusHandles } from "./vector-corner-radius-handle";
 
@@ -300,17 +301,24 @@ export const CanvasVectorPathOverlay = ({ viewportRevision }) => {
         ref={setPaperCanvasElement}
       />
 
-      <VectorCornerRadiusHandles
-        activeDragSession={activeDragSession}
-        contours={scene?.contours || null}
-        editor={editor}
-        hoveredPoint={scene?.hoveredCornerHandlePoint || null}
+      <PenInsertGhostAnchor
         matrix={scene?.matrix || null}
-        nodeId={node?.id || null}
-        onDragStateChange={setActiveDragSession}
-        onHoverChange={setHoveredCornerHandlePoint}
-        selectedPoints={scene?.selectedPoints || []}
+        penHover={isPenToolActive ? scene?.penHover || null : null}
       />
+
+      {isPenToolActive ? null : (
+        <VectorCornerRadiusHandles
+          activeDragSession={activeDragSession}
+          contours={scene?.contours || null}
+          editor={editor}
+          hoveredPoint={scene?.hoveredCornerHandlePoint || null}
+          matrix={scene?.matrix || null}
+          nodeId={node?.id || null}
+          onDragStateChange={setActiveDragSession}
+          onHoverChange={setHoveredCornerHandlePoint}
+          selectedPoints={scene?.selectedPoints || []}
+        />
+      )}
     </div>
   );
 };
