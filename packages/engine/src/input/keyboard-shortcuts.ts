@@ -53,6 +53,36 @@ const handleDeleteShortcutKeyDown = (editor, event, key) => {
   return true;
 };
 
+const getPathPointNudgeDelta = (event) => {
+  const distance = event.shiftKey ? 10 : 1;
+
+  switch (event.code) {
+    case "ArrowLeft":
+      return { x: -distance, y: 0 };
+    case "ArrowRight":
+      return { x: distance, y: 0 };
+    case "ArrowUp":
+      return { x: 0, y: -distance };
+    case "ArrowDown":
+      return { x: 0, y: distance };
+    default:
+      return null;
+  }
+};
+
+const handlePathPointNudgeShortcutKeyDown = (editor, event) => {
+  const delta = getPathPointNudgeDelta(event);
+
+  if (
+    !(editor.pathEditingNodeId && editor.pathEditingPoints.length > 0 && delta)
+  ) {
+    return false;
+  }
+
+  event.preventDefault();
+  return editor.moveSelectedPathPointsBy(delta);
+};
+
 export const handleCanvasShortcutKeyDown = (editor, event, key) => {
   const currentTool = editor.currentTool;
   const toolOwnsEscape = Boolean(
@@ -75,6 +105,10 @@ export const handleCanvasShortcutKeyDown = (editor, event, key) => {
 
   if (event.metaKey || event.ctrlKey || event.altKey) {
     return false;
+  }
+
+  if (handlePathPointNudgeShortcutKeyDown(editor, event)) {
+    return true;
   }
 
   if (key === "escape" && editor.pathEditingNodeId && !toolOwnsEscape) {
@@ -131,6 +165,52 @@ export const handleWindowKeyDown = (editor, event) => {
   }
 };
 
+export const handlePenDirectSelectionModifierDown = (editor, event) => {
+  if (
+    isInputElement(event.target) ||
+    (event.code !== "MetaLeft" && event.code !== "MetaRight")
+  ) {
+    return;
+  }
+
+  editor.getState().setPenDirectSelectionModifierPressed(true);
+};
+
+export const handlePenDirectSelectionModifierUp = (editor, event) => {
+  if (
+    event.code !== "MetaLeft" &&
+    event.code !== "MetaRight" &&
+    event.key !== "Meta"
+  ) {
+    return;
+  }
+
+  editor.getState().setPenDirectSelectionModifierPressed(false);
+};
+
+export const handlePenPointTypeToggleModifierDown = (editor, event) => {
+  if (
+    isInputElement(event.target) ||
+    (event.code !== "AltLeft" && event.code !== "AltRight")
+  ) {
+    return;
+  }
+
+  editor.getState().setPenPointTypeToggleModifierPressed(true);
+};
+
+export const handlePenPointTypeToggleModifierUp = (editor, event) => {
+  if (
+    event.code !== "AltLeft" &&
+    event.code !== "AltRight" &&
+    event.key !== "Alt"
+  ) {
+    return;
+  }
+
+  editor.getState().setPenPointTypeToggleModifierPressed(false);
+};
+
 export const handleSpaceDown = (editor, event) => {
   if (event.code !== "Space" || isInputElement(event.target)) {
     return;
@@ -145,5 +225,11 @@ export const handleSpaceUp = (editor, event) => {
     return;
   }
 
+  editor.getState().setSpacePressed(false);
+};
+
+export const handleWindowBlur = (editor) => {
+  editor.getState().setPenDirectSelectionModifierPressed(false);
+  editor.getState().setPenPointTypeToggleModifierPressed(false);
   editor.getState().setSpacePressed(false);
 };

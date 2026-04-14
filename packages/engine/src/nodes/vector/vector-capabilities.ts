@@ -1,3 +1,8 @@
+import {
+  DEFAULT_VECTOR_STROKE_LINE_CAP,
+  DEFAULT_VECTOR_STROKE_LINE_JOIN,
+  DEFAULT_VECTOR_STROKE_MITER_LIMIT,
+} from "@punchpress/punch-schema";
 import { toTransformedWorldFrame, toWorldFrame } from "../node-frame-utils";
 import { createDefaultVectorNode } from "./model";
 import { buildVectorNodeGeometry } from "./vector-engine";
@@ -36,6 +41,10 @@ export const vectorNodeCapabilities = {
       fillRule: node.fillRule,
       fontRevision,
       stroke: node.stroke,
+      strokeLineCap: node.strokeLineCap ?? DEFAULT_VECTOR_STROKE_LINE_CAP,
+      strokeLineJoin: node.strokeLineJoin ?? DEFAULT_VECTOR_STROKE_LINE_JOIN,
+      strokeMiterLimit:
+        node.strokeMiterLimit ?? DEFAULT_VECTOR_STROKE_MITER_LIMIT,
       strokeWidth: node.strokeWidth,
     });
   },

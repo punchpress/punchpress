@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Editor } from "@punchpress/engine";
 import {
-  authorVectorPointHandlesFromAnchorDrag,
+  setVectorPointHandlesFromAnchorDrag,
   setVectorPointType,
   updateVectorPointHandle,
 } from "../../../../packages/engine/src/nodes/vector/point-edit";
@@ -48,16 +48,20 @@ describe("vector point editing", () => {
     });
     const segment = nextContours[0]?.segments[0];
 
+    if (!segment) {
+      throw new Error("Expected a converted segment at contour 0, segment 0.");
+    }
+
     expect(segment?.pointType).toBe("smooth");
-    expect(segment?.handleIn.x).toBeCloseTo(-segment!.handleOut.x, 5);
-    expect(segment?.handleIn.y).toBeCloseTo(-segment!.handleOut.y, 5);
-    expect(Math.hypot(segment!.handleOut.x, segment!.handleOut.y)).toBeGreaterThan(
-      1
-    );
+    expect(segment.handleIn.x).toBeCloseTo(-segment.handleOut.x, 5);
+    expect(segment.handleIn.y).toBeCloseTo(-segment.handleOut.y, 5);
+    expect(
+      Math.hypot(segment.handleOut.x, segment.handleOut.y)
+    ).toBeGreaterThan(1);
   });
 
   test("dragging a corner anchor with the convert gesture creates mirrored handles", () => {
-    const nextContours = authorVectorPointHandlesFromAnchorDrag(
+    const nextContours = setVectorPointHandlesFromAnchorDrag(
       [createRectangleContour()],
       {
         contourIndex: 0,
@@ -70,6 +74,22 @@ describe("vector point editing", () => {
     expect(segment?.pointType).toBe("smooth");
     expect(segment?.handleIn).toEqual({ x: -54, y: -18 });
     expect(segment?.handleOut).toEqual({ x: 54, y: 18 });
+  });
+
+  test("dragging a corner anchor assigns the dragged side to the matching contour side", () => {
+    const nextContours = setVectorPointHandlesFromAnchorDrag(
+      [createRectangleContour()],
+      {
+        contourIndex: 0,
+        segmentIndex: 2,
+        value: { x: 54, y: 18 },
+      }
+    );
+    const segment = nextContours[0]?.segments[2];
+
+    expect(segment?.pointType).toBe("smooth");
+    expect(segment?.handleIn).toEqual({ x: 54, y: 18 });
+    expect(segment?.handleOut).toEqual({ x: -54, y: -18 });
   });
 
   test("converting a smooth point to corner collapses both handles", () => {
@@ -97,9 +117,14 @@ describe("vector point editing", () => {
       segmentIndex: 0,
     });
     const previousSegment = contours[0]?.segments[0];
+
+    if (!previousSegment) {
+      throw new Error("Expected an existing smooth segment at contour 0.");
+    }
+
     const previousOppositeLength = Math.hypot(
-      previousSegment!.handleIn.x,
-      previousSegment!.handleIn.y
+      previousSegment.handleIn.x,
+      previousSegment.handleIn.y
     );
 
     const nextContours = updateVectorPointHandle(contours, {
@@ -109,14 +134,19 @@ describe("vector point editing", () => {
       value: { x: 60, y: 20 },
     });
     const segment = nextContours[0]?.segments[0];
+
+    if (!segment) {
+      throw new Error("Expected an updated smooth segment at contour 0.");
+    }
+
     const nextOppositeLength = Math.hypot(
-      segment!.handleIn.x,
-      segment!.handleIn.y
+      segment.handleIn.x,
+      segment.handleIn.y
     );
 
     expect(segment?.pointType).toBe("smooth");
-    expect(segment?.handleIn.x / segment!.handleIn.y).toBeCloseTo(
-      segment!.handleOut.x / segment!.handleOut.y,
+    expect(segment.handleIn.x / segment.handleIn.y).toBeCloseTo(
+      segment.handleOut.x / segment.handleOut.y,
       5
     );
     expect(segment?.handleIn.x).toBeLessThan(0);
@@ -131,9 +161,14 @@ describe("vector point editing", () => {
       segmentIndex: 0,
     });
     const previousSegment = contours[0]?.segments[0];
+
+    if (!previousSegment) {
+      throw new Error("Expected an existing smooth segment at contour 0.");
+    }
+
     const previousOppositeLength = Math.hypot(
-      previousSegment!.handleOut.x,
-      previousSegment!.handleOut.y
+      previousSegment.handleOut.x,
+      previousSegment.handleOut.y
     );
 
     const nextContours = updateVectorPointHandle(contours, {
@@ -143,14 +178,19 @@ describe("vector point editing", () => {
       value: { x: -52, y: -18 },
     });
     const segment = nextContours[0]?.segments[0];
+
+    if (!segment) {
+      throw new Error("Expected an updated smooth segment at contour 0.");
+    }
+
     const nextOppositeLength = Math.hypot(
-      segment!.handleOut.x,
-      segment!.handleOut.y
+      segment.handleOut.x,
+      segment.handleOut.y
     );
 
     expect(segment?.pointType).toBe("smooth");
-    expect(segment?.handleOut.x / segment!.handleOut.y).toBeCloseTo(
-      segment!.handleIn.x / segment!.handleIn.y,
+    expect(segment.handleOut.x / segment.handleOut.y).toBeCloseTo(
+      segment.handleIn.x / segment.handleIn.y,
       5
     );
     expect(segment?.handleOut.x).toBeGreaterThan(0);
@@ -261,6 +301,6 @@ describe("vector point editing", () => {
     const segment = editor.getNode("vector-node")?.contours?.[0]?.segments?.[0];
 
     expect(segment?.pointType).toBe("corner");
-    expect(editor.getDebugDump().document.version).toBe("1.5");
+    expect(editor.getDebugDump().document.version).toBe("1.6");
   });
 });

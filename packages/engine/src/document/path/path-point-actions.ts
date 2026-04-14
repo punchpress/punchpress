@@ -74,6 +74,37 @@ export const setVectorPointType = (editor, nodeId, point, pointType) => {
   return true;
 };
 
+export const setVectorPointTypes = (editor, nodeId, points, pointType) => {
+  const node = editor.getNode(nodeId);
+
+  if (!(node?.type === "vector" && points?.length > 0)) {
+    return false;
+  }
+
+  editor.run(() => {
+    editor.getState().updateNodeById(nodeId, (currentNode) => {
+      if (currentNode.type !== "vector") {
+        return currentNode;
+      }
+
+      const contours = points.reduce((nextContours, point) => {
+        return setVectorPointTypeOnContours(nextContours, {
+          contourIndex: point.contourIndex,
+          pointType,
+          segmentIndex: point.segmentIndex,
+        });
+      }, currentNode.contours);
+
+      return {
+        ...currentNode,
+        contours,
+      };
+    });
+  });
+
+  return true;
+};
+
 export const insertVectorPoint = (editor, nodeId, target) => {
   const node = editor.getNode(nodeId);
 
@@ -376,4 +407,52 @@ export const setPathPointType = (editor, nodeId, point, pointType) => {
   }
 
   return setVectorPointType(editor, nodeId, point, pointType);
+};
+
+export const setPathPointTypes = (editor, nodeId, points, pointType) => {
+  const session = editor.getEditablePathSession(nodeId);
+
+  if (!(session?.contours && points?.length > 0)) {
+    return false;
+  }
+
+  if (session.nodeType === "shape") {
+    const node = editor.getNode(nodeId);
+
+    if (node?.type !== "shape") {
+      return false;
+    }
+
+    const nextContours = points.reduce((currentContours, point) => {
+      return setVectorPointTypeOnContours(currentContours, {
+        contourIndex: point.contourIndex,
+        pointType,
+        segmentIndex: point.segmentIndex,
+      });
+    }, session.contours);
+    const shapeEditResult = getShapePathEditResult(
+      node,
+      nextContours,
+      "point-type"
+    );
+
+    if (!shapeEditResult) {
+      return false;
+    }
+
+    editor.run(() => {
+      editor
+        .getState()
+        .updateNodeById(
+          nodeId,
+          shapeEditResult.kind === "shape"
+            ? shapeEditResult.patch
+            : shapeEditResult.node
+        );
+    });
+
+    return true;
+  }
+
+  return setVectorPointTypes(editor, nodeId, points, pointType);
 };

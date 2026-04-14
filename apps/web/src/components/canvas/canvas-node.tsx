@@ -1,4 +1,9 @@
-import { round } from "@punchpress/engine";
+import {
+  DEFAULT_VECTOR_STROKE_LINE_CAP,
+  DEFAULT_VECTOR_STROKE_LINE_JOIN,
+  DEFAULT_VECTOR_STROKE_MITER_LIMIT,
+  round,
+} from "@punchpress/engine";
 import { memo } from "react";
 import { cn } from "@/lib/utils";
 import { useEditor } from "../../editor-react/use-editor";
@@ -50,6 +55,18 @@ const selectNodeArtState = (editor, state, nodeId) => {
     paths: geometry?.paths || [],
     ready: Boolean(geometry?.ready),
     stroke: node.stroke,
+    strokeLineCap:
+      node.type === "vector"
+        ? (node.strokeLineCap ?? DEFAULT_VECTOR_STROKE_LINE_CAP)
+        : DEFAULT_VECTOR_STROKE_LINE_CAP,
+    strokeLineJoin:
+      node.type === "vector"
+        ? (node.strokeLineJoin ?? DEFAULT_VECTOR_STROKE_LINE_JOIN)
+        : DEFAULT_VECTOR_STROKE_LINE_JOIN,
+    strokeMiterLimit:
+      node.type === "vector"
+        ? (node.strokeMiterLimit ?? DEFAULT_VECTOR_STROKE_MITER_LIMIT)
+        : DEFAULT_VECTOR_STROKE_MITER_LIMIT,
     strokeWidth: node.strokeWidth,
   };
 };
@@ -289,6 +306,9 @@ const CanvasNodeComponent = ({ nodeId }) => {
         isEditing={artState.isEditing}
         paths={artState.paths}
         stroke={artState.stroke}
+        strokeLineCap={artState.strokeLineCap}
+        strokeLineJoin={artState.strokeLineJoin}
+        strokeMiterLimit={artState.strokeMiterLimit}
         strokeWidth={artState.strokeWidth}
         width={Math.max(1, artState.bbox.width)}
       />
@@ -307,6 +327,9 @@ const CanvasNodeArt = memo(
     isEditing,
     paths,
     stroke,
+    strokeLineCap,
+    strokeLineJoin,
+    strokeMiterLimit,
     strokeWidth,
     width,
   }) => {
@@ -331,8 +354,9 @@ const CanvasNodeArt = memo(
                 paintOrder={getVectorPathPaintOrder()}
                 pointerEvents="none"
                 stroke={stroke}
-                strokeLinecap="round"
-                strokeLinejoin="round"
+                strokeLinecap={strokeLineCap}
+                strokeLinejoin={strokeLineJoin}
+                strokeMiterlimit={strokeMiterLimit}
                 strokeWidth={strokeWidth}
                 transform={path.transform || undefined}
               />

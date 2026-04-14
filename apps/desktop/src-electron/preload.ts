@@ -1,6 +1,16 @@
 import { contextBridge, ipcRenderer } from "electron";
+import type {
+  DesktopAppMenuState,
+  DesktopEditorCommand,
+} from "./app-menu-types.js";
+import { APP_MENU_STATE_CHANNEL } from "./desktop-channels.js";
 
 contextBridge.exposeInMainWorld("electron", {
+  appMenu: {
+    updateState: (state: DesktopAppMenuState) => {
+      ipcRenderer.send(APP_MENU_STATE_CHANNEL, state);
+    },
+  },
   documentCommands: {
     markReady: () => {
       ipcRenderer.send("document:renderer-ready");
@@ -49,8 +59,9 @@ contextBridge.exposeInMainWorld("electron", {
     },
   },
   editorCommands: {
-    onCommand: (callback) => {
-      const listener = (_event, command) => callback(command);
+    onCommand: (callback: (command: DesktopEditorCommand) => void) => {
+      const listener = (_event, command: DesktopEditorCommand) =>
+        callback(command);
 
       ipcRenderer.on("editor:command", listener);
 

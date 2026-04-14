@@ -1,5 +1,6 @@
 export const DOCUMENT_COMMAND_CHANNEL = "document:command";
 export const EDITOR_COMMAND_CHANNEL = "editor:command";
+export const APP_MENU_STATE_CHANNEL = "app-menu:update-state";
 export const DOCUMENT_OPENED_CHANNEL = "document:open-file";
 export const DOCUMENT_BEFORE_CLOSE_CHANNEL = "document:before-close";
 export const DOCUMENT_CLOSE_RESPONSE_CHANNEL = "document:close-response";

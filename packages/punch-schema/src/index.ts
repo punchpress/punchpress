@@ -16,9 +16,17 @@ export {
   ROOT_PARENT_ID,
 } from "./constants";
 export {
+  DEFAULT_VECTOR_STROKE_LINE_CAP,
+  DEFAULT_VECTOR_STROKE_LINE_JOIN,
+  DEFAULT_VECTOR_STROKE_MITER_LIMIT,
+  VECTOR_STROKE_LINE_CAP_VALUES,
+  VECTOR_STROKE_LINE_JOIN_VALUES,
+} from "./vector-stroke-style";
+export {
   getMissingDocumentFonts,
   replaceMissingDocumentFonts,
 } from "./document-fonts";
+export { normalizeNodeForSchema, normalizeNodesForSchema } from "./normalize";
 export {
   DocumentParseError,
   DocumentValidationError,
@@ -60,6 +68,8 @@ export type {
   VectorContourDocument,
   VectorFillRuleDocument,
   VectorHandleDocument,
+  VectorStrokeLineCapDocument,
+  VectorStrokeLineJoinDocument,
   VectorNodeDocument,
   VectorPointTypeDocument,
   VectorSegmentDocument,
@@ -80,5 +90,7 @@ export {
   vectorNodeSchema,
   vectorPointTypeSchema,
   vectorSegmentSchema,
+  vectorStrokeLineCapSchema,
+  vectorStrokeLineJoinSchema,
   warpSchema,
 } from "./schema";

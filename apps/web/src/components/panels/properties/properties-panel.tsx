@@ -23,11 +23,13 @@ export const PropertiesPanel = () => {
     selectedPathPoint,
     selectionProperties,
     showsPathPointCornerRadius,
-  } =
-    usePropertiesPanelState();
+  } = usePropertiesPanelState();
   const hasAppearanceFields = Boolean(
     selectionProperties.properties.fill ||
       selectionProperties.properties.stroke ||
+      selectionProperties.properties.strokeLineCap ||
+      selectionProperties.properties.strokeLineJoin ||
+      selectionProperties.properties.strokeMiterLimit ||
       selectionProperties.properties.strokeWidth
   );
   const selectedNode = selectionProperties.selectedNode;
@@ -95,13 +97,19 @@ export const PropertiesPanel = () => {
           <AppearanceFields
             fill={selectionProperties.properties.fill}
             stroke={selectionProperties.properties.stroke}
+            strokeLineCap={selectionProperties.properties.strokeLineCap}
+            strokeLineJoin={selectionProperties.properties.strokeLineJoin}
+            strokeMiterLimit={selectionProperties.properties.strokeMiterLimit}
             strokeWidth={selectionProperties.properties.strokeWidth}
             withTopBorder={hasFieldsBeforeAppearance}
           />
         ) : null}
 
         {selectedNode?.type === "text" ? (
-          <TextWarpFields node={selectedNode} withTopBorder={hasAppearanceFields} />
+          <TextWarpFields
+            node={selectedNode}
+            withTopBorder={hasAppearanceFields}
+          />
         ) : null}
 
         {selectionProperties.canDelete ? (

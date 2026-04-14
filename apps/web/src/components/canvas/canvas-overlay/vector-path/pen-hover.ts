@@ -5,6 +5,8 @@ const PEN_HOVER_LABELS = {
   add: "Add Point",
   close: "Close Path",
   continue: "Continue Path",
+  "convert-to-corner": "Convert to Corner Point",
+  "convert-to-smooth": "Convert to Smooth Point",
   delete: "Delete Point",
 } as const;
 
@@ -12,6 +14,8 @@ const PEN_HOVER_CURSOR_MODES = {
   add: "add",
   close: "default",
   continue: "default",
+  "convert-to-corner": "default",
+  "convert-to-smooth": "default",
   delete: "minus",
 } as const;
 
@@ -39,7 +43,11 @@ export const getVectorPenHoverCursorCompanion = (
   editor,
   state
 ): CanvasCursorCompanion | null => {
-  if (state.activeTool !== "pen" || state.spacePressed) {
+  if (
+    state.activeTool !== "pen" ||
+    state.penDirectSelectionModifierPressed ||
+    state.spacePressed
+  ) {
     return null;
   }
 

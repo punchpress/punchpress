@@ -34,6 +34,60 @@ const VALID_DOCUMENT = {
   ],
 } as const;
 
+const LEGACY_VECTOR_DOCUMENT = {
+  version: "1.5",
+  nodes: [
+    {
+      contours: [
+        {
+          closed: true,
+          segments: [
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: -120, y: -90 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: 120, y: -90 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: 120, y: 90 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: -120, y: 90 },
+              pointType: "corner",
+            },
+          ],
+        },
+      ],
+      fill: "rgba(255, 0, 0, 0.4)",
+      fillRule: "evenodd",
+      id: "legacy-vector-node",
+      parentId: "root",
+      stroke: "rgba(0, 0, 0, 0.6)",
+      strokeWidth: 12,
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: 360,
+        y: 260,
+      },
+      type: "vector",
+      visible: true,
+    },
+  ],
+} as const;
+
 describe("parseDesignDocument", () => {
   test("rejects invalid JSON", () => {
     expect(() => parseDesignDocument("{")).toThrow(DocumentParseError);
@@ -59,5 +113,18 @@ describe("parseDesignDocument", () => {
         })
       )
     ).toThrow(DocumentValidationError);
+  });
+
+  test("migrates 1.5 vector documents to add durable stroke style fields", () => {
+    const document = parseDesignDocument(JSON.stringify(LEGACY_VECTOR_DOCUMENT));
+    const vectorNode = document.nodes[0];
+
+    expect(document.version).toBe("1.6");
+    expect(vectorNode).toMatchObject({
+      strokeLineCap: "round",
+      strokeLineJoin: "round",
+      strokeMiterLimit: 4,
+      type: "vector",
+    });
   });
 });

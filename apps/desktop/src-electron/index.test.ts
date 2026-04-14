@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 
+const APP_MENU_STATE_CHANNEL = "app-menu:update-state";
 const DOCUMENT_BEFORE_CLOSE_CHANNEL = "document:before-close";
 const DOCUMENT_CLOSE_RESPONSE_CHANNEL = "document:close-response";
 const DOCUMENT_RECENT_DOCUMENTS_CHANGED_CHANNEL =
   "document:recent-documents-changed";
+const EDITOR_COMMAND_CHANNEL = "editor:command";
 const RENDERER_READY_CHANNEL = "document:renderer-ready";
 
 const appHandlers = new Map<string, (...args: unknown[]) => void>();
@@ -18,6 +20,9 @@ let resolveWhenReady: (() => void) | null = null;
 let whenReadyPromise: Promise<void>;
 
 const flushTasks = async () => {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
   await Promise.resolve();
   await Promise.resolve();
   await Promise.resolve();
@@ -334,6 +339,100 @@ describe("desktop index bootstrap", () => {
     );
     expect(mainWindow.webContents.send).toHaveBeenCalledWith(
       DOCUMENT_RECENT_DOCUMENTS_CHANGED_CHANNEL
+    );
+  });
+
+  test("rebuilds the native object menu from renderer state and routes editor commands back", async () => {
+    await importDesktopIndex();
+    await flushTasks();
+
+    const mainWindow = createdWindows[0];
+
+    ipcHandlers.get(APP_MENU_STATE_CHANNEL)?.(
+      {
+        sender: mainWindow.webContents,
+      },
+      {
+        canDelete: true,
+        canEditPath: true,
+        selectedNodeType: "vector",
+        selectionKind: "single",
+        vectorStyle: {
+          fillRule: {
+            enabled: true,
+            isMixed: false,
+            value: "evenodd",
+          },
+          strokeLineCap: {
+            enabled: true,
+            isMixed: false,
+            value: "round",
+          },
+          strokeLineJoin: {
+            enabled: true,
+            isMixed: true,
+            value: null,
+          },
+        },
+      }
+    );
+    await flushTasks();
+
+    const template = buildFromTemplateMock.mock.calls.at(-1)?.[0] as {
+      label?: string;
+      submenu?: {
+        checked?: boolean;
+        click?: () => void;
+        enabled?: boolean;
+        label?: string;
+        submenu?: {
+          checked?: boolean;
+          click?: () => void;
+          enabled?: boolean;
+          label?: string;
+        }[];
+      }[];
+    }[];
+    const objectMenu = template.find((item) => item.label === "Object");
+    const editPathItem = objectMenu?.submenu?.find(
+      (item) => item.label === "Edit Path"
+    );
+    const deleteItem = objectMenu?.submenu?.find(
+      (item) => item.label === "Delete"
+    );
+    const fillRuleMenu = objectMenu?.submenu?.find(
+      (item) => item.label === "Fill Rule"
+    );
+    const evenOddItem = fillRuleMenu?.submenu?.find((item) => {
+      return item.label === "Use Even-Odd Fill Rule";
+    });
+    const nonZeroItem = fillRuleMenu?.submenu?.find((item) => {
+      return item.label === "Use Non-Zero Winding Fill Rule";
+    });
+
+    expect(editPathItem?.enabled).toBe(true);
+    expect(deleteItem?.enabled).toBe(true);
+    expect(fillRuleMenu?.enabled).toBe(true);
+    expect(evenOddItem?.checked).toBe(true);
+    expect(nonZeroItem?.checked).toBe(false);
+
+    editPathItem?.click?.();
+    nonZeroItem?.click?.();
+
+    expect(mainWindow.webContents.send).toHaveBeenCalledWith(
+      EDITOR_COMMAND_CHANNEL,
+      {
+        action: "toggle-path-editing",
+        type: "selection",
+      }
+    );
+    expect(mainWindow.webContents.send).toHaveBeenCalledWith(
+      EDITOR_COMMAND_CHANNEL,
+      {
+        propertyId: "fillRule",
+        type: "selection-property",
+        value: "nonzero",
+      }
     );
   });
 

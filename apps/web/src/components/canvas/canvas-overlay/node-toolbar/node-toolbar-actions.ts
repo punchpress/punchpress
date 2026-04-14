@@ -4,7 +4,7 @@ const getPathEditingToolbarActions = (editor, state) => {
   }
 
   const selectedPathPoints = state.isPathEditing
-    ? editor.pathEditingPoints
+    ? state.selectedPathPoints || editor.pathEditingPoints
     : [];
   const actions = [
     {
@@ -38,7 +38,11 @@ const getPathEditingToolbarActions = (editor, state) => {
     });
   }
 
-  if (state.isPathEditing && state.selectedNode && state.selectedPathPoint) {
+  if (
+    state.isPathEditing &&
+    state.selectedNode &&
+    selectedPathPoints.length > 0
+  ) {
     const pointActions = [
       {
         id: "delete-point",
@@ -48,6 +52,11 @@ const getPathEditingToolbarActions = (editor, state) => {
         title: "Delete point (Delete)",
         variant: "ghost",
         onSelect: () => {
+          if (selectedPathPoints.length > 1) {
+            editor.deletePathPoints(state.selectedNode.id, selectedPathPoints);
+            return;
+          }
+
           editor.deletePathPoint(
             state.selectedNode.id,
             state.selectedPathPoint
@@ -61,11 +70,7 @@ const getPathEditingToolbarActions = (editor, state) => {
         title: "Convert point to corner",
         variant: "ghost",
         onSelect: () => {
-          editor.setPathPointType(
-            "corner",
-            state.selectedNode.id,
-            state.selectedPathPoint
-          );
+          editor.setPathPointType("corner", state.selectedNode.id);
         },
       },
       {
@@ -75,17 +80,14 @@ const getPathEditingToolbarActions = (editor, state) => {
         title: "Convert point to smooth",
         variant: "ghost",
         onSelect: () => {
-          editor.setPathPointType(
-            "smooth",
-            state.selectedNode.id,
-            state.selectedPathPoint
-          );
+          editor.setPathPointType("smooth", state.selectedNode.id);
         },
       },
     ];
 
     if (
       state.selectedNode.type === "vector" &&
+      state.selectedPathPoint &&
       editor.canSplitPath(state.selectedNode.id, state.selectedPathPoint)
     ) {
       pointActions.unshift({
@@ -107,7 +109,11 @@ const getPathEditingToolbarActions = (editor, state) => {
 };
 
 const getSharedToolbarActions = (editor, state) => {
-  if (state.visibleSelectedNodeIds.length === 0 || state.selectedPathPoint) {
+  if (
+    state.visibleSelectedNodeIds.length === 0 ||
+    state.selectedPathPoint ||
+    state.selectedPathPoints?.length > 0
+  ) {
     return [];
   }
 

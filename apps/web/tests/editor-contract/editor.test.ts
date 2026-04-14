@@ -657,7 +657,7 @@ describe("Editor.getDebugDump", () => {
 
     expect(dump.bootstrap.fontCatalogState).toBe("ready");
     expect(dump.document.nodeCount).toBe(1);
-    expect(dump.document.version).toBe("1.5");
+    expect(dump.document.version).toBe("1.6");
     expect(dump.nodes).toHaveLength(1);
     expect(dump.nodes[0]?.id).toBe("debug-node");
     expect(dump.nodes[0]?.text).toBe("DEBUG");

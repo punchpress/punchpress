@@ -1,9 +1,9 @@
 import {
-  authorVectorPointHandlesFromAnchorDrag,
   getVectorPathCursorMode,
   isPointerDistanceAtLeast,
   isVectorPathPointRole,
   offsetEditablePathPoints,
+  setVectorPointHandlesFromAnchorDrag,
   updateVectorPointHandle,
 } from "@punchpress/engine";
 import paper from "paper";
@@ -194,6 +194,7 @@ export const createVectorPaperSession = ({
     historyMark: null,
     inverseMatrix: null,
     isGeometryDragging: false,
+    isPanning: false,
     localPaths: [],
     matrix: null,
     nodeDragSession: null,
@@ -494,7 +495,9 @@ export const createVectorPaperSession = ({
       }
     }
 
-    const hoveredPoint = state.hoveredPoint || state.penHover;
+    const hoveredPoint = state.isPanning
+      ? null
+      : state.hoveredPoint || state.penHover;
 
     if (!hoveredPoint) {
       syncCurveHighlightsAndUpdate();
@@ -876,6 +879,7 @@ export const createVectorPaperSession = ({
       contours,
       hoveredCornerHandlePoint,
       interactionPolicy,
+      isPanning,
       matrix,
       metrics,
       nodeStrokeWidth,
@@ -913,6 +917,7 @@ export const createVectorPaperSession = ({
     state.interactionPolicy = interactionPolicy || {
       canInsertPoint: true,
     };
+    state.isPanning = Boolean(isPanning);
     state.inverseMatrix = inverseMatrix;
     state.matrix = matrix;
     state.nodeStrokeWidth = nodeStrokeWidth || 0;
@@ -1037,6 +1042,7 @@ export const createVectorPaperSession = ({
     const {
       activeDragSession,
       interactionPolicy,
+      isPanning,
       matrix,
       metrics,
       nodeStrokeWidth,
@@ -1073,6 +1079,7 @@ export const createVectorPaperSession = ({
       canInsertPoint: true,
     };
     state.activeDragSession = activeDragSession || null;
+    state.isPanning = Boolean(isPanning);
     state.matrix = matrix;
     state.nodeStrokeWidth = nodeStrokeWidth || 0;
     state.hoveredCornerHandlePoint = hoveredCornerHandlePoint || null;
@@ -1202,6 +1209,13 @@ export const createVectorPaperSession = ({
   };
 
   const updateCursor = (point) => {
+    if (state.isPanning) {
+      setHoveredPoint(null);
+      setHoverCursorMode(null);
+      setActiveCursorMode(null);
+      return;
+    }
+
     if (state.nodeDragSession || state.activeDrag || state.selectionMarquee) {
       return;
     }
@@ -1261,7 +1275,7 @@ export const createVectorPaperSession = ({
     currentSegment
   ) => {
     setEndpointDragTarget(null);
-    state.contours = authorVectorPointHandlesFromAnchorDrag(state.contours, {
+    state.contours = setVectorPointHandlesFromAnchorDrag(state.contours, {
       constrainAngle: modifiers.constrainAngle,
       contourIndex,
       segmentIndex,

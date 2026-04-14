@@ -19,6 +19,30 @@ const clickPen = (editor: Editor, point: { x: number; y: number }) => {
   }
 };
 
+const optionClickPen = (editor: Editor, point: { x: number; y: number }) => {
+  const session = editor.dispatchCanvasPointerDown({
+    event: {
+      altKey: true,
+    },
+    point,
+  });
+
+  if (!session) {
+    throw new Error(
+      "Expected the pen tool to create a modifier-click placement session."
+    );
+  }
+
+  if (
+    session.complete({
+      dragDistancePx: 0,
+      point,
+    }) !== true
+  ) {
+    throw new Error("Expected the pen modifier-click placement to complete.");
+  }
+};
+
 const clickPenNode = (
   editor: Editor,
   nodeId: string,
@@ -56,7 +80,10 @@ const dragPen = (
   editor: Editor,
   startPoint: { x: number; y: number },
   endPoint: { x: number; y: number },
-  { dragDistancePx }: { dragDistancePx?: number } = {}
+  {
+    dragDistancePx,
+    spaceKey = false,
+  }: { dragDistancePx?: number; spaceKey?: boolean } = {}
 ) => {
   const session = editor.dispatchCanvasPointerDown({ point: startPoint });
 
@@ -71,14 +98,46 @@ const dragPen = (
   session.update({
     dragDistancePx: resolvedDragDistancePx,
     point: endPoint,
+    spaceKey,
   });
 
   if (
     session.complete({
       dragDistancePx: resolvedDragDistancePx,
       point: endPoint,
+      spaceKey,
     }) !== true
   ) {
+    throw new Error("Expected the pen tool drag session to complete.");
+  }
+};
+
+const dragPenWithUpdates = (
+  editor: Editor,
+  startPoint: { x: number; y: number },
+  updates: Array<{
+    dragDistancePx?: number;
+    point: { x: number; y: number };
+    spaceKey?: boolean;
+  }>
+) => {
+  const session = editor.dispatchCanvasPointerDown({ point: startPoint });
+
+  if (!session) {
+    throw new Error("Expected the pen tool to create a placement session.");
+  }
+
+  for (const update of updates) {
+    session.update(update);
+  }
+
+  const lastUpdate = updates.at(-1);
+
+  if (!lastUpdate) {
+    throw new Error("Expected at least one pen drag update.");
+  }
+
+  if (session.complete(lastUpdate) !== true) {
     throw new Error("Expected the pen tool drag session to complete.");
   }
 };
@@ -131,6 +190,7 @@ describe("vector pen authoring", () => {
       segmentIndex: 0,
     });
     expect(node).toMatchObject({
+      strokeWidth: 3,
       transform: {
         x: 200,
         y: 160,
@@ -232,6 +292,146 @@ describe("vector pen authoring", () => {
     expect(segment?.pointType).toBe("smooth");
     expect(segment?.handleIn).toEqual({ x: -50, y: -30 });
     expect(segment?.handleOut).toEqual({ x: 50, y: 30 });
+  });
+
+  test("holding space while dragging a following pen point repositions the anchor without changing its handles", () => {
+    const editor = new Editor();
+
+    editor.setActiveTool("pen");
+    clickPen(editor, { x: 200, y: 160 });
+    dragPenWithUpdates(editor, { x: 260, y: 180 }, [
+      {
+        dragDistancePx: Math.hypot(40, 20),
+        point: { x: 300, y: 200 },
+      },
+      {
+        dragDistancePx: Math.hypot(60, 40),
+        point: { x: 320, y: 220 },
+        spaceKey: true,
+      },
+    ]);
+
+    const node = editor.selectedNode;
+
+    if (node?.type !== "vector") {
+      throw new Error("Expected a vector node after pen placement.");
+    }
+
+    const segment = node.contours[0]?.segments[1];
+
+    expect(segment).toMatchObject({
+      handleIn: { x: -40, y: -20 },
+      handleOut: { x: 40, y: 20 },
+      point: { x: 80, y: 40 },
+      pointType: "smooth",
+    });
+  });
+
+  test("option-clicking an existing anchor with pen toggles it between corner and smooth", () => {
+    const editor = new Editor();
+
+    editor.loadDocument(
+      JSON.stringify({
+        nodes: [
+          {
+            contours: [
+              {
+                closed: false,
+                segments: [
+                  {
+                    handleIn: { x: 0, y: 0 },
+                    handleOut: { x: 36, y: 0 },
+                    point: { x: 0, y: 0 },
+                    pointType: "smooth",
+                  },
+                  {
+                    handleIn: { x: -48, y: 0 },
+                    handleOut: { x: 48, y: 0 },
+                    point: { x: 120, y: 120 },
+                    pointType: "smooth",
+                  },
+                  {
+                    handleIn: { x: -36, y: 0 },
+                    handleOut: { x: 0, y: 0 },
+                    point: { x: 240, y: 120 },
+                    pointType: "smooth",
+                  },
+                ],
+              },
+            ],
+            fill: "#000000",
+            fillRule: "nonzero",
+            id: "open-vector-node",
+            parentId: "root",
+            stroke: "#000000",
+            strokeLineCap: "round",
+            strokeLineJoin: "round",
+            strokeMiterLimit: 4,
+            strokeWidth: 8,
+            transform: {
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+              x: 280,
+              y: 180,
+            },
+            type: "vector",
+            visible: true,
+          },
+        ],
+        version: "1.6",
+      })
+    );
+    editor.select("open-vector-node");
+    editor.startPathEditing("open-vector-node");
+    editor.setActiveTool("pen");
+
+    const node = editor.getNode("open-vector-node");
+    const bbox = editor.getNodeGeometry("open-vector-node")?.bbox;
+
+    if (!(node?.type === "vector" && bbox)) {
+      throw new Error("Expected an editable vector node for pen point toggle.");
+    }
+
+    const targetPoint = getNodeWorldPoint(
+      node,
+      bbox,
+      node.contours[0].segments[1].point
+    );
+
+    optionClickPen(editor, targetPoint);
+
+    let updatedNode = editor.getNode("open-vector-node");
+    let segment =
+      updatedNode?.type === "vector"
+        ? updatedNode.contours[0]?.segments[1]
+        : null;
+
+    expect(editor.pathEditingPoint).toEqual({
+      contourIndex: 0,
+      segmentIndex: 1,
+    });
+    expect(segment).toMatchObject({
+      handleIn: { x: 0, y: 0 },
+      handleOut: { x: 0, y: 0 },
+      pointType: "corner",
+    });
+
+    optionClickPen(editor, targetPoint);
+
+    updatedNode = editor.getNode("open-vector-node");
+    segment =
+      updatedNode?.type === "vector"
+        ? updatedNode.contours[0]?.segments[1]
+        : null;
+
+    expect(segment?.pointType).toBe("smooth");
+    expect(
+      Math.hypot(segment?.handleIn.x || 0, segment?.handleIn.y || 0)
+    ).toBeGreaterThan(1);
+    expect(
+      Math.hypot(segment?.handleOut.x || 0, segment?.handleOut.y || 0)
+    ).toBeGreaterThan(1);
   });
 
   test("tiny pen drag on the first point still creates a corner point", () => {

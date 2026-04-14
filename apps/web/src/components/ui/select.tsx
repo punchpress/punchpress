@@ -10,16 +10,26 @@ import {
   ChevronsUpDownIcon,
   ChevronUpIcon,
 } from "lucide-react";
+import { createContext, useContext, useEffect, useRef } from "react";
 
 import { getCanvasCursorStyle } from "@/components/canvas/canvas-cursor-assets";
+import { useEditor } from "@/editor-react/use-editor";
 import { cn } from "@/lib/utils";
 
 const SelectPrimitive = BaseSelectPrimitive;
 
-const Select = BaseSelectPrimitive.Root;
+const SelectValueChangeContext = createContext(null);
+
+function Select({ onValueChange, ...props }) {
+  return (
+    <SelectValueChangeContext.Provider value={onValueChange ?? null}>
+      <BaseSelectPrimitive.Root onValueChange={onValueChange} {...props} />
+    </SelectValueChangeContext.Provider>
+  );
+}
 
 const selectTriggerVariants = cva(
-  "relative inline-flex min-h-9 w-full min-w-36 select-none items-center justify-between gap-2 rounded-lg border border-transparent bg-muted px-[calc(--spacing(3)-1px)] text-left text-base text-foreground outline-none transition-[border-color,background-color] hover:border-input hover:bg-accent pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 focus-visible:border-ring aria-invalid:border-destructive/36 focus-visible:aria-invalid:border-destructive data-disabled:pointer-events-none data-disabled:opacity-64 data-disabled:hover:border-transparent sm:min-h-8 sm:text-sm dark:bg-input/32 [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "relative inline-flex min-h-9 w-full min-w-36 select-none items-center justify-between gap-2 rounded-lg border border-transparent bg-muted px-[calc(--spacing(3)-1px)] text-left text-base text-foreground outline-none transition-[border-color,background-color] pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 hover:border-input hover:bg-accent focus-visible:border-ring aria-invalid:border-destructive/36 focus-visible:aria-invalid:border-destructive data-disabled:pointer-events-none data-disabled:opacity-64 data-disabled:hover:border-transparent sm:min-h-8 sm:text-sm dark:bg-input/32 [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     defaultVariants: {
       size: "default",
@@ -28,7 +38,7 @@ const selectTriggerVariants = cva(
       size: {
         default: "",
         lg: "min-h-10 sm:min-h-9",
-        sm: "min-h-8 gap-1.5 px-[calc(--spacing(2.5)-1px)] sm:min-h-7",
+        sm: "h-8.5 min-h-8.5 gap-1.5 px-[calc(--spacing(2.5)-1px)] sm:h-7.5 sm:min-h-7.5",
       },
     },
   }
@@ -97,9 +107,83 @@ function SelectPopup({
   alignOffset = 0,
   alignItemWithTrigger = true,
   anchor,
+  onPointerDownCapture,
   style,
   ...props
 }) {
+  const editor = useEditor();
+  const popupRef = useRef<HTMLDivElement | null>(null);
+  const popupDismissSuppressionTimeoutRef = useRef<number | null>(null);
+  const selectionBeforePopupInteractionRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    return () => {
+      if (
+        typeof window !== "undefined" &&
+        popupDismissSuppressionTimeoutRef.current !== null
+      ) {
+        window.clearTimeout(popupDismissSuppressionTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handlePopupPointerDownCapture = (event) => {
+    onPointerDownCapture?.(event);
+
+    if (event.defaultPrevented || typeof window === "undefined") {
+      return;
+    }
+
+    if (popupDismissSuppressionTimeoutRef.current !== null) {
+      window.clearTimeout(popupDismissSuppressionTimeoutRef.current);
+    }
+
+    selectionBeforePopupInteractionRef.current = [...editor.selectedNodeIds];
+
+    const handlePointerInteractionEnd = () => {
+      const handleSuppressedClick = (clickEvent: MouseEvent) => {
+        if (
+          clickEvent.target instanceof Node &&
+          popupRef.current?.contains(clickEvent.target)
+        ) {
+          document.removeEventListener("click", handleSuppressedClick, true);
+          return;
+        }
+
+        clickEvent.preventDefault();
+        clickEvent.stopPropagation();
+        clickEvent.stopImmediatePropagation();
+        document.removeEventListener("click", handleSuppressedClick, true);
+      };
+
+      document.addEventListener("click", handleSuppressedClick, true);
+      window.setTimeout(() => {
+        if (
+          editor.selectedNodeIds.length === 0 &&
+          selectionBeforePopupInteractionRef.current.length > 0
+        ) {
+          editor.setSelectedNodes(selectionBeforePopupInteractionRef.current);
+        }
+      }, 0);
+      popupDismissSuppressionTimeoutRef.current = window.setTimeout(() => {
+        popupDismissSuppressionTimeoutRef.current = null;
+      }, 120);
+      window.removeEventListener(
+        "pointercancel",
+        handlePointerInteractionEnd,
+        true
+      );
+      window.removeEventListener(
+        "pointerup",
+        handlePointerInteractionEnd,
+        true
+      );
+    };
+
+    window.addEventListener("pointercancel", handlePointerInteractionEnd, true);
+    window.addEventListener("pointerup", handlePointerInteractionEnd, true);
+  };
+
   return (
     <BaseSelectPrimitive.Portal>
       <BaseSelectPrimitive.Positioner
@@ -115,6 +199,8 @@ function SelectPopup({
         <BaseSelectPrimitive.Popup
           className="origin-(--transform-origin) text-foreground"
           data-slot="select-popup"
+          onPointerDownCapture={handlePopupPointerDownCapture}
+          ref={popupRef}
           style={{
             ...getCanvasCursorStyle(),
             cursor: "var(--canvas-cursor-default)",
@@ -151,7 +237,16 @@ function SelectPopup({
   );
 }
 
-function SelectItem({ className, children, ...props }) {
+function SelectItem({
+  className,
+  children,
+  disabled,
+  onPointerDown,
+  value,
+  ...props
+}) {
+  const onValueChange = useContext(SelectValueChangeContext);
+
   return (
     <BaseSelectPrimitive.Item
       className={cn(
@@ -159,6 +254,22 @@ function SelectItem({ className, children, ...props }) {
         className
       )}
       data-slot="select-item"
+      disabled={disabled}
+      onPointerDown={(event) => {
+        onPointerDown?.(event);
+
+        if (
+          event.defaultPrevented ||
+          disabled ||
+          event.button !== 0 ||
+          typeof onValueChange !== "function"
+        ) {
+          return;
+        }
+
+        onValueChange(value);
+      }}
+      value={value}
       {...props}
     >
       <BaseSelectPrimitive.ItemIndicator className="col-start-1">

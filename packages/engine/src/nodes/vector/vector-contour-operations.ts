@@ -19,7 +19,7 @@ const cloneSegment = (segment) => {
   };
 };
 
-export const createPenContour = (point) => {
+export const createOpenVectorContour = (point) => {
   return {
     closed: false,
     segments: [
@@ -36,7 +36,7 @@ export const createPenContour = (point) => {
   };
 };
 
-export const appendPenContourSegment = (
+export const appendVectorContourSegment = (
   contours,
   { contourIndex, handleIn, handleOut, point, pointType }
 ) => {
@@ -63,7 +63,7 @@ export const appendPenContourSegment = (
   });
 };
 
-export const replacePenContourSegment = (
+export const replaceVectorContourSegment = (
   contours,
   { contourIndex, handleIn, handleOut, point, pointType, segmentIndex }
 ) => {
@@ -107,7 +107,7 @@ export const replacePenContourSegment = (
   });
 };
 
-export const closePenContour = (contours, contourIndex) => {
+export const closeVectorContour = (contours, contourIndex) => {
   const inheritedCornerRadius = getUniformVectorCornerRadius(contours);
   const closedContours = contours.map((contour, index) => {
     if (index !== contourIndex) {
@@ -158,7 +158,7 @@ export const closePenContour = (contours, contourIndex) => {
   return nextContours;
 };
 
-export const reversePenContour = (contours, contourIndex) => {
+export const reverseVectorContour = (contours, contourIndex) => {
   return contours.map((contour, index) => {
     if (index !== contourIndex) {
       return contour;

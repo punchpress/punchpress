@@ -41,8 +41,9 @@ export const useNodeToolbarState = () => {
       state.pathEditingPoint
         ? state.pathEditingPoint
         : null;
+    const selectedPathPoints = isPathEditing ? state.pathEditingPoints : [];
     const pathPointKey = isPathEditing
-      ? getPathPointsKey(state.pathEditingPoints)
+      ? getPathPointsKey(selectedPathPoints)
       : getPathPointKey(selectedPathPoint);
     const primaryPathPointKey = getPathPointKey(selectedPathPoint);
 
@@ -53,6 +54,7 @@ export const useNodeToolbarState = () => {
       ),
       isPathEditing,
       selectedPathPoint,
+      selectedPathPoints,
       selectedNode,
       selectionKey: `${visibleSelectedNodeIds.join(",")}:${isPathEditing ? `path:${pathPointKey}:${primaryPathPointKey}` : "node"}`,
       visibleSelectedNodeIds,

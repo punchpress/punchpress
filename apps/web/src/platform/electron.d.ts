@@ -1,4 +1,8 @@
 import type { Editor } from "@punchpress/engine";
+import type {
+  DesktopAppMenuState,
+  DesktopEditorCommand,
+} from "./desktop-menu/desktop-native-menu-types";
 
 export interface DesktopDocumentFileResult {
   contents: string;
@@ -36,6 +40,9 @@ declare global {
   interface Window {
     __PUNCHPRESS_EDITOR__?: Editor;
     electron?: {
+      appMenu?: {
+        updateState: (state: DesktopAppMenuState) => void;
+      };
       documentCommands?: {
         markReady: () => void;
         onCommand: (
@@ -51,7 +58,9 @@ declare global {
         respondBeforeClose: (requestId: number, shouldClose: boolean) => void;
       };
       editorCommands?: {
-        onCommand: (callback: (command: "redo" | "undo") => void) => () => void;
+        onCommand: (
+          callback: (command: DesktopEditorCommand) => void
+        ) => () => void;
       };
       updaterCommands?: {
         getStatus: () => Promise<DesktopUpdateStatus>;

@@ -37,6 +37,8 @@ export const createEditorStore = ({
     pathEditingNodeId: null,
     pathEditingPoint: null,
     pathEditingPoints: [],
+    penDirectSelectionModifierPressed: false,
+    penPointTypeToggleModifierPressed: false,
     selectedNodeIds: [],
     spacePressed: false,
     viewport: {

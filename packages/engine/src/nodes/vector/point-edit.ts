@@ -95,6 +95,50 @@ const getNeighborPoint = (
     : contour.segments[0]?.point || null;
 };
 
+const getDragHandleRole = (
+  contour: VectorContourDocument,
+  segmentIndex: number,
+  value: VectorHandleDocument
+) => {
+  const segment = contour.segments[segmentIndex];
+  const dragDirection = normalizeHandle(value);
+
+  if (!(segment && dragDirection)) {
+    return "handleOut" as const;
+  }
+
+  const previousPoint = getNeighborPoint(contour, segmentIndex, -1);
+  const nextPoint = getNeighborPoint(contour, segmentIndex, 1);
+  const previousDirection = previousPoint
+    ? normalizeHandle({
+        x: previousPoint.x - segment.point.x,
+        y: previousPoint.y - segment.point.y,
+      })
+    : null;
+  const nextDirection = nextPoint
+    ? normalizeHandle({
+        x: nextPoint.x - segment.point.x,
+        y: nextPoint.y - segment.point.y,
+      })
+    : null;
+
+  if (!(previousDirection && nextDirection)) {
+    if (previousDirection) {
+      return "handleIn" as const;
+    }
+
+    return "handleOut" as const;
+  }
+
+  const previousScore =
+    previousDirection.x * dragDirection.x +
+    previousDirection.y * dragDirection.y;
+  const nextScore =
+    nextDirection.x * dragDirection.x + nextDirection.y * dragDirection.y;
+
+  return previousScore > nextScore ? "handleIn" : "handleOut";
+};
+
 const getDefaultSmoothHandleLength = (
   contour: VectorContourDocument,
   segmentIndex: number
@@ -260,7 +304,7 @@ export const setVectorPointType = (
   });
 };
 
-export const authorVectorPointHandlesFromAnchorDrag = (
+export const setVectorPointHandlesFromAnchorDrag = (
   contours: VectorContourDocument[],
   target: {
     constrainAngle?: boolean;
@@ -273,6 +317,11 @@ export const authorVectorPointHandlesFromAnchorDrag = (
     const nextHandle = target.constrainAngle
       ? constrainHandleAngle(target.value)
       : target.value;
+    const dragHandleRole = getDragHandleRole(
+      contours[target.contourIndex],
+      target.segmentIndex,
+      nextHandle
+    );
 
     if (isZeroHandle(nextHandle)) {
       return {
@@ -285,8 +334,10 @@ export const authorVectorPointHandlesFromAnchorDrag = (
 
     return {
       ...segment,
-      handleIn: invertHandle(nextHandle),
-      handleOut: nextHandle,
+      handleIn:
+        dragHandleRole === "handleIn" ? nextHandle : invertHandle(nextHandle),
+      handleOut:
+        dragHandleRole === "handleOut" ? nextHandle : invertHandle(nextHandle),
       pointType: "smooth",
     };
   });

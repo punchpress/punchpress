@@ -1,31 +1,30 @@
-import { VECTOR_ANCHOR_INTERACTION_RADIUS_PX } from "../nodes/vector/interaction-constants";
 import {
-  appendPenContourSegment,
-  closePenContour,
-  createPenContour,
-  replacePenContourSegment,
-  reversePenContour,
-} from "../nodes/vector/pen-authoring";
-import { round } from "../primitives/math";
-import { getNodeLocalPoint, getNodeWorldPoint } from "../primitives/rotation";
+  getPenHoverState,
+  getPenPreviewState,
+} from "./pen-tool-authoring-preview";
 import {
-  getExistingPointActionNode,
-  getSelectedEndpointContinuationTarget,
-  resolveContinuationTarget,
-  resolveDeletePointTarget,
-  resolveInsertPointTarget,
-} from "./pen-existing-point-actions";
+  finishAuthoringSession,
+  getActiveAuthoringSession,
+  startAuthoringSession,
+  startContinuationSession,
+  startSelectedEndpointContinuationSession,
+} from "./pen-tool-authoring-session";
 import {
-  createPlacementSession,
-  DRAG_THRESHOLD_PX,
-  getContourSegmentCount,
-  getPenDragHandle,
-  getZeroHandle,
-  isSamePoint,
-  type PenAuthoringSession,
-  type PenHoverState,
-  roundHandle,
-} from "./pen-tool-types";
+  beginDraftPlacement,
+  cancelDraftPlacement,
+  completeDraftPlacement,
+  updateDraftPlacement,
+} from "./pen-tool-draft-placement";
+import {
+  handlePenCanvasPointerDown,
+  startExistingPointAction,
+} from "./pen-tool-existing-point-state";
+import {
+  clearIdleHoverTarget,
+  handlePenCanvasPointerLeave,
+  handlePenCanvasPointerMove,
+} from "./pen-tool-idle-state";
+import type { PenAuthoringSession, PenHoverState } from "./pen-tool-types";
 import { selectToolFromShortcut, Tool } from "./tool";
 
 export class PenTool extends Tool {
@@ -39,143 +38,29 @@ export class PenTool extends Tool {
   }
 
   getPreviewState() {
-    const session = this.getActiveAuthoringSession();
-
-    if (!session) {
-      return null;
-    }
-
-    if (session.draft?.kind === "next-point") {
-      return {
-        ...(session.draft.dragHandle
-          ? {
-              handleIn: roundHandle({
-                x: -session.draft.dragHandle.x,
-                y: -session.draft.dragHandle.y,
-              }),
-            }
-          : null),
-        contourIndex: session.contourIndex,
-        kind: "segment",
-        nodeId: session.nodeId,
-        pointer: {
-          x: round(session.draft.anchorLocalPoint.x, 2),
-          y: round(session.draft.anchorLocalPoint.y, 2),
-        },
-        target: session.draft.target,
-      };
-    }
-
-    if (!session.hoverPoint) {
-      return null;
-    }
-
-    return {
-      contourIndex: session.contourIndex,
-      kind: "segment",
-      nodeId: session.nodeId,
-      pointer: {
-        x: round(session.hoverPoint.x, 2),
-        y: round(session.hoverPoint.y, 2),
-      },
-      target: session.hoverTarget,
-    };
+    return getPenPreviewState(this);
   }
 
   getHoverState() {
-    const session = this.getActiveAuthoringSession();
-
-    if (session?.hoverTarget?.type === "start-anchor") {
-      const node = this.editor.getNode(session.nodeId);
-      const contour =
-        node?.type === "vector" ? node.contours[session.contourIndex] : null;
-      const point = contour?.segments[session.hoverTarget.segmentIndex]?.point;
-
-      if (!point) {
-        return null;
-      }
-
-      return {
-        contourIndex: session.contourIndex,
-        intent: "close",
-        nodeId: session.nodeId,
-        point: {
-          x: round(point.x, 2),
-          y: round(point.y, 2),
-        },
-        role: "anchor",
-        segmentIndex: session.hoverTarget.segmentIndex,
-      } satisfies PenHoverState;
-    }
-
-    return this.idleHoverTarget;
+    return getPenHoverState(this);
   }
 
   hasActiveSession() {
-    return Boolean(this.getActiveAuthoringSession());
+    return Boolean(getActiveAuthoringSession(this));
   }
 
-  onCanvasPointerDown({ point }) {
-    if (!point) {
-      return null;
-    }
-
-    let session = this.getActiveAuthoringSession();
-
-    if (!session) {
-      const existingPointAction = this.startExistingPointAction(point);
-
-      if (existingPointAction) {
-        return existingPointAction;
-      }
-    }
-
-    const hasResumedSelectedEndpoint =
-      session || this.startSelectedEndpointContinuationSession();
-
-    if (!(hasResumedSelectedEndpoint || this.startAuthoringSession(point))) {
-      return null;
-    }
-
-    if (!session) {
-      session = this.getActiveAuthoringSession();
-    }
-
-    if (!session) {
-      return null;
-    }
-
-    this.beginDraftPlacement(session, point);
-
-    return createPlacementSession(
-      () => this.cancelDraftPlacement(),
-      ({ point: nextPoint } = {}) =>
-        this.completeDraftPlacement(nextPoint || point),
-      ({ point: nextPoint } = {}) =>
-        this.updateDraftPlacement(nextPoint || point)
-    );
+  onCanvasPointerDown(info) {
+    return handlePenCanvasPointerDown(this, info);
   }
 
-  getSelectedEndpointContinuationTarget() {
-    return getSelectedEndpointContinuationTarget(this.editor);
-  }
-
-  startSelectedEndpointContinuationSession() {
-    const continuation = this.getSelectedEndpointContinuationTarget();
-
-    if (!continuation) {
-      return false;
-    }
-
-    return this.startContinuationSession(
-      continuation.node,
-      continuation.target
-    );
-  }
-
-  onNodePointerDown({ node, point }) {
+  onNodePointerDown({ event, node, point }) {
     if (point && !this.hasActiveSession()) {
-      const existingPointAction = this.startExistingPointAction(point, node);
+      const existingPointAction = startExistingPointAction(
+        this,
+        point,
+        node,
+        event
+      );
 
       if (existingPointAction) {
         return existingPointAction;
@@ -185,135 +70,33 @@ export class PenTool extends Tool {
     return super.onNodePointerDown({ node, point });
   }
 
-  startExistingPointAction(point, node = null) {
-    const targetNode =
-      node ||
-      this.getExistingPointActionNode(
-        this.editor.pathEditingNodeId || this.editor.selectedNodeId
-      );
-
-    if (!targetNode) {
-      return null;
-    }
-
-    const continuationTarget = this.resolveContinuationTarget(
-      targetNode,
-      point
-    );
-
-    if (
-      continuationTarget &&
-      this.startContinuationSession(targetNode, continuationTarget)
-    ) {
-      return createPlacementSession(
-        () => this.finishAuthoringSession({ commit: false }),
-        () => true,
-        () => false
-      );
-    }
-
-    const deletePointTarget = this.resolveDeletePointTarget(targetNode, point);
-
-    if (deletePointTarget) {
-      return createPlacementSession(
-        () => false,
-        ({ dragDistancePx = 0 } = {}) =>
-          this.completeDeletePointPlacement(
-            targetNode.id,
-            deletePointTarget,
-            dragDistancePx
-          ),
-        () => false
-      );
-    }
-
-    const insertPointTarget = this.resolveInsertPointTarget(targetNode, point);
-
-    if (!insertPointTarget) {
-      return null;
-    }
-
-    const insertPlacement = this.startInsertPointPlacement(
-      targetNode,
-      insertPointTarget
-    );
-
-    if (!insertPlacement) {
-      return null;
-    }
-
-    return createPlacementSession(
-      () => this.cancelInsertPointPlacement(insertPlacement),
-      ({ point: nextPoint = point } = {}) =>
-        this.completeInsertPointPlacement(insertPlacement, nextPoint),
-      ({ point: nextPoint = point } = {}) =>
-        this.updateInsertPointPlacement(insertPlacement, nextPoint)
-    );
-  }
-
-  getExistingPointActionNode(nodeId) {
-    return getExistingPointActionNode(this.editor, nodeId);
-  }
-
   onCanvasPointerLeave() {
-    const session = this.getActiveAuthoringSession();
-    let didChange = false;
-
-    if (
-      session &&
-      !session.draft &&
-      (session.hoverPoint || session.hoverTarget)
-    ) {
-      session.hoverPoint = null;
-      session.hoverTarget = null;
-      didChange = true;
-    }
-
-    if (this.idleHoverTarget) {
-      this.idleHoverTarget = null;
-      didChange = true;
-    }
-
-    if (didChange) {
-      this.editor.notifyInteractionPreviewChanged();
-    }
-
-    return didChange;
+    return handlePenCanvasPointerLeave(this);
   }
 
-  onCanvasPointerMove({ point }) {
-    const session = this.getActiveAuthoringSession();
-
-    if (!point) {
-      return false;
-    }
-
-    if (session && !session.draft) {
-      return this.setHoverPoint(session, point);
-    }
-
-    return this.setIdleHoverTarget(point);
+  onCanvasPointerMove(info) {
+    return handlePenCanvasPointerMove(this, info);
   }
 
   onActivate() {
-    return this.startSelectedEndpointContinuationSession();
+    return startSelectedEndpointContinuationSession(this);
   }
 
   onDeactivate() {
-    const didFinish = this.finishAuthoringSession({ commit: true });
-    const didClearIdleHover = this.clearIdleHoverTarget();
+    const didFinish = finishAuthoringSession(this, { commit: true });
+    const didClearIdleHover = clearIdleHoverTarget(this);
 
     return didFinish || didClearIdleHover;
   }
 
   onPathEditingStopped() {
-    return this.finishAuthoringSession({ commit: true });
+    return finishAuthoringSession(this, { commit: true });
   }
 
   onKeyDown({ event, key }) {
     if (key === "escape" || key === "enter") {
       if (this.hasActiveSession()) {
-        this.finishAuthoringSession({ commit: true });
+        finishAuthoringSession(this, { commit: true });
         return true;
       }
 
@@ -327,649 +110,38 @@ export class PenTool extends Tool {
   }
 
   beginDraftPlacement(session, point) {
-    const node = this.editor.getNode(session.nodeId);
-    const bbox = this.editor.getNodeGeometry(session.nodeId)?.bbox;
-    const contour =
-      node?.type === "vector" ? node.contours[session.contourIndex] : null;
-
-    if (!(node?.type === "vector" && bbox && contour)) {
-      return;
-    }
-
-    const isFirstPoint = !session.hasPlacedInitialPoint;
-    const anchorLocalPoint = isFirstPoint
-      ? contour.segments[0]?.point || { x: 0, y: 0 }
-      : getNodeLocalPoint(node, bbox, point);
-
-    session.draft = {
-      anchorCanvasPoint: {
-        x: round(point.x, 2),
-        y: round(point.y, 2),
-      },
-      anchorLocalPoint: {
-        x: round(anchorLocalPoint.x, 2),
-        y: round(anchorLocalPoint.y, 2),
-      },
-      dragHandle: null,
-      kind: isFirstPoint ? "first-point" : "next-point",
-      target: this.resolveCloseTarget(node, bbox, point, contour),
-    };
-    session.hoverPoint = null;
-    session.hoverTarget = null;
-    this.editor.notifyInteractionPreviewChanged();
+    return beginDraftPlacement(this, session, point);
   }
 
   cancelDraftPlacement() {
-    const session = this.getActiveAuthoringSession();
-
-    if (!session?.draft) {
-      return false;
-    }
-
-    const draft = session.draft;
-    session.draft = null;
-    session.hoverPoint = null;
-    session.hoverTarget = null;
-
-    if (draft.kind === "first-point") {
-      return this.finishAuthoringSession({ commit: false });
-    }
-
-    this.editor.notifyInteractionPreviewChanged();
-    return true;
+    return cancelDraftPlacement(this);
   }
 
-  completeDraftPlacement(point) {
-    const session = this.getActiveAuthoringSession();
-
-    if (!(session?.draft && point)) {
-      return false;
-    }
-
-    const node = this.editor.getNode(session.nodeId);
-    const bbox = this.editor.getNodeGeometry(session.nodeId)?.bbox;
-    const contour =
-      node?.type === "vector" ? node.contours[session.contourIndex] : null;
-
-    if (!(node?.type === "vector" && bbox && contour)) {
-      return false;
-    }
-
-    this.updateDraftPlacement(point);
-
-    const draft = session.draft;
-    session.draft = null;
-
-    if (draft.kind === "first-point") {
-      session.hasPlacedInitialPoint = true;
-      this.editor.notifyInteractionPreviewChanged();
-      return true;
-    }
-
-    if (draft.target?.type === "start-anchor") {
-      session.hasAuthoredChange = true;
-      const nextContours = draft.dragHandle
-        ? replacePenContourSegment(node.contours, {
-            contourIndex: session.contourIndex,
-            handleIn: roundHandle({
-              x: -draft.dragHandle.x,
-              y: -draft.dragHandle.y,
-            }),
-            pointType: "smooth",
-            segmentIndex: draft.target.segmentIndex,
-          })
-        : node.contours;
-
-      this.editor.updateVectorContours(
-        node.id,
-        closePenContour(nextContours, session.contourIndex)
-      );
-      return this.finishClosedContour(session, {
-        contourIndex: session.contourIndex,
-        segmentIndex: draft.target.segmentIndex,
-      });
-    }
-
-    const nextPointType = draft.dragHandle ? "smooth" : "corner";
-
-    session.hasAuthoredChange = true;
-    this.editor.updateVectorContours(
-      node.id,
-      appendPenContourSegment(node.contours, {
-        contourIndex: session.contourIndex,
-        handleIn: draft.dragHandle
-          ? roundHandle({
-              x: -draft.dragHandle.x,
-              y: -draft.dragHandle.y,
-            })
-          : getZeroHandle(),
-        handleOut: draft.dragHandle
-          ? roundHandle(draft.dragHandle)
-          : getZeroHandle(),
-        point: draft.anchorLocalPoint,
-        pointType: nextPointType,
-      }),
-      {
-        pinnedLocalPoint: draft.anchorLocalPoint,
-        pinnedWorldPoint: draft.anchorCanvasPoint,
-      }
-    );
-    this.editor.setPathEditingPoint({
-      contourIndex: session.contourIndex,
-      segmentIndex: contour.segments.length,
-    });
-    this.editor.notifyInteractionPreviewChanged();
-    return true;
+  completeDraftPlacement(point, options = {}) {
+    return completeDraftPlacement(this, point, options);
   }
 
-  finishClosedContour(session, selectedPoint) {
-    this.authoringSession = null;
-    this.idleHoverTarget = null;
-    this.editor.setPathEditingPoint(selectedPoint || null);
-    this.editor.notifyInteractionPreviewChanged();
-
-    if (session.historyMark) {
-      return this.editor.commitHistoryStep(session.historyMark);
-    }
-
-    return true;
+  finishAuthoringSession(options = { commit: true }) {
+    return finishAuthoringSession(this, options);
   }
 
-  finishAuthoringSession({ commit } = { commit: true }) {
-    const session = this.authoringSession;
-
-    if (!session) {
-      return false;
-    }
-
-    const node = this.editor.getNode(session.nodeId);
-    const shouldCommit =
-      commit &&
-      session.hasAuthoredChange &&
-      getContourSegmentCount(node, session.contourIndex) >= 2;
-
-    this.authoringSession = null;
-    this.idleHoverTarget = null;
-    this.editor.setPathEditingPoint(null);
-    this.editor.notifyInteractionPreviewChanged();
-
-    if (shouldCommit) {
-      return this.editor.commitHistoryStep(session.historyMark);
-    }
-
-    return this.editor.revertToMark(session.historyMark);
-  }
-
-  getActiveAuthoringSession() {
-    const session = this.authoringSession;
-
-    if (!session) {
-      return null;
-    }
-
-    const node = this.editor.getNode(session.nodeId);
-
-    if (
-      node?.type !== "vector" ||
-      node.contours[session.contourIndex]?.closed ||
-      !node.contours[session.contourIndex]
-    ) {
-      this.authoringSession = null;
-      return null;
-    }
-
-    return session;
-  }
-
-  resolveCloseTarget(node, bbox, point, contour) {
-    const startPoint = contour.segments[0]?.point;
-
-    if (
-      !startPoint ||
-      contour.segments.length < 2 ||
-      !this.shouldCloseContour(node, bbox, point, startPoint)
-    ) {
-      return null;
-    }
-
-    return {
-      segmentIndex: 0,
-      type: "start-anchor",
-    } as const;
-  }
-
-  setHoverPoint(session, point) {
-    const node = this.editor.getNode(session.nodeId);
-    const bbox = this.editor.getNodeGeometry(session.nodeId)?.bbox;
-    const contour =
-      node?.type === "vector" ? node.contours[session.contourIndex] : null;
-
-    if (!(node?.type === "vector" && bbox && contour)) {
-      return false;
-    }
-
-    const nextHoverPoint = getNodeLocalPoint(node, bbox, point);
-    const nextHoverTarget = this.resolveCloseTarget(node, bbox, point, contour);
-    const didHoverPointChange = !(
-      session.hoverPoint && isSamePoint(session.hoverPoint, nextHoverPoint)
-    );
-    const didHoverTargetChange =
-      session.hoverTarget?.type !== nextHoverTarget?.type ||
-      session.hoverTarget?.segmentIndex !== nextHoverTarget?.segmentIndex;
-
-    if (!(didHoverPointChange || didHoverTargetChange)) {
-      return false;
-    }
-
-    session.hoverPoint = {
-      x: round(nextHoverPoint.x, 2),
-      y: round(nextHoverPoint.y, 2),
-    };
-    session.hoverTarget = nextHoverTarget;
-    this.editor.notifyInteractionPreviewChanged();
-    return true;
-  }
-
-  setIdleHoverTarget(point) {
-    const nodeId = this.editor.pathEditingNodeId || this.editor.selectedNodeId;
-    const node = nodeId ? this.editor.getNode(nodeId) : null;
-    const continuationTarget = this.resolveContinuationTarget(node, point);
-    const deletePointTarget =
-      continuationTarget || !node
-        ? null
-        : this.resolveDeletePointTarget(node, point);
-    const insertPointTarget =
-      continuationTarget || deletePointTarget || !node
-        ? null
-        : this.resolveInsertPointTarget(node, point);
-    let nextIdleHoverTarget: PenHoverState | null = null;
-
-    if (continuationTarget && node?.type === "vector") {
-      const hoverPoint =
-        node.contours[continuationTarget.contourIndex]?.segments[
-          continuationTarget.segmentIndex
-        ]?.point;
-
-      if (!hoverPoint) {
-        return false;
-      }
-
-      nextIdleHoverTarget = {
-        contourIndex: continuationTarget.contourIndex,
-        intent: "continue" as const,
-        nodeId: node.id,
-        point: {
-          x: round(hoverPoint.x, 2),
-          y: round(hoverPoint.y, 2),
-        },
-        role: "anchor" as const,
-        segmentIndex: continuationTarget.segmentIndex,
-      };
-    } else if (deletePointTarget && node?.type === "vector") {
-      const hoverPoint =
-        node.contours[deletePointTarget.contourIndex]?.segments[
-          deletePointTarget.segmentIndex
-        ]?.point;
-
-      if (!hoverPoint) {
-        return false;
-      }
-
-      nextIdleHoverTarget = {
-        contourIndex: deletePointTarget.contourIndex,
-        intent: "delete" as const,
-        nodeId: node.id,
-        point: {
-          x: round(hoverPoint.x, 2),
-          y: round(hoverPoint.y, 2),
-        },
-        role: "anchor" as const,
-        segmentIndex: deletePointTarget.segmentIndex,
-      };
-    } else if (insertPointTarget && node?.type === "vector") {
-      const hoverPoint =
-        insertPointTarget.segments[insertPointTarget.segmentIndex]?.point;
-
-      if (!hoverPoint) {
-        return false;
-      }
-
-      nextIdleHoverTarget = {
-        contourIndex: insertPointTarget.contourIndex,
-        intent: "add" as const,
-        nodeId: node.id,
-        point: {
-          x: round(hoverPoint.x, 2),
-          y: round(hoverPoint.y, 2),
-        },
-        role: "segment" as const,
-        segmentIndex: insertPointTarget.segmentIndex,
-      };
-    }
-
-    const didChange =
-      this.idleHoverTarget?.nodeId !== nextIdleHoverTarget?.nodeId ||
-      this.idleHoverTarget?.contourIndex !==
-        nextIdleHoverTarget?.contourIndex ||
-      this.idleHoverTarget?.intent !== nextIdleHoverTarget?.intent ||
-      this.idleHoverTarget?.role !== nextIdleHoverTarget?.role ||
-      this.idleHoverTarget?.segmentIndex !== nextIdleHoverTarget?.segmentIndex ||
-      this.idleHoverTarget?.point.x !== nextIdleHoverTarget?.point.x ||
-      this.idleHoverTarget?.point.y !== nextIdleHoverTarget?.point.y;
-
-    if (!didChange) {
-      return false;
-    }
-
-    this.idleHoverTarget = nextIdleHoverTarget;
-    this.editor.notifyInteractionPreviewChanged();
-    return true;
-  }
-
-  completeDeletePointPlacement(nodeId, target, dragDistancePx) {
-    if (dragDistancePx >= DRAG_THRESHOLD_PX) {
-      return false;
-    }
-
-    const didDelete = this.editor.deleteVectorPoint(nodeId, target);
-
-    if (!didDelete) {
-      return false;
-    }
-
-    this.idleHoverTarget = null;
-    this.editor.notifyInteractionPreviewChanged();
-    return true;
-  }
-
-  startInsertPointPlacement(node, target) {
-    const bbox = this.editor.getNodeGeometry(node.id)?.bbox;
-    const insertedPoint = target.segments[target.segmentIndex]?.point;
-    const historyMark = this.editor.markHistoryStep("edit vector path");
-
-    if (!(bbox && insertedPoint && historyMark)) {
-      return null;
-    }
-
-    const anchorCanvasPoint = getNodeWorldPoint(node, bbox, insertedPoint);
-    const didInsert = this.editor.insertVectorPoint(target, node.id);
-
-    if (!didInsert) {
-      this.editor.revertToMark(historyMark);
-      return null;
-    }
-
-    const insertedNode = this.editor.getNode(node.id);
-
-    if (insertedNode?.type !== "vector") {
-      this.editor.revertToMark(historyMark);
-      return null;
-    }
-
-    this.idleHoverTarget = null;
-    this.editor.notifyInteractionPreviewChanged();
-
-    return {
-      anchorCanvasPoint,
-      anchorLocalPoint: insertedPoint,
-      baseContours: insertedNode.contours,
-      historyMark,
-      nodeId: node.id,
-      point: {
-        contourIndex: target.contourIndex,
-        segmentIndex: target.segmentIndex,
-      },
-    };
-  }
-
-  getInsertPlacementContours(placement, point) {
-    const node = this.editor.getNode(placement.nodeId);
-    const bbox = this.editor.getNodeGeometry(placement.nodeId)?.bbox;
-
-    if (!(node?.type === "vector" && bbox && point)) {
-      return placement.baseContours;
-    }
-
-    const currentLocalPoint = getNodeLocalPoint(node, bbox, point);
-    const dragHandle = getPenDragHandle({
-      anchorCanvasPoint: placement.anchorCanvasPoint,
-      anchorLocalPoint: placement.anchorLocalPoint,
-      currentCanvasPoint: point,
-      currentLocalPoint,
-    });
-
-    if (!dragHandle) {
-      return placement.baseContours;
-    }
-
-    return replacePenContourSegment(placement.baseContours, {
-      contourIndex: placement.point.contourIndex,
-      handleIn: {
-        x: -dragHandle.x,
-        y: -dragHandle.y,
-      },
-      handleOut: dragHandle,
-      pointType: "smooth",
-      segmentIndex: placement.point.segmentIndex,
-    });
-  }
-
-  updateInsertPointPlacement(placement, point) {
-    const nextContours = this.getInsertPlacementContours(placement, point);
-
-    return this.editor.updateVectorContours(placement.nodeId, nextContours, {
-      pinnedLocalPoint: placement.anchorLocalPoint,
-      pinnedWorldPoint: placement.anchorCanvasPoint,
-    });
-  }
-
-  cancelInsertPointPlacement(placement) {
-    return this.editor.revertToMark(placement.historyMark);
-  }
-
-  completeInsertPointPlacement(placement, point) {
-    if (!this.updateInsertPointPlacement(placement, point)) {
-      return false;
-    }
-
-    return this.editor.commitHistoryStep(placement.historyMark);
+  startSelectedEndpointContinuationSession() {
+    return startSelectedEndpointContinuationSession(this);
   }
 
   startAuthoringSession(point) {
-    const historyMark = this.editor.markHistoryStep("draw vector path");
-
-    if (!historyMark) {
-      return false;
-    }
-
-    let nodeId: string | null = null;
-
-    this.editor.run(() => {
-      if (this.editor.pathEditingNodeId) {
-        this.editor.stopPathEditing();
-      }
-
-      nodeId = this.editor.getState().addVectorNode(point, {
-        activatePointer: false,
-        patch: {
-          contours: [createPenContour({ x: 0, y: 0 })],
-        },
-      });
-
-      if (!nodeId) {
-        return;
-      }
-
-      this.editor.getState().setPathEditingNodeId(nodeId);
-      this.editor.getState().setPathEditingPoint({
-        contourIndex: 0,
-        segmentIndex: 0,
-      });
-    });
-
-    if (!nodeId) {
-      this.editor.revertToMark(historyMark);
-      return false;
-    }
-
-    this.idleHoverTarget = null;
-    this.authoringSession = {
-      contourIndex: 0,
-      draft: null,
-      hasAuthoredChange: false,
-      hasPlacedInitialPoint: false,
-      historyMark,
-      hoverPoint: null,
-      hoverTarget: null,
-      nodeId,
-    };
-    this.editor.notifyInteractionPreviewChanged();
-    return true;
-  }
-
-  resolveContinuationTarget(node, point) {
-    return resolveContinuationTarget(this.editor, node, point);
-  }
-
-  resolveDeletePointTarget(node, point) {
-    return resolveDeletePointTarget(this.editor, node, point);
-  }
-
-  resolveInsertPointTarget(node, point) {
-    return resolveInsertPointTarget(this.editor, node, point);
+    return startAuthoringSession(this, point);
   }
 
   startContinuationSession(node, target) {
-    const historyMark = this.editor.markHistoryStep("continue vector path");
-
-    if (!historyMark) {
-      return false;
-    }
-
-    const contour = node.contours[target.contourIndex];
-
-    if (!contour || contour.closed || contour.segments.length === 0) {
-      this.editor.revertToMark(historyMark);
-      return false;
-    }
-
-    let continuationTarget = target;
-
-    if (target.endpoint === "start") {
-      this.editor.updateVectorContours(
-        node.id,
-        reversePenContour(node.contours, target.contourIndex)
-      );
-      continuationTarget = {
-        ...target,
-        endpoint: "end",
-        segmentIndex: contour.segments.length - 1,
-      };
-    }
-
-    this.editor.setPathEditingNodeId(node.id);
-    this.editor.setPathEditingPoint({
-      contourIndex: continuationTarget.contourIndex,
-      segmentIndex: continuationTarget.segmentIndex,
-    });
-
-    this.idleHoverTarget = null;
-    this.authoringSession = {
-      contourIndex: continuationTarget.contourIndex,
-      draft: null,
-      hasAuthoredChange: false,
-      hasPlacedInitialPoint: true,
-      historyMark,
-      hoverPoint: null,
-      hoverTarget: null,
-      nodeId: node.id,
-    };
-    this.editor.notifyInteractionPreviewChanged();
-    return true;
+    return startContinuationSession(this, node, target);
   }
 
   clearIdleHoverTarget() {
-    if (!this.idleHoverTarget) {
-      return false;
-    }
-
-    this.idleHoverTarget = null;
-    this.editor.notifyInteractionPreviewChanged();
-    return true;
+    return clearIdleHoverTarget(this);
   }
 
-  shouldCloseContour(node, bbox, point, startPoint) {
-    const startWorldPoint = getNodeWorldPoint(node, bbox, startPoint);
-    const closeDistance =
-      VECTOR_ANCHOR_INTERACTION_RADIUS_PX / Math.max(this.editor.zoom || 1, 1);
-
-    return (
-      Math.hypot(point.x - startWorldPoint.x, point.y - startWorldPoint.y) <=
-      closeDistance
-    );
-  }
-
-  updateDraftPlacement(point) {
-    const session = this.getActiveAuthoringSession();
-
-    if (!(session?.draft && point)) {
-      return false;
-    }
-
-    const node = this.editor.getNode(session.nodeId);
-    const bbox = this.editor.getNodeGeometry(session.nodeId)?.bbox;
-    const contour =
-      node?.type === "vector" ? node.contours[session.contourIndex] : null;
-
-    if (!(node?.type === "vector" && bbox && contour)) {
-      return false;
-    }
-
-    const draft = session.draft;
-    const localPoint = getNodeLocalPoint(node, bbox, point);
-
-    if (draft.kind === "first-point") {
-      const nextHandle = getPenDragHandle({
-        anchorCanvasPoint: draft.anchorCanvasPoint,
-        anchorLocalPoint: draft.anchorLocalPoint,
-        currentCanvasPoint: point,
-        currentLocalPoint: localPoint,
-      });
-
-      draft.dragHandle = nextHandle;
-
-      this.editor.updateVectorContours(
-        node.id,
-        replacePenContourSegment(node.contours, {
-          contourIndex: session.contourIndex,
-          handleIn: nextHandle
-            ? {
-                x: -nextHandle.x,
-                y: -nextHandle.y,
-              }
-            : getZeroHandle(),
-          handleOut: nextHandle || getZeroHandle(),
-          pointType: nextHandle ? "smooth" : "corner",
-          segmentIndex: 0,
-        })
-      );
-      this.editor.notifyInteractionPreviewChanged();
-      return true;
-    }
-
-    draft.dragHandle = getPenDragHandle({
-      anchorCanvasPoint: draft.anchorCanvasPoint,
-      anchorLocalPoint: draft.anchorLocalPoint,
-      currentCanvasPoint: point,
-      currentLocalPoint: localPoint,
-    });
-    draft.target = this.resolveCloseTarget(
-      node,
-      bbox,
-      draft.anchorCanvasPoint,
-      contour
-    );
-    this.editor.notifyInteractionPreviewChanged();
-    return true;
+  updateDraftPlacement(point, options = {}) {
+    return updateDraftPlacement(this, point, options);
   }
 }

@@ -1,6 +1,11 @@
 import { PUNCH_DOCUMENT_VERSION, ROOT_PARENT_ID } from "./constants";
 import { UnsupportedDocumentVersionError } from "./errors";
 import { createLocalFontDescriptor } from "./local-fonts";
+import {
+  DEFAULT_VECTOR_STROKE_LINE_CAP,
+  DEFAULT_VECTOR_STROKE_LINE_JOIN,
+  DEFAULT_VECTOR_STROKE_MITER_LIMIT,
+} from "./vector-stroke-style";
 
 const FILE_EXTENSION_RE = /\.[a-z0-9]+$/i;
 const SEPARATOR_RE = /[-_]+/g;
@@ -62,7 +67,8 @@ const migrateV1Document = (value: Record<string, unknown>) => {
   return {
     ...value,
     version: PUNCH_DOCUMENT_VERSION,
-    nodes: withVectorPointTypes(
+    nodes: withVectorStrokeStyles(
+      withVectorPointTypes(
       withGroupNames(
         nodes.map((node) => {
           if (!isRecord(node)) {
@@ -82,6 +88,7 @@ const migrateV1Document = (value: Record<string, unknown>) => {
           };
         })
       )
+      )
     ),
   };
 };
@@ -92,7 +99,8 @@ const migrateV11Document = (value: Record<string, unknown>) => {
   return {
     ...value,
     version: PUNCH_DOCUMENT_VERSION,
-    nodes: withVectorPointTypes(
+    nodes: withVectorStrokeStyles(
+      withVectorPointTypes(
       withGroupNames(
         nodes.map((node) => {
           if (!isRecord(node)) {
@@ -107,6 +115,7 @@ const migrateV11Document = (value: Record<string, unknown>) => {
                 : ROOT_PARENT_ID,
           };
         })
+      )
       )
     ),
   };
@@ -172,13 +181,42 @@ const withVectorPointTypes = (nodes: unknown[]) => {
   });
 };
 
+const withVectorStrokeStyles = (nodes: unknown[]) => {
+  return nodes.map((node) => {
+    if (!isRecord(node) || node.type !== "vector") {
+      return node;
+    }
+
+    return {
+      ...node,
+      strokeLineCap:
+        node.strokeLineCap === "butt" ||
+        node.strokeLineCap === "round" ||
+        node.strokeLineCap === "square"
+          ? node.strokeLineCap
+          : DEFAULT_VECTOR_STROKE_LINE_CAP,
+      strokeLineJoin:
+        node.strokeLineJoin === "miter" ||
+        node.strokeLineJoin === "round" ||
+        node.strokeLineJoin === "bevel"
+          ? node.strokeLineJoin
+          : DEFAULT_VECTOR_STROKE_LINE_JOIN,
+      strokeMiterLimit:
+        typeof node.strokeMiterLimit === "number" &&
+        Number.isFinite(node.strokeMiterLimit)
+          ? node.strokeMiterLimit
+          : DEFAULT_VECTOR_STROKE_MITER_LIMIT,
+    };
+  });
+};
+
 const migrateV12Document = (value: Record<string, unknown>) => {
   const nodes = Array.isArray(value.nodes) ? value.nodes : [];
 
   return {
     ...value,
     version: PUNCH_DOCUMENT_VERSION,
-    nodes: withVectorPointTypes(withGroupNames(nodes)),
+    nodes: withVectorStrokeStyles(withVectorPointTypes(withGroupNames(nodes))),
   };
 };
 
@@ -186,7 +224,9 @@ const migrateV13Document = (value: Record<string, unknown>) => {
   return {
     ...value,
     version: PUNCH_DOCUMENT_VERSION,
-    nodes: withVectorPointTypes(Array.isArray(value.nodes) ? value.nodes : []),
+    nodes: withVectorStrokeStyles(
+      withVectorPointTypes(Array.isArray(value.nodes) ? value.nodes : [])
+    ),
   };
 };
 
@@ -194,7 +234,19 @@ const migrateV14Document = (value: Record<string, unknown>) => {
   return {
     ...value,
     version: PUNCH_DOCUMENT_VERSION,
-    nodes: withVectorPointTypes(Array.isArray(value.nodes) ? value.nodes : []),
+    nodes: withVectorStrokeStyles(
+      withVectorPointTypes(Array.isArray(value.nodes) ? value.nodes : [])
+    ),
+  };
+};
+
+const migrateV15Document = (value: Record<string, unknown>) => {
+  return {
+    ...value,
+    version: PUNCH_DOCUMENT_VERSION,
+    nodes: withVectorStrokeStyles(
+      Array.isArray(value.nodes) ? value.nodes : []
+    ),
   };
 };
 
@@ -227,6 +279,10 @@ export const migrateDocument = (value: unknown) => {
 
   if (value.version === "1.4") {
     return migrateV14Document(value);
+  }
+
+  if (value.version === "1.5") {
+    return migrateV15Document(value);
   }
 
   if (typeof value.version !== "string" || value.version.length === 0) {

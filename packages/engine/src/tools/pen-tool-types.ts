@@ -8,11 +8,18 @@ export const DRAG_THRESHOLD_PX = 3;
 export const PEN_HANDLE_LENGTH_THRESHOLD = 12;
 export const POINT_EPSILON = 0.5;
 export const SEGMENT_INSERT_INTERACTION_TOLERANCE_PX = 10;
-export type PenHoverIntent = "add" | "close" | "continue" | "delete";
+export type PenHoverIntent =
+  | "add"
+  | "close"
+  | "continue"
+  | "convert-to-corner"
+  | "convert-to-smooth"
+  | "delete";
 
 export interface PenDraftPlacement {
   anchorCanvasPoint: { x: number; y: number };
   anchorLocalPoint: { x: number; y: number };
+  currentCanvasPoint: { x: number; y: number };
   dragHandle: { x: number; y: number } | null;
   kind: "first-point" | "next-point";
   target: null | {

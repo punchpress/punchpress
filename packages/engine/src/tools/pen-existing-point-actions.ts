@@ -84,7 +84,11 @@ export const resolveContinuationTarget = (editor, node, point) => {
 
   const closeDistance =
     VECTOR_ANCHOR_INTERACTION_RADIUS_PX / Math.max(editor.zoom || 1, 1);
-  let closestTarget = null;
+  let closestTarget: {
+    contourIndex: number;
+    endpoint: "end" | "start";
+    segmentIndex: number;
+  } | null = null;
   let closestDistance = Number.POSITIVE_INFINITY;
 
   for (const [contourIndex, contour] of node.contours.entries()) {
@@ -160,7 +164,10 @@ export const resolveDeletePointTarget = (editor, node, point) => {
 
   const closeDistance =
     VECTOR_ANCHOR_INTERACTION_RADIUS_PX / Math.max(editor.zoom || 1, 1);
-  let closestTarget = null;
+  let closestTarget: {
+    contourIndex: number;
+    segmentIndex: number;
+  } | null = null;
   let closestDistance = Number.POSITIVE_INFINITY;
 
   for (const [contourIndex, contour] of node.contours.entries()) {
@@ -174,7 +181,58 @@ export const resolveDeletePointTarget = (editor, node, point) => {
       }
 
       const worldPoint = getNodeWorldPoint(node, bbox, segment.point);
-      const distance = Math.hypot(point.x - worldPoint.x, point.y - worldPoint.y);
+      const distance = Math.hypot(
+        point.x - worldPoint.x,
+        point.y - worldPoint.y
+      );
+
+      if (distance > closeDistance || distance >= closestDistance) {
+        continue;
+      }
+
+      closestDistance = distance;
+      closestTarget = {
+        contourIndex,
+        segmentIndex,
+      };
+    }
+  }
+
+  return closestTarget;
+};
+
+export const resolvePointTypeToggleTarget = (editor, node, point) => {
+  if (
+    !(
+      node?.type === "vector" &&
+      editor.isSelected(node.id) &&
+      editor.pathEditingNodeId === node.id
+    )
+  ) {
+    return null;
+  }
+
+  const bbox = editor.getNodeGeometry(node.id)?.bbox;
+
+  if (!bbox) {
+    return null;
+  }
+
+  const closeDistance =
+    VECTOR_ANCHOR_INTERACTION_RADIUS_PX / Math.max(editor.zoom || 1, 1);
+  let closestTarget: {
+    contourIndex: number;
+    segmentIndex: number;
+  } | null = null;
+  let closestDistance = Number.POSITIVE_INFINITY;
+
+  for (const [contourIndex, contour] of node.contours.entries()) {
+    for (const [segmentIndex, segment] of contour.segments.entries()) {
+      const worldPoint = getNodeWorldPoint(node, bbox, segment.point);
+      const distance = Math.hypot(
+        point.x - worldPoint.x,
+        point.y - worldPoint.y
+      );
 
       if (distance > closeDistance || distance >= closestDistance) {
         continue;

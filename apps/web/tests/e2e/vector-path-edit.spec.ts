@@ -1189,6 +1189,68 @@ test("selecting an open endpoint then clicking pen continues that path", async (
     });
 });
 
+test("holding command in pen mode temporarily enables direct anchor dragging", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadOpenVectorDocument(page);
+
+  await clickNodeCenter(page, "open-vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "open-vector-node");
+  await pauseForUi(page);
+  await page.getByRole("button", { name: "Pen (P)" }).click();
+  await pauseForUi(page);
+
+  const anchorPoint = await getEditablePathPointScreenPoint(
+    page,
+    "open-vector-node",
+    1
+  );
+
+  if (!anchorPoint) {
+    throw new Error("Missing editable anchor point for pen command-drag test");
+  }
+
+  await page.keyboard.down("Meta");
+  await page.mouse.move(anchorPoint.x, anchorPoint.y);
+  await page.mouse.down();
+  await page.mouse.move(anchorPoint.x + 40, anchorPoint.y + 24, {
+    steps: 6,
+  });
+  await page.mouse.up();
+  await page.keyboard.up("Meta");
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => {
+      const dump = await getDebugDump(page);
+      const document = dump?.document?.serialized
+        ? JSON.parse(dump.document.serialized)
+        : null;
+      const vectorNode = document?.nodes?.find(
+        (entry) => entry.id === "open-vector-node"
+      );
+      const segment = vectorNode?.contours?.[0]?.segments?.[1];
+
+      return {
+        pathNodeId: dump?.editing?.pathNodeId || null,
+        point: segment?.point || null,
+        segmentCount: vectorNode?.contours?.[0]?.segments?.length || 0,
+        tool: dump?.tool || null,
+      };
+    })
+    .toEqual({
+      pathNodeId: "open-vector-node",
+      point: {
+        x: 160,
+        y: 144,
+      },
+      segmentCount: 3,
+      tool: "pen",
+    });
+});
+
 test("pen mode still shows the endpoint hover halo for open vector continuation", async ({
   page,
 }) => {
@@ -1339,6 +1401,94 @@ test("pen mode uses the minus cursor and deletes interior anchors without affect
     });
 });
 
+test("option-clicking an anchor with pen toggles it between smooth and corner", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadOpenVectorDocument(page);
+
+  await clickNodeCenter(page, "open-vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "open-vector-node");
+  await pauseForUi(page);
+  await page.getByRole("button", { name: "Pen (P)" }).click();
+  await pauseForUi(page);
+
+  const interiorAnchor = await getVectorSegmentScreenPoint(
+    page,
+    "open-vector-node",
+    1
+  );
+
+  if (!interiorAnchor) {
+    throw new Error("Missing interior anchor point for pen toggle test");
+  }
+
+  await page.keyboard.down("Alt");
+  await page.mouse.click(interiorAnchor.x, interiorAnchor.y);
+  await page.keyboard.up("Alt");
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => {
+      const dump = await getDebugDump(page);
+      const document = dump?.document?.serialized
+        ? JSON.parse(dump.document.serialized)
+        : null;
+      const vectorNode = document?.nodes?.find(
+        (entry) => entry.id === "open-vector-node"
+      );
+      const segment = vectorNode?.contours?.[0]?.segments?.[1];
+
+      return segment
+        ? {
+            pathPoint: dump?.editing?.pathPoint || null,
+            pointType: segment.pointType || null,
+            tool: dump?.tool || null,
+          }
+        : null;
+    })
+    .toEqual({
+      pathPoint: {
+        contourIndex: 0,
+        segmentIndex: 1,
+      },
+      pointType: "corner",
+      tool: "pen",
+    });
+
+  await page.keyboard.down("Alt");
+  await page.mouse.click(interiorAnchor.x, interiorAnchor.y);
+  await page.keyboard.up("Alt");
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => {
+      const segment = await getVectorSegmentDocument(
+        page,
+        1,
+        0,
+        "open-vector-node"
+      );
+
+      return segment
+        ? {
+            handleInLength: Math.hypot(segment.handleIn.x, segment.handleIn.y),
+            handleOutLength: Math.hypot(
+              segment.handleOut.x,
+              segment.handleOut.y
+            ),
+            pointType: segment.pointType || null,
+          }
+        : null;
+    })
+    .toMatchObject({
+      handleInLength: expect.any(Number),
+      handleOutLength: expect.any(Number),
+      pointType: "smooth",
+    });
+});
+
 test("pen hover tooltip states the click action for anchors", async ({
   page,
 }) => {
@@ -1378,6 +1528,166 @@ test("pen hover tooltip states the click action for anchors", async ({
   await expect(page.getByTestId("canvas-pen-hover-tooltip")).toContainText(
     "Continue Path"
   );
+});
+
+test("option modifier updates pen hover affordances immediately for an already-hovered anchor", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadOpenVectorDocument(page);
+  const penCursor = await getCursorVariableValue(
+    page,
+    "--canvas-cursor-pen-tool"
+  );
+  const penMinusCursor = await getCursorVariableValue(
+    page,
+    "--canvas-cursor-pen-tool-minus"
+  );
+
+  await clickNodeCenter(page, "open-vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "open-vector-node");
+  await pauseForUi(page);
+  await page.getByRole("button", { name: "Pen (P)" }).click();
+  await pauseForUi(page);
+
+  const interiorAnchor = await getVectorSegmentScreenPoint(
+    page,
+    "open-vector-node",
+    1
+  );
+
+  if (!interiorAnchor) {
+    throw new Error("Missing interior anchor point for pen convert hover test");
+  }
+
+  await page.mouse.move(interiorAnchor.x, interiorAnchor.y);
+  await pauseForUi(page);
+
+  await expect
+    .poll(() => {
+      return page.evaluate(() => {
+        return window.__PUNCHPRESS_EDITOR__?.getPenHoverState?.() || null;
+      });
+    })
+    .toMatchObject({
+      contourIndex: 0,
+      intent: "delete",
+      nodeId: "open-vector-node",
+      role: "anchor",
+      segmentIndex: 1,
+    });
+
+  await expect(page.getByTestId("canvas-pen-hover-tooltip")).toContainText(
+    "Delete Point"
+  );
+  await expect
+    .poll(() => {
+      return getCursorAtPoint(page, interiorAnchor);
+    })
+    .toBe(penMinusCursor);
+
+  await page.keyboard.down("Alt");
+
+  await expect
+    .poll(() => {
+      return page.evaluate(() => {
+        return window.__PUNCHPRESS_EDITOR__?.getPenHoverState?.() || null;
+      });
+    })
+    .toMatchObject({
+      contourIndex: 0,
+      intent: "convert-to-corner",
+      nodeId: "open-vector-node",
+      role: "anchor",
+      segmentIndex: 1,
+    });
+
+  await expect(page.getByTestId("canvas-pen-hover-tooltip")).toContainText(
+    "Convert to Corner Point"
+  );
+  await expect
+    .poll(() => {
+      return getCursorAtPoint(page, interiorAnchor);
+    })
+    .toBe(penCursor);
+
+  await page.keyboard.up("Alt");
+
+  await expect
+    .poll(() => {
+      return page.evaluate(() => {
+        return window.__PUNCHPRESS_EDITOR__?.getPenHoverState?.() || null;
+      });
+    })
+    .toMatchObject({
+      contourIndex: 0,
+      intent: "delete",
+      nodeId: "open-vector-node",
+      role: "anchor",
+      segmentIndex: 1,
+    });
+
+  await expect(page.getByTestId("canvas-pen-hover-tooltip")).toContainText(
+    "Delete Point"
+  );
+  await expect
+    .poll(() => {
+      return getCursorAtPoint(page, interiorAnchor);
+    })
+    .toBe(penMinusCursor);
+});
+
+test("option-dragging a corner anchor with pen converts it to smooth and authors mirrored handles", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadVectorDocument(page);
+
+  await clickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+  await page.getByRole("button", { name: "Pen (P)" }).click();
+  await pauseForUi(page);
+
+  const anchorPoint = await getVectorSegmentScreenPoint(page, "vector-node", 1);
+
+  if (!anchorPoint) {
+    throw new Error("Missing vector anchor point for pen convert drag test");
+  }
+
+  await page.keyboard.down("Alt");
+  await page.mouse.move(anchorPoint.x, anchorPoint.y);
+  await page.mouse.down();
+  await page.mouse.move(anchorPoint.x + 42, anchorPoint.y + 18, {
+    steps: 4,
+  });
+  await page.mouse.up();
+  await page.keyboard.up("Alt");
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => {
+      const segment = await getVectorSegmentDocument(page, 1);
+
+      if (!segment) {
+        return null;
+      }
+
+      return {
+        handleIn: segment.handleIn,
+        handleOut: segment.handleOut,
+        point: segment.point,
+        pointType: segment.pointType || "corner",
+      };
+    })
+    .toEqual({
+      handleIn: { x: -42, y: -18 },
+      handleOut: { x: 42, y: 18 },
+      point: { x: 200, y: 0 },
+      pointType: "smooth",
+    });
 });
 
 test("snapping endpoints across contours selects both endpoints so join is one click away", async ({
@@ -3100,6 +3410,192 @@ test("after escaping a finished pen path, clicking away paints the new path prev
   });
 
   expect(await getVectorOverlayInkCountAroundTarget(page)).toBeGreaterThan(0);
+});
+
+test("holding space during a pen drag repositions the pending anchor", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+
+  await page.keyboard.press("p");
+  await page.mouse.click(300, 260);
+  await pauseForUi(page);
+
+  await page.mouse.move(360, 300);
+  await page.mouse.down();
+  await page.mouse.move(400, 320, { steps: 4 });
+  await page.keyboard.down("Space");
+  await page.mouse.move(420, 350, { steps: 4 });
+  await page.keyboard.up("Space");
+  await page.mouse.up();
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => {
+      const dump = await getDebugDump(page);
+      const document = dump?.document?.serialized
+        ? JSON.parse(dump.document.serialized)
+        : null;
+      const vectorNode = document?.nodes?.find((entry) => {
+        return entry.type === "vector";
+      });
+      const segment = vectorNode?.contours?.[0]?.segments?.[1];
+
+      return segment
+        ? {
+            handleIn: segment.handleIn,
+            handleOut: segment.handleOut,
+            pathPoint: dump?.editing?.pathPoint || null,
+            point: segment.point,
+            pointType: segment.pointType || null,
+            tool: dump?.tool || null,
+          }
+        : null;
+    })
+    .toEqual({
+      handleIn: { x: -40, y: -20 },
+      handleOut: { x: 40, y: 20 },
+      pathPoint: {
+        contourIndex: 0,
+        segmentIndex: 1,
+      },
+      point: { x: 80, y: 70 },
+      pointType: "smooth",
+      tool: "pen",
+    });
+});
+
+test("holding space in pen mode swaps to the pan cursor and hides the pen preview", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  const grabCursor = await getCursorVariableValue(page, "--canvas-cursor-grab");
+
+  await page.keyboard.press("p");
+  await page.mouse.click(300, 260);
+  await pauseForUi(page);
+  await page.mouse.move(380, 320);
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => {
+      return await page.evaluate(() => {
+        return window.__PUNCHPRESS_EDITOR__?.getPenPreviewState?.() || null;
+      });
+    })
+    .toMatchObject({
+      contourIndex: 0,
+      kind: "segment",
+      pointer: { x: 80, y: 60 },
+      target: null,
+    });
+
+  await page.keyboard.down("Space");
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => await getCanvasSurfaceCursor(page))
+    .toBe(grabCursor);
+  await expect
+    .poll(async () => {
+      return await page.evaluate(() => {
+        return window.__PUNCHPRESS_EDITOR__?.getPenPreviewState?.() || null;
+      });
+    })
+    .toBeNull();
+  await expect
+    .poll(async () => {
+      return await page.evaluate(() => {
+        return window.__PUNCHPRESS_EDITOR__?.getPenHoverState?.() || null;
+      });
+    })
+    .toBeNull();
+
+  await page.keyboard.up("Space");
+  await page.mouse.move(390, 330);
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => {
+      return await page.evaluate(() => {
+        return window.__PUNCHPRESS_EDITOR__?.getPenPreviewState?.() || null;
+      });
+    })
+    .toMatchObject({
+      contourIndex: 0,
+      kind: "segment",
+      pointer: { x: 90, y: 70 },
+      target: null,
+    });
+});
+
+test("holding space in pen mode hides vector hover halos and suspends hover actions", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  const grabCursor = await getCursorVariableValue(page, "--canvas-cursor-grab");
+
+  await loadOpenVectorDocument(page);
+  await clickNodeCenter(page, "open-vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "open-vector-node");
+  await pauseForUi(page);
+  await page.getByRole("button", { name: "Pen (P)" }).click();
+  await pauseForUi(page);
+
+  const endpoint = await getVectorSegmentScreenPoint(
+    page,
+    "open-vector-node",
+    2
+  );
+
+  if (!endpoint) {
+    throw new Error("Missing open vector endpoint screen point");
+  }
+
+  const beforeHoverAlpha = await getVectorPaperRingAlphaTotal(page, endpoint);
+
+  await page.mouse.move(endpoint.x, endpoint.y);
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => {
+      return await page.evaluate(() => {
+        return window.__PUNCHPRESS_EDITOR__?.getPenHoverState?.() || null;
+      });
+    })
+    .toMatchObject({
+      contourIndex: 0,
+      nodeId: "open-vector-node",
+      role: "anchor",
+      segmentIndex: 2,
+    });
+  await expect
+    .poll(() => {
+      return getVectorPaperRingAlphaTotal(page, endpoint);
+    })
+    .toBeGreaterThan(beforeHoverAlpha);
+
+  const hoveredAlpha = await getVectorPaperRingAlphaTotal(page, endpoint);
+
+  await page.keyboard.down("Space");
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => await getCanvasSurfaceCursor(page))
+    .toBe(grabCursor);
+  await expect
+    .poll(async () => {
+      return await page.evaluate(() => {
+        return window.__PUNCHPRESS_EDITOR__?.getPenHoverState?.() || null;
+      });
+    })
+    .toBeNull();
+  await expect
+    .poll(() => {
+      return getVectorPaperRingAlphaTotal(page, endpoint);
+    })
+    .toBeLessThan(hoveredAlpha);
 });
 
 test("closing a pen-authored contour keeps path editing active", async ({

@@ -1,7 +1,11 @@
 import { getNodeX, getNodeY } from "../nodes/text/model";
 import {
   fillStyleDescriptor,
+  fillRuleStyleDescriptor,
   strokeStyleDescriptor,
+  strokeLineCapStyleDescriptor,
+  strokeLineJoinStyleDescriptor,
+  strokeMiterLimitStyleDescriptor,
   strokeWidthStyleDescriptor,
 } from "../styles/style-descriptors";
 
@@ -102,11 +106,15 @@ const yDescriptor = createPropertyDescriptor({
 const PROPERTY_DESCRIPTORS = {
   cornerRadius: cornerRadiusDescriptor,
   fill: fillStyleDescriptor,
+  fillRule: fillRuleStyleDescriptor,
   font: fontDescriptor,
   fontSize: fontSizeDescriptor,
   height: heightDescriptor,
   shape: shapeDescriptor,
   stroke: strokeStyleDescriptor,
+  strokeLineCap: strokeLineCapStyleDescriptor,
+  strokeLineJoin: strokeLineJoinStyleDescriptor,
+  strokeMiterLimit: strokeMiterLimitStyleDescriptor,
   strokeWidth: strokeWidthStyleDescriptor,
   text: textDescriptor,
   tracking: trackingDescriptor,

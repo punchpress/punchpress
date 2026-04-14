@@ -55,7 +55,9 @@ import {
   insertPathPoint as insertEditorPathPoint,
   insertVectorPoint as insertEditorVectorPoint,
   setPathPointType as setEditorPathPointType,
+  setPathPointTypes as setEditorPathPointTypes,
   setVectorPointType as setEditorVectorPointType,
+  setVectorPointTypes as setEditorVectorPointTypes,
 } from "./document/path/path-point-actions";
 import {
   canJoinVectorPathEndpoints as canEditorJoinVectorPathEndpoints,
@@ -93,8 +95,13 @@ import {
 import {
   handleCanvasShortcutKeyDown as handleEditorCanvasShortcutKeyDown,
   handleEditingShortcutKeyDown as handleEditorEditingShortcutKeyDown,
+  handlePenDirectSelectionModifierDown as handleEditorPenDirectSelectionModifierDown,
+  handlePenDirectSelectionModifierUp as handleEditorPenDirectSelectionModifierUp,
+  handlePenPointTypeToggleModifierDown as handleEditorPenPointTypeToggleModifierDown,
+  handlePenPointTypeToggleModifierUp as handleEditorPenPointTypeToggleModifierUp,
   handleSpaceDown as handleEditorSpaceDown,
   handleSpaceUp as handleEditorSpaceUp,
+  handleWindowBlur as handleEditorWindowBlur,
   handleWindowKeyDown as handleEditorWindowKeyDown,
 } from "./input/keyboard-shortcuts";
 import { getPathEditingInspectorState as getEditorPathEditingInspectorState } from "./inspection/path/path-edit-inspector";
@@ -238,7 +245,6 @@ export class Editor {
     this.editingHistoryMark = null;
     this.lastPasteCount = 0;
     this.lastPasteKey = null;
-    this.unsubscribeEditorCommand = null;
     this.unsubscribe = null;
     this.localFontCatalogPromise = null;
     this.interactionPreviewListeners = new Set();
@@ -271,8 +277,17 @@ export class Editor {
       createChange: createDocumentChange,
     });
     this.handleWindowKeyDown = this.handleWindowKeyDown.bind(this);
+    this.handlePenDirectSelectionModifierDown =
+      this.handlePenDirectSelectionModifierDown.bind(this);
+    this.handlePenDirectSelectionModifierUp =
+      this.handlePenDirectSelectionModifierUp.bind(this);
+    this.handlePenPointTypeToggleModifierDown =
+      this.handlePenPointTypeToggleModifierDown.bind(this);
+    this.handlePenPointTypeToggleModifierUp =
+      this.handlePenPointTypeToggleModifierUp.bind(this);
     this.handleSpaceDown = this.handleSpaceDown.bind(this);
     this.handleSpaceUp = this.handleSpaceUp.bind(this);
+    this.handleWindowBlur = this.handleWindowBlur.bind(this);
     this.onViewportChange = null;
     this.selectionPropertiesSnapshotCache = null;
     this.selectionDragPreviewState = null;
@@ -312,6 +327,10 @@ export class Editor {
 
   get editingNodeId() {
     return this.getState().editingNodeId;
+  }
+
+  get penDirectSelectionModifierPressed() {
+    return this.getState().penDirectSelectionModifierPressed;
   }
 
   get editingNode() {
@@ -829,6 +848,30 @@ export class Editor {
     handleEditorWindowKeyDown(this, event);
   }
 
+  handlePenDirectSelectionModifierDown(event) {
+    handleEditorPenDirectSelectionModifierDown(this, event);
+  }
+
+  handlePenDirectSelectionModifierUp(event) {
+    handleEditorPenDirectSelectionModifierUp(this, event);
+  }
+
+  handlePenPointTypeToggleModifierDown(event) {
+    handleEditorPenPointTypeToggleModifierDown(this, event);
+  }
+
+  handlePenPointTypeToggleModifierUp(event) {
+    handleEditorPenPointTypeToggleModifierUp(this, event);
+  }
+
+  handleWindowBlur() {
+    handleEditorWindowBlur(this);
+  }
+
+  get penPointTypeToggleModifierPressed() {
+    return this.getState().penPointTypeToggleModifierPressed;
+  }
+
   select(nodeId) {
     selectEditorNode(this, nodeId);
   }
@@ -1054,11 +1097,24 @@ export class Editor {
     nodeId = this.pathEditingNodeId,
     point = this.pathEditingPoint
   ) {
-    if (!(nodeId && point)) {
+    if (!nodeId) {
       return false;
     }
 
-    return setEditorVectorPointType(this, nodeId, point, pointType);
+    if (point) {
+      return setEditorVectorPointType(this, nodeId, point, pointType);
+    }
+
+    if (this.pathEditingPoints.length === 0) {
+      return false;
+    }
+
+    return setEditorVectorPointTypes(
+      this,
+      nodeId,
+      this.pathEditingPoints,
+      pointType
+    );
   }
 
   setPathPointType(
@@ -1066,11 +1122,24 @@ export class Editor {
     nodeId = this.pathEditingNodeId,
     point = this.pathEditingPoint
   ) {
-    if (!(nodeId && point)) {
+    if (!nodeId) {
       return false;
     }
 
-    return setEditorPathPointType(this, nodeId, point, pointType);
+    if (point) {
+      return setEditorPathPointType(this, nodeId, point, pointType);
+    }
+
+    if (this.pathEditingPoints.length === 0) {
+      return false;
+    }
+
+    return setEditorPathPointTypes(
+      this,
+      nodeId,
+      this.pathEditingPoints,
+      pointType
+    );
   }
 
   setPathPointCornerRadius(
