@@ -58,6 +58,12 @@ import {
   setVectorPointType as setEditorVectorPointType,
 } from "./document/path/path-point-actions";
 import {
+  canJoinVectorPathEndpoints as canEditorJoinVectorPathEndpoints,
+  canSplitVectorPath as canEditorSplitVectorPath,
+  joinVectorPathEndpoints as joinEditorVectorPathEndpoints,
+  splitVectorPath as splitEditorVectorPath,
+} from "./document/path/path-topology-actions";
+import {
   addShapeNode as addEditorShapeNode,
   addTextNode as addEditorTextNode,
   addVectorNode as addEditorVectorNode,
@@ -1085,6 +1091,44 @@ export class Editor {
     }
 
     return setEditorPathCornerRadius(this, nodeId, cornerRadius);
+  }
+
+  canSplitPath(nodeId = this.pathEditingNodeId, point = this.pathEditingPoint) {
+    if (!(nodeId && point)) {
+      return false;
+    }
+
+    return canEditorSplitVectorPath(this.getNode(nodeId), point);
+  }
+
+  splitPath(nodeId = this.pathEditingNodeId, point = this.pathEditingPoint) {
+    if (!(nodeId && point)) {
+      return false;
+    }
+
+    return splitEditorVectorPath(this, nodeId, point);
+  }
+
+  canJoinPathEndpoints(
+    nodeId = this.pathEditingNodeId,
+    points = this.pathEditingPoints
+  ) {
+    if (!(nodeId && points?.length > 0)) {
+      return false;
+    }
+
+    return canEditorJoinVectorPathEndpoints(this.getNode(nodeId), points);
+  }
+
+  joinPathEndpoints(
+    nodeId = this.pathEditingNodeId,
+    points = this.pathEditingPoints
+  ) {
+    if (!(nodeId && points?.length > 0)) {
+      return false;
+    }
+
+    return joinEditorVectorPathEndpoints(this, nodeId, points);
   }
 
   insertVectorPoint(target, nodeId = this.pathEditingNodeId) {

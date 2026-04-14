@@ -92,9 +92,12 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 - Path editing should support cutting or splitting a path at a selected point or segment.
 - Path editing should support joining compatible open endpoints.
 - Dragging an open endpoint onto the opposite endpoint of the same contour in path edit mode should snap and close the contour.
+- Dragging an open endpoint onto a compatible endpoint on another open contour should snap the dragged endpoint to that target without auto-joining the contours.
+- Releasing after that cross-contour snap should leave those two endpoints selected so the explicit join action is immediately available.
 - Path editing should support closing an open path through explicit intent with clear feedback when the user is targeting the starting anchor.
 - Path editing should support reopening or breaking a closed contour at a chosen point later.
 - Joining endpoints should preserve the path as editable vector source geometry and should follow Illustrator-style expectations for corner joins by default.
+- Joining explicitly after a snapped endpoint alignment should collapse coincident endpoints into one anchor instead of leaving a zero-length edge.
 
 ## Pen Workflow
 

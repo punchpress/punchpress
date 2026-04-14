@@ -16,6 +16,12 @@ export interface CanvasCursorCompanion {
   text: string;
 }
 
+const getCanvasCursorCompanionOffset = (value) => {
+  const parsedValue = Number(value);
+
+  return Number.isFinite(parsedValue) ? parsedValue : undefined;
+};
+
 export const getTextPathHandleCursorToken = (role) => {
   if (role === "bend" || role === "amplitude" || role === "slant") {
     return CANVAS_CURSOR_TOKENS.textPathBend;
@@ -83,4 +89,46 @@ export const setCanvasCursorToken = (element, token) => {
 
 export const setActiveCanvasCursorToken = (hostElement, token) => {
   setCanvasCursorDataset(hostElement, "activeCanvasCursor", token);
+};
+
+export const setActiveCanvasCursorCompanion = (hostElement, companion) => {
+  if (!hostElement) {
+    return;
+  }
+
+  if (!companion) {
+    delete hostElement.dataset.activeCanvasCursorCompanionText;
+    delete hostElement.dataset.activeCanvasCursorCompanionOffsetX;
+    delete hostElement.dataset.activeCanvasCursorCompanionOffsetY;
+    return;
+  }
+
+  hostElement.dataset.activeCanvasCursorCompanionText = companion.text;
+  hostElement.dataset.activeCanvasCursorCompanionOffsetX = String(
+    companion.offsetX ?? 0
+  );
+  hostElement.dataset.activeCanvasCursorCompanionOffsetY = String(
+    companion.offsetY ?? 0
+  );
+};
+
+export const getActiveCanvasCursorCompanion = (
+  hostElement
+): CanvasCursorCompanion | null => {
+  const text = hostElement?.dataset?.activeCanvasCursorCompanionText;
+
+  if (!text) {
+    return null;
+  }
+
+  return {
+    kind: "label",
+    offsetX: getCanvasCursorCompanionOffset(
+      hostElement.dataset.activeCanvasCursorCompanionOffsetX
+    ),
+    offsetY: getCanvasCursorCompanionOffset(
+      hostElement.dataset.activeCanvasCursorCompanionOffsetY
+    ),
+    text,
+  };
 };

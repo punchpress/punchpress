@@ -6,6 +6,8 @@ import {
 } from "./helpers/canvas";
 import { getDebugDump, gotoEditor, pauseForUi } from "./helpers/editor";
 
+const JOIN_ENDPOINTS_BUTTON_NAME = /Join.*endpoints/i;
+
 const loadVectorDocument = async (page) => {
   await page.evaluate(() => {
     const editor = window.__PUNCHPRESS_EDITOR__;
@@ -118,6 +120,85 @@ const loadOpenVectorDocument = async (page) => {
               scaleX: 1,
               scaleY: 1,
               x: 280,
+              y: 180,
+            },
+            type: "vector",
+            visible: true,
+          },
+        ],
+        version: "1.4",
+      })
+    );
+
+    return true;
+  });
+};
+
+const loadMultiContourOpenVectorDocument = async (page) => {
+  await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    if (!editor) {
+      return false;
+    }
+
+    editor.loadDocument(
+      JSON.stringify({
+        nodes: [
+          {
+            contours: [
+              {
+                closed: false,
+                segments: [
+                  {
+                    handleIn: { x: 0, y: 0 },
+                    handleOut: { x: 0, y: 0 },
+                    point: { x: 0, y: 0 },
+                    pointType: "corner",
+                  },
+                  {
+                    handleIn: { x: 0, y: 0 },
+                    handleOut: { x: 0, y: 0 },
+                    point: { x: 120, y: 0 },
+                    pointType: "corner",
+                  },
+                  {
+                    handleIn: { x: 0, y: 0 },
+                    handleOut: { x: 0, y: 0 },
+                    point: { x: 220, y: 40 },
+                    pointType: "corner",
+                  },
+                ],
+              },
+              {
+                closed: false,
+                segments: [
+                  {
+                    handleIn: { x: 0, y: 0 },
+                    handleOut: { x: 0, y: 0 },
+                    point: { x: 300, y: 40 },
+                    pointType: "corner",
+                  },
+                  {
+                    handleIn: { x: 0, y: 0 },
+                    handleOut: { x: 0, y: 0 },
+                    point: { x: 420, y: 40 },
+                    pointType: "corner",
+                  },
+                ],
+              },
+            ],
+            fill: null,
+            fillRule: "nonzero",
+            id: "multi-open-vector-node",
+            parentId: "root",
+            stroke: "#000000",
+            strokeWidth: 8,
+            transform: {
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+              x: 220,
               y: 180,
             },
             type: "vector",
@@ -558,18 +639,21 @@ const getVectorCornerWidgetScreenPoint = (
         return null;
       }
 
-      const previousIndex =
-        currentSegmentIndex > 0
-          ? currentSegmentIndex - 1
-          : contour.closed
-            ? contour.segments.length - 1
-            : -1;
-      const nextIndex =
-        currentSegmentIndex < contour.segments.length - 1
-          ? currentSegmentIndex + 1
-          : contour.closed
-            ? 0
-            : -1;
+      let previousIndex = -1;
+
+      if (currentSegmentIndex > 0) {
+        previousIndex = currentSegmentIndex - 1;
+      } else if (contour.closed) {
+        previousIndex = contour.segments.length - 1;
+      }
+
+      let nextIndex = -1;
+
+      if (currentSegmentIndex < contour.segments.length - 1) {
+        nextIndex = currentSegmentIndex + 1;
+      } else if (contour.closed) {
+        nextIndex = 0;
+      }
       const previousSegment = contour.segments[previousIndex];
       const nextSegment = contour.segments[nextIndex];
 
@@ -786,18 +870,21 @@ const getEditablePathCornerWidgetScreenPoint = (
         return null;
       }
 
-      const previousIndex =
-        currentSegmentIndex > 0
-          ? currentSegmentIndex - 1
-          : contour.closed
-            ? contour.segments.length - 1
-            : -1;
-      const nextIndex =
-        currentSegmentIndex < contour.segments.length - 1
-          ? currentSegmentIndex + 1
-          : contour.closed
-            ? 0
-            : -1;
+      let previousIndex = -1;
+
+      if (currentSegmentIndex > 0) {
+        previousIndex = currentSegmentIndex - 1;
+      } else if (contour.closed) {
+        previousIndex = contour.segments.length - 1;
+      }
+
+      let nextIndex = -1;
+
+      if (currentSegmentIndex < contour.segments.length - 1) {
+        nextIndex = currentSegmentIndex + 1;
+      } else if (contour.closed) {
+        nextIndex = 0;
+      }
       const previousSegment = contour.segments[previousIndex];
       const nextSegment = contour.segments[nextIndex];
 
@@ -1293,6 +1380,111 @@ test("pen hover tooltip states the click action for anchors", async ({
   );
 });
 
+test("snapping endpoints across contours selects both endpoints so join is one click away", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadMultiContourOpenVectorDocument(page);
+
+  await clickNodeCenter(page, "multi-open-vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "multi-open-vector-node");
+  await pauseForUi(page);
+
+  const sourceEndpoint = await getVectorSegmentScreenPoint(
+    page,
+    "multi-open-vector-node",
+    2,
+    0
+  );
+  const targetEndpoint = await getVectorSegmentScreenPoint(
+    page,
+    "multi-open-vector-node",
+    0,
+    1
+  );
+
+  if (!(sourceEndpoint && targetEndpoint)) {
+    throw new Error("Missing vector endpoints for snap-join flow test");
+  }
+
+  await page.mouse.move(sourceEndpoint.x, sourceEndpoint.y);
+  await page.mouse.down();
+  await page.mouse.move(targetEndpoint.x, targetEndpoint.y, {
+    steps: 10,
+  });
+  await pauseForUi(page);
+
+  await expect(page.getByTestId("canvas-pen-hover-tooltip")).toContainText(
+    "Snap to Point"
+  );
+
+  await page.mouse.up();
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => {
+      const dump = await getDebugDump(page);
+
+      return {
+        pathPoint: dump?.editing?.pathPoint || null,
+        pathPoints: dump?.editing?.pathPoints || [],
+      };
+    })
+    .toEqual({
+      pathPoint: null,
+      pathPoints: [
+        {
+          contourIndex: 0,
+          segmentIndex: 2,
+        },
+        {
+          contourIndex: 1,
+          segmentIndex: 0,
+        },
+      ],
+    });
+
+  await expect(
+    page.getByRole("button", { name: JOIN_ENDPOINTS_BUTTON_NAME })
+  ).toBeVisible();
+  await page.getByRole("button", { name: JOIN_ENDPOINTS_BUTTON_NAME }).click();
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => {
+      const dump = await getDebugDump(page);
+      const document = dump?.document?.serialized
+        ? JSON.parse(dump.document.serialized)
+        : null;
+      const node = document?.nodes?.find(
+        (entry) => entry.id === "multi-open-vector-node"
+      );
+
+      return {
+        contourCount: node?.contours?.length || 0,
+        pathPoint: dump?.editing?.pathPoint || null,
+        pathPoints: dump?.editing?.pathPoints || [],
+        segmentCounts:
+          node?.contours?.map((contour) => contour.segments.length) || [],
+      };
+    })
+    .toEqual({
+      contourCount: 1,
+      pathPoint: {
+        contourIndex: 0,
+        segmentIndex: 2,
+      },
+      pathPoints: [
+        {
+          contourIndex: 0,
+          segmentIndex: 2,
+        },
+      ],
+      segmentCounts: [4],
+    });
+});
+
 test("pen hover shows add-point feedback and inserts at an off-center segment location", async ({
   page,
 }) => {
@@ -1335,9 +1527,9 @@ test("pen hover shows add-point feedback and inserts at an off-center segment lo
     throw new Error("Missing visible pen insert ghost anchor");
   }
 
-  expect(Math.abs(ghostBox.x + ghostBox.width / 2 - quarterPoint.x)).toBeLessThan(
-    3
-  );
+  expect(
+    Math.abs(ghostBox.x + ghostBox.width / 2 - quarterPoint.x)
+  ).toBeLessThan(3);
   expect(
     Math.abs(ghostBox.y + ghostBox.height / 2 - quarterPoint.y)
   ).toBeLessThan(3);
@@ -1406,7 +1598,9 @@ test("dragging on a segment with pen inserts a smooth point and authors handles"
   const secondPoint = await getVectorSegmentScreenPoint(page, "vector-node", 1);
 
   if (!(firstPoint && secondPoint)) {
-    throw new Error("Missing vector segment screen points for dragged add-point");
+    throw new Error(
+      "Missing vector segment screen points for dragged add-point"
+    );
   }
 
   const quarterPoint = {
@@ -2976,7 +3170,11 @@ test("re-entering path edit mode still allows selecting a smooth point", async (
   await doubleClickNodeCenter(page, "vector-node");
   await pauseForUi(page);
 
-  const topRightPoint = await getVectorSegmentScreenPoint(page, "vector-node", 1);
+  const topRightPoint = await getVectorSegmentScreenPoint(
+    page,
+    "vector-node",
+    1
+  );
 
   if (!topRightPoint) {
     throw new Error("Missing vector anchor point for re-entry test");
@@ -3025,7 +3223,11 @@ test("option-dragging a smooth handle breaks coupling and converts the point to 
   await doubleClickNodeCenter(page, "vector-node");
   await pauseForUi(page);
 
-  const topRightPoint = await getVectorSegmentScreenPoint(page, "vector-node", 1);
+  const topRightPoint = await getVectorSegmentScreenPoint(
+    page,
+    "vector-node",
+    1
+  );
 
   if (!topRightPoint) {
     throw new Error("Missing vector anchor point for smooth handle test");

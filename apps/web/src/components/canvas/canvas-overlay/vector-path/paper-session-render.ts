@@ -267,4 +267,21 @@ export const refreshSegmentChrome = (
   chrome.handleOut.position = handleOutPoint;
   applyHandleItemAppearance(chrome.handleOut, styles);
   chrome.handleOut.visible = hasHandleOut;
+
+  if (isSelected) {
+    if (hasHandleIn) {
+      chrome.handleInLine.bringToFront();
+      chrome.handleIn.bringToFront();
+      chrome.handleInHalo.bringToFront();
+    }
+
+    if (hasHandleOut) {
+      chrome.handleOutLine.bringToFront();
+      chrome.handleOut.bringToFront();
+      chrome.handleOutHalo.bringToFront();
+    }
+
+    chrome.anchorHalo.bringToFront();
+    chrome.anchor.bringToFront();
+  }
 };

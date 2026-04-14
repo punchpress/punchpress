@@ -48,6 +48,8 @@ of one coherent path editing system.
   affordances
 - pointer-level hit testing for path edit affordances
 - transient interaction plumbing during an active edit gesture
+- gesture-local endpoint assistance such as snap-target resolution, action
+  labels, and drag-release selection handoff
 - geometric assistance that is immediately translated back into engine-owned
   edits
 
@@ -142,6 +144,8 @@ When adding vector path editing features:
 - put durable path semantics and conversion rules in the engine first
 - keep the backend focused on rendering, hit testing, and edit-session
   mechanics
+- keep gesture-specific helpers in focused sibling modules instead of growing
+  the main backend session file into one large mixed-responsibility surface
 - write edits back into engine-owned geometry immediately
 - avoid backend-local state for durable editor concepts
 - keep `Paper` and similar implementation details out of product-facing
