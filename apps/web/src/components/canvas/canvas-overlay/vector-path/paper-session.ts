@@ -1,7 +1,7 @@
 import {
   authorVectorPointHandlesFromAnchorDrag,
-  isPointerDistanceAtLeast,
   getVectorPathCursorMode,
+  isPointerDistanceAtLeast,
   isVectorPathPointRole,
   offsetEditablePathPoints,
   updateVectorPointHandle,
@@ -10,15 +10,20 @@ import paper from "paper";
 import {
   getActiveVectorPathCursorToken,
   getVectorPathCursorToken,
+  setActiveCanvasCursorCompanion,
   setActiveCanvasCursorToken,
   setCanvasCursorToken,
 } from "../../canvas-cursor-policy";
 import {
-  closeVectorContourByDraggingEndpoint,
+  finalizeVectorEndpointDrag,
   getVectorDraggedEndpointPreviewPoint,
-  getVectorEndpointCloseTarget,
-  shouldSnapVectorEndpointClose,
+  resolveVectorEndpointDragTarget,
+  type VectorEndpointDragTarget,
 } from "./endpoint-close";
+import {
+  applyVectorEndpointDragTargetChrome,
+  getVectorEndpointDragCursorCompanion,
+} from "./endpoint-drag-feedback";
 import { getVectorAnchorHoverHaloRadiusPx } from "./hover-halo";
 import {
   createLocalContourPath,
@@ -132,13 +137,6 @@ type PendingPress =
       type: "body";
     };
 
-type EndpointCloseTarget = {
-  contourIndex: number;
-  point: { x: number; y: number };
-  role: "anchor";
-  segmentIndex: number;
-} | null;
-
 const getCanvasPoint = (editor, clientX, clientY) => {
   const viewer = editor.viewerRef;
   const host = editor.hostRef;
@@ -192,7 +190,7 @@ export const createVectorPaperSession = ({
     chrome: [],
     contours: [],
     dragCanvasPoint: null,
-    endpointCloseTarget: null as EndpointCloseTarget,
+    endpointDragTarget: null as VectorEndpointDragTarget | null,
     historyMark: null,
     inverseMatrix: null,
     isGeometryDragging: false,
@@ -345,7 +343,9 @@ export const createVectorPaperSession = ({
 
     clearMaxedCurveHighlights();
 
-    if (!(state.activeDragSession && maxedSegments.length > 0 && state.matrix)) {
+    if (
+      !(state.activeDragSession && maxedSegments.length > 0 && state.matrix)
+    ) {
       return;
     }
 
@@ -468,6 +468,23 @@ export const createVectorPaperSession = ({
     scope.view.update();
   };
 
+  const highlightHoveredAnchor = (
+    chrome: VectorSegmentChrome,
+    hoveredPoint: Exclude<HoveredPoint, null>
+  ) => {
+    const endpointDragTarget = state.endpointDragTarget;
+    const isEndpointDragTarget =
+      endpointDragTarget?.contourIndex === hoveredPoint.contourIndex &&
+      endpointDragTarget?.segmentIndex === hoveredPoint.segmentIndex;
+
+    if (isEndpointDragTarget) {
+      applyVectorEndpointDragTargetChrome(chrome, state.styles);
+      return;
+    }
+
+    chrome.anchorHalo.visible = true;
+  };
+
   const syncHoveredChrome = () => {
     for (const contourChrome of state.chrome) {
       for (const chrome of contourChrome) {
@@ -493,7 +510,7 @@ export const createVectorPaperSession = ({
     }
 
     if (hoveredPoint.role === "anchor") {
-      chrome.anchorHalo.visible = true;
+      highlightHoveredAnchor(chrome, hoveredPoint);
       syncCurveHighlightsAndUpdate();
       return;
     }
@@ -531,6 +548,21 @@ export const createVectorPaperSession = ({
       editor.hostRef,
       getActiveVectorPathCursorToken(mode)
     );
+  };
+
+  const setActiveCursorCompanionLabel = (text: string | null) => {
+    setActiveCanvasCursorCompanion(
+      editor.hostRef,
+      text
+        ? {
+            kind: "label",
+            offsetX: 28,
+            offsetY: -28,
+            text,
+          }
+        : null
+    );
+    editor.notifyInteractionPreviewChanged();
   };
 
   const getLocalPoint = (point) => {
@@ -640,9 +672,10 @@ export const createVectorPaperSession = ({
     setSelectedPoints(point ? [point] : [], point);
   };
 
-  const setEndpointCloseTarget = (target: EndpointCloseTarget) => {
-    const current = state.endpointCloseTarget;
+  const setEndpointDragTarget = (target: VectorEndpointDragTarget | null) => {
+    const current = state.endpointDragTarget;
     const isSameTarget =
+      current?.behavior === target?.behavior &&
       current?.contourIndex === target?.contourIndex &&
       current?.segmentIndex === target?.segmentIndex;
 
@@ -650,8 +683,34 @@ export const createVectorPaperSession = ({
       return;
     }
 
-    state.endpointCloseTarget = target;
-    setHoveredPoint(target);
+    state.endpointDragTarget = target;
+    setActiveCursorCompanionLabel(
+      getVectorEndpointDragCursorCompanion(target)?.text || null
+    );
+
+    const pointsToRefresh = new Map();
+
+    for (const point of [current, target]) {
+      if (!point) {
+        continue;
+      }
+
+      pointsToRefresh.set(getPointSelectionKey(point), point);
+    }
+
+    for (const point of pointsToRefresh.values()) {
+      applySourceSegmentToPaper(point.contourIndex, point.segmentIndex);
+    }
+
+    setHoveredPoint(
+      target
+        ? {
+            contourIndex: target.contourIndex,
+            role: "anchor",
+            segmentIndex: target.segmentIndex,
+          }
+        : null
+    );
   };
 
   const ensurePreviewChrome = () => {
@@ -1170,6 +1229,60 @@ export const createVectorPaperSession = ({
     );
   };
 
+  const getDraggedAnchorPoints = (role, contourIndex, segmentIndex) => {
+    if (role !== "anchor") {
+      return [];
+    }
+
+    if (
+      state.selectedPoints.length > 1 &&
+      isPointSelectionIncluded(state.selectedPoints, {
+        contourIndex,
+        segmentIndex,
+      })
+    ) {
+      return state.selectedPoints;
+    }
+
+    return [
+      {
+        contourIndex,
+        segmentIndex,
+      },
+    ];
+  };
+
+  const applyConvertAnchorToSmoothDrag = (
+    contourIndex,
+    segmentIndex,
+    localPoint,
+    worldPoint,
+    modifiers,
+    currentSegment
+  ) => {
+    setEndpointDragTarget(null);
+    state.contours = authorVectorPointHandlesFromAnchorDrag(state.contours, {
+      constrainAngle: modifiers.constrainAngle,
+      contourIndex,
+      segmentIndex,
+      value: {
+        x: localPoint.x - currentSegment.point.x,
+        y: localPoint.y - currentSegment.point.y,
+      },
+    });
+
+    applySourceSegmentToPaper(contourIndex, segmentIndex, {
+      updateView: true,
+    });
+    syncNode({
+      pinnedLocalPoint: {
+        x: localPoint.x,
+        y: localPoint.y,
+      },
+      pinnedWorldPoint: worldPoint,
+    });
+  };
+
   const updateDraggedGeometry = (
     role,
     contourIndex,
@@ -1189,117 +1302,74 @@ export const createVectorPaperSession = ({
       return;
     }
 
-    const pinnedLocalPoint = localPoint;
-
-    if (role === "anchor") {
-      if (modifiers.convertAnchorToSmooth) {
-        setEndpointCloseTarget(null);
-        state.contours = authorVectorPointHandlesFromAnchorDrag(
-          state.contours,
-          {
-            constrainAngle: modifiers.constrainAngle,
-            contourIndex,
-            segmentIndex,
-            value: {
-              x: localPoint.x - currentSegment.point.x,
-              y: localPoint.y - currentSegment.point.y,
-            },
-          }
-        );
-
-        applySourceSegmentToPaper(contourIndex, segmentIndex, {
-          updateView: true,
-        });
-        syncNode({
-          pinnedLocalPoint: {
-            x: localPoint.x,
-            y: localPoint.y,
-          },
-          pinnedWorldPoint: worldPoint,
-        });
-        return;
-      }
-
-      const selectedAnchorPoints =
-        state.selectedPoints.length > 1 &&
-        isPointSelectionIncluded(state.selectedPoints, {
-          contourIndex,
-          segmentIndex,
-        })
-          ? state.selectedPoints
-          : [
-              {
-                contourIndex,
-                segmentIndex,
-              },
-            ];
-
-      if (selectedAnchorPoints.length > 1) {
-        const delta = {
-          x: localPoint.x - currentSegment.point.x,
-          y: localPoint.y - currentSegment.point.y,
-        };
-
-        setEndpointCloseTarget(null);
-        state.contours = offsetEditablePathPoints(
-          state.contours,
-          selectedAnchorPoints,
-          delta
-        );
-
-        for (const selectedPoint of selectedAnchorPoints) {
-          applySourceSegmentToPaper(
-            selectedPoint.contourIndex,
-            selectedPoint.segmentIndex
-          );
-        }
-
-        syncHoveredChrome();
-        syncNode({
-          pinnedLocalPoint: {
-            x: localPoint.x,
-            y: localPoint.y,
-          },
-          pinnedWorldPoint: worldPoint,
-        });
-        return;
-      }
-
-      const endpointCloseTarget = getVectorEndpointCloseTarget(state.contours, {
+    if (role === "anchor" && modifiers.convertAnchorToSmooth) {
+      applyConvertAnchorToSmoothDrag(
         contourIndex,
         segmentIndex,
-      });
+        localPoint,
+        worldPoint,
+        modifiers,
+        currentSegment
+      );
+      return;
+    }
 
-      if (endpointCloseTarget && state.matrix) {
-        const projectedTargetPoint = projectPoint(
-          state.matrix,
-          endpointCloseTarget.point
+    const selectedAnchorPoints = getDraggedAnchorPoints(
+      role,
+      contourIndex,
+      segmentIndex
+    );
+
+    if (selectedAnchorPoints.length > 1) {
+      const delta = {
+        x: localPoint.x - currentSegment.point.x,
+        y: localPoint.y - currentSegment.point.y,
+      };
+
+      setEndpointDragTarget(null);
+      state.contours = offsetEditablePathPoints(
+        state.contours,
+        selectedAnchorPoints,
+        delta
+      );
+
+      for (const selectedPoint of selectedAnchorPoints) {
+        applySourceSegmentToPaper(
+          selectedPoint.contourIndex,
+          selectedPoint.segmentIndex
         );
+      }
 
-        if (
-          shouldSnapVectorEndpointClose(
+      syncHoveredChrome();
+      syncNode({
+        pinnedLocalPoint: {
+          x: localPoint.x,
+          y: localPoint.y,
+        },
+        pinnedWorldPoint: worldPoint,
+      });
+      return;
+    }
+
+    if (role === "anchor") {
+      const nextEndpointDragTarget = state.matrix
+        ? resolveVectorEndpointDragTarget(
+            state.contours,
             {
-              x: projectedTargetPoint.x,
-              y: projectedTargetPoint.y,
+              contourIndex,
+              segmentIndex,
             },
             {
               x: point.x,
               y: point.y,
             },
-            ENDPOINT_CLOSE_SNAP_DISTANCE_PX
+            {
+              projectPoint: (targetPoint) =>
+                projectPoint(state.matrix, targetPoint),
+              snapDistancePx: ENDPOINT_CLOSE_SNAP_DISTANCE_PX,
+            }
           )
-        ) {
-          setEndpointCloseTarget({
-            ...endpointCloseTarget,
-            role: "anchor",
-          });
-        } else {
-          setEndpointCloseTarget(null);
-        }
-      } else {
-        setEndpointCloseTarget(null);
-      }
-
+        : null;
       const previewPoint = getVectorDraggedEndpointPreviewPoint(
         state.contours,
         {
@@ -1310,9 +1380,10 @@ export const createVectorPaperSession = ({
           x: localPoint.x,
           y: localPoint.y,
         },
-        state.endpointCloseTarget
+        nextEndpointDragTarget
       );
 
+      setEndpointDragTarget(nextEndpointDragTarget);
       state.contours = mapTargetSegment(
         state.contours,
         { contourIndex, segmentIndex },
@@ -1326,70 +1397,58 @@ export const createVectorPaperSession = ({
           };
         }
       );
-    } else {
-      setEndpointCloseTarget(null);
-      state.contours = updateVectorPointHandle(state.contours, {
-        constrainAngle: modifiers.constrainAngle,
-        contourIndex,
-        handleRole: role === "handle-in" ? "handleIn" : "handleOut",
-        preserveSmoothCoupling: modifiers.preserveSmoothCoupling,
-        segmentIndex,
-        value: {
-          x: localPoint.x - currentSegment.point.x,
-          y: localPoint.y - currentSegment.point.y,
-        },
+      applySourceSegmentToPaper(contourIndex, segmentIndex, {
+        updateView: true,
       });
+      syncNode({
+        pinnedLocalPoint: {
+          x: localPoint.x,
+          y: localPoint.y,
+        },
+        pinnedWorldPoint: worldPoint,
+      });
+      return;
     }
 
+    setEndpointDragTarget(null);
+    state.contours = updateVectorPointHandle(state.contours, {
+      constrainAngle: modifiers.constrainAngle,
+      contourIndex,
+      handleRole: role === "handle-in" ? "handleIn" : "handleOut",
+      preserveSmoothCoupling: modifiers.preserveSmoothCoupling,
+      segmentIndex,
+      value: {
+        x: localPoint.x - currentSegment.point.x,
+        y: localPoint.y - currentSegment.point.y,
+      },
+    });
     applySourceSegmentToPaper(contourIndex, segmentIndex, { updateView: true });
     syncNode({
-      pinnedLocalPoint:
-        role === "anchor"
-          ? {
-              x: localPoint.x,
-              y: localPoint.y,
-            }
-          : pinnedLocalPoint,
+      pinnedLocalPoint: localPoint,
       pinnedWorldPoint: worldPoint,
     });
   };
 
-  const tool = new scope.Tool();
+  const handlePointMouseDown = (event, hit, role, isAdditiveSelection) => {
+    const pointSelection = {
+      contourIndex: hit.item.data.contourIndex,
+      segmentIndex: hit.item.data.segmentIndex,
+    };
 
-  tool.onMouseDown = (event) => {
-    const hit = getInteractiveHit(scope, event.point);
-    const role = hit?.item?.data?.role;
-    const { bodyHit, insertTarget } = getPathInteraction(event.point);
-    const isAdditiveSelection = Boolean(event.event?.shiftKey);
+    if (role === "anchor" && isAdditiveSelection) {
+      const nextSelectedPoints = isPointSelectionIncluded(
+        state.selectedPoints,
+        pointSelection
+      )
+        ? state.selectedPoints.filter((currentPoint) => {
+            return !isSamePointSelection(currentPoint, pointSelection);
+          })
+        : [...state.selectedPoints, pointSelection];
+      const nextPrimaryPoint =
+        nextSelectedPoints.length === 1 ? nextSelectedPoints[0] : null;
 
-    if (role === "anchor" || role === "handle-in" || role === "handle-out") {
-      const pointSelection = {
-        contourIndex: hit.item.data.contourIndex,
-        segmentIndex: hit.item.data.segmentIndex,
-      };
-
-      if (role === "anchor" && isAdditiveSelection) {
-        const nextSelectedPoints = isPointSelectionIncluded(
-          state.selectedPoints,
-          pointSelection
-        )
-          ? state.selectedPoints.filter((currentPoint) => {
-              return !isSamePointSelection(currentPoint, pointSelection);
-            })
-          : [...state.selectedPoints, pointSelection];
-        const nextPrimaryPoint =
-          nextSelectedPoints.length === 1 ? nextSelectedPoints[0] : null;
-
-        setSelectedPoints(nextSelectedPoints, nextPrimaryPoint);
-        setHoveredPoint({
-          contourIndex: hit.item.data.contourIndex,
-          role,
-          segmentIndex: hit.item.data.segmentIndex,
-        });
-        setHoverCursorMode("point");
-        return;
-      }
-
+      setSelectedPoints(nextSelectedPoints, nextPrimaryPoint);
+    } else {
       state.pendingPress = {
         ...hit.item.data,
         origin: event.point.clone(),
@@ -1401,12 +1460,169 @@ export const createVectorPaperSession = ({
           : [pointSelection],
         pointSelection
       );
-      setHoveredPoint({
-        contourIndex: hit.item.data.contourIndex,
-        role,
-        segmentIndex: hit.item.data.segmentIndex,
-      });
-      setHoverCursorMode("point");
+    }
+
+    setHoveredPoint({
+      contourIndex: hit.item.data.contourIndex,
+      role,
+      segmentIndex: hit.item.data.segmentIndex,
+    });
+    setHoverCursorMode("point");
+  };
+
+  const updateSelectionMarqueeDrag = (event) => {
+    if (state.pendingPress?.type !== "empty") {
+      return false;
+    }
+
+    if (
+      !state.selectionMarquee &&
+      isPointerDistanceAtLeast(
+        state.pendingPress.origin,
+        event.point,
+        SELECTION_MARQUEE_THRESHOLD_PX
+      )
+    ) {
+      state.selectionMarquee = {
+        additive: state.pendingPress.additive,
+        current: event.point.clone(),
+        origin: state.pendingPress.origin.clone(),
+      };
+      syncSelectionMarquee();
+      setHoveredPoint(null);
+      setHoverCursorMode(null);
+    }
+
+    if (state.selectionMarquee) {
+      state.selectionMarquee.current = event.point.clone();
+      syncSelectionMarquee();
+      scope.view.update();
+    }
+
+    return true;
+  };
+
+  const beginPendingDrag = (event) => {
+    if (
+      state.pendingPress?.type === "body" ||
+      state.pendingPress?.type === "insert"
+    ) {
+      state.pendingPress = null;
+
+      if (event.event) {
+        startNodeDrag(event.event);
+      }
+    }
+
+    if (
+      !(
+        state.pendingPress?.type === "point" &&
+        !state.activeDrag &&
+        isPointerDistanceAtLeast(
+          state.pendingPress.origin,
+          event.point,
+          PATH_POINT_DRAG_THRESHOLD_PX
+        )
+      )
+    ) {
+      return;
+    }
+
+    state.activeDrag = state.pendingPress;
+    state.pendingPress = null;
+    state.historyMark = onHistoryStart();
+    state.isGeometryDragging = true;
+    setEndpointDragTarget(null);
+    setHoveredPoint(null);
+    setHoverCursorMode(null);
+    setActiveCursorMode("point");
+  };
+
+  const finalizeSelectionMarquee = (event) => {
+    if (!state.selectionMarquee) {
+      return false;
+    }
+
+    const selectedPointsInBox = getAnchorSelectionsInRectangle(
+      state.contours,
+      state.matrix,
+      state.selectionMarquee.origin,
+      state.selectionMarquee.current
+    );
+    const nextSelectedPoints = state.selectionMarquee.additive
+      ? [...state.selectedPoints, ...selectedPointsInBox]
+      : selectedPointsInBox;
+    const nextPrimaryPoint =
+      nextSelectedPoints.length === 1 ? nextSelectedPoints[0] : null;
+
+    setSelectedPoints(nextSelectedPoints, nextPrimaryPoint);
+    hideSelectionMarquee();
+    updateCursor(event.point);
+    return true;
+  };
+
+  const finalizePendingPress = (pendingPress, event) => {
+    if (state.activeDrag) {
+      return false;
+    }
+
+    if (pendingPress?.type === "insert") {
+      insertPointAtTarget(pendingPress);
+    } else if (pendingPress?.type === "empty" && !pendingPress.additive) {
+      onExitPathEditing();
+    }
+
+    updateCursor(event.point);
+    return true;
+  };
+
+  const finalizeActivePointDrag = () => {
+    if (
+      !(
+        state.activeDrag?.type === "point" &&
+        state.activeDrag.role === "anchor" &&
+        state.endpointDragTarget
+      )
+    ) {
+      return;
+    }
+
+    const finalizeResult = finalizeVectorEndpointDrag(
+      state.contours,
+      {
+        contourIndex: state.activeDrag.contourIndex,
+        segmentIndex: state.activeDrag.segmentIndex,
+      },
+      state.endpointDragTarget
+    );
+
+    if (!finalizeResult) {
+      return;
+    }
+
+    const didChangeTopology = finalizeResult.contours !== state.contours;
+
+    state.contours = finalizeResult.contours;
+    setSelectedPoints(
+      finalizeResult.selectedPoints,
+      finalizeResult.primaryPoint
+    );
+
+    if (didChangeTopology) {
+      syncNode();
+    }
+  };
+
+  const tool = new scope.Tool();
+
+  tool.onMouseDown = (event) => {
+    const hit = getInteractiveHit(scope, event.point);
+    const role = hit?.item?.data?.role;
+    const { bodyHit, insertTarget } = getPathInteraction(event.point);
+    const isAdditiveSelection = Boolean(event.event?.shiftKey);
+
+    if (role === "anchor" || role === "handle-in" || role === "handle-out") {
+      handlePointMouseDown(event, hit, role, isAdditiveSelection);
       return;
     }
 
@@ -1443,63 +1659,11 @@ export const createVectorPaperSession = ({
       return;
     }
 
-    if (state.pendingPress?.type === "empty") {
-      if (
-        !state.selectionMarquee &&
-        isPointerDistanceAtLeast(
-          state.pendingPress.origin,
-          event.point,
-          SELECTION_MARQUEE_THRESHOLD_PX
-        )
-      ) {
-        state.selectionMarquee = {
-          additive: state.pendingPress.additive,
-          current: event.point.clone(),
-          origin: state.pendingPress.origin.clone(),
-        };
-        syncSelectionMarquee();
-        setHoveredPoint(null);
-        setHoverCursorMode(null);
-      }
-
-      if (state.selectionMarquee) {
-        state.selectionMarquee.current = event.point.clone();
-        syncSelectionMarquee();
-        scope.view.update();
-      }
-
+    if (updateSelectionMarqueeDrag(event)) {
       return;
     }
 
-    if (
-      state.pendingPress?.type === "body" ||
-      state.pendingPress?.type === "insert"
-    ) {
-      state.pendingPress = null;
-
-      if (event.event) {
-        startNodeDrag(event.event);
-      }
-    }
-
-    if (
-      state.pendingPress?.type === "point" &&
-      !state.activeDrag &&
-      isPointerDistanceAtLeast(
-        state.pendingPress.origin,
-        event.point,
-        PATH_POINT_DRAG_THRESHOLD_PX
-      )
-    ) {
-      state.activeDrag = state.pendingPress;
-      state.pendingPress = null;
-      state.historyMark = onHistoryStart();
-      state.isGeometryDragging = true;
-      setEndpointCloseTarget(null);
-      setHoveredPoint(null);
-      setHoverCursorMode(null);
-      setActiveCursorMode("point");
-    }
+    beginPendingDrag(event);
 
     if (!state.activeDrag) {
       return;
@@ -1537,56 +1701,19 @@ export const createVectorPaperSession = ({
 
     state.pendingPress = null;
 
-    if (state.selectionMarquee) {
-      const selectedPointsInBox = getAnchorSelectionsInRectangle(
-        state.contours,
-        state.matrix,
-        state.selectionMarquee.origin,
-        state.selectionMarquee.current
-      );
-      const nextSelectedPoints = state.selectionMarquee.additive
-        ? [...state.selectedPoints, ...selectedPointsInBox]
-        : selectedPointsInBox;
-      const nextPrimaryPoint =
-        nextSelectedPoints.length === 1 ? nextSelectedPoints[0] : null;
-
-      setSelectedPoints(nextSelectedPoints, nextPrimaryPoint);
-      hideSelectionMarquee();
-      updateCursor(event.point);
+    if (finalizeSelectionMarquee(event)) {
       return;
     }
 
-    if (!state.activeDrag) {
-      if (pendingPress?.type === "insert") {
-        insertPointAtTarget(pendingPress);
-      } else if (pendingPress?.type === "empty" && !pendingPress.additive) {
-        onExitPathEditing();
-      }
-
-      updateCursor(event.point);
+    if (finalizePendingPress(pendingPress, event)) {
       return;
     }
 
-    if (
-      state.activeDrag.type === "point" &&
-      state.activeDrag.role === "anchor" &&
-      state.endpointCloseTarget &&
-      state.endpointCloseTarget.contourIndex === state.activeDrag.contourIndex
-    ) {
-      const closeResult = closeVectorContourByDraggingEndpoint(state.contours, {
-        contourIndex: state.activeDrag.contourIndex,
-        draggedSegmentIndex: state.activeDrag.segmentIndex,
-        targetSegmentIndex: state.endpointCloseTarget.segmentIndex,
-      });
-
-      state.contours = closeResult.contours;
-      setSelectedPoint(closeResult.selectedPoint);
-      syncNode();
-    }
+    finalizeActivePointDrag();
 
     state.activeDrag = null;
     state.isGeometryDragging = false;
-    setEndpointCloseTarget(null);
+    setEndpointDragTarget(null);
     setActiveCursorMode(null);
 
     if (state.historyMark) {
@@ -1606,6 +1733,7 @@ export const createVectorPaperSession = ({
   return {
     destroy: () => {
       clearScene();
+      setActiveCursorCompanionLabel(null);
       setHoveredPoint(null);
       setHoverCursorMode(null);
       setActiveCursorMode(null);
@@ -1618,6 +1746,7 @@ export const createVectorPaperSession = ({
     render: (scene) => {
       if (!scene) {
         clearScene();
+        setActiveCursorCompanionLabel(null);
         setHoveredPoint(null);
         setHoverCursorMode(null);
         return;

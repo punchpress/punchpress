@@ -1,5 +1,23 @@
 import type { VectorContourDocument } from "@punchpress/punch-schema";
 
+export interface VectorEndpointDragTarget {
+  behavior: "close-contour" | "snap-endpoint";
+  contourIndex: number;
+  point: { x: number; y: number };
+  segmentIndex: number;
+}
+
+interface VectorPathPoint {
+  contourIndex: number;
+  segmentIndex: number;
+}
+
+interface FinalizeVectorEndpointDragResult {
+  contours: VectorContourDocument[];
+  primaryPoint: VectorPathPoint | null;
+  selectedPoints: VectorPathPoint[];
+}
+
 const cloneHandle = (handle) => {
   return {
     x: handle.x,
@@ -52,6 +70,132 @@ export const getVectorEndpointCloseTarget = (
   return null;
 };
 
+export const getVectorEndpointSnapTargets = (
+  contours: VectorContourDocument[],
+  {
+    contourIndex,
+    segmentIndex,
+  }: {
+    contourIndex: number;
+    segmentIndex: number;
+  }
+) => {
+  const sourceContour = contours[contourIndex];
+
+  if (
+    !(
+      sourceContour &&
+      !sourceContour.closed &&
+      sourceContour.segments.length > 1
+    )
+  ) {
+    return [];
+  }
+
+  const isSourceEndpoint =
+    segmentIndex === 0 || segmentIndex === sourceContour.segments.length - 1;
+
+  if (!isSourceEndpoint) {
+    return [];
+  }
+
+  return contours.flatMap((contour, currentContourIndex) => {
+    if (!(contour && !contour.closed && contour.segments.length > 0)) {
+      return [];
+    }
+
+    if (currentContourIndex === contourIndex) {
+      const closeTarget = getVectorEndpointCloseTarget(contours, {
+        contourIndex,
+        segmentIndex,
+      });
+
+      return closeTarget ? [closeTarget] : [];
+    }
+
+    const leadingTarget = contour.segments[0];
+    const trailingTarget = contour.segments.at(-1);
+
+    return [
+      leadingTarget
+        ? {
+            contourIndex: currentContourIndex,
+            point: cloneHandle(leadingTarget.point),
+            segmentIndex: 0,
+          }
+        : null,
+      trailingTarget
+        ? {
+            contourIndex: currentContourIndex,
+            point: cloneHandle(trailingTarget.point),
+            segmentIndex: contour.segments.length - 1,
+          }
+        : null,
+    ].filter(Boolean);
+  });
+};
+
+export const resolveVectorEndpointDragTarget = (
+  contours: VectorContourDocument[],
+  sourcePoint: {
+    contourIndex: number;
+    segmentIndex: number;
+  },
+  draggedCanvasPoint: { x: number; y: number },
+  {
+    projectPoint,
+    snapDistancePx,
+  }: {
+    projectPoint: (point: { x: number; y: number }) => {
+      x: number;
+      y: number;
+    };
+    snapDistancePx: number;
+  }
+): VectorEndpointDragTarget | null => {
+  const endpointSnapTargets = getVectorEndpointSnapTargets(
+    contours,
+    sourcePoint
+  );
+
+  if (endpointSnapTargets.length === 0) {
+    return null;
+  }
+
+  let nextTarget: VectorEndpointDragTarget | null = null;
+  let closestDistance = Number.POSITIVE_INFINITY;
+
+  for (const endpointSnapTarget of endpointSnapTargets) {
+    const projectedTargetPoint = projectPoint(endpointSnapTarget.point);
+    const candidateDistance = Math.hypot(
+      projectedTargetPoint.x - draggedCanvasPoint.x,
+      projectedTargetPoint.y - draggedCanvasPoint.y
+    );
+
+    if (
+      !shouldSnapVectorEndpointClose(
+        projectedTargetPoint,
+        draggedCanvasPoint,
+        snapDistancePx
+      ) ||
+      candidateDistance >= closestDistance
+    ) {
+      continue;
+    }
+
+    closestDistance = candidateDistance;
+    nextTarget = {
+      ...endpointSnapTarget,
+      behavior:
+        endpointSnapTarget.contourIndex === sourcePoint.contourIndex
+          ? "close-contour"
+          : "snap-endpoint",
+    };
+  }
+
+  return nextTarget;
+};
+
 export const shouldSnapVectorEndpointClose = (
   targetPoint: { x: number; y: number },
   draggedPoint: { x: number; y: number },
@@ -87,10 +231,7 @@ export const getVectorDraggedEndpointPreviewPoint = (
     return draggedPoint;
   }
 
-  if (
-    !endpointCloseTarget ||
-    endpointCloseTarget.contourIndex !== contourIndex
-  ) {
+  if (!endpointCloseTarget) {
     return draggedPoint;
   }
 
@@ -176,5 +317,46 @@ export const closeVectorContourByDraggingEndpoint = (
       contourIndex,
       segmentIndex: nextTargetSegmentIndex,
     },
+  };
+};
+
+export const finalizeVectorEndpointDrag = (
+  contours: VectorContourDocument[],
+  sourcePoint: VectorPathPoint,
+  target: VectorEndpointDragTarget | null
+): FinalizeVectorEndpointDragResult | null => {
+  if (!target) {
+    return null;
+  }
+
+  if (target.behavior === "close-contour") {
+    const closeResult = closeVectorContourByDraggingEndpoint(contours, {
+      contourIndex: sourcePoint.contourIndex,
+      draggedSegmentIndex: sourcePoint.segmentIndex,
+      targetSegmentIndex: target.segmentIndex,
+    });
+
+    return {
+      contours: closeResult.contours,
+      primaryPoint: closeResult.selectedPoint,
+      selectedPoints: closeResult.selectedPoint
+        ? [closeResult.selectedPoint]
+        : [],
+    };
+  }
+
+  return {
+    contours,
+    primaryPoint: null,
+    selectedPoints: [
+      {
+        contourIndex: sourcePoint.contourIndex,
+        segmentIndex: sourcePoint.segmentIndex,
+      },
+      {
+        contourIndex: target.contourIndex,
+        segmentIndex: target.segmentIndex,
+      },
+    ],
   };
 };

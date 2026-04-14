@@ -3,6 +3,9 @@ const getPathEditingToolbarActions = (editor, state) => {
     return [];
   }
 
+  const selectedPathPoints = state.isPathEditing
+    ? editor.pathEditingPoints
+    : [];
   const actions = [
     {
       id: "toggle-path-editing",
@@ -17,8 +20,26 @@ const getPathEditingToolbarActions = (editor, state) => {
     },
   ];
 
+  if (
+    state.isPathEditing &&
+    state.selectedNode?.type === "vector" &&
+    selectedPathPoints.length === 2 &&
+    editor.canJoinPathEndpoints(state.selectedNode.id, selectedPathPoints)
+  ) {
+    actions.unshift({
+      id: "join-path-endpoints",
+      isActive: false,
+      label: "Join endpoints",
+      title: "Join selected path endpoints",
+      variant: "ghost",
+      onSelect: () => {
+        editor.joinPathEndpoints(state.selectedNode.id, selectedPathPoints);
+      },
+    });
+  }
+
   if (state.isPathEditing && state.selectedNode && state.selectedPathPoint) {
-    actions.unshift(
+    const pointActions = [
       {
         id: "delete-point",
         isActive: false,
@@ -60,8 +81,26 @@ const getPathEditingToolbarActions = (editor, state) => {
             state.selectedPathPoint
           );
         },
-      }
-    );
+      },
+    ];
+
+    if (
+      state.selectedNode.type === "vector" &&
+      editor.canSplitPath(state.selectedNode.id, state.selectedPathPoint)
+    ) {
+      pointActions.unshift({
+        id: "split-path",
+        isActive: false,
+        label: "Split path",
+        title: "Split path at the selected point",
+        variant: "ghost",
+        onSelect: () => {
+          editor.splitPath(state.selectedNode.id, state.selectedPathPoint);
+        },
+      });
+    }
+
+    actions.unshift(...pointActions);
   }
 
   return actions;

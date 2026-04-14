@@ -1,5 +1,13 @@
 import { useEditorValue } from "../../../../editor-react/use-editor-value";
 
+const getPathPointKey = (point) => {
+  return point ? `${point.contourIndex}:${point.segmentIndex}` : "none";
+};
+
+const getPathPointsKey = (points) => {
+  return points.map((point) => getPathPointKey(point)).join("|") || "none";
+};
+
 export const useNodeToolbarState = () => {
   return useEditorValue((editor, state) => {
     if (state.editingNodeId) {
@@ -33,9 +41,10 @@ export const useNodeToolbarState = () => {
       state.pathEditingPoint
         ? state.pathEditingPoint
         : null;
-    const pathPointKey = selectedPathPoint
-      ? `${selectedPathPoint.contourIndex}:${selectedPathPoint.segmentIndex}`
-      : "none";
+    const pathPointKey = isPathEditing
+      ? getPathPointsKey(state.pathEditingPoints)
+      : getPathPointKey(selectedPathPoint);
+    const primaryPathPointKey = getPathPointKey(selectedPathPoint);
 
     return {
       canEditPath: Boolean(selectedEditCapabilities?.canEditPath),
@@ -45,7 +54,7 @@ export const useNodeToolbarState = () => {
       isPathEditing,
       selectedPathPoint,
       selectedNode,
-      selectionKey: `${visibleSelectedNodeIds.join(",")}:${isPathEditing ? `path:${pathPointKey}` : "node"}`,
+      selectionKey: `${visibleSelectedNodeIds.join(",")}:${isPathEditing ? `path:${pathPointKey}:${primaryPathPointKey}` : "node"}`,
       visibleSelectedNodeIds,
     };
   });
