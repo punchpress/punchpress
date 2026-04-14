@@ -1,4 +1,9 @@
 import {
+  DEFAULT_VECTOR_STROKE_LINE_CAP,
+  DEFAULT_VECTOR_STROKE_LINE_JOIN,
+  DEFAULT_VECTOR_STROKE_MITER_LIMIT,
+} from "@punchpress/punch-schema";
+import {
   buildRoundedPolygonPath,
   canRoundPolygonPoint,
   getPolygonCornerRadiusSummary,
@@ -333,6 +338,9 @@ export const createVectorNodeFromShapeContours = (node, contours) => {
     id: node.id,
     parentId: node.parentId,
     stroke: node.stroke,
+    strokeLineCap: DEFAULT_VECTOR_STROKE_LINE_CAP,
+    strokeLineJoin: DEFAULT_VECTOR_STROKE_LINE_JOIN,
+    strokeMiterLimit: DEFAULT_VECTOR_STROKE_MITER_LIMIT,
     strokeWidth: node.strokeWidth,
     transform: node.transform,
     type: "vector",

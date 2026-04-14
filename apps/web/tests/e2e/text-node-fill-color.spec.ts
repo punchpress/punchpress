@@ -5,8 +5,11 @@ import {
   loadDocumentFixture,
 } from "./helpers/editor";
 
+const RGBA_ALPHA_PATTERN =
+  /rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*([0-9.]+)\s*\)/;
+
 const getFillAndStrokeSection = (page) => {
-  return page.locator("section").filter({ hasText: "Fill & Stroke" });
+  return page.locator("section").filter({ hasText: "Fill" });
 };
 
 const getFillColorInput = (page) => {
@@ -31,9 +34,7 @@ const getFillAlpha = (fill) => {
     return null;
   }
 
-  const rgbaMatch = fill.match(
-    /rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*([0-9.]+)\s*\)/
-  );
+  const rgbaMatch = fill.match(RGBA_ALPHA_PATTERN);
 
   if (rgbaMatch) {
     return Number.parseFloat(rgbaMatch[1] || "0");

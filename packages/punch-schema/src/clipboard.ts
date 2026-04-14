@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { PUNCH_DOCUMENT_VERSION } from "./constants";
+import { normalizeNodesForSchema } from "./normalize";
 import { nodeSchema } from "./schema";
 
 export const PUNCH_CLIPBOARD_MIME_TYPE =
@@ -21,7 +22,12 @@ export const parseClipboardContent = (value) => {
 };
 
 export const serializeClipboardContent = (content) => {
-  return JSON.stringify(clipboardContentSchema.parse(content));
+  return JSON.stringify(
+    clipboardContentSchema.parse({
+      ...content,
+      nodes: normalizeNodesForSchema(content.nodes),
+    })
+  );
 };
 
 export type ClipboardContent = z.infer<typeof clipboardContentSchema>;

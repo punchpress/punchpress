@@ -1,3 +1,8 @@
+import {
+  DEFAULT_VECTOR_STROKE_LINE_CAP,
+  DEFAULT_VECTOR_STROKE_LINE_JOIN,
+  DEFAULT_VECTOR_STROKE_MITER_LIMIT,
+} from "@punchpress/punch-schema";
 import { ARTBOARD_HEIGHT, ARTBOARD_WIDTH } from "../constants";
 import { format } from "../primitives/math";
 import {
@@ -43,10 +48,24 @@ const buildSvgPathMarkup = (node, path) => {
   const transform = path.transform ? ` transform="${path.transform}"` : "";
   const fillRule =
     node.type === "vector" ? ` fill-rule="${node.fillRule}"` : "";
+  const strokeLineCap =
+    node.type === "vector"
+      ? (node.strokeLineCap ?? DEFAULT_VECTOR_STROKE_LINE_CAP)
+      : DEFAULT_VECTOR_STROKE_LINE_CAP;
+  const strokeLineJoin =
+    node.type === "vector"
+      ? (node.strokeLineJoin ?? DEFAULT_VECTOR_STROKE_LINE_JOIN)
+      : DEFAULT_VECTOR_STROKE_LINE_JOIN;
+  const strokeMiterLimit =
+    node.type === "vector"
+      ? (node.strokeMiterLimit ?? DEFAULT_VECTOR_STROKE_MITER_LIMIT)
+      : DEFAULT_VECTOR_STROKE_MITER_LIMIT;
 
   return `<path d="${path.d}"${transform}${fillRule} fill="${fill}" stroke="${stroke}" stroke-width="${format(
     node.strokeWidth
-  )}" paint-order="fill stroke" stroke-linejoin="round" stroke-linecap="round"/>`;
+  )}" paint-order="fill stroke" stroke-linejoin="${strokeLineJoin}" stroke-linecap="${strokeLineCap}" stroke-miterlimit="${format(
+    strokeMiterLimit
+  )}"/>`;
 };
 
 export const buildSvgExport = (nodes, geometryById) => {

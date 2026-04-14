@@ -44,9 +44,15 @@ export const startCanvasToolPlacementSession = ({
 
   const handlePointerMove = (moveEvent) => {
     session.update({
+      altKey: moveEvent.altKey,
       dragDistancePx: getDragDistancePx(moveEvent),
+      metaKey: moveEvent.metaKey,
       point: getCanvasPoint(moveEvent.clientX, moveEvent.clientY),
       preserveAspectRatio: moveEvent.shiftKey,
+      spaceKey:
+        editor.getState().spacePressed ||
+        moveEvent.code === "Space" ||
+        moveEvent.getModifierState?.("Space"),
     });
   };
 
@@ -58,9 +64,15 @@ export const startCanvasToolPlacementSession = ({
   const handlePointerUp = (upEvent) => {
     cleanup();
     session.complete({
+      altKey: upEvent.altKey,
       dragDistancePx: getDragDistancePx(upEvent),
+      metaKey: upEvent.metaKey,
       point: getCanvasPoint(upEvent.clientX, upEvent.clientY),
       preserveAspectRatio: upEvent.shiftKey,
+      spaceKey:
+        editor.getState().spacePressed ||
+        upEvent.code === "Space" ||
+        upEvent.getModifierState?.("Space"),
     });
     editor.notifyPlacementSurfaceApplied();
   };

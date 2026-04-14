@@ -16,6 +16,7 @@ const getVectorPathOverlayScene = ({
   activeDragSession,
   editablePathSession,
   hoveredCornerHandlePoint,
+  isPanning,
   isPathEditing,
   matrix,
   metrics,
@@ -30,8 +31,9 @@ const getVectorPathOverlayScene = ({
   return {
     activeDragSession,
     contours: editablePathSession.contours,
-    hoveredCornerHandlePoint,
+    hoveredCornerHandlePoint: isPanning ? null : hoveredCornerHandlePoint,
     interactionPolicy: editablePathSession.interactionPolicy,
+    isPanning,
     matrix,
     metrics,
     nodeStrokeWidth: node.strokeWidth,
@@ -49,12 +51,15 @@ const getVectorPathOverlayRenderState = ({
   hoveredCornerHandlePoint,
   overlayState,
   pathEditingNodeId,
+  penDirectSelectionModifierPressed,
   spacePressed,
 }) => {
   const nodeId = overlayState?.node.id || null;
   const isPathEditing = Boolean(nodeId && pathEditingNodeId === nodeId);
   const isPanning = spacePressed || activeTool === "hand";
   const isPenToolActive = activeTool === "pen";
+  const isPenDirectSelectionMode =
+    isPenToolActive && penDirectSelectionModifierPressed;
   const editablePathSession = overlayState?.editablePathSession || null;
   const geometry = overlayState?.geometry || null;
   const node = overlayState?.node || null;
@@ -86,6 +91,7 @@ const getVectorPathOverlayRenderState = ({
     activeDragSession,
     editablePathSession,
     hoveredCornerHandlePoint,
+    isPanning,
     isPathEditing,
     matrix,
     metrics,
@@ -96,6 +102,7 @@ const getVectorPathOverlayRenderState = ({
 
   return {
     isPathEditing,
+    isPenDirectSelectionMode,
     isPanning,
     isPenToolActive,
     node,
@@ -119,6 +126,9 @@ export const CanvasVectorPathOverlay = ({ viewportRevision }) => {
   const activeTool = useEditorValue((_, state) => state.activeTool);
   const pathEditingNodeId = useEditorValue(
     (_, state) => state.pathEditingNodeId
+  );
+  const penDirectSelectionModifierPressed = useEditorValue(
+    (_, state) => state.penDirectSelectionModifierPressed
   );
   const spacePressed = useEditorValue((_, state) => state.spacePressed);
   const overlayState = useEditorSurfaceValue((editor, state) => {
@@ -153,9 +163,12 @@ export const CanvasVectorPathOverlay = ({ viewportRevision }) => {
       editablePathSession,
       geometry,
       node,
-      penHover: penHover?.nodeId === node.id ? penHover : null,
+      penHover:
+        !state.spacePressed && penHover?.nodeId === node.id ? penHover : null,
       penPreview:
-        penPreview?.nodeId === node.id && penPreview.kind === "segment"
+        !state.spacePressed &&
+        penPreview?.nodeId === node.id &&
+        penPreview.kind === "segment"
           ? penPreview
           : null,
       previewDelta: editor.getSelectionPreviewDelta([node.id]) || null,
@@ -163,6 +176,7 @@ export const CanvasVectorPathOverlay = ({ viewportRevision }) => {
   });
   const {
     isPathEditing,
+    isPenDirectSelectionMode,
     isPanning,
     isPenToolActive,
     node,
@@ -176,6 +190,7 @@ export const CanvasVectorPathOverlay = ({ viewportRevision }) => {
     hoveredCornerHandlePoint,
     overlayState,
     pathEditingNodeId,
+    penDirectSelectionModifierPressed,
     spacePressed,
   });
 
@@ -283,7 +298,7 @@ export const CanvasVectorPathOverlay = ({ viewportRevision }) => {
 
   return (
     <div
-      className={`absolute inset-0 z-20 ${isPanning || isPenToolActive ? "pointer-events-none" : ""}`}
+      className={`absolute inset-0 z-20 ${isPanning || (isPenToolActive && !isPenDirectSelectionMode) ? "pointer-events-none" : ""}`}
       data-viewport-revision={viewportRevision}
       onWheelCapture={isPanning ? undefined : forwardWheelToCanvasSurface}
     >
@@ -303,7 +318,11 @@ export const CanvasVectorPathOverlay = ({ viewportRevision }) => {
 
       <PenInsertGhostAnchor
         matrix={scene?.matrix || null}
-        penHover={isPenToolActive ? scene?.penHover || null : null}
+        penHover={
+          isPenToolActive && !isPenDirectSelectionMode
+            ? scene?.penHover || null
+            : null
+        }
       />
 
       {isPenToolActive ? null : (

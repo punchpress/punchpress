@@ -1,5 +1,9 @@
 import { z } from "zod";
 import { PUNCH_DOCUMENT_VERSION, ROOT_PARENT_ID } from "./constants";
+import {
+  VECTOR_STROKE_LINE_CAP_VALUES,
+  VECTOR_STROKE_LINE_JOIN_VALUES,
+} from "./vector-stroke-style";
 
 const finiteNumber = z.number().refine(Number.isFinite, {
   message: "Expected a finite number.",
@@ -138,6 +142,10 @@ export const vectorContourSchema = z
   .strict();
 
 export const vectorFillRuleSchema = z.enum(["evenodd", "nonzero"]);
+export const vectorStrokeLineCapSchema = z.enum(VECTOR_STROKE_LINE_CAP_VALUES);
+export const vectorStrokeLineJoinSchema = z.enum(
+  VECTOR_STROKE_LINE_JOIN_VALUES
+);
 
 export const vectorNodeSchema = baseNodeSchema
   .extend({
@@ -145,6 +153,9 @@ export const vectorNodeSchema = baseNodeSchema
     fill: z.string().min(1).nullable(),
     fillRule: vectorFillRuleSchema,
     stroke: z.string().min(1).nullable(),
+    strokeLineCap: vectorStrokeLineCapSchema,
+    strokeLineJoin: vectorStrokeLineJoinSchema,
+    strokeMiterLimit: finiteNumber,
     strokeWidth: finiteNumber,
     transform: transformSchema,
     type: z.literal("vector"),
@@ -214,3 +225,9 @@ export type VectorHandleDocument = z.infer<typeof vectorHandleSchema>;
 export type VectorNodeDocument = z.infer<typeof vectorNodeSchema>;
 export type VectorPointTypeDocument = z.infer<typeof vectorPointTypeSchema>;
 export type VectorSegmentDocument = z.infer<typeof vectorSegmentSchema>;
+export type VectorStrokeLineCapDocument = z.infer<
+  typeof vectorStrokeLineCapSchema
+>;
+export type VectorStrokeLineJoinDocument = z.infer<
+  typeof vectorStrokeLineJoinSchema
+>;

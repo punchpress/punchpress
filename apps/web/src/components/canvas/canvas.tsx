@@ -32,12 +32,17 @@ const getCanvasPoint = (viewer, host, clientX, clientY, zoom) => {
   };
 };
 
-const syncHostPenCursorMode = (host, activeTool, editor) => {
+const syncHostPenCursorMode = (
+  host,
+  activeTool,
+  editor,
+  penDirectSelectionMode
+) => {
   if (!(host instanceof HTMLElement)) {
     return;
   }
 
-  if (activeTool !== "pen") {
+  if (activeTool !== "pen" || penDirectSelectionMode) {
     delete host.dataset.penCursorMode;
     return;
   }
@@ -58,12 +63,23 @@ export const Canvas = () => {
   const editor = useEditor();
   useTheme();
   const activeTool = useEditorValue((_, state) => state.activeTool);
+  const penDirectSelectionMode = useEditorValue((_, state) => {
+    return (
+      state.activeTool === "pen" && state.penDirectSelectionModifierPressed
+    );
+  });
+  const penPointTypeToggleModifierPressed = useEditorValue((_, state) => {
+    return state.penPointTypeToggleModifierPressed;
+  });
   const spacePressed = useEditorValue((_, state) => state.spacePressed);
   const zoom = useEditorValue((_, state) => state.viewport.zoom);
   const shouldRenderOverlay = !shouldDisableCanvasOverlay();
 
   const viewerRef = useRef(null);
   const hostRef = useRef(null);
+  const lastPenHoverClientPointRef = useRef<{ x: number; y: number } | null>(
+    null
+  );
   const [hostElement, setHostElement] = useState<HTMLDivElement | null>(null);
 
   const handleHostRef = useCallback((nextHostElement) => {
@@ -97,8 +113,60 @@ export const Canvas = () => {
   }, [editor, hostElement]);
 
   useEffect(() => {
-    syncHostPenCursorMode(hostRef.current, activeTool, editor);
-  }, [activeTool, editor]);
+    syncHostPenCursorMode(
+      hostRef.current,
+      activeTool,
+      editor,
+      penDirectSelectionMode
+    );
+
+    if (activeTool !== "pen") {
+      lastPenHoverClientPointRef.current = null;
+      return;
+    }
+
+    if (penDirectSelectionMode || spacePressed) {
+      editor.dispatchCanvasPointerLeave({});
+      return;
+    }
+
+    const lastClientPoint = lastPenHoverClientPointRef.current;
+
+    if (!lastClientPoint) {
+      return;
+    }
+
+    const point = getCanvasPoint(
+      viewerRef.current,
+      hostRef.current,
+      lastClientPoint.x,
+      lastClientPoint.y,
+      zoom
+    );
+
+    editor.dispatchCanvasPointerMove({
+      event: {
+        altKey: penPointTypeToggleModifierPressed,
+      },
+      point: {
+        x: round(point.x, 2),
+        y: round(point.y, 2),
+      },
+    });
+    syncHostPenCursorMode(
+      hostRef.current,
+      activeTool,
+      editor,
+      penDirectSelectionMode
+    );
+  }, [
+    activeTool,
+    editor,
+    penDirectSelectionMode,
+    penPointTypeToggleModifierPressed,
+    spacePressed,
+    zoom,
+  ]);
 
   const handleScroll = useCallback(
     (event) => {
@@ -178,25 +246,49 @@ export const Canvas = () => {
           },
         }),
       });
-      syncHostPenCursorMode(hostRef.current, activeTool, editor);
+      syncHostPenCursorMode(
+        hostRef.current,
+        activeTool,
+        editor,
+        penDirectSelectionMode
+      );
     },
-    [activeTool, editor, spacePressed, zoom]
+    [activeTool, editor, penDirectSelectionMode, spacePressed, zoom]
   );
   const handleCanvasPointerLeave = useCallback(() => {
+    lastPenHoverClientPointRef.current = null;
+
     if (activeTool !== "pen") {
       return;
     }
 
     editor.dispatchCanvasPointerLeave({});
-    syncHostPenCursorMode(hostRef.current, activeTool, editor);
-  }, [activeTool, editor]);
+    syncHostPenCursorMode(
+      hostRef.current,
+      activeTool,
+      editor,
+      penDirectSelectionMode
+    );
+  }, [activeTool, editor, penDirectSelectionMode]);
   const handleCanvasPointerMove = useCallback(
     (event) => {
       if (spacePressed || activeTool !== "pen" || event.buttons !== 0) {
         return;
       }
 
+      if (penDirectSelectionMode) {
+        editor.dispatchCanvasPointerLeave({ event });
+        syncHostPenCursorMode(
+          hostRef.current,
+          activeTool,
+          editor,
+          penDirectSelectionMode
+        );
+        return;
+      }
+
       if (!(event.target instanceof Element)) {
+        lastPenHoverClientPointRef.current = null;
         editor.dispatchCanvasPointerLeave({ event });
         return;
       }
@@ -206,9 +298,15 @@ export const Canvas = () => {
           [".canvas-surface", ".canvas-node", ".canvas-vector-paper"].join(",")
         )
       ) {
+        lastPenHoverClientPointRef.current = null;
         editor.dispatchCanvasPointerLeave({ event });
         return;
       }
+
+      lastPenHoverClientPointRef.current = {
+        x: event.clientX,
+        y: event.clientY,
+      };
 
       const point = getCanvasPoint(
         viewerRef.current,
@@ -225,9 +323,14 @@ export const Canvas = () => {
           y: round(point.y, 2),
         },
       });
-      syncHostPenCursorMode(hostRef.current, activeTool, editor);
+      syncHostPenCursorMode(
+        hostRef.current,
+        activeTool,
+        editor,
+        penDirectSelectionMode
+      );
     },
-    [activeTool, editor, spacePressed, zoom]
+    [activeTool, editor, penDirectSelectionMode, spacePressed, zoom]
   );
 
   return (

@@ -1,8 +1,14 @@
-import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
+import {
+  DEFAULT_VECTOR_STROKE_LINE_CAP,
+  DEFAULT_VECTOR_STROKE_LINE_JOIN,
+  DEFAULT_VECTOR_STROKE_MITER_LIMIT,
+  ROOT_PARENT_ID,
+} from "@punchpress/punch-schema";
 import { createId } from "../text/model";
 
 const DEFAULT_WIDTH = 240;
 const DEFAULT_HEIGHT = 180;
+const DEFAULT_VECTOR_STROKE_WIDTH = 3;
 
 const createRectangleContour = (
   width = DEFAULT_WIDTH,
@@ -50,7 +56,10 @@ export const createDefaultVectorNode = () => {
     id: createId(),
     parentId: ROOT_PARENT_ID,
     stroke: "#000000",
-    strokeWidth: 12,
+    strokeLineCap: DEFAULT_VECTOR_STROKE_LINE_CAP,
+    strokeLineJoin: DEFAULT_VECTOR_STROKE_LINE_JOIN,
+    strokeMiterLimit: DEFAULT_VECTOR_STROKE_MITER_LIMIT,
+    strokeWidth: DEFAULT_VECTOR_STROKE_WIDTH,
     transform: {
       rotation: 0,
       scaleX: 1,

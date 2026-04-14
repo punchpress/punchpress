@@ -127,11 +127,18 @@ durable meaning.
 
 ## SVG Import Direction
 
-SVG import should normalize external geometry into PunchPress vector contours,
-segments, handles, and point types.
+SVG import should normalize supported external path geometry into PunchPress
+vector contours, segments, handles, and point types, along with the
+representable path styling that belongs on editable vector nodes.
 
 That means imported Illustrator-style paths become ordinary PunchPress vector
 nodes that the existing editor can modify.
+
+That imported vector styling should preserve the semantics PunchPress can own
+durably, including fill, fill rule, stroke, stroke width, stroke cap, stroke
+join, and miter limit, while preserving fill or stroke transparency through
+alpha-capable stored paint colors rather than collapsing everything into opaque
+runtime SVG blobs.
 
 The importer may use Paper or another parser as an intermediate helper, but the
 result should be engine-owned vector data rather than persisted backend objects
@@ -148,6 +155,8 @@ When adding vector path editing features:
   the main backend session file into one large mixed-responsibility surface
 - write edits back into engine-owned geometry immediately
 - avoid backend-local state for durable editor concepts
+- name engine-side vector modules after durable geometry semantics rather than
+  a specific tool gesture
 - keep `Paper` and similar implementation details out of product-facing
   interfaces and names
 - treat SVG import as a conversion into PunchPress vector data, not as a mode

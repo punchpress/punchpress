@@ -72,6 +72,22 @@ export const createSelectionStoreActions = (set) => {
       }));
     },
 
+    setPenDirectSelectionModifierPressed: (
+      penDirectSelectionModifierPressed
+    ) => {
+      set(() => ({
+        penDirectSelectionModifierPressed,
+      }));
+    },
+
+    setPenPointTypeToggleModifierPressed: (
+      penPointTypeToggleModifierPressed
+    ) => {
+      set(() => ({
+        penPointTypeToggleModifierPressed,
+      }));
+    },
+
     setHoveringSuppressed: (isHoveringSuppressed) => {
       set((state) => ({
         hoveredNodeId: isHoveringSuppressed ? null : state.hoveredNodeId,

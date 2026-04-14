@@ -322,6 +322,13 @@ textarea,
   cursor: var(--canvas-cursor-pen-tool-add) !important;
 }
 
+.canvas-host[data-panning="true"],
+.canvas-host[data-panning="true"] .canvas-surface,
+.canvas-host[data-panning="true"] .canvas-node,
+.canvas-host[data-panning="true"] .canvas-node * {
+  cursor: var(--canvas-cursor-grab) !important;
+}
+
 [data-canvas-cursor="text-path-slide"] {
   cursor: ew-resize;
 }

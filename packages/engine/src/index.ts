@@ -1,4 +1,10 @@
-/* biome-ignore lint/performance/noBarrelFile: package root public API */
+// biome-ignore-all lint/performance/noBarrelFile: package root public API
+
+export {
+  DEFAULT_VECTOR_STROKE_LINE_CAP,
+  DEFAULT_VECTOR_STROKE_LINE_JOIN,
+  DEFAULT_VECTOR_STROKE_MITER_LIMIT,
+} from "@punchpress/punch-schema";
 export {
   ARTBOARD_HEIGHT,
   ARTBOARD_WIDTH,
@@ -65,7 +71,7 @@ export {
   isVectorPathPointRole,
 } from "./nodes/vector/path-edit-interaction";
 export {
-  authorVectorPointHandlesFromAnchorDrag,
+  setVectorPointHandlesFromAnchorDrag,
   setVectorPointType,
   updateVectorPointHandle,
 } from "./nodes/vector/point-edit";
@@ -89,15 +95,15 @@ export {
 export { getResizeCorner } from "./primitives/group-resize";
 export { clamp, format, round, toNumber, toSafeHex } from "./primitives/math";
 export {
-  getNodeLocalPoint,
-  getNodeRotationCenter,
-  getNodeWorldPoint,
-} from "./primitives/rotation";
-export {
   getPointerDistancePx,
   isPointerDistanceAtLeast,
   isPointerDistanceWithin,
 } from "./primitives/pointer-distance";
+export {
+  getNodeLocalPoint,
+  getNodeRotationCenter,
+  getNodeWorldPoint,
+} from "./primitives/rotation";
 export {
   includesPathPoint,
   isSamePathPoint,

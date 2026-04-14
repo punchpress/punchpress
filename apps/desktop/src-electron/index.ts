@@ -1,7 +1,12 @@
 import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
+import type {
+  DesktopAppMenuState,
+  DesktopEditorCommand,
+} from "./app-menu-types.js";
 import { installApplicationMenu } from "./application-menu.js";
 import {
+  APP_MENU_STATE_CHANNEL,
   DESKTOP_UPDATE_GET_STATUS_CHANNEL,
   DESKTOP_UPDATE_RESTART_CHANNEL,
   DESKTOP_UPDATE_STATUS_CHANNEL,
@@ -44,6 +49,7 @@ const mainWindowController = createMainWindowController();
 let documentOpeningController: ReturnType<
   typeof createDocumentOpeningController
 >;
+let appMenuState: DesktopAppMenuState | null = null;
 
 const sendDocumentCommand = (
   command: "export" | "new" | "open" | "save" | "save-as"
@@ -51,12 +57,13 @@ const sendDocumentCommand = (
   mainWindowController.sendToRenderer(DOCUMENT_COMMAND_CHANNEL, command);
 };
 
-const sendEditorCommand = (command: "redo" | "undo") => {
+const sendEditorCommand = (command: DesktopEditorCommand) => {
   mainWindowController.sendToRenderer(EDITOR_COMMAND_CHANNEL, command);
 };
 
 const syncApplicationMenu = () => {
   return installApplicationMenu({
+    appMenuState,
     clearRecentDocumentsFromMenu: () => {
       return documentOpeningController.clearRecentDocumentsFromMenu();
     },
@@ -121,6 +128,17 @@ const launch = async () => {
     }
   );
 
+  ipcMain.on(APP_MENU_STATE_CHANNEL, (event, nextAppMenuState) => {
+    if (mainWindowController.getMainWindow()?.webContents !== event.sender) {
+      return;
+    }
+
+    appMenuState = nextAppMenuState as DesktopAppMenuState;
+    syncApplicationMenu().catch((error) => {
+      console.error(error);
+    });
+  });
+
   ipcMain.on(RENDERER_READY_CHANNEL, (event) => {
     if (!mainWindowController.handleRendererReady(event.sender)) {
       return;
@@ -155,6 +173,8 @@ const launch = async () => {
     await serveStaticAt(path.join(app.getAppPath(), "dist"));
   }
 
+  appMenuState = null;
+  await syncApplicationMenu();
   mainWindowController.createMainWindow();
   onAutoUpdaterStatus((status) => {
     mainWindowController.sendToRenderer(DESKTOP_UPDATE_STATUS_CHANNEL, status);
@@ -164,6 +184,10 @@ const launch = async () => {
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
+      appMenuState = null;
+      syncApplicationMenu().catch((error) => {
+        console.error(error);
+      });
       mainWindowController.createMainWindow();
       return;
     }

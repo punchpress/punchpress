@@ -79,6 +79,61 @@ const createTextNode = (id: string) => {
   } as const;
 };
 
+const createVectorNode = (id: string, overrides = {}) => {
+  return {
+    contours: [
+      {
+        closed: true,
+        segments: [
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: -100, y: -80 },
+            pointType: "corner" as const,
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: 100, y: -80 },
+            pointType: "corner" as const,
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: 100, y: 80 },
+            pointType: "corner" as const,
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: -100, y: 80 },
+            pointType: "corner" as const,
+          },
+        ],
+      },
+    ],
+    fill: "rgba(255, 0, 0, 0.4)",
+    fillRule: "evenodd" as const,
+    id,
+    parentId: "root",
+    stroke: "rgba(0, 0, 0, 0.6)",
+    strokeLineCap: "square" as const,
+    strokeLineJoin: "miter" as const,
+    strokeMiterLimit: 12,
+    strokeWidth: 14,
+    transform: {
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+      x: 420,
+      y: 320,
+    },
+    type: "vector" as const,
+    visible: true,
+    ...overrides,
+  };
+};
+
 describe("Editor selection properties", () => {
   test("exposes shape-specific and shared properties for a single shape selection", () => {
     const editor = new Editor();
@@ -192,6 +247,68 @@ describe("Editor selection properties", () => {
       cornerRadius: 36,
       shape: "polygon",
       type: "shape",
+    });
+  });
+
+  test("exposes vector fill and stroke style properties for a single vector selection", () => {
+    const editor = new Editor();
+
+    editor.getState().loadNodes([createVectorNode("vector-node")]);
+    editor.select("vector-node");
+
+    const selectionProperties = editor.getSelectionProperties();
+
+    expect(Object.keys(selectionProperties.properties).sort()).toEqual([
+      "fill",
+      "fillRule",
+      "stroke",
+      "strokeLineCap",
+      "strokeLineJoin",
+      "strokeMiterLimit",
+      "strokeWidth",
+      "x",
+      "y",
+    ]);
+    expect(selectionProperties.properties.fill?.value).toBe(
+      "rgba(255, 0, 0, 0.4)"
+    );
+    expect(selectionProperties.properties.fillRule?.value).toBe("evenodd");
+    expect(selectionProperties.properties.strokeLineCap?.value).toBe("square");
+    expect(selectionProperties.properties.strokeLineJoin?.value).toBe("miter");
+    expect(selectionProperties.properties.strokeMiterLimit?.value).toBe(12);
+  });
+
+  test("applies vector stroke style descriptors across a multi-selection", () => {
+    const editor = new Editor();
+
+    editor.getState().loadNodes([
+      createVectorNode("first-vector"),
+      createVectorNode("second-vector", {
+        strokeLineCap: "round",
+        strokeLineJoin: "bevel",
+        strokeMiterLimit: 4,
+      }),
+    ]);
+    editor.setSelectedNodes(["first-vector", "second-vector"]);
+
+    expect(editor.getSelectionProperties().properties.strokeLineJoin).toEqual({
+      id: "strokeLineJoin",
+      isMixed: true,
+      value: null,
+    });
+
+    expect(editor.setSelectionProperty("strokeLineJoin", "round")).toBe(true);
+    expect(editor.setSelectionProperty("strokeMiterLimit", 18)).toBe(true);
+
+    expect(editor.getNode("first-vector")).toMatchObject({
+      strokeLineJoin: "round",
+      strokeMiterLimit: 18,
+      type: "vector",
+    });
+    expect(editor.getNode("second-vector")).toMatchObject({
+      strokeLineJoin: "round",
+      strokeMiterLimit: 18,
+      type: "vector",
     });
   });
 });

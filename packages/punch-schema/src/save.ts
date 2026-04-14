@@ -1,4 +1,5 @@
 import { PUNCH_DOCUMENT_VERSION } from "./constants";
+import { normalizeNodesForSchema } from "./normalize";
 import { type DesignDocument, designDocumentSchema } from "./schema";
 
 export const createDesignDocument = (
@@ -6,7 +7,7 @@ export const createDesignDocument = (
 ): DesignDocument => {
   return designDocumentSchema.parse({
     version: PUNCH_DOCUMENT_VERSION,
-    nodes,
+    nodes: normalizeNodesForSchema(nodes),
   });
 };
 

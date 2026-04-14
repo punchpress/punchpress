@@ -24,7 +24,8 @@ const TICK_SPACING = 6;
 const TICK_HEIGHT_SMALL = 4;
 const TICK_HEIGHT_LARGE = 7;
 const LARGE_TICK_INTERVAL = 5;
-const RANGE_SCRUB_PIXELS = 400;
+const SCRUB_PERCENT_PADDING = 4;
+const SCRUB_PERCENT_SPAN = 100 - SCRUB_PERCENT_PADDING * 2;
 export const ScrubSlider = ({
   ariaLabel,
   className,
@@ -41,6 +42,8 @@ export const ScrubSlider = ({
 }: ScrubSliderProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<{
+    dragValuePerPixel: number;
+    overflowRecoveryValueSpan: number;
     pointerId: number;
     startValue: number;
     startX: number;
@@ -50,8 +53,9 @@ export const ScrubSlider = ({
   const [draftValue, setDraftValue] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const dragValuePerPixel = getDragValuePerPixel(min, max, step, pixelsPerStep);
-  const overflowRecoveryValueSpan = overflowRecoveryPixels * dragValuePerPixel;
+  const overflowRecoveryValueSpan =
+    overflowRecoveryPixels *
+    getDragValuePerPixel(min, max, step, pixelsPerStep);
 
   useEffect(() => {
     if (!isEditing) {
@@ -138,6 +142,7 @@ export const ScrubSlider = ({
         className
       )}
       data-dragging={isDragging ? "true" : undefined}
+      data-slot="scrub-slider"
       onDoubleClick={() => {
         startEditing();
       }}
@@ -181,7 +186,17 @@ export const ScrubSlider = ({
         event.currentTarget.focus();
         event.currentTarget.setPointerCapture(event.pointerId);
 
+        const dragValuePerPixel = getDragValuePerPixel(
+          min,
+          max,
+          step,
+          pixelsPerStep,
+          event.currentTarget.getBoundingClientRect().width
+        );
+
         dragStateRef.current = {
+          dragValuePerPixel,
+          overflowRecoveryValueSpan: overflowRecoveryPixels * dragValuePerPixel,
           pointerId: event.pointerId,
           startValue: value,
           startX: event.clientX,
@@ -195,9 +210,18 @@ export const ScrubSlider = ({
         }
 
         const deltaX = event.clientX - dragState.startX;
-        const deltaValue = deltaX * dragValuePerPixel;
+        const deltaValue = deltaX * dragState.dragValuePerPixel;
 
-        commitScrubValue(dragState.startValue, deltaValue);
+        onValueChange(
+          resolveScrubValue(
+            dragState.startValue,
+            deltaValue,
+            min,
+            max,
+            step,
+            dragState.overflowRecoveryValueSpan
+          )
+        );
       }}
       onPointerUp={stopDragging}
       ref={containerRef}
@@ -250,6 +274,7 @@ export const ScrubSlider = ({
               ? "bg-foreground/50 dark:bg-foreground/60"
               : "bg-foreground/20 dark:bg-foreground/25"
           )}
+          data-slot="scrub-slider-indicator"
           ref={scrubLineRef}
           style={{
             left: getScrubPercent(value, min, max),
@@ -347,10 +372,19 @@ const getDragValuePerPixel = (
   min: number,
   max: number,
   step: number,
-  pixelsPerStep: number
+  pixelsPerStep: number,
+  containerWidth?: number
 ) => {
-  if (Number.isFinite(min) && Number.isFinite(max) && max > min) {
-    return (max - min) / RANGE_SCRUB_PIXELS;
+  if (
+    Number.isFinite(min) &&
+    Number.isFinite(max) &&
+    max > min &&
+    typeof containerWidth === "number" &&
+    containerWidth > 0
+  ) {
+    return (
+      (max - min) / Math.max((containerWidth * SCRUB_PERCENT_SPAN) / 100, 1)
+    );
   }
 
   return step / Math.max(pixelsPerStep, 1);
@@ -452,7 +486,7 @@ const getScrubPercent = (value: number, min: number, max: number): string => {
   }
 
   const ratio = clamp((value - min) / (max - min), 0, 1);
-  const percent = 4 + ratio * 92;
+  const percent = SCRUB_PERCENT_PADDING + ratio * SCRUB_PERCENT_SPAN;
   return `${percent}%`;
 };
 
