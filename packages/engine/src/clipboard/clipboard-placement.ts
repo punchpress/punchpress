@@ -2,6 +2,8 @@ import {
   buildNodeCapabilityGeometry,
   getNodeFrameFromGeometry,
 } from "../nodes/node-capabilities";
+import { isContainerNode } from "../nodes/node-tree";
+import { getViewportCenter, getViewportWorldBounds } from "../viewport/viewport-queries";
 
 export const PASTE_STEP = 120;
 
@@ -12,30 +14,8 @@ const getBoundsCenter = (bounds) => {
   };
 };
 
-const getViewportBounds = (editor) => {
-  const host = editor.hostRef;
-  const viewer = editor.viewerRef;
-
-  if (!(host && viewer && editor.zoom > 0)) {
-    return null;
-  }
-
-  const rect = host.getBoundingClientRect();
-  const scrollLeft = viewer.getScrollLeft();
-  const scrollTop = viewer.getScrollTop();
-
-  return {
-    minX: scrollLeft,
-    minY: scrollTop,
-    maxX: scrollLeft + rect.width / editor.zoom,
-    maxY: scrollTop + rect.height / editor.zoom,
-    width: rect.width / editor.zoom,
-    height: rect.height / editor.zoom,
-  };
-};
-
 const getNodeContentBounds = (node) => {
-  if (!node || node.type === "group") {
+  if (!node || isContainerNode(node)) {
     return null;
   }
 
@@ -93,7 +73,7 @@ export const resetPasteSequence = (editor) => {
 
 export const getClipboardPasteOffset = (editor, content, pasteKey) => {
   const stepCount = getPasteStepCount(editor, pasteKey);
-  const viewportBounds = getViewportBounds(editor);
+  const viewportBounds = getViewportWorldBounds(editor);
   const contentBounds = getContentBounds(content?.nodes || []);
   const steppedOffset = {
     x: PASTE_STEP * stepCount,
@@ -116,9 +96,13 @@ export const getClipboardPasteOffset = (editor, content, pasteKey) => {
     return steppedOffset;
   }
 
-  const viewportCenter = getBoundsCenter(viewportBounds);
+  const viewportCenter = getViewportCenter(editor);
   const contentCenter = getBoundsCenter(contentBounds);
   const steppedViewportOffset = PASTE_STEP * (stepCount - 1);
+
+  if (!viewportCenter) {
+    return steppedOffset;
+  }
 
   return {
     x: viewportCenter.x - contentCenter.x + steppedViewportOffset,
@@ -128,14 +112,18 @@ export const getClipboardPasteOffset = (editor, content, pasteKey) => {
 
 export const getTextPastePoint = (editor, pasteKey) => {
   const stepCount = getPasteStepCount(editor, pasteKey);
-  const viewportBounds = getViewportBounds(editor);
+  const viewportBounds = getViewportWorldBounds(editor);
 
   if (!viewportBounds) {
     return null;
   }
 
-  const viewportCenter = getBoundsCenter(viewportBounds);
+  const viewportCenter = getViewportCenter(editor);
   const steppedViewportOffset = PASTE_STEP * (stepCount - 1);
+
+  if (!viewportCenter) {
+    return null;
+  }
 
   return {
     x: viewportCenter.x + steppedViewportOffset,

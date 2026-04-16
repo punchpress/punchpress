@@ -9,6 +9,8 @@ import {
   getNodeParentId,
   getSubtreeNodeIds,
   getTreeOrderedNodes,
+  isContainerNode,
+  isDescendantOf,
   isGroupNode,
 } from "../../nodes/node-tree";
 
@@ -36,7 +38,7 @@ const cleanupEmptyGroups = (nodes) => {
     const emptyGroupIds = nextNodes
       .filter(
         (node) =>
-          isGroupNode(node) &&
+          isContainerNode(node) &&
           (childIdsByParent.get(node.id) || []).length === 0
       )
       .map((node) => node.id);
@@ -50,14 +52,24 @@ const cleanupEmptyGroups = (nodes) => {
   }
 };
 
-const removeNodeSubtrees = (nodes, nodeIds) => {
+const removeNodeSubtreesWithoutCleanup = (nodes, nodeIds) => {
   const removedNodeIdSet = new Set(
     nodeIds.flatMap((nodeId) => getSubtreeNodeIds(nodes, nodeId))
   );
 
-  return cleanupEmptyGroups(
-    nodes.filter((node) => !removedNodeIdSet.has(node.id))
-  );
+  return nodes.filter((node) => !removedNodeIdSet.has(node.id));
+};
+
+const removeNodeSubtrees = (nodes, nodeIds) => {
+  return cleanupEmptyGroups(removeNodeSubtreesWithoutCleanup(nodes, nodeIds));
+};
+
+const getInsertedRootNodeIds = (nodes) => {
+  const insertedNodeIds = new Set(nodes.map((node) => node.id));
+
+  return nodes
+    .filter((node) => !insertedNodeIds.has(node.parentId))
+    .map((node) => node.id);
 };
 
 export const deleteNodeTreeState = (state, nodeIds) => {
@@ -250,6 +262,218 @@ export const moveNodeBlocksToBoundaryState = (state, nodeIds, edge) => {
 
   return {
     nodes: rebuildNodesFromMaps(nodesById, childIdsByParent),
+  };
+};
+
+export const moveNodeBlocksState = (
+  state,
+  nodeIds,
+  targetParentId = ROOT_PARENT_ID,
+  beforeNodeId = null
+) => {
+  const movedNodeIds = dedupeIds(nodeIds).filter((nodeId) => {
+    return state.nodes.some((node) => node.id === nodeId);
+  });
+
+  if (movedNodeIds.length === 0) {
+    return {};
+  }
+
+  const nodesById = createNodeMap(state.nodes);
+  const targetParentNode =
+    targetParentId === ROOT_PARENT_ID ? null : nodesById.get(targetParentId);
+
+  if (
+    !(targetParentId === ROOT_PARENT_ID || isContainerNode(targetParentNode))
+  ) {
+    return {};
+  }
+
+  if (
+    movedNodeIds.some((nodeId) => {
+      return (
+        nodeId === targetParentId ||
+        (targetParentId !== ROOT_PARENT_ID &&
+          isDescendantOf(state.nodes, targetParentId, nodeId))
+      );
+    })
+  ) {
+    return {};
+  }
+
+  const firstNode = nodesById.get(movedNodeIds[0]);
+
+  if (!firstNode) {
+    return {};
+  }
+
+  const sourceParentId = getNodeParentId(firstNode);
+
+  if (
+    !movedNodeIds.every((nodeId) => {
+      return getNodeParentId(nodesById.get(nodeId)) === sourceParentId;
+    })
+  ) {
+    return {};
+  }
+
+  const childIdsByParent = cloneChildIdsByParent(
+    getChildIdsByParent(state.nodes)
+  );
+  const sourceSiblingIds = [...(childIdsByParent.get(sourceParentId) || [])];
+  const movedNodeIdSet = new Set(movedNodeIds);
+  const orderedMovedNodeIds = sourceSiblingIds.filter((siblingId) => {
+    return movedNodeIdSet.has(siblingId);
+  });
+
+  if (orderedMovedNodeIds.length !== movedNodeIds.length) {
+    return {};
+  }
+
+  const nextSourceSiblingIds = sourceSiblingIds.filter((siblingId) => {
+    return !movedNodeIdSet.has(siblingId);
+  });
+  const targetSiblingIds = [
+    ...((targetParentId === sourceParentId
+      ? nextSourceSiblingIds
+      : childIdsByParent.get(targetParentId)) || []),
+  ];
+
+  if (beforeNodeId && !targetSiblingIds.includes(beforeNodeId)) {
+    return {};
+  }
+
+  const insertionIndex = beforeNodeId
+    ? targetSiblingIds.indexOf(beforeNodeId)
+    : targetSiblingIds.length;
+  const nextTargetSiblingIds = [
+    ...targetSiblingIds.slice(0, insertionIndex),
+    ...orderedMovedNodeIds,
+    ...targetSiblingIds.slice(insertionIndex),
+  ];
+
+  childIdsByParent.set(targetParentId, nextTargetSiblingIds);
+
+  if (sourceParentId !== targetParentId) {
+    childIdsByParent.set(sourceParentId, nextSourceSiblingIds);
+  }
+
+  for (const movedNodeId of orderedMovedNodeIds) {
+    const movedNode = nodesById.get(movedNodeId);
+
+    if (!movedNode) {
+      continue;
+    }
+
+    nodesById.set(movedNodeId, {
+      ...movedNode,
+      parentId: targetParentId,
+    });
+  }
+
+  const nextNodes = cleanupEmptyGroups(
+    rebuildNodesFromMaps(nodesById, childIdsByParent)
+  );
+  const nextNodeIds = new Set(nextNodes.map((node) => node.id));
+
+  return {
+    focusedGroupId:
+      state.focusedGroupId && nextNodeIds.has(state.focusedGroupId)
+        ? state.focusedGroupId
+        : null,
+    nodes: nextNodes,
+    selectedNodeIds: state.selectedNodeIds.filter((nodeId) =>
+      nextNodeIds.has(nodeId)
+    ),
+  };
+};
+
+export const replaceNodeBlocksState = (state, nodeIds, insertedNodes) => {
+  const replacedNodeIds = dedupeIds(nodeIds).filter((nodeId) => {
+    return state.nodes.some((node) => node.id === nodeId);
+  });
+
+  if (!(replacedNodeIds.length > 0 && insertedNodes.length > 0)) {
+    return {};
+  }
+
+  const nodesById = createNodeMap(state.nodes);
+  const firstNode = nodesById.get(replacedNodeIds[0]);
+
+  if (!firstNode) {
+    return {};
+  }
+
+  const parentId = getNodeParentId(firstNode);
+
+  if (
+    !replacedNodeIds.every((nodeId) => {
+      return getNodeParentId(nodesById.get(nodeId)) === parentId;
+    })
+  ) {
+    return {};
+  }
+
+  const siblingIds = getChildIdsByParent(state.nodes).get(parentId) || [];
+  const replacedNodeIdSet = new Set(replacedNodeIds);
+  const orderedReplacedNodeIds = siblingIds.filter((childId) => {
+    return replacedNodeIdSet.has(childId);
+  });
+
+  if (orderedReplacedNodeIds.length !== replacedNodeIds.length) {
+    return {};
+  }
+
+  const beforeNodeId =
+    siblingIds
+      .slice(siblingIds.indexOf(orderedReplacedNodeIds.at(-1) || "") + 1)
+      .find((childId) => !replacedNodeIdSet.has(childId)) || null;
+  const nextNodes = removeNodeSubtreesWithoutCleanup(
+    state.nodes,
+    orderedReplacedNodeIds
+  );
+  const nextNodesById = createNodeMap(nextNodes);
+  const childIdsByParent = cloneChildIdsByParent(
+    getChildIdsByParent(nextNodes)
+  );
+  const insertedRootNodeIds = getInsertedRootNodeIds(insertedNodes);
+
+  for (const insertedNode of insertedNodes) {
+    nextNodesById.set(insertedNode.id, insertedNode);
+  }
+
+  for (const [childParentId, childIds] of getChildIdsByParent(insertedNodes)) {
+    if (childParentId === parentId) {
+      continue;
+    }
+
+    childIdsByParent.set(childParentId, childIds);
+  }
+
+  const remainingSiblingIds = [...(childIdsByParent.get(parentId) || [])];
+  const insertionIndex = beforeNodeId
+    ? remainingSiblingIds.indexOf(beforeNodeId)
+    : remainingSiblingIds.length;
+  const nextSiblingIds = [
+    ...remainingSiblingIds.slice(0, insertionIndex),
+    ...insertedRootNodeIds,
+    ...remainingSiblingIds.slice(insertionIndex),
+  ];
+
+  childIdsByParent.set(parentId, nextSiblingIds);
+
+  const rebuiltNodes = cleanupEmptyGroups(
+    rebuildNodesFromMaps(nextNodesById, childIdsByParent)
+  );
+  const nextNodeIds = new Set(rebuiltNodes.map((node) => node.id));
+
+  return {
+    focusedGroupId:
+      state.focusedGroupId && nextNodeIds.has(state.focusedGroupId)
+        ? state.focusedGroupId
+        : null,
+    nodes: rebuiltNodes,
+    selectedNodeIds: insertedRootNodeIds,
   };
 };
 

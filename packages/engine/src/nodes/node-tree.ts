@@ -16,8 +16,12 @@ export const isVectorNode = (node) => {
   return node?.type === "vector";
 };
 
+export const isPathNode = (node) => {
+  return node?.type === "path";
+};
+
 export const isContainerNode = (node) => {
-  return isGroupNode(node);
+  return isGroupNode(node) || isVectorNode(node);
 };
 
 export const getNodeParentId = (node) => {

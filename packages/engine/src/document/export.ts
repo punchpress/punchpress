@@ -4,7 +4,7 @@ import type {
 } from "@punchpress/punch-schema";
 import { buildNodeCapabilityGeometry } from "../nodes/node-capabilities";
 import { buildSvgExport } from "../nodes/node-svg-export";
-import { isDescendantOf } from "../nodes/node-tree";
+import { isContainerNode, isDescendantOf } from "../nodes/node-tree";
 
 const escapeMetadata = (value: string) => {
   return value
@@ -18,7 +18,7 @@ export const exportDesignDocument = async (
   loadFont: (font: TextNodeDocument["font"]) => Promise<unknown>
 ) => {
   const nodes = document.nodes.filter((node) => {
-    if (node.type === "group" || node.visible === false) {
+    if (isContainerNode(node) || node.visible === false) {
       return false;
     }
 

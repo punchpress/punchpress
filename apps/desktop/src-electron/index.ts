@@ -52,7 +52,7 @@ let documentOpeningController: ReturnType<
 let appMenuState: DesktopAppMenuState | null = null;
 
 const sendDocumentCommand = (
-  command: "export" | "new" | "open" | "save" | "save-as"
+  command: "export" | "import-svg" | "new" | "open" | "save" | "save-as"
 ) => {
   mainWindowController.sendToRenderer(DOCUMENT_COMMAND_CHANNEL, command);
 };

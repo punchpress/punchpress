@@ -85,6 +85,7 @@ contextBridge.exposeInMainWorld("electron", {
   },
   documentFiles: {
     openDocument: () => ipcRenderer.invoke("document:open"),
+    openSvg: () => ipcRenderer.invoke("document:open-svg"),
     openRecentDocument: (filePath) =>
       ipcRenderer.invoke("document:open-recent", filePath),
     saveDocument: (payload) => ipcRenderer.invoke("document:save", payload),

@@ -2,9 +2,21 @@ import {
   getNodePropertyIds,
   supportsNodeProperty,
 } from "../nodes/node-property-support";
+import { isContainerNode } from "../nodes/node-tree";
 import { getPropertyDescriptor } from "./property-descriptors";
+import {
+  getSelectionColors,
+  setSelectionColor as setSelectionColorInternal,
+} from "./selection-colors";
 
 const EMPTY_PROPERTIES = Object.freeze({});
+
+const getPropertyTargetNodeIds = (editor, nodeIds) => {
+  return nodeIds
+    .map((nodeId) => editor.getPathEditingTargetNodeId(nodeId) || nodeId)
+    .filter(Boolean)
+    .filter((nodeId, index, values) => values.indexOf(nodeId) === index);
+};
 
 const getSelectionKind = (selectedNodes) => {
   if (selectedNodes.length === 0) {
@@ -15,7 +27,7 @@ const getSelectionKind = (selectedNodes) => {
     return "multi";
   }
 
-  return selectedNodes[0]?.type === "group" ? "group" : "single";
+  return isContainerNode(selectedNodes[0]) ? "group" : "single";
 };
 
 const getSharedPropertyIds = (selectedNodes, selectionKind) => {
@@ -27,7 +39,7 @@ const getSharedPropertyIds = (selectedNodes, selectionKind) => {
     (propertyId) => {
       const descriptor = getPropertyDescriptor(propertyId);
 
-      return Boolean(descriptor && descriptor.scopes.includes(selectionKind));
+      return Boolean(descriptor?.scopes.includes(selectionKind));
     }
   );
 
@@ -66,9 +78,14 @@ const getPropertyState = (selectedNodes, propertyId) => {
 
 const buildSelectionProperties = (editor, nodeIds) => {
   const selectedNodeIds = [...nodeIds];
-  const selectedNodes = selectedNodeIds
+  const propertyTargetNodeIds = getPropertyTargetNodeIds(
+    editor,
+    selectedNodeIds
+  );
+  const selectedNodes = propertyTargetNodeIds
     .map((nodeId) => editor.getNode(nodeId))
     .filter(Boolean);
+  const selectionColors = getSelectionColors(editor, selectedNodeIds);
   const selectedNode = selectedNodes.length === 1 ? selectedNodes[0] : null;
   const selectionKind = getSelectionKind(selectedNodes);
   const propertyIds = getSharedPropertyIds(selectedNodes, selectionKind);
@@ -89,10 +106,11 @@ const buildSelectionProperties = (editor, nodeIds) => {
   return {
     canDelete:
       selectionKind === "single" &&
-      selectedNode?.type !== "group" &&
+      !isContainerNode(selectedNode) &&
       !hasPathGuide,
     properties:
       Object.keys(properties).length > 0 ? properties : EMPTY_PROPERTIES,
+    selectionColors,
     selectedCount: selectedNodes.length,
     selectedNode,
     selectedNodeIds,
@@ -112,6 +130,11 @@ const getSelectionPropertiesKeyFromState = (selectionProperties) => {
   return JSON.stringify({
     canDelete: selectionProperties.canDelete,
     properties: keyedProperties,
+    selectionColors: selectionProperties.selectionColors.map(
+      (selectionColor) => {
+        return [selectionColor.id, selectionColor.usageCount];
+      }
+    ),
     selectedNodeId: selectionProperties.selectedNode?.id || null,
     selectionKind: selectionProperties.selectionKind,
   });
@@ -137,9 +160,11 @@ export const setSelectionProperty = (
     return false;
   }
 
-  const targetNodeIds = nodeIds.filter((nodeId) => {
-    return supportsNodeProperty(editor.getNode(nodeId), propertyId);
-  });
+  const targetNodeIds = getPropertyTargetNodeIds(editor, nodeIds).filter(
+    (nodeId) => {
+      return supportsNodeProperty(editor.getNode(nodeId), propertyId);
+    }
+  );
   if (targetNodeIds.length === 0) {
     return false;
   }
@@ -149,6 +174,15 @@ export const setSelectionProperty = (
   });
 
   return true;
+};
+
+export const setSelectionColor = (
+  editor,
+  selectionColorId,
+  value,
+  nodeIds = editor.selectedNodeIds
+) => {
+  return setSelectionColorInternal(editor, selectionColorId, value, nodeIds);
 };
 
 export const getSelectionProperties = (

@@ -1,3 +1,4 @@
+import { ARTBOARD_HEIGHT, ARTBOARD_WIDTH } from "@punchpress/engine";
 import type { LocalFontDescriptor } from "@punchpress/punch-schema";
 import {
   DEFAULT_DOCUMENT_BASE_NAME,
@@ -10,6 +11,7 @@ import {
   getDocumentBaseName,
   getRecentPunchDocumentFiles,
   openPunchDocumentFile,
+  openSvgImportFile,
   openRecentPunchDocumentFile,
   type PunchDocumentHandle,
   type PunchOpenedDocumentFile,
@@ -17,6 +19,7 @@ import {
   savePunchDocumentFile,
   savePunchSvgFile,
 } from "@/platform/web-document-files";
+import { importSvgToNodes } from "@/platform/svg-import-document";
 import { useEditor } from "../../../editor-react/use-editor";
 import {
   type DocumentCommand,
@@ -26,6 +29,15 @@ import {
 import { useDocumentCommandTriggers } from "./use-document-command-triggers";
 import { useEditorModalBlocking } from "./use-editor-modal-blocking";
 import { useUnsavedDocumentWarning } from "./use-unsaved-document-warning";
+
+const getSvgImportTargetCenter = (editor: ReturnType<typeof useEditor>) => {
+  return (
+    editor.getViewportCenter?.() || {
+      x: ARTBOARD_WIDTH / 2,
+      y: ARTBOARD_HEIGHT / 2,
+    }
+  );
+};
 
 export const useDocumentCommands = () => {
   const editor = useEditor();
@@ -160,6 +172,24 @@ export const useDocumentCommands = () => {
     await finishOpenedDocument(openedDocument);
   });
 
+  const handleImportSvg = useEffectEvent(async () => {
+    const openedSvg = await openSvgImportFile();
+
+    if (!openedSvg) {
+      return;
+    }
+
+    const importedNodes = await importSvgToNodes(openedSvg.contents, {
+      targetCenter: getSvgImportTargetCenter(editor),
+    });
+
+    editor.insertNodes(importedNodes);
+    showToast({
+      message: `Imported ${openedSvg.fileName}`,
+      type: "success",
+    });
+  });
+
   const handleExportDocument = useEffectEvent(async () => {
     const svg = await editor.exportDocument();
     const result = await savePunchSvgFile(svg, documentBaseName);
@@ -183,6 +213,11 @@ export const useDocumentCommands = () => {
 
       if (command === "open") {
         await handleOpenDocument();
+        return;
+      }
+
+      if (command === "import-svg") {
+        await handleImportSvg();
         return;
       }
 

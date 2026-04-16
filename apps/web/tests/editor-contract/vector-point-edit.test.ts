@@ -276,12 +276,30 @@ describe("vector point editing", () => {
       JSON.stringify({
         nodes: [
           {
-            contours: [createRectangleContour()],
+            id: "vector-container",
+            name: "Vector",
+            parentId: "root",
+            transform: {
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+              x: 0,
+              y: 0,
+            },
+            type: "vector",
+            visible: true,
+          },
+          {
+            closed: true,
             fill: "#ffffff",
             fillRule: "nonzero",
             id: "vector-node",
-            parentId: "root",
+            parentId: "vector-container",
+            segments: createRectangleContour().segments,
             stroke: "#000000",
+            strokeLineCap: "butt",
+            strokeLineJoin: "miter",
+            strokeMiterLimit: 4,
             strokeWidth: 12,
             transform: {
               rotation: 0,
@@ -290,15 +308,16 @@ describe("vector point editing", () => {
               x: 240,
               y: 180,
             },
-            type: "vector",
+            type: "path",
             visible: true,
           },
         ],
-        version: "1.4",
+        version: "1.6",
       })
     );
 
-    const segment = editor.getNode("vector-node")?.contours?.[0]?.segments?.[0];
+    const node = editor.getNode("vector-node");
+    const segment = node?.type === "path" ? node.segments[0] : null;
 
     expect(segment?.pointType).toBe("corner");
     expect(editor.getDebugDump().document.version).toBe("1.6");

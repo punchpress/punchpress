@@ -1,10 +1,12 @@
 import { groupNodeCapabilities } from "./group/group-capabilities";
+import { pathNodeCapabilities } from "./path/path-capabilities";
 import { shapeNodeCapabilities } from "./shape/shape-capabilities";
 import { textNodeCapabilities } from "./text/text-capabilities";
 import { vectorNodeCapabilities } from "./vector/vector-capabilities";
 
 const nodeCapabilitiesByType = {
   group: groupNodeCapabilities,
+  path: pathNodeCapabilities,
   shape: shapeNodeCapabilities,
   text: textNodeCapabilities,
   vector: vectorNodeCapabilities,

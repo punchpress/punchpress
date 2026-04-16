@@ -1,3 +1,5 @@
+import { isContainerNode } from "@punchpress/engine";
+
 export const getTargetClientBounds = (targets) => {
   if (targets.length === 0) {
     return null;
@@ -80,7 +82,7 @@ export const getNodeIdsFromSelectionRect = (editor, rect) => {
   const bottom = rect.bottom ?? rect.top + rect.height;
 
   return editor.nodes
-    .filter((node) => node.type !== "group")
+    .filter((node) => !isContainerNode(node))
     .filter((node) => editor.isNodeEffectivelyVisible(node.id))
     .map((node) => node.id)
     .filter((nodeId) => {

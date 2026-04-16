@@ -5,10 +5,11 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 ## Product Expectations
 
 - A vector node stores editable vector source geometry, not only a flattened export artifact.
-- A vector node remains a first-class canvas object with stable identity, layer behavior, visibility, styling, and transform.
-- A vector node supports the durable styling needed for editable SVG path artwork: fill color, stroke color, stroke width, fill-rule, stroke line cap, stroke line join, and miter limit.
+- A vector node remains a first-class canvas object with stable identity, layer behavior, visibility, and transform.
 - Fill and stroke colors may carry alpha directly in the stored color value, and that alpha should remain editable through the normal color picker workflow.
-- A vector node may contain one or more contours, including open paths, closed paths, and compound path-like structures.
+- A vector node is a container for one or more child path nodes.
+- A child path node represents one editable path or contour.
+- A vector node should appear as one parent layer entry in the layers panel with its child path rows nested underneath it.
 - A vector node should stay editable after save, load, copy, paste, duplicate, transform, and export workflows.
 - A vector node should represent freeform path geometry and converted live shapes whose editing no longer maps cleanly to a live shape model.
 - By default, vector object behavior should follow familiar Adobe Illustrator-style conventions unless PunchPress intentionally chooses to diverge for a clear product reason.
@@ -20,6 +21,7 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 - Selection and transform handles should remain screen-sized and visually consistent even when the node's durable data represents resize through transform scale.
 - A vector node should not require path-edit mode for normal object transforms.
 - Resizing or rotating a vector node in the default selected state should preserve editability of the underlying vector source.
+- Selecting a vector node should show one object-level selection frame for the whole vector object rather than separate frames for each child path.
 
 ## Path Editing
 
@@ -35,6 +37,7 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 - Path-editing affordances should follow PunchPress's visual language rather than looking like a foreign embedded tool.
 - Anchor and handle controls should remain visually stable and screen-sized while the user edits the path.
 - Path edits should update the same vector node rather than creating a replacement node.
+- Path edits should update child path nodes inside the same vector node rather than replacing the parent vector object.
 
 ## Anchor Semantics
 
@@ -54,10 +57,9 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 - Users should be able to select anchor points by click, additive selection, and marquee-style point selection.
 - Dragging one selected anchor should move the full selected anchor set together.
 - While path editing is active, marquee selection should target path points rather than whole nodes.
-- Path-edit cursors should distinguish point selection/editing from whole-object dragging.
-- Hovering or dragging a point should use point-edit cursor language such as `pointer`, not object-move cursors.
-- Hovering an anchor or bezier handle should communicate point editing, not object movement.
-- Dragging the vector body should continue to use object-drag cursor language such as `grab` and `grabbing`.
+- Path-edit cursor behavior should feel coherent and stable during vector editing.
+- PunchPress may use the shared general-purpose canvas cursor for both point editing and vector-body dragging during path edit mode.
+- Point editing intent should remain clear through anchors, handles, hover halos, selection chrome, and related affordances even when the cursor itself does not change between point and body interactions.
 - Open and closed contours should both be editable through the same interaction model.
 - Open contours should remain visually open on canvas and export rather than being filled across an implied closing edge.
 - Selecting a single anchor should expose point-specific actions without leaving path edit mode.
@@ -93,13 +95,13 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 - Press-dragging from an insertable segment with the Pen tool should insert the point first and then author its handles in the same gesture.
 - Path editing should support deleting selected points without destroying the whole path.
 - While path editing is active and one anchor is selected, `Delete` or `Backspace` should delete that anchor before falling back to whole-object deletion behavior.
-- Path editing should support cutting or splitting a path at a selected point or segment.
+- Path editing should support cutting or splitting a path at a selected point.
 - Path editing should support joining compatible open endpoints.
 - Dragging an open endpoint onto the opposite endpoint of the same contour in path edit mode should snap and close the contour.
 - Dragging an open endpoint onto a compatible endpoint on another open contour should snap the dragged endpoint to that target without auto-joining the contours.
 - Releasing after that cross-contour snap should leave those two endpoints selected so the explicit join action is immediately available.
 - Path editing should support closing an open path through explicit intent with clear feedback when the user is targeting the starting anchor.
-- Path editing should support reopening or breaking a closed contour at a chosen point.
+- Path editing should support reopening or breaking a closed contour at a chosen existing point.
 - Joining endpoints should preserve the path as editable vector source geometry and should follow Illustrator-style expectations for corner joins by default.
 - Joining explicitly after a snapped endpoint alignment should collapse coincident endpoints into one anchor instead of leaving a zero-length edge.
 
@@ -121,8 +123,8 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 - Esc should end the current drawing gesture without exiting the broader vector editing mode unexpectedly.
 - Enter or an equivalent explicit confirm gesture may finish the current path.
 - The Pen workflow should support continuing an open path from either valid endpoint.
-- By default, after the user finishes one contour, starting a new disconnected Pen path should create a new vector node rather than silently appending another contour to the current node.
-- A vector node may still contain multiple contours through import, topology edits, or explicit combine or compound-path workflows, but that should not be the baseline Pen authoring behavior.
+- While the user remains in vector path editing, starting a new disconnected Pen path should create a new child path inside that same vector node.
+- When the user is not actively editing a vector, starting a new disconnected Pen path should create a new vector node.
 
 ## Complete Editor
 
@@ -160,29 +162,37 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 
 ## Styling And Geometry
 
-- Fill and stroke styling should remain attached to the vector node, not to temporary editing UI.
+- Fill and stroke styling should remain attached to editable path content, not to temporary editing UI.
+- Child path nodes should support the durable styling needed for editable SVG path artwork: fill color, stroke color, stroke width, fill-rule, stroke line cap, stroke line join, and miter limit.
 - Changing fill color, stroke color, stroke width, fill rule, stroke line cap, stroke line join, or miter limit should not reduce editability of the path.
 - PunchPress vector nodes use center-aligned strokes as the baseline stroke model for editable vector artwork.
 - Newly created vector paths should default to a `3px` stroke width until the user changes it.
 - Object resize should scale vector stroke visually with the rest of the object by default.
 - This Illustrator-style default should be treated as the baseline vector behavior for PunchPress.
-- A vector node should support curved segments, straight segments, and mixed contours within the same node.
+- A vector node should support curved segments, straight segments, and mixed child paths within the same node.
+
+## Properties Panel
+
+- Selecting a vector node should show object-level controls for the vector as a whole and aggregate appearance controls for its child paths.
+- When a selected vector contains multiple child path colors, the properties panel should show a `Selection colors` section listing the distinct colors currently in use by those child paths.
+- Editing one `Selection colors` swatch should update every selected child path fill or stroke paint that currently uses that exact color value.
+- `Selection colors` should be color-based rather than fill-versus-stroke based, so the same color should appear only once even if it is currently used by both fills and strokes.
+- Path-specific geometry and path-specific appearance controls should remain on direct child path selection rather than moving onto the parent vector node.
 
 ## Relationship To Other Features
 
-- A vector path should be able to act as a reusable path source for other canvas behaviors.
-- Path-following layout features should reuse vector path geometry without conflating path placement with geometry deformation.
 - Vector editing may use a specialized editing subsystem, but PunchPress remains the durable owner of the node model and writes edits back into editable vector source geometry.
 
 ## SVG Import
 
+- SVG import should insert editable vector nodes into the current PunchPress document rather than opening raw `.svg` files as if they were native document files.
 - SVG import should target editable path artwork rather than treating raw SVG path strings as the durable model.
-- Import should normalize supported SVG geometry such as `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`, and compound paths into PunchPress vector contours, segments, handles, and point types.
-- Import should preserve visible geometry, object transforms, contour openness or closedness, and contour grouping closely enough that an imported Illustrator-style path object still looks and edits like the same artwork.
-- Import should preserve representable path styling on editable vector nodes, including `fill`, `stroke`, `stroke-width`, `fill-rule`, `stroke-linecap`, `stroke-linejoin`, and `stroke-miterlimit`.
+- Import should normalize supported SVG geometry such as `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`, and compound paths into PunchPress vector nodes with editable child path nodes, segments, handles, and point types.
+- Import should preserve visible geometry, object transforms, path openness or closedness, and path grouping closely enough that an imported Illustrator-style path object still looks and edits like the same artwork.
+- Import should preserve representable path styling on editable child path nodes, including `fill`, `stroke`, `stroke-width`, `fill-rule`, `stroke-linecap`, `stroke-linejoin`, and `stroke-miterlimit`.
 - When imported SVG path artwork uses `fill-opacity` or `stroke-opacity`, PunchPress should preserve that transparency through alpha-capable stored fill or stroke colors rather than dropping the visual result.
 - Import should preserve `fill="none"` and `stroke="none"` explicitly rather than synthesizing fallback paint.
-- Import should preserve compound-path semantics through the combination of multiple contours and the imported fill rule so holes and overlaps still render correctly in the editor and on export.
+- Import should preserve compound-path semantics through the combination of multiple child paths and the imported fill rule so holes and overlaps still render correctly in the editor and on export.
 - Open imported paths should remain open and should not be filled across an implied closing edge.
 - Imported vector objects should remain editable through the ordinary vector path editing workflow without requiring a destructive expand or flatten step first.
 - The baseline editable SVG import target for vector nodes is solid-color path artwork. Features such as gradients, patterns, masks, filters, markers, blend modes, raster images, and SVG text are outside this vector-node contract unless PunchPress defines a separate import behavior for them.

@@ -1,4 +1,5 @@
 import { getShapePathEditResult } from "../../nodes/shape/shape-engine";
+import { buildPathNodeGeometry } from "../../nodes/path/path-engine";
 import { buildVectorNodeGeometry } from "../../nodes/vector/vector-engine";
 import { getNodeTransformForPinnedWorldPoint } from "../../primitives/rotation";
 import { toPathPointKey } from "../../state/store/path/path-point-selection";
@@ -17,7 +18,56 @@ export const updateVectorContours = (
 ) => {
   const node = editor.getNode(nodeId);
 
-  if (!(node?.type === "vector" && contours)) {
+  if (!(node && contours)) {
+    return false;
+  }
+
+  if (node.type === "path") {
+    const nextContour = contours[0];
+
+    if (!nextContour) {
+      return false;
+    }
+
+    editor.run(() => {
+      editor.getState().updateNodeById(nodeId, (currentNode) => {
+        if (currentNode.type !== "path") {
+          return currentNode;
+        }
+
+        const nextNode = {
+          ...currentNode,
+          closed: nextContour.closed,
+          segments: nextContour.segments,
+        };
+        const nextGeometry = buildPathNodeGeometry(nextNode);
+        const nextTransform =
+          nextGeometry.bbox && pinnedLocalPoint && pinnedWorldPoint
+            ? getNodeTransformForPinnedWorldPoint(
+                nextNode,
+                nextGeometry.bbox,
+                pinnedLocalPoint,
+                pinnedWorldPoint
+              )
+            : null;
+
+        return {
+          closed: nextContour.closed,
+          segments: nextContour.segments,
+          transform: nextTransform
+            ? {
+                ...currentNode.transform,
+                ...nextTransform,
+              }
+            : undefined,
+        };
+      });
+    });
+
+    return true;
+  }
+
+  if (node.type !== "vector") {
     return false;
   }
 

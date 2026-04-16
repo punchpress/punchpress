@@ -10,6 +10,7 @@ import {
 } from "./recent-documents.js";
 
 const OPEN_DOCUMENT_CHANNEL = "document:open";
+const OPEN_SVG_CHANNEL = "document:open-svg";
 const OPEN_RECENT_DOCUMENT_CHANNEL = "document:open-recent";
 const SAVE_DOCUMENT_CHANNEL = "document:save";
 const SAVE_SVG_CHANNEL = "document:save-svg";
@@ -77,6 +78,24 @@ export const registerDocumentFileHandlers = ({
     onRecentDocumentsChanged?.();
 
     return openedDocument;
+  });
+
+  ipcMain.handle(OPEN_SVG_CHANNEL, async () => {
+    const result = await dialog.showOpenDialog(getDialogWindow(), {
+      filters: [
+        {
+          extensions: ["svg"],
+          name: "SVG artwork",
+        },
+      ],
+      properties: ["openFile"],
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return null;
+    }
+
+    return readDocumentAtPath(result.filePaths[0]);
   });
 
   ipcMain.handle(OPEN_RECENT_DOCUMENT_CHANNEL, async (_event, filePath) => {

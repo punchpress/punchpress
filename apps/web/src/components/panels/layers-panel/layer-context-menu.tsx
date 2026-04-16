@@ -16,7 +16,7 @@ export const LayerGlyph = ({ icon, size = 18, strokeWidth = 1.8 }) => {
       color="currentColor"
       icon={icon}
       size={size}
-      strokeWidth={strokeWidth}
+      {...(typeof strokeWidth === "number" ? { strokeWidth } : {})}
     />
   );
 };

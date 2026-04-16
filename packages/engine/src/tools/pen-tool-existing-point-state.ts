@@ -19,7 +19,11 @@ import {
 } from "./pen-tool-draft-placement";
 import { startInsertPointAction } from "./pen-tool-insert-point-action";
 import { startPointTypeToggleAction } from "./pen-tool-point-type-toggle-action";
-import { createPlacementSession, DRAG_THRESHOLD_PX } from "./pen-tool-types";
+import {
+  createPlacementSession,
+  DRAG_THRESHOLD_PX,
+  isPenEditableNode,
+} from "./pen-tool-types";
 
 export const startExistingPointAction = (
   tool: PenTool,
@@ -28,7 +32,7 @@ export const startExistingPointAction = (
   event = null
 ) => {
   const targetNode =
-    node ||
+    (isPenEditableNode(node) ? node : null) ||
     getExistingPointActionNode(
       tool.editor,
       tool.editor.pathEditingNodeId || tool.editor.selectedNodeId

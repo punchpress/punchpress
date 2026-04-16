@@ -175,7 +175,7 @@ describe("browser recent documents", () => {
 
   test("reopens a prompted handle and refreshes recent documents when access is granted", async () => {
     const fileHandle = new TestFileSystemFileHandle("granted.punch", {
-      contents: '{"version":"1.0"}',
+      contents: '{"version":"1.6"}',
       permissionState: "prompt",
       requestPermissionState: "granted",
     });
@@ -187,7 +187,7 @@ describe("browser recent documents", () => {
     );
 
     expect(openedDocument).toEqual({
-      contents: '{"version":"1.0"}',
+      contents: '{"version":"1.6"}',
       fileHandle,
       fileName: "granted.punch",
     });

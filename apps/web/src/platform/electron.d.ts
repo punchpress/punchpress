@@ -47,7 +47,13 @@ declare global {
         markReady: () => void;
         onCommand: (
           callback: (
-            command: "export" | "new" | "open" | "save" | "save-as"
+            command:
+              | "export"
+              | "import-svg"
+              | "new"
+              | "open"
+              | "save"
+              | "save-as"
           ) => void
         ) => () => void;
         onOpenDocument: (
@@ -71,6 +77,7 @@ declare global {
       };
       documentFiles?: {
         openDocument: () => Promise<DesktopDocumentFileResult | null>;
+        openSvg: () => Promise<DesktopDocumentFileResult | null>;
         openRecentDocument: (
           filePath: string
         ) => Promise<DesktopDocumentFileResult | null>;

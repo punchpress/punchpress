@@ -1,25 +1,32 @@
 import {
-  getNodeEditCapabilities as getNodeSurfaceEditCapabilities,
   getNodeEditablePathSession as getNodeSurfaceEditablePathSession,
+  getNodeEditCapabilities as getNodeSurfaceEditCapabilities,
   getNodeSurfaceFrame,
   getNodeSurfaceGeometry,
   getNodeHitBounds as getNodeSurfaceHitBounds,
   getNodeSurfaceLocalBounds,
 } from "../nodes/node-capabilities";
-import { isGroupNode, isShapeNode, isTextNode } from "../nodes/node-tree";
+import {
+  isContainerNode,
+  isGroupNode,
+  isPathNode,
+  isShapeNode,
+  isTextNode,
+  isVectorNode,
+} from "../nodes/node-tree";
 import {
   getNodeRotation,
   getNodeX,
   getNodeY,
   isNodeVisible,
 } from "../nodes/text/model";
-import { getOverlayWorldFrame } from "./overlay-frame";
 import {
   getLocalBoundsCenter,
   getNodeWorldPoint,
   getWorldPointFromTransformFrame,
   rotatePointAround,
 } from "../primitives/rotation";
+import { getOverlayWorldFrame } from "./overlay-frame";
 
 export const getNode = (editor, nodeId) => {
   if (!nodeId) {
@@ -51,26 +58,32 @@ export const getLayerRow = (editor, nodeId) => {
   const siblingIds = editor.getChildNodeIds(node.parentId);
   const siblingIndex = siblingIds.indexOf(node.id);
   const layerIndex = siblingIds.length - 1 - siblingIndex;
-  const groupSiblingIds = siblingIds.filter((siblingId) => {
-    return isGroupNode(editor.getNode(siblingId));
+  const containerSiblingIds = siblingIds.filter((siblingId) => {
+    return isContainerNode(editor.getNode(siblingId));
   });
-  const groupIndex = groupSiblingIds.indexOf(node.id);
-  const groupLayerIndex =
-    groupIndex >= 0 ? groupSiblingIds.length - 1 - groupIndex : -1;
+  const containerIndex = containerSiblingIds.indexOf(node.id);
+  const containerLayerIndex =
+    containerIndex >= 0 ? containerSiblingIds.length - 1 - containerIndex : -1;
   const isVisible = isNodeEffectivelyVisible(editor, node);
-  let label = node.name || `Group ${groupLayerIndex + 1}`;
+  let label = node.name || `Group ${containerLayerIndex + 1}`;
 
   if (isTextNode(node)) {
     label = node.text.trim().length > 0 ? node.text : `Text ${layerIndex + 1}`;
   } else if (isShapeNode(node)) {
     label = `${node.shape[0].toUpperCase()}${node.shape.slice(1)} ${layerIndex + 1}`;
+  } else if (isVectorNode(node)) {
+    label = node.name || `Vector ${containerLayerIndex + 1}`;
+  } else if (isPathNode(node)) {
+    label = `Path ${layerIndex + 1}`;
   }
 
   return {
     isBackmost: siblingIndex === 0,
+    isContainer: isContainerNode(node),
     isFrontmost: siblingIndex === siblingIds.length - 1,
     isGroup: isGroupNode(node),
     isSelected: editor.isSelected(node.id),
+    isVector: isVectorNode(node),
     isVisible,
     label,
     node,
@@ -145,11 +158,19 @@ export const getNodeSelectionFrame = (editor, nodeId) => {
     });
   }
 
+  const frame = getNodeSurfaceFrame(editor, nodeId, "selection", {
+    useSelectionBounds: Boolean(editor.getNodeTransformElement(nodeId)),
+  });
+
+  if (frame) {
+    return frame;
+  }
+
   const bounds = getNodeSurfaceLocalBounds(editor, nodeId, "selection", {
     useSelectionBounds: Boolean(editor.getNodeTransformElement(nodeId)),
   });
 
-  return getOverlayWorldFrame(node, bounds);
+  return bounds ? getOverlayWorldFrame(node, bounds) : null;
 };
 
 export const getNodeTransformFrame = (editor, nodeId) => {
@@ -163,7 +184,9 @@ export const getNodeTransformFrame = (editor, nodeId) => {
   const geometry = isPathEditing ? editor.getNodeGeometry(nodeId) : null;
 
   if (!(node && bounds)) {
-    return null;
+    return getNodeSurfaceFrame(editor, nodeId, "transform", {
+      useSelectionBounds: Boolean(editor.getNodeTransformElement(nodeId)),
+    });
   }
 
   if (isPathEditing && geometry?.bbox) {
@@ -201,7 +224,11 @@ export const getNodeTransformFrame = (editor, nodeId) => {
     };
   }
 
-  return getOverlayWorldFrame(node, bounds);
+  return (
+    getNodeSurfaceFrame(editor, nodeId, "transform", {
+      useSelectionBounds: Boolean(editor.getNodeTransformElement(nodeId)),
+    }) || getOverlayWorldFrame(node, bounds)
+  );
 };
 
 export const getNodeFrame = (editor, nodeId) => {
@@ -351,7 +378,7 @@ export const getSelectionTransformFrame = (
 
   if (
     requestedNodeIds.length === 1 &&
-    editor.getNode(requestedNodeIds[0])?.type !== "group"
+    !isContainerNode(editor.getNode(requestedNodeIds[0]))
   ) {
     const selectedNode = editor.getNode(requestedNodeIds[0]);
     const frame = editor.getNodeTransformFrame(requestedNodeIds[0]);

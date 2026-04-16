@@ -46,8 +46,13 @@ export const useNodeToolbarState = () => {
       ? getPathPointsKey(selectedPathPoints)
       : getPathPointKey(selectedPathPoint);
     const primaryPathPointKey = getPathPointKey(selectedPathPoint);
+    const selectionBooleanOperations = editor.getSelectionBooleanOperations(
+      visibleSelectedNodeIds
+    );
 
     return {
+      canBoolean: selectionBooleanOperations.hasAny,
+      selectionBooleanOperations,
       canEditPath: Boolean(selectedEditCapabilities?.canEditPath),
       hasPathEditingMode: Boolean(
         selectedEditCapabilities?.requiresPathEditing

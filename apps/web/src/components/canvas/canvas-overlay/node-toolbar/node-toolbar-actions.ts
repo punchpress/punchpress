@@ -1,3 +1,10 @@
+import {
+  PathfinderExcludeIcon,
+  PathfinderIntersectIcon,
+  PathfinderMergeIcon,
+  PathfinderMinusFrontIcon,
+} from "@hugeicons-pro/core-stroke-rounded";
+
 const getPathEditingToolbarActions = (editor, state) => {
   if (!(state.selectedNode && state.canEditPath && state.hasPathEditingMode)) {
     return [];
@@ -22,7 +29,7 @@ const getPathEditingToolbarActions = (editor, state) => {
 
   if (
     state.isPathEditing &&
-    state.selectedNode?.type === "vector" &&
+    state.selectedNode?.type === "path" &&
     selectedPathPoints.length === 2 &&
     editor.canJoinPathEndpoints(state.selectedNode.id, selectedPathPoints)
   ) {
@@ -86,7 +93,7 @@ const getPathEditingToolbarActions = (editor, state) => {
     ];
 
     if (
-      state.selectedNode.type === "vector" &&
+      state.selectedNode.type === "path" &&
       state.selectedPathPoint &&
       editor.canSplitPath(state.selectedNode.id, state.selectedPathPoint)
     ) {
@@ -108,6 +115,68 @@ const getPathEditingToolbarActions = (editor, state) => {
   return actions;
 };
 
+const getBooleanToolbarActions = (editor, state) => {
+  if (
+    !state.canBoolean ||
+    state.selectedPathPoint ||
+    state.selectedPathPoints?.length > 0
+  ) {
+    return [];
+  }
+
+  const booleanActions = [
+    {
+      icon: PathfinderMergeIcon,
+      id: "unite-selection",
+      isVisible: state.selectionBooleanOperations.unite,
+      onSelect: () => {
+        editor.uniteSelection(state.visibleSelectedNodeIds);
+      },
+      title: "Unite selection",
+    },
+    {
+      icon: PathfinderMinusFrontIcon,
+      id: "subtract-selection",
+      isVisible: state.selectionBooleanOperations.subtract,
+      onSelect: () => {
+        editor.subtractSelection(state.visibleSelectedNodeIds);
+      },
+      title: "Subtract selection",
+    },
+    {
+      icon: PathfinderIntersectIcon,
+      id: "intersect-selection",
+      isVisible: state.selectionBooleanOperations.intersect,
+      onSelect: () => {
+        editor.intersectSelection(state.visibleSelectedNodeIds);
+      },
+      title: "Intersect selection",
+    },
+    {
+      icon: PathfinderExcludeIcon,
+      id: "exclude-selection",
+      isVisible: state.selectionBooleanOperations.exclude,
+      onSelect: () => {
+        editor.excludeSelection(state.visibleSelectedNodeIds);
+      },
+      title: "Exclude selection",
+    },
+  ];
+
+  return booleanActions
+    .filter((action) => action.isVisible)
+    .map(({ isVisible: _isVisible, ...action }) => {
+      return {
+        ...action,
+        iconLibrary: "hugeicons",
+        isActive: false,
+        isIconOnly: true,
+        label: action.title,
+        variant: "ghost",
+      };
+    });
+};
+
 const getSharedToolbarActions = (editor, state) => {
   if (
     state.visibleSelectedNodeIds.length === 0 ||
@@ -118,6 +187,7 @@ const getSharedToolbarActions = (editor, state) => {
   }
 
   return [
+    ...getBooleanToolbarActions(editor, state),
     {
       id: "delete-selection",
       isActive: false,

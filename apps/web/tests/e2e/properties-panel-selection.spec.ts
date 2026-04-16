@@ -20,6 +20,8 @@ const getSection = (page, title) => {
 };
 
 const getFillSection = (page) => getSection(page, "Fill");
+const getSelectionColorsSection = (page) =>
+  getSection(page, "Selection colors");
 const getStrokeSection = (page) => getSection(page, "Stroke");
 
 const loadVectorStrokeStyleDocument = (page) => {
@@ -28,35 +30,45 @@ const loadVectorStrokeStyleDocument = (page) => {
     JSON.stringify({
       nodes: [
         {
-          contours: [
-            {
-              closed: false,
-              segments: [
-                {
-                  handleIn: { x: 0, y: 0 },
-                  handleOut: { x: 0, y: 0 },
-                  point: { x: -120, y: -40 },
-                  pointType: "corner",
-                },
-                {
-                  handleIn: { x: 0, y: 0 },
-                  handleOut: { x: 0, y: 0 },
-                  point: { x: 0, y: 80 },
-                  pointType: "corner",
-                },
-                {
-                  handleIn: { x: 0, y: 0 },
-                  handleOut: { x: 0, y: 0 },
-                  point: { x: 120, y: -40 },
-                  pointType: "corner",
-                },
-              ],
-            },
-          ],
+          id: "vector-container",
+          name: "Vector",
+          parentId: "root",
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: 0,
+            y: 0,
+          },
+          type: "vector",
+          visible: true,
+        },
+        {
+          closed: false,
           fill: null,
           fillRule: "nonzero",
           id: "vector-node",
-          parentId: "root",
+          parentId: "vector-container",
+          segments: [
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: -120, y: -40 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: 0, y: 80 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: 120, y: -40 },
+              pointType: "corner",
+            },
+          ],
           stroke: "#000000",
           strokeLineCap: "round",
           strokeLineJoin: "round",
@@ -69,7 +81,126 @@ const loadVectorStrokeStyleDocument = (page) => {
             x: 320,
             y: 240,
           },
+          type: "path",
+          visible: true,
+        },
+      ],
+      version: "1.6",
+    })
+  );
+};
+
+const loadVectorSelectionColorsDocument = (page) => {
+  return loadDocument(
+    page,
+    JSON.stringify({
+      nodes: [
+        {
+          id: "vector-container",
+          name: "Vector",
+          parentId: "root",
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: 0,
+            y: 0,
+          },
           type: "vector",
+          visible: true,
+        },
+        {
+          closed: true,
+          fill: "#F63F3F",
+          fillRule: "nonzero",
+          id: "vector-path-1",
+          parentId: "vector-container",
+          segments: [
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: -120, y: -90 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: 120, y: -90 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: 120, y: 90 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: -120, y: 90 },
+              pointType: "corner",
+            },
+          ],
+          stroke: "#000000",
+          strokeLineCap: "butt",
+          strokeLineJoin: "miter",
+          strokeMiterLimit: 4,
+          strokeWidth: 12,
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: 260,
+            y: 240,
+          },
+          type: "path",
+          visible: true,
+        },
+        {
+          closed: true,
+          fill: "#FFFFFF",
+          fillRule: "nonzero",
+          id: "vector-path-2",
+          parentId: "vector-container",
+          segments: [
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: -80, y: -40 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: 80, y: -40 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: 80, y: 40 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: -80, y: 40 },
+              pointType: "corner",
+            },
+          ],
+          stroke: "#F63F3F",
+          strokeLineCap: "butt",
+          strokeLineJoin: "miter",
+          strokeMiterLimit: 4,
+          strokeWidth: 12,
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: 260,
+            y: 240,
+          },
+          type: "path",
           visible: true,
         },
       ],
@@ -134,46 +265,55 @@ test("shows bulk path corner controls for a selected vector outside path edit mo
     JSON.stringify({
       nodes: [
         {
-          contours: [
-            {
-              closed: true,
-              segments: [
-                {
-                  cornerRadius: 18,
-                  handleIn: { x: 0, y: 0 },
-                  handleOut: { x: 0, y: 0 },
-                  point: { x: -120, y: -90 },
-                  pointType: "corner",
-                },
-                {
-                  cornerRadius: 18,
-                  handleIn: { x: 0, y: 0 },
-                  handleOut: { x: 0, y: 0 },
-                  point: { x: 120, y: -90 },
-                  pointType: "corner",
-                },
-                {
-                  cornerRadius: 18,
-                  handleIn: { x: 0, y: 0 },
-                  handleOut: { x: 0, y: 0 },
-                  point: { x: 120, y: 90 },
-                  pointType: "corner",
-                },
-                {
-                  cornerRadius: 18,
-                  handleIn: { x: 0, y: 0 },
-                  handleOut: { x: 0, y: 0 },
-                  point: { x: -120, y: 90 },
-                  pointType: "corner",
-                },
-              ],
-            },
-          ],
+          id: "vector-container",
+          name: "Vector",
+          parentId: "root",
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: 0,
+            y: 0,
+          },
+          type: "vector",
+          visible: true,
+        },
+        {
+          closed: true,
           fill: "#ffffff",
           fillRule: "nonzero",
           id: "vector-node",
-          parentId: "root",
+          parentId: "vector-container",
+          segments: [
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: -120, y: -90 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: 120, y: -90 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: 120, y: 90 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: -120, y: 90 },
+              pointType: "corner",
+            },
+          ],
           stroke: "#000000",
+          strokeLineCap: "butt",
+          strokeLineJoin: "miter",
+          strokeMiterLimit: 4,
           strokeWidth: 12,
           transform: {
             rotation: 0,
@@ -182,11 +322,11 @@ test("shows bulk path corner controls for a selected vector outside path edit mo
             x: 320,
             y: 240,
           },
-          type: "vector",
+          type: "path",
           visible: true,
         },
       ],
-      version: "1.5",
+      version: "1.6",
     })
   );
   await selectNodes(page, ["vector-node"]);
@@ -237,6 +377,53 @@ test("shows bulk path corner controls while pen-authoring an open path with elig
   ).toBeVisible();
 });
 
+test("shows selection colors for a selected multi-path vector and applies one swatch across matching fills and strokes", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadVectorSelectionColorsDocument(page);
+  await selectNodes(page, ["vector-container"]);
+
+  const selectionColorsSection = getSelectionColorsSection(page);
+  const selectionColorInputs = selectionColorsSection.getByRole("textbox");
+  const redSelectionColorInput = selectionColorInputs.nth(0);
+
+  await expect(selectionColorsSection).toBeVisible();
+  await expect(selectionColorInputs).toHaveCount(3);
+  await expect(redSelectionColorInput).toHaveValue("#F63F3F");
+
+  await redSelectionColorInput.fill("#112233");
+  await page.locator("body").click();
+
+  await expect
+    .poll(async () => {
+      const state = await getStateSnapshot(page);
+
+      return state.nodes
+        .filter((node) => {
+          return node.id === "vector-path-1" || node.id === "vector-path-2";
+        })
+        .map((node) => ({
+          fill: node.fill,
+          id: node.id,
+          stroke: node.stroke,
+        }))
+        .sort((left, right) => left.id.localeCompare(right.id));
+    })
+    .toEqual([
+      {
+        fill: "#112233",
+        id: "vector-path-1",
+        stroke: "#000000",
+      },
+      {
+        fill: "#FFFFFF",
+        id: "vector-path-2",
+        stroke: "#112233",
+      },
+    ]);
+});
+
 test("applies vector stroke cap and join from the properties panel without clearing selection", async ({
   page,
 }) => {
@@ -277,8 +464,8 @@ test("applies vector stroke cap and join from the properties panel without clear
     .click();
 
   await expect.poll(getVectorStrokeState).toMatchObject({
-    selectedNodeId: "vector-node",
-    selectedNodeIds: ["vector-node"],
+    selectedNodeId: "vector-container",
+    selectedNodeIds: ["vector-container"],
     strokeLineCap: "square",
   });
   await expect(capTrigger).toContainText("Square");
@@ -290,8 +477,8 @@ test("applies vector stroke cap and join from the properties panel without clear
     .click();
 
   await expect.poll(getVectorStrokeState).toMatchObject({
-    selectedNodeId: "vector-node",
-    selectedNodeIds: ["vector-node"],
+    selectedNodeId: "vector-container",
+    selectedNodeIds: ["vector-container"],
     strokeLineCap: "square",
     strokeLineJoin: "bevel",
   });

@@ -1,90 +1,57 @@
-import {
-  DEFAULT_VECTOR_STROKE_LINE_CAP,
-  DEFAULT_VECTOR_STROKE_LINE_JOIN,
-  DEFAULT_VECTOR_STROKE_MITER_LIMIT,
-} from "@punchpress/punch-schema";
-import { toTransformedWorldFrame, toWorldFrame } from "../node-frame-utils";
+import { getDescendantLeafNodeIds } from "../node-tree";
 import { createDefaultVectorNode } from "./model";
-import { buildVectorNodeGeometry } from "./vector-engine";
 
 export const vectorNodeCapabilities = {
-  buildGeometry: (node) => {
-    return buildVectorNodeGeometry(node);
-  },
+  buildGeometry: () => null,
 
   createDefaultNode: () => {
     return createDefaultVectorNode();
   },
 
-  getFrameFromGeometry: (node, geometry, surface) => {
-    switch (surface) {
-      case "render":
-        return toWorldFrame(node, geometry?.bbox);
-      case "selection":
-      case "transform":
-        return toTransformedWorldFrame(node, geometry?.bbox);
-      default:
-        return null;
+  getFrameFromGeometry: () => null,
+
+  getFrame: (editor, nodeId) => {
+    const descendantLeafNodeIds = getDescendantLeafNodeIds(
+      editor.nodes,
+      nodeId
+    );
+    if (descendantLeafNodeIds.length === 0) {
+      return null;
     }
-  },
 
-  getFrame: (editor, nodeId, node, surface) => {
-    const geometry = editor.getNodeGeometry(nodeId);
+    const bounds = editor.getSelectionBounds(descendantLeafNodeIds);
+    if (!bounds) {
+      return null;
+    }
 
-    return vectorNodeCapabilities.getFrameFromGeometry(node, geometry, surface);
+    return {
+      bounds,
+      transform: undefined,
+    };
   },
 
   getGeometrySignature: (node, fontRevision) => {
-    return JSON.stringify({
-      contours: node.contours,
-      fill: node.fill,
-      fillRule: node.fillRule,
-      fontRevision,
-      stroke: node.stroke,
-      strokeLineCap: node.strokeLineCap ?? DEFAULT_VECTOR_STROKE_LINE_CAP,
-      strokeLineJoin: node.strokeLineJoin ?? DEFAULT_VECTOR_STROKE_LINE_JOIN,
-      strokeMiterLimit:
-        node.strokeMiterLimit ?? DEFAULT_VECTOR_STROKE_MITER_LIMIT,
-      strokeWidth: node.strokeWidth,
-    });
+    return `${fontRevision}:${node.id}:${node.type}`;
   },
 
-  getLocalBounds: (editor, nodeId) => {
-    return editor.getNodeGeometry(nodeId)?.bbox || null;
-  },
+  getLocalBounds: () => null,
 
-  getSurfaceGeometry: (editor, nodeId) => {
-    return editor.getNodeGeometry(nodeId);
-  },
+  getSurfaceGeometry: () => null,
 
-  getHitBounds: (editor, nodeId) => {
-    return editor.getNodeGeometry(nodeId)?.bbox || null;
-  },
+  getHitBounds: () => null,
 
   getEditCapabilities: () => ({
-    canEditPath: true,
+    canEditPath: false,
     canEditText: false,
     guide: null,
     hasExpandedHitBounds: false,
-    pathEditingOverlayMode: "replace-transform",
-    requiresPathEditing: true,
+    pathEditingOverlayMode: "keep-transform",
+    requiresPathEditing: false,
   }),
 
-  canPersistPathEditing: () => true,
+  canPersistPathEditing: () => false,
 
-  getEditablePathSession: (editor, nodeId, node) => ({
-    backend: "vector-path",
-    contours: node.contours,
-    interactionPolicy: {
-      canInsertPoint: true,
-    },
-    nodeId,
-    nodeType: node.type,
-    selectedPoints:
-      editor.pathEditingNodeId === nodeId ? editor.pathEditingPoints : [],
-    selectedPoint:
-      editor.pathEditingNodeId === nodeId ? editor.pathEditingPoint : null,
-  }),
+  getEditablePathSession: () => null,
 
   type: "vector",
 };

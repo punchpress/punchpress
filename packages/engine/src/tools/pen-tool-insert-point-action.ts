@@ -1,7 +1,12 @@
 import { replaceVectorContourSegment } from "../nodes/vector/vector-contour-operations";
 import { getNodeLocalPoint, getNodeWorldPoint } from "../primitives/rotation";
 import type { PenTool } from "./pen-tool";
-import { createPlacementSession, getPenDragHandle } from "./pen-tool-types";
+import {
+  createPlacementSession,
+  getNodeContours,
+  getPenDragHandle,
+  isPenEditableNode,
+} from "./pen-tool-types";
 
 interface PointPlacement {
   contourIndex: number;
@@ -37,7 +42,7 @@ const startInsertPointPlacement = (tool: PenTool, node, target) => {
 
   const insertedNode = tool.editor.getNode(node.id);
 
-  if (insertedNode?.type !== "vector") {
+  if (!isPenEditableNode(insertedNode)) {
     tool.editor.revertToMark(historyMark);
     return null;
   }
@@ -48,7 +53,7 @@ const startInsertPointPlacement = (tool: PenTool, node, target) => {
   return {
     anchorCanvasPoint,
     anchorLocalPoint: insertedPoint,
-    baseContours: insertedNode.contours,
+    baseContours: getNodeContours(insertedNode),
     currentCanvasPoint: anchorCanvasPoint,
     historyMark,
     nodeId: node.id,
@@ -68,7 +73,7 @@ const getInsertPointPlacementContours = (
   const node = tool.editor.getNode(placement.nodeId);
   const bbox = tool.editor.getNodeGeometry(placement.nodeId)?.bbox;
 
-  if (!(node?.type === "vector" && bbox && point)) {
+  if (!(isPenEditableNode(node) && bbox && point)) {
     return placement.baseContours;
   }
 
@@ -104,7 +109,7 @@ const getInsertPointPlacementContours = (
     };
     placement.currentCanvasPoint = nextCanvasPoint;
 
-    return replaceVectorContourSegment(node.contours, {
+    return replaceVectorContourSegment(getNodeContours(node), {
       contourIndex: placement.point.contourIndex,
       point: placement.anchorLocalPoint,
       segmentIndex: placement.point.segmentIndex,

@@ -5,6 +5,11 @@ import {
 } from "../nodes/vector/point-insert";
 import { getNodeLocalPoint, getNodeWorldPoint } from "../primitives/rotation";
 import { SEGMENT_INSERT_INTERACTION_TOLERANCE_PX } from "./pen-tool-types";
+import {
+  getNodeContours,
+  isPenEditableNode,
+  isPenSelectionActive,
+} from "./pen-tool-types";
 
 export const getSelectedEndpointContinuationTarget = (editor) => {
   const nodeId = editor.pathEditingNodeId;
@@ -18,15 +23,15 @@ export const getSelectedEndpointContinuationTarget = (editor) => {
 
   if (
     !(
-      node?.type === "vector" &&
-      editor.selectedNodeId === nodeId &&
-      editor.isSelected(nodeId)
+      isPenEditableNode(node) &&
+      editor.selectedNodeIds.length === 1 &&
+      isPenSelectionActive(editor, node)
     )
   ) {
     return null;
   }
 
-  const contour = node.contours[point.contourIndex];
+  const contour = getNodeContours(node)?.[point.contourIndex];
 
   if (!(contour && !contour.closed && contour.segments.length > 0)) {
     return null;
@@ -64,7 +69,7 @@ export const getExistingPointActionNode = (editor, nodeId) => {
 
   const node = editor.getNode(nodeId);
 
-  if (!(node?.type === "vector" && editor.isSelected(node.id))) {
+  if (!isPenSelectionActive(editor, node)) {
     return null;
   }
 
@@ -72,7 +77,7 @@ export const getExistingPointActionNode = (editor, nodeId) => {
 };
 
 export const resolveContinuationTarget = (editor, node, point) => {
-  if (!(node?.type === "vector" && editor.isSelected(node.id))) {
+  if (!isPenSelectionActive(editor, node)) {
     return null;
   }
 
@@ -91,7 +96,7 @@ export const resolveContinuationTarget = (editor, node, point) => {
   } | null = null;
   let closestDistance = Number.POSITIVE_INFINITY;
 
-  for (const [contourIndex, contour] of node.contours.entries()) {
+  for (const [contourIndex, contour] of (getNodeContours(node) || []).entries()) {
     if (contour.closed || contour.segments.length === 0) {
       continue;
     }
@@ -147,11 +152,7 @@ export const resolveContinuationTarget = (editor, node, point) => {
 
 export const resolveDeletePointTarget = (editor, node, point) => {
   if (
-    !(
-      node?.type === "vector" &&
-      editor.isSelected(node.id) &&
-      editor.pathEditingNodeId === node.id
-    )
+    !(isPenSelectionActive(editor, node) && editor.pathEditingNodeId === node.id)
   ) {
     return null;
   }
@@ -170,7 +171,7 @@ export const resolveDeletePointTarget = (editor, node, point) => {
   } | null = null;
   let closestDistance = Number.POSITIVE_INFINITY;
 
-  for (const [contourIndex, contour] of node.contours.entries()) {
+  for (const [contourIndex, contour] of (getNodeContours(node) || []).entries()) {
     for (const [segmentIndex, segment] of contour.segments.entries()) {
       const isEndpoint =
         !contour.closed &&
@@ -203,11 +204,7 @@ export const resolveDeletePointTarget = (editor, node, point) => {
 
 export const resolvePointTypeToggleTarget = (editor, node, point) => {
   if (
-    !(
-      node?.type === "vector" &&
-      editor.isSelected(node.id) &&
-      editor.pathEditingNodeId === node.id
-    )
+    !(isPenSelectionActive(editor, node) && editor.pathEditingNodeId === node.id)
   ) {
     return null;
   }
@@ -226,7 +223,7 @@ export const resolvePointTypeToggleTarget = (editor, node, point) => {
   } | null = null;
   let closestDistance = Number.POSITIVE_INFINITY;
 
-  for (const [contourIndex, contour] of node.contours.entries()) {
+  for (const [contourIndex, contour] of (getNodeContours(node) || []).entries()) {
     for (const [segmentIndex, segment] of contour.segments.entries()) {
       const worldPoint = getNodeWorldPoint(node, bbox, segment.point);
       const distance = Math.hypot(
@@ -251,11 +248,7 @@ export const resolvePointTypeToggleTarget = (editor, node, point) => {
 
 export const resolveInsertPointTarget = (editor, node, point) => {
   if (
-    !(
-      node?.type === "vector" &&
-      editor.isSelected(node.id) &&
-      editor.pathEditingNodeId === node.id
-    )
+    !(isPenSelectionActive(editor, node) && editor.pathEditingNodeId === node.id)
   ) {
     return null;
   }
@@ -273,7 +266,7 @@ export const resolveInsertPointTarget = (editor, node, point) => {
   );
   const localPoint = getNodeLocalPoint(node, bbox, point);
   const target = findVectorPathInsertTarget(
-    node.contours,
+    getNodeContours(node),
     localPoint,
     SEGMENT_INSERT_INTERACTION_TOLERANCE_PX /
       (Math.max(editor.zoom || 1, 1) * interactionScale)
@@ -284,7 +277,7 @@ export const resolveInsertPointTarget = (editor, node, point) => {
   }
 
   return splitVectorContourAtParameter(
-    node.contours[target.contourIndex],
+    getNodeContours(node)?.[target.contourIndex],
     target
   );
 };

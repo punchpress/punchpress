@@ -4,6 +4,7 @@ import {
   createLocalFontDescriptor,
   getLocalFontId,
   MissingDocumentFontsError,
+  PUNCH_DOCUMENT_VERSION,
 } from "@punchpress/punch-schema";
 
 const AVAILABLE_FONT = {
@@ -24,7 +25,7 @@ const createDocument = (
   id: string,
   text: string,
   font = MISSING_FONT,
-  version = "1.1"
+  version = "1.6"
 ) => {
   return JSON.stringify({
     nodes: [
@@ -85,7 +86,7 @@ const createCircleDocument = (id: string, pathPosition?: number) => {
         },
       },
     ],
-    version: "1.3",
+    version: "1.6",
   });
 };
 
@@ -110,6 +111,35 @@ const createFakeLoadedFont = () => {
     }),
     unitsPerEm: 1000,
   };
+};
+
+const createRectangleSegments = () => {
+  return [
+    {
+      handleIn: { x: 0, y: 0 },
+      handleOut: { x: 0, y: 0 },
+      point: { x: -100, y: -60 },
+      pointType: "corner" as const,
+    },
+    {
+      handleIn: { x: 0, y: 0 },
+      handleOut: { x: 0, y: 0 },
+      point: { x: 100, y: -60 },
+      pointType: "corner" as const,
+    },
+    {
+      handleIn: { x: 0, y: 0 },
+      handleOut: { x: 0, y: 0 },
+      point: { x: 100, y: 60 },
+      pointType: "corner" as const,
+    },
+    {
+      handleIn: { x: 0, y: 0 },
+      handleOut: { x: 0, y: 0 },
+      point: { x: -100, y: 60 },
+      pointType: "corner" as const,
+    },
+  ];
 };
 
 describe("Editor.loadDocument", () => {
@@ -229,43 +259,34 @@ describe("Editor.getSelectionFrameKey", () => {
 });
 
 describe("Editor.getNodeTransformFrame", () => {
-  test("bakes vector scale into overlay bounds instead of scaling the transform wrapper", () => {
+  test("uses the child path geometry for a selected vector container transform frame", () => {
     const editor = new Editor();
 
     editor.getState().loadNodes([
       {
-        contours: [
-          {
-            closed: true,
-            segments: [
-              {
-                handleIn: { x: 0, y: 0 },
-                handleOut: { x: 0, y: 0 },
-                point: { x: -100, y: -60 },
-              },
-              {
-                handleIn: { x: 0, y: 0 },
-                handleOut: { x: 0, y: 0 },
-                point: { x: 100, y: -60 },
-              },
-              {
-                handleIn: { x: 0, y: 0 },
-                handleOut: { x: 0, y: 0 },
-                point: { x: 100, y: 60 },
-              },
-              {
-                handleIn: { x: 0, y: 0 },
-                handleOut: { x: 0, y: 0 },
-                point: { x: -100, y: 60 },
-              },
-            ],
-          },
-        ],
-        fill: "#ffffff",
-        fillRule: "nonzero",
         id: "scaled-vector-node",
         parentId: "root",
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 0,
+          y: 0,
+        },
+        type: "vector",
+        visible: true,
+      },
+      {
+        closed: true,
+        fill: "#ffffff",
+        fillRule: "nonzero",
+        id: "scaled-vector-path",
+        parentId: "scaled-vector-node",
+        segments: createRectangleSegments(),
         stroke: null,
+        strokeLineCap: "round",
+        strokeLineJoin: "round",
+        strokeMiterLimit: 4,
         strokeWidth: 0,
         transform: {
           rotation: 30,
@@ -274,7 +295,7 @@ describe("Editor.getNodeTransformFrame", () => {
           x: 100,
           y: 200,
         },
-        type: "vector",
+        type: "path",
         visible: true,
       },
     ]);
@@ -288,7 +309,6 @@ describe("Editor.getNodeTransformFrame", () => {
         minY: 170,
         width: 400,
       },
-      transform: "rotate(30deg)",
     });
   });
 
@@ -325,47 +345,82 @@ describe("Editor.getNodeTransformFrame", () => {
 
     expect(frame?.transform).toBe("rotate(20deg)");
   });
-});
 
-describe("Editor vector resize behavior", () => {
-  test("keeps vector stroke width stable while object resize changes transform scale", () => {
+  test("keeps rotated path overlay bounds stable instead of expanding the box", () => {
     const editor = new Editor();
 
     editor.getState().loadNodes([
       {
-        contours: [
-          {
-            closed: true,
-            segments: [
-              {
-                handleIn: { x: 0, y: 0 },
-                handleOut: { x: 0, y: 0 },
-                point: { x: -100, y: -60 },
-              },
-              {
-                handleIn: { x: 0, y: 0 },
-                handleOut: { x: 0, y: 0 },
-                point: { x: 100, y: -60 },
-              },
-              {
-                handleIn: { x: 0, y: 0 },
-                handleOut: { x: 0, y: 0 },
-                point: { x: 100, y: 60 },
-              },
-              {
-                handleIn: { x: 0, y: 0 },
-                handleOut: { x: 0, y: 0 },
-                point: { x: -100, y: 60 },
-              },
-            ],
-          },
-        ],
+        closed: true,
         fill: "#ffffff",
         fillRule: "nonzero",
+        id: "scaled-path-node",
+        parentId: "root",
+        segments: [
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: -100, y: -60 },
+            pointType: "corner",
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: 100, y: -60 },
+            pointType: "corner",
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: 100, y: 60 },
+            pointType: "corner",
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: -100, y: 60 },
+            pointType: "corner",
+          },
+        ],
+        stroke: null,
+        strokeLineCap: "round",
+        strokeLineJoin: "round",
+        strokeMiterLimit: 4,
+        strokeWidth: 0,
+        transform: {
+          rotation: 30,
+          scaleX: 2,
+          scaleY: 0.5,
+          x: 100,
+          y: 200,
+        },
+        type: "path",
+        visible: true,
+      },
+    ]);
+
+    expect(editor.getNodeTransformFrame("scaled-path-node")).toEqual({
+      bounds: {
+        height: 60,
+        maxX: 300,
+        maxY: 230,
+        minX: -100,
+        minY: 170,
+        width: 400,
+      },
+      transform: "rotate(30deg)",
+    });
+  });
+});
+
+describe("Editor vector resize behavior", () => {
+  test("keeps path stroke width stable while resizing a selected vector container", () => {
+    const editor = new Editor();
+
+    editor.getState().loadNodes([
+      {
         id: "vector-resize-node",
         parentId: "root",
-        stroke: "#000000",
-        strokeWidth: 12,
         transform: {
           rotation: 0,
           scaleX: 1,
@@ -374,6 +429,28 @@ describe("Editor vector resize behavior", () => {
           y: 200,
         },
         type: "vector",
+        visible: true,
+      },
+      {
+        closed: true,
+        fill: "#ffffff",
+        fillRule: "nonzero",
+        id: "vector-resize-path",
+        parentId: "vector-resize-node",
+        segments: createRectangleSegments(),
+        stroke: "#000000",
+        strokeLineCap: "round",
+        strokeLineJoin: "round",
+        strokeMiterLimit: 4,
+        strokeWidth: 12,
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 100,
+          y: 200,
+        },
+        type: "path",
         visible: true,
       },
     ]);
@@ -385,12 +462,19 @@ describe("Editor vector resize behavior", () => {
     });
 
     expect(editor.getNode("vector-resize-node")).toMatchObject({
+      transform: {
+        scaleX: 1,
+        scaleY: 1,
+      },
+      type: "vector",
+    });
+    expect(editor.getNode("vector-resize-path")).toMatchObject({
       strokeWidth: 12,
       transform: {
         scaleX: 1.5,
         scaleY: 1.5,
       },
-      type: "vector",
+      type: "path",
     });
   });
 });
@@ -512,24 +596,34 @@ describe("Editor text editing mode", () => {
     expect(editor.getNode(editor.selectedNodeId)).toMatchObject({
       type: "vector",
     });
-    expect(editor.getNode(editor.selectedNodeId)?.transform).toMatchObject({
+    const childPathId = editor.getChildNodeIds(editor.selectedNodeId || "")[0];
+
+    expect(editor.getNode(childPathId)).toMatchObject({
+      parentId: editor.selectedNodeId,
+      type: "path",
+    });
+    expect(editor.getNode(childPathId)?.transform).toMatchObject({
       x: 420,
       y: 180,
     });
-    expect(editor.pathEditingNodeId).toBe(editor.selectedNodeId);
+    expect(editor.pathEditingNodeId).toBe(childPathId);
   });
 
-  test("places a default vector with corner anchor points", () => {
+  test("places a default vector with corner anchor points on its child path", () => {
     const editor = new Editor();
 
     editor.addVectorNode({ x: 420, y: 180 });
 
-    expect(editor.selectedNode).toMatchObject({
+    const selectedVector = editor.selectedNode;
+    const childPath = selectedVector?.id
+      ? editor.getNode(editor.getChildNodeIds(selectedVector.id)[0])
+      : null;
+
+    expect(selectedVector).toMatchObject({
       type: "vector",
     });
-    expect(
-      editor.selectedNode?.contours[0]?.segments.map((segment) => segment.point)
-    ).toEqual([
+    expect(childPath?.type).toBe("path");
+    expect(childPath?.segments.map((segment) => segment.point)).toEqual([
       { x: -120, y: -90 },
       { x: 120, y: -90 },
       { x: 120, y: 90 },
@@ -585,42 +679,55 @@ describe("Editor shape export", () => {
 
     editor.getState().loadNodes([
       {
-        contours: [
-          {
-            closed: false,
-            segments: [
-              {
-                handleIn: { x: 0, y: 0 },
-                handleOut: { x: 0, y: 0 },
-                point: { x: -120, y: -90 },
-                pointType: "corner",
-              },
-              {
-                handleIn: { x: 0, y: 0 },
-                handleOut: { x: 0, y: 0 },
-                point: { x: 120, y: -90 },
-                pointType: "corner",
-              },
-              {
-                handleIn: { x: 0, y: 0 },
-                handleOut: { x: 0, y: 0 },
-                point: { x: 120, y: 90 },
-                pointType: "corner",
-              },
-              {
-                handleIn: { x: 0, y: 0 },
-                handleOut: { x: 0, y: 0 },
-                point: { x: -120, y: 90 },
-                pointType: "corner",
-              },
-            ],
-          },
-        ],
+        id: "open-vector-node",
+        name: "Vector",
+        parentId: "root",
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 0,
+          y: 0,
+        },
+        type: "vector",
+        visible: true,
+      },
+      {
+        closed: false,
         fill: "#ffffff",
         fillRule: "nonzero",
-        id: "open-vector-node",
-        parentId: "root",
+        id: "open-vector-path",
+        parentId: "open-vector-node",
+        segments: [
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: -120, y: -90 },
+            pointType: "corner",
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: 120, y: -90 },
+            pointType: "corner",
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: 120, y: 90 },
+            pointType: "corner",
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: -120, y: 90 },
+            pointType: "corner",
+          },
+        ],
         stroke: "#000000",
+        strokeLineCap: "round",
+        strokeLineJoin: "round",
+        strokeMiterLimit: 4,
         strokeWidth: 12,
         transform: {
           rotation: 0,
@@ -629,7 +736,7 @@ describe("Editor shape export", () => {
           x: 480,
           y: 360,
         },
-        type: "vector",
+        type: "path",
         visible: true,
       },
     ]);
@@ -657,7 +764,7 @@ describe("Editor.getDebugDump", () => {
 
     expect(dump.bootstrap.fontCatalogState).toBe("ready");
     expect(dump.document.nodeCount).toBe(1);
-    expect(dump.document.version).toBe("1.6");
+    expect(dump.document.version).toBe(PUNCH_DOCUMENT_VERSION);
     expect(dump.nodes).toHaveLength(1);
     expect(dump.nodes[0]?.id).toBe("debug-node");
     expect(dump.nodes[0]?.text).toBe("DEBUG");

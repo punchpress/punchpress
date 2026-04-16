@@ -2,6 +2,77 @@ import { describe, expect, test } from "bun:test";
 import { Editor } from "@punchpress/engine";
 import { getNodeWorldPoint } from "../../../../packages/engine/src/primitives/rotation";
 
+const createRectanglePathDocument = () => {
+  const segments = [
+    {
+      handleIn: { x: 0, y: 0 },
+      handleOut: { x: 0, y: 0 },
+      point: { x: 0, y: 0 },
+      pointType: "corner" as const,
+    },
+    {
+      handleIn: { x: 0, y: 0 },
+      handleOut: { x: 0, y: 0 },
+      point: { x: 200, y: 0 },
+      pointType: "corner" as const,
+    },
+    {
+      handleIn: { x: 0, y: 0 },
+      handleOut: { x: 0, y: 0 },
+      point: { x: 200, y: 120 },
+      pointType: "corner" as const,
+    },
+    {
+      handleIn: { x: 0, y: 0 },
+      handleOut: { x: 0, y: 0 },
+      point: { x: 0, y: 120 },
+      pointType: "corner" as const,
+    },
+  ];
+
+  return {
+    nodes: [
+      {
+        id: "vector-container",
+        name: "Vector",
+        parentId: "root",
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 0,
+          y: 0,
+        },
+        type: "vector" as const,
+        visible: true,
+      },
+      {
+        closed: true,
+        fill: "#000000",
+        fillRule: "nonzero" as const,
+        id: "vector-node",
+        parentId: "vector-container",
+        segments,
+        stroke: null,
+        strokeLineCap: "butt",
+        strokeLineJoin: "miter",
+        strokeMiterLimit: 4,
+        strokeWidth: 0,
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 320,
+          y: 220,
+        },
+        type: "path" as const,
+        visible: true,
+      },
+    ],
+    version: "1.6",
+  };
+};
+
 const clickPen = (editor: Editor, point: { x: number; y: number }) => {
   const session = editor.dispatchCanvasPointerDown({ point });
 
@@ -174,6 +245,99 @@ const pressKey = (editor: Editor, key: string, code: string) => {
   return prevented;
 };
 
+const getSelectedVectorNode = (editor: Editor) => {
+  const node = editor.selectedNode;
+
+  if (node?.type !== "vector") {
+    throw new Error("Expected the selected node to be a vector container.");
+  }
+
+  return node;
+};
+
+const getPathNode = (editor: Editor, nodeId = editor.pathEditingNodeId) => {
+  const node = nodeId ? editor.getNode(nodeId) : null;
+
+  if (node?.type !== "path") {
+    throw new Error("Expected a path node.");
+  }
+
+  return node;
+};
+
+const getVectorCount = (editor: Editor) => {
+  return editor.nodes.filter((node) => node.type === "vector").length;
+};
+
+const getVectorPathIds = (editor: Editor, vectorId: string) => {
+  return editor
+    .getChildNodeIds(vectorId)
+    .filter((nodeId) => editor.getNode(nodeId)?.type === "path");
+};
+
+const createOpenPathDocument = () => {
+  return {
+    nodes: [
+      {
+        id: "open-vector-container",
+        name: "Vector",
+        parentId: "root",
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 0,
+          y: 0,
+        },
+        type: "vector" as const,
+        visible: true,
+      },
+      {
+        closed: false,
+        fill: "#000000",
+        fillRule: "nonzero" as const,
+        id: "open-vector-node",
+        parentId: "open-vector-container",
+        segments: [
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 36, y: 0 },
+            point: { x: 0, y: 0 },
+            pointType: "smooth" as const,
+          },
+          {
+            handleIn: { x: -48, y: 0 },
+            handleOut: { x: 48, y: 0 },
+            point: { x: 120, y: 120 },
+            pointType: "smooth" as const,
+          },
+          {
+            handleIn: { x: -36, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: 240, y: 120 },
+            pointType: "smooth" as const,
+          },
+        ],
+        stroke: "#000000",
+        strokeLineCap: "round" as const,
+        strokeLineJoin: "round" as const,
+        strokeMiterLimit: 4,
+        strokeWidth: 8,
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 280,
+          y: 180,
+        },
+        type: "path" as const,
+        visible: true,
+      },
+    ],
+    version: "1.6",
+  };
+};
+
 describe("vector pen authoring", () => {
   test("starts an open vector contour and keeps the pen tool active", () => {
     const editor = new Editor();
@@ -181,38 +345,32 @@ describe("vector pen authoring", () => {
     editor.setActiveTool("pen");
     clickPen(editor, { x: 200, y: 160 });
 
-    const node = editor.selectedNode;
+    const vectorNode = getSelectedVectorNode(editor);
+    const pathNode = getPathNode(editor);
 
     expect(editor.activeTool).toBe("pen");
-    expect(editor.pathEditingNodeId).toBe(node?.id || null);
+    expect(editor.pathEditingNodeId).toBe(pathNode.id);
     expect(editor.pathEditingPoint).toEqual({
       contourIndex: 0,
       segmentIndex: 0,
     });
-    expect(node).toMatchObject({
+    expect(vectorNode).toMatchObject({
+      type: "vector",
+    });
+    expect(pathNode).toMatchObject({
       strokeWidth: 3,
       transform: {
         x: 200,
         y: 160,
       },
-      type: "vector",
+      type: "path",
     });
-
-    if (node?.type !== "vector") {
-      throw new Error("Expected a vector node after the first pen click.");
-    }
-
-    expect(node.contours).toEqual([
+    expect(pathNode.segments).toEqual([
       {
-        closed: false,
-        segments: [
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: 0, y: 0 },
-            pointType: "corner",
-          },
-        ],
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: 0, y: 0 },
+        pointType: "corner",
       },
     ]);
   });
@@ -223,40 +381,34 @@ describe("vector pen authoring", () => {
     editor.setActiveTool("pen");
     clickPen(editor, { x: 200, y: 160 });
 
-    const nodeId = editor.selectedNodeId;
+    const nodeId = editor.pathEditingNodeId;
 
     clickPen(editor, { x: 260, y: 180 });
 
-    expect(editor.nodes).toHaveLength(1);
-    expect(editor.selectedNodeId).toBe(nodeId);
+    expect(editor.nodes).toHaveLength(2);
+    expect(editor.pathEditingNodeId).toBe(nodeId);
     expect(editor.pathEditingPoint).toEqual({
       contourIndex: 0,
       segmentIndex: 1,
     });
 
-    const node = editor.getNode(nodeId);
+    const node = getPathNode(editor, nodeId);
 
-    if (node?.type !== "vector") {
-      throw new Error("Expected the authored path to remain a vector node.");
-    }
-
-    expect(node.contours[0]).toEqual({
-      closed: false,
-      segments: [
-        {
-          handleIn: { x: 0, y: 0 },
-          handleOut: { x: 0, y: 0 },
-          point: { x: 0, y: 0 },
-          pointType: "corner",
-        },
-        {
-          handleIn: { x: 0, y: 0 },
-          handleOut: { x: 0, y: 0 },
-          point: { x: 60, y: 20 },
-          pointType: "corner",
-        },
-      ],
-    });
+    expect(node.closed).toBe(false);
+    expect(node.segments).toEqual([
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: 0, y: 0 },
+        pointType: "corner",
+      },
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: 60, y: 20 },
+        pointType: "corner",
+      },
+    ]);
   });
 
   test("tracks a live preview point while hovering before the next placement", () => {
@@ -269,7 +421,7 @@ describe("vector pen authoring", () => {
     expect(editor.getPenPreviewState()).toEqual({
       contourIndex: 0,
       kind: "segment",
-      nodeId: editor.selectedNodeId,
+      nodeId: editor.pathEditingNodeId,
       pointer: { x: 80, y: 40 },
       target: null,
     });
@@ -281,13 +433,8 @@ describe("vector pen authoring", () => {
     editor.setActiveTool("pen");
     dragPen(editor, { x: 200, y: 160 }, { x: 250, y: 190 });
 
-    const node = editor.selectedNode;
-
-    if (node?.type !== "vector") {
-      throw new Error("Expected a vector node after smooth pen placement.");
-    }
-
-    const segment = node.contours[0]?.segments[0];
+    const node = getPathNode(editor);
+    const segment = node.segments[0];
 
     expect(segment?.pointType).toBe("smooth");
     expect(segment?.handleIn).toEqual({ x: -50, y: -30 });
@@ -311,13 +458,8 @@ describe("vector pen authoring", () => {
       },
     ]);
 
-    const node = editor.selectedNode;
-
-    if (node?.type !== "vector") {
-      throw new Error("Expected a vector node after pen placement.");
-    }
-
-    const segment = node.contours[0]?.segments[1];
+    const node = getPathNode(editor);
+    const segment = node.segments[1];
 
     expect(segment).toMatchObject({
       handleIn: { x: -40, y: -20 },
@@ -330,82 +472,24 @@ describe("vector pen authoring", () => {
   test("option-clicking an existing anchor with pen toggles it between corner and smooth", () => {
     const editor = new Editor();
 
-    editor.loadDocument(
-      JSON.stringify({
-        nodes: [
-          {
-            contours: [
-              {
-                closed: false,
-                segments: [
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 36, y: 0 },
-                    point: { x: 0, y: 0 },
-                    pointType: "smooth",
-                  },
-                  {
-                    handleIn: { x: -48, y: 0 },
-                    handleOut: { x: 48, y: 0 },
-                    point: { x: 120, y: 120 },
-                    pointType: "smooth",
-                  },
-                  {
-                    handleIn: { x: -36, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 240, y: 120 },
-                    pointType: "smooth",
-                  },
-                ],
-              },
-            ],
-            fill: "#000000",
-            fillRule: "nonzero",
-            id: "open-vector-node",
-            parentId: "root",
-            stroke: "#000000",
-            strokeLineCap: "round",
-            strokeLineJoin: "round",
-            strokeMiterLimit: 4,
-            strokeWidth: 8,
-            transform: {
-              rotation: 0,
-              scaleX: 1,
-              scaleY: 1,
-              x: 280,
-              y: 180,
-            },
-            type: "vector",
-            visible: true,
-          },
-        ],
-        version: "1.6",
-      })
-    );
+    editor.loadDocument(JSON.stringify(createOpenPathDocument()));
     editor.select("open-vector-node");
     editor.startPathEditing("open-vector-node");
     editor.setActiveTool("pen");
 
-    const node = editor.getNode("open-vector-node");
+    const node = getPathNode(editor, "open-vector-node");
     const bbox = editor.getNodeGeometry("open-vector-node")?.bbox;
 
-    if (!(node?.type === "vector" && bbox)) {
-      throw new Error("Expected an editable vector node for pen point toggle.");
+    if (!bbox) {
+      throw new Error("Expected an editable path node for pen point toggle.");
     }
 
-    const targetPoint = getNodeWorldPoint(
-      node,
-      bbox,
-      node.contours[0].segments[1].point
-    );
+    const targetPoint = getNodeWorldPoint(node, bbox, node.segments[1].point);
 
     optionClickPen(editor, targetPoint);
 
-    let updatedNode = editor.getNode("open-vector-node");
-    let segment =
-      updatedNode?.type === "vector"
-        ? updatedNode.contours[0]?.segments[1]
-        : null;
+    let updatedNode = getPathNode(editor, "open-vector-node");
+    let segment = updatedNode.segments[1];
 
     expect(editor.pathEditingPoint).toEqual({
       contourIndex: 0,
@@ -419,11 +503,8 @@ describe("vector pen authoring", () => {
 
     optionClickPen(editor, targetPoint);
 
-    updatedNode = editor.getNode("open-vector-node");
-    segment =
-      updatedNode?.type === "vector"
-        ? updatedNode.contours[0]?.segments[1]
-        : null;
+    updatedNode = getPathNode(editor, "open-vector-node");
+    segment = updatedNode.segments[1];
 
     expect(segment?.pointType).toBe("smooth");
     expect(
@@ -440,13 +521,8 @@ describe("vector pen authoring", () => {
     editor.setActiveTool("pen");
     dragPen(editor, { x: 200, y: 160 }, { x: 204, y: 163 });
 
-    const node = editor.selectedNode;
-
-    if (node?.type !== "vector") {
-      throw new Error("Expected a vector node after pen placement.");
-    }
-
-    const segment = node.contours[0]?.segments[0];
+    const node = getPathNode(editor);
+    const segment = node.segments[0];
 
     expect(segment?.pointType).toBe("corner");
     expect(segment?.handleIn).toEqual({ x: 0, y: 0 });
@@ -459,13 +535,8 @@ describe("vector pen authoring", () => {
     editor.setActiveTool("pen");
     dragPen(editor, { x: 200, y: 160 }, { x: 208, y: 166 });
 
-    const node = editor.selectedNode;
-
-    if (node?.type !== "vector") {
-      throw new Error("Expected a vector node after pen placement.");
-    }
-
-    const segment = node.contours[0]?.segments[0];
+    const node = getPathNode(editor);
+    const segment = node.segments[0];
 
     expect(segment?.pointType).toBe("corner");
     expect(segment?.handleIn).toEqual({ x: 0, y: 0 });
@@ -483,13 +554,8 @@ describe("vector pen authoring", () => {
       { dragDistancePx: 8 }
     );
 
-    const node = editor.selectedNode;
-
-    if (node?.type !== "vector") {
-      throw new Error("Expected a vector node after pen placement.");
-    }
-
-    const segment = node.contours[0]?.segments[0];
+    const node = getPathNode(editor);
+    const segment = node.segments[0];
 
     expect(segment?.pointType).toBe("corner");
     expect(segment?.handleIn).toEqual({ x: 0, y: 0 });
@@ -503,15 +569,8 @@ describe("vector pen authoring", () => {
     dragPen(editor, { x: 200, y: 160 }, { x: 250, y: 190 });
     dragPen(editor, { x: 320, y: 220 }, { x: 360, y: 250 });
 
-    const node = editor.selectedNode;
-
-    if (node?.type !== "vector") {
-      throw new Error(
-        "Expected the authored smooth path to remain a vector node."
-      );
-    }
-
-    const secondSegment = node.contours[0]?.segments[1];
+    const node = getPathNode(editor);
+    const secondSegment = node.segments[1];
 
     expect(secondSegment?.point).toEqual({ x: 120, y: 60 });
     expect(secondSegment?.pointType).toBe("smooth");
@@ -526,13 +585,8 @@ describe("vector pen authoring", () => {
     clickPen(editor, { x: 200, y: 160 });
     dragPen(editor, { x: 260, y: 180 }, { x: 264, y: 183 });
 
-    const node = editor.selectedNode;
-
-    if (node?.type !== "vector") {
-      throw new Error("Expected the authored path to remain a vector node.");
-    }
-
-    const secondSegment = node.contours[0]?.segments[1];
+    const node = getPathNode(editor);
+    const secondSegment = node.segments[1];
 
     expect(secondSegment?.pointType).toBe("corner");
     expect(secondSegment?.handleIn).toEqual({ x: 0, y: 0 });
@@ -546,13 +600,8 @@ describe("vector pen authoring", () => {
     clickPen(editor, { x: 200, y: 160 });
     dragPen(editor, { x: 260, y: 180 }, { x: 268, y: 186 });
 
-    const node = editor.selectedNode;
-
-    if (node?.type !== "vector") {
-      throw new Error("Expected the authored path to remain a vector node.");
-    }
-
-    const secondSegment = node.contours[0]?.segments[1];
+    const node = getPathNode(editor);
+    const secondSegment = node.segments[1];
 
     expect(secondSegment?.pointType).toBe("corner");
     expect(secondSegment?.handleIn).toEqual({ x: 0, y: 0 });
@@ -571,36 +620,35 @@ describe("vector pen authoring", () => {
       { dragDistancePx: 8 }
     );
 
-    const node = editor.selectedNode;
-
-    if (node?.type !== "vector") {
-      throw new Error("Expected the authored path to remain a vector node.");
-    }
-
-    const secondSegment = node.contours[0]?.segments[1];
+    const node = getPathNode(editor);
+    const secondSegment = node.segments[1];
 
     expect(secondSegment?.pointType).toBe("corner");
     expect(secondSegment?.handleIn).toEqual({ x: 0, y: 0 });
     expect(secondSegment?.handleOut).toEqual({ x: 0, y: 0 });
   });
 
-  test("escape finishes the current pen path so the next click starts a new vector", () => {
+  test("escape finishes the current pen path so the next click starts a new path in the same vector", () => {
     const editor = new Editor();
 
     editor.setActiveTool("pen");
     clickPen(editor, { x: 200, y: 160 });
     clickPen(editor, { x: 260, y: 180 });
 
-    const firstNodeId = editor.selectedNodeId;
+    const firstVectorId = editor.selectedNodeId;
+    const firstNodeId = editor.pathEditingNodeId;
 
     expect(pressKey(editor, "Escape", "Escape")).toBe(true);
     expect(editor.activeTool).toBe("pen");
     expect(editor.pathEditingNodeId).toBe(firstNodeId);
+    expect(editor.pathEditingPoint).toBeNull();
 
     clickPen(editor, { x: 360, y: 260 });
 
-    expect(editor.nodes).toHaveLength(2);
-    expect(editor.selectedNodeId).not.toBe(firstNodeId);
+    expect(getVectorCount(editor)).toBe(1);
+    expect(editor.selectedNodeId).toBe(firstVectorId);
+    expect(editor.pathEditingNodeId).not.toBe(firstNodeId);
+    expect(getVectorPathIds(editor, firstVectorId || "")).toHaveLength(2);
     expect(editor.pathEditingPoint).toEqual({
       contourIndex: 0,
       segmentIndex: 0,
@@ -615,7 +663,8 @@ describe("vector pen authoring", () => {
     clickPen(editor, { x: 260, y: 160 });
     clickPen(editor, { x: 260, y: 220 });
 
-    const firstNodeId = editor.selectedNodeId;
+    const firstVectorId = editor.selectedNodeId;
+    const firstNodeId = editor.pathEditingNodeId;
 
     expect(pressKey(editor, "E", "KeyE")).toBe(true);
     expect(editor.activeTool).toBe("pen");
@@ -624,8 +673,9 @@ describe("vector pen authoring", () => {
 
     clickPen(editor, { x: 360, y: 260 });
 
-    expect(editor.nodes).toHaveLength(2);
-    expect(editor.selectedNodeId).not.toBe(firstNodeId);
+    expect(getVectorCount(editor)).toBe(2);
+    expect(editor.selectedNodeId).not.toBe(firstVectorId);
+    expect(editor.pathEditingNodeId).not.toBe(firstNodeId);
     expect(editor.pathEditingPoint).toEqual({
       contourIndex: 0,
       segmentIndex: 0,
@@ -639,21 +689,15 @@ describe("vector pen authoring", () => {
     clickPen(editor, { x: 120, y: 140 });
     clickPen(editor, { x: 260, y: 140 });
 
-    const nodeId = editor.selectedNodeId;
+    const nodeId = editor.pathEditingNodeId;
 
     expect(pressKey(editor, "Escape", "Escape")).toBe(true);
 
     clickPenNode(editor, nodeId, { x: 260, y: 140 });
 
-    const resumedNode = editor.getNode(nodeId);
+    const resumedNode = getPathNode(editor, nodeId);
 
-    if (resumedNode?.type !== "vector") {
-      throw new Error(
-        "Expected the open vector path to remain available for continuation."
-      );
-    }
-
-    expect(resumedNode.contours[0]?.segments).toHaveLength(2);
+    expect(resumedNode.segments).toHaveLength(2);
     expect(editor.pathEditingNodeId).toBe(nodeId);
     expect(editor.pathEditingPoint).toEqual({
       contourIndex: 0,
@@ -662,15 +706,11 @@ describe("vector pen authoring", () => {
 
     clickPen(editor, { x: 320, y: 220 });
 
-    const continuedNode = editor.getNode(nodeId);
+    const continuedNode = getPathNode(editor, nodeId);
 
-    if (continuedNode?.type !== "vector") {
-      throw new Error("Expected the continued path to remain a vector node.");
-    }
-
-    expect(editor.nodes).toHaveLength(1);
-    expect(continuedNode.contours[0]?.segments).toHaveLength(3);
-    expect(continuedNode.contours[0]?.segments[2]?.point).toEqual({
+    expect(editor.nodes).toHaveLength(2);
+    expect(continuedNode.segments).toHaveLength(3);
+    expect(continuedNode.segments[2]?.point).toEqual({
       x: 200,
       y: 80,
     });
@@ -683,21 +723,15 @@ describe("vector pen authoring", () => {
     clickPen(editor, { x: 120, y: 140 });
     clickPen(editor, { x: 260, y: 140 });
 
-    const nodeId = editor.selectedNodeId;
+    const nodeId = editor.pathEditingNodeId;
 
     expect(pressKey(editor, "Escape", "Escape")).toBe(true);
 
     clickPenNode(editor, nodeId, { x: 120, y: 140 });
 
-    const resumedNode = editor.getNode(nodeId);
+    const resumedNode = getPathNode(editor, nodeId);
 
-    if (resumedNode?.type !== "vector") {
-      throw new Error(
-        "Expected the open vector path to remain available for continuation."
-      );
-    }
-
-    expect(resumedNode.contours[0]?.segments).toHaveLength(2);
+    expect(resumedNode.segments).toHaveLength(2);
     expect(editor.pathEditingNodeId).toBe(nodeId);
     expect(editor.pathEditingPoint).toEqual({
       contourIndex: 0,
@@ -706,15 +740,11 @@ describe("vector pen authoring", () => {
 
     clickPen(editor, { x: 80, y: 100 });
 
-    const continuedNode = editor.getNode(nodeId);
+    const continuedNode = getPathNode(editor, nodeId);
 
-    if (continuedNode?.type !== "vector") {
-      throw new Error("Expected the continued path to remain a vector node.");
-    }
-
-    expect(editor.nodes).toHaveLength(1);
-    expect(continuedNode.contours[0]?.segments).toHaveLength(3);
-    expect(continuedNode.contours[0]?.segments[2]?.point).toEqual({
+    expect(editor.nodes).toHaveLength(2);
+    expect(continuedNode.segments).toHaveLength(3);
+    expect(continuedNode.segments[2]?.point).toEqual({
       x: -40,
       y: -40,
     });
@@ -727,7 +757,7 @@ describe("vector pen authoring", () => {
     clickPen(editor, { x: 120, y: 140 });
     clickPen(editor, { x: 260, y: 140 });
 
-    const nodeId = editor.selectedNodeId;
+    const nodeId = editor.pathEditingNodeId;
 
     expect(pressKey(editor, "Escape", "Escape")).toBe(true);
 
@@ -740,21 +770,16 @@ describe("vector pen authoring", () => {
     editor.setActiveTool("pen");
     clickPen(editor, { x: 320, y: 220 });
 
-    const continuedNode = editor.getNode(nodeId);
+    const continuedNode = getPathNode(editor, nodeId);
 
-    if (continuedNode?.type !== "vector") {
-      throw new Error("Expected the continued path to remain a vector node.");
-    }
-
-    expect(editor.nodes).toHaveLength(1);
-    expect(editor.selectedNodeId).toBe(nodeId);
+    expect(editor.nodes).toHaveLength(2);
     expect(editor.pathEditingNodeId).toBe(nodeId);
     expect(editor.pathEditingPoint).toEqual({
       contourIndex: 0,
       segmentIndex: 2,
     });
-    expect(continuedNode.contours[0]?.segments).toHaveLength(3);
-    expect(continuedNode.contours[0]?.segments[2]?.point).toEqual({
+    expect(continuedNode.segments).toHaveLength(3);
+    expect(continuedNode.segments[2]?.point).toEqual({
       x: 200,
       y: 80,
     });
@@ -767,7 +792,7 @@ describe("vector pen authoring", () => {
     clickPen(editor, { x: 120, y: 140 });
     clickPen(editor, { x: 260, y: 140 });
 
-    const nodeId = editor.selectedNodeId;
+    const nodeId = editor.pathEditingNodeId;
 
     expect(pressKey(editor, "Escape", "Escape")).toBe(true);
 
@@ -797,7 +822,7 @@ describe("vector pen authoring", () => {
     clickPen(editor, { x: 200, y: 200 });
     clickPen(editor, { x: 260, y: 140 });
 
-    const nodeId = editor.selectedNodeId;
+    const nodeId = editor.pathEditingNodeId;
 
     expect(pressKey(editor, "Escape", "Escape")).toBe(true);
 
@@ -825,14 +850,10 @@ describe("vector pen authoring", () => {
 
     clickPenNode(editor, nodeId, { x: 200, y: 200 });
 
-    const node = editor.getNode(nodeId);
+    const node = getPathNode(editor, nodeId);
 
-    if (node?.type !== "vector") {
-      throw new Error("Expected the vector node to remain after pen deletion.");
-    }
-
-    expect(node.contours[0]?.closed).toBe(false);
-    expect(node.contours[0]?.segments).toHaveLength(2);
+    expect(node.closed).toBe(false);
+    expect(node.segments).toHaveLength(2);
     expect(editor.pathEditingPoint).toEqual({
       contourIndex: 0,
       segmentIndex: 1,
@@ -847,7 +868,7 @@ describe("vector pen authoring", () => {
     clickPen(editor, { x: 200, y: 200 });
     clickPen(editor, { x: 260, y: 140 });
 
-    const nodeId = editor.selectedNodeId;
+    const nodeId = editor.pathEditingNodeId;
 
     expect(pressKey(editor, "Escape", "Escape")).toBe(true);
 
@@ -900,14 +921,13 @@ describe("vector pen authoring", () => {
     clickPen(editor, { x: 200, y: 200 });
     clickPen(editor, { x: 260, y: 140 });
 
-    const nodeId = editor.selectedNodeId;
+    const nodeId = editor.pathEditingNodeId;
 
     expect(pressKey(editor, "Escape", "Escape")).toBe(true);
 
     clickPen(editor, { x: 272, y: 140 });
 
-    expect(editor.nodes).toHaveLength(1);
-    expect(editor.selectedNodeId).toBe(nodeId);
+    expect(editor.nodes).toHaveLength(2);
     expect(editor.pathEditingNodeId).toBe(nodeId);
     expect(editor.pathEditingPoint).toEqual({
       contourIndex: 0,
@@ -923,22 +943,16 @@ describe("vector pen authoring", () => {
     clickPen(editor, { x: 200, y: 200 });
     clickPen(editor, { x: 260, y: 140 });
 
-    const nodeId = editor.selectedNodeId;
+    const nodeId = editor.pathEditingNodeId;
 
     expect(pressKey(editor, "Escape", "Escape")).toBe(true);
 
     clickPen(editor, { x: 212, y: 200 });
 
-    const node = editor.getNode(nodeId);
+    const node = getPathNode(editor, nodeId);
 
-    if (node?.type !== "vector") {
-      throw new Error(
-        "Expected the vector node to remain after off-center pen delete."
-      );
-    }
-
-    expect(editor.nodes).toHaveLength(1);
-    expect(node.contours[0]?.segments).toHaveLength(2);
+    expect(editor.nodes).toHaveLength(2);
+    expect(node.segments).toHaveLength(2);
     expect(editor.pathEditingPoint).toEqual({
       contourIndex: 0,
       segmentIndex: 1,
@@ -948,61 +962,7 @@ describe("vector pen authoring", () => {
   test("pen clicking a segment inserts a point instead of requiring the pointer tool", () => {
     const editor = new Editor();
 
-    editor.loadDocument(
-      JSON.stringify({
-        nodes: [
-          {
-            contours: [
-              {
-                closed: true,
-                segments: [
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 0, y: 0 },
-                    pointType: "corner",
-                  },
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 200, y: 0 },
-                    pointType: "corner",
-                  },
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 200, y: 120 },
-                    pointType: "corner",
-                  },
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 0, y: 120 },
-                    pointType: "corner",
-                  },
-                ],
-              },
-            ],
-            fill: "#000000",
-            fillRule: "nonzero",
-            id: "vector-node",
-            parentId: "root",
-            stroke: null,
-            strokeWidth: 0,
-            transform: {
-              rotation: 0,
-              scaleX: 1,
-              scaleY: 1,
-              x: 320,
-              y: 220,
-            },
-            type: "vector",
-            visible: true,
-          },
-        ],
-        version: "1.5",
-      })
-    );
+    editor.loadDocument(JSON.stringify(createRectanglePathDocument()));
 
     editor.select("vector-node");
     editor.startPathEditing("vector-node");
@@ -1027,13 +987,10 @@ describe("vector pen authoring", () => {
     ).toBe(true);
 
     const node = editor.getNode("vector-node");
-    const segment =
-      node?.type === "vector" ? node.contours[0]?.segments[1] : null;
+    const segment = node?.type === "path" ? node.segments[1] : null;
 
-    expect(node?.type).toBe("vector");
-    expect(
-      node?.type === "vector" ? node.contours[0]?.segments.length : 0
-    ).toBe(5);
+    expect(node?.type).toBe("path");
+    expect(node?.type === "path" ? node.segments.length : 0).toBe(5);
     expect(segment?.point).toEqual({ x: 100, y: 0 });
     expect(editor.pathEditingPoint).toEqual({
       contourIndex: 0,
@@ -1044,61 +1001,7 @@ describe("vector pen authoring", () => {
   test("pen clicking an off-center spot on a segment inserts the point at that hovered location", () => {
     const editor = new Editor();
 
-    editor.loadDocument(
-      JSON.stringify({
-        nodes: [
-          {
-            contours: [
-              {
-                closed: true,
-                segments: [
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 0, y: 0 },
-                    pointType: "corner",
-                  },
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 200, y: 0 },
-                    pointType: "corner",
-                  },
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 200, y: 120 },
-                    pointType: "corner",
-                  },
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 0, y: 120 },
-                    pointType: "corner",
-                  },
-                ],
-              },
-            ],
-            fill: "#000000",
-            fillRule: "nonzero",
-            id: "vector-node",
-            parentId: "root",
-            stroke: null,
-            strokeWidth: 0,
-            transform: {
-              rotation: 0,
-              scaleX: 1,
-              scaleY: 1,
-              x: 320,
-              y: 220,
-            },
-            type: "vector",
-            visible: true,
-          },
-        ],
-        version: "1.5",
-      })
-    );
+    editor.loadDocument(JSON.stringify(createRectanglePathDocument()));
 
     editor.select("vector-node");
     editor.startPathEditing("vector-node");
@@ -1107,19 +1010,19 @@ describe("vector pen authoring", () => {
     const vectorNode = editor.getNode("vector-node");
     const bbox = editor.getNodeGeometry("vector-node")?.bbox;
 
-    if (!(vectorNode?.type === "vector" && bbox)) {
+    if (!(vectorNode?.type === "path" && bbox)) {
       throw new Error("Expected vector geometry for off-center insertion.");
     }
 
     const firstWorldPoint = getNodeWorldPoint(
       vectorNode,
       bbox,
-      vectorNode.contours[0].segments[0].point
+      vectorNode.segments[0].point
     );
     const secondWorldPoint = getNodeWorldPoint(
       vectorNode,
       bbox,
-      vectorNode.contours[0].segments[1].point
+      vectorNode.segments[1].point
     );
     const quarterPoint = {
       x: firstWorldPoint.x + (secondWorldPoint.x - firstWorldPoint.x) * 0.25,
@@ -1145,13 +1048,10 @@ describe("vector pen authoring", () => {
     ).toBe(true);
 
     const node = editor.getNode("vector-node");
-    const segment =
-      node?.type === "vector" ? node.contours[0]?.segments[1] : null;
+    const segment = node?.type === "path" ? node.segments[1] : null;
 
-    expect(node?.type).toBe("vector");
-    expect(
-      node?.type === "vector" ? node.contours[0]?.segments.length : 0
-    ).toBe(5);
+    expect(node?.type).toBe("path");
+    expect(node?.type === "path" ? node.segments.length : 0).toBe(5);
     expect(segment?.point).toEqual({ x: 50, y: 0 });
     expect(editor.pathEditingPoint).toEqual({
       contourIndex: 0,
@@ -1162,61 +1062,7 @@ describe("vector pen authoring", () => {
   test("pen hover updates the add-point target while moving along the same segment", () => {
     const editor = new Editor();
 
-    editor.loadDocument(
-      JSON.stringify({
-        nodes: [
-          {
-            contours: [
-              {
-                closed: true,
-                segments: [
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 0, y: 0 },
-                    pointType: "corner",
-                  },
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 200, y: 0 },
-                    pointType: "corner",
-                  },
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 200, y: 120 },
-                    pointType: "corner",
-                  },
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 0, y: 120 },
-                    pointType: "corner",
-                  },
-                ],
-              },
-            ],
-            fill: "#000000",
-            fillRule: "nonzero",
-            id: "vector-node",
-            parentId: "root",
-            stroke: null,
-            strokeWidth: 0,
-            transform: {
-              rotation: 0,
-              scaleX: 1,
-              scaleY: 1,
-              x: 320,
-              y: 220,
-            },
-            type: "vector",
-            visible: true,
-          },
-        ],
-        version: "1.5",
-      })
-    );
+    editor.loadDocument(JSON.stringify(createRectanglePathDocument()));
 
     editor.select("vector-node");
     editor.startPathEditing("vector-node");
@@ -1225,19 +1071,19 @@ describe("vector pen authoring", () => {
     const vectorNode = editor.getNode("vector-node");
     const bbox = editor.getNodeGeometry("vector-node")?.bbox;
 
-    if (!(vectorNode?.type === "vector" && bbox)) {
+    if (!(vectorNode?.type === "path" && bbox)) {
       throw new Error("Expected vector geometry for insert hover.");
     }
 
     const firstWorldPoint = getNodeWorldPoint(
       vectorNode,
       bbox,
-      vectorNode.contours[0].segments[0].point
+      vectorNode.segments[0].point
     );
     const secondWorldPoint = getNodeWorldPoint(
       vectorNode,
       bbox,
-      vectorNode.contours[0].segments[1].point
+      vectorNode.segments[1].point
     );
 
     movePen(editor, {
@@ -1272,61 +1118,7 @@ describe("vector pen authoring", () => {
   test("dragging on a segment with the pen inserts a smooth point and authors handles", () => {
     const editor = new Editor();
 
-    editor.loadDocument(
-      JSON.stringify({
-        nodes: [
-          {
-            contours: [
-              {
-                closed: true,
-                segments: [
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 0, y: 0 },
-                    pointType: "corner",
-                  },
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 200, y: 0 },
-                    pointType: "corner",
-                  },
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 200, y: 120 },
-                    pointType: "corner",
-                  },
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 0, y: 120 },
-                    pointType: "corner",
-                  },
-                ],
-              },
-            ],
-            fill: "#000000",
-            fillRule: "nonzero",
-            id: "vector-node",
-            parentId: "root",
-            stroke: null,
-            strokeWidth: 0,
-            transform: {
-              rotation: 0,
-              scaleX: 1,
-              scaleY: 1,
-              x: 320,
-              y: 220,
-            },
-            type: "vector",
-            visible: true,
-          },
-        ],
-        version: "1.5",
-      })
-    );
+    editor.loadDocument(JSON.stringify(createRectanglePathDocument()));
 
     editor.select("vector-node");
     editor.startPathEditing("vector-node");
@@ -1335,19 +1127,19 @@ describe("vector pen authoring", () => {
     const vectorNode = editor.getNode("vector-node");
     const bbox = editor.getNodeGeometry("vector-node")?.bbox;
 
-    if (!(vectorNode?.type === "vector" && bbox)) {
+    if (!(vectorNode?.type === "path" && bbox)) {
       throw new Error("Expected vector geometry for dragged insertion.");
     }
 
     const firstWorldPoint = getNodeWorldPoint(
       vectorNode,
       bbox,
-      vectorNode.contours[0].segments[0].point
+      vectorNode.segments[0].point
     );
     const secondWorldPoint = getNodeWorldPoint(
       vectorNode,
       bbox,
-      vectorNode.contours[0].segments[1].point
+      vectorNode.segments[1].point
     );
     const quarterPoint = {
       x: firstWorldPoint.x + (secondWorldPoint.x - firstWorldPoint.x) * 0.25,
@@ -1388,13 +1180,10 @@ describe("vector pen authoring", () => {
     ).toBe(true);
 
     const node = editor.getNode("vector-node");
-    const segment =
-      node?.type === "vector" ? node.contours[0]?.segments[1] : null;
+    const segment = node?.type === "path" ? node.segments[1] : null;
 
-    expect(node?.type).toBe("vector");
-    expect(
-      node?.type === "vector" ? node.contours[0]?.segments.length : 0
-    ).toBe(5);
+    expect(node?.type).toBe("path");
+    expect(node?.type === "path" ? node.segments.length : 0).toBe(5);
     expect(segment?.point).toEqual({ x: 50, y: 0 });
     expect(segment?.pointType).toBe("smooth");
     expect(segment?.handleIn).toEqual({ x: -40, y: 30 });
@@ -1412,19 +1201,15 @@ describe("vector pen authoring", () => {
     clickPen(editor, { x: 120, y: 140 });
     clickPen(editor, { x: 260, y: 140 });
 
-    const nodeId = editor.selectedNodeId;
+    const nodeId = editor.pathEditingNodeId;
 
     dragPen(editor, { x: 120, y: 140 }, { x: 80, y: 100 });
 
-    const node = editor.getNode(nodeId);
+    const node = getPathNode(editor, nodeId);
 
-    if (node?.type !== "vector") {
-      throw new Error("Expected the closed path to remain a vector node.");
-    }
-
-    expect(node.contours[0]?.closed).toBe(true);
-    expect(node.contours[0]?.segments).toHaveLength(2);
-    expect(node.contours[0]?.segments[0]).toMatchObject({
+    expect(node.closed).toBe(true);
+    expect(node.segments).toHaveLength(2);
+    expect(node.segments[0]).toMatchObject({
       handleIn: { x: 40, y: 40 },
       pointType: "smooth",
     });
@@ -1435,18 +1220,19 @@ describe("vector pen authoring", () => {
     });
   });
 
-  test("clicking the starting anchor closes the active contour", () => {
+  test("clicking the starting anchor closes the active contour and the next disconnected click starts a new path in the same vector", () => {
     const editor = new Editor();
 
     editor.setActiveTool("pen");
     clickPen(editor, { x: 120, y: 140 });
     clickPen(editor, { x: 260, y: 140 });
 
-    const nodeId = editor.selectedNodeId;
+    const vectorNodeId = editor.selectedNodeId;
+    const nodeId = editor.pathEditingNodeId;
 
     clickPen(editor, { x: 120, y: 140 });
 
-    expect(editor.nodes).toHaveLength(1);
+    expect(editor.nodes).toHaveLength(2);
     expect(editor.activeTool).toBe("pen");
     expect(editor.pathEditingNodeId).toBe(nodeId);
     expect(editor.pathEditingPoint).toEqual({
@@ -1454,18 +1240,16 @@ describe("vector pen authoring", () => {
       segmentIndex: 0,
     });
 
-    const node = editor.getNode(nodeId);
+    const node = getPathNode(editor, nodeId);
 
-    if (node?.type !== "vector") {
-      throw new Error("Expected the closed path to remain a vector node.");
-    }
-
-    expect(node.contours[0]?.closed).toBe(true);
-    expect(node.contours[0]?.segments).toHaveLength(2);
+    expect(node.closed).toBe(true);
+    expect(node.segments).toHaveLength(2);
 
     clickPen(editor, { x: 320, y: 240 });
 
-    expect(editor.nodes).toHaveLength(2);
-    expect(editor.selectedNodeId).not.toBe(nodeId);
+    expect(getVectorCount(editor)).toBe(1);
+    expect(editor.selectedNodeId).toBe(vectorNodeId);
+    expect(editor.pathEditingNodeId).not.toBe(nodeId);
+    expect(getVectorPathIds(editor, vectorNodeId || "")).toHaveLength(2);
   });
 });

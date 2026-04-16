@@ -50,21 +50,21 @@ const selectNodeArtState = (editor, state, nodeId) => {
   return {
     bbox,
     fill: node.fill,
-    fillRule: node.type === "vector" ? node.fillRule : undefined,
+    fillRule: node.type === "path" ? node.fillRule : undefined,
     isEditing: state.editingNodeId === nodeId,
     paths: geometry?.paths || [],
     ready: Boolean(geometry?.ready),
     stroke: node.stroke,
     strokeLineCap:
-      node.type === "vector"
+      node.type === "path"
         ? (node.strokeLineCap ?? DEFAULT_VECTOR_STROKE_LINE_CAP)
         : DEFAULT_VECTOR_STROKE_LINE_CAP,
     strokeLineJoin:
-      node.type === "vector"
+      node.type === "path"
         ? (node.strokeLineJoin ?? DEFAULT_VECTOR_STROKE_LINE_JOIN)
         : DEFAULT_VECTOR_STROKE_LINE_JOIN,
     strokeMiterLimit:
-      node.type === "vector"
+      node.type === "path"
         ? (node.strokeMiterLimit ?? DEFAULT_VECTOR_STROKE_MITER_LIMIT)
         : DEFAULT_VECTOR_STROKE_MITER_LIMIT,
     strokeWidth: node.strokeWidth,

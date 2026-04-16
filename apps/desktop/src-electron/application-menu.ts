@@ -15,7 +15,7 @@ interface InstallApplicationMenuOptions {
   clearRecentDocumentsFromMenu: () => Promise<void>;
   openRecentDocumentFromMenu: (filePath: string) => Promise<void>;
   sendDocumentCommand: (
-    command: "export" | "new" | "open" | "save" | "save-as"
+    command: "export" | "import-svg" | "new" | "open" | "save" | "save-as"
   ) => void;
   sendEditorCommand: (command: DesktopEditorCommand) => void;
 }
@@ -110,6 +110,10 @@ export const installApplicationMenu = async ({
           accelerator: "CmdOrCtrl+O",
           click: () => sendDocumentCommand("open"),
           label: "Open...",
+        },
+        {
+          click: () => sendDocumentCommand("import-svg"),
+          label: "Import SVG...",
         },
         {
           accelerator: "CmdOrCtrl+S",

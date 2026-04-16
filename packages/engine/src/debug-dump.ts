@@ -62,12 +62,15 @@ export const getEditorDebugDump = (editor) => {
           };
         }
 
-        if (node.type === "vector") {
+        if (node.type === "path") {
           return {
-            contours: node.contours.map((contour) => ({
-              closed: contour.closed,
-              segments: contour.segments.length,
-            })),
+            closed: node.closed,
+            contours: [
+              {
+                closed: node.closed,
+                segments: node.segments.length,
+              },
+            ],
             fill: node.fill,
             fillRule: node.fillRule,
             font: null,
@@ -77,6 +80,18 @@ export const getEditorDebugDump = (editor) => {
             strokeLineJoin: node.strokeLineJoin ?? "round",
             strokeMiterLimit: node.strokeMiterLimit ?? 4,
             strokeWidth: node.strokeWidth,
+            text: "",
+            tracking: null,
+            warp: null,
+          };
+        }
+
+        if (node.type === "vector") {
+          return {
+            font: null,
+            fontSize: null,
+            stroke: null,
+            strokeWidth: null,
             text: "",
             tracking: null,
             warp: null,

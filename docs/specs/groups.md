@@ -24,6 +24,13 @@ Groups let users organize multiple layers and manipulate them as one canvas obje
 - Transforming a group preserves the relative arrangement of its child layers.
 - A selected group should present one clear selection frame that represents the grouped object, not separate frames for each child layer.
 
+## Properties Panel
+
+- Selecting a group should show object-level controls for the group as a whole.
+- When a selected group contains multiple child-layer colors, the properties panel should show a `Selection colors` section listing the distinct colors currently in use across supported child-layer paints.
+- Editing one `Selection colors` swatch on a selected group should update every selected descendant fill or stroke paint that currently uses that exact color value.
+- `Selection colors` should be color-based rather than fill-versus-stroke based, so the same color should appear only once even if it is currently used by both fills and strokes.
+
 ## Drill-In
 
 - Double-clicking a selected group enters a mode where child layers inside that group become individually selectable.

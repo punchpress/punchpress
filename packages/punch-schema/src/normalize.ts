@@ -5,7 +5,7 @@ import {
 } from "./vector-stroke-style";
 
 export const normalizeNodeForSchema = (node: Record<string, unknown>) => {
-  if (node.type !== "vector") {
+  if (node.type !== "path") {
     return node;
   }
 

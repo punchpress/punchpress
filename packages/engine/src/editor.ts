@@ -24,6 +24,8 @@ import {
   deleteSelected as deleteEditorSelected,
   duplicate as duplicateEditorNodes,
   groupSelected as groupEditorSelected,
+  insertNodes as insertEditorNodes,
+  moveNodeToParent as moveEditorNodeToParent,
   renameGroup as renameEditorGroup,
   sendToBack as sendEditorToBack,
   setNodeOrder as setEditorNodeOrder,
@@ -38,6 +40,10 @@ import {
   updateEditablePath as updateEditorEditablePath,
   updateVectorContours as updateEditorVectorContours,
 } from "./document/path/editable-path-actions";
+import {
+  applyBooleanOperation as applyEditorBooleanOperation,
+  canApplyBooleanOperation as canEditorApplyBooleanOperation,
+} from "./document/path/path-boolean-actions";
 import {
   canRoundPathPoint as canEditorRoundPathPoint,
   getPathCornerRadiusStableMax as getEditorPathCornerRadiusStableMax,
@@ -105,11 +111,13 @@ import {
   handleWindowKeyDown as handleEditorWindowKeyDown,
 } from "./input/keyboard-shortcuts";
 import { getPathEditingInspectorState as getEditorPathEditingInspectorState } from "./inspection/path/path-edit-inspector";
+import { getSelectionBooleanOperations as getEditorSelectionBooleanOperations } from "./inspection/selection-boolean-operations";
 import {
   getNodePropertySupport as getEditorNodePropertySupport,
   getSelectionProperties as getEditorSelectionProperties,
   getSelectionPropertiesKey as getEditorSelectionPropertiesKey,
   getSelectionPropertiesSnapshot as getEditorSelectionPropertiesSnapshot,
+  setSelectionColor as setEditorSelectionColor,
   setSelectionProperty as setEditorSelectionProperty,
 } from "./inspection/selection-properties";
 import {
@@ -208,6 +216,7 @@ import {
   zoomIn as zoomEditorIn,
   zoomOut as zoomEditorOut,
 } from "./viewport/viewport-focus";
+import { getViewportCenter as getEditorViewportCenter } from "./viewport/viewport-queries";
 import { zoomViewportFromWheel as zoomEditorViewportFromWheel } from "./viewport/viewport-wheel-zoom";
 
 // Intentional facade: keep the public editor API and durable subsystem wiring
@@ -492,11 +501,15 @@ export class Editor {
   }
 
   canEditNodePath(nodeId = this.selectedNodeId) {
-    return Boolean(this.getNodeEditCapabilities(nodeId)?.canEditPath);
+    const targetNodeId = this.getPathEditingTargetNodeId(nodeId);
+    return Boolean(this.getNodeEditCapabilities(targetNodeId)?.canEditPath);
   }
 
   canStartPathEditing(nodeId = this.selectedNodeId) {
-    return Boolean(this.getNodeEditCapabilities(nodeId)?.requiresPathEditing);
+    const targetNodeId = this.getPathEditingTargetNodeId(nodeId);
+    return Boolean(
+      this.getNodeEditCapabilities(targetNodeId)?.requiresPathEditing
+    );
   }
 
   isPathEditing(nodeId = this.pathEditingNodeId) {
@@ -584,6 +597,35 @@ export class Editor {
     return getSelectionTargetNodeId(this.nodes, nodeId, this.focusedGroupId);
   }
 
+  getPathEditingTargetNodeId(nodeId = this.selectedNodeId) {
+    const node = this.getNode(nodeId);
+
+    if (!node) {
+      return null;
+    }
+
+    if (node.type === "path") {
+      return node.id;
+    }
+
+    if (node.type !== "vector") {
+      return node.id;
+    }
+
+    const childPathIds = this.getChildNodeIds(node.id).filter((childNodeId) => {
+      return this.getNode(childNodeId)?.type === "path";
+    });
+
+    if (
+      this.pathEditingNodeId &&
+      this.isDescendantOf(this.pathEditingNodeId, node.id)
+    ) {
+      return this.pathEditingNodeId;
+    }
+
+    return childPathIds.length === 1 ? childPathIds[0] : node.id;
+  }
+
   isDescendantOf(nodeId, ancestorId) {
     return isDescendantOf(this.nodes, nodeId, ancestorId);
   }
@@ -643,6 +685,34 @@ export class Editor {
 
   setSelectionProperty(propertyId, value, nodeIds = this.selectedNodeIds) {
     return setEditorSelectionProperty(this, propertyId, value, nodeIds);
+  }
+
+  setSelectionColor(selectionColorId, value, nodeIds = this.selectedNodeIds) {
+    return setEditorSelectionColor(this, selectionColorId, value, nodeIds);
+  }
+
+  getSelectionBooleanOperations(nodeIds = this.selectedNodeIds) {
+    return getEditorSelectionBooleanOperations(this, nodeIds);
+  }
+
+  canApplyBooleanOperation(operation, nodeIds = this.selectedNodeIds) {
+    return canEditorApplyBooleanOperation(this, operation, nodeIds);
+  }
+
+  uniteSelection(nodeIds = this.selectedNodeIds) {
+    return applyEditorBooleanOperation(this, "unite", nodeIds);
+  }
+
+  subtractSelection(nodeIds = this.selectedNodeIds) {
+    return applyEditorBooleanOperation(this, "subtract", nodeIds);
+  }
+
+  intersectSelection(nodeIds = this.selectedNodeIds) {
+    return applyEditorBooleanOperation(this, "intersect", nodeIds);
+  }
+
+  excludeSelection(nodeIds = this.selectedNodeIds) {
+    return applyEditorBooleanOperation(this, "exclude", nodeIds);
   }
 
   getNodeSelectionFrame(nodeId) {
@@ -741,6 +811,10 @@ export class Editor {
 
   addVectorNode(point) {
     addEditorVectorNode(this, point);
+  }
+
+  insertNodes(nodes) {
+    insertEditorNodes(this, nodes);
   }
 
   cancelEditing() {
@@ -1018,7 +1092,15 @@ export class Editor {
   getVectorPointType(nodeId, point = this.pathEditingPoint) {
     const node = this.getNode(nodeId);
 
-    if (!(node?.type === "vector" && point)) {
+    if (!(node && point)) {
+      return null;
+    }
+
+    if (node.type === "path") {
+      return node.segments[point.segmentIndex]?.pointType || null;
+    }
+
+    if (node.type !== "vector") {
       return null;
     }
 
@@ -1089,7 +1171,10 @@ export class Editor {
   }
 
   getPathEditingInspectorState(nodeId = this.selectedNodeId) {
-    return getEditorPathEditingInspectorState(this, nodeId);
+    return getEditorPathEditingInspectorState(
+      this,
+      this.getPathEditingTargetNodeId(nodeId)
+    );
   }
 
   setVectorPointType(
@@ -1252,6 +1337,10 @@ export class Editor {
     setEditorNodeOrder(this, nodeIds, parentId);
   }
 
+  moveNodeToParent(nodeId, parentId, beforeNodeId) {
+    moveEditorNodeToParent(this, nodeId, parentId, beforeNodeId);
+  }
+
   renameGroup(nodeId, name) {
     renameEditorGroup(this, nodeId, name);
   }
@@ -1261,7 +1350,10 @@ export class Editor {
   }
 
   startPathEditing(nodeId = this.selectedNodeId) {
-    return startEditorPathEditing(this, nodeId);
+    return startEditorPathEditing(
+      this,
+      this.getPathEditingTargetNodeId(nodeId)
+    );
   }
 
   stopPathEditing() {
@@ -1269,11 +1361,13 @@ export class Editor {
   }
 
   togglePathEditing(nodeId = this.selectedNodeId) {
-    if (this.isPathEditing(nodeId)) {
+    const targetNodeId = this.getPathEditingTargetNodeId(nodeId);
+
+    if (this.isPathEditing(targetNodeId)) {
       return this.stopPathEditing();
     }
 
-    return this.startPathEditing(nodeId);
+    return this.startPathEditing(targetNodeId);
   }
 
   moveSelectionBy(options) {
@@ -1471,6 +1565,10 @@ export class Editor {
 
   zoomOut() {
     zoomEditorOut(this);
+  }
+
+  getViewportCenter() {
+    return getEditorViewportCenter(this);
   }
 
   zoomViewportFromWheel(options) {

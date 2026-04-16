@@ -1,7 +1,13 @@
 import { setVectorPointHandlesFromAnchorDrag } from "../nodes/vector/point-edit";
 import { getNodeLocalPoint, getNodeWorldPoint } from "../primitives/rotation";
 import type { PenTool } from "./pen-tool";
-import { createPlacementSession, getPenDragHandle } from "./pen-tool-types";
+import {
+  createPlacementSession,
+  getNodeContour,
+  getNodeContours,
+  getPenDragHandle,
+  isPenEditableNode,
+} from "./pen-tool-types";
 
 interface PointPlacement {
   contourIndex: number;
@@ -21,9 +27,7 @@ interface PointTypeTogglePlacement {
 const startPointTypeTogglePlacement = (tool: PenTool, node, target) => {
   const bbox = tool.editor.getNodeGeometry(node.id)?.bbox;
   const segment =
-    node.type === "vector"
-      ? node.contours[target.contourIndex]?.segments[target.segmentIndex]
-      : null;
+    getNodeContour(node, target.contourIndex)?.segments[target.segmentIndex];
 
   if (!(bbox && segment)) {
     return null;
@@ -32,7 +36,7 @@ const startPointTypeTogglePlacement = (tool: PenTool, node, target) => {
   return {
     anchorCanvasPoint: getNodeWorldPoint(node, bbox, segment.point),
     anchorLocalPoint: segment.point,
-    baseContours: node.contours,
+    baseContours: getNodeContours(node),
     historyMark: null,
     initialPointType: segment.pointType || "corner",
     nodeId: node.id,
@@ -67,7 +71,7 @@ const getPointTypeTogglePlacementContours = (
   const node = tool.editor.getNode(placement.nodeId);
   const bbox = tool.editor.getNodeGeometry(placement.nodeId)?.bbox;
 
-  if (!(node?.type === "vector" && bbox && point)) {
+  if (!(isPenEditableNode(node) && bbox && point)) {
     return placement.baseContours;
   }
 
@@ -148,11 +152,9 @@ const completePointTypeTogglePlacement = (
 
   const node = tool.editor.getNode(placement.nodeId);
   const segment =
-    node?.type === "vector"
-      ? node.contours[placement.point.contourIndex]?.segments[
-          placement.point.segmentIndex
-        ]
-      : null;
+    getNodeContour(node, placement.point.contourIndex)?.segments[
+      placement.point.segmentIndex
+    ];
 
   if (!segment) {
     return false;

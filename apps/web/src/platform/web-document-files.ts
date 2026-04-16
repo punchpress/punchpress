@@ -113,6 +113,35 @@ export const openPunchDocumentFile = async () => {
   }
 };
 
+export const openSvgImportFile = async () => {
+  const desktopDocumentFiles = getDesktopDocumentFiles();
+
+  if (desktopDocumentFiles) {
+    return desktopDocumentFiles.openSvg();
+  }
+
+  try {
+    const file = await fileOpen({
+      description: "SVG artwork",
+      excludeAcceptAllOption: true,
+      extensions: [PUNCH_SVG_EXTENSION],
+      mimeTypes: [PUNCH_SVG_MIME_TYPE],
+    });
+
+    return {
+      contents: await file.text(),
+      fileHandle: file.handle || null,
+      fileName: file.name,
+    };
+  } catch (error) {
+    if (isUserAbortError(error)) {
+      return null;
+    }
+
+    throw error;
+  }
+};
+
 export const openRecentPunchDocumentFile = (
   recentDocument: PunchRecentDocument
 ) => {

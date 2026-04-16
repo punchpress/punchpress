@@ -20,38 +20,55 @@ const loadVectorDocument = async (page) => {
       JSON.stringify({
         nodes: [
           {
-            contours: [
-              {
-                closed: true,
-                segments: [
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 0, y: 0 },
-                  },
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 200, y: 0 },
-                  },
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 200, y: 120 },
-                  },
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 0, y: 120 },
-                  },
-                ],
-              },
-            ],
+            id: "vector-node:container",
+            name: "Vector",
+            parentId: "root",
+            transform: {
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+              x: 0,
+              y: 0,
+            },
+            type: "vector",
+            visible: true,
+          },
+          {
+            closed: true,
             fill: "#000000",
             fillRule: "nonzero",
             id: "vector-node",
-            parentId: "root",
+            parentId: "vector-node:container",
+            segments: [
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 0, y: 0 },
+                pointType: "corner",
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 200, y: 0 },
+                pointType: "corner",
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 200, y: 120 },
+                pointType: "corner",
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 0, y: 120 },
+                pointType: "corner",
+              },
+            ],
             stroke: null,
+            strokeLineCap: "butt",
+            strokeLineJoin: "miter",
+            strokeMiterLimit: 4,
             strokeWidth: 0,
             transform: {
               rotation: 0,
@@ -60,11 +77,11 @@ const loadVectorDocument = async (page) => {
               x: 320,
               y: 220,
             },
-            type: "vector",
+            type: "path",
             visible: true,
           },
         ],
-        version: "1.4",
+        version: "1.6",
       })
     );
 
@@ -84,36 +101,49 @@ const loadOpenVectorDocument = async (page) => {
       JSON.stringify({
         nodes: [
           {
-            contours: [
-              {
-                closed: false,
-                segments: [
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 36, y: 0 },
-                    point: { x: 0, y: 0 },
-                    pointType: "smooth",
-                  },
-                  {
-                    handleIn: { x: -48, y: 0 },
-                    handleOut: { x: 48, y: 0 },
-                    point: { x: 120, y: 120 },
-                    pointType: "smooth",
-                  },
-                  {
-                    handleIn: { x: -36, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 240, y: 120 },
-                    pointType: "smooth",
-                  },
-                ],
-              },
-            ],
+            id: "open-vector-node:container",
+            name: "Vector",
+            parentId: "root",
+            transform: {
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+              x: 0,
+              y: 0,
+            },
+            type: "vector",
+            visible: true,
+          },
+          {
+            closed: false,
             fill: "#000000",
             fillRule: "nonzero",
             id: "open-vector-node",
-            parentId: "root",
+            parentId: "open-vector-node:container",
+            segments: [
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 36, y: 0 },
+                point: { x: 0, y: 0 },
+                pointType: "smooth",
+              },
+              {
+                handleIn: { x: -48, y: 0 },
+                handleOut: { x: 48, y: 0 },
+                point: { x: 120, y: 120 },
+                pointType: "smooth",
+              },
+              {
+                handleIn: { x: -36, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 240, y: 120 },
+                pointType: "smooth",
+              },
+            ],
             stroke: "#000000",
+            strokeLineCap: "butt",
+            strokeLineJoin: "miter",
+            strokeMiterLimit: 4,
             strokeWidth: 8,
             transform: {
               rotation: 0,
@@ -122,11 +152,11 @@ const loadOpenVectorDocument = async (page) => {
               x: 280,
               y: 180,
             },
-            type: "vector",
+            type: "path",
             visible: true,
           },
         ],
-        version: "1.4",
+        version: "1.6",
       })
     );
 
@@ -146,53 +176,49 @@ const loadMultiContourOpenVectorDocument = async (page) => {
       JSON.stringify({
         nodes: [
           {
-            contours: [
-              {
-                closed: false,
-                segments: [
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 0, y: 0 },
-                    pointType: "corner",
-                  },
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 120, y: 0 },
-                    pointType: "corner",
-                  },
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 220, y: 40 },
-                    pointType: "corner",
-                  },
-                ],
-              },
-              {
-                closed: false,
-                segments: [
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 300, y: 40 },
-                    pointType: "corner",
-                  },
-                  {
-                    handleIn: { x: 0, y: 0 },
-                    handleOut: { x: 0, y: 0 },
-                    point: { x: 420, y: 40 },
-                    pointType: "corner",
-                  },
-                ],
-              },
-            ],
-            fill: null,
-            fillRule: "nonzero",
             id: "multi-open-vector-node",
             parentId: "root",
+            name: "Vector",
+            transform: {
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+              x: 0,
+              y: 0,
+            },
+            type: "vector",
+            visible: true,
+          },
+          {
+            closed: false,
+            fill: null,
+            fillRule: "nonzero",
+            id: "multi-open-vector-node:path:1",
+            parentId: "multi-open-vector-node",
+            segments: [
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 0, y: 0 },
+                pointType: "corner",
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 120, y: 0 },
+                pointType: "corner",
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 220, y: 40 },
+                pointType: "corner",
+              },
+            ],
             stroke: "#000000",
+            strokeLineCap: "butt",
+            strokeLineJoin: "miter",
+            strokeMiterLimit: 4,
             strokeWidth: 8,
             transform: {
               rotation: 0,
@@ -201,11 +227,46 @@ const loadMultiContourOpenVectorDocument = async (page) => {
               x: 220,
               y: 180,
             },
-            type: "vector",
+            type: "path",
+            visible: true,
+          },
+          {
+            closed: false,
+            fill: null,
+            fillRule: "nonzero",
+            id: "multi-open-vector-node:path:2",
+            parentId: "multi-open-vector-node",
+            segments: [
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 300, y: 40 },
+                pointType: "corner",
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 420, y: 40 },
+                pointType: "corner",
+              },
+            ],
+            stroke: "#000000",
+            strokeLineCap: "butt",
+            strokeLineJoin: "miter",
+            strokeMiterLimit: 4,
+            strokeWidth: 8,
+            transform: {
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+              x: 220,
+              y: 180,
+            },
+            type: "path",
             visible: true,
           },
         ],
-        version: "1.4",
+        version: "1.6",
       })
     );
 
@@ -252,7 +313,7 @@ const loadPolygonShapeDocument = async (page) => {
             width: 240,
           },
         ],
-        version: "1.4",
+        version: "1.6",
       })
     );
 

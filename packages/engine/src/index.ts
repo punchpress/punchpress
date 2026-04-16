@@ -20,6 +20,7 @@ export {
   getSelectionProperties,
   getSelectionPropertiesKey,
   getSelectionPropertiesSnapshot,
+  setSelectionColor,
   setSelectionProperty,
 } from "./inspection/selection-properties";
 export { createDefaultGroupNode } from "./nodes/group/model";
@@ -35,11 +36,13 @@ export {
   isContainerNode,
   isDescendantOf,
   isGroupNode,
+  isPathNode,
   isShapeNode,
   isTextNode,
   isVectorNode,
   rebuildTreeOrder,
 } from "./nodes/node-tree";
+export { createDefaultPathNode } from "./nodes/path/model";
 export { createDefaultShapeNode } from "./nodes/shape/model";
 export {
   ARCH_BEND_LIMIT,
