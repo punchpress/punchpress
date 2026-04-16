@@ -1,3 +1,4 @@
+import { isContainerNode } from "@punchpress/engine";
 import { useEditor } from "../../../editor-react/use-editor";
 import { CanvasMultiNodeTransformOverlay } from "./canvas-multi-node-transform-overlay";
 import { CanvasSingleNodeTransformOverlay } from "./canvas-single-node-transform-overlay";
@@ -63,7 +64,7 @@ export const CanvasTransformOverlay = () => {
         isRotatable={overlayState.isRotatable}
         nodeIds={overlayState.visibleSelectedNodeIds}
         selectedGroupNodeId={
-          overlayState.selectedNode?.type === "group"
+          isContainerNode(overlayState.selectedNode)
             ? overlayState.selectedNode.id
             : null
         }

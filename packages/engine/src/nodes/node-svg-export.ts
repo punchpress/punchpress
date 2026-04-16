@@ -41,23 +41,23 @@ const getNodeLocalTransform = (node, bbox) => {
 
 const buildSvgPathMarkup = (node, path) => {
   const fill =
-    node.type === "vector" && path.closed === false
+    node.type === "path" && path.closed === false
       ? "none"
       : (node.fill ?? "none");
   const stroke = node.stroke ?? "none";
   const transform = path.transform ? ` transform="${path.transform}"` : "";
   const fillRule =
-    node.type === "vector" ? ` fill-rule="${node.fillRule}"` : "";
+    node.type === "path" ? ` fill-rule="${node.fillRule}"` : "";
   const strokeLineCap =
-    node.type === "vector"
+    node.type === "path"
       ? (node.strokeLineCap ?? DEFAULT_VECTOR_STROKE_LINE_CAP)
       : DEFAULT_VECTOR_STROKE_LINE_CAP;
   const strokeLineJoin =
-    node.type === "vector"
+    node.type === "path"
       ? (node.strokeLineJoin ?? DEFAULT_VECTOR_STROKE_LINE_JOIN)
       : DEFAULT_VECTOR_STROKE_LINE_JOIN;
   const strokeMiterLimit =
-    node.type === "vector"
+    node.type === "path"
       ? (node.strokeMiterLimit ?? DEFAULT_VECTOR_STROKE_MITER_LIMIT)
       : DEFAULT_VECTOR_STROKE_MITER_LIMIT;
 

@@ -48,12 +48,45 @@ export interface PenHoverState {
   segmentIndex: number;
 }
 
-export const getContourSegmentCount = (node, contourIndex) => {
-  if (node?.type !== "vector") {
-    return 0;
+export const isPenEditableNode = (node) => {
+  return node?.type === "path";
+};
+
+export const isPenSelectionActive = (editor, node) => {
+  if (!isPenEditableNode(node)) {
+    return false;
   }
 
-  return node.contours[contourIndex]?.segments.length || 0;
+  return editor.selectedNodeIds.some((selectedNodeId) => {
+    return (
+      selectedNodeId === node.id || editor.isDescendantOf(node.id, selectedNodeId)
+    );
+  });
+};
+
+export const getNodeContours = (node) => {
+  if (node?.type === "path") {
+    return [
+      {
+        closed: node.closed,
+        segments: node.segments,
+      },
+    ];
+  }
+
+  if (node?.type === "vector") {
+    return node.contours;
+  }
+
+  return null;
+};
+
+export const getNodeContour = (node, contourIndex) => {
+  return getNodeContours(node)?.[contourIndex] || null;
+};
+
+export const getContourSegmentCount = (node, contourIndex) => {
+  return getNodeContour(node, contourIndex)?.segments.length || 0;
 };
 
 export const getZeroHandle = () => ({ x: 0, y: 0 });

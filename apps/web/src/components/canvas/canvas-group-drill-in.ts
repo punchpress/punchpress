@@ -1,10 +1,12 @@
+import { isContainerNode } from "@punchpress/engine";
+
 export const drillIntoGroupSelection = (editor, nodeId) => {
   const selectionTargetNodeId = editor.getSelectionTargetNodeId(nodeId);
   const selectionTargetNode = selectionTargetNodeId
     ? editor.getNode(selectionTargetNodeId)
     : null;
 
-  if (selectionTargetNode?.type !== "group") {
+  if (!isContainerNode(selectionTargetNode)) {
     return false;
   }
 

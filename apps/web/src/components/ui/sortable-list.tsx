@@ -19,6 +19,7 @@ export const SortableList = ({
   activationDistance = 5,
   children,
   items,
+  onMove,
   onReorder,
   onReorderEnd,
   onReorderStart,
@@ -42,11 +43,18 @@ export const SortableList = ({
       }}
       onDragEnd={({ active, over }) => {
         if (over && active.id !== over.id) {
-          const oldIndex = items.indexOf(active.id);
-          const newIndex = items.indexOf(over.id);
+          if (onMove) {
+            onMove({
+              activeId: active.id,
+              overId: over.id,
+            });
+          } else {
+            const oldIndex = items.indexOf(active.id);
+            const newIndex = items.indexOf(over.id);
 
-          if (!(oldIndex < 0 || newIndex < 0)) {
-            onReorder(arrayMove(items, oldIndex, newIndex));
+            if (!(oldIndex < 0 || newIndex < 0)) {
+              onReorder(arrayMove(items, oldIndex, newIndex));
+            }
           }
         }
 

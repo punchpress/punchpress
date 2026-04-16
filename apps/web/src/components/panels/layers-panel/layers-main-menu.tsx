@@ -1,6 +1,7 @@
 import {
   ChevronDownIcon,
   DownloadIcon,
+  FileInputIcon,
   FilePlus2Icon,
   FolderOpenIcon,
   SaveIcon,
@@ -70,6 +71,14 @@ export const LayersMainMenu = ({
             <FolderOpenIcon size={15} />
             Open
             <MenuShortcut>⌘O</MenuShortcut>
+          </MenuItem>
+          <MenuItem
+            onClick={() => {
+              runDocumentCommandSafely("import-svg");
+            }}
+          >
+            <FileInputIcon size={15} />
+            Import SVG...
           </MenuItem>
           {children}
           <MenuItem

@@ -49,14 +49,14 @@ describe("savePunchDocumentFile", () => {
 
     const { savePunchDocumentFile } = await importWebDocumentFiles();
     const result = await savePunchDocumentFile(
-      '{"version":"1.1","nodes":[]}',
+      '{"version":"1.6","nodes":[]}',
       "renamed-design",
       "/tmp/original-folder/original-design.punch",
       true
     );
 
     expect(saveDocumentMock).toHaveBeenCalledWith({
-      contents: '{"version":"1.1","nodes":[]}',
+      contents: '{"version":"1.6","nodes":[]}',
       defaultFileName: "renamed-design.punch",
       directoryPath: "/tmp/original-folder/original-design.punch",
       fileHandle: null,
@@ -66,6 +66,84 @@ describe("savePunchDocumentFile", () => {
       canceled: false,
       fileHandle: "/tmp/renamed-design.punch",
       fileName: "renamed-design.punch",
+    });
+  });
+});
+
+describe("getDocumentBaseName", () => {
+  test("strips svg extensions when deriving the document name", async () => {
+    const { getDocumentBaseName } = await importWebDocumentFiles();
+
+    expect(getDocumentBaseName("imported-art.svg")).toBe("imported-art");
+  });
+});
+
+describe("openPunchDocumentFile", () => {
+  test("opens punch documents through the browser open dialog", async () => {
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {},
+    });
+    fileOpenMock.mockResolvedValueOnce({
+      handle: {
+        kind: "file",
+        name: "design.punch",
+      },
+      name: "design.punch",
+      text: async () => '{"version":"1.6","nodes":[]}',
+    });
+
+    const { openPunchDocumentFile } = await importWebDocumentFiles();
+    const result = await openPunchDocumentFile();
+
+    expect(fileOpenMock).toHaveBeenCalledWith({
+      description: "PunchPress document",
+      excludeAcceptAllOption: true,
+      extensions: [".punch"],
+      mimeTypes: ["application/vnd.punchpress+json"],
+    });
+    expect(result).toEqual({
+      contents: '{"version":"1.6","nodes":[]}',
+      fileHandle: {
+        kind: "file",
+        name: "design.punch",
+      },
+      fileName: "design.punch",
+    });
+  });
+});
+
+describe("openSvgImportFile", () => {
+  test("opens svg artwork through the browser import dialog", async () => {
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {},
+    });
+    fileOpenMock.mockResolvedValueOnce({
+      handle: {
+        kind: "file",
+        name: "imported-art.svg",
+      },
+      name: "imported-art.svg",
+      text: async () => "<svg></svg>",
+    });
+
+    const { openSvgImportFile } = await importWebDocumentFiles();
+    const result = await openSvgImportFile();
+
+    expect(fileOpenMock).toHaveBeenCalledWith({
+      description: "SVG artwork",
+      excludeAcceptAllOption: true,
+      extensions: [".svg"],
+      mimeTypes: ["image/svg+xml"],
+    });
+    expect(result).toEqual({
+      contents: "<svg></svg>",
+      fileHandle: {
+        kind: "file",
+        name: "imported-art.svg",
+      },
+      fileName: "imported-art.svg",
     });
   });
 });

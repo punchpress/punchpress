@@ -5,6 +5,7 @@ import { usePerformanceRenderCounter } from "../../../performance/use-performanc
 import { AppearanceFields } from "./appearance-fields";
 import { PathCornerFields } from "./path-corner-fields";
 import { PathPointFields } from "./path-point-fields";
+import { SelectionColorsFields } from "./selection-colors-fields";
 import { ShapeFields } from "./shape-fields";
 import { TextFields } from "./text-fields";
 import { TextWarpFields } from "./text-warp-fields";
@@ -32,9 +33,10 @@ export const PropertiesPanel = () => {
       selectionProperties.properties.strokeMiterLimit ||
       selectionProperties.properties.strokeWidth
   );
+  const hasSelectionColors = selectionProperties.selectionColors.length > 0;
   const selectedNode = selectionProperties.selectedNode;
   const showsPathCornerRadiusSummary = Boolean(
-    pointSelectedNode?.type === "vector" &&
+    pointSelectedNode?.type === "path" &&
       !showsPathPointCornerRadius &&
       pathCornerRadiusSummary
   );
@@ -105,10 +107,17 @@ export const PropertiesPanel = () => {
           />
         ) : null}
 
+        {hasSelectionColors ? (
+          <SelectionColorsFields
+            selectionColors={selectionProperties.selectionColors}
+            withTopBorder={hasFieldsBeforeAppearance || hasAppearanceFields}
+          />
+        ) : null}
+
         {selectedNode?.type === "text" ? (
           <TextWarpFields
             node={selectedNode}
-            withTopBorder={hasAppearanceFields}
+            withTopBorder={hasAppearanceFields || hasSelectionColors}
           />
         ) : null}
 

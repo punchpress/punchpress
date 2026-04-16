@@ -112,6 +112,7 @@ describe("registerDocumentFileHandlers", () => {
       "document:get-recent-documents",
       "document:open",
       "document:open-recent",
+      "document:open-svg",
       "document:save",
       "document:save-svg",
     ]);
@@ -121,6 +122,12 @@ describe("registerDocumentFileHandlers", () => {
     expect(showOpenDialogMock).toHaveBeenCalledWith(
       { id: "focused-window" },
       expect.objectContaining({
+        filters: [
+          {
+            extensions: ["punch"],
+            name: "PunchPress documents",
+          },
+        ],
         properties: ["openFile"],
       })
     );
@@ -135,6 +142,41 @@ describe("registerDocumentFileHandlers", () => {
       contents: "loaded:/tmp/from-dialog.punch",
       fileHandle: "/tmp/from-dialog.punch",
       fileName: "from-dialog.punch",
+    });
+  });
+
+  test("opens svg artwork for import without updating recents", async () => {
+    showOpenDialogMock.mockResolvedValueOnce({
+      canceled: false,
+      filePaths: ["/tmp/from-dialog.svg"],
+    });
+
+    const { registerDocumentFileHandlers } = await importDocumentFiles();
+    registerDocumentFileHandlers({
+      onRecentDocumentsChanged: recentDocumentsChanged,
+    });
+
+    const openedDocument = await handlers.get("document:open-svg")?.();
+
+    expect(showOpenDialogMock).toHaveBeenCalledWith(
+      { id: "focused-window" },
+      expect.objectContaining({
+        filters: [
+          {
+            extensions: ["svg"],
+            name: "SVG artwork",
+          },
+        ],
+        properties: ["openFile"],
+      })
+    );
+    expect(readDocumentAtPathMock).toHaveBeenCalledWith("/tmp/from-dialog.svg");
+    expect(rememberRecentDocumentMock).not.toHaveBeenCalled();
+    expect(recentDocumentsChanged).not.toHaveBeenCalled();
+    expect(openedDocument).toEqual({
+      contents: "loaded:/tmp/from-dialog.svg",
+      fileHandle: "/tmp/from-dialog.svg",
+      fileName: "from-dialog.svg",
     });
   });
 

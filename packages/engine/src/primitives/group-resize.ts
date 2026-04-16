@@ -71,7 +71,7 @@ export const getScaledGroupNodeUpdate = (node, anchor, scale) => {
     };
   }
 
-  if (node.type === "vector") {
+  if (node.type === "path") {
     return {
       transform: {
         scaleX: round((node.transform.scaleX ?? 1) * scale, 4),
@@ -132,7 +132,7 @@ export const getResizedNodeUpdate = (node, bbox, anchor, scale, direction) => {
     };
   }
 
-  if (node.type === "vector") {
+  if (node.type === "path") {
     const nextScaleX = round((node.transform.scaleX ?? 1) * scale, 4);
     const nextScaleY = round((node.transform.scaleY ?? 1) * scale, 4);
     const nextRotatedOffset = rotateVector(

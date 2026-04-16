@@ -2,7 +2,7 @@ import { VECTOR_ANCHOR_INTERACTION_RADIUS_PX } from "../nodes/vector/interaction
 import { round } from "../primitives/math";
 import { getNodeLocalPoint, getNodeWorldPoint } from "../primitives/rotation";
 import type { PenTool } from "./pen-tool";
-import { isSamePoint } from "./pen-tool-types";
+import { getNodeContour, isPenEditableNode, isSamePoint } from "./pen-tool-types";
 
 export const resolveCloseTarget = (
   tool: PenTool,
@@ -30,10 +30,9 @@ export const resolveCloseTarget = (
 export const setHoverPoint = (tool: PenTool, session, point) => {
   const node = tool.editor.getNode(session.nodeId);
   const bbox = tool.editor.getNodeGeometry(session.nodeId)?.bbox;
-  const contour =
-    node?.type === "vector" ? node.contours[session.contourIndex] : null;
+  const contour = getNodeContour(node, session.contourIndex);
 
-  if (!(node?.type === "vector" && bbox && contour)) {
+  if (!(isPenEditableNode(node) && bbox && contour)) {
     return false;
   }
 

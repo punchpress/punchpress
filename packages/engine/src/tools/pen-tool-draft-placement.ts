@@ -13,7 +13,10 @@ import {
 import { resolveCloseTarget } from "./pen-tool-close-target";
 import {
   getPenDragHandle,
+  getNodeContour,
+  getNodeContours,
   getZeroHandle,
+  isPenEditableNode,
   type PenAuthoringSession,
   roundHandle,
 } from "./pen-tool-types";
@@ -25,10 +28,9 @@ export const beginDraftPlacement = (
 ) => {
   const node = tool.editor.getNode(session.nodeId);
   const bbox = tool.editor.getNodeGeometry(session.nodeId)?.bbox;
-  const contour =
-    node?.type === "vector" ? node.contours[session.contourIndex] : null;
+  const contour = getNodeContour(node, session.contourIndex);
 
-  if (!(node?.type === "vector" && bbox && contour)) {
+  if (!(isPenEditableNode(node) && bbox && contour)) {
     return;
   }
 
@@ -88,10 +90,9 @@ export const completeDraftPlacement = (tool: PenTool, point, options = {}) => {
 
   const node = tool.editor.getNode(session.nodeId);
   const bbox = tool.editor.getNodeGeometry(session.nodeId)?.bbox;
-  const contour =
-    node?.type === "vector" ? node.contours[session.contourIndex] : null;
+  const contour = getNodeContour(node, session.contourIndex);
 
-  if (!(node?.type === "vector" && bbox && contour)) {
+  if (!(isPenEditableNode(node) && bbox && contour)) {
     return false;
   }
 
@@ -109,7 +110,7 @@ export const completeDraftPlacement = (tool: PenTool, point, options = {}) => {
   if (draft.target?.type === "start-anchor") {
     session.hasAuthoredChange = true;
     const nextContours = draft.dragHandle
-      ? replaceVectorContourSegment(node.contours, {
+      ? replaceVectorContourSegment(getNodeContours(node), {
           contourIndex: session.contourIndex,
           handleIn: roundHandle({
             x: -draft.dragHandle.x,
@@ -118,7 +119,7 @@ export const completeDraftPlacement = (tool: PenTool, point, options = {}) => {
           pointType: "smooth",
           segmentIndex: draft.target.segmentIndex,
         })
-      : node.contours;
+      : getNodeContours(node);
 
     tool.editor.updateVectorContours(
       node.id,
@@ -135,7 +136,7 @@ export const completeDraftPlacement = (tool: PenTool, point, options = {}) => {
   session.hasAuthoredChange = true;
   tool.editor.updateVectorContours(
     node.id,
-    appendVectorContourSegment(node.contours, {
+    appendVectorContourSegment(getNodeContours(node), {
       contourIndex: session.contourIndex,
       handleIn: draft.dragHandle
         ? roundHandle({
@@ -192,10 +193,9 @@ export const updateDraftPlacement = (
 
   const node = tool.editor.getNode(session.nodeId);
   const bbox = tool.editor.getNodeGeometry(session.nodeId)?.bbox;
-  const contour =
-    node?.type === "vector" ? node.contours[session.contourIndex] : null;
+  const contour = getNodeContour(node, session.contourIndex);
 
-  if (!(node?.type === "vector" && bbox && contour)) {
+  if (!(isPenEditableNode(node) && bbox && contour)) {
     return false;
   }
 
@@ -229,7 +229,7 @@ export const updateDraftPlacement = (
     if (draft.kind === "first-point") {
       tool.editor.updateVectorContours(
         node.id,
-        replaceVectorContourSegment(node.contours, {
+        replaceVectorContourSegment(getNodeContours(node), {
           contourIndex: session.contourIndex,
           point: draft.anchorLocalPoint,
           segmentIndex: 0,
@@ -267,7 +267,7 @@ export const updateDraftPlacement = (
 
     tool.editor.updateVectorContours(
       node.id,
-      replaceVectorContourSegment(node.contours, {
+      replaceVectorContourSegment(getNodeContours(node), {
         contourIndex: session.contourIndex,
         handleIn: nextHandle
           ? {

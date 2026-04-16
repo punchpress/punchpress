@@ -5,6 +5,7 @@ import {
 } from "../../nodes/shape/shape-engine";
 import {
   canRoundVectorPoint,
+  getEligibleVectorCornerPoints,
   getStableVectorCornerRadiusMax,
   getVectorCornerRadiusSummary,
   getVectorPointCornerControl,
@@ -19,6 +20,31 @@ const getScopedCornerPoints = (editor, nodeId) => {
     : null;
 };
 
+const getScopedCornerSummaryPoints = (editor, nodeId, contours) => {
+  const scopedPoints = getScopedCornerPoints(editor, nodeId);
+
+  if (!scopedPoints?.length) {
+    return null;
+  }
+
+  return getEligibleVectorCornerPoints(contours, scopedPoints).length > 0
+    ? scopedPoints
+    : null;
+};
+
+const getPathContours = (node) => {
+  if (node?.type !== "path") {
+    return null;
+  }
+
+  return [
+    {
+      closed: node.closed,
+      segments: node.segments,
+    },
+  ];
+};
+
 export const canRoundPathPoint = (editor, nodeId, point) => {
   const node = editor.getNode(nodeId);
 
@@ -28,6 +54,10 @@ export const canRoundPathPoint = (editor, nodeId, point) => {
 
   if (node?.type === "shape") {
     return canRoundShapePoint(node, point);
+  }
+
+  if (node?.type === "path") {
+    return canRoundVectorPoint(getPathContours(node), point);
   }
 
   if (node?.type !== "vector") {
@@ -46,6 +76,10 @@ export const getPathPointCornerControl = (editor, nodeId, point) => {
 
   if (node?.type === "shape") {
     return getShapePointCornerControl(node, point);
+  }
+
+  if (node?.type === "path") {
+    return getVectorPointCornerControl(getPathContours(node), point);
   }
 
   if (node?.type !== "vector") {
@@ -70,13 +104,22 @@ export const getPathCornerRadiusSummary = (editor, nodeId) => {
     return getShapeCornerRadiusSummary(node);
   }
 
+  if (node.type === "path") {
+    const contours = getPathContours(node);
+
+    return getVectorCornerRadiusSummary(
+      contours,
+      getScopedCornerSummaryPoints(editor, nodeId, contours)
+    );
+  }
+
   if (node.type !== "vector") {
     return null;
   }
 
   return getVectorCornerRadiusSummary(
     node.contours,
-    getScopedCornerPoints(editor, nodeId)
+    getScopedCornerSummaryPoints(editor, nodeId, node.contours)
   );
 };
 
@@ -91,13 +134,22 @@ export const getPathCornerRadiusStableMax = (editor, nodeId) => {
     return getShapeCornerRadiusSummary(node)?.max || 0;
   }
 
+  if (node.type === "path") {
+    const contours = getPathContours(node);
+
+    return getStableVectorCornerRadiusMax(
+      contours,
+      getScopedCornerSummaryPoints(editor, nodeId, contours)
+    );
+  }
+
   if (node.type !== "vector") {
     return 0;
   }
 
   return getStableVectorCornerRadiusMax(
     node.contours,
-    getScopedCornerPoints(editor, nodeId)
+    getScopedCornerSummaryPoints(editor, nodeId, node.contours)
   );
 };
 
@@ -127,6 +179,34 @@ export const setPathPointCornerRadius = (
         return {
           ...currentNode,
           cornerRadius: Math.max(0, cornerRadius || 0),
+        };
+      });
+    });
+
+    return true;
+  }
+
+  if (node.type === "path") {
+    const nextContours = setVectorPointCornerRadius(
+      getPathContours(node),
+      point,
+      cornerRadius
+    );
+
+    if (!nextContours) {
+      return false;
+    }
+
+    editor.run(() => {
+      editor.getState().updateNodeById(nodeId, (currentNode) => {
+        if (currentNode.type !== "path") {
+          return currentNode;
+        }
+
+        return {
+          ...currentNode,
+          closed: nextContours[0].closed,
+          segments: nextContours[0].segments,
         };
       });
     });
@@ -185,6 +265,34 @@ export const setPathCornerRadius = (editor, nodeId, cornerRadius) => {
         return {
           ...currentNode,
           cornerRadius: Math.max(0, cornerRadius || 0),
+        };
+      });
+    });
+
+    return true;
+  }
+
+  if (node.type === "path") {
+    const nextContours = setAllVectorPointCornerRadii(
+      getPathContours(node),
+      cornerRadius,
+      getScopedCornerPoints(editor, nodeId)
+    );
+
+    if (!nextContours) {
+      return false;
+    }
+
+    editor.run(() => {
+      editor.getState().updateNodeById(nodeId, (currentNode) => {
+        if (currentNode.type !== "path") {
+          return currentNode;
+        }
+
+        return {
+          ...currentNode,
+          closed: nextContours[0].closed,
+          segments: nextContours[0].segments,
         };
       });
     });

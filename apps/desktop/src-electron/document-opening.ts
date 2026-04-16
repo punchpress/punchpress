@@ -6,7 +6,7 @@ import {
   openRecentDocument,
 } from "./recent-documents.js";
 
-const PUNCH_DOCUMENT_EXTENSION = ".punch";
+const SUPPORTED_OPEN_DOCUMENT_EXTENSIONS = new Set([".punch"]);
 
 interface CreateDocumentOpeningControllerOptions {
   emitOpenedDocument: (openedDocument: DesktopOpenedDocument) => void;
@@ -32,8 +32,9 @@ const normalizeOpenDocumentPath = (value: unknown) => {
 
   const resolvedFilePath = path.resolve(trimmedValue);
 
-  return path.extname(resolvedFilePath).toLowerCase() ===
-    PUNCH_DOCUMENT_EXTENSION
+  return SUPPORTED_OPEN_DOCUMENT_EXTENSIONS.has(
+    path.extname(resolvedFilePath).toLowerCase()
+  )
     ? resolvedFilePath
     : null;
 };

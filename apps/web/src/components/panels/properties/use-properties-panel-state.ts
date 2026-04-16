@@ -2,13 +2,16 @@ import { useEditorValue } from "../../../editor-react/use-editor-value";
 
 export const usePropertiesPanelState = () => {
   const snapshot = useEditorValue((editor, state) => {
-    const selectedNode =
-      state.selectedNodeIds.length === 1
-        ? editor.getNode(state.selectedNodeIds[0])
-        : null;
-    const pathEditingInspectorState = editor.getPathEditingInspectorState(
-      selectedNode?.id || null
-    );
+    const selectedNodeId =
+      state.selectedNodeIds.length === 1 ? state.selectedNodeIds[0] : null;
+    const pathInspectionNodeId = selectedNodeId
+      ? editor.getPathEditingTargetNodeId(selectedNodeId)
+      : null;
+    const selectedNode = pathInspectionNodeId
+      ? editor.getNode(pathInspectionNodeId)
+      : null;
+    const pathEditingInspectorState =
+      editor.getPathEditingInspectorState(selectedNodeId);
 
     return {
       bootstrapError: editor.bootstrapError,

@@ -8,10 +8,11 @@ import {
 import type { PenTool } from "./pen-tool";
 import { getActiveAuthoringSession } from "./pen-tool-authoring-session";
 import { setHoverPoint } from "./pen-tool-close-target";
+import { getNodeContour, isPenEditableNode } from "./pen-tool-types";
 
 const createAnchorHoverState = (node, target, intent) => {
   const hoverPoint =
-    node.contours[target.contourIndex]?.segments[target.segmentIndex]?.point;
+    getNodeContour(node, target.contourIndex)?.segments[target.segmentIndex]?.point;
 
   if (!hoverPoint) {
     return null;
@@ -51,7 +52,7 @@ const createSegmentHoverState = (nodeId, target) => {
 };
 
 const resolveIdlePenHoverState = (tool: PenTool, node, point, event = null) => {
-  if (node?.type !== "vector") {
+  if (!isPenEditableNode(node)) {
     return null;
   }
 
@@ -62,7 +63,7 @@ const resolveIdlePenHoverState = (tool: PenTool, node, point, event = null) => {
 
   if (pointTypeToggleTarget) {
     const segment =
-      node.contours[pointTypeToggleTarget.contourIndex]?.segments[
+      getNodeContour(node, pointTypeToggleTarget.contourIndex)?.segments[
         pointTypeToggleTarget.segmentIndex
       ];
 

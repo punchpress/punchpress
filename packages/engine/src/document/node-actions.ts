@@ -85,17 +85,29 @@ export const setNodeOrder = (editor, nodeIds, parentId) => {
   });
 };
 
+export const moveNodeToParent = (editor, nodeId, parentId, beforeNodeId) => {
+  finishEditingIfNeeded(editor);
+  editor.run(() => {
+    editor.getState().moveNodeToParent(nodeId, parentId, beforeNodeId);
+  });
+};
+
 export const renameGroup = (editor, nodeId, name) => {
   const nextName = typeof name === "string" ? name.trim() : "";
   const node = editor.getNode(nodeId);
 
-  if (!(node?.type === "group" && nextName.length > 0)) {
+  if (
+    !(
+      (node?.type === "group" || node?.type === "vector") &&
+      nextName.length > 0
+    )
+  ) {
     return;
   }
 
   editor.run(() => {
     editor.getState().updateNodeById(nodeId, (currentNode) => {
-      if (currentNode.type !== "group") {
+      if (!(currentNode.type === "group" || currentNode.type === "vector")) {
         return currentNode;
       }
 
@@ -153,6 +165,17 @@ export const updateSelectedNode = (editor, updater) => {
   finishEditingIfNeeded(editor);
   editor.run(() => {
     editor.getState().updateSelectedNode(updater);
+  });
+};
+
+export const insertNodes = (editor, nodes) => {
+  finishEditingIfNeeded(editor);
+  if (!(Array.isArray(nodes) && nodes.length > 0)) {
+    return;
+  }
+
+  editor.run(() => {
+    editor.getState().insertNodes(nodes);
   });
 };
 

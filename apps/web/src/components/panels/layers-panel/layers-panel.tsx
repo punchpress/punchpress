@@ -1,5 +1,6 @@
+import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
 import { useState } from "react";
-import { SortableItem, SortableList } from "@/components/ui/sortable-list";
+import { SortableList } from "@/components/ui/sortable-list";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
@@ -13,12 +14,132 @@ import { LayersMainMenu } from "./layers-main-menu";
 import { getDuplicateRecentDocumentNames } from "./recent-documents";
 import { RecentDocumentsMenu } from "./recent-documents-menu";
 
+const isContainerLayerNode = (node) => {
+  return node?.type === "group" || node?.type === "vector";
+};
+
+const getDisplayedChildIds = (editor, parentId = ROOT_PARENT_ID) => {
+  return [...editor.getChildNodeIds(parentId)].reverse();
+};
+
+const getVisibleLayerNodeIds = (
+  editor,
+  collapsedGroupIds,
+  parentId = ROOT_PARENT_ID
+) => {
+  return getDisplayedChildIds(editor, parentId).flatMap((nodeId) => {
+    const node = editor.getNode(nodeId);
+
+    if (!(isContainerLayerNode(node) && !collapsedGroupIds.has(nodeId))) {
+      return [nodeId];
+    }
+
+    return [
+      nodeId,
+      ...getVisibleLayerNodeIds(editor, collapsedGroupIds, nodeId),
+    ];
+  });
+};
+
+const setDisplayedNodeOrder = (
+  editor,
+  displayedNodeIds,
+  parentId = ROOT_PARENT_ID
+) => {
+  const orderedNodeIds = [...displayedNodeIds].reverse();
+
+  if (parentId === ROOT_PARENT_ID) {
+    editor.setNodeOrder(orderedNodeIds);
+    return;
+  }
+
+  editor.setNodeOrder(orderedNodeIds, parentId);
+};
+
+const movePathLayerNode = (editor, activeId, overNode) => {
+  if (overNode.type === "vector") {
+    editor.moveNodeToParent(activeId, overNode.id, null);
+    return true;
+  }
+
+  const targetParentId = overNode.parentId || ROOT_PARENT_ID;
+  const targetParentNode =
+    targetParentId === ROOT_PARENT_ID ? null : editor.getNode(targetParentId);
+
+  if (targetParentNode?.type !== "vector") {
+    return false;
+  }
+
+  const displayedTargetChildIds = getDisplayedChildIds(
+    editor,
+    targetParentId
+  ).filter((nodeId) => nodeId !== activeId);
+  const overIndex = displayedTargetChildIds.indexOf(overNode.id);
+
+  if (overIndex < 0) {
+    return false;
+  }
+
+  const beforeNodeId =
+    overIndex > 0 ? displayedTargetChildIds[overIndex - 1] : null;
+
+  editor.moveNodeToParent(activeId, targetParentId, beforeNodeId);
+
+  return true;
+};
+
+const reorderLayerSiblings = (editor, activeId, overId, parentId) => {
+  const nextDisplayedSiblingIds = getDisplayedChildIds(editor, parentId).filter(
+    (nodeId) => nodeId !== activeId
+  );
+  const overIndex = nextDisplayedSiblingIds.indexOf(overId);
+
+  if (overIndex < 0) {
+    return;
+  }
+
+  nextDisplayedSiblingIds.splice(overIndex, 0, activeId);
+  setDisplayedNodeOrder(editor, nextDisplayedSiblingIds, parentId);
+};
+
+const moveLayerNode = (editor, activeId, overId) => {
+  const activeNode = editor.getNode(activeId);
+  const overNode = editor.getNode(overId);
+
+  if (!(activeNode && overNode) || activeId === overId) {
+    return;
+  }
+
+  if (editor.isDescendantOf(overId, activeId)) {
+    return;
+  }
+
+  if (
+    activeNode.type === "path" &&
+    movePathLayerNode(editor, activeId, overNode)
+  ) {
+    return;
+  }
+
+  const activeParentId = activeNode.parentId || ROOT_PARENT_ID;
+  const overParentId = overNode.parentId || ROOT_PARENT_ID;
+
+  if (activeParentId !== overParentId) {
+    return;
+  }
+
+  reorderLayerSiblings(editor, activeId, overId, activeParentId);
+};
+
 export const LayersPanel = () => {
   usePerformanceRenderCounter("render.panel.layers");
   const editor = useEditor();
-  const layerNodeIds = useEditorValue((editor) => editor.layerNodeIds);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [collapsedGroupIds, setCollapsedGroupIds] = useState(() => new Set());
+  const layerNodeIds = useEditorValue((editor) => editor.layerNodeIds);
+  const visibleLayerNodeIds = useEditorValue((editor) => {
+    return getVisibleLayerNodeIds(editor, collapsedGroupIds);
+  });
   const {
     clearRecentDocumentsSafely,
     missingFontsExportDialogProps,
@@ -71,9 +192,9 @@ export const LayersPanel = () => {
         <div className="flex flex-col gap-[0.5px] px-1 pb-1">
           {layerNodeIds.length > 0 ? (
             <SortableList
-              items={layerNodeIds}
-              onReorder={(orderedIds) =>
-                editor.setNodeOrder([...orderedIds].reverse())
+              items={visibleLayerNodeIds}
+              onMove={({ activeId, overId }) =>
+                moveLayerNode(editor, activeId, overId)
               }
               renderDragOverlay={(nodeId) => (
                 <LayerTreeDragGhost
@@ -84,24 +205,12 @@ export const LayersPanel = () => {
             >
               {layerNodeIds.map((nodeId) => {
                 return (
-                  <SortableItem id={nodeId} key={nodeId}>
-                    {({
-                      dragHandleProps,
-                      isDragging,
-                      itemStyle,
-                      setItemRef,
-                    }) => (
-                      <LayerTreeRow
-                        collapsedGroupIds={collapsedGroupIds}
-                        dragHandleProps={dragHandleProps}
-                        isDragging={isDragging}
-                        itemStyle={itemStyle}
-                        nodeId={nodeId}
-                        onToggleCollapse={toggleCollapsedGroup}
-                        setItemRef={setItemRef}
-                      />
-                    )}
-                  </SortableItem>
+                  <LayerTreeRow
+                    collapsedGroupIds={collapsedGroupIds}
+                    key={nodeId}
+                    nodeId={nodeId}
+                    onToggleCollapse={toggleCollapsedGroup}
+                  />
                 );
               })}
             </SortableList>

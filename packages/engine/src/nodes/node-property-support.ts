@@ -1,16 +1,17 @@
 import { GROUP_NODE_PROPERTY_IDS } from "./group/group-property-support";
+import { VECTOR_NODE_PROPERTY_IDS } from "./vector/vector-property-support";
 import {
   SHAPE_NODE_PROPERTY_IDS,
   supportsShapeProperty,
 } from "./shape/shape-property-support";
 import { TEXT_NODE_PROPERTY_IDS } from "./text/text-property-support";
-import { VECTOR_NODE_PROPERTY_IDS } from "./vector/vector-property-support";
 
 const NODE_PROPERTY_IDS = {
   group: GROUP_NODE_PROPERTY_IDS,
+  path: VECTOR_NODE_PROPERTY_IDS,
   shape: SHAPE_NODE_PROPERTY_IDS,
   text: TEXT_NODE_PROPERTY_IDS,
-  vector: VECTOR_NODE_PROPERTY_IDS,
+  vector: [],
 };
 
 export const getNodePropertyIds = (node) => {

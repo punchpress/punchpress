@@ -1,3 +1,4 @@
+import { isContainerNode } from "../nodes/node-tree";
 import {
   getCornerPointFromBounds,
   getResizeAnchorFromBounds,
@@ -26,12 +27,15 @@ export const beginResizeSelection = (
       : null) ||
     editor.selectedNodeIds;
   const resolvedNodeIds = editor.getEffectiveSelectionNodeIds(requestedNodeIds);
+  const includesContainerSelection = requestedNodeIds.some((currentNodeId) => {
+    return isContainerNode(editor.getNode(currentNodeId));
+  });
 
   if (!(resolvedNodeIds.length > 0 && anchorCanvas)) {
     return null;
   }
 
-  if (resolvedNodeIds.length === 1) {
+  if (resolvedNodeIds.length === 1 && !includesContainerSelection) {
     const resolvedNodeId = resolvedNodeIds[0];
     const resizedNode = editor.getNode(resolvedNodeId);
     const bbox = resizedNode
@@ -157,7 +161,13 @@ export const resizeSelectionFromCorner = (
   editor,
   { corner = "se", scale = 1 } = {}
 ) => {
+  const requestedSelectedNodeIds = editor.selectedNodeIds.filter((nodeId) => {
+    return editor.getNode(nodeId);
+  });
   const effectiveSelectedNodeIds = editor.getEffectiveSelectionNodeIds();
+  const includesContainerSelection = requestedSelectedNodeIds.some((nodeId) => {
+    return isContainerNode(editor.getNode(nodeId));
+  });
 
   if (effectiveSelectedNodeIds.length === 0) {
     return [];
@@ -169,7 +179,7 @@ export const resizeSelectionFromCorner = (
     return [];
   }
 
-  if (effectiveSelectedNodeIds.length === 1) {
+  if (effectiveSelectedNodeIds.length === 1 && !includesContainerSelection) {
     const selectedNode = editor.getNode(effectiveSelectedNodeIds[0]);
     const bbox = selectedNode?.id
       ? editor.getNodeTransformBounds(selectedNode.id)
@@ -210,7 +220,10 @@ export const resizeSelectionFromCorner = (
       effectiveSelectionBounds,
       direction
     ),
-    nodeIds: effectiveSelectedNodeIds,
+    nodeIds:
+      requestedSelectedNodeIds.length > 0
+        ? requestedSelectedNodeIds
+        : effectiveSelectedNodeIds,
   });
 
   return updateResizeSelection(editor, resizeSession, {

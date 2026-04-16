@@ -1,10 +1,16 @@
+import { isVectorNode } from "../nodes/node-tree";
 import {
   createOpenVectorContour,
   reverseVectorContour,
 } from "../nodes/vector/vector-contour-operations";
 import { getSelectedEndpointContinuationTarget } from "./pen-existing-point-actions";
 import type { PenTool } from "./pen-tool";
-import { getContourSegmentCount } from "./pen-tool-types";
+import {
+  getContourSegmentCount,
+  getNodeContour,
+  getNodeContours,
+  isPenEditableNode,
+} from "./pen-tool-types";
 
 export const getActiveAuthoringSession = (tool: PenTool) => {
   const session = tool.authoringSession;
@@ -14,12 +20,9 @@ export const getActiveAuthoringSession = (tool: PenTool) => {
   }
 
   const node = tool.editor.getNode(session.nodeId);
+  const contour = getNodeContour(node, session.contourIndex);
 
-  if (
-    node?.type !== "vector" ||
-    node.contours[session.contourIndex]?.closed ||
-    !node.contours[session.contourIndex]
-  ) {
+  if (!(isPenEditableNode(node) && contour && !contour.closed)) {
     tool.authoringSession = null;
     return null;
   }
@@ -65,6 +68,16 @@ export const finishAuthoringSession = (
   return tool.editor.revertToMark(session.historyMark);
 };
 
+const getAppendTargetVectorId = (tool: PenTool) => {
+  const pathEditingNode = tool.editor.pathEditingNodeId
+    ? tool.editor.getNode(tool.editor.pathEditingNodeId)
+    : null;
+  const parentNodeId = pathEditingNode?.parentId || null;
+  const parentNode = parentNodeId ? tool.editor.getNode(parentNodeId) : null;
+
+  return isVectorNode(parentNode) ? parentNode.id : null;
+};
+
 export const startAuthoringSession = (tool: PenTool, point) => {
   const historyMark = tool.editor.markHistoryStep("draw vector path");
 
@@ -72,35 +85,58 @@ export const startAuthoringSession = (tool: PenTool, point) => {
     return false;
   }
 
+  const appendTargetVectorId = getAppendTargetVectorId(tool);
+  let parentNodeId: string | null = null;
   let nodeId: string | null = null;
 
   tool.editor.run(() => {
+    if (appendTargetVectorId) {
+      parentNodeId = appendTargetVectorId;
+      nodeId = tool.editor.getState().addPathNode(appendTargetVectorId, point, {
+        activatePointer: false,
+        patch: {
+          closed: false,
+          segments: createOpenVectorContour({ x: 0, y: 0 }).segments,
+        },
+        selectionNodeId: appendTargetVectorId,
+      });
+      return;
+    }
+
     if (tool.editor.pathEditingNodeId) {
       tool.editor.stopPathEditing();
     }
 
-    nodeId = tool.editor.getState().addVectorNode(point, {
+    parentNodeId = tool.editor.getState().addVectorNode(point, {
       activatePointer: false,
       patch: {
-        contours: [createOpenVectorContour({ x: 0, y: 0 })],
+        path: {
+          closed: false,
+          segments: createOpenVectorContour({ x: 0, y: 0 }).segments,
+        },
       },
-    });
-
-    if (!nodeId) {
-      return;
-    }
-
-    tool.editor.getState().setPathEditingNodeId(nodeId);
-    tool.editor.getState().setPathEditingPoint({
-      contourIndex: 0,
-      segmentIndex: 0,
     });
   });
 
-  if (!nodeId) {
+  if (!(parentNodeId || nodeId)) {
     tool.editor.revertToMark(historyMark);
     return false;
   }
+
+  const resolvedNodeId =
+    nodeId ||
+    (parentNodeId ? tool.editor.getChildNodeIds(parentNodeId)[0] : null);
+
+  if (!resolvedNodeId) {
+    tool.editor.revertToMark(historyMark);
+    return false;
+  }
+
+  tool.editor.setPathEditingNodeId(resolvedNodeId);
+  tool.editor.setPathEditingPoint({
+    contourIndex: 0,
+    segmentIndex: 0,
+  });
 
   tool.idleHoverTarget = null;
   tool.authoringSession = {
@@ -111,7 +147,7 @@ export const startAuthoringSession = (tool: PenTool, point) => {
     historyMark,
     hoverPoint: null,
     hoverTarget: null,
-    nodeId,
+    nodeId: resolvedNodeId,
   };
   tool.editor.notifyInteractionPreviewChanged();
   return true;
@@ -124,9 +160,16 @@ export const startContinuationSession = (tool: PenTool, node, target) => {
     return false;
   }
 
-  const contour = node.contours[target.contourIndex];
+  const contour = getNodeContour(node, target.contourIndex);
 
-  if (!contour || contour.closed || contour.segments.length === 0) {
+  if (
+    !(
+      isPenEditableNode(node) &&
+      contour &&
+      !contour.closed &&
+      contour.segments.length > 0
+    )
+  ) {
     tool.editor.revertToMark(historyMark);
     return false;
   }
@@ -136,7 +179,7 @@ export const startContinuationSession = (tool: PenTool, node, target) => {
   if (target.endpoint === "start") {
     tool.editor.updateVectorContours(
       node.id,
-      reverseVectorContour(node.contours, target.contourIndex)
+      reverseVectorContour(getNodeContours(node), target.contourIndex)
     );
     continuationTarget = {
       ...target,

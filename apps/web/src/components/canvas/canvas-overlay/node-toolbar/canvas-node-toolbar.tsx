@@ -1,3 +1,4 @@
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Fragment, memo } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -5,6 +6,11 @@ import {
   ToolbarGroup,
   ToolbarSeparator,
 } from "@/components/ui/toolbar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useEditor } from "../../../../editor-react/use-editor";
 import { resolveNodeToolbarActions } from "./node-toolbar-actions";
 import { useNodeToolbarPresence } from "./use-node-toolbar-presence";
@@ -79,25 +85,7 @@ export const CanvasNodeToolbar = memo(function CanvasNodeToolbar() {
                   {index > 0 ? (
                     <ToolbarSeparator orientation="vertical" />
                   ) : null}
-                  <Button
-                    aria-label={action.title}
-                    data-active={action.isActive ? "true" : "false"}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      action.onSelect();
-                    }}
-                    size="sm"
-                    title={action.title}
-                    variant={action.variant}
-                  >
-                    {action.label}
-                    {action.shortcutLabel ? (
-                      <span className="rounded bg-foreground/8 px-1.5 py-0.5 text-[11px] text-foreground/50 leading-none">
-                        {action.shortcutLabel}
-                      </span>
-                    ) : null}
-                  </Button>
+                  <NodeToolbarActionButton action={action} />
                 </Fragment>
               );
             })}
@@ -107,3 +95,50 @@ export const CanvasNodeToolbar = memo(function CanvasNodeToolbar() {
     </div>
   );
 });
+
+const NodeToolbarActionButton = ({ action }) => {
+  const button = (
+    <Button
+      aria-label={action.title}
+      className={
+        action.isIconOnly ? undefined : "font-normal text-foreground/84"
+      }
+      data-active={action.isActive ? "true" : "false"}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        action.onSelect();
+      }}
+      size={action.isIconOnly ? "icon-sm" : "sm"}
+      title={action.title}
+      variant={action.variant}
+    >
+      {action.icon && action.iconLibrary === "hugeicons" ? (
+        <HugeiconsIcon
+          color="currentColor"
+          icon={action.icon}
+          size={18}
+          strokeWidth={1.6}
+        />
+      ) : (
+        action.label
+      )}
+      {!action.isIconOnly && action.shortcutLabel ? (
+        <span className="rounded bg-foreground/8 px-1.5 py-0.5 text-[11px] text-foreground/50 leading-none">
+          {action.shortcutLabel}
+        </span>
+      ) : null}
+    </Button>
+  );
+
+  if (!action.isIconOnly) {
+    return button;
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger render={button} />
+      <TooltipContent>{action.title}</TooltipContent>
+    </Tooltip>
+  );
+};

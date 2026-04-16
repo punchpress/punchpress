@@ -1,3 +1,4 @@
+import { isContainerNode } from "@punchpress/engine";
 import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { getTransformFlags } from "./canvas-overlay-interactions";
@@ -54,7 +55,7 @@ export const useCanvasTransformState = (editor) => {
   const zoom = useEditorValue((editor) => editor.zoom);
 
   const hasGroupSelection =
-    effectiveSelectedNodeIds.length > 1 || selectedNode?.type === "group";
+    effectiveSelectedNodeIds.length > 1 || isContainerNode(selectedNode);
   const isPathEditingSelection = Boolean(
     !hasGroupSelection &&
       selectedNode?.id &&

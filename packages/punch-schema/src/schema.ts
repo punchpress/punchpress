@@ -149,16 +149,25 @@ export const vectorStrokeLineJoinSchema = z.enum(
 
 export const vectorNodeSchema = baseNodeSchema
   .extend({
-    contours: z.array(vectorContourSchema).min(1),
+    name: z.string().min(1),
+    transform: transformSchema,
+    type: z.literal("vector"),
+  })
+  .strict();
+
+export const pathNodeSchema = baseNodeSchema
+  .extend({
+    closed: z.boolean(),
     fill: z.string().min(1).nullable(),
     fillRule: vectorFillRuleSchema,
+    segments: z.array(vectorSegmentSchema).min(1),
     stroke: z.string().min(1).nullable(),
     strokeLineCap: vectorStrokeLineCapSchema,
     strokeLineJoin: vectorStrokeLineJoinSchema,
     strokeMiterLimit: finiteNumber,
     strokeWidth: finiteNumber,
     transform: transformSchema,
-    type: z.literal("vector"),
+    type: z.literal("path"),
   })
   .strict();
 
@@ -167,6 +176,7 @@ export const nodeSchema = z.discriminatedUnion("type", [
   groupNodeSchema,
   shapeNodeSchema,
   vectorNodeSchema,
+  pathNodeSchema,
 ]);
 
 export const designDocumentSchema = z
@@ -206,6 +216,39 @@ export const designDocumentSchema = z
           path: ["nodes", index, "parentId"],
         });
       }
+
+      if (node.type === "path") {
+        if (node.parentId === ROOT_PARENT_ID) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Path nodes must belong to a vector node.",
+            path: ["nodes", index, "parentId"],
+          });
+          continue;
+        }
+
+        const parentNode = document.nodes.find((entry) => entry.id === node.parentId);
+
+        if (parentNode?.type !== "vector") {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Path nodes must have a vector parent.",
+            path: ["nodes", index, "parentId"],
+          });
+        }
+      }
+
+      if (node.type === "vector") {
+        const childNodes = document.nodes.filter((entry) => entry.parentId === node.id);
+
+        if (childNodes.some((entry) => entry.type !== "path")) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Vector nodes may only contain path children.",
+            path: ["nodes", index, "id"],
+          });
+        }
+      }
     }
   });
 
@@ -217,6 +260,7 @@ export type ShapePointDocument = z.infer<typeof shapePointSchema>;
 export type ShapeNodeDocument = z.infer<typeof shapeNodeSchema>;
 export type TextNodeDocument = z.infer<typeof textNodeSchema>;
 export type LocalFontDocument = z.infer<typeof localFontSchema>;
+export type PathNodeDocument = z.infer<typeof pathNodeSchema>;
 export type TransformDocument = z.infer<typeof transformSchema>;
 export type WarpDocument = z.infer<typeof warpSchema>;
 export type VectorContourDocument = z.infer<typeof vectorContourSchema>;

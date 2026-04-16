@@ -446,6 +446,28 @@ export const dragLayerBelow = async (page, sourceLabel, targetLabel) => {
   await page.mouse.up();
 };
 
+export const dragLayerOnto = async (page, sourceLabel, targetLabel) => {
+  const source = page.getByRole("button", { name: sourceLabel }).first();
+  const target = page.getByRole("button", { name: targetLabel }).first();
+  const sourceBox = await source.boundingBox();
+  const targetBox = await target.boundingBox();
+
+  if (!(sourceBox && targetBox)) {
+    throw new Error("Missing layer row bounds for drag move");
+  }
+
+  const sourceX = sourceBox.x + Math.min(36, sourceBox.width / 2);
+  const sourceY = sourceBox.y + sourceBox.height / 2;
+  const targetX = targetBox.x + Math.min(36, targetBox.width / 2);
+  const targetY = targetBox.y + targetBox.height / 2;
+
+  await page.mouse.move(sourceX, sourceY);
+  await page.mouse.down();
+  await page.mouse.move(sourceX, sourceY + 12, { steps: 4 });
+  await page.mouse.move(targetX, targetY, { steps: 10 });
+  await page.mouse.up();
+};
+
 export const marqueeSelect = async (page, from, to) => {
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();

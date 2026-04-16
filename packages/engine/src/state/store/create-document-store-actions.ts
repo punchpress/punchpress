@@ -1,3 +1,4 @@
+import { createDefaultPathNode } from "../../nodes/path/model";
 import { createDefaultShapeNode } from "../../nodes/shape/model";
 import { createDefaultNode } from "../../nodes/text/model";
 import { createDefaultVectorNode } from "../../nodes/vector/model";
@@ -20,6 +21,8 @@ import {
 } from "./node-mutations";
 import {
   groupNodeTreeState,
+  moveNodeBlocksState,
+  replaceNodeBlocksState,
   setChildNodeOrderState,
   setRootNodeOrderState,
   ungroupNodeTreeState,
@@ -30,6 +33,14 @@ import {
 } from "./selection-state";
 
 export const createDocumentStoreActions = (set, resolveDefaultFont) => {
+  const getInsertedRootNodeIds = (nodes) => {
+    const insertedNodeIds = new Set(nodes.map((node) => node.id));
+
+    return nodes
+      .filter((node) => !insertedNodeIds.has(node.parentId))
+      .map((node) => node.id);
+  };
+
   return {
     addShapeNode: (point, shape, options = {}) => {
       const node = createDefaultShapeNode(shape);
@@ -102,8 +113,55 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
 
     addVectorNode: (point, options = {}) => {
       const node = createDefaultVectorNode();
+      const pathNode = createDefaultPathNode(node.id);
       const activatePointer = options.activatePointer !== false;
       const nodePatch = options.patch || null;
+
+      if (point) {
+        pathNode.transform = {
+          ...pathNode.transform,
+          x: point.x,
+          y: point.y,
+        };
+      }
+
+      if (nodePatch) {
+        if (nodePatch.vector) {
+          Object.assign(node, nodePatch.vector);
+        }
+
+        if (nodePatch.path) {
+          Object.assign(pathNode, nodePatch.path);
+        }
+      }
+
+      set((state) =>
+        withDocumentMutation(state, {
+          activeTool: activatePointer ? "pointer" : state.activeTool,
+          editingNodeId: null,
+          editingOriginalText: "",
+          editingText: "",
+          focusedGroupId: null,
+          nodes: [...state.nodes, node, pathNode],
+          pathEditingNodeId: null,
+          pathEditingPoint: null,
+          pathEditingPoints: [],
+          selectedNodeIds: [node.id],
+        })
+      );
+
+      return node.id;
+    },
+
+    addPathNode: (parentId, point, options = {}) => {
+      if (!parentId) {
+        return null;
+      }
+
+      const node = createDefaultPathNode(parentId);
+      const activatePointer = options.activatePointer !== false;
+      const nodePatch = options.patch || null;
+      const selectionNodeId = options.selectionNodeId || parentId;
 
       if (point) {
         node.transform = {
@@ -130,12 +188,12 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
           editingNodeId: null,
           editingOriginalText: "",
           editingText: "",
-          focusedGroupId: null,
+          focusedGroupId: state.focusedGroupId,
           nodes: [...state.nodes, node],
           pathEditingNodeId: null,
           pathEditingPoint: null,
           pathEditingPoints: [],
-          selectedNodeIds: [node.id],
+          selectedNodeIds: [selectionNodeId],
         })
       );
 
@@ -186,6 +244,27 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
           pasteTextState(state, text, font, point)
         );
       });
+    },
+
+    insertNodes: (nodes) => {
+      if (!Array.isArray(nodes) || nodes.length === 0) {
+        return;
+      }
+
+      set((state) =>
+        withDocumentMutation(state, {
+          activeTool: "pointer",
+          editingNodeId: null,
+          editingOriginalText: "",
+          editingText: "",
+          focusedGroupId: null,
+          nodes: [...state.nodes, ...nodes],
+          pathEditingNodeId: null,
+          pathEditingPoint: null,
+          pathEditingPoints: [],
+          selectedNodeIds: getInsertedRootNodeIds(nodes),
+        })
+      );
     },
 
     loadNodes: (nodes) => {
@@ -240,6 +319,28 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
             ? setChildNodeOrderState(state, parentId, orderedIds)
             : setRootNodeOrderState(state, orderedIds)),
         })
+      );
+    },
+
+    moveNodeToParent: (nodeId, parentId, beforeNodeId) => {
+      set((state) =>
+        withDocumentMutation(
+          state,
+          moveNodeBlocksState(state, [nodeId], parentId, beforeNodeId)
+        )
+      );
+    },
+
+    replaceNodeBlocks: (nodeIds, insertedNodes) => {
+      if (!(Array.isArray(insertedNodes) && insertedNodes.length > 0)) {
+        return;
+      }
+
+      set((state) =>
+        withDocumentMutation(
+          state,
+          replaceNodeBlocksState(state, nodeIds, insertedNodes)
+        )
       );
     },
 

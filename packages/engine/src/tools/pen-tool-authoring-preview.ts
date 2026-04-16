@@ -1,7 +1,11 @@
 import { round } from "../primitives/math";
 import type { PenTool } from "./pen-tool";
 import { getActiveAuthoringSession } from "./pen-tool-authoring-session";
-import { type PenHoverState, roundHandle } from "./pen-tool-types";
+import {
+  getNodeContour,
+  type PenHoverState,
+  roundHandle,
+} from "./pen-tool-types";
 
 export const getPenPreviewState = (tool: PenTool) => {
   const session = getActiveAuthoringSession(tool);
@@ -52,8 +56,7 @@ export const getPenHoverState = (tool: PenTool) => {
 
   if (session?.hoverTarget?.type === "start-anchor") {
     const node = tool.editor.getNode(session.nodeId);
-    const contour =
-      node?.type === "vector" ? node.contours[session.contourIndex] : null;
+    const contour = getNodeContour(node, session.contourIndex);
     const point = contour?.segments[session.hoverTarget.segmentIndex]?.point;
 
     if (!point) {

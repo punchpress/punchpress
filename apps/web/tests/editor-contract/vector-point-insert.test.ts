@@ -33,34 +33,56 @@ const createRectangleContour = () => {
   };
 };
 
+const createPathDocument = () => {
+  return {
+    nodes: [
+      {
+        id: "vector-container",
+        name: "Vector",
+        parentId: "root",
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 0,
+          y: 0,
+        },
+        type: "vector" as const,
+        visible: true,
+      },
+      {
+        closed: true,
+        fill: "#000000",
+        fillRule: "nonzero" as const,
+        id: "vector-node",
+        parentId: "vector-container",
+        segments: createRectangleContour().segments,
+        stroke: null,
+        strokeLineCap: "butt",
+        strokeLineJoin: "miter",
+        strokeMiterLimit: 4,
+        strokeWidth: 0,
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 320,
+          y: 220,
+        },
+        type: "path" as const,
+        visible: true,
+      },
+    ],
+    version: "1.6",
+  };
+};
+
 describe("vector point insertion", () => {
   test("inserting a vector point persists the new contour geometry and selects the inserted point", () => {
     const editor = new Editor();
 
     editor.loadDocument(
-      JSON.stringify({
-        nodes: [
-          {
-            contours: [createRectangleContour()],
-            fill: "#000000",
-            fillRule: "nonzero",
-            id: "vector-node",
-            parentId: "root",
-            stroke: null,
-            strokeWidth: 0,
-            transform: {
-              rotation: 0,
-              scaleX: 1,
-              scaleY: 1,
-              x: 320,
-              y: 220,
-            },
-            type: "vector",
-            visible: true,
-          },
-        ],
-        version: "1.5",
-      })
+      JSON.stringify(createPathDocument())
     );
 
     editor.setPathEditingNodeId("vector-node");
@@ -106,14 +128,11 @@ describe("vector point insertion", () => {
     );
 
     const node = editor.getNode("vector-node");
-    const segment =
-      node?.type === "vector" ? node.contours[0]?.segments[1] : null;
+    const segment = node?.type === "path" ? node.segments[1] : null;
 
     expect(didInsert).toBe(true);
-    expect(node?.type).toBe("vector");
-    expect(
-      node?.type === "vector" ? node.contours[0]?.segments.length : 0
-    ).toBe(5);
+    expect(node?.type).toBe("path");
+    expect(node?.type === "path" ? node.segments.length : 0).toBe(5);
     expect(segment?.point).toEqual({ x: 100, y: 0 });
     expect(segment?.handleIn).toEqual({ x: 0, y: 0 });
     expect(segment?.handleOut).toEqual({ x: 0, y: 0 });
@@ -128,33 +147,7 @@ describe("vector point insertion", () => {
     const editor = new Editor();
 
     editor.loadDocument(
-      JSON.stringify({
-        nodes: [
-          {
-            contours: [
-              {
-                ...createRectangleContour(),
-              },
-            ],
-            fill: "#000000",
-            fillRule: "nonzero",
-            id: "vector-node",
-            parentId: "root",
-            stroke: null,
-            strokeWidth: 0,
-            transform: {
-              rotation: 0,
-              scaleX: 1,
-              scaleY: 1,
-              x: 320,
-              y: 220,
-            },
-            type: "vector",
-            visible: true,
-          },
-        ],
-        version: "1.5",
-      })
+      JSON.stringify(createPathDocument())
     );
 
     editor.setPathEditingNodeId("vector-node");
@@ -200,12 +193,9 @@ describe("vector point insertion", () => {
     );
 
     const node = editor.getNode("vector-node");
-    const segment =
-      node?.type === "vector" ? node.contours[0]?.segments[1] : null;
+    const segment = node?.type === "path" ? node.segments[1] : null;
 
-    expect(
-      node?.type === "vector" ? node.contours[0]?.segments.length : 0
-    ).toBe(5);
+    expect(node?.type === "path" ? node.segments.length : 0).toBe(5);
     expect(segment ? Object.hasOwn(segment, "cornerRadius") : false).toBe(
       false
     );

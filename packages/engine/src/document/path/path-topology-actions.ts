@@ -2,6 +2,7 @@ import type {
   VectorContourDocument,
   VectorHandleDocument,
 } from "@punchpress/punch-schema";
+import { createId } from "../../nodes/text/model";
 
 interface PathPoint {
   contourIndex: number;
@@ -352,6 +353,23 @@ const getJoinResult = (
 };
 
 export const canSplitVectorPath = (node, point: PathPoint | null) => {
+  if (node?.type === "path" && point) {
+    return Boolean(
+      getSplitResult(
+        [
+          {
+            closed: node.closed,
+            segments: node.segments,
+          },
+        ],
+        {
+          contourIndex: 0,
+          segmentIndex: point.segmentIndex,
+        }
+      )
+    );
+  }
+
   if (!(node?.type === "vector" && point)) {
     return false;
   }
@@ -361,6 +379,60 @@ export const canSplitVectorPath = (node, point: PathPoint | null) => {
 
 export const splitVectorPath = (editor, nodeId, point: PathPoint | null) => {
   const node = editor.getNode(nodeId);
+
+  if (node?.type === "path" && point) {
+    const result = getSplitResult(
+      [
+        {
+          closed: node.closed,
+          segments: node.segments,
+        },
+      ],
+      {
+        contourIndex: 0,
+        segmentIndex: point.segmentIndex,
+      }
+    );
+
+    if (!result) {
+      return false;
+    }
+
+    editor.run(() => {
+      editor.getState().updateNodeById(nodeId, (currentNode) => {
+        if (currentNode.type !== "path") {
+          return currentNode;
+        }
+
+        return {
+          ...currentNode,
+          closed: result.contours[0].closed,
+          segments: result.contours[0].segments,
+        };
+      });
+
+      if (result.contours[1]) {
+        editor.getState().insertNodes([
+          {
+            ...node,
+            closed: result.contours[1].closed,
+            id: createId(),
+            segments: result.contours[1].segments,
+          },
+        ]);
+      }
+
+      editor.getState().setFocusedGroupId(node.parentId);
+      editor.getState().setPathEditingNodeId(
+        result.contours[1] ? editor.selectedNodeId : nodeId
+      );
+      editor
+        .getState()
+        .setPathEditingPoints(result.selectedPoints, result.primaryPoint);
+    });
+
+    return true;
+  }
 
   if (!(node?.type === "vector" && point)) {
     return false;
@@ -392,6 +464,23 @@ export const splitVectorPath = (editor, nodeId, point: PathPoint | null) => {
 };
 
 export const canJoinVectorPathEndpoints = (node, points: PathPoint[]) => {
+  if (node?.type === "path") {
+    return Boolean(
+      getJoinResult(
+        [
+          {
+            closed: node.closed,
+            segments: node.segments,
+          },
+        ],
+        points.map((point) => ({
+          contourIndex: 0,
+          segmentIndex: point.segmentIndex,
+        }))
+      )
+    );
+  }
+
   if (!(node?.type === "vector")) {
     return false;
   }
@@ -405,6 +494,44 @@ export const joinVectorPathEndpoints = (
   points: PathPoint[]
 ) => {
   const node = editor.getNode(nodeId);
+
+  if (node?.type === "path") {
+    const result = getJoinResult(
+      [
+        {
+          closed: node.closed,
+          segments: node.segments,
+        },
+      ],
+      points.map((point) => ({
+        contourIndex: 0,
+        segmentIndex: point.segmentIndex,
+      }))
+    );
+
+    if (!result) {
+      return false;
+    }
+
+    editor.run(() => {
+      editor.getState().updateNodeById(nodeId, (currentNode) => {
+        if (currentNode.type !== "path") {
+          return currentNode;
+        }
+
+        return {
+          ...currentNode,
+          closed: result.contours[0].closed,
+          segments: result.contours[0].segments,
+        };
+      });
+      editor
+        .getState()
+        .setPathEditingPoints(result.selectedPoints, result.primaryPoint);
+    });
+
+    return true;
+  }
 
   if (!(node?.type === "vector")) {
     return false;

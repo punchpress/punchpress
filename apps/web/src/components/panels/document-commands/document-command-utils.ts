@@ -1,6 +1,12 @@
 import type { LocalFontDescriptor } from "@punchpress/punch-schema";
 
-export type DocumentCommand = "export" | "new" | "open" | "save" | "save-as";
+export type DocumentCommand =
+  | "export"
+  | "import-svg"
+  | "new"
+  | "open"
+  | "save"
+  | "save-as";
 
 export const getDocumentCommandFromKeyEvent = (event: KeyboardEvent) => {
   if (!(event.metaKey || event.ctrlKey) || event.altKey) {
@@ -35,6 +41,10 @@ export const getDocumentCommandFromKeyEvent = (event: KeyboardEvent) => {
 export const getDocumentCommandErrorTitle = (command: DocumentCommand) => {
   if (command === "open") {
     return "Couldn't open file";
+  }
+
+  if (command === "import-svg") {
+    return "Couldn't import SVG";
   }
 
   if (command === "new") {

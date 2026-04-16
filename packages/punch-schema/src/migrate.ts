@@ -1,252 +1,247 @@
 import { PUNCH_DOCUMENT_VERSION, ROOT_PARENT_ID } from "./constants";
 import { UnsupportedDocumentVersionError } from "./errors";
-import { createLocalFontDescriptor } from "./local-fonts";
 import {
   DEFAULT_VECTOR_STROKE_LINE_CAP,
   DEFAULT_VECTOR_STROKE_LINE_JOIN,
   DEFAULT_VECTOR_STROKE_MITER_LIMIT,
 } from "./vector-stroke-style";
 
-const FILE_EXTENSION_RE = /\.[a-z0-9]+$/i;
-const SEPARATOR_RE = /[-_]+/g;
+const V16_DOCUMENT_VERSION = "1.6";
+const DEFAULT_VECTOR_NAME = "Vector";
+const DEFAULT_VECTOR_TRANSFORM = Object.freeze({
+  rotation: 0,
+  scaleX: 1,
+  scaleY: 1,
+  x: 0,
+  y: 0,
+});
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return !!value && typeof value === "object" && !Array.isArray(value);
 };
 
-const LEGACY_FONT_BY_URL: Record<
-  string,
-  ReturnType<typeof createLocalFontDescriptor>
-> = {
-  "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/anton/Anton-Regular.ttf":
-    createLocalFontDescriptor({
-      family: "Anton",
-      fullName: "Anton Regular",
-      postscriptName: "Anton-Regular",
-      style: "Regular",
-    }),
-  "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/bebasneue/BebasNeue-Regular.ttf":
-    createLocalFontDescriptor({
-      family: "Bebas Neue",
-      fullName: "Bebas Neue Regular",
-      postscriptName: "BebasNeue-Regular",
-      style: "Regular",
-    }),
-  "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/oswald/Oswald%5Bwght%5D.ttf":
-    createLocalFontDescriptor({
-      family: "Oswald",
-      fullName: "Oswald",
-      postscriptName: "Oswald",
-      style: "Regular",
-    }),
+const isFiniteNumber = (value: unknown): value is number => {
+  return typeof value === "number" && Number.isFinite(value);
 };
 
-const getLegacyFontName = (fontUrl: string) => {
-  if (LEGACY_FONT_BY_URL[fontUrl]) {
-    return LEGACY_FONT_BY_URL[fontUrl];
+const getParentId = (value: unknown) => {
+  return typeof value === "string" && value.length > 0 ? value : ROOT_PARENT_ID;
+};
+
+const getVisible = (value: unknown) => {
+  return value !== false;
+};
+
+const getNodeId = (node: Record<string, unknown>, fallback: string) => {
+  return typeof node.id === "string" && node.id.length > 0 ? node.id : fallback;
+};
+
+const getNodeName = (value: unknown, fallback: string) => {
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : fallback;
+};
+
+const getTransform = (value: unknown, fallback = DEFAULT_VECTOR_TRANSFORM) => {
+  if (!isRecord(value)) {
+    return { ...fallback };
   }
 
-  const fileName =
-    fontUrl.split("/").at(-1)?.replace(FILE_EXTENSION_RE, "") ||
-    "Imported Font";
-  const normalizedLabel = decodeURIComponent(fileName)
-    .replace(SEPARATOR_RE, " ")
-    .trim();
-
-  return createLocalFontDescriptor({
-    family: normalizedLabel,
-    fullName: normalizedLabel,
-    postscriptName: normalizedLabel.replace(/\s+/g, "-"),
-    style: "Regular",
-  });
+  return {
+    rotation: isFiniteNumber(value.rotation)
+      ? value.rotation
+      : fallback.rotation,
+    scaleX: isFiniteNumber(value.scaleX) ? value.scaleX : fallback.scaleX,
+    scaleY: isFiniteNumber(value.scaleY) ? value.scaleY : fallback.scaleY,
+    x: isFiniteNumber(value.x) ? value.x : fallback.x,
+    y: isFiniteNumber(value.y) ? value.y : fallback.y,
+  };
 };
 
-const migrateV1Document = (value: Record<string, unknown>) => {
+const getNullableColor = (value: unknown) => {
+  return typeof value === "string" && value.length > 0 ? value : null;
+};
+
+const getFillRule = (value: unknown) => {
+  return value === "evenodd" ? "evenodd" : "nonzero";
+};
+
+const getStrokeLineCap = (value: unknown) => {
+  return value === "butt" || value === "round" || value === "square"
+    ? value
+    : DEFAULT_VECTOR_STROKE_LINE_CAP;
+};
+
+const getStrokeLineJoin = (value: unknown) => {
+  return value === "miter" || value === "round" || value === "bevel"
+    ? value
+    : DEFAULT_VECTOR_STROKE_LINE_JOIN;
+};
+
+const getStrokeMiterLimit = (value: unknown) => {
+  return isFiniteNumber(value) ? value : DEFAULT_VECTOR_STROKE_MITER_LIMIT;
+};
+
+const getStrokeWidth = (value: unknown) => {
+  return isFiniteNumber(value) ? value : 0;
+};
+
+const getPointType = (value: unknown) => {
+  return value === "smooth" ? "smooth" : "corner";
+};
+
+const getHandle = (value: unknown) => {
+  if (!isRecord(value)) {
+    return { x: 0, y: 0 };
+  }
+
+  return {
+    x: isFiniteNumber(value.x) ? value.x : 0,
+    y: isFiniteNumber(value.y) ? value.y : 0,
+  };
+};
+
+const getSegments = (value: unknown) => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter(isRecord)
+    .map((segment) => {
+      return {
+        handleIn: getHandle(segment.handleIn),
+        handleOut: getHandle(segment.handleOut),
+        point: getHandle(segment.point),
+        pointType: getPointType(segment.pointType),
+      };
+    });
+};
+
+const createUniquePathId = (
+  existingIds: Set<string>,
+  vectorId: string,
+  contourIndex: number
+) => {
+  let suffix = contourIndex + 1;
+  let candidateId = `${vectorId}-path-${suffix}`;
+
+  while (existingIds.has(candidateId)) {
+    suffix += 1;
+    candidateId = `${vectorId}-path-${suffix}`;
+  }
+
+  existingIds.add(candidateId);
+
+  return candidateId;
+};
+
+const isLegacyVectorNode = (node: Record<string, unknown>) => {
+  return node.type === "vector" && Array.isArray(node.contours);
+};
+
+const migrateLegacyVectorNode = (
+  node: Record<string, unknown>,
+  existingIds: Set<string>,
+  vectorIndex: number
+) => {
+  const vectorId = getNodeId(node, `vector-${vectorIndex}`);
+  const vectorName = getNodeName(node.name, `${DEFAULT_VECTOR_NAME} ${vectorIndex}`);
+  const pathTransform = getTransform(node.transform);
+  const nextNodes: Record<string, unknown>[] = [
+    {
+      id: vectorId,
+      name: vectorName,
+      parentId: getParentId(node.parentId),
+      transform: { ...DEFAULT_VECTOR_TRANSFORM },
+      type: "vector",
+      visible: getVisible(node.visible),
+    },
+  ];
+
+  existingIds.add(vectorId);
+
+  for (const [contourIndex, contour] of node.contours.entries()) {
+    if (!isRecord(contour)) {
+      continue;
+    }
+
+    const segments = getSegments(contour.segments);
+
+    if (segments.length === 0) {
+      continue;
+    }
+
+    nextNodes.push({
+      closed: contour.closed !== false,
+      fill: getNullableColor(node.fill),
+      fillRule: getFillRule(node.fillRule),
+      id: createUniquePathId(existingIds, vectorId, contourIndex),
+      parentId: vectorId,
+      segments,
+      stroke: getNullableColor(node.stroke),
+      strokeLineCap: getStrokeLineCap(node.strokeLineCap),
+      strokeLineJoin: getStrokeLineJoin(node.strokeLineJoin),
+      strokeMiterLimit: getStrokeMiterLimit(node.strokeMiterLimit),
+      strokeWidth: getStrokeWidth(node.strokeWidth),
+      transform: pathTransform,
+      type: "path",
+      visible: true,
+    });
+  }
+
+  return nextNodes;
+};
+
+const migrateV16Document = (value: Record<string, unknown>) => {
   const nodes = Array.isArray(value.nodes) ? value.nodes : [];
+  const existingIds = new Set(
+    nodes
+      .filter(isRecord)
+      .map((node) => node.id)
+      .filter((nodeId): nodeId is string => {
+        return typeof nodeId === "string" && nodeId.length > 0;
+    })
+  );
+  let nextVectorIndex = 1;
 
   return {
     ...value,
     version: PUNCH_DOCUMENT_VERSION,
-    nodes: withVectorStrokeStyles(
-      withVectorPointTypes(
-      withGroupNames(
-        nodes.map((node) => {
-          if (!isRecord(node)) {
-            return node;
-          }
+    nodes: nodes.flatMap((node) => {
+      if (!isRecord(node)) {
+        return [node];
+      }
 
-          const { fontUrl: legacyFontUrl, ...nextNode } = node;
-          const fontUrl =
-            typeof legacyFontUrl === "string" && legacyFontUrl.trim().length > 0
-              ? legacyFontUrl
-              : "";
+      if (!isLegacyVectorNode(node)) {
+        const nextNode = {
+          ...node,
+          parentId: getParentId(node.parentId),
+          visible: getVisible(node.visible),
+        };
 
-          return {
-            ...nextNode,
-            font: getLegacyFontName(fontUrl),
-            parentId: ROOT_PARENT_ID,
-          };
-        })
-      )
-      )
-    ),
-  };
-};
-
-const migrateV11Document = (value: Record<string, unknown>) => {
-  const nodes = Array.isArray(value.nodes) ? value.nodes : [];
-
-  return {
-    ...value,
-    version: PUNCH_DOCUMENT_VERSION,
-    nodes: withVectorStrokeStyles(
-      withVectorPointTypes(
-      withGroupNames(
-        nodes.map((node) => {
-          if (!isRecord(node)) {
-            return node;
-          }
-
-          return {
-            ...node,
-            parentId:
-              typeof node.parentId === "string" && node.parentId.length > 0
-                ? node.parentId
-                : ROOT_PARENT_ID,
-          };
-        })
-      )
-      )
-    ),
-  };
-};
-
-const withGroupNames = (nodes: unknown[]) => {
-  let nextGroupIndex = 1;
-
-  return nodes.map((node) => {
-    if (!isRecord(node) || node.type !== "group") {
-      return node;
-    }
-
-    const name =
-      typeof node.name === "string" && node.name.trim().length > 0
-        ? node.name
-        : `Group ${nextGroupIndex}`;
-
-    nextGroupIndex += 1;
-
-    return {
-      ...node,
-      name,
-    };
-  });
-};
-
-const withVectorPointTypes = (nodes: unknown[]) => {
-  return nodes.map((node) => {
-    if (
-      !isRecord(node) ||
-      node.type !== "vector" ||
-      !Array.isArray(node.contours)
-    ) {
-      return node;
-    }
-
-    return {
-      ...node,
-      contours: node.contours.map((contour) => {
-        if (!isRecord(contour) || !Array.isArray(contour.segments)) {
-          return contour;
+        if (node.type !== "vector") {
+          return [nextNode];
         }
 
-        return {
-          ...contour,
-          segments: contour.segments.map((segment) => {
-            if (!isRecord(segment)) {
-              return segment;
-            }
+        return [
+          {
+            ...nextNode,
+            name: getNodeName(node.name, DEFAULT_VECTOR_NAME),
+            transform: getTransform(node.transform),
+          },
+        ];
+      }
 
-            return {
-              ...segment,
-              pointType:
-                segment.pointType === "smooth" || segment.pointType === "corner"
-                  ? segment.pointType
-                  : "corner",
-            };
-          }),
-        };
-      }),
-    };
-  });
-};
+      const migratedNodes = migrateLegacyVectorNode(
+        node,
+        existingIds,
+        nextVectorIndex
+      );
+      nextVectorIndex += 1;
 
-const withVectorStrokeStyles = (nodes: unknown[]) => {
-  return nodes.map((node) => {
-    if (!isRecord(node) || node.type !== "vector") {
-      return node;
-    }
-
-    return {
-      ...node,
-      strokeLineCap:
-        node.strokeLineCap === "butt" ||
-        node.strokeLineCap === "round" ||
-        node.strokeLineCap === "square"
-          ? node.strokeLineCap
-          : DEFAULT_VECTOR_STROKE_LINE_CAP,
-      strokeLineJoin:
-        node.strokeLineJoin === "miter" ||
-        node.strokeLineJoin === "round" ||
-        node.strokeLineJoin === "bevel"
-          ? node.strokeLineJoin
-          : DEFAULT_VECTOR_STROKE_LINE_JOIN,
-      strokeMiterLimit:
-        typeof node.strokeMiterLimit === "number" &&
-        Number.isFinite(node.strokeMiterLimit)
-          ? node.strokeMiterLimit
-          : DEFAULT_VECTOR_STROKE_MITER_LIMIT,
-    };
-  });
-};
-
-const migrateV12Document = (value: Record<string, unknown>) => {
-  const nodes = Array.isArray(value.nodes) ? value.nodes : [];
-
-  return {
-    ...value,
-    version: PUNCH_DOCUMENT_VERSION,
-    nodes: withVectorStrokeStyles(withVectorPointTypes(withGroupNames(nodes))),
-  };
-};
-
-const migrateV13Document = (value: Record<string, unknown>) => {
-  return {
-    ...value,
-    version: PUNCH_DOCUMENT_VERSION,
-    nodes: withVectorStrokeStyles(
-      withVectorPointTypes(Array.isArray(value.nodes) ? value.nodes : [])
-    ),
-  };
-};
-
-const migrateV14Document = (value: Record<string, unknown>) => {
-  return {
-    ...value,
-    version: PUNCH_DOCUMENT_VERSION,
-    nodes: withVectorStrokeStyles(
-      withVectorPointTypes(Array.isArray(value.nodes) ? value.nodes : [])
-    ),
-  };
-};
-
-const migrateV15Document = (value: Record<string, unknown>) => {
-  return {
-    ...value,
-    version: PUNCH_DOCUMENT_VERSION,
-    nodes: withVectorStrokeStyles(
-      Array.isArray(value.nodes) ? value.nodes : []
-    ),
+      return migratedNodes;
+    }),
   };
 };
 
@@ -261,28 +256,8 @@ export const migrateDocument = (value: unknown) => {
     return value;
   }
 
-  if (value.version === "1.0") {
-    return migrateV1Document(value);
-  }
-
-  if (value.version === "1.1") {
-    return migrateV11Document(value);
-  }
-
-  if (value.version === "1.2") {
-    return migrateV12Document(value);
-  }
-
-  if (value.version === "1.3") {
-    return migrateV13Document(value);
-  }
-
-  if (value.version === "1.4") {
-    return migrateV14Document(value);
-  }
-
-  if (value.version === "1.5") {
-    return migrateV15Document(value);
+  if (value.version === V16_DOCUMENT_VERSION) {
+    return migrateV16Document(value);
   }
 
   if (typeof value.version !== "string" || value.version.length === 0) {

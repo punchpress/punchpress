@@ -3,17 +3,23 @@ import {
   DocumentParseError,
   DocumentValidationError,
   parseDesignDocument,
+  PUNCH_DOCUMENT_VERSION,
   UnsupportedDocumentVersionError,
 } from "@punchpress/punch-schema";
 
 const VALID_DOCUMENT = {
-  version: "1.0",
+  version: PUNCH_DOCUMENT_VERSION,
   nodes: [
     {
       id: "node_1",
       type: "text",
       text: "TEST",
-      fontUrl: "/fonts/test.ttf",
+      font: {
+        family: "Test Sans",
+        fullName: "Test Sans Regular",
+        postscriptName: "TestSans-Regular",
+        style: "Regular",
+      },
       transform: {
         x: 100,
         y: 200,
@@ -35,7 +41,7 @@ const VALID_DOCUMENT = {
 } as const;
 
 const LEGACY_VECTOR_DOCUMENT = {
-  version: "1.5",
+  version: "1.6",
   nodes: [
     {
       contours: [
@@ -74,6 +80,9 @@ const LEGACY_VECTOR_DOCUMENT = {
       id: "legacy-vector-node",
       parentId: "root",
       stroke: "rgba(0, 0, 0, 0.6)",
+      strokeLineCap: "round",
+      strokeLineJoin: "round",
+      strokeMiterLimit: 4,
       strokeWidth: 12,
       transform: {
         rotation: 0,
@@ -83,6 +92,67 @@ const LEGACY_VECTOR_DOCUMENT = {
         y: 260,
       },
       type: "vector",
+      visible: true,
+    },
+  ],
+} as const;
+
+const ALREADY_UPDATED_V16_DOCUMENT = {
+  version: "1.6",
+  nodes: [
+    {
+      id: "vector-node",
+      name: "Vector",
+      parentId: "root",
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: 0,
+        y: 0,
+      },
+      type: "vector",
+      visible: true,
+    },
+    {
+      closed: true,
+      fill: "#ffffff",
+      fillRule: "nonzero",
+      id: "path-node",
+      parentId: "vector-node",
+      segments: [
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: -100, y: -80 },
+          pointType: "corner",
+        },
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 100, y: -80 },
+          pointType: "corner",
+        },
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 100, y: 80 },
+          pointType: "corner",
+        },
+      ],
+      stroke: "#000000",
+      strokeLineCap: "round",
+      strokeLineJoin: "round",
+      strokeMiterLimit: 4,
+      strokeWidth: 3,
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: 320,
+        y: 240,
+      },
+      type: "path",
       visible: true,
     },
   ],
@@ -115,16 +185,64 @@ describe("parseDesignDocument", () => {
     ).toThrow(DocumentValidationError);
   });
 
-  test("migrates 1.5 vector documents to add durable stroke style fields", () => {
+  test("migrates legacy 1.6 vector nodes into vector containers with child paths", () => {
     const document = parseDesignDocument(JSON.stringify(LEGACY_VECTOR_DOCUMENT));
-    const vectorNode = document.nodes[0];
 
-    expect(document.version).toBe("1.6");
-    expect(vectorNode).toMatchObject({
+    expect(document.version).toBe(PUNCH_DOCUMENT_VERSION);
+    expect(document.nodes).toHaveLength(2);
+    expect(document.nodes[0]).toMatchObject({
+      id: "legacy-vector-node",
+      name: "Vector 1",
+      parentId: "root",
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: 0,
+        y: 0,
+      },
+      type: "vector",
+      visible: true,
+    });
+    expect(document.nodes[1]).toMatchObject({
+      closed: true,
+      fill: "rgba(255, 0, 0, 0.4)",
+      fillRule: "evenodd",
+      parentId: "legacy-vector-node",
+      stroke: "rgba(0, 0, 0, 0.6)",
       strokeLineCap: "round",
       strokeLineJoin: "round",
       strokeMiterLimit: 4,
-      type: "vector",
+      strokeWidth: 12,
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: 360,
+        y: 260,
+      },
+      type: "path",
+      visible: true,
     });
+  });
+
+  test("accepts already-updated 1.6 documents by migrating only the version", () => {
+    const document = parseDesignDocument(
+      JSON.stringify(ALREADY_UPDATED_V16_DOCUMENT)
+    );
+
+    expect(document.version).toBe(PUNCH_DOCUMENT_VERSION);
+    expect(document.nodes).toMatchObject(ALREADY_UPDATED_V16_DOCUMENT.nodes);
+  });
+
+  test("rejects older document versions", () => {
+    expect(() =>
+      parseDesignDocument(
+        JSON.stringify({
+          ...VALID_DOCUMENT,
+          version: "1.5",
+        })
+      )
+    ).toThrow(UnsupportedDocumentVersionError);
   });
 });
