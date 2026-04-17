@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.4.0 - 2026-04-16
+
+### Added
+
+- Draw and refine editable vector artwork with a much fuller pen-and-points workflow, including anchor and handle editing, multi-point selection, point insertion and deletion, path closing and joining, and live corner rounding on eligible paths.
+- Combine overlapping shapes and vector artwork with Unite, Subtract, Intersect, and Exclude, while keeping the result editable for further path work.
+- Import supported `.svg` artwork directly into the current document as editable vector layers instead of treating it like a flattened asset.
+
+### Changed
+
+- Shape and vector path editing now feel like one coherent system, with clearer `Edit path` controls, better nested vector layer behavior, and inspector controls that make mixed-color selections easier to retouch.
+- Canvas interaction polish is noticeably stronger across path editing, transforms, hover feedback, and zooming, with cursor language that does a better job signaling what will happen before you click.
+- The Mac app now wires more editor actions into the native menu flow, making core document commands feel more at home on desktop.
+
+### Fixed
+
+- Corner-radius editing on vector paths is steadier at its limits, so precise rounding work is less likely to jump or destabilize.
+- Inserted text lands centered under your click, and the dark seam that could appear across the canvas has been removed.
+- Pen hover states, anchor feedback, and panel labels are more consistent during detailed vector editing sessions.
+
 ## v0.3.0 - 2026-03-26
 
 ### Added
