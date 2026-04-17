@@ -5,8 +5,9 @@ export const openCanvasNodeEditingMode = (editor, nodeId) => {
     return true;
   }
 
-  const node = editor.getNode(nodeId);
-  const nodeEditCapabilities = editor.getNodeEditCapabilities(nodeId);
+  const targetNodeId = editor.getPathEditingTargetNodeId(nodeId) || nodeId;
+  const node = editor.getNode(targetNodeId);
+  const nodeEditCapabilities = editor.getNodeEditCapabilities(targetNodeId);
 
   if (!(node && nodeEditCapabilities)) {
     return false;

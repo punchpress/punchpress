@@ -12,10 +12,11 @@ import {
   setAllVectorPointCornerRadii,
   setVectorPointCornerRadius,
 } from "../../nodes/vector/vector-corner-controls";
+import { clampCornerRadius } from "../../primitives/corner-radius";
 
 const getScopedCornerPoints = (editor, nodeId) => {
-  return editor.pathEditingNodeId === nodeId &&
-    editor.pathEditingPoints.length > 0
+  return editor.pathEditingPoints.length > 0 &&
+    (!editor.pathEditingNodeId || editor.pathEditingNodeId === nodeId)
     ? editor.pathEditingPoints
     : null;
 };
@@ -43,6 +44,14 @@ const getPathContours = (node) => {
       segments: node.segments,
     },
   ];
+};
+
+const resolvePathCornerSourceNode = (editor, nodeId, sourceNode) => {
+  if (sourceNode?.id === nodeId) {
+    return sourceNode;
+  }
+
+  return editor.getNode(nodeId);
 };
 
 export const canRoundPathPoint = (editor, nodeId, point) => {
@@ -157,16 +166,19 @@ export const setPathPointCornerRadius = (
   editor,
   nodeId,
   point,
-  cornerRadius
+  cornerRadius,
+  sourceNode = null
 ) => {
-  const node = editor.getNode(nodeId);
+  const node = resolvePathCornerSourceNode(editor, nodeId, sourceNode);
 
   if (!(node && point)) {
     return false;
   }
 
   if (node.type === "shape") {
-    if (!canRoundShapePoint(node, point)) {
+    const cornerSummary = getShapeCornerRadiusSummary(node);
+
+    if (!(canRoundShapePoint(node, point) && cornerSummary)) {
       return false;
     }
 
@@ -178,7 +190,7 @@ export const setPathPointCornerRadius = (
 
         return {
           ...currentNode,
-          cornerRadius: Math.max(0, cornerRadius || 0),
+          cornerRadius: clampCornerRadius(cornerRadius, 0, cornerSummary.max),
         };
       });
     });
@@ -244,15 +256,22 @@ export const setPathPointCornerRadius = (
   return true;
 };
 
-export const setPathCornerRadius = (editor, nodeId, cornerRadius) => {
-  const node = editor.getNode(nodeId);
+export const setPathCornerRadius = (
+  editor,
+  nodeId,
+  cornerRadius,
+  sourceNode = null
+) => {
+  const node = resolvePathCornerSourceNode(editor, nodeId, sourceNode);
 
   if (!node) {
     return false;
   }
 
   if (node.type === "shape") {
-    if (!getShapeCornerRadiusSummary(node)) {
+    const cornerSummary = getShapeCornerRadiusSummary(node);
+
+    if (!cornerSummary) {
       return false;
     }
 
@@ -264,7 +283,7 @@ export const setPathCornerRadius = (editor, nodeId, cornerRadius) => {
 
         return {
           ...currentNode,
-          cornerRadius: Math.max(0, cornerRadius || 0),
+          cornerRadius: clampCornerRadius(cornerRadius, 0, cornerSummary.max),
         };
       });
     });

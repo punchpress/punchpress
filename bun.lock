@@ -87,6 +87,7 @@
       "dependencies": {
         "@punchpress/punch-schema": "workspace:*",
         "opentype.js": "1.3.4",
+        "paper": "^0.12.18",
         "zustand": "4.1.1",
       },
     },

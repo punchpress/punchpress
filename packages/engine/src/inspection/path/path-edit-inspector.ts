@@ -1,5 +1,6 @@
 import {
   canRoundPathPoint as canEditorRoundPathPoint,
+  getPathCornerRadiusStableMax as getEditorPathCornerRadiusStableMax,
   getPathCornerRadiusSummary as getEditorPathCornerRadiusSummary,
   getPathPointCornerControl as getEditorPathPointCornerControl,
   getPathPointCornerRadius as getEditorPathPointCornerRadius,
@@ -24,6 +25,10 @@ export const getPathEditingInspectorState = (editor, nodeId) => {
       nodeId && !showsPathPointCornerRadius
         ? getEditorPathCornerRadiusSummary(editor, nodeId)
         : null,
+    pathCornerRadiusStableMax:
+      nodeId && !showsPathPointCornerRadius
+        ? getEditorPathCornerRadiusStableMax(editor, nodeId)
+        : 0,
     pathPointCornerMax:
       nodeId && selectedPathPoint
         ? (getEditorPathPointCornerControl(editor, nodeId, selectedPathPoint)

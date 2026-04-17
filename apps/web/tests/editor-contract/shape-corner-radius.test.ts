@@ -24,6 +24,36 @@ const createPolygonShapeNode = () => {
   } as const;
 };
 
+const createIrregularPolygonShapeNode = () => {
+  return {
+    cornerRadius: 0,
+    fill: "#000000",
+    height: 160,
+    id: "irregular-shape-node",
+    parentId: "root",
+    points: [
+      { x: -130, y: 0 },
+      { x: -10, y: -110 },
+      { x: 110, y: -90 },
+      { x: 110, y: -20 },
+      { x: 10, y: 120 },
+    ],
+    shape: "polygon",
+    stroke: null,
+    strokeWidth: 0,
+    transform: {
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+      x: 600,
+      y: 450,
+    },
+    type: "shape",
+    visible: true,
+    width: 240,
+  } as const;
+};
+
 describe("shape corner radius", () => {
   test("renders polygon corner radius from base polygon anchors", () => {
     const editor = new Editor();
@@ -133,5 +163,77 @@ describe("shape corner radius", () => {
       value: 24,
     });
     expect(summary?.max).toBeCloseTo(80, 6);
+  });
+
+  test("irregular polygon bulk path corner summary reflects the shared shape radius", () => {
+    const editor = new Editor();
+    const node = createIrregularPolygonShapeNode();
+
+    editor.getState().loadNodes([node]);
+    editor.select(node.id);
+    editor.startPathEditing(node.id);
+
+    const initialSummary = editor.getPathCornerRadiusSummary(node.id);
+
+    expect(initialSummary).toMatchObject({
+      eligibleCount: 5,
+      isMixed: false,
+      value: 0,
+    });
+    expect(initialSummary?.max).toBeGreaterThan(0);
+
+    expect(editor.setPathCornerRadius(999, node.id)).toBe(true);
+
+    const nextSummary = editor.getPathCornerRadiusSummary(node.id);
+    const nextNode = editor.getNode(node.id);
+
+    expect(nextNode?.type).toBe("shape");
+    expect(nextNode?.type === "shape" ? nextNode.cornerRadius : null).toBeCloseTo(
+      initialSummary?.max || 0,
+      6
+    );
+    expect(nextSummary).toMatchObject({
+      eligibleCount: 5,
+      isMixed: false,
+      value: initialSummary?.max || 0,
+    });
+  });
+
+  test("selected polygon path point updates clamp the shared shape radius instead of leaving a mixed summary", () => {
+    const editor = new Editor();
+    const node = createIrregularPolygonShapeNode();
+
+    editor.getState().loadNodes([node]);
+    editor.select(node.id);
+    editor.startPathEditing(node.id);
+    editor.setPathEditingPoint({
+      contourIndex: 0,
+      segmentIndex: 0,
+    });
+
+    const pointControl = editor.getPathPointCornerControl(
+      node.id,
+      editor.pathEditingPoint
+    );
+
+    expect(pointControl?.maxRadius).toBeGreaterThan(0);
+    expect(
+      editor.setPathPointCornerRadius(
+        999,
+        node.id,
+        editor.pathEditingPoint
+      )
+    ).toBe(true);
+
+    const nextNode = editor.getNode(node.id);
+    const summary = editor.getPathCornerRadiusSummary(node.id);
+
+    expect(nextNode?.type).toBe("shape");
+    expect(nextNode?.type === "shape" ? nextNode.cornerRadius : null).toBeCloseTo(
+      pointControl?.maxRadius || 0,
+      6
+    );
+    expect(summary?.isMixed).toBe(false);
+    expect(summary?.value).toBeCloseTo(pointControl?.maxRadius || 0, 6);
   });
 });

@@ -2,6 +2,7 @@ import {
   getNodePropertyIds,
   supportsNodeProperty,
 } from "../nodes/node-property-support";
+import { getShapeCornerRadiusSummary } from "../nodes/shape/shape-engine";
 import { isContainerNode } from "../nodes/node-tree";
 import { getPropertyDescriptor } from "./property-descriptors";
 import {
@@ -170,7 +171,15 @@ export const setSelectionProperty = (
   }
 
   editor.updateNodes(targetNodeIds, (node) => {
-    return descriptor.setValue(node, value);
+    const nextValue =
+      propertyId === "cornerRadius" && node?.type === "shape"
+        ? Math.min(
+            Math.max(0, value),
+            getShapeCornerRadiusSummary(node)?.max ?? Math.max(0, value)
+          )
+        : value;
+
+    return descriptor.setValue(node, nextValue);
   });
 
   return true;

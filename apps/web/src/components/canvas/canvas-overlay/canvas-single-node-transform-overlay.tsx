@@ -13,7 +13,6 @@ import { getTextPathTransformTargetStyle } from "./text-path-overlay-geometry";
 import {
   getRotateCursorRotationDegrees,
   getScaleCursorRotationDegrees,
-  getTransformRotationDegrees,
   type TransformCorner,
 } from "./transform-cursor-angle";
 import { useActiveTransformCursor } from "./use-active-transform-cursor";
@@ -272,9 +271,6 @@ export const CanvasSingleNodeTransformOverlay = ({
   nodeId,
 }) => {
   const editor = useEditor();
-  const isSelectionDragging = useEditorValue(
-    (_, state) => state.isSelectionDragging
-  );
   const isShapeNode = useEditorValue((editor) => {
     return editor.getNode(nodeId)?.type === "shape";
   });
@@ -364,13 +360,13 @@ export const CanvasSingleNodeTransformOverlay = ({
   const activeTransformCursor =
     activeRotateCursor ??
     (activeResizeCorner !== null
-        ? getCanvasScaleCursor(
-            getScaleCursorRotationDegrees(
-              activeResizeCorner,
-              overlayRotationDegrees
-            )
+      ? getCanvasScaleCursor(
+          getScaleCursorRotationDegrees(
+            activeResizeCorner,
+            overlayRotationDegrees
           )
-        : null);
+        )
+      : null);
 
   useActiveTransformCursor(activeTransformCursor);
 
@@ -378,7 +374,7 @@ export const CanvasSingleNodeTransformOverlay = ({
     return null;
   }
 
-  let cursorClassName = "canvas-cursor-default";
+  const cursorClassName = "canvas-cursor-default";
 
   const startSelectionDrag = (event) => {
     if (!(event.button === 0 && isDraggable)) {

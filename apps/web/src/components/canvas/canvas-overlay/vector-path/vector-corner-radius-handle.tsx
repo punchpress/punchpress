@@ -1,14 +1,13 @@
-import { RadiusIcon } from "lucide-react";
 import {
   getActiveVectorPathCursorToken,
   getVectorPathCursorToken,
   setActiveCanvasCursorToken,
 } from "../../canvas-cursor-policy";
 import {
+  CORNER_RADIUS_HANDLE_DOT_CLASS,
+  CORNER_RADIUS_HANDLE_DOT_WARNING_CLASS,
   FANCY_CANVAS_HANDLE_BUTTON_CLASS,
-  FANCY_CANVAS_HANDLE_ICON_CLASS,
   FANCY_CANVAS_HANDLE_WARNING_BUTTON_CLASS,
-  FANCY_CANVAS_HANDLE_WARNING_ICON_CLASS,
 } from "../canvas-handle-icon-styles";
 import { getVectorCornerRadiusDragContours } from "./corner-radius-drag";
 import {
@@ -22,9 +21,6 @@ import {
   shouldAdjustSelectedCornerPoints,
 } from "./vector-corner-radius-points";
 
-const CORNER_RADIUS_ICON_REFERENCE_DEG = 45;
-const CORNER_RADIUS_ICON_SIZE = 34;
-const CORNER_RADIUS_ICON_STROKE_WIDTH = 2;
 const CORNER_RADIUS_MAX_EPSILON = 0.01;
 
 const roundDelta = (value: number) => Math.round(value * 100) / 100;
@@ -43,16 +39,6 @@ const getCanvasPoint = (editor, clientX: number, clientY: number) => {
     x: viewer.getScrollLeft() + (clientX - rect.left) / editor.zoom,
     y: viewer.getScrollTop() + (clientY - rect.top) / editor.zoom,
   };
-};
-
-export const getCornerRadiusIconRotationDeg = (direction: {
-  x: number;
-  y: number;
-}) => {
-  return (
-    (Math.atan2(-direction.y, -direction.x) * 180) / Math.PI -
-    CORNER_RADIUS_ICON_REFERENCE_DEG
-  );
 };
 
 export const VectorCornerRadiusHandle = ({
@@ -100,7 +86,6 @@ export const VectorCornerRadiusHandle = ({
   const cursorToken = getVectorPathCursorToken("point");
   const activeCursorToken =
     getActiveVectorPathCursorToken("point") || cursorToken;
-  const rotationDeg = getCornerRadiusIconRotationDeg(geometry.direction);
   const pathPoint = {
     contourIndex: selectedPoint.contourIndex,
     segmentIndex: selectedPoint.segmentIndex,
@@ -134,6 +119,10 @@ export const VectorCornerRadiusHandle = ({
 
     const historyMark = editor.markHistoryStep("edit vector path");
     const dragStartSession = editor.getEditablePathSession(nodeId);
+    const dragStartPrimaryPoint =
+      editor.pathEditingNodeId === nodeId ? editor.pathEditingPoint : null;
+    const dragStartSelectedPoints =
+      editor.pathEditingNodeId === nodeId ? editor.pathEditingPoints : [];
     let didChange = false;
     const dragStartPoint = getCanvasPoint(editor, event.clientX, event.clientY);
     const dragStartGeometry = geometry;
@@ -224,6 +213,15 @@ export const VectorCornerRadiusHandle = ({
       if (historyMark) {
         editor.revertToMark(historyMark);
       }
+
+      if (!editor.isPathEditing(nodeId)) {
+        editor.startPathEditing(nodeId);
+      }
+
+      editor.setPathEditingPoints(
+        dragStartSelectedPoints,
+        dragStartPrimaryPoint
+      );
     };
 
     window.addEventListener("pointermove", handlePointerMove);
@@ -270,19 +268,8 @@ export const VectorCornerRadiusHandle = ({
     >
       <span
         aria-hidden="true"
-        className={`${FANCY_CANVAS_HANDLE_ICON_CLASS} ${isWarningActive ? FANCY_CANVAS_HANDLE_WARNING_ICON_CLASS : ""}`}
-      >
-        <span
-          className="flex items-center justify-center"
-          style={{ transform: `rotate(${rotationDeg}deg)` }}
-        >
-          <RadiusIcon
-            color="currentColor"
-            size={CORNER_RADIUS_ICON_SIZE}
-            strokeWidth={CORNER_RADIUS_ICON_STROKE_WIDTH}
-          />
-        </span>
-      </span>
+        className={`${CORNER_RADIUS_HANDLE_DOT_CLASS} ${isWarningActive ? CORNER_RADIUS_HANDLE_DOT_WARNING_CLASS : ""}`}
+      />
     </button>
   );
 };

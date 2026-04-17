@@ -1,3 +1,4 @@
+import { clampCornerRadius } from "../../primitives/corner-radius";
 import { getVectorPointCornerDescriptor } from "./vector-corner-controls-query";
 import {
   clampNumber,
@@ -57,7 +58,7 @@ const getSharpVectorRoundCornerGeometry = (descriptor, cornerRadius) => {
 };
 
 const setSharpVectorCornerRadius = (contours, descriptor, cornerRadius) => {
-  const nextCornerRadius = Math.max(0, cornerRadius || 0);
+  const nextCornerRadius = clampCornerRadius(cornerRadius);
   const contour = contours?.[descriptor?.contourIndex];
 
   if (!(contour && descriptor?.kind === "sharp")) {
@@ -132,7 +133,7 @@ const setDetectedVectorRoundCornerRadius = (
   cornerRadius,
   options = {}
 ) => {
-  const nextCornerRadius = Math.max(0, cornerRadius || 0);
+  const nextCornerRadius = clampCornerRadius(cornerRadius);
   const contour = contours?.[descriptor?.contourIndex];
 
   if (!(contour && descriptor?.kind === "detected")) {
@@ -245,7 +246,7 @@ const setDetectedVectorRoundCornerRadius = (
 };
 
 export const setVectorPointCornerRadius = (contours, point, cornerRadius) => {
-  const nextCornerRadius = Math.max(0, cornerRadius || 0);
+  const nextCornerRadius = clampCornerRadius(cornerRadius);
   const descriptor = getVectorPointCornerDescriptor(contours, point);
 
   if (!(contours && point && descriptor)) {
@@ -282,6 +283,7 @@ export const applyVectorCornerRadiusToControls = (
   cornerRadius
 ) => {
   let nextContours = contours;
+  const normalizedCornerRadius = clampCornerRadius(cornerRadius);
 
   for (const control of sortVectorCornerControls(controls)) {
     const updatedContours =
@@ -289,12 +291,16 @@ export const applyVectorCornerRadiusToControls = (
         ? setDetectedVectorRoundCornerRadius(
             nextContours,
             control,
-            cornerRadius,
+            normalizedCornerRadius,
             {
               clampToDescriptorMax: false,
             }
           )
-        : setSharpVectorCornerRadius(nextContours, control, cornerRadius);
+        : setSharpVectorCornerRadius(
+            nextContours,
+            control,
+            normalizedCornerRadius
+          );
 
     if (updatedContours) {
       nextContours = updatedContours;

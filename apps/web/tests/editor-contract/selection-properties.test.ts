@@ -31,6 +31,36 @@ const createShapeNode = (id: string) => {
   } as const;
 };
 
+const createIrregularShapeNode = (id: string) => {
+  return {
+    cornerRadius: 0,
+    fill: "#000000",
+    height: 160,
+    id,
+    parentId: "root",
+    points: [
+      { x: -130, y: 0 },
+      { x: -10, y: -110 },
+      { x: 110, y: -90 },
+      { x: 110, y: -20 },
+      { x: 10, y: 120 },
+    ],
+    shape: "polygon",
+    stroke: null,
+    strokeWidth: 0,
+    transform: {
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+      x: 600,
+      y: 450,
+    },
+    type: "shape",
+    visible: true,
+    width: 240,
+  } as const;
+};
+
 const createEllipseShapeNode = (id: string) => {
   return {
     fill: "#000000",
@@ -302,6 +332,29 @@ describe("Editor selection properties", () => {
       cornerRadius: 36,
       shape: "polygon",
       type: "shape",
+    });
+  });
+
+  test("clamps irregular polygon corner radius through selection properties to the shared live-shape maximum", () => {
+    const editor = new Editor();
+
+    loadNodes(editor, [createIrregularShapeNode("shape-node")]);
+    editor.select("shape-node");
+    const maxCornerRadius = editor.getPathCornerRadiusSummary("shape-node")?.max || 0;
+
+    const didApply = editor.setSelectionProperty("cornerRadius", 999);
+    const nextNode = editor.getNode("shape-node");
+    const selectionProperties = editor.getSelectionProperties();
+
+    expect(didApply).toBe(true);
+    expect(nextNode?.type).toBe("shape");
+    expect(
+      nextNode?.type === "shape" ? nextNode.cornerRadius : null
+    ).toBeCloseTo(maxCornerRadius, 6);
+    expect(selectionProperties.properties.cornerRadius).toEqual({
+      id: "cornerRadius",
+      isMixed: false,
+      value: maxCornerRadius,
     });
   });
 

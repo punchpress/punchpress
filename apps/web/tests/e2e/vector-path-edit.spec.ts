@@ -320,6 +320,93 @@ const loadPolygonShapeDocument = async (page) => {
     return true;
   });
 };
+
+const loadIrregularVectorDocument = async (page) => {
+  await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    if (!editor) {
+      return false;
+    }
+
+    editor.loadDocument(
+      JSON.stringify({
+        nodes: [
+          {
+            id: "irregular-vector-container",
+            name: "Vector",
+            parentId: "root",
+            transform: {
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+              x: 0,
+              y: 0,
+            },
+            type: "vector",
+            visible: true,
+          },
+          {
+            closed: true,
+            fill: "#ffffff",
+            fillRule: "nonzero",
+            id: "irregular-vector-node",
+            parentId: "irregular-vector-container",
+            segments: [
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: -50, y: -10 },
+                pointType: "corner",
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 10, y: -45 },
+                pointType: "corner",
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 95, y: -5 },
+                pointType: "corner",
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 75, y: 70 },
+                pointType: "corner",
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: -20, y: 85 },
+                pointType: "corner",
+              },
+            ],
+            stroke: "#000000",
+            strokeLineCap: "butt",
+            strokeLineJoin: "miter",
+            strokeMiterLimit: 4,
+            strokeWidth: 12,
+            transform: {
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+              x: 400,
+              y: 280,
+            },
+            type: "path",
+            visible: true,
+          },
+        ],
+        version: "1.6",
+      })
+    );
+
+    return true;
+  });
+};
 const getViewerScroll = (page) => {
   return page.evaluate(() => {
     const viewer = window.__PUNCHPRESS_EDITOR__?.viewerRef;
@@ -1100,6 +1187,48 @@ test("double-clicking a vector node enters path editing", async ({ page }) => {
   await expect(
     page.locator(".canvas-single-node-transform-overlay")
   ).toHaveCount(0);
+});
+
+test("single-path vector selections keep the edit path action visible", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadIrregularVectorDocument(page);
+
+  await clickNodeCenter(page, "irregular-vector-node");
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => {
+      const dump = await getDebugDump(page);
+      const toolbarButtons = await page
+        .locator(".canvas-node-toolbar button")
+        .evaluateAll((buttons) => {
+          return buttons.map((button) => {
+            return (
+              button.getAttribute("aria-label") || button.textContent || ""
+            );
+          });
+        });
+
+      return {
+        pathNodeId: dump?.editing?.pathNodeId || null,
+        selectedNodeIds: dump?.selection?.ids || [],
+        toolbarButtons,
+      };
+    })
+    .toEqual({
+      pathNodeId: null,
+      selectedNodeIds: ["irregular-vector-container"],
+      toolbarButtons: ["Edit path (E)", "Delete (Delete)"],
+    });
+
+  await page.getByRole("button", { name: "Edit path (E)" }).click();
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => (await getDebugDump(page))?.editing?.pathNodeId || null)
+    .toBe("irregular-vector-node");
 });
 
 test("pen tool uses the custom pen cursor on the canvas", async ({ page }) => {
@@ -2583,6 +2712,172 @@ test("polygon shape points show the live corner widget and update shape corner r
     .toBeGreaterThan(0);
 });
 
+test("clicking a polygon corner-radius handle without dragging keeps path edit mode active", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadPolygonShapeDocument(page);
+
+  await clickNodeCenter(page, "polygon-shape-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "polygon-shape-node");
+  await pauseForUi(page);
+
+  const anchorPoint = await getEditablePathPointScreenPoint(
+    page,
+    "polygon-shape-node",
+    0
+  );
+
+  if (!anchorPoint) {
+    throw new Error("Missing polygon shape anchor point");
+  }
+
+  await page.mouse.click(anchorPoint.x, anchorPoint.y);
+  await pauseForUi(page);
+
+  await expect(page.getByTestId("path-corner-radius-handle")).toBeVisible();
+  await page.getByTestId("path-corner-radius-handle").click();
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => {
+      const dump = await getDebugDump(page);
+
+      return {
+        pathNodeId: dump?.editing?.pathNodeId || null,
+        pathPoint: dump?.editing?.pathPoint || null,
+        selectedNodeIds: dump?.selection?.ids || [],
+      };
+    })
+    .toEqual({
+      pathNodeId: "polygon-shape-node",
+      pathPoint: {
+        contourIndex: 0,
+        segmentIndex: 0,
+      },
+      selectedNodeIds: ["polygon-shape-node"],
+    });
+
+  await expect(page.getByTestId("path-corner-radius-handle")).toBeVisible();
+});
+
+test("polygon corner slider keeps the shared shape radius stable across repeated adjustments", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadPolygonShapeDocument(page);
+
+  await clickNodeCenter(page, "polygon-shape-node");
+  await pauseForUi(page);
+
+  const bulkCornerSlider = page.getByRole("slider", {
+    name: "Polygon corner radius",
+  });
+
+  await expect(bulkCornerSlider).toBeVisible();
+  await expect(bulkCornerSlider).toHaveAttribute("aria-valuetext", "0");
+
+  await bulkCornerSlider.focus();
+  await page.keyboard.press("ArrowRight");
+  await pauseForUi(page);
+
+  await expect
+    .poll(() => {
+      return page.evaluate(() => {
+        const editor = window.__PUNCHPRESS_EDITOR__;
+        const node = editor?.getNode("polygon-shape-node");
+        const summary =
+          editor?.getPathCornerRadiusSummary("polygon-shape-node");
+
+        return {
+          cornerRadius: node?.type === "shape" ? node.cornerRadius : null,
+          isMixed: summary?.isMixed ?? null,
+          value: summary?.value ?? null,
+        };
+      });
+    })
+    .toEqual({
+      cornerRadius: 1,
+      isMixed: false,
+      value: 1,
+    });
+
+  await page.keyboard.press("ArrowRight");
+  await pauseForUi(page);
+
+  await expect
+    .poll(() => {
+      return page.evaluate(() => {
+        const editor = window.__PUNCHPRESS_EDITOR__;
+        const node = editor?.getNode("polygon-shape-node");
+        const summary =
+          editor?.getPathCornerRadiusSummary("polygon-shape-node");
+
+        return {
+          cornerRadius: node?.type === "shape" ? node.cornerRadius : null,
+          isMixed: summary?.isMixed ?? null,
+          value: summary?.value ?? null,
+        };
+      });
+    })
+    .toEqual({
+      cornerRadius: 2,
+      isMixed: false,
+      value: 2,
+    });
+  await expect(bulkCornerSlider).toHaveAttribute("aria-valuetext", "2");
+});
+
+test("bulk path corner slider stays uniform for an irregular vector after repeated adjustments", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadIrregularVectorDocument(page);
+
+  await clickNodeCenter(page, "irregular-vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "irregular-vector-node");
+  await pauseForUi(page);
+
+  const bulkCornerSlider = page.getByRole("slider", {
+    name: "Path corner radius",
+  });
+
+  await expect(bulkCornerSlider).toBeVisible();
+  await expect(bulkCornerSlider).toHaveAttribute("aria-valuetext", "0");
+
+  await bulkCornerSlider.focus();
+  await page.keyboard.press("ArrowRight");
+  await pauseForUi(page);
+
+  await expect(bulkCornerSlider).toHaveAttribute("aria-valuetext", "1");
+
+  await page.keyboard.press("ArrowRight");
+  await pauseForUi(page);
+
+  await expect
+    .poll(() => {
+      return page.evaluate(() => {
+        const editor = window.__PUNCHPRESS_EDITOR__;
+        const summary = editor?.getPathCornerRadiusSummary(
+          "irregular-vector-node"
+        );
+
+        return {
+          isMixed: summary?.isMixed ?? null,
+          value: summary?.value ?? null,
+        };
+      });
+    })
+    .toEqual({
+      isMixed: false,
+      value: 2,
+    });
+
+  await expect(bulkCornerSlider).toHaveAttribute("aria-valuetext", "2");
+});
+
 test("properties panel shows mixed path corner radius and can apply one value to all vector corners", async ({
   page,
 }) => {
@@ -2683,7 +2978,7 @@ test("properties panel scopes path corner radius to the selected path points", a
       },
       {
         contourIndex: 0,
-        segmentIndex: 1,
+        segmentIndex: 4,
       },
     ]);
   });
@@ -2702,12 +2997,12 @@ test("properties panel scopes path corner radius to the selected path points", a
   await expect
     .poll(() => {
       return Promise.all(
-        [0, 1, 2, 3].map((segmentIndex) => {
+        [0, 1, 2, 3, 4, 5, 6].map((segmentIndex) => {
           return getVectorPointCornerRadius(page, segmentIndex);
         })
       );
     })
-    .toEqual([1, 1, 30, 0]);
+    .toEqual([1, 1, 30, 30, 1, 1, 0]);
 });
 
 test("clicking a properties panel control does not exit vector path editing", async ({

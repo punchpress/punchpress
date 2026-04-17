@@ -33,6 +33,8 @@ Shape nodes let users create and edit live geometric shapes that remain easy to 
 - A polygon shape should remain a shape node while corner-based edits still preserve meaningful polygon controls, even after it is no longer a perfect square or rectangle.
 - A polygon shape should support adding or removing points while it still remains a live polygon rather than a freeform vector.
 - A polygon shape should expose a live `Corner radius` control that rounds eligible polygon corners from the same underlying polygon anchors used for shape editing.
+- While path editing a polygon shape, the bulk `Corner radius` control should reflect the one shared shape corner-radius value rather than surfacing a mixed per-corner summary.
+- If an irregular polygon would force some corners to clamp earlier than others, the shared `Corner radius` control should clamp to the stable shared maximum instead of jumping back to `0` or showing `Mixed`.
 - A polygon shape should convert to a vector node when the user introduces bezier-style point semantics such as smoothing a corner or dragging a new direction handle.
 - An ellipse should preserve ellipse behavior only while the edits still describe an ellipse-like shape with meaningful ellipse controls.
 - Moving an ellipse anchor or bezier handle should convert the ellipse into a vector node rather than preserving it as a live ellipse.

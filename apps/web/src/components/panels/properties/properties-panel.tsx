@@ -18,6 +18,7 @@ export const PropertiesPanel = () => {
     bootstrapError,
     bootstrapState,
     pathCornerRadiusSummary,
+    pathCornerRadiusStableMax,
     pathPointCornerMax,
     pathPointCornerRadius,
     selectedNode: pointSelectedNode,
@@ -90,6 +91,7 @@ export const PropertiesPanel = () => {
 
         {showsPathCornerRadiusSummary ? (
           <PathCornerFields
+            cornerStableMax={pathCornerRadiusStableMax}
             cornerSummary={pathCornerRadiusSummary}
             selectedNode={pointSelectedNode}
           />
