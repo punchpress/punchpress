@@ -7,7 +7,6 @@ import {
   buildRoundedPolygonPath,
   canRoundPolygonPoint,
   getPolygonCornerRadiusSummary,
-  getPolygonPointCornerControl,
 } from "./shape-corner-controls";
 
 const getStrokeInset = (node) => {
@@ -303,19 +302,15 @@ export const getShapePointCornerControl = (node, point) => {
   }
 
   const points = contour.segments.map((currentSegment) => currentSegment.point);
-  const roundedCorner = getPolygonPointCornerControl(
-    points,
-    point,
-    node.cornerRadius
-  );
+  const cornerSummary = getPolygonCornerRadiusSummary(points, node.cornerRadius);
 
-  if (!roundedCorner) {
+  if (!cornerSummary) {
     return null;
   }
 
   return {
-    currentRadius: roundedCorner.appliedRadius,
-    maxRadius: roundedCorner.maxRadius,
+    currentRadius: cornerSummary.value ?? 0,
+    maxRadius: cornerSummary.max,
   };
 };
 

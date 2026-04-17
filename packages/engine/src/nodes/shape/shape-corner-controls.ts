@@ -1,3 +1,8 @@
+import {
+  clampCornerRadius,
+  normalizeCornerRadius,
+} from "../../primitives/corner-radius";
+
 const MIN_CORNER_ANGLE = 0.001;
 
 const clampNumber = (value, min, max) => {
@@ -86,16 +91,26 @@ export const getRoundedPolygonCorner = (points, index, cornerRadius) => {
 
   return {
     appliedRadius,
-    controlIn: addScaledPoint(start, {
-      x: -previousDirection.x,
-      y: -previousDirection.y,
-    }, handleLength),
-    controlOut: addScaledPoint(end, {
-      x: -nextDirection.x,
-      y: -nextDirection.y,
-    }, handleLength),
+    controlIn: addScaledPoint(
+      start,
+      {
+        x: -previousDirection.x,
+        y: -previousDirection.y,
+      },
+      handleLength
+    ),
+    controlOut: addScaledPoint(
+      end,
+      {
+        x: -nextDirection.x,
+        y: -nextDirection.y,
+      },
+      handleLength
+    ),
     end,
-    maxRadius: maxCutDistance * Math.tan(cornerAngle / 2),
+    maxRadius: normalizeCornerRadius(
+      maxCutDistance * Math.tan(cornerAngle / 2)
+    ),
     start,
   };
 };
@@ -107,24 +122,27 @@ export const buildRoundedPolygonPath = (points, cornerRadius) => {
   const startPoint = corners[0]?.start || points[0];
 
   return corners
-    .reduce((commands, corner, index) => {
-      const point = points[index];
+    .reduce(
+      (commands, corner, index) => {
+        const point = points[index];
 
-      if (!point) {
+        if (!point) {
+          return commands;
+        }
+
+        if (!corner) {
+          commands.push(`L ${point.x} ${point.y}`);
+          return commands;
+        }
+
+        commands.push(`L ${corner.start.x} ${corner.start.y}`);
+        commands.push(
+          `C ${corner.controlIn.x} ${corner.controlIn.y} ${corner.controlOut.x} ${corner.controlOut.y} ${corner.end.x} ${corner.end.y}`
+        );
         return commands;
-      }
-
-      if (!corner) {
-        commands.push(`L ${point.x} ${point.y}`);
-        return commands;
-      }
-
-      commands.push(`L ${corner.start.x} ${corner.start.y}`);
-      commands.push(
-        `C ${corner.controlIn.x} ${corner.controlIn.y} ${corner.controlOut.x} ${corner.controlOut.y} ${corner.end.x} ${corner.end.y}`
-      );
-      return commands;
-    }, [`M ${startPoint.x} ${startPoint.y}`])
+      },
+      [`M ${startPoint.x} ${startPoint.y}`]
+    )
     .concat("Z")
     .join(" ");
 };
@@ -143,7 +161,11 @@ export const getPolygonPointCornerControl = (points, point, cornerRadius) => {
   }
 
   return (
-    getRoundedPolygonCorner(points, point.segmentIndex, Math.max(cornerRadius ?? 0, 1)) || null
+    getRoundedPolygonCorner(
+      points,
+      point.segmentIndex,
+      Math.max(cornerRadius ?? 0, 1)
+    ) || null
   );
 };
 
@@ -167,17 +189,15 @@ export const getPolygonCornerRadiusSummary = (points, cornerRadius) => {
     return null;
   }
 
-  const values = controls.map((control) => control.appliedRadius);
-  const [firstValue = 0] = values;
-  const isMixed = values.some((value) => value !== firstValue);
   const max = controls.reduce((currentMax, control) => {
-    return Math.max(currentMax, control.maxRadius);
-  }, 0);
+    return Math.min(currentMax, control.maxRadius);
+  }, Number.POSITIVE_INFINITY);
+  const value = clampCornerRadius(cornerRadius ?? 0, 0, max);
 
   return {
     eligibleCount,
-    isMixed,
-    max,
-    value: isMixed ? null : firstValue,
+    isMixed: false,
+    max: normalizeCornerRadius(max),
+    value,
   };
 };

@@ -651,4 +651,23 @@ describe("vector corner radius", () => {
         : null
     ).toBe(10);
   });
+
+  test("bulk path corner radius summary stays uniform for an irregular vector after a bulk apply", () => {
+    const editor = new Editor();
+    const node = createIrregularPolygonVectorNode();
+
+    editor.getState().loadNodes([node]);
+    editor.select(node.id);
+    editor.startPathEditing(node.id);
+
+    expect(editor.setPathCornerRadius(20, node.id)).toBe(true);
+
+    const summary = editor.getPathCornerRadiusSummary(node.id);
+
+    expect(summary).toMatchObject({
+      eligibleCount: 5,
+      isMixed: false,
+    });
+    expect(summary?.value).toBeCloseTo(20, 6);
+  });
 });

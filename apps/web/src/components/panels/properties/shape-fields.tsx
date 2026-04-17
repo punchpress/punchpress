@@ -1,13 +1,18 @@
+import { ScrubSlider } from "@/components/ui/scrub-slider";
 import {
   ToggleGroup,
   Toggle as ToggleGroupItem,
 } from "@/components/ui/toggle-group";
-import { ScrubSlider } from "@/components/ui/scrub-slider";
 import { useEditor } from "../../../editor-react/use-editor";
-import { FieldRow, PairedRow, Section } from "./field-primitives";
+import { FieldRow, Section } from "./field-primitives";
 
 const SHAPE_SIZE_RANGE = { min: 1, max: 5000 };
 const CORNER_RADIUS_RANGE = { min: 0, max: 1000 };
+const CORNER_RADIUS_KEYBOARD_STEP = 1;
+const CORNER_RADIUS_STEP = 0.01;
+const formatCornerRadiusDisplay = (value: number) => {
+  return Math.round(value).toString();
+};
 
 const SHAPE_OPTIONS = [
   { label: "Poly", value: "polygon" },
@@ -76,11 +81,14 @@ export const ShapeFields = ({ cornerRadius, height, node, shape, width }) => {
         <FieldRow label="Corners">
           <ScrubSlider
             ariaLabel="Polygon corner radius"
+            formatValue={formatCornerRadiusDisplay}
+            keyboardStep={CORNER_RADIUS_KEYBOARD_STEP}
             max={CORNER_RADIUS_RANGE.max}
             min={CORNER_RADIUS_RANGE.min}
             onValueChange={(nextCornerRadius) => {
               editor.setSelectionProperty("cornerRadius", nextCornerRadius);
             }}
+            step={CORNER_RADIUS_STEP}
             value={cornerRadius.value ?? node.cornerRadius ?? 0}
           />
         </FieldRow>

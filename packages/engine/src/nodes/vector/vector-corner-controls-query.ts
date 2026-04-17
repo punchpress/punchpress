@@ -1,4 +1,9 @@
 import {
+  areCornerRadiiEquivalent,
+  clampCornerRadius,
+  normalizeCornerRadius,
+} from "../../primitives/corner-radius";
+import {
   clampNumber,
   getHandleLength,
   getLineIntersection,
@@ -20,7 +25,6 @@ import {
 
 const MIN_CORNER_ANGLE = 0.001;
 const CORNER_DIRECTION_SAMPLE_DISTANCE = 12;
-
 const getDetectedRoundCornerNeighbors = (contour, startIndex) => {
   const startSegment = contour?.segments?.[startIndex];
   const previousIndex = getPreviousVectorSegmentIndex(contour, startIndex);
@@ -171,7 +175,7 @@ export const getVectorSegmentCornerControl = (contour, segmentIndex) => {
     cornerAngle,
     currentRadius: 0,
     kind: "sharp",
-    maxRadius,
+    maxRadius: normalizeCornerRadius(maxRadius),
     nextCurve: nextSide.curve,
     nextCurveLength: nextSide.curveLength,
     nextDirection: nextSide.direction,
@@ -275,7 +279,9 @@ const getDetectedVectorRoundCornerControlFromStart = (
     return null;
   }
 
-  const currentRadius = virtualCorner.distanceA * Math.tan(cornerAngle / 2);
+  const currentRadius = normalizeCornerRadius(
+    virtualCorner.distanceA * Math.tan(cornerAngle / 2)
+  );
   const expectedHandleLength = getRoundCornerHandleLength(
     cornerAngle,
     currentRadius
@@ -319,7 +325,9 @@ const getDetectedVectorRoundCornerControlFromStart = (
     endIndex,
     kind: "detected",
     key: getVectorCornerKey(contourIndex, startIndex),
-    maxRadius: maxCutDistance * Math.tan(cornerAngle / 2),
+    maxRadius: normalizeCornerRadius(
+      maxCutDistance * Math.tan(cornerAngle / 2)
+    ),
     nextIndex,
     previousIndex,
     selectedSegmentIndex,
@@ -385,7 +393,9 @@ export const getVectorPointCornerDescriptor = (contours, point) => {
 };
 
 export const getVectorPointCornerRadius = (contours, point) => {
-  return getVectorPointCornerDescriptor(contours, point)?.currentRadius ?? 0;
+  return clampCornerRadius(
+    getVectorPointCornerDescriptor(contours, point)?.currentRadius ?? 0
+  );
 };
 
 export const canRoundVectorPoint = (contours, point) => {
@@ -450,18 +460,28 @@ export const getVectorCornerRadiusSummary = (contours, points = null) => {
   const controls = eligiblePoints
     .map((point) => getVectorPointCornerControl(contours, point))
     .filter(Boolean);
-  const values = controls.map((control) => control.currentRadius);
+  const values = controls.map((control) => {
+    return clampCornerRadius(control.currentRadius);
+  });
   const [firstValue = 0] = values;
-  const isMixed = values.some((value) => value !== firstValue);
+  const isMixed = values.some((value) => {
+    return !areCornerRadiiEquivalent(value, firstValue);
+  });
   const max = controls.reduce((currentMax, control) => {
-    return Math.max(currentMax, control.maxRadius);
+    return Math.max(currentMax, clampCornerRadius(control.maxRadius));
   }, 0);
+  const value = isMixed
+    ? null
+    : normalizeCornerRadius(
+        values.reduce((sum, currentValue) => sum + currentValue, 0) /
+          Math.max(values.length, 1)
+      );
 
   return {
     eligibleCount: eligiblePoints.length,
     isMixed,
-    max,
-    value: isMixed ? null : firstValue,
+    max: normalizeCornerRadius(max),
+    value,
   };
 };
 

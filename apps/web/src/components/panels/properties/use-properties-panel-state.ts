@@ -16,7 +16,10 @@ export const usePropertiesPanelState = () => {
     return {
       bootstrapError: editor.bootstrapError,
       bootstrapState: editor.bootstrapState,
-      pathCornerRadiusSummary: pathEditingInspectorState.pathCornerRadiusSummary,
+      pathCornerRadiusSummary:
+        pathEditingInspectorState.pathCornerRadiusSummary,
+      pathCornerRadiusStableMax:
+        pathEditingInspectorState.pathCornerRadiusStableMax,
       pathPointCornerMax: pathEditingInspectorState.pathPointCornerMax,
       pathPointCornerRadius: pathEditingInspectorState.pathPointCornerRadius,
       selectedNode,
@@ -32,12 +35,14 @@ export const usePropertiesPanelState = () => {
   return {
     bootstrapError: snapshot.bootstrapError,
     bootstrapState: snapshot.bootstrapState,
+    pathCornerRadiusStableMax: snapshot.pathCornerRadiusStableMax,
     pathPointCornerMax: snapshot.pathPointCornerMax,
     pathPointCornerRadius: snapshot.pathPointCornerRadius,
     selectedNode: snapshot.selectedNode,
     pathCornerRadiusSummary: snapshot.pathCornerRadiusSummary,
     selectedPathPoint: snapshot.selectedPathPoint,
-    selectionProperties: snapshot.selectionPropertiesSnapshot.selectionProperties,
+    selectionProperties:
+      snapshot.selectionPropertiesSnapshot.selectionProperties,
     showsPathPointCornerRadius: snapshot.showsPathPointCornerRadius,
   };
 };

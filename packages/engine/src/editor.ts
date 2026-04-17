@@ -1081,11 +1081,33 @@ export class Editor {
     this.getState().setPathEditingNodeId(nodeId);
   }
 
+  ensurePathEditingTargetForPointSelection() {
+    if (this.pathEditingNodeId) {
+      return;
+    }
+
+    const targetNodeId = this.getPathEditingTargetNodeId(this.selectedNodeId);
+
+    if (!(targetNodeId && this.canEditNodePath(targetNodeId))) {
+      return;
+    }
+
+    this.getState().setPathEditingNodeId(targetNodeId);
+  }
+
   setPathEditingPoint(point) {
+    if (point) {
+      this.ensurePathEditingTargetForPointSelection();
+    }
+
     this.getState().setPathEditingPoint(point);
   }
 
   setPathEditingPoints(points, primaryPoint = null) {
+    if ((points?.length || 0) > 0) {
+      this.ensurePathEditingTargetForPointSelection();
+    }
+
     this.getState().setPathEditingPoints(points, primaryPoint);
   }
 
@@ -1230,21 +1252,32 @@ export class Editor {
   setPathPointCornerRadius(
     cornerRadius,
     nodeId = this.pathEditingNodeId,
-    point = this.pathEditingPoint
+    point = this.pathEditingPoint,
+    sourceNode = null
   ) {
     if (!(nodeId && point)) {
       return false;
     }
 
-    return setEditorPathPointCornerRadius(this, nodeId, point, cornerRadius);
+    return setEditorPathPointCornerRadius(
+      this,
+      nodeId,
+      point,
+      cornerRadius,
+      sourceNode
+    );
   }
 
-  setPathCornerRadius(cornerRadius, nodeId = this.pathEditingNodeId) {
+  setPathCornerRadius(
+    cornerRadius,
+    nodeId = this.pathEditingNodeId,
+    sourceNode = null
+  ) {
     if (!nodeId) {
       return false;
     }
 
-    return setEditorPathCornerRadius(this, nodeId, cornerRadius);
+    return setEditorPathCornerRadius(this, nodeId, cornerRadius, sourceNode);
   }
 
   canSplitPath(nodeId = this.pathEditingNodeId, point = this.pathEditingPoint) {

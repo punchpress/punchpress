@@ -1,6 +1,7 @@
 "use client";
 
 import { clamp, format, toNumber } from "@punchpress/engine";
+import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
@@ -11,13 +12,18 @@ interface ScrubSliderProps {
   disabled?: boolean;
   displayValue?: string | null;
   formatValue?: (value: number) => string;
+  keyboardStep?: number;
   max: number;
   min: number;
+  onScrubEnd?: () => void;
+  onScrubStart?: () => void;
   onValueChange: (value: number) => void;
   overflowRecoveryPixels?: number;
   pixelsPerStep?: number;
+  preserveDisplayValueWhileDragging?: boolean;
   step?: number;
   value: number;
+  valueBadge?: string | null;
 }
 
 const TICK_SPACING = 6;
@@ -26,23 +32,302 @@ const TICK_HEIGHT_LARGE = 7;
 const LARGE_TICK_INTERVAL = 5;
 const SCRUB_PERCENT_PADDING = 4;
 const SCRUB_PERCENT_SPAN = 100 - SCRUB_PERCENT_PADDING * 2;
-export const ScrubSlider = ({
-  ariaLabel,
-  className,
-  disabled = false,
-  displayValue = null,
-  formatValue = format,
+
+const handleSliderKeyDown = ({
+  disabled,
+  event,
+  isEditing,
   max,
   min,
+  onStep,
   onValueChange,
-  overflowRecoveryPixels = 80,
-  pixelsPerStep = 2,
-  step = 1,
+  resolvedKeyboardStep,
+  startEditing,
+}: {
+  disabled: boolean;
+  event: ReactKeyboardEvent<HTMLDivElement>;
+  isEditing: boolean;
+  max: number;
+  min: number;
+  onStep: (deltaValue: number) => void;
+  onValueChange: (value: number) => void;
+  resolvedKeyboardStep: number;
+  startEditing: () => void;
+}) => {
+  if (isEditing || disabled) {
+    return;
+  }
+
+  if (event.key === "Enter") {
+    event.preventDefault();
+    event.stopPropagation();
+    startEditing();
+    return;
+  }
+
+  if (event.key === "Home" && Number.isFinite(min)) {
+    event.preventDefault();
+    event.stopPropagation();
+    onValueChange(min);
+    return;
+  }
+
+  if (event.key === "End" && Number.isFinite(max)) {
+    event.preventDefault();
+    event.stopPropagation();
+    onValueChange(max);
+    return;
+  }
+
+  const delta = getKeyboardDelta(
+    event.key,
+    resolvedKeyboardStep,
+    event.shiftKey
+  );
+
+  if (delta === null) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  onStep(delta);
+};
+
+const beginScrubDrag = ({
+  event,
+  max,
+  min,
+  overflowRecoveryPixels,
+  pixelsPerStep,
+  setIsDragging,
+  startValue,
+  step,
+}: {
+  event: React.PointerEvent<HTMLDivElement>;
+  max: number;
+  min: number;
+  overflowRecoveryPixels: number;
+  pixelsPerStep: number;
+  setIsDragging: (value: boolean) => void;
+  startValue: number;
+  step: number;
+}) => {
+  event.preventDefault();
+  event.currentTarget.focus();
+  event.currentTarget.setPointerCapture(event.pointerId);
+
+  const dragValuePerPixel = getDragValuePerPixel(
+    min,
+    max,
+    step,
+    pixelsPerStep,
+    event.currentTarget.getBoundingClientRect().width
+  );
+
+  setIsDragging(true);
+
+  return {
+    dragValuePerPixel,
+    max,
+    min,
+    overflowRecoveryValueSpan: overflowRecoveryPixels * dragValuePerPixel,
+    pointerId: event.pointerId,
+    startValue,
+    startX: event.clientX,
+  };
+};
+
+const getScrubDragDeltaValue = ({
+  dragState,
+  event,
+}: {
+  dragState: {
+    dragValuePerPixel: number;
+    max: number;
+    min: number;
+    overflowRecoveryValueSpan: number;
+    pointerId: number;
+    startValue: number;
+    startX: number;
+  } | null;
+  event: React.PointerEvent<HTMLDivElement>;
+}) => {
+  if (!dragState || dragState.pointerId !== event.pointerId) {
+    return null;
+  }
+
+  const deltaX = event.clientX - dragState.startX;
+
+  return {
+    deltaValue: deltaX * dragState.dragValuePerPixel,
+    dragState,
+  };
+};
+
+const handleScrubSliderPointerDown = ({
+  disabled,
+  event,
+  isEditing,
+  max,
+  min,
+  overflowRecoveryPixels,
+  pixelsPerStep,
+  setIsDragging,
+  startValue,
+  step,
+}: {
+  disabled: boolean;
+  event: React.PointerEvent<HTMLDivElement>;
+  isEditing: boolean;
+  max: number;
+  min: number;
+  overflowRecoveryPixels: number;
+  pixelsPerStep: number;
+  setIsDragging: (value: boolean) => void;
+  startValue: number;
+  step: number;
+}) => {
+  if (disabled || isEditing) {
+    return null;
+  }
+
+  return beginScrubDrag({
+    event,
+    max,
+    min,
+    overflowRecoveryPixels,
+    pixelsPerStep,
+    setIsDragging,
+    startValue,
+    step,
+  });
+};
+
+const handleScrubSliderPointerMove = ({
+  dragState,
+  event,
+  onValueChange,
+  step,
+}: {
+  dragState: {
+    dragValuePerPixel: number;
+    max: number;
+    min: number;
+    overflowRecoveryValueSpan: number;
+    pointerId: number;
+    startValue: number;
+    startX: number;
+  } | null;
+  event: React.PointerEvent<HTMLDivElement>;
+  onValueChange: (value: number) => void;
+  step: number;
+}) => {
+  const dragUpdate = getScrubDragDeltaValue({
+    dragState,
+    event,
+  });
+
+  if (!dragUpdate) {
+    return;
+  }
+
+  onValueChange(
+    resolveScrubValue(
+      dragUpdate.dragState.startValue,
+      dragUpdate.deltaValue,
+      dragUpdate.dragState.min,
+      dragUpdate.dragState.max,
+      step,
+      dragUpdate.dragState.overflowRecoveryValueSpan
+    )
+  );
+};
+
+const handleScrubSliderInputKeyDown = ({
+  event,
+  commitDraftValue,
+  cancelEditing,
+}: {
+  cancelEditing: () => void;
+  commitDraftValue: () => void;
+  event: ReactKeyboardEvent<HTMLInputElement>;
+}) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    commitDraftValue();
+    return;
+  }
+
+  if (event.key !== "Escape") {
+    return;
+  }
+
+  event.preventDefault();
+  cancelEditing();
+};
+
+const beginScrubSliderEditing = ({
+  disabled,
+  formatValue,
+  setDraftValue,
+  setIsEditing,
   value,
-}: ScrubSliderProps) => {
+}: {
+  disabled: boolean;
+  formatValue: (value: number) => string;
+  setDraftValue: (value: string) => void;
+  setIsEditing: (value: boolean) => void;
+  value: number;
+}) => {
+  if (disabled) {
+    return;
+  }
+
+  setDraftValue(formatValue(value));
+  setIsEditing(true);
+};
+
+const useAutoSelectScrubSliderInput = (
+  inputRef: RefObject<HTMLInputElement | null>,
+  isEditing: boolean
+) => {
+  useEffect(() => {
+    if (!isEditing) {
+      return;
+    }
+
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, [isEditing, inputRef]);
+};
+
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: shared slider handles display, typing, keyboard scrub, and pointer scrub in one control.
+export const ScrubSlider = (props: ScrubSliderProps) => {
+  const {
+    ariaLabel,
+    className,
+    disabled = false,
+    displayValue = null,
+    formatValue = format,
+    keyboardStep,
+    max,
+    min,
+    onScrubEnd,
+    onScrubStart,
+    onValueChange,
+    overflowRecoveryPixels = 80,
+    pixelsPerStep = 2,
+    preserveDisplayValueWhileDragging = false,
+    step = 1,
+    value,
+    valueBadge = null,
+  } = props;
   const containerRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<{
     dragValuePerPixel: number;
+    max: number;
+    min: number;
     overflowRecoveryValueSpan: number;
     pointerId: number;
     startValue: number;
@@ -53,20 +338,15 @@ export const ScrubSlider = ({
   const [draftValue, setDraftValue] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const overflowRecoveryValueSpan =
-    overflowRecoveryPixels *
-    getDragValuePerPixel(min, max, step, pixelsPerStep);
-
-  useEffect(() => {
-    if (!isEditing) {
-      return;
-    }
-
-    inputRef.current?.focus();
-    inputRef.current?.select();
-  }, [isEditing]);
+  const dragMin = dragStateRef.current?.min ?? min;
+  const dragMax = dragStateRef.current?.max ?? max;
+  useAutoSelectScrubSliderInput(inputRef, isEditing);
 
   const commitScrubValue = (startValue: number, deltaValue: number) => {
+    const overflowRecoveryValueSpan =
+      overflowRecoveryPixels *
+      getDragValuePerPixel(min, max, step, pixelsPerStep);
+
     onValueChange(
       resolveScrubValue(
         startValue,
@@ -84,17 +364,23 @@ export const ScrubSlider = ({
   };
 
   const startEditing = () => {
-    if (disabled) {
-      return;
-    }
-
-    setDraftValue(formatValue(value));
-    setIsEditing(true);
+    beginScrubSliderEditing({
+      disabled,
+      formatValue,
+      setDraftValue,
+      setIsEditing,
+      value,
+    });
   };
 
   const stopDragging = () => {
+    const wasDragging = dragStateRef.current !== null;
     dragStateRef.current = null;
     setIsDragging(false);
+
+    if (wasDragging) {
+      onScrubEnd?.();
+    }
   };
 
   const commitDraftValue = () => {
@@ -112,6 +398,14 @@ export const ScrubSlider = ({
   }, []);
 
   const [ticks, setTicks] = useState(0);
+  const visibleValue =
+    displayValue && (!isDragging || preserveDisplayValueWhileDragging)
+      ? displayValue
+      : formatValue(value);
+  const ariaValueText = [displayValue || formatValue(value), valueBadge]
+    .filter(Boolean)
+    .join(" ");
+  const resolvedKeyboardStep = keyboardStep ?? step;
 
   useEffect(() => {
     setTicks(tickCount());
@@ -131,10 +425,10 @@ export const ScrubSlider = ({
     <div
       aria-disabled={disabled || undefined}
       aria-label={ariaLabel}
-      aria-valuemax={Number.isFinite(max) ? max : undefined}
-      aria-valuemin={Number.isFinite(min) ? min : undefined}
+      aria-valuemax={Number.isFinite(dragMax) ? dragMax : undefined}
+      aria-valuemin={Number.isFinite(dragMin) ? dragMin : undefined}
       aria-valuenow={value}
-      aria-valuetext={displayValue || formatValue(value)}
+      aria-valuetext={ariaValueText}
       className={cn(
         "canvas-cursor-scroll-horizontal group relative flex min-h-9 w-full touch-none select-none items-center overflow-hidden rounded-lg border border-transparent bg-muted px-[calc(--spacing(3)-1px)] text-base text-foreground outline-none transition-[border-color,background-color] hover:border-input hover:bg-accent focus-visible:border-ring sm:min-h-8 sm:text-sm dark:bg-input/32 dark:hover:bg-input/64",
         disabled && "pointer-events-none opacity-64",
@@ -147,81 +441,47 @@ export const ScrubSlider = ({
         startEditing();
       }}
       onKeyDown={(event) => {
-        if (isEditing || disabled) {
-          return;
-        }
-
-        if (event.key === "Enter") {
-          event.preventDefault();
-          startEditing();
-          return;
-        }
-
-        if (event.key === "Home" && Number.isFinite(min)) {
-          event.preventDefault();
-          onValueChange(min);
-          return;
-        }
-
-        if (event.key === "End" && Number.isFinite(max)) {
-          event.preventDefault();
-          onValueChange(max);
-          return;
-        }
-
-        const delta = getKeyboardDelta(event.key, step, event.shiftKey);
-        if (delta !== null) {
-          event.preventDefault();
-          commitScrubValue(value, delta);
-        }
+        handleSliderKeyDown({
+          disabled,
+          event,
+          isEditing,
+          max,
+          min,
+          onStep: (deltaValue) => {
+            commitScrubValue(value, deltaValue);
+          },
+          onValueChange,
+          resolvedKeyboardStep,
+          startEditing,
+        });
       }}
       onLostPointerCapture={stopDragging}
       onPointerCancel={stopDragging}
       onPointerDown={(event) => {
-        if (disabled || isEditing) {
-          return;
-        }
-
-        event.preventDefault();
-        event.currentTarget.focus();
-        event.currentTarget.setPointerCapture(event.pointerId);
-
-        const dragValuePerPixel = getDragValuePerPixel(
-          min,
+        dragStateRef.current = handleScrubSliderPointerDown({
+          disabled,
+          event,
+          isEditing,
           max,
-          step,
+          min,
+          overflowRecoveryPixels,
           pixelsPerStep,
-          event.currentTarget.getBoundingClientRect().width
-        );
-
-        dragStateRef.current = {
-          dragValuePerPixel,
-          overflowRecoveryValueSpan: overflowRecoveryPixels * dragValuePerPixel,
-          pointerId: event.pointerId,
+          setIsDragging,
           startValue: value,
-          startX: event.clientX,
-        };
-        setIsDragging(true);
+          step,
+        });
+
+        if (dragStateRef.current) {
+          onScrubStart?.();
+        }
       }}
       onPointerMove={(event) => {
-        const dragState = dragStateRef.current;
-        if (!dragState || dragState.pointerId !== event.pointerId) {
-          return;
-        }
-
-        const deltaX = event.clientX - dragState.startX;
-        const deltaValue = deltaX * dragState.dragValuePerPixel;
-
-        onValueChange(
-          resolveScrubValue(
-            dragState.startValue,
-            deltaValue,
-            min,
-            max,
-            step,
-            dragState.overflowRecoveryValueSpan
-          )
-        );
+        handleScrubSliderPointerMove({
+          dragState: dragStateRef.current,
+          event,
+          onValueChange,
+          step,
+        });
       }}
       onPointerUp={stopDragging}
       ref={containerRef}
@@ -277,7 +537,7 @@ export const ScrubSlider = ({
           data-slot="scrub-slider-indicator"
           ref={scrubLineRef}
           style={{
-            left: getScrubPercent(value, min, max),
+            left: getScrubPercent(value, dragMin, dragMax),
           }}
         />
       )}
@@ -291,23 +551,25 @@ export const ScrubSlider = ({
             setDraftValue(event.target.value);
           }}
           onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              commitDraftValue();
-              return;
-            }
-
-            if (event.key === "Escape") {
-              event.preventDefault();
-              setIsEditing(false);
-            }
+            handleScrubSliderInputKeyDown({
+              cancelEditing: () => {
+                setIsEditing(false);
+              },
+              commitDraftValue,
+              event,
+            });
           }}
           ref={inputRef}
           value={draftValue}
         />
       ) : (
-        <span className="pointer-events-none relative z-10 ml-auto truncate font-medium tabular-nums tracking-[-0.01em]">
-          {displayValue && !isDragging ? displayValue : formatValue(value)}
+        <span className="pointer-events-none relative z-10 ml-auto flex min-w-0 items-center gap-1.5 font-medium tabular-nums tracking-[-0.01em]">
+          {valueBadge ? (
+            <span className="shrink-0 rounded-full bg-foreground/7 px-1.5 py-0.5 font-semibold text-[10px] text-foreground/56 uppercase tracking-[0.08em]">
+              {valueBadge}
+            </span>
+          ) : null}
+          <span className="truncate">{visibleValue}</span>
         </span>
       )}
     </div>

@@ -1,3 +1,7 @@
+import {
+  clampCornerRadius,
+  normalizeCornerRadius,
+} from "../../primitives/corner-radius";
 import { applyVectorCornerRadiusToControls } from "./vector-corner-controls-mutation";
 import {
   getEligibleVectorCornerPoints,
@@ -168,7 +172,7 @@ const getSharedVectorCornerRadiusMax = (contours, points = null) => {
     );
   });
 
-  return Number.isFinite(sharedMax) ? sharedMax : 0;
+  return Number.isFinite(sharedMax) ? normalizeCornerRadius(sharedMax) : 0;
 };
 
 const getRoundableVectorCornerCount = (contours) => {
@@ -180,7 +184,7 @@ const getStableAppliedVectorCornerRadius = (
   controls,
   requestedCornerRadius
 ) => {
-  const nextCornerRadius = Math.max(0, requestedCornerRadius || 0);
+  const nextCornerRadius = clampCornerRadius(requestedCornerRadius);
 
   if (nextCornerRadius <= 0) {
     return 0;
@@ -212,7 +216,7 @@ const getStableAppliedVectorCornerRadius = (
   );
 
   if (hasStableCornerCount(maxRequestedContours)) {
-    return maxRequestedCornerRadius;
+    return normalizeCornerRadius(maxRequestedCornerRadius);
   }
 
   let low = 0;
@@ -236,7 +240,7 @@ const getStableAppliedVectorCornerRadius = (
     high = mid;
   }
 
-  return best;
+  return normalizeCornerRadius(best);
 };
 
 export const getStableVectorCornerRadiusMax = (contours, points = null) => {
@@ -248,10 +252,12 @@ export const getStableVectorCornerRadiusMax = (contours, points = null) => {
     return 0;
   }
 
-  return getStableAppliedVectorCornerRadius(
-    contours,
-    eligibleControls,
-    getSharedVectorCornerRadiusMax(contours, points)
+  return normalizeCornerRadius(
+    getStableAppliedVectorCornerRadius(
+      contours,
+      eligibleControls,
+      getSharedVectorCornerRadiusMax(contours, points)
+    )
   );
 };
 
@@ -260,7 +266,7 @@ export const setAllVectorPointCornerRadii = (
   cornerRadius,
   points = null
 ) => {
-  const nextCornerRadius = Math.max(0, cornerRadius || 0);
+  const nextCornerRadius = clampCornerRadius(cornerRadius);
   const eligibleControls = getEligibleVectorCornerPoints(contours, points)
     .map((point) => getVectorPointCornerDescriptor(contours, point))
     .filter(Boolean);
@@ -272,12 +278,14 @@ export const setAllVectorPointCornerRadii = (
   const appliedCornerRadius =
     nextCornerRadius <= 0
       ? 0
-      : getStableAppliedVectorCornerRadius(
-          contours,
-          eligibleControls,
-          Math.min(
-            nextCornerRadius,
-            getSharedVectorCornerRadiusMax(contours, points)
+      : normalizeCornerRadius(
+          getStableAppliedVectorCornerRadius(
+            contours,
+            eligibleControls,
+            Math.min(
+              nextCornerRadius,
+              getSharedVectorCornerRadiusMax(contours, points)
+            )
           )
         );
 

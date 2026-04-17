@@ -8,32 +8,56 @@ const getPathPointsKey = (points) => {
   return points.map((point) => getPathPointKey(point)).join("|") || "none";
 };
 
+const getVisibleSelectedNodeIds = (editor, state) => {
+  return state.selectedNodeIds.filter((nodeId) => {
+    return (
+      editor.isNodeEffectivelyVisible(nodeId) &&
+      Boolean(editor.getNodeFrame(nodeId))
+    );
+  });
+};
+
+const getEditableToolbarNodeState = (editor, visibleSelectedNodeIds) => {
+  if (visibleSelectedNodeIds.length !== 1) {
+    return {
+      editableNode: null,
+      selectedEditCapabilities: null,
+    };
+  }
+
+  const selectedNode = editor.getNode(visibleSelectedNodeIds[0]);
+  const pathEditingTargetNodeId = selectedNode
+    ? editor.getPathEditingTargetNodeId(selectedNode.id)
+    : null;
+  const editableNode =
+    pathEditingTargetNodeId && pathEditingTargetNodeId !== selectedNode?.id
+      ? editor.getNode(pathEditingTargetNodeId)
+      : selectedNode;
+
+  return {
+    editableNode,
+    selectedEditCapabilities: pathEditingTargetNodeId
+      ? editor.getNodeEditCapabilities(pathEditingTargetNodeId)
+      : null,
+  };
+};
+
 export const useNodeToolbarState = () => {
   return useEditorValue((editor, state) => {
     if (state.editingNodeId) {
       return null;
     }
 
-    const visibleSelectedNodeIds = state.selectedNodeIds.filter((nodeId) => {
-      return (
-        editor.isNodeEffectivelyVisible(nodeId) &&
-        Boolean(editor.getNodeFrame(nodeId))
-      );
-    });
+    const visibleSelectedNodeIds = getVisibleSelectedNodeIds(editor, state);
 
     if (visibleSelectedNodeIds.length === 0) {
       return null;
     }
 
-    const selectedNode =
-      visibleSelectedNodeIds.length === 1
-        ? editor.getNode(visibleSelectedNodeIds[0])
-        : null;
-    const selectedEditCapabilities = selectedNode
-      ? editor.getNodeEditCapabilities(selectedNode.id)
-      : null;
+    const { editableNode, selectedEditCapabilities } =
+      getEditableToolbarNodeState(editor, visibleSelectedNodeIds);
     const isPathEditing = Boolean(
-      selectedNode?.id && state.pathEditingNodeId === selectedNode.id
+      editableNode?.id && state.pathEditingNodeId === editableNode.id
     );
     const selectedPathPoint =
       isPathEditing &&
@@ -60,7 +84,7 @@ export const useNodeToolbarState = () => {
       isPathEditing,
       selectedPathPoint,
       selectedPathPoints,
-      selectedNode,
+      selectedNode: editableNode,
       selectionKey: `${visibleSelectedNodeIds.join(",")}:${isPathEditing ? `path:${pathPointKey}:${primaryPathPointKey}` : "node"}`,
       visibleSelectedNodeIds,
     };

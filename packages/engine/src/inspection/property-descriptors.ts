@@ -1,11 +1,15 @@
 import { getNodeX, getNodeY } from "../nodes/text/model";
 import {
-  fillStyleDescriptor,
+  areCornerRadiiEquivalent,
+  clampCornerRadius,
+} from "../primitives/corner-radius";
+import {
   fillRuleStyleDescriptor,
-  strokeStyleDescriptor,
+  fillStyleDescriptor,
   strokeLineCapStyleDescriptor,
   strokeLineJoinStyleDescriptor,
   strokeMiterLimitStyleDescriptor,
+  strokeStyleDescriptor,
   strokeWidthStyleDescriptor,
 } from "../styles/style-descriptors";
 
@@ -45,10 +49,11 @@ const heightDescriptor = createPropertyDescriptor({
 });
 
 const cornerRadiusDescriptor = createPropertyDescriptor({
-  getValue: (node) => node.cornerRadius ?? 0,
+  getValue: (node) => clampCornerRadius(node.cornerRadius ?? 0),
   id: "cornerRadius",
+  isEqual: areCornerRadiiEquivalent,
   setValue: (_node, value) => ({
-    cornerRadius: Math.max(0, value),
+    cornerRadius: clampCornerRadius(value),
   }),
 });
 

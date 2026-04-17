@@ -1,4 +1,4 @@
-import { isContainerNode } from "@punchpress/engine";
+import { isGroupNode } from "@punchpress/engine";
 
 export const drillIntoGroupSelection = (editor, nodeId) => {
   const selectionTargetNodeId = editor.getSelectionTargetNodeId(nodeId);
@@ -6,7 +6,7 @@ export const drillIntoGroupSelection = (editor, nodeId) => {
     ? editor.getNode(selectionTargetNodeId)
     : null;
 
-  if (!isContainerNode(selectionTargetNode)) {
+  if (!isGroupNode(selectionTargetNode)) {
     return false;
   }
 
