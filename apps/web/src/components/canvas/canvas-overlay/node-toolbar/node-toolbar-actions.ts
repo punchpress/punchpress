@@ -13,19 +13,40 @@ const getPathEditingToolbarActions = (editor, state) => {
   const selectedPathPoints = state.isPathEditing
     ? state.selectedPathPoints || editor.pathEditingPoints
     : [];
+  const hasSelectedPathPoints = selectedPathPoints.length > 0;
+  const suppressAnchorPointActions = Boolean(
+    state.isPathEditing &&
+      hasSelectedPathPoints &&
+      selectedPathPoints.length === 1 &&
+      state.selectedPathPointCornerControlKind === "detected"
+  );
   const actions = [
     {
       id: "toggle-path-editing",
       isActive: false,
-      label: state.isPathEditing ? "Done" : "Edit path",
+      label: state.isPathEditing ? "Stop editing path" : "Edit path",
       shortcutLabel: "E",
-      title: state.isPathEditing ? "Done path editing (E)" : "Edit path (E)",
+      title: state.isPathEditing ? "Stop editing path (E)" : "Edit path (E)",
       variant: "ghost",
       onSelect: () => {
         editor.togglePathEditing(state.selectedNode.id);
       },
     },
   ];
+
+  if (state.isPathEditing && hasSelectedPathPoints) {
+    actions.unshift({
+      id: "clear-path-selection",
+      isActive: false,
+      label: "Deselect",
+      shortcutLabel: "Esc",
+      title: "Deselect (Esc)",
+      variant: "ghost",
+      onSelect: () => {
+        editor.clearPathEditingSelection();
+      },
+    });
+  }
 
   if (
     state.isPathEditing &&
@@ -48,7 +69,8 @@ const getPathEditingToolbarActions = (editor, state) => {
   if (
     state.isPathEditing &&
     state.selectedNode &&
-    selectedPathPoints.length > 0
+    hasSelectedPathPoints &&
+    !suppressAnchorPointActions
   ) {
     const pointActions = [
       {

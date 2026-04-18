@@ -27,7 +27,12 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 
 - Path editing is a distinct secondary mode for vector nodes.
 - Vector path editing should enter through explicit intent, such as double-clicking the node or using an `Edit path` affordance.
-- Entering path editing should keep the node selected.
+- Entering path editing should select the focused child path contour rather than leaving the parent vector row as the active selection.
+- Vector path editing should remain durable while the user switches focus between child path contours.
+- While vector path editing is active, one child path should be the focused contour for direct point editing at a time.
+- Clicking another child path in the same vector while path editing is active should switch contour focus and active selection without requiring the user to exit and re-enter path editing.
+- Clicking another editable vector while path editing is active should switch directly into path editing for that vector and select its focused contour rather than forcing a plain-selection intermediate step.
+- Clicking empty canvas while vector path editing is active should first exit path editing while keeping the vector selected; the next empty-canvas click may clear object selection.
 - While path editing is active, the normal object transform box should be replaced by path-editing affordances.
 - While path editing is active, canvas marquee selection should stay suppressed so path manipulation does not surface unrelated selection UI.
 - While path editing is active, users should still be able to move the vector object itself by dragging the vector body when they are not targeting an anchor or handle.
@@ -35,6 +40,7 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 - While temporary `Space`-pan is active during vector or pen editing, pen-specific hover and preview affordances should disappear until panning ends and the hand-pan cursor should take precedence.
 - Path editing should expose anchors, bezier handles, and contour structure clearly enough that direct manipulation feels precise.
 - Path-editing affordances should follow PunchPress's visual language rather than looking like a foreign embedded tool.
+- While path editing is active, node hover feedback should use a blue contour-outline preview instead of the default gray object-bounds hover box.
 - Anchor and handle controls should remain visually stable and screen-sized while the user edits the path.
 - Path edits should update the same vector node rather than creating a replacement node.
 - Path edits should update child path nodes inside the same vector node rather than replacing the parent vector object.
@@ -54,6 +60,7 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 - Users should be able to move existing anchor points directly on the canvas.
 - Users should be able to adjust bezier handles directly on the canvas.
 - Users should be able to select one or multiple anchor points within path edit mode.
+- Point selection should stay scoped to the currently focused child path contour rather than spanning every contour in the parent vector by default.
 - Users should be able to select anchor points by click, additive selection, and marquee-style point selection.
 - Dragging one selected anchor should move the full selected anchor set together.
 - While path editing is active, marquee selection should target path points rather than whole nodes.
@@ -72,7 +79,9 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 - `Corner` should collapse the current point's handles immediately, producing a sharp corner that may gain independent handles through direct manipulation.
 - `Smooth` should preserve continuous curvature through the anchor.
 - `Delete point` should remove the selected anchor while preserving the remaining path when possible.
+- A logical rounded-corner selection is not the same thing as an anchor conversion selection; it should stay focused on corner-radius editing rather than exposing anchor actions.
 - A dedicated action to collapse both handles is not part of the baseline editor; one-sided or zero-handle states should primarily come from direct manipulation rather than dedicated mode buttons.
+- While one or more anchors or logical corners are selected inside path edit mode, PunchPress should expose a separate deselect affordance rather than forcing users to leave edit mode just to clear that inner selection.
 
 ## Modifier Gestures
 
@@ -149,6 +158,10 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 - While path editing a vector with no anchor selected, PunchPress should show on-canvas corner-radius handles for all eligible live corners.
 - While the Pen tool is the active cursor mode, PunchPress should suppress vector corner-radius handles and favor point-authoring affordances instead.
 - Once one or more anchors are selected, PunchPress should show on-canvas corner-radius handles only for the selected logical corners.
+- Clicking an on-canvas vector corner-radius handle without dragging should select that logical corner and keep path editing active.
+- When a logical vector corner is selected through its corner-radius handle, PunchPress should indicate that selection through the corner-radius handle itself rather than surfacing ordinary trim-point bezier-handle chrome.
+- When a detected live rounded corner is selected through its corner-radius handle, PunchPress should immediately suppress anchor actions such as `Delete point`, `Corner`, `Smooth`, and `Split path`, leaving radius editing to the corner handle and properties panel.
+- While path editing with one or more selected anchors or logical corners, `Esc` should clear that inner selection before a subsequent `Esc` exits path edit mode.
 - While the user is actively dragging a corner-radius handle, PunchPress should keep only the dragged corner handle visible until the drag ends.
 - Dragging a corner-radius handle with no anchor selection should adjust all eligible live corners together.
 - Dragging a corner-radius handle with anchor selection should adjust only the selected logical corners.
@@ -178,6 +191,11 @@ Vector nodes let users create and edit custom vector artwork directly on the can
 - Editing one `Selection colors` swatch should update every selected child path fill or stroke paint that currently uses that exact color value.
 - `Selection colors` should be color-based rather than fill-versus-stroke based, so the same color should appear only once even if it is currently used by both fills and strokes.
 - Path-specific geometry and path-specific appearance controls should remain on direct child path selection rather than moving onto the parent vector node.
+
+## Layers Panel
+
+- While vector path editing is active, the focused child path row should be the selected layer row instead of the parent vector row.
+- Clicking a child path row under a vector during path editing should switch active contour selection directly to that child path.
 
 ## Relationship To Other Features
 

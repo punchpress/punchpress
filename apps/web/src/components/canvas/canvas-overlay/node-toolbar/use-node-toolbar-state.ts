@@ -8,6 +8,21 @@ const getPathPointsKey = (points) => {
   return points.map((point) => getPathPointKey(point)).join("|") || "none";
 };
 
+const getSelectedPathPointCornerControlKind = (
+  editor,
+  editableNode,
+  selectedPathPoint
+) => {
+  if (!(editableNode?.id && selectedPathPoint)) {
+    return null;
+  }
+
+  return (
+    editor.getPathPointCornerControl(editableNode.id, selectedPathPoint)
+      ?.kind || null
+  );
+};
+
 const getVisibleSelectedNodeIds = (editor, state) => {
   return state.selectedNodeIds.filter((nodeId) => {
     return (
@@ -27,7 +42,7 @@ const getEditableToolbarNodeState = (editor, visibleSelectedNodeIds) => {
 
   const selectedNode = editor.getNode(visibleSelectedNodeIds[0]);
   const pathEditingTargetNodeId = selectedNode
-    ? editor.getPathEditingTargetNodeId(selectedNode.id)
+    ? editor.getPathEditingEntryNodeId(selectedNode.id)
     : null;
   const editableNode =
     pathEditingTargetNodeId && pathEditingTargetNodeId !== selectedNode?.id
@@ -66,6 +81,12 @@ export const useNodeToolbarState = () => {
         ? state.pathEditingPoint
         : null;
     const selectedPathPoints = isPathEditing ? state.pathEditingPoints : [];
+    const selectedPathPointCornerControlKind =
+      getSelectedPathPointCornerControlKind(
+        editor,
+        editableNode,
+        selectedPathPoint
+      );
     const pathPointKey = isPathEditing
       ? getPathPointsKey(selectedPathPoints)
       : getPathPointKey(selectedPathPoint);
@@ -83,9 +104,10 @@ export const useNodeToolbarState = () => {
       ),
       isPathEditing,
       selectedPathPoint,
+      selectedPathPointCornerControlKind,
       selectedPathPoints,
       selectedNode: editableNode,
-      selectionKey: `${visibleSelectedNodeIds.join(",")}:${isPathEditing ? `path:${pathPointKey}:${primaryPathPointKey}` : "node"}`,
+      selectionKey: `${visibleSelectedNodeIds.join(",")}:${isPathEditing ? `path:${pathPointKey}:${primaryPathPointKey}:${selectedPathPointCornerControlKind || "none"}` : "node"}`,
       visibleSelectedNodeIds,
     };
   });

@@ -7,6 +7,14 @@ import {
 import { mapNodeById, withDocumentMutation } from "./node-mutations";
 import { getSelectedNodeIds } from "./selection-state";
 
+const shouldPreservePathEditingSelection = (state, nextSelectedNodeIds) => {
+  if (!(state.pathEditingNodeId && nextSelectedNodeIds.length === 1)) {
+    return false;
+  }
+
+  return nextSelectedNodeIds[0] === state.pathEditingNodeId;
+};
+
 export const createEditingStoreActions = (set) => {
   return {
     cancelEditing: () => {
@@ -89,6 +97,10 @@ export const createEditingStoreActions = (set) => {
     selectNode: (nodeId) => {
       set((state) => {
         const nextSelectedNodeIds = getSelectedNodeIds(state, [nodeId]);
+        const preservesPathEditing = shouldPreservePathEditingSelection(
+          state,
+          nextSelectedNodeIds
+        );
 
         if (state.editingNodeId && state.editingNodeId !== nodeId) {
           return withDocumentMutation(
@@ -98,15 +110,16 @@ export const createEditingStoreActions = (set) => {
         }
 
         return {
-          ...(state.pathEditingNodeId === nodeId
-            ? {}
-            : exitPathEditingInteractionState()),
-          pathEditingNodeId:
-            state.pathEditingNodeId === nodeId ? state.pathEditingNodeId : null,
-          pathEditingPoint:
-            state.pathEditingNodeId === nodeId ? state.pathEditingPoint : null,
-          pathEditingPoints:
-            state.pathEditingNodeId === nodeId ? state.pathEditingPoints : [],
+          ...(preservesPathEditing ? {} : exitPathEditingInteractionState()),
+          pathEditingNodeId: preservesPathEditing
+            ? state.pathEditingNodeId
+            : null,
+          pathEditingPoint: preservesPathEditing
+            ? state.pathEditingPoint
+            : null,
+          pathEditingPoints: preservesPathEditing
+            ? state.pathEditingPoints
+            : [],
           selectedNodeIds: nextSelectedNodeIds,
         };
       });
@@ -115,6 +128,10 @@ export const createEditingStoreActions = (set) => {
     selectNodes: (nodeIds) => {
       set((state) => {
         const nextSelectedNodeIds = getSelectedNodeIds(state, nodeIds);
+        const preservesPathEditing = shouldPreservePathEditingSelection(
+          state,
+          nextSelectedNodeIds
+        );
 
         if (
           state.editingNodeId &&
@@ -128,25 +145,16 @@ export const createEditingStoreActions = (set) => {
         }
 
         return {
-          ...(nextSelectedNodeIds.length === 1 &&
-          nextSelectedNodeIds[0] === state.pathEditingNodeId
-            ? {}
-            : exitPathEditingInteractionState()),
-          pathEditingNodeId:
-            nextSelectedNodeIds.length === 1 &&
-            nextSelectedNodeIds[0] === state.pathEditingNodeId
-              ? state.pathEditingNodeId
-              : null,
-          pathEditingPoint:
-            nextSelectedNodeIds.length === 1 &&
-            nextSelectedNodeIds[0] === state.pathEditingNodeId
-              ? state.pathEditingPoint
-              : null,
-          pathEditingPoints:
-            nextSelectedNodeIds.length === 1 &&
-            nextSelectedNodeIds[0] === state.pathEditingNodeId
-              ? state.pathEditingPoints
-              : [],
+          ...(preservesPathEditing ? {} : exitPathEditingInteractionState()),
+          pathEditingNodeId: preservesPathEditing
+            ? state.pathEditingNodeId
+            : null,
+          pathEditingPoint: preservesPathEditing
+            ? state.pathEditingPoint
+            : null,
+          pathEditingPoints: preservesPathEditing
+            ? state.pathEditingPoints
+            : [],
           selectedNodeIds: nextSelectedNodeIds,
         };
       });
@@ -159,6 +167,10 @@ export const createEditingStoreActions = (set) => {
               (selectedNodeId) => selectedNodeId !== nodeId
             )
           : getSelectedNodeIds(state, [...state.selectedNodeIds, nodeId]);
+        const preservesPathEditing = shouldPreservePathEditingSelection(
+          state,
+          nextSelectedNodeIds
+        );
 
         if (
           state.editingNodeId &&
@@ -172,25 +184,16 @@ export const createEditingStoreActions = (set) => {
         }
 
         return {
-          ...(nextSelectedNodeIds.length === 1 &&
-          nextSelectedNodeIds[0] === state.pathEditingNodeId
-            ? {}
-            : exitPathEditingInteractionState()),
-          pathEditingNodeId:
-            nextSelectedNodeIds.length === 1 &&
-            nextSelectedNodeIds[0] === state.pathEditingNodeId
-              ? state.pathEditingNodeId
-              : null,
-          pathEditingPoint:
-            nextSelectedNodeIds.length === 1 &&
-            nextSelectedNodeIds[0] === state.pathEditingNodeId
-              ? state.pathEditingPoint
-              : null,
-          pathEditingPoints:
-            nextSelectedNodeIds.length === 1 &&
-            nextSelectedNodeIds[0] === state.pathEditingNodeId
-              ? state.pathEditingPoints
-              : [],
+          ...(preservesPathEditing ? {} : exitPathEditingInteractionState()),
+          pathEditingNodeId: preservesPathEditing
+            ? state.pathEditingNodeId
+            : null,
+          pathEditingPoint: preservesPathEditing
+            ? state.pathEditingPoint
+            : null,
+          pathEditingPoints: preservesPathEditing
+            ? state.pathEditingPoints
+            : [],
           selectedNodeIds: nextSelectedNodeIds,
         };
       });

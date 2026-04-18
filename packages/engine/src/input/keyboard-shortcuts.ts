@@ -41,6 +41,21 @@ const handleDeleteShortcutKeyDown = (editor, event, key) => {
   }
 
   event.preventDefault();
+  const pathPointTargetNodeId =
+    editor.pathEditingNodeId ||
+    editor.getPathEditingEntryNodeId(editor.selectedNodeId);
+
+  if (
+    pathPointTargetNodeId &&
+    editor.pathEditingPoints.length === 1 &&
+    editor.pathEditingPoint &&
+    editor.getPathPointCornerControl(
+      pathPointTargetNodeId,
+      editor.pathEditingPoint
+    )?.kind === "detected"
+  ) {
+    return true;
+  }
 
   if (
     !(editor.pathEditingPoints.length > 1
@@ -83,6 +98,31 @@ const handlePathPointNudgeShortcutKeyDown = (editor, event) => {
   return editor.moveSelectedPathPointsBy(delta);
 };
 
+const handlePathEditingEscapeShortcutKeyDown = (
+  editor,
+  event,
+  key,
+  toolOwnsEscape
+) => {
+  if (key !== "escape" || toolOwnsEscape) {
+    return false;
+  }
+
+  if (editor.pathEditingPoints.length > 0) {
+    event.preventDefault();
+    editor.clearPathEditingSelection();
+    return true;
+  }
+
+  if (!editor.pathEditingNodeId) {
+    return false;
+  }
+
+  event.preventDefault();
+  editor.stopPathEditing();
+  return true;
+};
+
 export const handleCanvasShortcutKeyDown = (editor, event, key) => {
   const currentTool = editor.currentTool;
   const toolOwnsEscape = Boolean(
@@ -111,9 +151,9 @@ export const handleCanvasShortcutKeyDown = (editor, event, key) => {
     return true;
   }
 
-  if (key === "escape" && editor.pathEditingNodeId && !toolOwnsEscape) {
-    event.preventDefault();
-    editor.stopPathEditing();
+  if (
+    handlePathEditingEscapeShortcutKeyDown(editor, event, key, toolOwnsEscape)
+  ) {
     return true;
   }
 

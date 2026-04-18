@@ -13,26 +13,59 @@ const applyInteractionState = (editor, patch) => {
   editor.getState().applyInteractionState(patch);
 };
 
+const selectDirectNode = (editor, nodeId) => {
+  if (!nodeId) {
+    return;
+  }
+
+  if (
+    editor.focusedGroupId &&
+    nodeId !== editor.focusedGroupId &&
+    !editor.isDescendantOf(nodeId, editor.focusedGroupId)
+  ) {
+    editor.setFocusedGroup(null);
+  }
+
+  editor.getState().selectNode(nodeId);
+};
+
 export const startPathEditing = (editor, nodeId = editor.selectedNodeId) => {
-  if (!editor.canStartPathEditing(nodeId) || editor.editingNodeId) {
+  const targetNodeId = editor.getPathEditingEntryNodeId(nodeId);
+
+  if (!editor.canStartPathEditing(targetNodeId) || editor.editingNodeId) {
     return false;
   }
 
-  if (!editor.isSelected(nodeId)) {
-    editor.select(nodeId);
+  if (!editor.isSelected(targetNodeId)) {
+    selectDirectNode(editor, targetNodeId);
   }
 
-  applyInteractionState(editor, enterPathEditingInteractionState(nodeId));
+  applyInteractionState(editor, enterPathEditingInteractionState(targetNodeId));
   return true;
 };
 
 export const stopPathEditing = (editor) => {
-  if (!editor.pathEditingNodeId) {
+  const pathEditingNodeId = editor.pathEditingNodeId;
+
+  if (!pathEditingNodeId) {
     return false;
   }
 
+  const selectionOwnerNodeId =
+    editor.getSelectionTargetNodeId(pathEditingNodeId);
+  const shouldRestoreSelectionOwner =
+    editor.selectedNodeIds.length === 1 &&
+    editor.selectedNodeId === pathEditingNodeId &&
+    selectionOwnerNodeId &&
+    selectionOwnerNodeId !== pathEditingNodeId;
+
   editor.currentTool.onPathEditingStopped?.();
   applyInteractionState(editor, exitPathEditingInteractionState());
+
+  if (shouldRestoreSelectionOwner) {
+    editor.select(selectionOwnerNodeId);
+  }
+
   return true;
 };
 

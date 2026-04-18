@@ -63,6 +63,9 @@ export const Canvas = () => {
   const editor = useEditor();
   useTheme();
   const activeTool = useEditorValue((_, state) => state.activeTool);
+  const pathEditingNodeId = useEditorValue(
+    (_, state) => state.pathEditingNodeId
+  );
   const penDirectSelectionMode = useEditorValue((_, state) => {
     return (
       state.activeTool === "pen" && state.penDirectSelectionModifierPressed
@@ -204,6 +207,14 @@ export const Canvas = () => {
       }
 
       if (
+        pathEditingNodeId &&
+        event.target instanceof Element &&
+        event.target.closest(".canvas-vector-paper")
+      ) {
+        return;
+      }
+
+      if (
         !(
           event.target instanceof Element &&
           event.target.closest(".canvas-surface")
@@ -253,7 +264,14 @@ export const Canvas = () => {
         penDirectSelectionMode
       );
     },
-    [activeTool, editor, penDirectSelectionMode, spacePressed, zoom]
+    [
+      activeTool,
+      editor,
+      pathEditingNodeId,
+      penDirectSelectionMode,
+      spacePressed,
+      zoom,
+    ]
   );
   const handleCanvasPointerLeave = useCallback(() => {
     lastPenHoverClientPointRef.current = null;

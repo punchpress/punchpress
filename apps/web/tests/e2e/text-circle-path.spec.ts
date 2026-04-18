@@ -826,7 +826,7 @@ test("enters path edit mode when circle warp is first applied", async ({
   await pauseForUi(page);
 
   await expect(
-    page.getByRole("button", { name: "Done path editing (E)" })
+    page.getByRole("button", { name: "Stop editing path (E)" })
   ).toBeVisible();
   await expect(page.getByTestId("text-path-handle-position")).toBeVisible();
 });
@@ -840,7 +840,7 @@ test("exits path edit mode when circle warp is cleared", async ({ page }) => {
   await pauseForUi(page);
 
   await expect(
-    page.getByRole("button", { name: "Done path editing (E)" })
+    page.getByRole("button", { name: "Stop editing path (E)" })
   ).toBeVisible();
   await expect(page.getByTestId("text-path-handle-position")).toBeVisible();
 
@@ -848,7 +848,7 @@ test("exits path edit mode when circle warp is cleared", async ({ page }) => {
   await pauseForUi(page);
 
   await expect(
-    page.getByRole("button", { name: "Done path editing (E)" })
+    page.getByRole("button", { name: "Stop editing path (E)" })
   ).toHaveCount(0);
   await expect(page.getByTestId("text-path-handle-position")).toHaveCount(0);
   await expect(

@@ -30,6 +30,10 @@ export const createSelectionStoreActions = (set) => {
             ? null
             : nodeId;
 
+        if (hoveredNodeId === state.hoveredNodeId) {
+          return state;
+        }
+
         return { hoveredNodeId };
       });
     },

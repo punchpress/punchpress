@@ -159,6 +159,10 @@ export const CanvasVectorPathOverlay = ({ viewportRevision }) => {
     const penPreview = editor.getPenPreviewState();
     const penHover = editor.getPenHoverState();
 
+    const previewNodeIds = editor.getEffectiveSelectionNodeIds([
+      editor.getSelectionTargetNodeId(node.id) || node.id,
+    ]);
+
     return {
       editablePathSession,
       geometry,
@@ -171,7 +175,7 @@ export const CanvasVectorPathOverlay = ({ viewportRevision }) => {
         penPreview.kind === "segment"
           ? penPreview
           : null,
-      previewDelta: editor.getSelectionPreviewDelta([node.id]) || null,
+      previewDelta: editor.getSelectionPreviewDelta(previewNodeIds) || null,
     };
   });
   const {

@@ -180,4 +180,18 @@
       );
     @apply rounded;
   }
+
+  .canvas-hover-preview[data-preview-kind="path"] {
+    z-index: 9;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .canvas-hover-preview[data-preview-kind="path"] .canvas-hover-preview-path {
+    filter: drop-shadow(
+      0 0 5px color-mix(in srgb, var(--canvas-handle-accent) 34%, transparent)
+    );
+  }
 }

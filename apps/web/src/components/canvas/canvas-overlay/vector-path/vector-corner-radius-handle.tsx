@@ -1,9 +1,11 @@
+import { isPointerDistanceAtLeast } from "@punchpress/engine";
 import {
   getActiveVectorPathCursorToken,
   getVectorPathCursorToken,
   setActiveCanvasCursorToken,
 } from "../../canvas-cursor-policy";
 import {
+  CORNER_RADIUS_HANDLE_DOT_ACTIVE_CLASS,
   CORNER_RADIUS_HANDLE_DOT_CLASS,
   CORNER_RADIUS_HANDLE_DOT_WARNING_CLASS,
   FANCY_CANVAS_HANDLE_BUTTON_CLASS,
@@ -22,8 +24,21 @@ import {
 } from "./vector-corner-radius-points";
 
 const CORNER_RADIUS_MAX_EPSILON = 0.01;
+const CORNER_RADIUS_HANDLE_DRAG_THRESHOLD_PX = 4;
 
 const roundDelta = (value: number) => Math.round(value * 100) / 100;
+const getEventClientPoint = (event) => ({
+  x: event.clientX,
+  y: event.clientY,
+});
+const isSamePathPoint = (a, b) => {
+  return Boolean(
+    a &&
+      b &&
+      a.contourIndex === b.contourIndex &&
+      a.segmentIndex === b.segmentIndex
+  );
+};
 
 const getCanvasPoint = (editor, clientX: number, clientY: number) => {
   const viewer = editor.viewerRef;
@@ -47,6 +62,7 @@ export const VectorCornerRadiusHandle = ({
   contours,
   editor,
   hoveredPoint,
+  isSelected = false,
   matrix,
   nodeId,
   onDragStateChange,
@@ -90,6 +106,7 @@ export const VectorCornerRadiusHandle = ({
     contourIndex: selectedPoint.contourIndex,
     segmentIndex: selectedPoint.segmentIndex,
   };
+  const isHovered = isSamePathPoint(hoveredPoint, pathPoint);
   const adjustsSelectedPoints = shouldAdjustSelectedCornerPoints(
     dragScope,
     selectedPoints
@@ -117,29 +134,63 @@ export const VectorCornerRadiusHandle = ({
       event.currentTarget.setPointerCapture(event.pointerId);
     }
 
-    const historyMark = editor.markHistoryStep("edit vector path");
     const dragStartSession = editor.getEditablePathSession(nodeId);
-    const dragStartPrimaryPoint =
-      editor.pathEditingNodeId === nodeId ? editor.pathEditingPoint : null;
-    const dragStartSelectedPoints =
-      editor.pathEditingNodeId === nodeId ? editor.pathEditingPoints : [];
     let didChange = false;
+    let didStartDrag = false;
+    let historyMark: ReturnType<typeof editor.markHistoryStep> | null = null;
+    const dragStartClientPoint = getEventClientPoint(event);
     const dragStartPoint = getCanvasPoint(editor, event.clientX, event.clientY);
     const dragStartGeometry = geometry;
     const dragStartRadius = currentRadius;
     const dragStartContours = dragStartSession?.contours || contours;
     let isAtMax = false;
-
-    onDragStateChange?.(dragSession);
-    setActiveCanvasCursorToken(editor.hostRef, activeCursorToken);
-
-    const handlePointerMove = (moveEvent) => {
-      const nextSession = editor.getEditablePathSession(nodeId);
-
-      if (nextSession?.backend !== "vector-path") {
-        return;
+    const beginDragInteraction = () => {
+      if (didStartDrag) {
+        return true;
       }
 
+      historyMark = editor.markHistoryStep("edit vector path");
+
+      if (!historyMark) {
+        return false;
+      }
+
+      didStartDrag = true;
+      onDragStateChange?.(dragSession);
+      setActiveCanvasCursorToken(editor.hostRef, activeCursorToken);
+      return true;
+    };
+    const shouldStartDrag = (moveEvent) => {
+      return (
+        didStartDrag ||
+        isPointerDistanceAtLeast(
+          dragStartClientPoint,
+          getEventClientPoint(moveEvent),
+          CORNER_RADIUS_HANDLE_DRAG_THRESHOLD_PX
+        )
+      );
+    };
+    const updateActiveDragState = (nextCornerRadius) => {
+      const appliedRadius = editor.getPathPointCornerRadius(nodeId, pathPoint);
+      const nextIsAtMax =
+        dragStartGeometry.maxRadius - appliedRadius <=
+        CORNER_RADIUS_MAX_EPSILON;
+
+      if (nextIsAtMax !== isAtMax) {
+        isAtMax = nextIsAtMax;
+      }
+
+      onDragStateChange?.(
+        dragSession
+          ? {
+              ...dragSession,
+              displayRadius: nextCornerRadius,
+              isAtMax,
+            }
+          : null
+      );
+    };
+    const applyDragMove = (moveEvent) => {
       const nextCornerRadius = roundDelta(
         getVectorCornerRadiusFromWidgetDragDelta(
           dragStartGeometry,
@@ -178,24 +229,25 @@ export const VectorCornerRadiusHandle = ({
         didChange = true;
       }
 
-      const appliedRadius = editor.getPathPointCornerRadius(nodeId, pathPoint);
-      const nextIsAtMax =
-        dragStartGeometry.maxRadius - appliedRadius <=
-        CORNER_RADIUS_MAX_EPSILON;
+      updateActiveDragState(nextCornerRadius);
+    };
 
-      if (nextIsAtMax !== isAtMax) {
-        isAtMax = nextIsAtMax;
+    const handlePointerMove = (moveEvent) => {
+      const nextSession = editor.getEditablePathSession(nodeId);
+
+      if (nextSession?.backend !== "vector-path") {
+        return;
       }
 
-      onDragStateChange?.(
-        dragSession
-          ? {
-              ...dragSession,
-              displayRadius: nextCornerRadius,
-              isAtMax,
-            }
-          : null
-      );
+      if (!shouldStartDrag(moveEvent)) {
+        return;
+      }
+
+      if (!beginDragInteraction()) {
+        return;
+      }
+
+      applyDragMove(moveEvent);
     };
 
     const handlePointerEnd = () => {
@@ -218,10 +270,7 @@ export const VectorCornerRadiusHandle = ({
         editor.startPathEditing(nodeId);
       }
 
-      editor.setPathEditingPoints(
-        dragStartSelectedPoints,
-        dragStartPrimaryPoint
-      );
+      editor.setPathEditingPoints([pathPoint], pathPoint);
     };
 
     window.addEventListener("pointermove", handlePointerMove);
@@ -234,6 +283,7 @@ export const VectorCornerRadiusHandle = ({
       aria-label="Adjust corner radius"
       className={`${FANCY_CANVAS_HANDLE_BUTTON_CLASS} ${isWarningActive ? FANCY_CANVAS_HANDLE_WARNING_BUTTON_CLASS : ""}`}
       data-canvas-cursor={cursorToken || undefined}
+      data-selected={isSelected ? "true" : undefined}
       data-testid="path-corner-radius-handle"
       onBlur={() => {
         if (
@@ -268,7 +318,7 @@ export const VectorCornerRadiusHandle = ({
     >
       <span
         aria-hidden="true"
-        className={`${CORNER_RADIUS_HANDLE_DOT_CLASS} ${isWarningActive ? CORNER_RADIUS_HANDLE_DOT_WARNING_CLASS : ""}`}
+        className={`${CORNER_RADIUS_HANDLE_DOT_CLASS} ${isHovered || isSelected ? CORNER_RADIUS_HANDLE_DOT_ACTIVE_CLASS : ""} ${isWarningActive ? CORNER_RADIUS_HANDLE_DOT_WARNING_CLASS : ""}`}
       />
     </button>
   );
@@ -301,6 +351,10 @@ export const VectorCornerRadiusHandles = ({
   }
 
   return visibleHandlePoints.map((point) => {
+    const isSelected = (selectedPoints || []).some((selectedPoint) => {
+      return isSamePathPoint(selectedPoint, point);
+    });
+
     return (
       <VectorCornerRadiusHandle
         activeDragSession={activeDragSession}
@@ -308,6 +362,7 @@ export const VectorCornerRadiusHandles = ({
         dragScope={visibleHandles.dragScope}
         editor={editor}
         hoveredPoint={hoveredPoint}
+        isSelected={isSelected}
         isWarningActive={Boolean(activeDragSession?.isAtMax)}
         key={`${point.contourIndex}:${point.segmentIndex}`}
         matrix={matrix}

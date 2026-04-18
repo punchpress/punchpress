@@ -2,8 +2,8 @@ import {
   getNodePropertyIds,
   supportsNodeProperty,
 } from "../nodes/node-property-support";
-import { getShapeCornerRadiusSummary } from "../nodes/shape/shape-engine";
 import { isContainerNode } from "../nodes/node-tree";
+import { getShapeCornerRadiusSummary } from "../nodes/shape/shape-engine";
 import { getPropertyDescriptor } from "./property-descriptors";
 import {
   getSelectionColors,
@@ -11,6 +11,69 @@ import {
 } from "./selection-colors";
 
 const EMPTY_PROPERTIES = Object.freeze({});
+const VECTOR_AGGREGATE_PROPERTY_IDS = [
+  "fill",
+  "fillRule",
+  "stroke",
+  "strokeLineCap",
+  "strokeLineJoin",
+  "strokeMiterLimit",
+  "strokeWidth",
+] as const;
+
+const getVectorAggregatePropertyNodes = (editor, nodeId) => {
+  return editor
+    .getChildNodeIds(nodeId)
+    .map((childNodeId) => editor.getNode(childNodeId))
+    .filter((node) => node?.type === "path");
+};
+
+const isVectorAggregatePropertySelection = (editor, nodeId) => {
+  const node = editor.getNode(nodeId);
+
+  return (
+    node?.type === "vector" &&
+    editor.getPathEditingTargetNodeId(nodeId) === nodeId &&
+    getVectorAggregatePropertyNodes(editor, nodeId).length > 1
+  );
+};
+
+const buildVectorAggregateSelectionProperties = (editor, nodeId) => {
+  const selectedNode = editor.getNode(nodeId);
+  const selectedNodes = getVectorAggregatePropertyNodes(editor, nodeId);
+  const properties = VECTOR_AGGREGATE_PROPERTY_IDS.reduce(
+    (nextProperties, propertyId) => {
+      if (
+        !selectedNodes.every((node) => {
+          return supportsNodeProperty(node, propertyId);
+        })
+      ) {
+        return nextProperties;
+      }
+
+      const propertyState = getPropertyState(selectedNodes, propertyId);
+
+      if (!propertyState) {
+        return nextProperties;
+      }
+
+      nextProperties[propertyId] = propertyState;
+      return nextProperties;
+    },
+    {}
+  );
+
+  return {
+    canDelete: false,
+    properties:
+      Object.keys(properties).length > 0 ? properties : EMPTY_PROPERTIES,
+    selectionColors: getSelectionColors(editor, [nodeId]),
+    selectedCount: 1,
+    selectedNode,
+    selectedNodeIds: [nodeId],
+    selectionKind: "group",
+  };
+};
 
 const getPropertyTargetNodeIds = (editor, nodeIds) => {
   return nodeIds
@@ -79,6 +142,19 @@ const getPropertyState = (selectedNodes, propertyId) => {
 
 const buildSelectionProperties = (editor, nodeIds) => {
   const selectedNodeIds = [...nodeIds];
+  const singleSelectedNodeId =
+    selectedNodeIds.length === 1 ? selectedNodeIds[0] : null;
+
+  if (
+    singleSelectedNodeId &&
+    isVectorAggregatePropertySelection(editor, singleSelectedNodeId)
+  ) {
+    return buildVectorAggregateSelectionProperties(
+      editor,
+      singleSelectedNodeId
+    );
+  }
+
   const propertyTargetNodeIds = getPropertyTargetNodeIds(
     editor,
     selectedNodeIds
@@ -161,11 +237,23 @@ export const setSelectionProperty = (
     return false;
   }
 
-  const targetNodeIds = getPropertyTargetNodeIds(editor, nodeIds).filter(
-    (nodeId) => {
+  const targetNodeIds = nodeIds
+    .flatMap((nodeId) => {
+      if (
+        VECTOR_AGGREGATE_PROPERTY_IDS.includes(propertyId) &&
+        isVectorAggregatePropertySelection(editor, nodeId)
+      ) {
+        return getVectorAggregatePropertyNodes(editor, nodeId).map((node) => {
+          return node.id;
+        });
+      }
+
+      return [editor.getPathEditingTargetNodeId(nodeId) || nodeId];
+    })
+    .filter((nodeId, index, values) => values.indexOf(nodeId) === index)
+    .filter((nodeId) => {
       return supportsNodeProperty(editor.getNode(nodeId), propertyId);
-    }
-  );
+    });
   if (targetNodeIds.length === 0) {
     return false;
   }

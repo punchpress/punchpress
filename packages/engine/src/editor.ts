@@ -501,12 +501,12 @@ export class Editor {
   }
 
   canEditNodePath(nodeId = this.selectedNodeId) {
-    const targetNodeId = this.getPathEditingTargetNodeId(nodeId);
+    const targetNodeId = this.getPathEditingEntryNodeId(nodeId);
     return Boolean(this.getNodeEditCapabilities(targetNodeId)?.canEditPath);
   }
 
   canStartPathEditing(nodeId = this.selectedNodeId) {
-    const targetNodeId = this.getPathEditingTargetNodeId(nodeId);
+    const targetNodeId = this.getPathEditingEntryNodeId(nodeId);
     return Boolean(
       this.getNodeEditCapabilities(targetNodeId)?.requiresPathEditing
     );
@@ -624,6 +624,26 @@ export class Editor {
     }
 
     return childPathIds.length === 1 ? childPathIds[0] : node.id;
+  }
+
+  getPathEditingEntryNodeId(nodeId = this.selectedNodeId) {
+    const targetNodeId = this.getPathEditingTargetNodeId(nodeId);
+
+    if (targetNodeId !== nodeId) {
+      return targetNodeId;
+    }
+
+    const node = this.getNode(nodeId);
+
+    if (node?.type !== "vector") {
+      return targetNodeId;
+    }
+
+    const childPathIds = this.getChildNodeIds(node.id).filter((childNodeId) => {
+      return this.getNode(childNodeId)?.type === "path";
+    });
+
+    return childPathIds[0] || targetNodeId;
   }
 
   isDescendantOf(nodeId, ancestorId) {
@@ -1086,7 +1106,7 @@ export class Editor {
       return;
     }
 
-    const targetNodeId = this.getPathEditingTargetNodeId(this.selectedNodeId);
+    const targetNodeId = this.getPathEditingEntryNodeId(this.selectedNodeId);
 
     if (!(targetNodeId && this.canEditNodePath(targetNodeId))) {
       return;
@@ -1109,6 +1129,11 @@ export class Editor {
     }
 
     this.getState().setPathEditingPoints(points, primaryPoint);
+  }
+
+  clearPathEditingSelection() {
+    this.ensurePathEditingTargetForPointSelection();
+    this.getState().setPathEditingPoints([]);
   }
 
   getVectorPointType(nodeId, point = this.pathEditingPoint) {
@@ -1383,10 +1408,7 @@ export class Editor {
   }
 
   startPathEditing(nodeId = this.selectedNodeId) {
-    return startEditorPathEditing(
-      this,
-      this.getPathEditingTargetNodeId(nodeId)
-    );
+    return startEditorPathEditing(this, this.getPathEditingEntryNodeId(nodeId));
   }
 
   stopPathEditing() {
@@ -1394,7 +1416,7 @@ export class Editor {
   }
 
   togglePathEditing(nodeId = this.selectedNodeId) {
-    const targetNodeId = this.getPathEditingTargetNodeId(nodeId);
+    const targetNodeId = this.getPathEditingEntryNodeId(nodeId);
 
     if (this.isPathEditing(targetNodeId)) {
       return this.stopPathEditing();

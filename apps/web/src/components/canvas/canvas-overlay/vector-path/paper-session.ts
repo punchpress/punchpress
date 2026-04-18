@@ -14,6 +14,7 @@ import {
   setActiveCanvasCursorToken,
   setCanvasCursorToken,
 } from "../../canvas-cursor-policy";
+import { getCanvasLeafNodeIdAtPoint } from "./canvas-node-hit-target";
 import {
   finalizeVectorEndpointDrag,
   getVectorDraggedEndpointPreviewPoint,
@@ -73,7 +74,10 @@ import {
   getHoveredVectorCornerCurveSegment,
   getMaxedVectorCornerCurveSegments,
 } from "./vector-corner-radius-points";
-import { shouldShowBezierHandlesForPoint } from "./vector-path-selection-chrome";
+import {
+  shouldShowBezierHandlesForPoint,
+  shouldShowSelectedAnchorForPoint,
+} from "./vector-path-selection-chrome";
 
 const ENDPOINT_CLOSE_SNAP_DISTANCE_PX = 14;
 const HOVERED_CORNER_CURVE_FALLBACK_STROKE_WIDTH_PX = 12;
@@ -599,7 +603,13 @@ export const createVectorPaperSession = ({
       segment,
       chrome,
       state.styles,
-      isPointSelectionIncluded(state.selectedPoints, pointSelection),
+      shouldShowSelectedAnchorForPoint(
+        editor,
+        nodeId,
+        state.selectedPoints,
+        state.selectedPoint,
+        pointSelection
+      ),
       shouldShowBezierHandlesForPoint(
         editor,
         nodeId,
@@ -624,7 +634,13 @@ export const createVectorPaperSession = ({
       segment,
       state.chrome[contourIndex][segmentIndex],
       state.styles,
-      isPointSelectionIncluded(state.selectedPoints, pointSelection),
+      shouldShowSelectedAnchorForPoint(
+        editor,
+        nodeId,
+        state.selectedPoints,
+        state.selectedPoint,
+        pointSelection
+      ),
       shouldShowBezierHandlesForPoint(
         editor,
         nodeId,
@@ -1123,7 +1139,9 @@ export const createVectorPaperSession = ({
   };
 
   const startNodeDrag = (nativeEvent) => {
-    state.nodeDragSession = editor.beginSelectionDrag({ nodeId });
+    state.nodeDragSession = editor.beginSelectionDrag({
+      nodeId: editor.getSelectionTargetNodeId(nodeId) || nodeId,
+    });
     state.dragCanvasPoint = getCanvasPoint(
       editor,
       nativeEvent.clientX,
@@ -1137,6 +1155,7 @@ export const createVectorPaperSession = ({
 
     setHoverCursorMode(null);
     setActiveCursorMode("body");
+    editor.setHoveredNode(null);
     setSelectedPoints([], null);
     return true;
   };
@@ -1208,15 +1227,17 @@ export const createVectorPaperSession = ({
     return editor.insertPathPoint(insertion, nodeId);
   };
 
-  const updateCursor = (point) => {
+  const updateCursor = (point, event = null) => {
     if (state.isPanning) {
       setHoveredPoint(null);
       setHoverCursorMode(null);
       setActiveCursorMode(null);
+      editor.setHoveredNode(null);
       return;
     }
 
     if (state.nodeDragSession || state.activeDrag || state.selectionMarquee) {
+      editor.setHoveredNode(null);
       return;
     }
 
@@ -1230,8 +1251,15 @@ export const createVectorPaperSession = ({
         role,
         segmentIndex: hit.item.data.segmentIndex,
       });
+      editor.setHoveredNode(null);
     } else {
       setHoveredPoint(null);
+      const hoveredNodeId = event?.clientX
+        ? getCanvasLeafNodeIdAtPoint(event.clientX, event.clientY)
+        : null;
+      editor.setHoveredNode(
+        hoveredNodeId && hoveredNodeId !== nodeId ? hoveredNodeId : null
+      );
     }
 
     setHoverCursorMode(
@@ -1550,6 +1578,7 @@ export const createVectorPaperSession = ({
     setHoveredPoint(null);
     setHoverCursorMode(null);
     setActiveCursorMode("point");
+    editor.setHoveredNode(null);
   };
 
   const finalizeSelectionMarquee = (event) => {
@@ -1583,10 +1612,25 @@ export const createVectorPaperSession = ({
     if (pendingPress?.type === "insert") {
       insertPointAtTarget(pendingPress);
     } else if (pendingPress?.type === "empty" && !pendingPress.additive) {
-      onExitPathEditing();
+      const hoveredNodeId = event.event?.clientX
+        ? getCanvasLeafNodeIdAtPoint(event.event.clientX, event.event.clientY)
+        : null;
+
+      if (hoveredNodeId && hoveredNodeId !== nodeId) {
+        const nextNodeEditCapabilities =
+          editor.getNodeEditCapabilities(hoveredNodeId);
+
+        if (nextNodeEditCapabilities?.requiresPathEditing) {
+          editor.startPathEditing(hoveredNodeId);
+        } else {
+          editor.select(hoveredNodeId);
+        }
+      } else {
+        onExitPathEditing();
+      }
     }
 
-    updateCursor(event.point);
+    updateCursor(event.point, event.event);
     return true;
   };
 
@@ -1701,7 +1745,7 @@ export const createVectorPaperSession = ({
       return;
     }
 
-    updateCursor(event.point);
+    updateCursor(event.point, event.event);
   };
 
   tool.onMouseUp = (event) => {
@@ -1709,7 +1753,7 @@ export const createVectorPaperSession = ({
 
     if (state.nodeDragSession) {
       endNodeDrag();
-      updateCursor(event.point);
+      updateCursor(event.point, event.event);
       return;
     }
 
@@ -1741,7 +1785,7 @@ export const createVectorPaperSession = ({
       renderScene(nextScene);
     }
 
-    updateCursor(event.point);
+    updateCursor(event.point, event.event);
   };
 
   return {
@@ -1755,6 +1799,7 @@ export const createVectorPaperSession = ({
       tool.onMouseDrag = null;
       tool.onMouseMove = null;
       tool.onMouseUp = null;
+      editor.setHoveredNode(null);
       tool.remove?.();
     },
     render: (scene) => {
@@ -1763,6 +1808,7 @@ export const createVectorPaperSession = ({
         setActiveCursorCompanionLabel(null);
         setHoveredPoint(null);
         setHoverCursorMode(null);
+        editor.setHoveredNode(null);
         return;
       }
 
