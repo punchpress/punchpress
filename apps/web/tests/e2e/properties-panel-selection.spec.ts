@@ -594,6 +594,67 @@ test("shows selection colors for a selected multi-path vector and applies one sw
     ]);
 });
 
+test("shows aggregate stroke controls for a selected multi-path vector and applies them to each child path", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadVectorSelectionColorsDocument(page);
+  await selectNodes(page, ["vector-container"]);
+
+  const strokeSection = getStrokeSection(page);
+  const getRow = (label) => {
+    return strokeSection
+      .locator("label", { hasText: label })
+      .locator("xpath=ancestor::div[contains(@class, 'grid')][1]");
+  };
+  const capTrigger = getRow("Cap").getByRole("combobox");
+  const joinTrigger = getRow("Join").getByRole("combobox");
+
+  await expect(strokeSection).toBeVisible();
+  await expect(capTrigger).toContainText("Butt");
+  await expect(joinTrigger).toContainText("Miter");
+
+  await capTrigger.click();
+  await page
+    .locator("[data-slot='select-item']")
+    .filter({ hasText: "Square" })
+    .click();
+
+  await joinTrigger.click();
+  await page
+    .locator("[data-slot='select-item']")
+    .filter({ hasText: "Bevel" })
+    .click();
+
+  await expect
+    .poll(async () => {
+      const state = await getStateSnapshot(page);
+
+      return state.nodes
+        .filter((node) => {
+          return node.id === "vector-path-1" || node.id === "vector-path-2";
+        })
+        .map((node) => ({
+          id: node.id,
+          strokeLineCap: node.strokeLineCap,
+          strokeLineJoin: node.strokeLineJoin,
+        }))
+        .sort((left, right) => left.id.localeCompare(right.id));
+    })
+    .toEqual([
+      {
+        id: "vector-path-1",
+        strokeLineCap: "square",
+        strokeLineJoin: "bevel",
+      },
+      {
+        id: "vector-path-2",
+        strokeLineCap: "square",
+        strokeLineJoin: "bevel",
+      },
+    ]);
+});
+
 test("applies vector stroke cap and join from the properties panel without clearing selection", async ({
   page,
 }) => {

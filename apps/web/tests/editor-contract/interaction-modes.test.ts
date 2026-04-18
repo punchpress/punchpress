@@ -216,6 +216,176 @@ const createVectorNode = () => {
   } as const;
 };
 
+const createVectorContainerWithPaths = () => {
+  return [
+    {
+      id: "vector-container",
+      name: "Vector",
+      parentId: "root",
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: 0,
+        y: 0,
+      },
+      type: "vector" as const,
+      visible: true,
+    },
+    {
+      closed: true,
+      fill: "#ffffff",
+      fillRule: "nonzero" as const,
+      id: "vector-path-1",
+      parentId: "vector-container",
+      segments: [
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: -120, y: -90 },
+          pointType: "corner" as const,
+        },
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 120, y: -90 },
+          pointType: "corner" as const,
+        },
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 120, y: 90 },
+          pointType: "corner" as const,
+        },
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: -120, y: 90 },
+          pointType: "corner" as const,
+        },
+      ],
+      stroke: "#000000",
+      strokeWidth: 12,
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: 320,
+        y: 220,
+      },
+      type: "path" as const,
+      visible: true,
+    },
+    {
+      closed: true,
+      fill: "#ffffff",
+      fillRule: "nonzero" as const,
+      id: "vector-path-2",
+      parentId: "vector-container",
+      segments: [
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: -80, y: -50 },
+          pointType: "corner" as const,
+        },
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 80, y: -50 },
+          pointType: "corner" as const,
+        },
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 80, y: 50 },
+          pointType: "corner" as const,
+        },
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: -80, y: 50 },
+          pointType: "corner" as const,
+        },
+      ],
+      stroke: "#000000",
+      strokeWidth: 12,
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: 540,
+        y: 220,
+      },
+      type: "path" as const,
+      visible: true,
+    },
+  ] as const;
+};
+
+const createSinglePathVectorNodes = () => {
+  return [
+    {
+      id: "vector-container",
+      name: "Vector",
+      parentId: "root",
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: 0,
+        y: 0,
+      },
+      type: "vector" as const,
+      visible: true,
+    },
+    {
+      closed: true,
+      fill: "#ffffff",
+      fillRule: "nonzero" as const,
+      id: "vector-path",
+      parentId: "vector-container",
+      segments: [
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: -120, y: -90 },
+          pointType: "corner" as const,
+        },
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 120, y: -90 },
+          pointType: "corner" as const,
+        },
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 120, y: 90 },
+          pointType: "corner" as const,
+        },
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: -120, y: 90 },
+          pointType: "corner" as const,
+        },
+      ],
+      stroke: "#000000",
+      strokeWidth: 12,
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: 380,
+        y: 220,
+      },
+      type: "path" as const,
+      visible: true,
+    },
+  ] as const;
+};
+
 describe("Editor interaction mode boundaries", () => {
   test("startPathEditing clears incompatible transient interaction state", () => {
     const editor = createEditor();
@@ -240,24 +410,26 @@ describe("Editor interaction mode boundaries", () => {
 
   test("vector nodes can enter explicit path editing mode", () => {
     const editor = createEditor();
-    const node = createVectorNode();
+    const nodes = createSinglePathVectorNodes();
 
-    editor.getState().loadNodes([node]);
-    editor.select(node.id);
+    editor.getState().loadNodes([...nodes]);
+    editor.select("vector-container");
 
-    expect(editor.canEditNodePath(node.id)).toBe(true);
-    expect(editor.canStartPathEditing(node.id)).toBe(true);
-    expect(editor.startPathEditing(node.id)).toBe(true);
-    expect(editor.pathEditingNodeId).toBe(node.id);
+    expect(editor.canEditNodePath("vector-container")).toBe(true);
+    expect(editor.canStartPathEditing("vector-container")).toBe(true);
+    expect(editor.startPathEditing("vector-container")).toBe(true);
+    expect(editor.selectedNodeIds).toEqual(["vector-path"]);
+    expect(editor.pathEditingNodeId).toBe("vector-path");
   });
 
-  test("vector nodes expose an editable path session for the vector path backend", () => {
+  test("vector path editing exposes an editable child path session for the vector path backend", () => {
     const editor = createEditor();
-    const node = createVectorNode();
+    const nodes = createSinglePathVectorNodes();
+    const pathNode = nodes[1];
 
-    editor.getState().loadNodes([node]);
-    editor.select(node.id);
-    editor.startPathEditing(node.id);
+    editor.getState().loadNodes([...nodes]);
+    editor.select("vector-container");
+    editor.startPathEditing("vector-container");
     editor.setPathEditingPoints(
       [
         {
@@ -275,14 +447,19 @@ describe("Editor interaction mode boundaries", () => {
       }
     );
 
-    expect(editor.getEditablePathSession(node.id)).toEqual({
+    expect(editor.getEditablePathSession("vector-path")).toEqual({
       backend: "vector-path",
-      contours: node.contours,
+      contours: [
+        {
+          closed: pathNode.closed,
+          segments: pathNode.segments,
+        },
+      ],
       interactionPolicy: {
         canInsertPoint: true,
       },
-      nodeId: node.id,
-      nodeType: "vector",
+      nodeId: "vector-path",
+      nodeType: "path",
       selectedPoints: [
         {
           contourIndex: 0,
@@ -300,6 +477,47 @@ describe("Editor interaction mode boundaries", () => {
     });
   });
 
+  test("multi-path vector containers enter path editing through a child path and select that contour", () => {
+    const editor = createEditor();
+    const nodes = createVectorContainerWithPaths();
+
+    editor.getState().loadNodes([...nodes]);
+    editor.select("vector-container");
+
+    expect(editor.canEditNodePath("vector-container")).toBe(true);
+    expect(editor.canStartPathEditing("vector-container")).toBe(true);
+    expect(editor.startPathEditing("vector-container")).toBe(true);
+    expect(editor.selectedNodeIds).toEqual(["vector-path-1"]);
+    expect(editor.pathEditingNodeId).toBe("vector-path-1");
+  });
+
+  test("multi-path vector path editing can retarget to another child path without exiting edit mode", () => {
+    const editor = createEditor();
+    const nodes = createVectorContainerWithPaths();
+
+    editor.getState().loadNodes([...nodes]);
+    editor.select("vector-container");
+    editor.startPathEditing("vector-container");
+
+    expect(editor.startPathEditing("vector-path-2")).toBe(true);
+    expect(editor.selectedNodeIds).toEqual(["vector-path-2"]);
+    expect(editor.pathEditingNodeId).toBe("vector-path-2");
+  });
+
+  test("selecting a vector parent while path editing exits contour editing", () => {
+    const editor = createEditor();
+    const nodes = createVectorContainerWithPaths();
+
+    editor.getState().loadNodes([...nodes]);
+    editor.select("vector-container");
+    editor.startPathEditing("vector-container");
+
+    editor.select("vector-container");
+
+    expect(editor.selectedNodeIds).toEqual(["vector-container"]);
+    expect(editor.pathEditingNodeId).toBeNull();
+  });
+
   test("text guide path editing does not expose a vector path session", () => {
     const editor = createEditor();
     const node = createCircleNode();
@@ -314,30 +532,31 @@ describe("Editor interaction mode boundaries", () => {
 
   test("vector path editing persists across vector node updates", () => {
     const editor = createEditor();
-    const node = createVectorNode();
+    const nodes = createSinglePathVectorNodes();
 
-    editor.getState().loadNodes([node]);
-    editor.select(node.id);
-    editor.startPathEditing(node.id);
+    editor.getState().loadNodes([...nodes]);
+    editor.select("vector-container");
+    editor.startPathEditing("vector-container");
 
-    editor.updateNode(node.id, {
+    editor.updateNode("vector-path", {
       transform: {
-        x: node.transform.x + 40,
-        y: node.transform.y + 20,
+        x: nodes[1].transform.x + 40,
+        y: nodes[1].transform.y + 20,
       },
     });
 
-    expect(editor.pathEditingNodeId).toBe(node.id);
-    expect(editor.isPathEditing(node.id)).toBe(true);
+    expect(editor.pathEditingNodeId).toBe("vector-path");
+    expect(editor.isPathEditing("vector-path")).toBe(true);
   });
 
-  test("updateEditablePath updates vector node contours through the shared path interface", () => {
+  test("updateEditablePath updates vector child path contours through the shared path interface", () => {
     const editor = createEditor();
-    const node = createVectorNode();
+    const nodes = createSinglePathVectorNodes();
+    const pathNode = nodes[1];
     const nextContours = [
       {
-        ...node.contours[0],
-        segments: node.contours[0].segments.map((segment, segmentIndex) => {
+        closed: pathNode.closed,
+        segments: pathNode.segments.map((segment, segmentIndex) => {
           if (segmentIndex !== 0) {
             return segment;
           }
@@ -353,21 +572,22 @@ describe("Editor interaction mode boundaries", () => {
       },
     ];
 
-    editor.getState().loadNodes([node]);
+    editor.getState().loadNodes([...nodes]);
 
-    expect(editor.updateEditablePath(node.id, nextContours)).toBe(true);
-    expect(editor.getNode(node.id)).toMatchObject({
-      contours: nextContours,
+    expect(editor.updateEditablePath("vector-path", nextContours)).toBe(true);
+    expect(editor.getNode("vector-path")).toMatchObject({
+      closed: nextContours[0]?.closed,
+      segments: nextContours[0]?.segments,
     });
   });
 
-  test("vector path editing replaces the normal transform overlay", () => {
+  test("vector child paths advertise the vector path editing overlay mode", () => {
     const editor = createEditor();
-    const node = createVectorNode();
+    const nodes = createSinglePathVectorNodes();
 
-    editor.getState().loadNodes([node]);
+    editor.getState().loadNodes([...nodes]);
 
-    expect(editor.getNodeEditCapabilities(node.id)).toMatchObject({
+    expect(editor.getNodeEditCapabilities("vector-path")).toMatchObject({
       canEditPath: true,
       pathEditingOverlayMode: "replace-transform",
       requiresPathEditing: true,
@@ -399,13 +619,27 @@ describe("Editor interaction mode boundaries", () => {
     expect(editor.pathEditingPoints).toEqual([]);
   });
 
+  test("stopping vector path editing restores parent vector selection", () => {
+    const editor = createEditor();
+    const nodes = createSinglePathVectorNodes();
+
+    editor.getState().loadNodes([...nodes]);
+    editor.select("vector-container");
+    editor.startPathEditing("vector-container");
+
+    editor.stopPathEditing();
+
+    expect(editor.pathEditingNodeId).toBeNull();
+    expect(editor.selectedNodeIds).toEqual(["vector-container"]);
+  });
+
   test("canvas shortcut toggles vector path editing with E", () => {
     const editor = createEditor();
-    const node = createVectorNode();
+    const nodes = createSinglePathVectorNodes();
     let prevented = false;
 
-    editor.getState().loadNodes([node]);
-    editor.select(node.id);
+    editor.getState().loadNodes([...nodes]);
+    editor.select("vector-container");
 
     expect(
       editor.handleCanvasShortcutKeyDown(
@@ -422,7 +656,8 @@ describe("Editor interaction mode boundaries", () => {
       )
     ).toBe(true);
     expect(prevented).toBe(true);
-    expect(editor.pathEditingNodeId).toBe(node.id);
+    expect(editor.pathEditingNodeId).toBe("vector-path");
+    expect(editor.selectedNodeIds).toEqual(["vector-path"]);
 
     prevented = false;
 
@@ -442,6 +677,7 @@ describe("Editor interaction mode boundaries", () => {
     ).toBe(true);
     expect(prevented).toBe(true);
     expect(editor.pathEditingNodeId).toBeNull();
+    expect(editor.selectedNodeIds).toEqual(["vector-container"]);
   });
 
   test("groups do not advertise vector-style path editing affordances", () => {

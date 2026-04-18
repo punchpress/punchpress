@@ -156,6 +156,7 @@ export const getStateSnapshot = (page) => {
   return getDebugDump(page).then((dump) => ({
     activeTool: dump?.tool || "pointer",
     editingNodeId: dump?.editing?.nodeId || null,
+    pathEditingNodeId: dump?.editing?.pathNodeId || null,
     nodes:
       dump?.nodes?.map((node) => ({
         fill: node.fill,
@@ -166,6 +167,9 @@ export const getStateSnapshot = (page) => {
         rotation: node.rotation || 0,
         shape: node.shape ?? null,
         stroke: node.stroke,
+        strokeLineCap: node.strokeLineCap,
+        strokeLineJoin: node.strokeLineJoin,
+        strokeMiterLimit: node.strokeMiterLimit,
         strokeWidth: node.strokeWidth,
         text: node.text,
         tracking: node.tracking,

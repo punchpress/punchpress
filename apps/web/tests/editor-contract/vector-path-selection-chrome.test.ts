@@ -9,7 +9,10 @@ import {
   getVisibleVectorCornerHandles,
   shouldAdjustSelectedCornerPoints,
 } from "../../src/components/canvas/canvas-overlay/vector-path/vector-corner-radius-points";
-import { shouldShowBezierHandlesForPoint } from "../../src/components/canvas/canvas-overlay/vector-path/vector-path-selection-chrome";
+import {
+  shouldShowBezierHandlesForPoint,
+  shouldShowSelectedAnchorForPoint,
+} from "../../src/components/canvas/canvas-overlay/vector-path/vector-path-selection-chrome";
 
 const createRectangleVectorNode = () => {
   return {
@@ -453,6 +456,46 @@ describe("vector path selection chrome", () => {
     );
   });
 
+  test("marks a selected logical corner handle as active", () => {
+    const editor = new Editor();
+    const node = createRectangleVectorNode();
+
+    editor.getState().loadNodes([node]);
+    editor.select(node.id);
+    editor.startPathEditing(node.id);
+    editor.setPathEditingPoint({
+      contourIndex: 0,
+      segmentIndex: 0,
+    });
+    editor.setPathPointCornerRadius(24, node.id, editor.pathEditingPoint);
+
+    const nextContours =
+      editor.getNode(node.id)?.type === "vector"
+        ? editor.getNode(node.id)?.contours || []
+        : [];
+
+    const renderedHandles = VectorCornerRadiusHandles({
+      activeDragSession: null,
+      contours: nextContours,
+      editor,
+      hoveredPoint: null,
+      matrix: TEST_MATRIX,
+      nodeId: node.id,
+      onDragStateChange: null,
+      onHoverChange: null,
+      selectedPoints: [
+        {
+          contourIndex: 0,
+          segmentIndex: 0,
+        },
+      ],
+    });
+
+    expect(Array.isArray(renderedHandles)).toBe(true);
+    expect(renderedHandles).toHaveLength(1);
+    expect(renderedHandles?.[0]?.props?.isSelected).toBe(true);
+  });
+
   test("marks the active dragged corner red when that handle reaches its local max", () => {
     const editor = new Editor();
     const node = createRectangleVectorNode();
@@ -496,7 +539,7 @@ describe("vector path selection chrome", () => {
     ]);
   });
 
-  test("shows bezier handles for both trim points of a detected live corner", () => {
+  test("treats a detected live corner selection as a logical corner instead of point-handle chrome", () => {
     const editor = new Editor();
     const node = createRectangleVectorNode();
 
@@ -522,7 +565,7 @@ describe("vector path selection chrome", () => {
           segmentIndex: 0,
         }
       )
-    ).toBe(true);
+    ).toBe(false);
     expect(
       shouldShowBezierHandlesForPoint(
         editor,
@@ -536,7 +579,47 @@ describe("vector path selection chrome", () => {
           segmentIndex: 1,
         }
       )
-    ).toBe(true);
+    ).toBe(false);
+    expect(
+      shouldShowSelectedAnchorForPoint(
+        editor,
+        node.id,
+        [
+          {
+            contourIndex: 0,
+            segmentIndex: 0,
+          },
+        ],
+        {
+          contourIndex: 0,
+          segmentIndex: 0,
+        },
+        {
+          contourIndex: 0,
+          segmentIndex: 0,
+        }
+      )
+    ).toBe(false);
+    expect(
+      shouldShowSelectedAnchorForPoint(
+        editor,
+        node.id,
+        [
+          {
+            contourIndex: 0,
+            segmentIndex: 0,
+          },
+        ],
+        {
+          contourIndex: 0,
+          segmentIndex: 0,
+        },
+        {
+          contourIndex: 0,
+          segmentIndex: 1,
+        }
+      )
+    ).toBe(false);
   });
 
   test("does not show bezier handles for unrelated points in a detected live corner selection", () => {

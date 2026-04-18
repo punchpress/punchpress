@@ -77,6 +77,8 @@ const createShapeNode = (id: string, x: number, fill: string) => {
 
 const getPathToolbarState = (editor: Editor, nodeId: string) => {
   const selectedNode = editor.getNode(nodeId);
+  const selectedPathPoint =
+    editor.pathEditingPoints.length === 1 ? editor.pathEditingPoint : null;
 
   return {
     canBoolean: false,
@@ -84,8 +86,11 @@ const getPathToolbarState = (editor: Editor, nodeId: string) => {
     hasPathEditingMode: true,
     isPathEditing: true,
     selectedNode,
-    selectedPathPoint:
-      editor.pathEditingPoints.length === 1 ? editor.pathEditingPoint : null,
+    selectedPathPoint,
+    selectedPathPointCornerControlKind: selectedPathPoint
+      ? editor.getPathPointCornerControl(nodeId, selectedPathPoint)?.kind ||
+        null
+      : null,
     selectedPathPoints: editor.pathEditingPoints,
     selectionBooleanOperations: {
       exclude: false,
@@ -145,6 +150,7 @@ describe("node toolbar actions", () => {
     expect(actionIds).toContain("delete-point");
     expect(actionIds).toContain("set-point-corner");
     expect(actionIds).toContain("set-point-smooth");
+    expect(actionIds).toContain("clear-path-selection");
     expect(actionIds).not.toContain("delete-selection");
 
     actions.find((action) => action.id === "set-point-smooth")?.onSelect();
@@ -159,6 +165,35 @@ describe("node toolbar actions", () => {
 
     expect(nextNode.segments[0]?.pointType).toBe("smooth");
     expect(nextNode.segments[1]?.pointType).toBe("smooth");
+  });
+
+  test("detected rounded-corner selections suppress anchor point actions", () => {
+    const editor = new Editor();
+    const node = createPathNode();
+
+    editor.getState().loadNodes([node]);
+    editor.select(node.id);
+    editor.startPathEditing(node.id);
+    editor.setPathEditingPoint({
+      contourIndex: 0,
+      segmentIndex: 0,
+    });
+    editor.setPathPointCornerRadius(24, node.id, editor.pathEditingPoint);
+
+    const actions = resolveNodeToolbarActions(
+      editor,
+      getPathToolbarState(editor, node.id)
+    );
+
+    expect(actions.map((action) => action.id)).toEqual([
+      "clear-path-selection",
+      "toggle-path-editing",
+    ]);
+
+    actions.find((action) => action.id === "clear-path-selection")?.onSelect();
+
+    expect(editor.pathEditingPoint).toBeNull();
+    expect(editor.pathEditingPoints).toEqual([]);
   });
 
   test("multi-selection exposes icon-only boolean actions in the shared action bar", () => {

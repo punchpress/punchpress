@@ -349,6 +349,11 @@ export const LayerTreeRow = ({
       return;
     }
 
+    if (layer.node.type === "path" && editor.pathEditingNodeId) {
+      editor.startPathEditing(nodeId);
+      return;
+    }
+
     editor.select(nodeId);
   };
 

@@ -11,8 +11,15 @@ export const findEmptyCanvasPoint = async (page) => {
 
         if (
           target instanceof Element &&
-          target.closest(".canvas-surface") &&
-          !target.closest("[data-node-id], .canvas-moveable, aside")
+          target.closest(".canvas-surface, .canvas-vector-paper") &&
+          !target.closest(
+            [
+              "[data-node-id]",
+              ".canvas-moveable",
+              ".canvas-node-toolbar",
+              "aside",
+            ].join(",")
+          )
         ) {
           return { x, y };
         }
@@ -35,7 +42,7 @@ export const clickEmptyCanvas = async (page) => {
 };
 
 const getNodeCenter = async (page, nodeId) => {
-  const node = page.locator(`[data-node-id="${nodeId}"]`);
+  const node = page.locator(`.canvas-node[data-node-id="${nodeId}"]`);
 
   await node.waitFor({ state: "visible" });
 

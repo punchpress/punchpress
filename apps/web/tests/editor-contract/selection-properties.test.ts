@@ -340,7 +340,8 @@ describe("Editor selection properties", () => {
 
     loadNodes(editor, [createIrregularShapeNode("shape-node")]);
     editor.select("shape-node");
-    const maxCornerRadius = editor.getPathCornerRadiusSummary("shape-node")?.max || 0;
+    const maxCornerRadius =
+      editor.getPathCornerRadiusSummary("shape-node")?.max || 0;
 
     const didApply = editor.setSelectionProperty("cornerRadius", 999);
     const nextNode = editor.getNode("shape-node");
@@ -402,7 +403,22 @@ describe("Editor selection properties", () => {
     const selectionProperties = editor.getSelectionProperties();
 
     expect(selectionProperties.selectionKind).toBe("group");
-    expect(selectionProperties.properties.fill).toBeUndefined();
+    expect(Object.keys(selectionProperties.properties).sort()).toEqual([
+      "fill",
+      "fillRule",
+      "stroke",
+      "strokeLineCap",
+      "strokeLineJoin",
+      "strokeMiterLimit",
+      "strokeWidth",
+    ]);
+    expect(selectionProperties.properties.fill?.isMixed).toBe(true);
+    expect(selectionProperties.properties.fillRule?.value).toBe("evenodd");
+    expect(selectionProperties.properties.stroke?.isMixed).toBe(true);
+    expect(selectionProperties.properties.strokeLineCap?.value).toBe("square");
+    expect(selectionProperties.properties.strokeLineJoin?.value).toBe("miter");
+    expect(selectionProperties.properties.strokeMiterLimit?.value).toBe(12);
+    expect(selectionProperties.properties.strokeWidth?.value).toBe(14);
     expect(selectionProperties.selectionColors).toEqual([
       {
         id: JSON.stringify("#F63F3F"),
@@ -420,6 +436,49 @@ describe("Editor selection properties", () => {
         value: "#FFFFFF",
       },
     ]);
+  });
+
+  test("applies aggregate path appearance properties for a selected multi-path vector", () => {
+    const editor = new Editor();
+
+    loadNodes(
+      editor,
+      createVectorWithTwoPaths(
+        "vector-node",
+        {
+          fill: "#F63F3F",
+          stroke: "#000000",
+          strokeLineCap: "round",
+          strokeLineJoin: "round",
+          strokeMiterLimit: 6,
+          strokeWidth: 10,
+        },
+        {
+          fill: "#FFFFFF",
+          stroke: "#F63F3F",
+          strokeLineCap: "round",
+          strokeLineJoin: "round",
+          strokeMiterLimit: 6,
+          strokeWidth: 10,
+        }
+      )
+    );
+    editor.select("vector-node");
+
+    expect(editor.setSelectionProperty("strokeLineCap", "square")).toBe(true);
+    expect(editor.setSelectionProperty("strokeLineJoin", "bevel")).toBe(true);
+    expect(editor.setSelectionProperty("strokeWidth", 22)).toBe(true);
+
+    expect(editor.getNode("vector-node-path-1")).toMatchObject({
+      strokeLineCap: "square",
+      strokeLineJoin: "bevel",
+      strokeWidth: 22,
+    });
+    expect(editor.getNode("vector-node-path-2")).toMatchObject({
+      strokeLineCap: "square",
+      strokeLineJoin: "bevel",
+      strokeWidth: 22,
+    });
   });
 
   test("applies a selection color across matching descendant fill and stroke paints for a selected group", () => {

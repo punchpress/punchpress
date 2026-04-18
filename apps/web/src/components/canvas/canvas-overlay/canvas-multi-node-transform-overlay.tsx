@@ -8,6 +8,7 @@ import {
   getCanvasScaleCursor,
 } from "../canvas-cursor-assets";
 import { drillIntoGroupSelection } from "../canvas-group-drill-in";
+import { openCanvasNodeEditingMode } from "../canvas-node-editing";
 import { getHostRectFromNodeFrame } from "./canvas-overlay-geometry";
 import {
   getRotateCursorRotationDegrees,
@@ -127,9 +128,6 @@ export const CanvasMultiNodeTransformOverlay = ({
   selectedGroupNodeId,
 }) => {
   const editor = useEditor();
-  const isSelectionDragging = useEditorValue(
-    (_, state) => state.isSelectionDragging
-  );
   const handleElementsRef = useRef<
     Record<"ne" | "nw" | "se" | "sw", HTMLButtonElement | null>
   >({
@@ -158,13 +156,13 @@ export const CanvasMultiNodeTransformOverlay = ({
   const activeTransformCursor =
     activeRotateCursor ??
     (activeResizeCorner !== null
-        ? getCanvasScaleCursor(
-            getScaleCursorRotationDegrees(
-              activeResizeCorner,
-              overlayRotationDegrees
-            )
+      ? getCanvasScaleCursor(
+          getScaleCursorRotationDegrees(
+            activeResizeCorner,
+            overlayRotationDegrees
           )
-        : null);
+        )
+      : null);
 
   useActiveTransformCursor(activeTransformCursor);
 
@@ -172,7 +170,7 @@ export const CanvasMultiNodeTransformOverlay = ({
     return null;
   }
 
-  let cursorClassName = "canvas-cursor-default";
+  const cursorClassName = "canvas-cursor-default";
 
   const startSelectionDrag = (event) => {
     if (!(event.button === 0 && isDraggable)) {
@@ -412,6 +410,12 @@ export const CanvasMultiNodeTransformOverlay = ({
         targetNodeId && editor.isDescendantOf(targetNodeId, selectedGroupNodeId)
       )
     ) {
+      return;
+    }
+
+    if (openCanvasNodeEditingMode(editor, targetNodeId)) {
+      event.preventDefault();
+      event.stopPropagation();
       return;
     }
 

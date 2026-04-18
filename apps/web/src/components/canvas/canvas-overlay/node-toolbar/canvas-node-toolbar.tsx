@@ -41,6 +41,14 @@ const getNodeToolbarStyle = (editor) => {
   };
 };
 
+export const getRenderedNodeToolbarActions = (actions, presenceState) => {
+  if (actions.length > 0) {
+    return actions;
+  }
+
+  return presenceState?.actions || [];
+};
+
 export const CanvasNodeToolbar = memo(function CanvasNodeToolbar() {
   const editor = useEditor();
   const toolbarState = useNodeToolbarState();
@@ -51,9 +59,10 @@ export const CanvasNodeToolbar = memo(function CanvasNodeToolbar() {
     })
     .join(",")}`;
   const presenceState = useNodeToolbarPresence(actions, presenceKey);
+  const renderedActions = getRenderedNodeToolbarActions(actions, presenceState);
   const style = getNodeToolbarStyle(editor);
 
-  if (!(presenceState && style)) {
+  if (!(presenceState && style && renderedActions.length > 0)) {
     return null;
   }
 
@@ -79,7 +88,7 @@ export const CanvasNodeToolbar = memo(function CanvasNodeToolbar() {
           }
         >
           <ToolbarGroup>
-            {presenceState.actions.map((action, index) => {
+            {renderedActions.map((action, index) => {
               return (
                 <Fragment key={action.id}>
                   {index > 0 ? (
