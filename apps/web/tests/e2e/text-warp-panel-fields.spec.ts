@@ -43,7 +43,7 @@ const loadPlainTextDocument = async (page) => {
             },
           },
         ],
-        version: "1.6",
+        version: "1.7",
       })
     );
 

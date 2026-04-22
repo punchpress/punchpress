@@ -49,14 +49,14 @@ describe("savePunchDocumentFile", () => {
 
     const { savePunchDocumentFile } = await importWebDocumentFiles();
     const result = await savePunchDocumentFile(
-      '{"version":"1.6","nodes":[]}',
+      '{"version":"1.7","nodes":[]}',
       "renamed-design",
       "/tmp/original-folder/original-design.punch",
       true
     );
 
     expect(saveDocumentMock).toHaveBeenCalledWith({
-      contents: '{"version":"1.6","nodes":[]}',
+      contents: '{"version":"1.7","nodes":[]}',
       defaultFileName: "renamed-design.punch",
       directoryPath: "/tmp/original-folder/original-design.punch",
       fileHandle: null,
@@ -90,7 +90,7 @@ describe("openPunchDocumentFile", () => {
         name: "design.punch",
       },
       name: "design.punch",
-      text: async () => '{"version":"1.6","nodes":[]}',
+      text: async () => '{"version":"1.7","nodes":[]}',
     });
 
     const { openPunchDocumentFile } = await importWebDocumentFiles();
@@ -103,7 +103,7 @@ describe("openPunchDocumentFile", () => {
       mimeTypes: ["application/vnd.punchpress+json"],
     });
     expect(result).toEqual({
-      contents: '{"version":"1.6","nodes":[]}',
+      contents: '{"version":"1.7","nodes":[]}',
       fileHandle: {
         kind: "file",
         name: "design.punch",

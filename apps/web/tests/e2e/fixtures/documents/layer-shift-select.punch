@@ -1,8 +1,9 @@
 {
-  "version": "1.6",
+  "version": "1.7",
   "nodes": [
     {
       "id": "shift-back-node",
+      "parentId": "root",
       "type": "text",
       "text": "Shift back",
       "font": {
@@ -31,6 +32,7 @@
     },
     {
       "id": "shift-middle-node",
+      "parentId": "root",
       "type": "text",
       "text": "Shift middle",
       "font": {
@@ -59,6 +61,7 @@
     },
     {
       "id": "shift-front-node",
+      "parentId": "root",
       "type": "text",
       "text": "Shift front",
       "font": {

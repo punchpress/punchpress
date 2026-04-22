@@ -7,6 +7,7 @@ import {
   getNodeSurfaceLocalBounds,
 } from "../nodes/node-capabilities";
 import {
+  getDescendantLeafNodeIds,
   isContainerNode,
   isGroupNode,
   isPathNode,
@@ -296,17 +297,6 @@ const applyPreviewDeltaToBounds = (bounds, previewDelta) => {
   };
 };
 
-const getBoundsCenter = (bounds) => {
-  if (!bounds) {
-    return null;
-  }
-
-  return {
-    x: (bounds.minX + bounds.maxX) / 2,
-    y: (bounds.minY + bounds.maxY) / 2,
-  };
-};
-
 const normalizeRotationDelta = (rotation) => {
   let nextRotation = rotation;
 
@@ -339,6 +329,197 @@ const getSharedSelectionRotation = (editor, nodeIds) => {
   return hasSharedRotation ? firstRotation : 0;
 };
 
+const hasMeaningfulSelectionRotation = (editor, nodeIds) => {
+  return nodeIds.some((nodeId) => {
+    const node = getNode(editor, nodeId);
+
+    return Math.abs(normalizeRotationDelta(getNodeRotation(node) || 0)) > 0.1;
+  });
+};
+
+interface SelectionFramePoint {
+  x: number;
+  y: number;
+}
+
+interface SelectionFrameBounds {
+  height: number;
+  maxX: number;
+  maxY: number;
+  minX: number;
+  minY: number;
+  width: number;
+}
+
+interface OrientedSelectionFrame {
+  area: number;
+  bounds: SelectionFrameBounds;
+  rotation: number;
+}
+
+const comparePointPosition = (
+  left: SelectionFramePoint,
+  right: SelectionFramePoint
+) => {
+  if (left.x !== right.x) {
+    return left.x - right.x;
+  }
+
+  return left.y - right.y;
+};
+
+const getCrossProduct = (
+  origin: SelectionFramePoint,
+  left: SelectionFramePoint,
+  right: SelectionFramePoint
+) => {
+  return (
+    (left.x - origin.x) * (right.y - origin.y) -
+    (left.y - origin.y) * (right.x - origin.x)
+  );
+};
+
+const getConvexHull = (points: SelectionFramePoint[]) => {
+  if (points.length <= 1) {
+    return [...points];
+  }
+
+  const sortedPoints = [...points].sort(comparePointPosition);
+  const lowerHull: SelectionFramePoint[] = [];
+
+  for (const point of sortedPoints) {
+    while (lowerHull.length >= 2) {
+      const left = lowerHull.at(-2);
+      const right = lowerHull.at(-1);
+
+      if (!(left && right && getCrossProduct(left, right, point) <= 0)) {
+        break;
+      }
+
+      lowerHull.pop();
+    }
+
+    lowerHull.push(point);
+  }
+
+  const upperHull: SelectionFramePoint[] = [];
+
+  for (const point of [...sortedPoints].reverse()) {
+    while (upperHull.length >= 2) {
+      const left = upperHull.at(-2);
+      const right = upperHull.at(-1);
+
+      if (!(left && right && getCrossProduct(left, right, point) <= 0)) {
+        break;
+      }
+
+      upperHull.pop();
+    }
+
+    upperHull.push(point);
+  }
+
+  lowerHull.pop();
+  upperHull.pop();
+
+  return [...lowerHull, ...upperHull];
+};
+
+const normalizeSelectionFrameRotation = (rotation) => {
+  let nextRotation = normalizeRotationDelta(rotation);
+
+  while (nextRotation <= -90) {
+    nextRotation += 180;
+  }
+
+  while (nextRotation > 90) {
+    nextRotation -= 180;
+  }
+
+  return Number.parseFloat(nextRotation.toFixed(2));
+};
+
+const getOrientedSelectionFrame = (
+  worldCorners: SelectionFramePoint[]
+): Omit<OrientedSelectionFrame, "area"> | null => {
+  if (worldCorners.length === 0) {
+    return null;
+  }
+
+  if (worldCorners.length === 1) {
+    return {
+      bounds: {
+        height: 0,
+        maxX: worldCorners[0].x,
+        maxY: worldCorners[0].y,
+        minX: worldCorners[0].x,
+        minY: worldCorners[0].y,
+        width: 0,
+      },
+      rotation: 0,
+    };
+  }
+
+  const hull = getConvexHull(worldCorners);
+  const candidateRotations = new Set(
+    hull.map((point, index) => {
+      const nextPoint = hull[(index + 1) % hull.length];
+
+      return normalizeSelectionFrameRotation(
+        (Math.atan2(nextPoint.y - point.y, nextPoint.x - point.x) * 180) /
+          Math.PI
+      );
+    })
+  );
+  let bestFrame: OrientedSelectionFrame | null = null;
+
+  for (const rotation of candidateRotations) {
+    const unrotatedCorners = worldCorners.map((point) => {
+      return rotatePointAround(point, { x: 0, y: 0 }, -rotation);
+    });
+    const minX = Math.min(...unrotatedCorners.map((point) => point.x));
+    const minY = Math.min(...unrotatedCorners.map((point) => point.y));
+    const maxX = Math.max(...unrotatedCorners.map((point) => point.x));
+    const maxY = Math.max(...unrotatedCorners.map((point) => point.y));
+    const width = maxX - minX;
+    const height = maxY - minY;
+    const area = width * height;
+
+    if (bestFrame && bestFrame.area <= area) {
+      continue;
+    }
+
+    const worldCenter = rotatePointAround(
+      {
+        x: minX + width / 2,
+        y: minY + height / 2,
+      },
+      { x: 0, y: 0 },
+      rotation
+    );
+
+    bestFrame = {
+      area,
+      bounds: {
+        height,
+        maxX: worldCenter.x + width / 2,
+        maxY: worldCenter.y + height / 2,
+        minX: worldCenter.x - width / 2,
+        minY: worldCenter.y - height / 2,
+        width,
+      },
+      rotation,
+    };
+  }
+
+  return bestFrame
+    ? {
+        bounds: bestFrame.bounds,
+        rotation: bestFrame.rotation,
+      }
+    : null;
+};
+
 const getSelectionFrameBounds = (editor, nodeIds) => {
   const bounds = nodeIds
     .map((nodeId) => editor.getNodeSelectionFrame(nodeId)?.bounds)
@@ -363,6 +544,62 @@ const getSelectionFrameBounds = (editor, nodeIds) => {
   };
 };
 
+const getSelectionFrameNodeIds = (editor, requestedNodeIds) => {
+  const selectionFrameNodeIds: string[] = [];
+
+  for (const nodeId of requestedNodeIds) {
+    const node = editor.getNode(nodeId);
+
+    if (!node) {
+      continue;
+    }
+
+    if (!isContainerNode(node)) {
+      selectionFrameNodeIds.push(nodeId);
+      continue;
+    }
+
+    if (
+      isVectorNode(node) &&
+      editor.getNodeRenderGeometry(nodeId)?.selectionPoints?.length
+    ) {
+      selectionFrameNodeIds.push(nodeId);
+      continue;
+    }
+
+    selectionFrameNodeIds.push(
+      ...getDescendantLeafNodeIds(editor.nodes, nodeId)
+    );
+  }
+
+  return [...new Set(selectionFrameNodeIds)];
+};
+
+const getSelectionFrameWorldPoints = (editor, nodeId) => {
+  const node = editor.getNode(nodeId);
+
+  if (!node) {
+    return [];
+  }
+
+  if (isVectorNode(node)) {
+    return editor.getNodeRenderGeometry(nodeId)?.selectionPoints || [];
+  }
+
+  const bounds = editor.getNodeTransformBounds(nodeId);
+
+  if (!bounds) {
+    return [];
+  }
+
+  return [
+    { x: bounds.minX, y: bounds.minY },
+    { x: bounds.maxX, y: bounds.minY },
+    { x: bounds.maxX, y: bounds.maxY },
+    { x: bounds.minX, y: bounds.maxY },
+  ].map((point) => getNodeWorldPoint(node, bounds, point));
+};
+
 export const getSelectionTransformFrame = (
   editor,
   nodeIds = editor.selectedNodeIds
@@ -374,6 +611,10 @@ export const getSelectionTransformFrame = (
   }
 
   const previewNodeIds = editor.getEffectiveSelectionNodeIds(requestedNodeIds);
+  const selectionFrameNodeIds = getSelectionFrameNodeIds(
+    editor,
+    requestedNodeIds
+  );
   const previewDelta = getSelectionPreviewDelta(editor, previewNodeIds);
 
   if (
@@ -393,7 +634,13 @@ export const getSelectionTransformFrame = (
     };
   }
 
-  const selectionBounds = getSelectionFrameBounds(editor, previewNodeIds);
+  const selectionBounds = getSelectionFrameBounds(
+    editor,
+    selectionFrameNodeIds
+  );
+  const worldCorners = selectionFrameNodeIds.flatMap((nodeId) => {
+    return getSelectionFrameWorldPoints(editor, nodeId);
+  });
 
   if (!selectionBounds) {
     return null;
@@ -402,56 +649,62 @@ export const getSelectionTransformFrame = (
   const sharedRotation = getSharedSelectionRotation(editor, previewNodeIds);
 
   if (sharedRotation === 0) {
+    if (!hasMeaningfulSelectionRotation(editor, previewNodeIds)) {
+      return {
+        bounds: applyPreviewDeltaToBounds(selectionBounds, previewDelta),
+        transform: undefined,
+      };
+    }
+
+    const orientedFrame = getOrientedSelectionFrame(worldCorners);
+
+    if (!(orientedFrame && Math.abs(orientedFrame.rotation) > 0.1)) {
+      return {
+        bounds: applyPreviewDeltaToBounds(selectionBounds, previewDelta),
+        transform: undefined,
+      };
+    }
+
+    return {
+      bounds: applyPreviewDeltaToBounds(orientedFrame.bounds, previewDelta),
+      transform: `rotate(${orientedFrame.rotation}deg)`,
+    };
+  }
+
+  if (worldCorners.length === 0) {
     return {
       bounds: applyPreviewDeltaToBounds(selectionBounds, previewDelta),
       transform: undefined,
     };
   }
 
-  const selectionCenter = getBoundsCenter(selectionBounds);
-
-  if (!selectionCenter) {
-    return null;
-  }
-
-  const projectedCorners = previewNodeIds.flatMap((nodeId) => {
-    const node = editor.getNode(nodeId);
-    const bounds = editor.getNodeTransformBounds(nodeId);
-
-    if (!(node && bounds)) {
-      return [];
-    }
-
-    return [
-      { x: bounds.minX, y: bounds.minY },
-      { x: bounds.maxX, y: bounds.minY },
-      { x: bounds.maxX, y: bounds.maxY },
-      { x: bounds.minX, y: bounds.maxY },
-    ]
-      .map((point) => getNodeWorldPoint(node, bounds, point))
-      .map((point) =>
-        rotatePointAround(point, selectionCenter, -sharedRotation)
-      );
+  const unrotatedCorners = worldCorners.map((point) => {
+    return rotatePointAround(point, { x: 0, y: 0 }, -sharedRotation);
   });
-
-  if (projectedCorners.length === 0) {
-    return null;
-  }
-
-  const minX = Math.min(...projectedCorners.map((point) => point.x));
-  const minY = Math.min(...projectedCorners.map((point) => point.y));
-  const maxX = Math.max(...projectedCorners.map((point) => point.x));
-  const maxY = Math.max(...projectedCorners.map((point) => point.y));
+  const minX = Math.min(...unrotatedCorners.map((point) => point.x));
+  const minY = Math.min(...unrotatedCorners.map((point) => point.y));
+  const maxX = Math.max(...unrotatedCorners.map((point) => point.x));
+  const maxY = Math.max(...unrotatedCorners.map((point) => point.y));
+  const width = maxX - minX;
+  const height = maxY - minY;
+  const worldCenter = rotatePointAround(
+    {
+      x: minX + width / 2,
+      y: minY + height / 2,
+    },
+    { x: 0, y: 0 },
+    sharedRotation
+  );
 
   return {
     bounds: applyPreviewDeltaToBounds(
       {
-        height: maxY - minY,
-        maxX,
-        maxY,
-        minX,
-        minY,
-        width: maxX - minX,
+        height,
+        maxX: worldCenter.x + width / 2,
+        maxY: worldCenter.y + height / 2,
+        minX: worldCenter.x - width / 2,
+        minY: worldCenter.y - height / 2,
+        width,
       },
       previewDelta
     ),

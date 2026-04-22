@@ -420,9 +420,10 @@ describe("Editor interaction mode boundaries", () => {
     expect(editor.startPathEditing("vector-container")).toBe(true);
     expect(editor.selectedNodeIds).toEqual(["vector-path"]);
     expect(editor.pathEditingNodeId).toBe("vector-path");
+    expect(editor.getPathEditingVisualOwnerNodeId()).toBe("vector-container");
   });
 
-  test("vector path editing exposes an editable child path session for the vector path backend", () => {
+  test("vector container path editing exposes the selected child path session", () => {
     const editor = createEditor();
     const nodes = createSinglePathVectorNodes();
     const pathNode = nodes[1];
@@ -447,7 +448,8 @@ describe("Editor interaction mode boundaries", () => {
       }
     );
 
-    expect(editor.getEditablePathSession("vector-path")).toEqual({
+    expect(editor.getEditablePathSession("vector-container")).toBeNull();
+    expect(editor.getEditablePathSession("vector-path")).toMatchObject({
       backend: "vector-path",
       contours: [
         {
@@ -487,24 +489,23 @@ describe("Editor interaction mode boundaries", () => {
     expect(editor.canEditNodePath("vector-container")).toBe(true);
     expect(editor.canStartPathEditing("vector-container")).toBe(true);
     expect(editor.startPathEditing("vector-container")).toBe(true);
-    expect(editor.selectedNodeIds).toEqual(["vector-path-1"]);
-    expect(editor.pathEditingNodeId).toBe("vector-path-1");
+    expect(editor.selectedNodeIds).toEqual(["vector-path-2"]);
+    expect(editor.pathEditingNodeId).toBe("vector-path-2");
+    expect(editor.getPathEditingVisualOwnerNodeId()).toBe("vector-container");
   });
 
-  test("multi-path vector path editing can retarget to another child path without exiting edit mode", () => {
+  test("child path ids can become the active edit owner while preserving the vector visual owner", () => {
     const editor = createEditor();
     const nodes = createVectorContainerWithPaths();
 
     editor.getState().loadNodes([...nodes]);
-    editor.select("vector-container");
-    editor.startPathEditing("vector-container");
-
     expect(editor.startPathEditing("vector-path-2")).toBe(true);
     expect(editor.selectedNodeIds).toEqual(["vector-path-2"]);
     expect(editor.pathEditingNodeId).toBe("vector-path-2");
+    expect(editor.getPathEditingVisualOwnerNodeId()).toBe("vector-container");
   });
 
-  test("selecting a vector parent while path editing exits contour editing", () => {
+  test("selecting a vector while path editing exits the child path session", () => {
     const editor = createEditor();
     const nodes = createVectorContainerWithPaths();
 
@@ -516,6 +517,7 @@ describe("Editor interaction mode boundaries", () => {
 
     expect(editor.selectedNodeIds).toEqual(["vector-container"]);
     expect(editor.pathEditingNodeId).toBeNull();
+    expect(editor.getPathEditingVisualOwnerNodeId()).toBeNull();
   });
 
   test("text guide path editing does not expose a vector path session", () => {
@@ -538,18 +540,19 @@ describe("Editor interaction mode boundaries", () => {
     editor.select("vector-container");
     editor.startPathEditing("vector-container");
 
-    editor.updateNode("vector-path", {
+    editor.updateNode("vector-container", {
       transform: {
-        x: nodes[1].transform.x + 40,
-        y: nodes[1].transform.y + 20,
+        x: 40,
+        y: 20,
       },
     });
 
     expect(editor.pathEditingNodeId).toBe("vector-path");
     expect(editor.isPathEditing("vector-path")).toBe(true);
+    expect(editor.getPathEditingVisualOwnerNodeId()).toBe("vector-container");
   });
 
-  test("updateEditablePath updates vector child path contours through the shared path interface", () => {
+  test("updateEditablePath updates the active child path through the shared path interface", () => {
     const editor = createEditor();
     const nodes = createSinglePathVectorNodes();
     const pathNode = nodes[1];
@@ -574,6 +577,9 @@ describe("Editor interaction mode boundaries", () => {
 
     editor.getState().loadNodes([...nodes]);
 
+    expect(editor.updateEditablePath("vector-container", nextContours)).toBe(
+      false
+    );
     expect(editor.updateEditablePath("vector-path", nextContours)).toBe(true);
     expect(editor.getNode("vector-path")).toMatchObject({
       closed: nextContours[0]?.closed,
@@ -581,16 +587,16 @@ describe("Editor interaction mode boundaries", () => {
     });
   });
 
-  test("vector child paths advertise the vector path editing overlay mode", () => {
+  test("vector containers do not expose direct path-editing overlay capabilities", () => {
     const editor = createEditor();
     const nodes = createSinglePathVectorNodes();
 
     editor.getState().loadNodes([...nodes]);
 
-    expect(editor.getNodeEditCapabilities("vector-path")).toMatchObject({
-      canEditPath: true,
-      pathEditingOverlayMode: "replace-transform",
-      requiresPathEditing: true,
+    expect(editor.getNodeEditCapabilities("vector-container")).toMatchObject({
+      canEditPath: false,
+      pathEditingOverlayMode: "keep-transform",
+      requiresPathEditing: false,
     });
   });
 
@@ -658,6 +664,7 @@ describe("Editor interaction mode boundaries", () => {
     expect(prevented).toBe(true);
     expect(editor.pathEditingNodeId).toBe("vector-path");
     expect(editor.selectedNodeIds).toEqual(["vector-path"]);
+    expect(editor.getPathEditingVisualOwnerNodeId()).toBe("vector-container");
 
     prevented = false;
 

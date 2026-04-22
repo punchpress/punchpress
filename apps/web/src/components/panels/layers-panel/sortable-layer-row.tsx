@@ -1,4 +1,3 @@
-import { ContextMenu } from "@base-ui/react/context-menu";
 import {
   Copy01Icon,
   Delete02Icon,
@@ -8,18 +7,19 @@ import {
   ViewIcon,
   ViewOffIcon,
 } from "@hugeicons-pro/core-stroke-rounded";
-import { MenuShortcut } from "@/components/ui/menu";
+import {
+  ContextMenu,
+  ContextMenuItem,
+  ContextMenuPopup,
+  ContextMenuSeparator,
+  ContextMenuShortcut,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { SortableItem } from "@/components/ui/sortable-list";
 import { cn } from "@/lib/utils";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
-import {
-  LAYER_SHORTCUTS,
-  LayerContextMenuItem,
-  LayerContextMenuPopup,
-  LayerContextMenuSeparator,
-  LayerGlyph,
-} from "./layer-context-menu";
+import { LAYER_SHORTCUTS, LayerGlyph } from "./layer-glyph";
 
 const getLayerPrimaryButtonClassName = ({
   isSelected,
@@ -128,8 +128,8 @@ export const SortableLayerRow = ({ nodeId, previousNodeId, nextNodeId }) => {
     <SortableItem id={nodeId}>
       {({ dragHandleProps, isDragging, itemStyle, setItemRef }) => {
         return (
-          <ContextMenu.Root>
-            <ContextMenu.Trigger
+          <ContextMenu>
+            <ContextMenuTrigger
               className="block"
               onContextMenuCapture={() => editor.ensureSelected(nodeId)}
               onPointerEnter={() => editor.setHoveredNode(nodeId)}
@@ -196,26 +196,26 @@ export const SortableLayerRow = ({ nodeId, previousNodeId, nextNodeId }) => {
                   />
                 </button>
               </div>
-            </ContextMenu.Trigger>
+            </ContextMenuTrigger>
 
-            <LayerContextMenuPopup>
-              <LayerContextMenuItem onClick={() => editor.duplicate(nodeId)}>
+            <ContextMenuPopup>
+              <ContextMenuItem onClick={() => editor.duplicate(nodeId)}>
                 <LayerGlyph icon={Copy01Icon} size={17} strokeWidth={1.7} />
                 Duplicate
-                <MenuShortcut>{LAYER_SHORTCUTS.duplicate}</MenuShortcut>
-              </LayerContextMenuItem>
-              <LayerContextMenuItem
-                onClick={() => editor.toggleVisibility(nodeId)}
-              >
+                <ContextMenuShortcut>
+                  {LAYER_SHORTCUTS.duplicate}
+                </ContextMenuShortcut>
+              </ContextMenuItem>
+              <ContextMenuItem onClick={() => editor.toggleVisibility(nodeId)}>
                 <LayerGlyph
                   icon={layer.isVisible ? ViewOffIcon : ViewIcon}
                   size={17}
                   strokeWidth={1.7}
                 />
                 {layer.visibilityLabel}
-              </LayerContextMenuItem>
-              <LayerContextMenuSeparator />
-              <LayerContextMenuItem
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem
                 disabled={!isMultiSelection && layer.isFrontmost}
                 onClick={() => editor.bringToFront(nodeId)}
               >
@@ -225,9 +225,11 @@ export const SortableLayerRow = ({ nodeId, previousNodeId, nextNodeId }) => {
                   strokeWidth={1.7}
                 />
                 Bring to front
-                <MenuShortcut>{LAYER_SHORTCUTS.bringToFront}</MenuShortcut>
-              </LayerContextMenuItem>
-              <LayerContextMenuItem
+                <ContextMenuShortcut>
+                  {LAYER_SHORTCUTS.bringToFront}
+                </ContextMenuShortcut>
+              </ContextMenuItem>
+              <ContextMenuItem
                 disabled={!isMultiSelection && layer.isBackmost}
                 onClick={() => editor.sendToBack(nodeId)}
               >
@@ -237,18 +239,20 @@ export const SortableLayerRow = ({ nodeId, previousNodeId, nextNodeId }) => {
                   strokeWidth={1.7}
                 />
                 Send to back
-                <MenuShortcut>{LAYER_SHORTCUTS.sendToBack}</MenuShortcut>
-              </LayerContextMenuItem>
-              <LayerContextMenuSeparator />
-              <LayerContextMenuItem
+                <ContextMenuShortcut>
+                  {LAYER_SHORTCUTS.sendToBack}
+                </ContextMenuShortcut>
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem
                 className="text-destructive-foreground data-highlighted:bg-destructive/10 data-highlighted:text-destructive-foreground"
                 onClick={() => editor.deleteNode(nodeId)}
               >
                 <LayerGlyph icon={Delete02Icon} size={17} strokeWidth={1.7} />
                 Delete
-              </LayerContextMenuItem>
-            </LayerContextMenuPopup>
-          </ContextMenu.Root>
+              </ContextMenuItem>
+            </ContextMenuPopup>
+          </ContextMenu>
         );
       }}
     </SortableItem>

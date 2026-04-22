@@ -50,7 +50,7 @@ const loadSlantDocument = async (page, rotation = 0) => {
               },
             },
           ],
-          version: "1.6",
+          version: "1.7",
         })
       );
 
@@ -98,7 +98,7 @@ test("applies slant from the panel with the default preset", async ({
             },
           },
         ],
-        version: "1.6",
+        version: "1.7",
       })
     );
 

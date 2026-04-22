@@ -1,31 +1,17 @@
-import { ContextMenu } from "@base-ui/react/context-menu";
-import {
-  Copy01Icon,
-  Delete02Icon,
-  Edit01Icon,
-  GroupLayersIcon,
-  LayerBringToFrontIcon,
-  LayerSendToBackIcon,
-  UngroupLayersIcon,
-  ViewIcon,
-  ViewOffIcon,
-} from "@hugeicons-pro/core-stroke-rounded";
+import { ViewIcon, ViewOffIcon } from "@hugeicons-pro/core-stroke-rounded";
 import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
-import { MenuShortcut } from "@/components/ui/menu";
+import { NodeContextMenuItems } from "@/components/context-menus/node-context-menu-items";
+import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { SortableItem } from "@/components/ui/sortable-list";
 import { cn } from "@/lib/utils";
+import { getCompoundVectorOperationTarget } from "@/lib/vector-compound-operation";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
-import {
-  LAYER_SHORTCUTS,
-  LayerContextMenuItem,
-  LayerContextMenuPopup,
-  LayerContextMenuSeparator,
-  LayerGlyph,
-} from "./layer-context-menu";
+import { LayerCompoundOperationMenu } from "./layer-compound-operation-menu";
+import { LayerGlyph } from "./layer-glyph";
 import { LayerNodeIcon } from "./layer-node-icon";
 
 const LAYER_TREE_INDENT = 24;
@@ -87,22 +73,12 @@ const getLayerRowClassName = ({ isHovered, isSelected }) => {
   return "bg-transparent";
 };
 
-const getFocusParentId = (parentId) => {
-  return parentId !== ROOT_PARENT_ID ? parentId : null;
+const getContourTone = (contour) => {
+  return contour.closed ? "closed" : "open";
 };
 
-const getCanGroupSelection = (editor, selectedNodeIds) => {
-  return (
-    selectedNodeIds.length > 1 &&
-    new Set(
-      selectedNodeIds
-        .map(
-          (selectedNodeId) =>
-            editor.getNode(selectedNodeId)?.parentId || ROOT_PARENT_ID
-        )
-        .filter(Boolean)
-    ).size === 1
-  );
+const getFocusParentId = (parentId) => {
+  return parentId !== ROOT_PARENT_ID ? parentId : null;
 };
 
 const handleLayerDoubleClick = ({
@@ -149,20 +125,20 @@ const LayerRowPrimaryControl = ({
   primaryButtonClassName,
   renameInputRef,
   renameValue,
+  showCompoundOperationMenu,
 }) => {
+  const iconClassName = cn(
+    getLayerNodeIconClassName({
+      isSelected: layer.isSelected,
+      isVisible: layer.isVisible,
+    })
+  );
+
   if (isContainer && isRenaming) {
     return (
       <div className={primaryButtonClassName}>
         <span className="flex min-w-0 flex-1 items-center gap-2">
-          <span
-            aria-hidden="true"
-            className={cn(
-              getLayerNodeIconClassName({
-                isSelected: layer.isSelected,
-                isVisible: layer.isVisible,
-              })
-            )}
-          >
+          <span aria-hidden="true" className={iconClassName}>
             <LayerNodeIcon isGroup={layer.isGroup} nodeType={layer.node.type} />
           </span>
           <input
@@ -187,79 +163,69 @@ const LayerRowPrimaryControl = ({
     );
   }
 
-  return (
-    <button
-      aria-pressed={layer.isSelected}
-      className={primaryButtonClassName}
-      onClick={onSelect}
-      onDoubleClick={onDoubleClick}
-      type="button"
-    >
-      <span className="flex min-w-0 flex-1 items-center gap-2">
-        <span
-          aria-hidden="true"
-          className={cn(
-            getLayerNodeIconClassName({
-              isSelected: layer.isSelected,
-              isVisible: layer.isVisible,
-            })
-          )}
-        >
-          <LayerNodeIcon isGroup={layer.isGroup} nodeType={layer.node.type} />
+  if (!showCompoundOperationMenu) {
+    return (
+      <button
+        aria-label={layer.label}
+        aria-pressed={layer.isSelected}
+        className={primaryButtonClassName}
+        data-layer-node-id={layer.node.id}
+        onClick={onSelect}
+        onDoubleClick={onDoubleClick}
+        type="button"
+      >
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          <span aria-hidden="true" className={iconClassName}>
+            <LayerNodeIcon isGroup={layer.isGroup} nodeType={layer.node.type} />
+          </span>
+          <span className={labelClassName}>{layer.label}</span>
         </span>
-        <span className={labelClassName}>{layer.label}</span>
-      </span>
-    </button>
-  );
-};
-
-const GroupLayerContextMenuItems = ({
-  canGroupSelection,
-  canUngroup,
-  editor,
-  nodeId,
-  onStartRenaming,
-}) => {
-  if (!(canGroupSelection || canUngroup)) {
-    return null;
+      </button>
+    );
   }
 
   return (
-    <>
-      {canGroupSelection && (
-        <LayerContextMenuItem onClick={() => editor.groupSelected()}>
-          <LayerGlyph icon={GroupLayersIcon} size={17} strokeWidth={1.7} />
-          Group selection
-          <MenuShortcut>{LAYER_SHORTCUTS.group}</MenuShortcut>
-        </LayerContextMenuItem>
-      )}
-      {canUngroup && (
-        <>
-          <LayerContextMenuItem onClick={onStartRenaming}>
-            <LayerGlyph icon={Edit01Icon} size={17} strokeWidth={1.7} />
-            Rename group…
-          </LayerContextMenuItem>
-          <LayerContextMenuItem onClick={() => editor.ungroup(nodeId)}>
-            <LayerGlyph icon={UngroupLayersIcon} size={17} strokeWidth={1.7} />
-            Ungroup
-            <MenuShortcut>{LAYER_SHORTCUTS.ungroup}</MenuShortcut>
-          </LayerContextMenuItem>
-        </>
-      )}
-      <LayerContextMenuSeparator />
-    </>
+    <div className={primaryButtonClassName}>
+      <span className="flex min-w-0 flex-1 items-center gap-2">
+        <LayerCompoundOperationMenu
+          className={iconClassName}
+          label={layer.label}
+          nodeId={layer.node.id}
+          nodeType={layer.node.type}
+          onSelect={onSelect}
+        />
+        <button
+          aria-label={layer.label}
+          aria-pressed={layer.isSelected}
+          className="min-w-0 flex-1 border-0 bg-transparent p-0 text-left text-inherit shadow-none outline-none"
+          data-layer-node-id={layer.node.id}
+          onClick={onSelect}
+          onDoubleClick={onDoubleClick}
+          type="button"
+        >
+          <span className={labelClassName}>{layer.label}</span>
+        </button>
+      </span>
+    </div>
   );
 };
 
 const LayerTreeChildren = ({
   childNodeIds,
   collapsedGroupIds,
+  contourRows,
   depth,
   isExpanded,
   isContainer,
   onToggleCollapse,
 }) => {
-  if (!(isContainer && isExpanded && childNodeIds.length > 0)) {
+  if (
+    !(
+      isContainer &&
+      isExpanded &&
+      (childNodeIds.length > 0 || contourRows.length > 0)
+    )
+  ) {
     return null;
   }
 
@@ -278,6 +244,53 @@ const LayerTreeChildren = ({
           />
         );
       })}
+
+      {contourRows.map((contourRow) => {
+        return (
+          <LayerContourRow
+            depth={depth + 1}
+            isSelected={contourRow.isSelected}
+            key={contourRow.id}
+            label={contourRow.label}
+            onSelect={contourRow.onSelect}
+            tone={contourRow.tone}
+          />
+        );
+      })}
+    </div>
+  );
+};
+
+const LayerContourRow = ({ depth, isSelected, label, onSelect, tone }) => {
+  return (
+    <div
+      className="flex w-full items-stretch"
+      style={{
+        paddingLeft: `${depth * LAYER_TREE_INDENT}px`,
+      }}
+    >
+      <span className="w-[34px]" />
+      <button
+        className={cn(
+          "flex h-auto min-w-0 flex-1 items-center justify-between gap-2 rounded-[8px] border-0 bg-transparent px-2 py-1.5 text-left text-[0.8125rem] shadow-none outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
+          isSelected
+            ? "bg-blue-600 text-white"
+            : "text-foreground/72 hover:bg-[var(--designer-hover)]"
+        )}
+        onClick={onSelect}
+        type="button"
+      >
+        <span className="min-w-0 truncate whitespace-nowrap">{label}</span>
+        <span
+          className={cn(
+            "shrink-0 text-[0.6875rem] uppercase tracking-[0.08em]",
+            isSelected ? "text-white/80" : "text-foreground/40"
+          )}
+        >
+          {tone}
+        </span>
+      </button>
+      <span className="w-8" />
     </div>
   );
 };
@@ -301,7 +314,20 @@ export const LayerTreeRow = ({
   const childNodeIds = useEditorValue((editor) =>
     editor.getChildNodeIds(nodeId)
   );
-  const selectedNodeIds = useEditorValue((_, state) => state.selectedNodeIds);
+  const vectorContours = useEditorValue((editor) => {
+    const node = editor.getNode(nodeId);
+
+    return node?.type === "vector" ? node.contours || [] : [];
+  });
+  const compoundOperationTarget = useEditorValue((nextEditor) => {
+    const target = getCompoundVectorOperationTarget(nextEditor, nodeId);
+
+    return target?.nodeId === nodeId ? target : null;
+  });
+  const pathEditingState = useEditorValue((_, state) => ({
+    pathEditingNodeId: state.pathEditingNodeId,
+    pathEditingPoint: state.pathEditingPoint,
+  }));
 
   useLayoutEffect(() => {
     if (!layer) {
@@ -322,12 +348,33 @@ export const LayerTreeRow = ({
   }
 
   const isContainer = layer.isContainer;
-  const isGroup = layer.isGroup;
   const isExpanded = !collapsedGroupIds.has(nodeId);
   const isHovered = hoveredNodeId === nodeId;
+  const contourRows =
+    layer.node.type === "vector" &&
+    childNodeIds.length === 0 &&
+    vectorContours.length > 1
+      ? vectorContours.map((contour, contourIndex) => ({
+          id: `${nodeId}:contour:${contourIndex}`,
+          isSelected:
+            pathEditingState.pathEditingNodeId === nodeId &&
+            pathEditingState.pathEditingPoint?.contourIndex === contourIndex,
+          label: `Contour ${contourIndex + 1}`,
+          onSelect: () => {
+            editor.select(nodeId);
+            editor.startPathEditing(nodeId);
+
+            if (contour.segments.length > 0) {
+              editor.setPathEditingPoint({
+                contourIndex,
+                segmentIndex: 0,
+              });
+            }
+          },
+          tone: getContourTone(contour),
+        }))
+      : [];
   const VisibilityIcon = layer.isVisible ? ViewIcon : ViewOffIcon;
-  const canGroupSelection = getCanGroupSelection(editor, selectedNodeIds);
-  const canUngroup = isGroup;
   const focusParentId = getFocusParentId(layer.node.parentId);
   const primaryButtonClassName = getLayerPrimaryButtonClassName({
     isSelected: layer.isSelected,
@@ -341,7 +388,7 @@ export const LayerTreeRow = ({
     isVisible: layer.isVisible,
   });
 
-  const handleSelect = (event) => {
+  const handleSelect = (event = { shiftKey: false }) => {
     editor.setFocusedGroup(focusParentId);
 
     if (event.shiftKey) {
@@ -395,10 +442,14 @@ export const LayerTreeRow = ({
           ref={setItemRef}
           style={itemStyle}
         >
-          <ContextMenu.Root>
-            <ContextMenu.Trigger
+          <ContextMenu>
+            <ContextMenuTrigger
               className="block w-full"
-              onContextMenuCapture={() => handleSelect({ shiftKey: false })}
+              onContextMenuCapture={() => {
+                if (!layer.isSelected) {
+                  handleSelect({ shiftKey: false });
+                }
+              }}
               onPointerEnter={() => editor.setHoveredNode(nodeId)}
               onPointerLeave={() => {
                 if (editor.hoveredNodeId !== nodeId) {
@@ -456,6 +507,7 @@ export const LayerTreeRow = ({
                   primaryButtonClassName={primaryButtonClassName}
                   renameInputRef={renameInputRef}
                   renameValue={renameValue}
+                  showCompoundOperationMenu={Boolean(compoundOperationTarget)}
                 />
 
                 <button
@@ -483,71 +535,18 @@ export const LayerTreeRow = ({
                   </span>
                 </button>
               </div>
-            </ContextMenu.Trigger>
+            </ContextMenuTrigger>
 
-            <LayerContextMenuPopup>
-              <GroupLayerContextMenuItems
-                canGroupSelection={canGroupSelection}
-                canUngroup={canUngroup}
-                editor={editor}
-                nodeId={nodeId}
-                onStartRenaming={startRenaming}
-              />
-
-              <LayerContextMenuItem onClick={() => editor.duplicate(nodeId)}>
-                <LayerGlyph icon={Copy01Icon} size={17} strokeWidth={1.7} />
-                Duplicate
-                <MenuShortcut>{LAYER_SHORTCUTS.duplicate}</MenuShortcut>
-              </LayerContextMenuItem>
-              <LayerContextMenuItem
-                onClick={() => editor.toggleVisibility(nodeId)}
-              >
-                <LayerGlyph
-                  icon={layer.isVisible ? ViewOffIcon : ViewIcon}
-                  size={17}
-                  strokeWidth={1.7}
-                />
-                {layer.visibilityLabel}
-              </LayerContextMenuItem>
-              <LayerContextMenuSeparator />
-              <LayerContextMenuItem
-                disabled={selectedCount <= 1 && layer.isFrontmost}
-                onClick={() => editor.bringToFront(nodeId)}
-              >
-                <LayerGlyph
-                  icon={LayerBringToFrontIcon}
-                  size={17}
-                  strokeWidth={1.7}
-                />
-                Bring to front
-                <MenuShortcut>{LAYER_SHORTCUTS.bringToFront}</MenuShortcut>
-              </LayerContextMenuItem>
-              <LayerContextMenuItem
-                disabled={selectedCount <= 1 && layer.isBackmost}
-                onClick={() => editor.sendToBack(nodeId)}
-              >
-                <LayerGlyph
-                  icon={LayerSendToBackIcon}
-                  size={17}
-                  strokeWidth={1.7}
-                />
-                Send to back
-                <MenuShortcut>{LAYER_SHORTCUTS.sendToBack}</MenuShortcut>
-              </LayerContextMenuItem>
-              <LayerContextMenuSeparator />
-              <LayerContextMenuItem
-                className="text-destructive-foreground data-highlighted:bg-destructive/10 data-highlighted:text-destructive-foreground"
-                onClick={() => editor.deleteNode(nodeId)}
-              >
-                <LayerGlyph icon={Delete02Icon} size={17} strokeWidth={1.7} />
-                Delete
-              </LayerContextMenuItem>
-            </LayerContextMenuPopup>
-          </ContextMenu.Root>
+            <NodeContextMenuItems
+              nodeId={nodeId}
+              onStartRenaming={startRenaming}
+            />
+          </ContextMenu>
 
           <LayerTreeChildren
             childNodeIds={childNodeIds}
             collapsedGroupIds={collapsedGroupIds}
+            contourRows={contourRows}
             depth={depth}
             isContainer={isContainer}
             isExpanded={isExpanded}

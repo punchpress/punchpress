@@ -1,4 +1,5 @@
-import { isVectorNode } from "../nodes/node-tree";
+import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
+import { createDefaultVectorContour } from "../nodes/vector/model";
 import {
   createOpenVectorContour,
   reverseVectorContour,
@@ -68,16 +69,6 @@ export const finishAuthoringSession = (
   return tool.editor.revertToMark(session.historyMark);
 };
 
-const getAppendTargetVectorId = (tool: PenTool) => {
-  const pathEditingNode = tool.editor.pathEditingNodeId
-    ? tool.editor.getNode(tool.editor.pathEditingNodeId)
-    : null;
-  const parentNodeId = pathEditingNode?.parentId || null;
-  const parentNode = parentNodeId ? tool.editor.getNode(parentNodeId) : null;
-
-  return isVectorNode(parentNode) ? parentNode.id : null;
-};
-
 export const startAuthoringSession = (tool: PenTool, point) => {
   const historyMark = tool.editor.markHistoryStep("draw vector path");
 
@@ -85,54 +76,33 @@ export const startAuthoringSession = (tool: PenTool, point) => {
     return false;
   }
 
-  const appendTargetVectorId = getAppendTargetVectorId(tool);
-  let parentNodeId: string | null = null;
   let nodeId: string | null = null;
 
   tool.editor.run(() => {
-    if (appendTargetVectorId) {
-      parentNodeId = appendTargetVectorId;
-      nodeId = tool.editor.getState().addPathNode(appendTargetVectorId, point, {
-        activatePointer: false,
-        patch: {
-          closed: false,
-          segments: createOpenVectorContour({ x: 0, y: 0 }).segments,
-        },
-        selectionNodeId: appendTargetVectorId,
-      });
-      return;
-    }
-
     if (tool.editor.pathEditingNodeId) {
       tool.editor.stopPathEditing();
     }
 
-    parentNodeId = tool.editor.getState().addVectorNode(point, {
+    nodeId = tool.editor.getState().addPathNode(ROOT_PARENT_ID, point, {
       activatePointer: false,
       patch: {
-        path: {
-          closed: false,
-          segments: createOpenVectorContour({ x: 0, y: 0 }).segments,
-        },
+        closed: false,
+        segments: [
+          {
+            ...createDefaultVectorContour().segments[0],
+            ...createOpenVectorContour({ x: 0, y: 0 }).segments[0],
+          },
+        ],
       },
     });
   });
 
-  if (!(parentNodeId || nodeId)) {
+  if (!nodeId) {
     tool.editor.revertToMark(historyMark);
     return false;
   }
 
-  const resolvedNodeId =
-    nodeId ||
-    (parentNodeId ? tool.editor.getChildNodeIds(parentNodeId)[0] : null);
-
-  if (!resolvedNodeId) {
-    tool.editor.revertToMark(historyMark);
-    return false;
-  }
-
-  tool.editor.setPathEditingNodeId(resolvedNodeId);
+  tool.editor.setPathEditingNodeId(nodeId);
   tool.editor.setPathEditingPoint({
     contourIndex: 0,
     segmentIndex: 0,
@@ -147,7 +117,7 @@ export const startAuthoringSession = (tool: PenTool, point) => {
     historyMark,
     hoverPoint: null,
     hoverTarget: null,
-    nodeId: resolvedNodeId,
+    nodeId,
   };
   tool.editor.notifyInteractionPreviewChanged();
   return true;

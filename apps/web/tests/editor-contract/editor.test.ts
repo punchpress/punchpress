@@ -25,7 +25,7 @@ const createDocument = (
   id: string,
   text: string,
   font = MISSING_FONT,
-  version = "1.6"
+  version = PUNCH_DOCUMENT_VERSION
 ) => {
   return JSON.stringify({
     nodes: [
@@ -34,6 +34,7 @@ const createDocument = (
         fontSize: 120,
         font,
         id,
+        parentId: "root",
         stroke: null,
         strokeWidth: 0,
         text,
@@ -86,7 +87,7 @@ const createCircleDocument = (id: string, pathPosition?: number) => {
         },
       },
     ],
-    version: "1.6",
+    version: "1.7",
   });
 };
 
@@ -141,6 +142,23 @@ const createRectangleSegments = () => {
     },
   ];
 };
+
+const rotatePointAround = (
+  point: { x: number; y: number },
+  center: { x: number; y: number },
+  rotation: number
+) => {
+  const angle = (rotation * Math.PI) / 180;
+  const offsetX = point.x - center.x;
+  const offsetY = point.y - center.y;
+
+  return {
+    x: center.x + offsetX * Math.cos(angle) - offsetY * Math.sin(angle),
+    y: center.y + offsetX * Math.sin(angle) + offsetY * Math.cos(angle),
+  };
+};
+
+const ROTATE_TRANSFORM_REGEX = /rotate\((-?\d+(?:\.\d+)?)deg\)/;
 
 describe("Editor.loadDocument", () => {
   test("replaces the current document and clears transient selection state", () => {
@@ -258,6 +276,646 @@ describe("Editor.getSelectionFrameKey", () => {
   });
 });
 
+describe("Editor.getSelectionTransformFrame", () => {
+  test("uses the rendered boolean compound center as the rotate anchor", () => {
+    const editor = new Editor();
+
+    editor.getState().loadNodes([
+      {
+        id: "subtract-vector",
+        name: "Subtract",
+        parentId: "root",
+        pathComposition: "subtract",
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 0,
+          y: 0,
+        },
+        type: "vector",
+        visible: true,
+      },
+      {
+        closed: true,
+        fill: "#ffffff",
+        fillRule: "nonzero",
+        id: "subtract-base",
+        parentId: "subtract-vector",
+        segments: createRectangleSegments(),
+        stroke: null,
+        strokeLineCap: "round",
+        strokeLineJoin: "round",
+        strokeMiterLimit: 4,
+        strokeWidth: 0,
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 200,
+          y: 200,
+        },
+        type: "path",
+        visible: true,
+      },
+      {
+        closed: true,
+        fill: "#ffffff",
+        fillRule: "nonzero",
+        id: "subtract-cutter",
+        parentId: "subtract-vector",
+        segments: createRectangleSegments(),
+        stroke: null,
+        strokeLineCap: "round",
+        strokeLineJoin: "round",
+        strokeMiterLimit: 4,
+        strokeWidth: 0,
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 300,
+          y: 200,
+        },
+        type: "path",
+        visible: true,
+      },
+    ]);
+
+    editor.select("subtract-vector");
+
+    const frame = editor.getSelectionTransformFrame(["subtract-vector"]);
+    const frameCenter = frame?.bounds
+      ? {
+          x: frame.bounds.minX + frame.bounds.width / 2,
+          y: frame.bounds.minY + frame.bounds.height / 2,
+        }
+      : null;
+    const childBounds = editor.getSelectionBounds([
+      "subtract-base",
+      "subtract-cutter",
+    ]);
+    const childBoundsCenter = childBounds
+      ? {
+          x: childBounds.minX + childBounds.width / 2,
+          y: childBounds.minY + childBounds.height / 2,
+        }
+      : null;
+    const session = editor.beginRotateSelection({ nodeId: "subtract-vector" });
+
+    expect(frameCenter).not.toBeNull();
+    expect(childBoundsCenter).not.toBeNull();
+    expect(session?.selectionCenter).not.toBeNull();
+    expect(frameCenter?.x).not.toBeCloseTo(childBoundsCenter?.x || 0, 4);
+    expect(session?.selectionCenter.x).toBeCloseTo(frameCenter?.x || 0, 4);
+    expect(session?.selectionCenter.y).toBeCloseTo(frameCenter?.y || 0, 4);
+  });
+
+  test("keeps a rotated compound vector selection frame aligned to the rotated child paths", () => {
+    const editor = new Editor();
+
+    editor.getState().loadNodes([
+      {
+        id: "compound-vector",
+        name: "Compound",
+        pathComposition: "compound-fill",
+        parentId: "root",
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 0,
+          y: 0,
+        },
+        type: "vector",
+        visible: true,
+      },
+      {
+        closed: true,
+        fill: "#ffffff",
+        fillRule: "nonzero",
+        id: "compound-path-1",
+        parentId: "compound-vector",
+        segments: createRectangleSegments(),
+        stroke: null,
+        strokeLineCap: "round",
+        strokeLineJoin: "round",
+        strokeMiterLimit: 4,
+        strokeWidth: 0,
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 220,
+          y: 40,
+        },
+        type: "path",
+        visible: true,
+      },
+      {
+        closed: true,
+        fill: "#ffffff",
+        fillRule: "nonzero",
+        id: "compound-path-2",
+        parentId: "compound-vector",
+        segments: [
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: -40, y: -30 },
+            pointType: "corner",
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: 70, y: -30 },
+            pointType: "corner",
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: 70, y: 50 },
+            pointType: "corner",
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: -40, y: 50 },
+            pointType: "corner",
+          },
+        ],
+        stroke: null,
+        strokeLineCap: "round",
+        strokeLineJoin: "round",
+        strokeMiterLimit: 4,
+        strokeWidth: 0,
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: -120,
+          y: -20,
+        },
+        type: "path",
+        visible: true,
+      },
+    ]);
+
+    editor.select("compound-vector");
+    editor.rotateSelectionBy({ deltaRotation: 30 });
+
+    const frame = editor.getSelectionTransformFrame(["compound-vector"]);
+
+    expect(frame?.transform).toBe("rotate(30deg)");
+
+    const frameBounds = frame?.bounds;
+    const frameCenter = frameBounds
+      ? {
+          x: frameBounds.minX + frameBounds.width / 2,
+          y: frameBounds.minY + frameBounds.height / 2,
+        }
+      : null;
+
+    expect(frameBounds).not.toBeNull();
+    expect(frameCenter).not.toBeNull();
+
+    for (const nodeId of ["compound-path-1", "compound-path-2"]) {
+      const node = editor.getNode(nodeId);
+      const bounds = editor.getNodeTransformBounds(nodeId);
+
+      expect(node).not.toBeNull();
+      expect(bounds).not.toBeNull();
+
+      const localCenter = {
+        x: (bounds.minX + bounds.maxX) / 2,
+        y: (bounds.minY + bounds.maxY) / 2,
+      };
+      const worldCenter = {
+        x: node.transform.x + localCenter.x,
+        y: node.transform.y + localCenter.y,
+      };
+      const localCorners = [
+        { x: bounds.minX, y: bounds.minY },
+        { x: bounds.maxX, y: bounds.minY },
+        { x: bounds.maxX, y: bounds.maxY },
+        { x: bounds.minX, y: bounds.maxY },
+      ];
+
+      for (const corner of localCorners) {
+        const worldCorner = rotatePointAround(
+          {
+            x: worldCenter.x + (corner.x - localCenter.x),
+            y: worldCenter.y + (corner.y - localCenter.y),
+          },
+          worldCenter,
+          node.transform.rotation
+        );
+        const unrotatedCorner = rotatePointAround(
+          worldCorner,
+          frameCenter,
+          -30
+        );
+
+        expect(unrotatedCorner.x).toBeGreaterThanOrEqual(
+          frameBounds.minX - 0.01
+        );
+        expect(unrotatedCorner.x).toBeLessThanOrEqual(frameBounds.maxX + 0.01);
+        expect(unrotatedCorner.y).toBeGreaterThanOrEqual(
+          frameBounds.minY - 0.01
+        );
+        expect(unrotatedCorner.y).toBeLessThanOrEqual(frameBounds.maxY + 0.01);
+      }
+    }
+  });
+
+  test("keeps a rotated multi-compound selection frame aligned to both compound vectors", () => {
+    const editor = new Editor();
+
+    const createCompoundVectorNodes = (
+      vectorId: string,
+      outerPathId: string,
+      innerPathId: string,
+      outerPosition: { x: number; y: number },
+      innerPosition: { x: number; y: number }
+    ) => {
+      return [
+        {
+          id: vectorId,
+          name: vectorId,
+          pathComposition: "compound-fill",
+          parentId: "root",
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: 0,
+            y: 0,
+          },
+          type: "vector",
+          visible: true,
+        },
+        {
+          closed: true,
+          fill: "#ffffff",
+          fillRule: "nonzero",
+          id: outerPathId,
+          parentId: vectorId,
+          segments: createRectangleSegments(),
+          stroke: null,
+          strokeLineCap: "round",
+          strokeLineJoin: "round",
+          strokeMiterLimit: 4,
+          strokeWidth: 0,
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: outerPosition.x,
+            y: outerPosition.y,
+          },
+          type: "path",
+          visible: true,
+        },
+        {
+          closed: true,
+          fill: "#ffffff",
+          fillRule: "nonzero",
+          id: innerPathId,
+          parentId: vectorId,
+          segments: [
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: -40, y: -30 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: 70, y: -30 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: 70, y: 50 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: -40, y: 50 },
+              pointType: "corner",
+            },
+          ],
+          stroke: null,
+          strokeLineCap: "round",
+          strokeLineJoin: "round",
+          strokeMiterLimit: 4,
+          strokeWidth: 0,
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: innerPosition.x,
+            y: innerPosition.y,
+          },
+          type: "path",
+          visible: true,
+        },
+      ];
+    };
+
+    editor
+      .getState()
+      .loadNodes([
+        ...createCompoundVectorNodes(
+          "compound-vector-a",
+          "compound-a-path-1",
+          "compound-a-path-2",
+          { x: 220, y: 40 },
+          { x: -120, y: -20 }
+        ),
+        ...createCompoundVectorNodes(
+          "compound-vector-b",
+          "compound-b-path-1",
+          "compound-b-path-2",
+          { x: 620, y: 360 },
+          { x: 300, y: 300 }
+        ),
+      ]);
+
+    editor.setSelectedNodes(["compound-vector-a", "compound-vector-b"]);
+    editor.rotateSelectionBy({ deltaRotation: 30 });
+
+    const frame = editor.getSelectionTransformFrame([
+      "compound-vector-a",
+      "compound-vector-b",
+    ]);
+
+    expect(frame?.transform).toBe("rotate(30deg)");
+
+    const frameBounds = frame?.bounds;
+    const frameCenter = frameBounds
+      ? {
+          x: frameBounds.minX + frameBounds.width / 2,
+          y: frameBounds.minY + frameBounds.height / 2,
+        }
+      : null;
+
+    expect(frameBounds).not.toBeNull();
+    expect(frameCenter).not.toBeNull();
+
+    for (const nodeId of [
+      "compound-a-path-1",
+      "compound-a-path-2",
+      "compound-b-path-1",
+      "compound-b-path-2",
+    ]) {
+      const node = editor.getNode(nodeId);
+      const bounds = editor.getNodeTransformBounds(nodeId);
+
+      expect(node).not.toBeNull();
+      expect(bounds).not.toBeNull();
+
+      const localCenter = {
+        x: (bounds.minX + bounds.maxX) / 2,
+        y: (bounds.minY + bounds.maxY) / 2,
+      };
+      const worldCenter = {
+        x: node.transform.x + localCenter.x,
+        y: node.transform.y + localCenter.y,
+      };
+      const localCorners = [
+        { x: bounds.minX, y: bounds.minY },
+        { x: bounds.maxX, y: bounds.minY },
+        { x: bounds.maxX, y: bounds.maxY },
+        { x: bounds.minX, y: bounds.maxY },
+      ];
+
+      for (const corner of localCorners) {
+        const worldCorner = rotatePointAround(
+          {
+            x: worldCenter.x + (corner.x - localCenter.x),
+            y: worldCenter.y + (corner.y - localCenter.y),
+          },
+          worldCenter,
+          node.transform.rotation
+        );
+        const unrotatedCorner = rotatePointAround(
+          worldCorner,
+          frameCenter,
+          -30
+        );
+
+        expect(unrotatedCorner.x).toBeGreaterThanOrEqual(
+          frameBounds.minX - 0.01
+        );
+        expect(unrotatedCorner.x).toBeLessThanOrEqual(frameBounds.maxX + 0.01);
+        expect(unrotatedCorner.y).toBeGreaterThanOrEqual(
+          frameBounds.minY - 0.01
+        );
+        expect(unrotatedCorner.y).toBeLessThanOrEqual(frameBounds.maxY + 0.01);
+      }
+    }
+  });
+
+  test("keeps a rotated multi-compound selection frame when the compounds have slightly different rotations", () => {
+    const editor = new Editor();
+
+    const createCompoundVectorNodes = (
+      vectorId: string,
+      outerPathId: string,
+      innerPathId: string,
+      outerPosition: { x: number; y: number },
+      innerPosition: { x: number; y: number },
+      rotation: number
+    ) => {
+      return [
+        {
+          id: vectorId,
+          name: vectorId,
+          pathComposition: "compound-fill",
+          parentId: "root",
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: 0,
+            y: 0,
+          },
+          type: "vector",
+          visible: true,
+        },
+        {
+          closed: true,
+          fill: "#ffffff",
+          fillRule: "nonzero",
+          id: outerPathId,
+          parentId: vectorId,
+          segments: createRectangleSegments(),
+          stroke: null,
+          strokeLineCap: "round",
+          strokeLineJoin: "round",
+          strokeMiterLimit: 4,
+          strokeWidth: 0,
+          transform: {
+            rotation,
+            scaleX: 1,
+            scaleY: 1,
+            x: outerPosition.x,
+            y: outerPosition.y,
+          },
+          type: "path",
+          visible: true,
+        },
+        {
+          closed: true,
+          fill: "#ffffff",
+          fillRule: "nonzero",
+          id: innerPathId,
+          parentId: vectorId,
+          segments: [
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: -40, y: -30 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: 70, y: -30 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: 70, y: 50 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: -40, y: 50 },
+              pointType: "corner",
+            },
+          ],
+          stroke: null,
+          strokeLineCap: "round",
+          strokeLineJoin: "round",
+          strokeMiterLimit: 4,
+          strokeWidth: 0,
+          transform: {
+            rotation,
+            scaleX: 1,
+            scaleY: 1,
+            x: innerPosition.x,
+            y: innerPosition.y,
+          },
+          type: "path",
+          visible: true,
+        },
+      ];
+    };
+
+    editor
+      .getState()
+      .loadNodes([
+        ...createCompoundVectorNodes(
+          "compound-vector-a",
+          "compound-a-path-1",
+          "compound-a-path-2",
+          { x: 220, y: 40 },
+          { x: -120, y: -20 },
+          10
+        ),
+        ...createCompoundVectorNodes(
+          "compound-vector-b",
+          "compound-b-path-1",
+          "compound-b-path-2",
+          { x: 620, y: 360 },
+          { x: 300, y: 300 },
+          20
+        ),
+      ]);
+
+    const frame = editor.getSelectionTransformFrame([
+      "compound-vector-a",
+      "compound-vector-b",
+    ]);
+    const frameRotation = Number.parseFloat(
+      frame?.transform?.match(ROTATE_TRANSFORM_REGEX)?.[1] || "0"
+    );
+
+    expect(Math.abs(frameRotation)).toBeGreaterThan(8);
+
+    const frameBounds = frame?.bounds;
+    const frameCenter = frameBounds
+      ? {
+          x: frameBounds.minX + frameBounds.width / 2,
+          y: frameBounds.minY + frameBounds.height / 2,
+        }
+      : null;
+
+    expect(frameBounds).not.toBeNull();
+    expect(frameCenter).not.toBeNull();
+
+    for (const nodeId of [
+      "compound-a-path-1",
+      "compound-a-path-2",
+      "compound-b-path-1",
+      "compound-b-path-2",
+    ]) {
+      const node = editor.getNode(nodeId);
+      const bounds = editor.getNodeTransformBounds(nodeId);
+
+      expect(node).not.toBeNull();
+      expect(bounds).not.toBeNull();
+
+      const localCenter = {
+        x: (bounds.minX + bounds.maxX) / 2,
+        y: (bounds.minY + bounds.maxY) / 2,
+      };
+      const worldCenter = {
+        x: node.transform.x + localCenter.x,
+        y: node.transform.y + localCenter.y,
+      };
+      const localCorners = [
+        { x: bounds.minX, y: bounds.minY },
+        { x: bounds.maxX, y: bounds.minY },
+        { x: bounds.maxX, y: bounds.maxY },
+        { x: bounds.minX, y: bounds.maxY },
+      ];
+
+      for (const corner of localCorners) {
+        const worldCorner = rotatePointAround(
+          {
+            x: worldCenter.x + (corner.x - localCenter.x),
+            y: worldCenter.y + (corner.y - localCenter.y),
+          },
+          worldCenter,
+          node.transform.rotation
+        );
+        const unrotatedCorner = rotatePointAround(
+          worldCorner,
+          frameCenter,
+          -frameRotation
+        );
+
+        expect(unrotatedCorner.x).toBeGreaterThanOrEqual(
+          frameBounds.minX - 0.01
+        );
+        expect(unrotatedCorner.x).toBeLessThanOrEqual(frameBounds.maxX + 0.01);
+        expect(unrotatedCorner.y).toBeGreaterThanOrEqual(
+          frameBounds.minY - 0.01
+        );
+        expect(unrotatedCorner.y).toBeLessThanOrEqual(frameBounds.maxY + 0.01);
+      }
+    }
+  });
+});
+
 describe("Editor.getNodeTransformFrame", () => {
   test("uses the child path geometry for a selected vector container transform frame", () => {
     const editor = new Editor();
@@ -302,13 +960,14 @@ describe("Editor.getNodeTransformFrame", () => {
 
     expect(editor.getNodeTransformFrame("scaled-vector-node")).toEqual({
       bounds: {
-        height: 60,
-        maxX: 300,
-        maxY: 230,
-        minX: -100,
-        minY: 170,
-        width: 400,
+        height: 120,
+        maxX: 200,
+        maxY: 260,
+        minX: 0,
+        minY: 140,
+        width: 200,
       },
+      transform: undefined,
     });
   });
 
@@ -575,7 +1234,7 @@ describe("Editor text editing mode", () => {
     });
   });
 
-  test("keeps the pen tool active while starting a vector path", () => {
+  test("keeps the pen tool active while starting a path", () => {
     const editor = new Editor();
 
     editor.setActiveTool("pen");
@@ -594,41 +1253,74 @@ describe("Editor text editing mode", () => {
     expect(editor.editingNodeId).toBeNull();
     expect(editor.selectedNodeIds).toEqual([editor.selectedNodeId]);
     expect(editor.getNode(editor.selectedNodeId)).toMatchObject({
-      type: "vector",
-    });
-    const childPathId = editor.getChildNodeIds(editor.selectedNodeId || "")[0];
-
-    expect(editor.getNode(childPathId)).toMatchObject({
-      parentId: editor.selectedNodeId,
       type: "path",
     });
-    expect(editor.getNode(childPathId)?.transform).toMatchObject({
+    expect(editor.getNode(editor.selectedNodeId)?.parentId).toBe("root");
+    expect(editor.getNode(editor.selectedNodeId)?.transform).toMatchObject({
       x: 420,
       y: 180,
     });
-    expect(editor.pathEditingNodeId).toBe(childPathId);
+    expect(editor.pathEditingNodeId).toBe(editor.selectedNodeId);
   });
 
-  test("places a default vector with corner anchor points on its child path", () => {
+  test("places a default path with corner anchor points", () => {
     const editor = new Editor();
 
     editor.addVectorNode({ x: 420, y: 180 });
 
-    const selectedVector = editor.selectedNode;
-    const childPath = selectedVector?.id
-      ? editor.getNode(editor.getChildNodeIds(selectedVector.id)[0])
-      : null;
+    const selectedPath = editor.selectedNode;
 
-    expect(selectedVector).toMatchObject({
-      type: "vector",
+    expect(selectedPath).toMatchObject({
+      parentId: "root",
+      type: "path",
     });
-    expect(childPath?.type).toBe("path");
-    expect(childPath?.segments.map((segment) => segment.point)).toEqual([
+    expect(selectedPath?.segments.map((segment) => segment.point)).toEqual([
       { x: -120, y: -90 },
       { x: 120, y: -90 },
       { x: 120, y: 90 },
       { x: -120, y: 90 },
     ]);
+  });
+
+  test("includes standalone path stroke width in the render frame", () => {
+    const editor = new Editor();
+
+    editor.getState().loadNodes([
+      {
+        closed: true,
+        fill: "#ffffff",
+        fillRule: "nonzero",
+        id: "stroke-path",
+        parentId: "root",
+        segments: createRectangleSegments(),
+        stroke: "#000000",
+        strokeLineCap: "round",
+        strokeLineJoin: "round",
+        strokeMiterLimit: 4,
+        strokeWidth: 54,
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 320,
+          y: 240,
+        },
+        type: "path",
+        visible: true,
+      },
+    ]);
+
+    expect(editor.getNodeRenderFrame("stroke-path")).toEqual({
+      bounds: {
+        height: 174,
+        maxX: 447,
+        maxY: 327,
+        minX: 193,
+        minY: 153,
+        width: 254,
+      },
+      transform: undefined,
+    });
   });
 
   test("keeps the pointer tool active when opening an existing text node for editing", () => {
@@ -662,7 +1354,7 @@ describe("Editor shape export", () => {
     expect(svg).toContain('"shape":"star"');
   });
 
-  test("exports visible vector nodes without requiring fonts", async () => {
+  test("exports visible paths without requiring fonts", async () => {
     const editor = new Editor();
 
     editor.addVectorNode({ x: 480, y: 360 });
@@ -671,7 +1363,7 @@ describe("Editor shape export", () => {
 
     expect(svg).toContain("<path");
     expect(svg).toContain('fill="#ffffff"');
-    expect(svg).toContain('"type":"vector"');
+    expect(svg).toContain('"type":"path"');
   });
 
   test("exports open vector contours without fill", async () => {

@@ -4,6 +4,7 @@ import type {
   DesktopAppMenuState,
   DesktopEditorCommand,
   DesktopMenuChoiceState,
+  DesktopVectorCompoundOperation,
   DesktopVectorFillRule,
   DesktopVectorStrokeLineCap,
   DesktopVectorStrokeLineJoin,
@@ -187,6 +188,9 @@ const buildObjectSubmenu = (
   const objectMenuState = appMenuState ?? {
     canDelete: false,
     canEditPath: false,
+    compoundOperation: null,
+    canMakeCompoundPath: false,
+    canReleaseCompoundPath: false,
     selectedNodeType: null,
     selectionKind: "none" as const,
     vectorStyle: null,
@@ -282,6 +286,44 @@ const buildObjectSubmenu = (
     ],
     sendEditorCommand
   );
+  const compoundOperationSubmenu = buildChoiceSubmenu(
+    objectMenuState.compoundOperation,
+    [
+      {
+        command: {
+          type: "vector-compound-operation",
+          value: "unite",
+        },
+        label: "Unite",
+        value: "unite",
+      },
+      {
+        command: {
+          type: "vector-compound-operation",
+          value: "subtract",
+        },
+        label: "Subtract",
+        value: "subtract",
+      },
+      {
+        command: {
+          type: "vector-compound-operation",
+          value: "intersect",
+        },
+        label: "Intersect",
+        value: "intersect",
+      },
+      {
+        command: {
+          type: "vector-compound-operation",
+          value: "exclude",
+        },
+        label: "Exclude",
+        value: "exclude",
+      },
+    ],
+    sendEditorCommand
+  );
 
   return [
     {
@@ -292,6 +334,30 @@ const buildObjectSubmenu = (
         }),
       enabled: objectMenuState.canEditPath,
       label: "Edit Path",
+    },
+    { type: "separator" },
+    {
+      click: () =>
+        sendEditorCommand({
+          action: "make-compound-path",
+          type: "selection",
+        }),
+      enabled: objectMenuState.canMakeCompoundPath,
+      label: "Make Compound Path",
+    },
+    {
+      click: () =>
+        sendEditorCommand({
+          action: "release-compound-path",
+          type: "selection",
+        }),
+      enabled: objectMenuState.canReleaseCompoundPath,
+      label: "Release Compound Path",
+    },
+    {
+      enabled: isSubmenuEnabled(compoundOperationSubmenu),
+      label: "Compound Operation",
+      submenu: compoundOperationSubmenu,
     },
     { type: "separator" },
     {
@@ -324,6 +390,7 @@ const buildObjectSubmenu = (
 
 const buildChoiceSubmenu = <
   Value extends
+    | DesktopVectorCompoundOperation
     | DesktopVectorFillRule
     | DesktopVectorStrokeLineCap
     | DesktopVectorStrokeLineJoin,

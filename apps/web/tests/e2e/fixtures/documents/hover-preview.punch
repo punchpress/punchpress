@@ -1,9 +1,10 @@
 {
-  "version": "1.6",
+  "version": "1.7",
   "nodes": [
     {
       "id": "hover-node",
       "type": "text",
+      "parentId": "root",
       "text": "Hover me",
       "font": {
         "family": "Arial",

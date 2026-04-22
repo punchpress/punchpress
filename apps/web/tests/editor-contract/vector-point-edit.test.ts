@@ -312,7 +312,7 @@ describe("vector point editing", () => {
             visible: true,
           },
         ],
-        version: "1.6",
+        version: "1.7",
       })
     );
 
@@ -320,6 +320,6 @@ describe("vector point editing", () => {
     const segment = node?.type === "path" ? node.segments[0] : null;
 
     expect(segment?.pointType).toBe("corner");
-    expect(editor.getDebugDump().document.version).toBe("1.6");
+    expect(editor.getDebugDump().document.version).toBe("1.7");
   });
 });

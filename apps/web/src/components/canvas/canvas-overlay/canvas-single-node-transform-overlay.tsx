@@ -1,5 +1,7 @@
 import { clamp } from "@punchpress/engine";
 import { useMemo, useRef, useState } from "react";
+import { NodeContextMenuItems } from "@/components/context-menus/node-context-menu-items";
+import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
@@ -9,6 +11,7 @@ import {
 } from "../canvas-cursor-assets";
 import { openCanvasNodeEditingMode } from "../canvas-node-editing";
 import { getHostRectFromNodeFrame } from "./canvas-overlay-geometry";
+import { CanvasSelectionPathGhost } from "./canvas-selection-path-ghost";
 import { getTextPathTransformTargetStyle } from "./text-path-overlay-geometry";
 import {
   getRotateCursorRotationDegrees,
@@ -264,12 +267,36 @@ const edgeLineStyle = {
   },
 };
 
+interface CanvasSingleNodeTransformOverlayProps {
+  isDraggable: boolean;
+  isResizable: boolean;
+  isRotatable: boolean;
+  nodeId: string;
+  selectionGhost: {
+    bbox: {
+      height: number;
+      maxX: number;
+      maxY: number;
+      minX: number;
+      minY: number;
+      width: number;
+    };
+    nodeId: string;
+    paths: Array<{
+      d: string;
+      key?: string;
+      transform?: string | null;
+    }>;
+  } | null;
+}
+
 export const CanvasSingleNodeTransformOverlay = ({
   isDraggable,
   isResizable,
   isRotatable,
   nodeId,
-}) => {
+  selectionGhost,
+}: CanvasSingleNodeTransformOverlayProps) => {
   const editor = useEditor();
   const isShapeNode = useEditorValue((editor) => {
     return editor.getNode(nodeId)?.type === "shape";
@@ -601,87 +628,106 @@ export const CanvasSingleNodeTransformOverlay = ({
   };
 
   return (
-    <div
-      className={`canvas-moveable canvas-single-node-transform-overlay moveable-control-box absolute ${cursorClassName}`}
-      onDoubleClick={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        openCanvasNodeEditingMode(editor, nodeId);
-      }}
-      onPointerDown={startSelectionDrag}
-      style={{
-        height: `${overlayRect.height}px`,
-        left: `${overlayRect.left}px`,
-        pointerEvents: isDraggable ? "auto" : "none",
-        top: `${overlayRect.top}px`,
-        transform: overlayRect.transform,
-        transformOrigin: "center center",
-        width: `${overlayRect.width}px`,
-      }}
-    >
-      {(["n", "s", "w", "e"] as const).map((edge) => {
-        return (
+    <ContextMenu>
+      <ContextMenuTrigger
+        render={
+          // biome-ignore lint/a11y/noStaticElementInteractions: editor transform overlays are pointer-only interaction surfaces
+          // biome-ignore lint/a11y/noNoninteractiveElementInteractions: editor transform overlays are not semantic controls
           <div
-            className={`absolute ${isShapeNode ? edgeCursorClassName[edge] : ""}`}
-            data-edge={edge}
-            key={edge}
-            onPointerDown={
-              isShapeNode ? (event) => startResize(edge, event) : undefined
-            }
-            ref={(element) => {
-              edgeElementsRef.current[edge] = element;
+            className={`canvas-moveable canvas-single-node-transform-overlay moveable-control-box absolute ${cursorClassName}`}
+            onDoubleClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              openCanvasNodeEditingMode(editor, nodeId, {
+                clientPoint: {
+                  x: event.clientX,
+                  y: event.clientY,
+                },
+              });
             }}
+            onPointerDown={startSelectionDrag}
             style={{
-              ...edgeHitAreaStyle[edge],
-              pointerEvents: isShapeNode ? "auto" : "none",
+              height: `${overlayRect.height}px`,
+              left: `${overlayRect.left}px`,
+              pointerEvents: isDraggable ? "auto" : "none",
+              top: `${overlayRect.top}px`,
+              transform: overlayRect.transform,
+              transformOrigin: "center center",
+              width: `${overlayRect.width}px`,
             }}
-          >
+          />
+        }
+      >
+        <CanvasSelectionPathGhost ghost={selectionGhost} />
+
+        {(["n", "s", "w", "e"] as const).map((edge) => {
+          return (
             <div
-              className="moveable-line absolute"
-              style={edgeLineStyle[edge]}
-            />
-          </div>
-        );
-      })}
-
-      {(["nw", "ne", "sw", "se"] as const).map((corner) => {
-        return (
-          <div key={corner}>
-            {isRotatable ? (
-              <div
-                className="canvas-rotation-zone canvas-single-node-rotation-zone canvas-cursor-rotate pointer-events-auto absolute"
-                data-corner={corner}
-                onPointerDown={(event) => startRotate(corner, event)}
-                style={{
-                  ...rotationZoneStyle[corner],
-                  cursor: getRotateCursorForCorner(
-                    corner,
-                    overlayRotationDegrees
-                  ),
-                  height: `${ROTATION_ZONE_SIZE}px`,
-                  width: `${ROTATION_ZONE_SIZE}px`,
-                }}
-              />
-            ) : null}
-
-            <button
-              className={`moveable-control moveable-${corner} canvas-single-node-control pointer-events-auto absolute ${resizeCursorClassName[corner]}`}
-              onPointerDown={(event) => startResize(corner, event)}
+              className={`absolute ${isShapeNode ? edgeCursorClassName[edge] : ""}`}
+              data-edge={edge}
+              key={edge}
+              onPointerDown={
+                isShapeNode ? (event) => startResize(edge, event) : undefined
+              }
               ref={(element) => {
-                handleElementsRef.current[corner] = element;
+                edgeElementsRef.current[edge] = element;
               }}
               style={{
-                ...handlePositionStyle[corner],
-                cursor: getCanvasScaleCursor(
-                  getScaleCursorRotationDegrees(corner, overlayRotationDegrees)
-                ),
-                transform: handleTransformStyle[corner],
+                ...edgeHitAreaStyle[edge],
+                pointerEvents: isShapeNode ? "auto" : "none",
               }}
-              type="button"
-            />
-          </div>
-        );
-      })}
-    </div>
+            >
+              <div
+                className="moveable-line absolute"
+                style={edgeLineStyle[edge]}
+              />
+            </div>
+          );
+        })}
+
+        {(["nw", "ne", "sw", "se"] as const).map((corner) => {
+          return (
+            <div key={corner}>
+              {isRotatable ? (
+                <div
+                  className="canvas-rotation-zone canvas-single-node-rotation-zone canvas-cursor-rotate pointer-events-auto absolute"
+                  data-corner={corner}
+                  onPointerDown={(event) => startRotate(corner, event)}
+                  style={{
+                    ...rotationZoneStyle[corner],
+                    cursor: getRotateCursorForCorner(
+                      corner,
+                      overlayRotationDegrees
+                    ),
+                    height: `${ROTATION_ZONE_SIZE}px`,
+                    width: `${ROTATION_ZONE_SIZE}px`,
+                  }}
+                />
+              ) : null}
+
+              <button
+                className={`moveable-control moveable-${corner} canvas-single-node-control pointer-events-auto absolute ${resizeCursorClassName[corner]}`}
+                onPointerDown={(event) => startResize(corner, event)}
+                ref={(element) => {
+                  handleElementsRef.current[corner] = element;
+                }}
+                style={{
+                  ...handlePositionStyle[corner],
+                  cursor: getCanvasScaleCursor(
+                    getScaleCursorRotationDegrees(
+                      corner,
+                      overlayRotationDegrees
+                    )
+                  ),
+                  transform: handleTransformStyle[corner],
+                }}
+                type="button"
+              />
+            </div>
+          );
+        })}
+      </ContextMenuTrigger>
+      <NodeContextMenuItems nodeId={nodeId} />
+    </ContextMenu>
   );
 };

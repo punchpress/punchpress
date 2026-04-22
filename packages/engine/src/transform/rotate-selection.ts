@@ -1,7 +1,4 @@
-import {
-  getNodeRotationCenter,
-  getRotatedNodeUpdate,
-} from "../primitives/rotation";
+import { getRotatedNodeUpdate } from "../primitives/rotation";
 
 const getBoundsCenter = (bounds) => {
   if (!bounds) {
@@ -12,6 +9,21 @@ const getBoundsCenter = (bounds) => {
     x: (bounds.minX + bounds.maxX) / 2,
     y: (bounds.minY + bounds.maxY) / 2,
   };
+};
+
+const getRotateSelectionCenter = (
+  editor,
+  requestedNodeIds,
+  resolvedNodeIds
+) => {
+  const selectionFrame = editor.getSelectionTransformFrame(requestedNodeIds);
+  const frameCenter = getBoundsCenter(selectionFrame?.bounds);
+
+  if (frameCenter) {
+    return frameCenter;
+  }
+
+  return getBoundsCenter(editor.getSelectionBounds(resolvedNodeIds));
 };
 
 export const beginRotateSelection = (editor, { nodeId, nodeIds } = {}) => {
@@ -49,13 +61,11 @@ export const beginRotateSelection = (editor, { nodeId, nodeIds } = {}) => {
     return null;
   }
 
-  const selectionCenter =
-    resolvedNodeIds.length === 1
-      ? getNodeRotationCenter(
-          baseNodes.get(resolvedNodeIds[0]),
-          baseNodes.get(resolvedNodeIds[0]).bbox
-        )
-      : getBoundsCenter(editor.getSelectionBounds(resolvedNodeIds));
+  const selectionCenter = getRotateSelectionCenter(
+    editor,
+    requestedNodeIds,
+    resolvedNodeIds
+  );
 
   if (!selectionCenter) {
     return null;
@@ -99,7 +109,11 @@ export const rotateSelectionBy = (
   editor,
   { deltaRotation = 0, queueRefresh = true } = {}
 ) => {
-  const effectiveSelectedNodeIds = editor.getEffectiveSelectionNodeIds();
+  const selectedNodeIds = editor.selectedNodeIds.filter((nodeId) => {
+    return editor.getNode(nodeId);
+  });
+  const effectiveSelectedNodeIds =
+    editor.getEffectiveSelectionNodeIds(selectedNodeIds);
 
   if (
     !(effectiveSelectedNodeIds.length > 0 && Number.isFinite(deltaRotation))
@@ -108,7 +122,7 @@ export const rotateSelectionBy = (
   }
 
   const rotateSession = beginRotateSelection(editor, {
-    nodeIds: effectiveSelectedNodeIds,
+    nodeIds: selectedNodeIds,
   });
 
   return updateRotateSelection(editor, rotateSession, {

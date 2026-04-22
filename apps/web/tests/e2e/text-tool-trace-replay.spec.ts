@@ -80,7 +80,7 @@ const TRACE_REPLAY_DOCUMENT = {
       },
     },
   ],
-  version: "1.6",
+  version: "1.7",
 } as const;
 
 const TRACE_ZOOM = 0.445_612_442_210_268_24;

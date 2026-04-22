@@ -1,3 +1,4 @@
+import { compoundVectorDragBenchmark } from "./benchmarks/compound-vector-drag-benchmark";
 import { idleSoakBenchmark } from "./benchmarks/idle-soak-benchmark";
 import { shapeDragBenchmarkLarge } from "./benchmarks/square-drag-benchmark";
 import {
@@ -6,6 +7,7 @@ import {
 } from "./benchmarks/text-drag-benchmark";
 
 export const performanceBenchmarks = [
+  compoundVectorDragBenchmark,
   idleSoakBenchmark,
   shapeDragBenchmarkLarge,
   textDragBenchmark,

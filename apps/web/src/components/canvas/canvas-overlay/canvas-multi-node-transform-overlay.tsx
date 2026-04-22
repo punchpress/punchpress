@@ -1,5 +1,7 @@
 import { clamp } from "@punchpress/engine";
 import { useMemo, useRef, useState } from "react";
+import { NodeContextMenuItems } from "@/components/context-menus/node-context-menu-items";
+import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
@@ -171,6 +173,7 @@ export const CanvasMultiNodeTransformOverlay = ({
   }
 
   const cursorClassName = "canvas-cursor-default";
+  const contextMenuNodeId = nodeIds[0] || selectedGroupNodeId || null;
 
   const startSelectionDrag = (event) => {
     if (!(event.button === 0 && isDraggable)) {
@@ -413,7 +416,14 @@ export const CanvasMultiNodeTransformOverlay = ({
       return;
     }
 
-    if (openCanvasNodeEditingMode(editor, targetNodeId)) {
+    if (
+      openCanvasNodeEditingMode(editor, targetNodeId, {
+        clientPoint: {
+          x: event.clientX,
+          y: event.clientY,
+        },
+      })
+    ) {
       event.preventDefault();
       event.stopPropagation();
       return;
@@ -425,76 +435,88 @@ export const CanvasMultiNodeTransformOverlay = ({
   };
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: editor transform overlays are pointer-only interaction surfaces
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: editor transform overlays are not semantic controls
-    <div
-      className={`canvas-moveable canvas-multi-node-transform-overlay moveable-control-box absolute ${cursorClassName}`}
-      onDoubleClick={handleDoubleClick}
-      onPointerDown={startSelectionDrag}
-      style={{
-        height: `${overlayRect.height}px`,
-        left: `${overlayRect.left}px`,
-        top: `${overlayRect.top}px`,
-        transform: overlayRect.transform,
-        transformOrigin: "center center",
-        width: `${overlayRect.width}px`,
-      }}
-    >
-      <div
-        className="moveable-line absolute top-0 left-0 w-full"
-        style={{ height: "1.5px" }}
-      />
-      <div
-        className="moveable-line absolute bottom-0 left-0 w-full"
-        style={{ height: "1.5px" }}
-      />
-      <div
-        className="moveable-line absolute top-0 left-0 h-full"
-        style={{ width: "1.5px" }}
-      />
-      <div
-        className="moveable-line absolute top-0 right-0 h-full"
-        style={{ width: "1.5px" }}
-      />
+    <ContextMenu>
+      <ContextMenuTrigger
+        render={
+          // biome-ignore lint/a11y/noStaticElementInteractions: editor transform overlays are pointer-only interaction surfaces
+          // biome-ignore lint/a11y/noNoninteractiveElementInteractions: editor transform overlays are not semantic controls
+          <div
+            className={`canvas-moveable canvas-multi-node-transform-overlay moveable-control-box absolute ${cursorClassName}`}
+            onDoubleClick={handleDoubleClick}
+            onPointerDown={startSelectionDrag}
+            style={{
+              height: `${overlayRect.height}px`,
+              left: `${overlayRect.left}px`,
+              top: `${overlayRect.top}px`,
+              transform: overlayRect.transform,
+              transformOrigin: "center center",
+              width: `${overlayRect.width}px`,
+            }}
+          />
+        }
+      >
+        <div
+          className="moveable-line absolute top-0 left-0 w-full"
+          style={{ height: "1.5px" }}
+        />
+        <div
+          className="moveable-line absolute bottom-0 left-0 w-full"
+          style={{ height: "1.5px" }}
+        />
+        <div
+          className="moveable-line absolute top-0 left-0 h-full"
+          style={{ width: "1.5px" }}
+        />
+        <div
+          className="moveable-line absolute top-0 right-0 h-full"
+          style={{ width: "1.5px" }}
+        />
 
-      {CORNERS.map((corner) => {
-        return (
-          <div key={corner}>
-            {isRotatable ? (
-              <div
-                className="canvas-rotation-zone canvas-multi-node-rotation-zone canvas-cursor-rotate absolute"
-                data-corner={corner}
-                onPointerDown={(event) => startRotate(corner, event)}
-                style={{
-                  ...rotationZoneStyle[corner],
-                  cursor: getRotateCursorForCorner(
-                    corner,
-                    overlayRotationDegrees
-                  ),
-                  height: `${ROTATION_ZONE_SIZE}px`,
-                  width: `${ROTATION_ZONE_SIZE}px`,
+        {CORNERS.map((corner) => {
+          return (
+            <div key={corner}>
+              {isRotatable ? (
+                <div
+                  className="canvas-rotation-zone canvas-multi-node-rotation-zone canvas-cursor-rotate absolute"
+                  data-corner={corner}
+                  onPointerDown={(event) => startRotate(corner, event)}
+                  style={{
+                    ...rotationZoneStyle[corner],
+                    cursor: getRotateCursorForCorner(
+                      corner,
+                      overlayRotationDegrees
+                    ),
+                    height: `${ROTATION_ZONE_SIZE}px`,
+                    width: `${ROTATION_ZONE_SIZE}px`,
+                  }}
+                />
+              ) : null}
+
+              <button
+                className={`moveable-control moveable-${corner} canvas-multi-node-control absolute ${resizeCursorClassName[corner]}`}
+                onPointerDown={(event) => startResize(corner, event)}
+                ref={(element) => {
+                  handleElementsRef.current[corner] = element;
                 }}
+                style={{
+                  ...handlePositionStyle[corner],
+                  cursor: getCanvasScaleCursor(
+                    getScaleCursorRotationDegrees(
+                      corner,
+                      overlayRotationDegrees
+                    )
+                  ),
+                  transform: handleTransformStyle[corner],
+                }}
+                type="button"
               />
-            ) : null}
-
-            <button
-              className={`moveable-control moveable-${corner} canvas-multi-node-control absolute ${resizeCursorClassName[corner]}`}
-              onPointerDown={(event) => startResize(corner, event)}
-              ref={(element) => {
-                handleElementsRef.current[corner] = element;
-              }}
-              style={{
-                ...handlePositionStyle[corner],
-                cursor: getCanvasScaleCursor(
-                  getScaleCursorRotationDegrees(corner, overlayRotationDegrees)
-                ),
-                transform: handleTransformStyle[corner],
-              }}
-              type="button"
-            />
-          </div>
-        );
-      })}
-    </div>
+            </div>
+          );
+        })}
+      </ContextMenuTrigger>
+      {contextMenuNodeId ? (
+        <NodeContextMenuItems nodeId={contextMenuNodeId} />
+      ) : null}
+    </ContextMenu>
   );
 };

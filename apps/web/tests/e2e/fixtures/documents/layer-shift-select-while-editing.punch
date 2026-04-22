@@ -1,8 +1,9 @@
 {
-  "version": "1.6",
+  "version": "1.7",
   "nodes": [
     {
       "id": "shift-editing-node",
+      "parentId": "root",
       "type": "text",
       "text": "Editing node",
       "font": {
@@ -31,6 +32,7 @@
     },
     {
       "id": "shift-other-node",
+      "parentId": "root",
       "type": "text",
       "text": "Other node",
       "font": {

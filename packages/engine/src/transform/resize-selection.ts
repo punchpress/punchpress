@@ -76,12 +76,22 @@ export const beginResizeSelection = (
   return {
     anchorCanvas: { ...anchorCanvas },
     baseNodes: new Map(
-      resolvedNodeIds.map((resolvedNodeId) => [
-        resolvedNodeId,
-        { ...editor.getNode(resolvedNodeId) },
-      ])
+      resolvedNodeIds.flatMap((resolvedNodeId) => {
+        const baseNode = editor.getNode(resolvedNodeId);
+        const bbox = baseNode
+          ? editor.getNodeTransformBounds(resolvedNodeId)
+          : null;
+
+        if (!(baseNode && bbox)) {
+          return [];
+        }
+
+        return [[resolvedNodeId, { ...baseNode, bbox }]];
+      })
     ),
-    nodeIds: [...resolvedNodeIds],
+    nodeIds: resolvedNodeIds.filter((resolvedNodeId) => {
+      return editor.getNodeTransformBounds(resolvedNodeId);
+    }),
   };
 };
 
@@ -125,6 +135,7 @@ export const updateResizeSelection = (
       session.pathEditing
         ? getScaledGroupNodeUpdate(
             session.baseNode,
+            session.baseBBox,
             session.anchorCanvas,
             scale
           )
@@ -151,7 +162,12 @@ export const updateResizeSelection = (
       return node;
     }
 
-    return getScaledGroupNodeUpdate(baseNode, session.anchorCanvas, scale);
+    return getScaledGroupNodeUpdate(
+      baseNode,
+      baseNode.bbox,
+      session.anchorCanvas,
+      scale
+    );
   });
 
   return session.nodeIds;

@@ -1,7 +1,7 @@
-import { createDefaultPathNode } from "../nodes/path/model";
 import { createDefaultNode } from "../nodes/text/model";
 import { getTextNodePlacementOrigin } from "../nodes/text/text-placement";
-import { createDefaultVectorNode } from "../nodes/vector/model";
+import { createDefaultPathNode } from "../nodes/path/model";
+import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
 
 export const addShapeNode = (editor, point, shape) => {
   finishEditingIfNeeded(editor);
@@ -27,8 +27,7 @@ export const addTextNode = (editor, point) => {
 
 export const addVectorNode = (editor, point) => {
   finishEditingIfNeeded(editor);
-  const parentNode = createDefaultVectorNode();
-  const defaultNode = createDefaultPathNode(parentNode.id);
+  const defaultNode = createDefaultPathNode(ROOT_PARENT_ID);
 
   editor.run(() => {
     editor.getState().addVectorNode(

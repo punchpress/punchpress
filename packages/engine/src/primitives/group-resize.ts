@@ -6,7 +6,11 @@ import {
   getNodeY,
 } from "../nodes/text/model";
 import { round } from "./math";
-import { getLocalBoundsCenter, rotateVector } from "./rotation";
+import {
+  getLocalBoundsCenter,
+  getNodeRotationCenter,
+  rotateVector,
+} from "./rotation";
 
 const getScaledWarp = (warp, scale) => {
   if (!warp) {
@@ -58,7 +62,7 @@ export const getResizeAnchorFromBounds = (bounds, direction) => {
   return getCornerPointFromBounds(bounds, getResizeCorner(direction, true));
 };
 
-export const getScaledGroupNodeUpdate = (node, anchor, scale) => {
+export const getScaledGroupNodeUpdate = (node, bbox, anchor, scale) => {
   if (node.type === "shape") {
     return {
       height: round(Math.max(1, node.height * scale), 2),
@@ -71,13 +75,33 @@ export const getScaledGroupNodeUpdate = (node, anchor, scale) => {
     };
   }
 
-  if (node.type === "path") {
+  if (node.type === "path" || node.type === "vector") {
+    const localCenter = bbox ? getLocalBoundsCenter(bbox) : null;
+    const nextWorldCenter = localCenter
+      ? {
+          x:
+            anchor.x + (getNodeRotationCenter(node, bbox).x - anchor.x) * scale,
+          y:
+            anchor.y + (getNodeRotationCenter(node, bbox).y - anchor.y) * scale,
+        }
+      : null;
+
     return {
       transform: {
         scaleX: round((node.transform.scaleX ?? 1) * scale, 4),
         scaleY: round((node.transform.scaleY ?? 1) * scale, 4),
-        x: round(anchor.x + (getNodeX(node) - anchor.x) * scale, 2),
-        y: round(anchor.y + (getNodeY(node) - anchor.y) * scale, 2),
+        x: round(
+          nextWorldCenter
+            ? nextWorldCenter.x - localCenter.x
+            : anchor.x + (getNodeX(node) - anchor.x) * scale,
+          2
+        ),
+        y: round(
+          nextWorldCenter
+            ? nextWorldCenter.y - localCenter.y
+            : anchor.y + (getNodeY(node) - anchor.y) * scale,
+          2
+        ),
       },
     };
   }
@@ -132,7 +156,7 @@ export const getResizedNodeUpdate = (node, bbox, anchor, scale, direction) => {
     };
   }
 
-  if (node.type === "path") {
+  if (node.type === "path" || node.type === "vector") {
     const nextScaleX = round((node.transform.scaleX ?? 1) * scale, 4);
     const nextScaleY = round((node.transform.scaleY ?? 1) * scale, 4);
     const nextRotatedOffset = rotateVector(

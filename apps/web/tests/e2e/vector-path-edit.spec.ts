@@ -81,7 +81,7 @@ const loadVectorDocument = async (page) => {
             visible: true,
           },
         ],
-        version: "1.6",
+        version: "1.7",
       })
     );
 
@@ -156,7 +156,7 @@ const loadOpenVectorDocument = async (page) => {
             visible: true,
           },
         ],
-        version: "1.6",
+        version: "1.7",
       })
     );
 
@@ -266,7 +266,7 @@ const loadMultiContourOpenVectorDocument = async (page) => {
             visible: true,
           },
         ],
-        version: "1.6",
+        version: "1.7",
       })
     );
 
@@ -394,7 +394,136 @@ const loadMultiContourVectorDocument = async (page) => {
             visible: true,
           },
         ],
-        version: "1.6",
+        version: "1.7",
+      })
+    );
+
+    return true;
+  });
+};
+
+const loadCompoundVectorDocument = async (page) => {
+  await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    if (!editor) {
+      return false;
+    }
+
+    editor.loadDocument(
+      JSON.stringify({
+        nodes: [
+          {
+            id: "compound-vector",
+            name: "Vector",
+            parentId: "root",
+            pathComposition: "compound-fill",
+            transform: {
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+              x: 0,
+              y: 0,
+            },
+            type: "vector",
+            visible: true,
+          },
+          {
+            closed: true,
+            fill: "#c05a53",
+            fillRule: "evenodd",
+            id: "compound-vector:path:1",
+            parentId: "compound-vector",
+            segments: [
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 0, y: 0 },
+                pointType: "corner",
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 240, y: 0 },
+                pointType: "corner",
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 240, y: 180 },
+                pointType: "corner",
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 0, y: 180 },
+                pointType: "corner",
+              },
+            ],
+            stroke: "#111111",
+            strokeLineCap: "round",
+            strokeLineJoin: "round",
+            strokeMiterLimit: 4,
+            strokeWidth: 6,
+            transform: {
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+              x: 260,
+              y: 180,
+            },
+            type: "path",
+            visible: true,
+          },
+          {
+            closed: true,
+            fill: "#c05a53",
+            fillRule: "evenodd",
+            id: "compound-vector:path:2",
+            parentId: "compound-vector",
+            segments: [
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 0, y: 0 },
+                pointType: "corner",
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 90, y: 0 },
+                pointType: "corner",
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 90, y: 90 },
+                pointType: "corner",
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 0, y: 90 },
+                pointType: "corner",
+              },
+            ],
+            stroke: "#111111",
+            strokeLineCap: "round",
+            strokeLineJoin: "round",
+            strokeMiterLimit: 4,
+            strokeWidth: 6,
+            transform: {
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+              x: 340,
+              y: 240,
+            },
+            type: "path",
+            visible: true,
+          },
+        ],
+        version: "1.7",
       })
     );
 
@@ -441,7 +570,7 @@ const loadPolygonShapeDocument = async (page) => {
             width: 240,
           },
         ],
-        version: "1.6",
+        version: "1.7",
       })
     );
 
@@ -528,7 +657,7 @@ const loadIrregularVectorDocument = async (page) => {
             visible: true,
           },
         ],
-        version: "1.6",
+        version: "1.7",
       })
     );
 
@@ -648,8 +777,49 @@ const getVectorNodeDocument = (page, nodeId = "vector-node") => {
     const document = dump?.document?.serialized
       ? JSON.parse(dump.document.serialized)
       : null;
+    const node = document?.nodes?.find((entry) => entry.id === currentNodeId);
 
-    return document?.nodes?.find((entry) => entry.id === currentNodeId) || null;
+    if (!node) {
+      return null;
+    }
+
+    if (node.type === "path") {
+      return {
+        ...node,
+        contours: [
+          {
+            closed: node.closed,
+            fill: node.fill,
+            fillRule: node.fillRule,
+            segments: node.segments || [],
+            stroke: node.stroke,
+            strokeWidth: node.strokeWidth,
+          },
+        ],
+      };
+    }
+
+    if (node.type === "vector") {
+      return {
+        ...node,
+        contours: (document?.nodes || [])
+          .filter((entry) => {
+            return entry.parentId === node.id && entry.type === "path";
+          })
+          .map((entry) => {
+            return {
+              closed: entry.closed,
+              fill: entry.fill,
+              fillRule: entry.fillRule,
+              segments: entry.segments || [],
+              stroke: entry.stroke,
+              strokeWidth: entry.strokeWidth,
+            };
+          }),
+      };
+    }
+
+    return node;
   }, nodeId);
 };
 
@@ -853,8 +1023,12 @@ const getCornerRadiusHandleDotStyle = (locator) => {
 const getVectorPathScreenPoint = (page, nodeId, distance = 0) => {
   return page.evaluate(
     ({ currentDistance, currentNodeId }) => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
+      const canvasNodeId =
+        editor?.getPathEditingVisualOwnerNodeId?.(currentNodeId) ||
+        currentNodeId;
       const path = document.querySelector(
-        `.canvas-node[data-node-id="${currentNodeId}"] path`
+        `.canvas-node[data-node-id="${canvasNodeId}"] path`
       );
 
       if (!(path instanceof SVGPathElement)) {
@@ -896,6 +1070,9 @@ const getVectorSegmentScreenPoint = (
   return page.evaluate(
     ({ currentContourIndex, currentNodeId, currentSegmentIndex }) => {
       const editor = window.__PUNCHPRESS_EDITOR__;
+      const canvasNodeId =
+        editor?.getPathEditingVisualOwnerNodeId?.(currentNodeId) ||
+        currentNodeId;
       const session = editor?.getEditablePathSession?.(currentNodeId);
       const localPoint =
         session?.backend === "vector-path"
@@ -905,7 +1082,7 @@ const getVectorSegmentScreenPoint = (
           : null;
       const bbox = editor?.getNodeGeometry?.(currentNodeId)?.bbox;
       const svg = document.querySelector(
-        `.canvas-node[data-node-id="${currentNodeId}"] svg`
+        `.canvas-node[data-node-id="${canvasNodeId}"] svg`
       );
 
       if (!(localPoint && bbox && svg instanceof SVGSVGElement)) {
@@ -946,12 +1123,15 @@ const getVectorCornerWidgetScreenPoint = (
   return page.evaluate(
     ({ currentContourIndex, currentNodeId, currentSegmentIndex }) => {
       const editor = window.__PUNCHPRESS_EDITOR__;
+      const canvasNodeId =
+        editor?.getPathEditingVisualOwnerNodeId?.(currentNodeId) ||
+        currentNodeId;
       const control = editor?.getPathPointCornerControl?.(currentNodeId, {
         contourIndex: currentContourIndex,
         segmentIndex: currentSegmentIndex,
       });
       const svg = document.querySelector(
-        `.canvas-node[data-node-id="${currentNodeId}"] svg`
+        `.canvas-node[data-node-id="${canvasNodeId}"] svg`
       );
       const bbox = editor?.getNodeGeometry?.(currentNodeId)?.bbox;
 
@@ -1020,6 +1200,9 @@ const getEditablePathPointScreenPoint = (
   return page.evaluate(
     ({ currentContourIndex, currentNodeId, currentSegmentIndex }) => {
       const editor = window.__PUNCHPRESS_EDITOR__;
+      const canvasNodeId =
+        editor?.getPathEditingVisualOwnerNodeId?.(currentNodeId) ||
+        currentNodeId;
       const dump = editor?.getDebugDump();
       const nodeSnapshot = dump?.nodes?.find(
         (entry) => entry.id === currentNodeId
@@ -1031,7 +1214,7 @@ const getEditablePathPointScreenPoint = (
         ]?.point;
       const bbox = nodeSnapshot?.geometry?.bbox;
       const svg = document.querySelector(
-        `.canvas-node[data-node-id="${currentNodeId}"] svg`
+        `.canvas-node[data-node-id="${canvasNodeId}"] svg`
       );
 
       if (!(localPoint && bbox && svg instanceof SVGSVGElement)) {
@@ -1072,6 +1255,9 @@ const getEditablePathCornerWidgetScreenPoint = (
   return page.evaluate(
     ({ currentContourIndex, currentNodeId, currentSegmentIndex }) => {
       const editor = window.__PUNCHPRESS_EDITOR__;
+      const canvasNodeId =
+        editor?.getPathEditingVisualOwnerNodeId?.(currentNodeId) ||
+        currentNodeId;
       const dump = editor?.getDebugDump();
       const nodeSnapshot = dump?.nodes?.find(
         (entry) => entry.id === currentNodeId
@@ -1084,7 +1270,7 @@ const getEditablePathCornerWidgetScreenPoint = (
         segmentIndex: currentSegmentIndex,
       });
       const svg = document.querySelector(
-        `.canvas-node[data-node-id="${currentNodeId}"] svg`
+        `.canvas-node[data-node-id="${canvasNodeId}"] svg`
       );
       const bbox = nodeSnapshot?.geometry?.bbox;
 
@@ -2328,16 +2514,15 @@ test("dragging a vector anchor edits the node through the paper session", async 
   await doubleClickNodeCenter(page, "vector-node");
   await pauseForUi(page);
 
-  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
-  const rect = await node.boundingBox();
+  const anchorPoint = await getVectorSegmentScreenPoint(page, "vector-node", 0);
 
-  if (!rect) {
-    throw new Error("Missing visible vector node bounds");
+  if (!anchorPoint) {
+    throw new Error("Missing vector anchor point");
   }
 
-  await page.mouse.move(rect.x + 6, rect.y + 6);
+  await page.mouse.move(anchorPoint.x, anchorPoint.y);
   await page.mouse.down();
-  await page.mouse.move(rect.x - 30, rect.y - 18, { steps: 6 });
+  await page.mouse.move(anchorPoint.x - 36, anchorPoint.y - 24, { steps: 6 });
   await expect(page.locator(".canvas-selecto .selecto-selection")).toHaveCount(
     0
   );
@@ -2346,32 +2531,14 @@ test("dragging a vector anchor edits the node through the paper session", async 
 
   await expect
     .poll(async () => {
-      const dump = await getDebugDump(page);
-      const document = dump?.document?.serialized
-        ? JSON.parse(dump.document.serialized)
-        : null;
-      const vectorNode = document?.nodes?.find(
-        (entry) => entry.id === "vector-node"
-      );
-
-      return vectorNode?.contours?.[0]?.segments?.[0]?.point || null;
+      return (await getVectorSegmentDocument(page, 0))?.point || null;
     })
     .toMatchObject({
       x: expect.any(Number),
       y: expect.any(Number),
     });
 
-  const firstPoint = await page.evaluate(() => {
-    const dump = window.__PUNCHPRESS_EDITOR__?.getDebugDump();
-    const document = dump?.document?.serialized
-      ? JSON.parse(dump.document.serialized)
-      : null;
-    const vectorNode = document?.nodes?.find(
-      (entry) => entry.id === "vector-node"
-    );
-
-    return vectorNode?.contours?.[0]?.segments?.[0]?.point || null;
-  });
+  const firstPoint = (await getVectorSegmentDocument(page, 0))?.point || null;
 
   expect(firstPoint?.x).toBeLessThan(-10);
   expect(firstPoint?.y).toBeLessThan(-10);
@@ -2388,20 +2555,16 @@ test("dragging a vector anchor keeps the rendered vector aligned mid-drag", asyn
   await doubleClickNodeCenter(page, "vector-node");
   await pauseForUi(page);
 
-  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
-  const rect = await node.boundingBox();
+  const anchorPoint = await getVectorSegmentScreenPoint(page, "vector-node", 0);
 
-  if (!rect) {
-    throw new Error("Missing visible vector node bounds");
+  if (!anchorPoint) {
+    throw new Error("Missing vector anchor point");
   }
 
-  const startPoint = {
-    x: rect.x + 6,
-    y: rect.y + 6,
-  };
+  const startPoint = anchorPoint;
   const dragPoint = {
-    x: rect.x - 26,
-    y: rect.y + 22,
+    x: anchorPoint.x - 26,
+    y: anchorPoint.y + 22,
   };
 
   await page.mouse.move(startPoint.x, startPoint.y);
@@ -2410,7 +2573,7 @@ test("dragging a vector anchor keeps the rendered vector aligned mid-drag", asyn
 
   await expect
     .poll(async () => {
-      const point = await getVectorPathScreenPoint(page, "vector-node", 0);
+      const point = await getVectorSegmentScreenPoint(page, "vector-node", 0);
 
       if (!point) {
         return Number.POSITIVE_INFINITY;
@@ -4903,6 +5066,81 @@ test("dragging a contour body in a multi-contour vector moves the edit outline l
     .toBe(true);
 
   await page.mouse.up();
+  await pauseForUi(page);
+});
+
+test("dragging a child path in a compound vector updates the rendered compound live", async ({
+  page,
+}) => {
+  const dragDelta = {
+    x: 56,
+    y: 34,
+  };
+
+  await gotoEditor(page);
+  await loadCompoundVectorDocument(page);
+  await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    if (!editor) {
+      return false;
+    }
+
+    editor.select("compound-vector");
+    editor.startPathEditing("compound-vector");
+    editor.select("compound-vector:path:2");
+    editor.setPathEditingNodeId("compound-vector:path:2");
+
+    window.__TEST_COMPOUND_DRAG_SESSION__ = editor.beginSelectionDrag({
+      nodeId: "compound-vector:path:2",
+    });
+
+    return true;
+  });
+  await pauseForUi(page);
+
+  const compoundPath = page
+    .locator('.canvas-node[data-node-id="compound-vector"] path')
+    .first();
+  const beforePathData = await compoundPath.getAttribute("d");
+
+  if (!beforePathData) {
+    throw new Error("Missing visible compound render path");
+  }
+
+  await page.evaluate((nextDelta) => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const session = window.__TEST_COMPOUND_DRAG_SESSION__;
+
+    if (!(editor && session)) {
+      return false;
+    }
+
+    editor.updateSelectionDrag(session, { delta: nextDelta });
+    return true;
+  }, dragDelta);
+
+  await expect
+    .poll(() => {
+      return page
+        .locator('.canvas-node[data-node-id="compound-vector"] path')
+        .first()
+        .getAttribute("d");
+    })
+    .not.toBe(beforePathData);
+
+  await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const session = window.__TEST_COMPOUND_DRAG_SESSION__;
+
+    if (!(editor && session)) {
+      return false;
+    }
+
+    editor.endSelectionDrag(session);
+    window.__TEST_COMPOUND_DRAG_SESSION__ = null;
+    return true;
+  });
   await pauseForUi(page);
 });
 

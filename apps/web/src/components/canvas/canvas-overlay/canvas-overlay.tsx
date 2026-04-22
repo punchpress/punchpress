@@ -8,6 +8,7 @@ import { CanvasTransformOverlay } from "./canvas-transform-overlay";
 import { CanvasNodeToolbar } from "./node-toolbar/canvas-node-toolbar";
 import { CanvasVectorPathOverlay } from "./vector-path/vector-path-overlay";
 
+// Host-anchored overlay stack. Stage-local previews live in CanvasStageOverlay.
 export const CanvasOverlay = () => {
   usePerformanceRenderCounter("render.canvas.overlay");
   const editor = useEditor();

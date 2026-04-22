@@ -28,6 +28,12 @@ large selected sets to do much more work than needed.
 The engine owns a strict node render contract. React renders that contract, but
 does not define it.
 
+This contract is the primary node extension seam.
+
+New node types and special node behaviors should fit into one shared
+capability surface instead of teaching the canvas a new special case for each
+type.
+
 Every node type must provide these durable capabilities:
 
 - render geometry: the plain visual payload used to draw the node when it is not
@@ -74,6 +80,10 @@ For now the editor should converge on three explicit surfaces:
 
 Selection-wide preview state remains separate from those node surfaces.
 
+As the editor grows, other node-facing geometry such as hit geometry,
+indicators, clipping, or edit affordance geometry should extend this shared
+capability surface rather than bypassing it.
+
 ## Rationale
 
 - New node types can plug into one engine-owned capability model instead of
@@ -88,8 +98,12 @@ Selection-wide preview state remains separate from those node surfaces.
 ## Consequences
 
 - Node implementations belong under `packages/engine/src/nodes/<type>/`.
+- `packages/engine/src/nodes/node-capabilities.ts` is the main node capability
+  seam, not just a helper file.
 - React components should render node geometry as plain SVG output when the node
   is not in a specialized editing mode.
+- Canvas modules should consume node capabilities rather than accumulating
+  per-node special-case logic.
 - Future optimizations such as viewport culling and large-selection indicator
   simplification should build on this contract rather than bypass it.
 

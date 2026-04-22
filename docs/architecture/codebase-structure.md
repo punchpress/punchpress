@@ -96,6 +96,8 @@ Those capabilities stay outside `packages/engine`.
 - own selection, transform, history, geometry, and export behavior
 - own interaction-state boundaries for modes such as text edit, path edit, drag,
   rotate, and similar canvas states
+- own the shared node capability surface that defines how node types plug into
+  rendering, selection, hit testing, and related canvas behavior
 - expose structured inspection like the debug dump
 - stay free of React and app/platform imports
 
@@ -110,6 +112,25 @@ Those capabilities stay outside `packages/engine`.
 - render engine state
 - translate GUI interactions into engine commands
 - attach host capabilities to the engine at runtime
+- keep rendering and overlays centralized instead of letting each node type
+  invent its own canvas architecture
+
+## Node Extension Model
+
+PunchPress should scale by giving every node type one strong capability surface
+in the engine.
+
+That means:
+
+- node-specific geometry and behavior should be implemented under
+  `packages/engine/src/nodes/<type>/`
+- shared canvas systems should ask the engine for node capabilities instead of
+  branching on node type in React
+- special node types should still fit the same selection, hover, transform, and
+  render pipeline unless there is a strong product reason to diverge
+
+When a new node type needs unusual behavior, prefer extending the shared node
+capability contract over creating a parallel canvas system for that node.
 
 **Platform responsibilities**
 

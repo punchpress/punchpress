@@ -3,7 +3,7 @@ import {
   DEFAULT_VECTOR_STROKE_LINE_JOIN,
   DEFAULT_VECTOR_STROKE_MITER_LIMIT,
 } from "@punchpress/punch-schema";
-import paper from "paper/dist/paper-core";
+import type paper from "paper/dist/paper-core.js";
 import { finishEditingIfNeeded } from "../../editing/editing-actions";
 import { buildNodeCapabilityGeometry } from "../../nodes/node-capabilities";
 import { createDefaultPathNode } from "../../nodes/path/model";
@@ -15,6 +15,7 @@ import {
   getNodeY,
 } from "../../nodes/text/model";
 import { createDefaultVectorNode } from "../../nodes/vector/model";
+import { createHeadlessPaperCompiler } from "../../primitives/headless-paper-compiler";
 import { round } from "../../primitives/math";
 
 const BOOLEAN_OPERATIONS = [
@@ -26,11 +27,7 @@ const BOOLEAN_OPERATIONS = [
 
 type BooleanOperation = (typeof BOOLEAN_OPERATIONS)[number];
 
-const createPaperScope = () => {
-  const scope = new paper.PaperScope();
-  scope.setup(new paper.Size(1, 1));
-  return scope;
-};
+const paperCompiler = createHeadlessPaperCompiler();
 
 const isBooleanOperation = (value: string): value is BooleanOperation => {
   return BOOLEAN_OPERATIONS.includes(value as BooleanOperation);
@@ -376,7 +373,11 @@ const createResultNodes = (
   }
 
   const vectorNode = createDefaultVectorNode();
+  vectorNode.compoundWrapper = false;
   vectorNode.id = resultVectorId;
+  vectorNode.contours = [];
+  vectorNode.pathComposition =
+    paths.length > 1 ? "compound-fill" : "independent";
   vectorNode.parentId = parentId;
 
   return [vectorNode, ...pathNodes];
@@ -412,33 +413,52 @@ export const applyBooleanOperation = (
   finishEditingIfNeeded(editor);
   editor.stopPathEditing();
 
-  const scope = createPaperScope();
-  const sourceItems = selection.sources
-    .map((source) => createPaperItemFromSource(scope, source))
-    .filter(Boolean);
+  const resultNodes = paperCompiler.run((scope) => {
+    const sourceItems = selection.sources
+      .map((source) => createPaperItemFromSource(scope, source))
+      .filter(Boolean);
 
-  if (sourceItems.length !== selection.sources.length) {
-    return false;
-  }
+    if (sourceItems.length !== selection.sources.length) {
+      return [];
+    }
 
-  const resultItem = performBooleanOperation(operation, sourceItems);
+    const resultItem = performBooleanOperation(operation, sourceItems);
 
-  if (!resultItem) {
-    return false;
-  }
+    if (!resultItem) {
+      return [];
+    }
 
-  const resultNodes = createResultNodes(
-    editor,
-    resultItem,
-    selection.parentId,
-    selection.styleTemplate
-  );
+    return createResultNodes(
+      editor,
+      resultItem,
+      selection.parentId,
+      selection.styleTemplate
+    );
+  });
 
   if (resultNodes.length === 0) {
     return false;
   }
 
   editor.run(() => {
+    if (
+      selection.parentId &&
+      editor.getNode(selection.parentId)?.type === "vector"
+    ) {
+      editor.getState().updateNodeById(selection.parentId, (node) => {
+        if (node.type !== "vector") {
+          return node;
+        }
+
+        return {
+          ...node,
+          compoundWrapper: false,
+          pathComposition:
+            resultNodes.length > 1 ? "compound-fill" : "independent",
+        };
+      });
+    }
+
     editor.getState().replaceNodeBlocks(nodeIds, resultNodes);
 
     if (
