@@ -30,23 +30,61 @@ const commandsToPathData = (commands) => {
     .join(" ");
 };
 
+const getContourStyle = (contour) => {
+  return {
+    fill: contour.fill ?? null,
+    fillRule: contour.fillRule ?? "nonzero",
+    stroke: contour.stroke ?? null,
+    strokeLineCap: contour.strokeLineCap ?? "round",
+    strokeLineJoin: contour.strokeLineJoin ?? "round",
+    strokeMiterLimit: contour.strokeMiterLimit ?? 4,
+    strokeWidth: contour.strokeWidth ?? 0,
+  };
+};
+
 export const buildVectorNodeGeometry = (node) => {
-  const paths = node.contours.map((contour, index) => {
+  const visibleContours = (node.contours || []).filter(
+    (contour) => contour?.visible !== false
+  );
+  const paths = visibleContours.map((contour, index) => {
     const commands = getVectorContourCommands(contour);
+    const style = getContourStyle(contour);
 
     return {
       closed: contour.closed,
       commands,
       d: commandsToPathData(commands),
-      key: `vector-${index}`,
+      fill: style.fill,
+      fillRule: style.fillRule,
+      key: contour.id || `vector-${index}`,
+      stroke: style.stroke,
+      strokeLineCap: style.strokeLineCap,
+      strokeLineJoin: style.strokeLineJoin,
+      strokeMiterLimit: style.strokeMiterLimit,
+      strokeWidth: style.strokeWidth,
     };
   });
 
   const flattenedContours = paths.flatMap((path) => {
     return commandsToContours(path.commands, 1.5);
   });
-  const strokeInset = Math.max(node.strokeWidth / 2, 0);
-  const rawBounds = getBounds(flattenedContours);
+  const strokeInset = visibleContours.reduce((maxStrokeInset, contour) => {
+    return Math.max(maxStrokeInset, (contour.strokeWidth || 0) / 2);
+  }, 0);
+  const sourceBoundsPoints =
+    flattenedContours.length > 0
+      ? flattenedContours
+      : visibleContours.flatMap((contour) => {
+          return contour.segments.map((segment) => {
+            return segment.point;
+          });
+        });
+
+  if (sourceBoundsPoints.length === 0) {
+    return null;
+  }
+
+  const rawBounds = getBounds(sourceBoundsPoints);
   const bbox = {
     height: rawBounds.height + strokeInset * 2,
     maxX: rawBounds.maxX + strokeInset,
@@ -55,12 +93,13 @@ export const buildVectorNodeGeometry = (node) => {
     minY: rawBounds.minY - strokeInset,
     width: rawBounds.width + strokeInset * 2,
   };
+  const renderedPaths = paths.map(({ commands: _commands, ...path }) => path);
 
   return {
     bbox,
     guide: null,
     id: node.id,
-    paths: paths.map(({ commands: _commands, ...path }) => path),
+    paths: renderedPaths,
     ready: true,
     selectionBounds: bbox,
   };

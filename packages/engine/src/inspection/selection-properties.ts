@@ -2,7 +2,7 @@ import {
   getNodePropertyIds,
   supportsNodeProperty,
 } from "../nodes/node-property-support";
-import { isContainerNode } from "../nodes/node-tree";
+import { isGroupNode } from "../nodes/node-tree";
 import { getShapeCornerRadiusSummary } from "../nodes/shape/shape-engine";
 import { getPropertyDescriptor } from "./property-descriptors";
 import {
@@ -91,7 +91,7 @@ const getSelectionKind = (selectedNodes) => {
     return "multi";
   }
 
-  return isContainerNode(selectedNodes[0]) ? "group" : "single";
+  return isGroupNode(selectedNodes[0]) ? "group" : "single";
 };
 
 const getSharedPropertyIds = (selectedNodes, selectionKind) => {
@@ -182,9 +182,7 @@ const buildSelectionProperties = (editor, nodeIds) => {
 
   return {
     canDelete:
-      selectionKind === "single" &&
-      !isContainerNode(selectedNode) &&
-      !hasPathGuide,
+      selectionKind === "single" && !isGroupNode(selectedNode) && !hasPathGuide,
     properties:
       Object.keys(properties).length > 0 ? properties : EMPTY_PROPERTIES,
     selectionColors,

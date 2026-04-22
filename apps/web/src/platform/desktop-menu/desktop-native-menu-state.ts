@@ -1,7 +1,9 @@
 import type { Editor } from "@punchpress/engine";
+import { getDesktopCompoundOperationState } from "./desktop-native-menu-compound";
 import type {
   DesktopAppMenuState,
   DesktopMenuChoiceState,
+  DesktopVectorCompoundOperation,
   DesktopVectorFillRule,
   DesktopVectorStrokeLineCap,
   DesktopVectorStrokeLineJoin,
@@ -30,12 +32,15 @@ export const getDesktopAppMenuState = (
   editor: Editor,
   selectedNodeIds: string[]
 ): DesktopAppMenuState => {
-  const selectionProperties = editor.getSelectionPropertiesSnapshot(
-    selectedNodeIds
-  ).selectionProperties;
+  const selectionProperties =
+    editor.getSelectionPropertiesSnapshot(selectedNodeIds).selectionProperties;
   const selectedNode = selectionProperties.selectedNode;
   const fillRule = getChoiceState<DesktopVectorFillRule>(
     selectionProperties.properties.fillRule
+  );
+  const compoundOperation = getDesktopCompoundOperationState(
+    editor,
+    selectedNodeIds
   );
   const strokeLineCap = getChoiceState<DesktopVectorStrokeLineCap>(
     selectionProperties.properties.strokeLineCap
@@ -49,6 +54,10 @@ export const getDesktopAppMenuState = (
     canEditPath: Boolean(
       selectedNode?.id && editor.canStartPathEditing(selectedNode.id)
     ),
+    compoundOperation:
+      getChoiceState<DesktopVectorCompoundOperation>(compoundOperation),
+    canMakeCompoundPath: editor.canMakeCompoundPath(selectedNodeIds),
+    canReleaseCompoundPath: editor.canReleaseCompoundPath(selectedNodeIds),
     selectedNodeType: selectedNode?.type || null,
     selectionKind: selectionProperties.selectionKind,
     vectorStyle:

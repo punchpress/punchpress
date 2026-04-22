@@ -142,6 +142,14 @@ export const vectorContourSchema = z
   .strict();
 
 export const vectorFillRuleSchema = z.enum(["evenodd", "nonzero"]);
+export const vectorPathCompositionSchema = z.enum([
+  "independent",
+  "compound-fill",
+  "unite",
+  "subtract",
+  "intersect",
+  "exclude",
+]);
 export const vectorStrokeLineCapSchema = z.enum(VECTOR_STROKE_LINE_CAP_VALUES);
 export const vectorStrokeLineJoinSchema = z.enum(
   VECTOR_STROKE_LINE_JOIN_VALUES
@@ -149,7 +157,9 @@ export const vectorStrokeLineJoinSchema = z.enum(
 
 export const vectorNodeSchema = baseNodeSchema
   .extend({
+    compoundWrapper: z.boolean().optional(),
     name: z.string().min(1),
+    pathComposition: vectorPathCompositionSchema.optional(),
     transform: transformSchema,
     type: z.literal("vector"),
   })
@@ -217,29 +227,24 @@ export const designDocumentSchema = z
         });
       }
 
-      if (node.type === "path") {
-        if (node.parentId === ROOT_PARENT_ID) {
-          context.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Path nodes must belong to a vector node.",
-            path: ["nodes", index, "parentId"],
-          });
-          continue;
-        }
-
-        const parentNode = document.nodes.find((entry) => entry.id === node.parentId);
+      if (node.type === "path" && node.parentId !== ROOT_PARENT_ID) {
+        const parentNode = document.nodes.find(
+          (entry) => entry.id === node.parentId
+        );
 
         if (parentNode?.type !== "vector") {
           context.addIssue({
             code: z.ZodIssueCode.custom,
-            message: "Path nodes must have a vector parent.",
+            message: "Path nodes may only have vector parents or the root.",
             path: ["nodes", index, "parentId"],
           });
         }
       }
 
       if (node.type === "vector") {
-        const childNodes = document.nodes.filter((entry) => entry.parentId === node.id);
+        const childNodes = document.nodes.filter(
+          (entry) => entry.parentId === node.id
+        );
 
         if (childNodes.some((entry) => entry.type !== "path")) {
           context.addIssue({

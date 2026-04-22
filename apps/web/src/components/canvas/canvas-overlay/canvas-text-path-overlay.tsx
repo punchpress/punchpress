@@ -3,7 +3,6 @@ import { CircleArrowDataTransferHorizontalIcon } from "@hugeicons-pro/core-strok
 import { useEffect, useState } from "react";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
-import { useEditorValue } from "../../../editor-react/use-editor-value";
 import {
   getActiveTextPathHandleCursorToken,
   getTextPathHandleCursorToken,
@@ -473,49 +472,11 @@ const TextPathHandles = ({
 export const CanvasTextPathOverlay = ({ viewportRevision }) => {
   const editor = useEditor();
   const [transformTargetElement, setTransformTargetElement] = useState(null);
-  const isSelectionRotating = useEditorValue(
-    (_, state) => state.isSelectionRotating
-  );
-  const pathEditingNodeId = useEditorValue(
-    (_, state) => state.pathEditingNodeId
-  );
-  const overlayState = useEditorSurfaceValue((editor, state) => {
-    if (state.editingNodeId) {
-      return null;
-    }
-
-    const visibleSelectedNodeIds = state.selectedNodeIds.filter((nodeId) => {
-      return (
-        editor.isNodeEffectivelyVisible(nodeId) &&
-        Boolean(editor.getNodeFrame(nodeId))
-      );
-    });
-
-    if (visibleSelectedNodeIds.length !== 1) {
-      return null;
-    }
-
-    const node = editor.getNode(visibleSelectedNodeIds[0]);
-
-    if (node?.type !== "text") {
-      return null;
-    }
-
-    const geometry = editor.getNodeGeometry(node.id);
-
-    if (!geometry?.guide) {
-      return null;
-    }
-
-    return {
-      geometry,
-      node,
-      previewDelta:
-        editor.getSelectionPreviewDelta(visibleSelectedNodeIds) || null,
-    };
+  const overlayState = useEditorSurfaceValue((editor) => {
+    return editor.getTextPathOverlayState();
   });
   const nodeId = overlayState?.node.id || null;
-  const isPathEditing = Boolean(nodeId && pathEditingNodeId === nodeId);
+  const isPathEditing = overlayState?.isPathEditing;
 
   useEffect(() => {
     if (!(nodeId && !isPathEditing && editor.getNodeTransformElement(nodeId))) {
@@ -547,6 +508,7 @@ export const CanvasTextPathOverlay = ({ viewportRevision }) => {
   }
   const metrics = overlayState ? getTextPathHostMetrics(editor) : null;
   const geometry = overlayState?.geometry || null;
+  const isSelectionRotating = overlayState?.isSelectionRotating;
   const node = overlayState?.node || null;
   const previewDelta = overlayState?.previewDelta || null;
   const transformTargetStyle =

@@ -6,6 +6,10 @@ import {
   saveDesignDocument,
 } from "@punchpress/punch-schema";
 import { finishEditingIfNeeded } from "../editing/editing-actions";
+import {
+  toInternalEditorNodes,
+  toSerializableDocumentNodes,
+} from "../nodes/vector/vector-document-conversion";
 import { exportDesignDocument } from "./export";
 
 export const getDocument = (editor) => {
@@ -13,7 +17,7 @@ export const getDocument = (editor) => {
     editor.finalizeEditing();
   }
 
-  return saveDesignDocument(editor.nodes).document;
+  return saveDesignDocument(toSerializableDocumentNodes(editor.nodes)).document;
 };
 
 export const exportDocument = (editor) => {
@@ -34,7 +38,7 @@ export const exportDocument = (editor) => {
 export const loadDocument = (editor, contents) => {
   const { nodes } = loadDesignDocument(contents);
   const resolution = replaceMissingDocumentFonts(
-    nodes,
+    toInternalEditorNodes(nodes),
     editor.availableFonts,
     editor.getDefaultFont()
   );
@@ -58,5 +62,5 @@ export const newDocument = (editor) => {
 };
 
 export const serializeDocument = (editor) => {
-  return saveDesignDocument(editor.nodes).contents;
+  return saveDesignDocument(toSerializableDocumentNodes(editor.nodes)).contents;
 };

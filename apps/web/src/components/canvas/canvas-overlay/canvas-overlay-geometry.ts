@@ -1,5 +1,3 @@
-import { isContainerNode } from "@punchpress/engine";
-
 export const getTargetClientBounds = (targets) => {
   if (targets.length === 0) {
     return null;
@@ -69,38 +67,4 @@ export const getHostRectFromNodeFrame = (editor, frame) => {
     ...hostRect,
     transform: frame.transform,
   };
-};
-
-export const getNodeIdsFromSelectionRect = (editor, rect) => {
-  if (!rect) {
-    return [];
-  }
-
-  const left = rect.left;
-  const top = rect.top;
-  const right = rect.right ?? rect.left + rect.width;
-  const bottom = rect.bottom ?? rect.top + rect.height;
-
-  return editor.nodes
-    .filter((node) => !isContainerNode(node))
-    .filter((node) => editor.isNodeEffectivelyVisible(node.id))
-    .map((node) => node.id)
-    .filter((nodeId) => {
-      const element =
-        editor.getNodeTransformElement(nodeId) || editor.getNodeElement(nodeId);
-      if (!element) {
-        return false;
-      }
-
-      const elementRect = element.getBoundingClientRect();
-      const overlapWidth =
-        Math.min(right, elementRect.right) - Math.max(left, elementRect.left);
-      const overlapHeight =
-        Math.min(bottom, elementRect.bottom) - Math.max(top, elementRect.top);
-
-      return overlapWidth > 0 && overlapHeight > 0;
-    })
-    .map((nodeId) => editor.getSelectionTargetNodeId(nodeId))
-    .filter(Boolean)
-    .filter((nodeId, index, values) => values.indexOf(nodeId) === index);
 };

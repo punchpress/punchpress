@@ -52,7 +52,7 @@ export const stopPathEditing = (editor) => {
   }
 
   const selectionOwnerNodeId =
-    editor.getSelectionTargetNodeId(pathEditingNodeId);
+    editor.getPathEditingVisualOwnerNodeId(pathEditingNodeId);
   const shouldRestoreSelectionOwner =
     editor.selectedNodeIds.length === 1 &&
     editor.selectedNodeId === pathEditingNodeId &&

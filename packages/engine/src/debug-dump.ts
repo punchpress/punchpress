@@ -88,8 +88,25 @@ export const getEditorDebugDump = (editor) => {
 
         if (node.type === "vector") {
           return {
+            compoundWrapper: node.compoundWrapper ?? false,
+            contours: (node.contours || []).map((contour) => {
+              return {
+                closed: contour.closed,
+                fill: contour.fill ?? null,
+                fillRule: contour.fillRule ?? "nonzero",
+                id: contour.id || null,
+                segments: contour.segments.length,
+                stroke: contour.stroke ?? null,
+                strokeLineCap: contour.strokeLineCap ?? "round",
+                strokeLineJoin: contour.strokeLineJoin ?? "round",
+                strokeMiterLimit: contour.strokeMiterLimit ?? 4,
+                strokeWidth: contour.strokeWidth ?? 0,
+                visible: contour.visible !== false,
+              };
+            }),
             font: null,
             fontSize: null,
+            pathComposition: node.pathComposition ?? "independent",
             stroke: null,
             strokeWidth: null,
             text: "",

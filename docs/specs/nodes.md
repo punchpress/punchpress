@@ -24,6 +24,8 @@ Nodes are the core building blocks of a PunchPress design.
 - The editable frame should stay aligned with the node's visible footprint closely enough that editing never feels detached from the object.
 - Selection and transform handles should remain screen-sized and visually consistent even when a node's durable data represents resize through transform scale.
 - Specialized editing affordances should prefer explicit secondary modes over overloading the default selected state when that keeps selection behavior clearer.
+- Standalone path nodes should behave like ordinary first-class canvas nodes outside their explicit path-edit mode.
+- Multi-path vector or compound objects should also remain ordinary first-class canvas nodes rather than introducing a separate hidden object model.
 - Shape editing should enter through an explicit secondary mode when the user intends to manipulate a live shape beyond normal object transforms.
 - Vector path editing should enter through an explicit secondary mode such as double-click or an `Edit path` action rather than replacing normal object selection by default.
 - While a shape node is in live shape editing, PunchPress should hide the normal node transform box so the shape anchors and shape-specific controls become the primary editing affordances.
@@ -42,6 +44,7 @@ Nodes are the core building blocks of a PunchPress design.
 - Shape nodes should preserve their own live shape family while they remain shape nodes instead of changing between multiple live shape families as an intermediate step.
 - Shape nodes should own their own conversion boundary to vector nodes instead of converting to plain vectors on every shape edit.
 - Vector nodes should preserve editable source geometry rather than treating SVG path strings as the only durable source of truth.
+- Path nodes should be first-class durable nodes rather than temporary authoring state hidden inside another object.
 - Vector editing may use a specialized editing subsystem, but PunchPress remains the durable owner of the node model and writes edits back into editable vector source geometry rather than flattening them into one-off UI state.
 - New container nodes should make their containment behavior explicit in the node contract rather than relying on ad hoc UI-only behavior.
 - PunchPress should feel like one coherent canvas system even as more node types are added.

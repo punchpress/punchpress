@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
 import { useEditor } from "../../editor-react/use-editor";
+import { resolvePreviewPlacementNodeIds } from "./canvas-node-preview-placement";
 
 interface NodeShellState {
   height: number;
@@ -133,7 +134,9 @@ const pruneNodeShells = (visibleNodeIds, appliedKeys, shellStates) => {
 
 const syncDurableNodeShells = (editor, visibleNodeIds, placementState) => {
   const { appliedKeys, preview, shellStates } = placementState;
-  const previewNodeIdSet = new Set(preview?.nodeIds || []);
+  const previewNodeIdSet = new Set(
+    resolvePreviewPlacementNodeIds(editor, visibleNodeIds, preview?.nodeIds)
+  );
 
   pruneNodeShells(visibleNodeIds, appliedKeys, shellStates);
 
@@ -187,10 +190,21 @@ const syncPreviewNodeShells = (editor, placementState, preview) => {
     return false;
   }
 
+  const previewPlacementNodeIds = resolvePreviewPlacementNodeIds(
+    editor,
+    [...placementState.shellStates.keys()],
+    preview.nodeIds
+  );
+
+  if (previewPlacementNodeIds.length === 0) {
+    placementState.preview = null;
+    return false;
+  }
+
   const entries = getPreviewBaseShellStates(
     editor,
     placementState,
-    preview.nodeIds
+    previewPlacementNodeIds
   );
   const deltaKey = `${preview.delta.x}:${preview.delta.y}`;
 

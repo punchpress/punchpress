@@ -12,3 +12,4 @@ Current decisions:
 - [0004: Interaction Ownership Boundary](./0004-interaction-ownership-boundary.md)
 - [0005: Node Render Contract](./0005-node-render-contract.md)
 - [0006: Interaction Render Hot Path](./0006-interaction-render-hot-path.md)
+- [0007: Vector Render Surface Pipeline](./0007-vector-render-surface-pipeline.md)

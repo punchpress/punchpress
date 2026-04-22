@@ -51,7 +51,7 @@ const loadWaveDocument = async (page, rotation = 0) => {
               },
             },
           ],
-          version: "1.6",
+          version: "1.7",
         })
       );
 

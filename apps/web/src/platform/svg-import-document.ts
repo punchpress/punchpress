@@ -1,15 +1,10 @@
 import {
   ARTBOARD_HEIGHT,
   ARTBOARD_WIDTH,
-  createDefaultPathNode,
   createDefaultVectorNode,
   round,
 } from "@punchpress/engine";
-import {
-  type PathNodeDocument,
-  type VectorNodeDocument,
-} from "@punchpress/punch-schema";
-import paper from "paper/dist/paper-core";
+import paper from "paper/dist/paper-core.js";
 
 const SUPPORTED_ITEM_CLASSES = new Set(["CompoundPath", "Path", "Shape"]);
 const SVG_SOURCE_NODE_NAME_KEY = "svgSourceNodeName";
@@ -92,10 +87,7 @@ const transformHandle = (
   return transformedHandlePoint.subtract(transformedPoint);
 };
 
-const createContourFromPath = (
-  path: paper.Path,
-  center: paper.Point
-): Pick<PathNodeDocument, "closed" | "segments"> => {
+const createContourFromPath = (path: paper.Path, center: paper.Point) => {
   const matrix = path.globalMatrix;
 
   return {
@@ -164,7 +156,9 @@ const getPathChildren = (item: paper.Item) => {
 const hasVisiblePaint = (item: paper.Item) => {
   const strokeWidth = item.strokeWidth || 0;
 
-  return Boolean(getItemFillColor(item) || (getItemStrokeColor(item) && strokeWidth > 0));
+  return Boolean(
+    getItemFillColor(item) || (getItemStrokeColor(item) && strokeWidth > 0)
+  );
 };
 
 const createVectorNodesFromItem = (
@@ -175,7 +169,7 @@ const createVectorNodesFromItem = (
   const fillColor = getItemFillColor(item);
   const strokeColor = getItemStrokeColor(item);
 
-  if (!isSolidColor(fillColor) || !isSolidColor(strokeColor)) {
+  if (!(isSolidColor(fillColor) && isSolidColor(strokeColor))) {
     return null;
   }
 
@@ -191,48 +185,50 @@ const createVectorNodesFromItem = (
 
   const center = item.bounds.center;
   const vectorNode = createDefaultVectorNode();
-  const pathTransform = {
-    rotation: 0,
-    scaleX: 1,
-    scaleY: 1,
-    x: roundCoordinate(center.x - importedCenter.x + targetCenter.x),
-    y: roundCoordinate(center.y - importedCenter.y + targetCenter.y),
-  };
-  const pathNodes = paths.map((path) => {
-    const baseNode = createDefaultPathNode(vectorNode.id);
-    const contour = createContourFromPath(path, center);
-
-    return {
-      ...baseNode,
-      closed: contour.closed,
-      fill: toStorageColor(fillColor),
-      fillRule: item.fillRule === "evenodd" ? "evenodd" : "nonzero",
-      segments: contour.segments,
-      stroke: toStorageColor(strokeColor),
-      strokeLineCap:
-        item.strokeCap === "round" || item.strokeCap === "square"
-          ? item.strokeCap
-          : "butt",
-      strokeLineJoin:
-        item.strokeJoin === "bevel" || item.strokeJoin === "round"
-          ? item.strokeJoin
-          : "miter",
-      strokeMiterLimit: roundCoordinate(item.miterLimit || 0),
-      strokeWidth: roundCoordinate(item.strokeWidth || 0),
-      transform: pathTransform,
-    } satisfies PathNodeDocument;
-  });
+  const isCompoundPath = item.className === "CompoundPath" && paths.length > 1;
 
   return [
     {
       ...vectorNode,
+      compoundWrapper: isCompoundPath,
+      contours: paths.map((path, index) => {
+        const contour = createContourFromPath(path, center);
+
+        return {
+          ...vectorNode.contours[0],
+          closed: contour.closed,
+          fill: toStorageColor(fillColor),
+          fillRule: item.fillRule === "evenodd" ? "evenodd" : "nonzero",
+          id: `${vectorNode.id}-contour-${index + 1}`,
+          segments: contour.segments,
+          stroke: toStorageColor(strokeColor),
+          strokeLineCap:
+            item.strokeCap === "round" || item.strokeCap === "square"
+              ? item.strokeCap
+              : "butt",
+          strokeLineJoin:
+            item.strokeJoin === "bevel" || item.strokeJoin === "round"
+              ? item.strokeJoin
+              : "miter",
+          strokeMiterLimit: roundCoordinate(item.miterLimit || 0),
+          strokeWidth: roundCoordinate(item.strokeWidth || 0),
+          visible: true,
+        };
+      }),
       name: item.name || vectorNode.name,
-    } satisfies VectorNodeDocument,
-    ...pathNodes,
+      pathComposition: isCompoundPath ? "compound-fill" : "independent",
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: roundCoordinate(center.x - importedCenter.x + targetCenter.x),
+        y: roundCoordinate(center.y - importedCenter.y + targetCenter.y),
+      },
+    },
   ];
 };
 
-export const importSvgToNodes = async (
+export const importSvgToNodes = (
   source: string,
   options: ImportSvgToNodesOptions = {}
 ) => {
@@ -263,7 +259,9 @@ export const importSvgToNodes = async (
       y: ARTBOARD_HEIGHT / 2,
     };
     const nodes = importableItems.flatMap((item) => {
-      return createVectorNodesFromItem(item, importedCenter, targetCenter) || [];
+      return (
+        createVectorNodesFromItem(item, importedCenter, targetCenter) || []
+      );
     });
 
     if (nodes.length === 0) {

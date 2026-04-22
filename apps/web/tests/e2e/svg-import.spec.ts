@@ -102,13 +102,16 @@ test("imports compound path svg artwork into the current document as an editable
       return false;
     }
 
-    return dump.nodes.filter((candidate) => candidate.parentId === node.id).length === 2;
+    return (
+      dump.nodes.filter((candidate) => candidate.parentId === node.id)
+        .length === 2
+    );
   });
   const importedPaths = (dump?.nodes || []).filter((node) => {
     return node.parentId === importedVector?.id;
   });
 
-  expect(dump?.nodes).toHaveLength(5);
+  expect(dump?.nodes).toHaveLength(4);
   expect(dump?.selection?.ids).toEqual([importedVector?.id]);
   expect(importedVector).toMatchObject({
     type: "vector",
@@ -140,6 +143,31 @@ test("imports compound path svg artwork into the current document as an editable
       }),
     ])
   );
+
+  await expect
+    .poll(() => {
+      return page.evaluate((currentVectorId) => {
+        const vectorNode = document.querySelector(
+          `.canvas-node[data-node-id="${currentVectorId}"]`
+        );
+        const renderedPaths = vectorNode?.querySelectorAll("path") || [];
+
+        return {
+          pathCommandCount:
+            renderedPaths[0]?.getAttribute("d")?.match(/M/g)?.length || 0,
+          pathCount: renderedPaths.length,
+          pathFillRule:
+            renderedPaths[0]?.getAttribute("fill-rule") ||
+            renderedPaths[0]?.getAttribute("fillRule") ||
+            null,
+        };
+      }, importedVector?.id || null);
+    })
+    .toEqual({
+      pathCommandCount: 2,
+      pathCount: 1,
+      pathFillRule: "evenodd",
+    });
 });
 
 test("round-trips imported svg path artwork back through svg export without filling open lines", async ({
@@ -172,9 +200,7 @@ test("round-trips imported svg path artwork back through svg export without fill
   const exportedSvg = await exportDocument(page);
   const sortedNodes = [...(dump?.nodes || [])]
     .filter((node) => node.type === "path")
-    .sort(
-    (left, right) => left.transform.x - right.transform.x
-  );
+    .sort((left, right) => left.transform.x - right.transform.x);
 
   expect(sortedNodes).toHaveLength(2);
   expect(sortedNodes[0]).toMatchObject({

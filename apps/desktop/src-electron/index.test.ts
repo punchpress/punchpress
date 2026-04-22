@@ -355,6 +355,13 @@ describe("desktop index bootstrap", () => {
       {
         canDelete: true,
         canEditPath: true,
+        compoundOperation: {
+          enabled: true,
+          isMixed: false,
+          value: "unite",
+        },
+        canMakeCompoundPath: true,
+        canReleaseCompoundPath: false,
         selectedNodeType: "vector",
         selectionKind: "single",
         vectorStyle: {
@@ -385,6 +392,7 @@ describe("desktop index bootstrap", () => {
         click?: () => void;
         enabled?: boolean;
         label?: string;
+        type?: string;
         submenu?: {
           checked?: boolean;
           click?: () => void;
@@ -394,8 +402,25 @@ describe("desktop index bootstrap", () => {
       }[];
     }[];
     const objectMenu = template.find((item) => item.label === "Object");
+    const objectMenuLabels = objectMenu?.submenu?.map((item) => {
+      return item.type === "separator" ? "---" : item.label;
+    });
     const editPathItem = objectMenu?.submenu?.find(
       (item) => item.label === "Edit Path"
+    );
+    const makeCompoundPathItem = objectMenu?.submenu?.find(
+      (item) => item.label === "Make Compound Path"
+    );
+    const releaseCompoundPathItem = objectMenu?.submenu?.find(
+      (item) => item.label === "Release Compound Path"
+    );
+    const compoundOperationMenu = objectMenu?.submenu?.find(
+      (item) => item.label === "Compound Operation"
+    );
+    const subtractCompoundItem = compoundOperationMenu?.submenu?.find(
+      (item) => {
+        return item.label === "Subtract";
+      }
     );
     const deleteItem = objectMenu?.submenu?.find(
       (item) => item.label === "Delete"
@@ -410,13 +435,32 @@ describe("desktop index bootstrap", () => {
       return item.label === "Use Non-Zero Winding Fill Rule";
     });
 
+    expect(objectMenuLabels).toEqual([
+      "Edit Path",
+      "---",
+      "Make Compound Path",
+      "Release Compound Path",
+      "Compound Operation",
+      "---",
+      "Fill Rule",
+      "Stroke Cap",
+      "Stroke Join",
+      "---",
+      "Delete",
+    ]);
     expect(editPathItem?.enabled).toBe(true);
+    expect(makeCompoundPathItem?.enabled).toBe(true);
+    expect(releaseCompoundPathItem?.enabled).toBe(false);
+    expect(compoundOperationMenu?.enabled).toBe(true);
+    expect(subtractCompoundItem?.checked).toBe(false);
     expect(deleteItem?.enabled).toBe(true);
     expect(fillRuleMenu?.enabled).toBe(true);
     expect(evenOddItem?.checked).toBe(true);
     expect(nonZeroItem?.checked).toBe(false);
 
     editPathItem?.click?.();
+    makeCompoundPathItem?.click?.();
+    subtractCompoundItem?.click?.();
     nonZeroItem?.click?.();
 
     expect(mainWindow.webContents.send).toHaveBeenCalledWith(
@@ -424,6 +468,20 @@ describe("desktop index bootstrap", () => {
       {
         action: "toggle-path-editing",
         type: "selection",
+      }
+    );
+    expect(mainWindow.webContents.send).toHaveBeenCalledWith(
+      EDITOR_COMMAND_CHANNEL,
+      {
+        action: "make-compound-path",
+        type: "selection",
+      }
+    );
+    expect(mainWindow.webContents.send).toHaveBeenCalledWith(
+      EDITOR_COMMAND_CHANNEL,
+      {
+        type: "vector-compound-operation",
+        value: "subtract",
       }
     );
     expect(mainWindow.webContents.send).toHaveBeenCalledWith(

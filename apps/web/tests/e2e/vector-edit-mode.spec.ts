@@ -181,44 +181,49 @@ const loadVectorEditModeDocument = async (page) => {
           visible: true,
         },
       ],
-      version: "1.6",
+      version: "1.7",
     })
   );
 
   await expect(
-    page.locator(".canvas-node[data-node-id='vector-a-path-1']")
+    page.locator(".canvas-node[data-node-id='vector-a']")
   ).toBeVisible();
   await expect(
-    page.locator(".canvas-node[data-node-id='vector-a-path-2']")
-  ).toBeVisible();
-  await expect(
-    page.locator(".canvas-node[data-node-id='vector-b-path-1']")
+    page.locator(".canvas-node[data-node-id='vector-b']")
   ).toBeVisible();
 };
 
-const getNodeCenter = async (page, nodeId) => {
-  const node = page.locator(`.canvas-node[data-node-id="${nodeId}"]`);
+const getCanvasPointClientPoint = async (page, point) => {
+  const clientPoint = await page.evaluate((nextPoint) => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const host = editor?.hostRef;
+    const viewer = editor?.viewerRef;
 
-  await node.waitFor({ state: "visible" });
+    if (!(host && viewer && nextPoint)) {
+      return null;
+    }
 
-  const rect = await node.boundingBox();
+    const rect = host.getBoundingClientRect();
 
-  if (!rect) {
-    throw new Error(`Missing element rect for ${nodeId}`);
+    return {
+      x: rect.left + (nextPoint.x - viewer.getScrollLeft()) * editor.zoom,
+      y: rect.top + (nextPoint.y - viewer.getScrollTop()) * editor.zoom,
+    };
+  }, point);
+
+  if (!clientPoint) {
+    throw new Error("Missing client point for canvas coordinate");
   }
 
-  return {
-    x: rect.x + rect.width / 2,
-    y: rect.y + rect.height / 2,
-  };
+  return clientPoint;
 };
 
-test("clicking another child path retargets vector edit mode while selecting the focused contour", async ({
+test("clicking another contour in the same vector keeps the vector edit session active", async ({
   page,
 }) => {
   await gotoEditor(page);
   await loadVectorEditModeDocument(page);
-  await clickNodeCenter(page, "vector-a-path-1");
+  await clickNodeCenter(page, "vector-a");
   await expect
     .poll(() => {
       return getStateSnapshot(page);
@@ -228,19 +233,22 @@ test("clicking another child path retargets vector edit mode while selecting the
       selectedNodeId: "vector-a",
       selectedNodeIds: ["vector-a"],
     });
-  await doubleClickNodeCenter(page, "vector-a-path-1");
+  await doubleClickNodeCenter(page, "vector-a");
 
   await expect
     .poll(() => {
       return getStateSnapshot(page);
     })
     .toMatchObject({
-      pathEditingNodeId: "vector-a-path-1",
-      selectedNodeId: "vector-a-path-1",
-      selectedNodeIds: ["vector-a-path-1"],
+      pathEditingNodeId: "vector-a-path-2",
+      selectedNodeId: "vector-a-path-2",
+      selectedNodeIds: ["vector-a-path-2"],
     });
 
-  const targetPoint = await getNodeCenter(page, "vector-a-path-2");
+  const targetPoint = await getCanvasPointClientPoint(page, {
+    x: 760,
+    y: 280,
+  });
   await page.mouse.click(targetPoint.x, targetPoint.y);
 
   await expect
@@ -254,15 +262,84 @@ test("clicking another child path retargets vector edit mode while selecting the
     });
 });
 
+test("clicking a different contour in the same vector switches the active path edit target", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadVectorEditModeDocument(page);
+  await clickNodeCenter(page, "vector-a");
+  await doubleClickNodeCenter(page, "vector-a");
+
+  await expect
+    .poll(() => {
+      return getStateSnapshot(page);
+    })
+    .toMatchObject({
+      pathEditingNodeId: "vector-a-path-2",
+      selectedNodeId: "vector-a-path-2",
+      selectedNodeIds: ["vector-a-path-2"],
+    });
+
+  const targetPoint = await getCanvasPointClientPoint(page, {
+    x: 420,
+    y: 280,
+  });
+  await page.mouse.click(targetPoint.x, targetPoint.y);
+
+  await expect
+    .poll(() => {
+      return getStateSnapshot(page);
+    })
+    .toMatchObject({
+      pathEditingNodeId: "vector-a-path-1",
+      selectedNodeId: "vector-a-path-1",
+      selectedNodeIds: ["vector-a-path-1"],
+    });
+});
+
+test("double-clicking a specific contour enters path editing on that contour", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadVectorEditModeDocument(page);
+  await clickNodeCenter(page, "vector-a");
+
+  await expect
+    .poll(() => {
+      return getStateSnapshot(page);
+    })
+    .toMatchObject({
+      pathEditingNodeId: null,
+      selectedNodeId: "vector-a",
+      selectedNodeIds: ["vector-a"],
+    });
+
+  const targetPoint = await getCanvasPointClientPoint(page, {
+    x: 420,
+    y: 280,
+  });
+  await page.mouse.dblclick(targetPoint.x, targetPoint.y);
+
+  await expect
+    .poll(() => {
+      return getStateSnapshot(page);
+    })
+    .toMatchObject({
+      pathEditingNodeId: "vector-a-path-1",
+      selectedNodeId: "vector-a-path-1",
+      selectedNodeIds: ["vector-a-path-1"],
+    });
+});
+
 test("clicking another vector while path editing jumps directly into editing that vector", async ({
   page,
 }) => {
   await gotoEditor(page);
   await loadVectorEditModeDocument(page);
-  await clickNodeCenter(page, "vector-a-path-1");
-  await doubleClickNodeCenter(page, "vector-a-path-1");
+  await clickNodeCenter(page, "vector-a");
+  await doubleClickNodeCenter(page, "vector-a");
 
-  await clickNodeCenter(page, "vector-b-path-1");
+  await clickNodeCenter(page, "vector-b");
 
   await expect
     .poll(() => {
@@ -280,8 +357,8 @@ test("empty canvas click exits path editing before clearing the vector selection
 }) => {
   await gotoEditor(page);
   await loadVectorEditModeDocument(page);
-  await clickNodeCenter(page, "vector-a-path-1");
-  await doubleClickNodeCenter(page, "vector-a-path-1");
+  await clickNodeCenter(page, "vector-a");
+  await doubleClickNodeCenter(page, "vector-a");
   const blankPoint = await findEmptyCanvasPoint(page);
 
   await page.mouse.click(blankPoint.x, blankPoint.y);
@@ -309,16 +386,27 @@ test("empty canvas click exits path editing before clearing the vector selection
     });
 });
 
-test("path editing hover preview switches to a blue path-outline preview", async ({
+test("path editing hover preview switches to a blue path-outline preview for another vector", async ({
   page,
 }) => {
   await gotoEditor(page);
   await loadVectorEditModeDocument(page);
-  await clickNodeCenter(page, "vector-a-path-1");
-  await doubleClickNodeCenter(page, "vector-a-path-1");
+  await clickNodeCenter(page, "vector-a");
+  await doubleClickNodeCenter(page, "vector-a");
 
-  const targetPoint = await getNodeCenter(page, "vector-a-path-2");
+  const targetPoint = await getCanvasPointClientPoint(page, {
+    x: 920,
+    y: 280,
+  });
   await page.mouse.move(targetPoint.x, targetPoint.y);
+
+  await expect
+    .poll(() => {
+      return getStateSnapshot(page);
+    })
+    .toMatchObject({
+      pathEditingNodeId: "vector-a-path-2",
+    });
 
   await expect(
     page.locator(".canvas-hover-preview[data-preview-kind='path'] svg path")
@@ -343,4 +431,49 @@ test("path editing hover preview switches to a blue path-outline preview", async
       borderTopWidth: "0px",
       boxShadow: "none",
     });
+});
+
+test("path editing hover preview appears for a sibling contour in the same vector", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadVectorEditModeDocument(page);
+  await clickNodeCenter(page, "vector-a");
+  await doubleClickNodeCenter(page, "vector-a");
+
+  const targetPoint = await getCanvasPointClientPoint(page, {
+    x: 420,
+    y: 280,
+  });
+  await page.mouse.move(targetPoint.x, targetPoint.y);
+
+  await expect
+    .poll(() => {
+      return getStateSnapshot(page);
+    })
+    .toMatchObject({
+      pathEditingNodeId: "vector-a-path-2",
+    });
+
+  await expect(
+    page.locator(".canvas-hover-preview[data-preview-kind='path'] svg path")
+  ).toHaveCount(1);
+  await expect(
+    page.locator(".canvas-hover-preview[data-preview-kind='bounds']")
+  ).toHaveCount(0);
+});
+
+test("layers panel shows contour rows for a multi-contour vector", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadVectorEditModeDocument(page);
+
+  await expect(page.getByRole("button", { name: "Vector A" })).toBeVisible();
+  await expect(
+    page.locator('[data-layer-node-id="vector-a-path-1"]')
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-layer-node-id="vector-a-path-2"]')
+  ).toBeVisible();
 });

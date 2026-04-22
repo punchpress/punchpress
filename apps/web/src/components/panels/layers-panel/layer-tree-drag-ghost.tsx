@@ -1,7 +1,7 @@
 import { ViewIcon, ViewOffIcon } from "@hugeicons-pro/core-stroke-rounded";
 import { cn } from "@/lib/utils";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
-import { LayerGlyph } from "./layer-context-menu";
+import { LayerGlyph } from "./layer-glyph";
 import { LayerNodeIcon } from "./layer-node-icon";
 
 export const LayerTreeDragGhost = ({ nodeId }) => {

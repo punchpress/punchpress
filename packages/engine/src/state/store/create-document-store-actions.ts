@@ -1,7 +1,8 @@
+import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
 import { createDefaultPathNode } from "../../nodes/path/model";
 import { createDefaultShapeNode } from "../../nodes/shape/model";
 import { createDefaultNode } from "../../nodes/text/model";
-import { createDefaultVectorNode } from "../../nodes/vector/model";
+import { toInternalEditorNodes } from "../../nodes/vector/vector-document-conversion";
 import {
   insertClipboardContentState,
   pasteClipboardContentState,
@@ -112,27 +113,20 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
     },
 
     addVectorNode: (point, options = {}) => {
-      const node = createDefaultVectorNode();
-      const pathNode = createDefaultPathNode(node.id);
+      const node = createDefaultPathNode(ROOT_PARENT_ID);
       const activatePointer = options.activatePointer !== false;
       const nodePatch = options.patch || null;
 
       if (point) {
-        pathNode.transform = {
-          ...pathNode.transform,
+        node.transform = {
+          ...node.transform,
           x: point.x,
           y: point.y,
         };
       }
 
       if (nodePatch) {
-        if (nodePatch.vector) {
-          Object.assign(node, nodePatch.vector);
-        }
-
-        if (nodePatch.path) {
-          Object.assign(pathNode, nodePatch.path);
-        }
+        Object.assign(node, nodePatch.path || nodePatch);
       }
 
       set((state) =>
@@ -142,7 +136,7 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
           editingOriginalText: "",
           editingText: "",
           focusedGroupId: null,
-          nodes: [...state.nodes, node, pathNode],
+          nodes: [...state.nodes, node],
           pathEditingNodeId: null,
           pathEditingPoint: null,
           pathEditingPoints: [],
@@ -154,14 +148,13 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
     },
 
     addPathNode: (parentId, point, options = {}) => {
-      if (!parentId) {
-        return null;
-      }
-
-      const node = createDefaultPathNode(parentId);
+      const resolvedParentId = parentId || ROOT_PARENT_ID;
+      const node = createDefaultPathNode(resolvedParentId);
       const activatePointer = options.activatePointer !== false;
       const nodePatch = options.patch || null;
-      const selectionNodeId = options.selectionNodeId || parentId;
+      const selectionNodeId =
+        options.selectionNodeId ||
+        (resolvedParentId === ROOT_PARENT_ID ? node.id : resolvedParentId);
 
       if (point) {
         node.transform = {
@@ -251,6 +244,8 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
         return;
       }
 
+      const normalizedNodes = toInternalEditorNodes(nodes);
+
       set((state) =>
         withDocumentMutation(state, {
           activeTool: "pointer",
@@ -258,16 +253,18 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
           editingOriginalText: "",
           editingText: "",
           focusedGroupId: null,
-          nodes: [...state.nodes, ...nodes],
+          nodes: [...state.nodes, ...normalizedNodes],
           pathEditingNodeId: null,
           pathEditingPoint: null,
           pathEditingPoints: [],
-          selectedNodeIds: getInsertedRootNodeIds(nodes),
+          selectedNodeIds: getInsertedRootNodeIds(normalizedNodes),
         })
       );
     },
 
     loadNodes: (nodes) => {
+      const normalizedNodes = toInternalEditorNodes(nodes);
+
       set((state) => ({
         activeTool: "pointer",
         editingNodeId: null,
@@ -276,7 +273,7 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
         focusedGroupId: null,
         hoveredNodeId: null,
         ...exitPathEditingInteractionState(),
-        nodes: [...nodes],
+        nodes: [...normalizedNodes],
         pathEditingNodeId: null,
         pathEditingPoint: null,
         pathEditingPoints: [],

@@ -69,7 +69,7 @@ const createRectanglePathDocument = () => {
         visible: true,
       },
     ],
-    version: "1.6",
+    version: "1.7",
   };
 };
 
@@ -245,11 +245,11 @@ const pressKey = (editor: Editor, key: string, code: string) => {
   return prevented;
 };
 
-const getSelectedVectorNode = (editor: Editor) => {
+const getSelectedPathNode = (editor: Editor) => {
   const node = editor.selectedNode;
 
-  if (node?.type !== "vector") {
-    throw new Error("Expected the selected node to be a vector container.");
+  if (node?.type !== "path") {
+    throw new Error("Expected the selected node to be a path.");
   }
 
   return node;
@@ -265,14 +265,16 @@ const getPathNode = (editor: Editor, nodeId = editor.pathEditingNodeId) => {
   return node;
 };
 
-const getVectorCount = (editor: Editor) => {
-  return editor.nodes.filter((node) => node.type === "vector").length;
+const getRootPathCount = (editor: Editor) => {
+  return editor.nodes.filter((node) => {
+    return node.type === "path" && node.parentId === "root";
+  }).length;
 };
 
-const getVectorPathIds = (editor: Editor, vectorId: string) => {
-  return editor
-    .getChildNodeIds(vectorId)
-    .filter((nodeId) => editor.getNode(nodeId)?.type === "path");
+const getRootPathIds = (editor: Editor) => {
+  return editor.nodes
+    .filter((node) => node.type === "path" && node.parentId === "root")
+    .map((node) => node.id);
 };
 
 const createOpenPathDocument = () => {
@@ -334,19 +336,19 @@ const createOpenPathDocument = () => {
         visible: true,
       },
     ],
-    version: "1.6",
+    version: "1.7",
   };
 };
 
 describe("vector pen authoring", () => {
-  test("starts an open vector contour and keeps the pen tool active", () => {
+  test("starts an open path and keeps the pen tool active", () => {
     const editor = new Editor();
 
     editor.setActiveTool("pen");
     clickPen(editor, { x: 200, y: 160 });
 
-    const vectorNode = getSelectedVectorNode(editor);
     const pathNode = getPathNode(editor);
+    const selectedPathNode = getSelectedPathNode(editor);
 
     expect(editor.activeTool).toBe("pen");
     expect(editor.pathEditingNodeId).toBe(pathNode.id);
@@ -354,10 +356,9 @@ describe("vector pen authoring", () => {
       contourIndex: 0,
       segmentIndex: 0,
     });
-    expect(vectorNode).toMatchObject({
-      type: "vector",
-    });
+    expect(selectedPathNode.id).toBe(pathNode.id);
     expect(pathNode).toMatchObject({
+      parentId: "root",
       strokeWidth: 3,
       transform: {
         x: 200,
@@ -385,7 +386,7 @@ describe("vector pen authoring", () => {
 
     clickPen(editor, { x: 260, y: 180 });
 
-    expect(editor.nodes).toHaveLength(2);
+    expect(editor.nodes).toHaveLength(1);
     expect(editor.pathEditingNodeId).toBe(nodeId);
     expect(editor.pathEditingPoint).toEqual({
       contourIndex: 0,
@@ -628,14 +629,14 @@ describe("vector pen authoring", () => {
     expect(secondSegment?.handleOut).toEqual({ x: 0, y: 0 });
   });
 
-  test("escape finishes the current pen path so the next click starts a new path in the same vector", () => {
+  test("escape finishes the current pen path so the next click starts a new path", () => {
     const editor = new Editor();
 
     editor.setActiveTool("pen");
     clickPen(editor, { x: 200, y: 160 });
     clickPen(editor, { x: 260, y: 180 });
 
-    const firstVectorId = editor.selectedNodeId;
+    const firstPathId = editor.selectedNodeId;
     const firstNodeId = editor.pathEditingNodeId;
 
     expect(pressKey(editor, "Escape", "Escape")).toBe(true);
@@ -645,17 +646,17 @@ describe("vector pen authoring", () => {
 
     clickPen(editor, { x: 360, y: 260 });
 
-    expect(getVectorCount(editor)).toBe(1);
-    expect(editor.selectedNodeId).toBe(firstVectorId);
+    expect(getRootPathCount(editor)).toBe(2);
+    expect(editor.selectedNodeId).not.toBe(firstPathId);
     expect(editor.pathEditingNodeId).not.toBe(firstNodeId);
-    expect(getVectorPathIds(editor, firstVectorId || "")).toHaveLength(2);
+    expect(getRootPathIds(editor)).toHaveLength(2);
     expect(editor.pathEditingPoint).toEqual({
       contourIndex: 0,
       segmentIndex: 0,
     });
   });
 
-  test("exiting path editing with E finishes the active pen path so the next click starts a new vector", () => {
+  test("exiting path editing with E finishes the active pen path so the next click starts a new path", () => {
     const editor = new Editor();
 
     editor.setActiveTool("pen");
@@ -663,7 +664,7 @@ describe("vector pen authoring", () => {
     clickPen(editor, { x: 260, y: 160 });
     clickPen(editor, { x: 260, y: 220 });
 
-    const firstVectorId = editor.selectedNodeId;
+    const firstPathId = editor.selectedNodeId;
     const firstNodeId = editor.pathEditingNodeId;
 
     expect(pressKey(editor, "E", "KeyE")).toBe(true);
@@ -673,8 +674,8 @@ describe("vector pen authoring", () => {
 
     clickPen(editor, { x: 360, y: 260 });
 
-    expect(getVectorCount(editor)).toBe(2);
-    expect(editor.selectedNodeId).not.toBe(firstVectorId);
+    expect(getRootPathCount(editor)).toBe(2);
+    expect(editor.selectedNodeId).not.toBe(firstPathId);
     expect(editor.pathEditingNodeId).not.toBe(firstNodeId);
     expect(editor.pathEditingPoint).toEqual({
       contourIndex: 0,
@@ -708,7 +709,7 @@ describe("vector pen authoring", () => {
 
     const continuedNode = getPathNode(editor, nodeId);
 
-    expect(editor.nodes).toHaveLength(2);
+    expect(editor.nodes).toHaveLength(1);
     expect(continuedNode.segments).toHaveLength(3);
     expect(continuedNode.segments[2]?.point).toEqual({
       x: 200,
@@ -742,7 +743,7 @@ describe("vector pen authoring", () => {
 
     const continuedNode = getPathNode(editor, nodeId);
 
-    expect(editor.nodes).toHaveLength(2);
+    expect(editor.nodes).toHaveLength(1);
     expect(continuedNode.segments).toHaveLength(3);
     expect(continuedNode.segments[2]?.point).toEqual({
       x: -40,
@@ -772,7 +773,7 @@ describe("vector pen authoring", () => {
 
     const continuedNode = getPathNode(editor, nodeId);
 
-    expect(editor.nodes).toHaveLength(2);
+    expect(editor.nodes).toHaveLength(1);
     expect(editor.pathEditingNodeId).toBe(nodeId);
     expect(editor.pathEditingPoint).toEqual({
       contourIndex: 0,
@@ -927,7 +928,7 @@ describe("vector pen authoring", () => {
 
     clickPen(editor, { x: 272, y: 140 });
 
-    expect(editor.nodes).toHaveLength(2);
+    expect(editor.nodes).toHaveLength(1);
     expect(editor.pathEditingNodeId).toBe(nodeId);
     expect(editor.pathEditingPoint).toEqual({
       contourIndex: 0,
@@ -951,7 +952,7 @@ describe("vector pen authoring", () => {
 
     const node = getPathNode(editor, nodeId);
 
-    expect(editor.nodes).toHaveLength(2);
+    expect(editor.nodes).toHaveLength(1);
     expect(node.segments).toHaveLength(2);
     expect(editor.pathEditingPoint).toEqual({
       contourIndex: 0,
@@ -1220,19 +1221,19 @@ describe("vector pen authoring", () => {
     });
   });
 
-  test("clicking the starting anchor closes the active contour and the next disconnected click starts a new path in the same vector", () => {
+  test("clicking the starting anchor closes the active contour and the next disconnected click starts a new path", () => {
     const editor = new Editor();
 
     editor.setActiveTool("pen");
     clickPen(editor, { x: 120, y: 140 });
     clickPen(editor, { x: 260, y: 140 });
 
-    const vectorNodeId = editor.selectedNodeId;
+    const firstPathId = editor.selectedNodeId;
     const nodeId = editor.pathEditingNodeId;
 
     clickPen(editor, { x: 120, y: 140 });
 
-    expect(editor.nodes).toHaveLength(2);
+    expect(editor.nodes).toHaveLength(1);
     expect(editor.activeTool).toBe("pen");
     expect(editor.pathEditingNodeId).toBe(nodeId);
     expect(editor.pathEditingPoint).toEqual({
@@ -1247,9 +1248,9 @@ describe("vector pen authoring", () => {
 
     clickPen(editor, { x: 320, y: 240 });
 
-    expect(getVectorCount(editor)).toBe(1);
-    expect(editor.selectedNodeId).toBe(vectorNodeId);
+    expect(getRootPathCount(editor)).toBe(2);
+    expect(editor.selectedNodeId).not.toBe(firstPathId);
     expect(editor.pathEditingNodeId).not.toBe(nodeId);
-    expect(getVectorPathIds(editor, vectorNodeId || "")).toHaveLength(2);
+    expect(getRootPathIds(editor)).toHaveLength(2);
   });
 });

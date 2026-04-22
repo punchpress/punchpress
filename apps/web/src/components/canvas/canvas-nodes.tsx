@@ -1,11 +1,18 @@
-import { isContainerNode } from "@punchpress/engine";
+import { isGroupNode } from "@punchpress/engine";
 import { useEditorValue } from "../../editor-react/use-editor-value";
 import { CanvasNode } from "./canvas-node";
 import { useCanvasNodePlacement } from "./use-canvas-node-placement";
 
 const selectNodeIds = (editor, state) =>
   state.nodes
-    .filter((node) => !isContainerNode(node))
+    .filter((node) => !isGroupNode(node))
+    .filter((node) => {
+      if (node.type !== "path") {
+        return true;
+      }
+
+      return editor.getNode(node.parentId)?.type !== "vector";
+    })
     .filter((node) => editor.isNodeEffectivelyVisible(node.id))
     .map((node) => node.id);
 

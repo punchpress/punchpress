@@ -1,6 +1,7 @@
 "use client";
 
 import { Toast as BaseToast } from "@base-ui/react/toast";
+import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Alert01Icon,
   AlertCircleIcon,
@@ -8,7 +9,6 @@ import {
   InformationCircleIcon,
   Loading03Icon,
 } from "@hugeicons-pro/core-stroke-rounded";
-import { HugeiconsIcon } from "@hugeicons/react";
 import type { ReactElement, ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
@@ -73,7 +73,7 @@ const Toasts = ({ position }: { position: ToastPosition }): ReactElement => {
     <BaseToast.Portal data-slot="toast-portal">
       <BaseToast.Viewport
         className={cn(
-          "fixed z-60 mx-auto flex w-[calc(100%-var(--toast-inset)*2)] max-w-90 [--toast-inset:--spacing(4)] sm:[--toast-inset:--spacing(8)]",
+          "fixed z-60 mx-auto flex w-[calc(100%-var(--toast-inset)*2)] max-w-[42rem] [--toast-inset:--spacing(4)] sm:[--toast-inset:--spacing(8)]",
           "data-[position*=top]:top-(--toast-inset)",
           "data-[position*=bottom]:bottom-(--toast-inset)",
           "data-[position*=left]:left-(--toast-inset)",
@@ -140,11 +140,11 @@ const ToastCard = ({
       swipeDirection={getToastSwipeDirection(position)}
       toast={toast}
     >
-      <BaseToast.Content className="pointer-events-auto flex items-center justify-between gap-1.5 overflow-hidden px-3.5 py-3 text-sm transition-opacity duration-250 data-behind:not-data-expanded:pointer-events-none data-behind:opacity-0 data-expanded:opacity-100">
-        <div className="flex gap-2">
+      <BaseToast.Content className="pointer-events-auto flex items-start justify-between gap-3 overflow-hidden px-3.5 py-3 text-sm transition-opacity duration-250 data-behind:not-data-expanded:pointer-events-none data-behind:opacity-0 data-expanded:opacity-100">
+        <div className="flex min-w-0 flex-1 gap-2">
           {Icon ? (
             <div
-              className="[&>svg]:h-lh [&>svg]:w-4 [&_svg]:pointer-events-none [&_svg]:shrink-0"
+              className="shrink-0 pt-0.5 [&>svg]:h-lh [&>svg]:w-4 [&_svg]:pointer-events-none [&_svg]:shrink-0"
               data-slot="toast-icon"
             >
               <HugeiconsIcon
@@ -158,7 +158,7 @@ const ToastCard = ({
           ) : null}
 
           <div
-            className="truncate font-medium"
+            className="min-w-0 break-words font-medium leading-5"
             data-slot="toast-message"
             title={typeof message === "string" ? message : undefined}
           >
@@ -168,7 +168,7 @@ const ToastCard = ({
 
         {toast.actionProps ? (
           <BaseToast.Action
-            className={buttonVariants({ size: "xs" })}
+            className={cn(buttonVariants({ size: "xs" }), "shrink-0")}
             data-slot="toast-action"
           >
             {toast.actionProps.children}

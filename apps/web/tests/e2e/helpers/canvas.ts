@@ -42,20 +42,39 @@ export const clickEmptyCanvas = async (page) => {
 };
 
 const getNodeCenter = async (page, nodeId) => {
-  const node = page.locator(`.canvas-node[data-node-id="${nodeId}"]`);
+  const candidateNodeIds = await page.evaluate((requestedNodeId) => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const visualOwnerNodeId =
+      editor?.getPathEditingVisualOwnerNodeId?.(requestedNodeId) ||
+      requestedNodeId;
 
-  await node.waitFor({ state: "visible" });
+    return [...new Set([requestedNodeId, visualOwnerNodeId].filter(Boolean))];
+  }, nodeId);
 
-  const rect = await node.boundingBox();
+  for (const candidateNodeId of candidateNodeIds) {
+    const node = page.locator(
+      `.canvas-node[data-node-id="${candidateNodeId}"]`
+    );
 
-  if (!rect) {
-    throw new Error(`Missing visible canvas node ${nodeId}`);
+    try {
+      await node.waitFor({ state: "visible", timeout: 1000 });
+    } catch {
+      continue;
+    }
+
+    const rect = await node.boundingBox();
+
+    if (!rect) {
+      continue;
+    }
+
+    return {
+      x: rect.x + rect.width / 2,
+      y: rect.y + rect.height / 2,
+    };
   }
 
-  return {
-    x: rect.x + rect.width / 2,
-    y: rect.y + rect.height / 2,
-  };
+  throw new Error(`Missing visible canvas node ${nodeId}`);
 };
 
 export const clickNodeCenter = async (page, nodeId, options) => {

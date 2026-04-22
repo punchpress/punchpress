@@ -2,8 +2,23 @@ import { useLayoutEffect, useRef } from "react";
 import Selecto from "react-selecto";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
-import { getNodeIdsFromSelectionRect } from "./canvas-overlay-geometry";
 import { shouldBlockSelectionStart } from "./canvas-overlay-interactions";
+
+const getNodeIdsFromSelectedTargets = (editor, targets) => {
+  return (targets || [])
+    .map((target) => {
+      if (!(target instanceof HTMLElement)) {
+        return null;
+      }
+
+      return target.dataset.nodeId || null;
+    })
+    .map((nodeId) => {
+      return nodeId ? editor.getSelectionTargetNodeId(nodeId) : null;
+    })
+    .filter(Boolean)
+    .filter((nodeId, index, values) => values.indexOf(nodeId) === index);
+};
 
 export const CanvasSelectionOverlay = () => {
   const editor = useEditor();
@@ -72,9 +87,9 @@ export const CanvasSelectionOverlay = () => {
           return;
         }
 
-        const nextSelectedNodeIds = getNodeIdsFromSelectionRect(
+        const nextSelectedNodeIds = getNodeIdsFromSelectedTargets(
           editor,
-          event.rect
+          event.selected
         );
 
         restoreHover();

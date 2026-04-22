@@ -5,7 +5,7 @@ import {
   SquareIcon,
   TextFontIcon,
 } from "@hugeicons-pro/core-stroke-rounded";
-import { LayerGlyph } from "./layer-context-menu";
+import { LayerGlyph } from "./layer-glyph";
 
 interface LayerNodeIconProps {
   isGroup?: boolean;

@@ -41,28 +41,31 @@ const getNodeLocalTransform = (node, bbox) => {
 
 const buildSvgPathMarkup = (node, path) => {
   const fill =
-    node.type === "path" && path.closed === false
-      ? "none"
-      : (node.fill ?? "none");
-  const stroke = node.stroke ?? "none";
+    path.closed === false ? "none" : (path.fill ?? node.fill ?? "none");
+  const stroke = path.stroke ?? node.stroke ?? "none";
   const transform = path.transform ? ` transform="${path.transform}"` : "";
-  const fillRule =
-    node.type === "path" ? ` fill-rule="${node.fillRule}"` : "";
+  const fillRuleValue =
+    path.fillRule ?? (node.type === "path" ? node.fillRule : null);
+  const fillRule = fillRuleValue ? ` fill-rule="${fillRuleValue}"` : "";
   const strokeLineCap =
-    node.type === "path"
+    path.strokeLineCap ??
+    (node.type === "path"
       ? (node.strokeLineCap ?? DEFAULT_VECTOR_STROKE_LINE_CAP)
-      : DEFAULT_VECTOR_STROKE_LINE_CAP;
+      : DEFAULT_VECTOR_STROKE_LINE_CAP);
   const strokeLineJoin =
-    node.type === "path"
+    path.strokeLineJoin ??
+    (node.type === "path"
       ? (node.strokeLineJoin ?? DEFAULT_VECTOR_STROKE_LINE_JOIN)
-      : DEFAULT_VECTOR_STROKE_LINE_JOIN;
+      : DEFAULT_VECTOR_STROKE_LINE_JOIN);
   const strokeMiterLimit =
-    node.type === "path"
+    path.strokeMiterLimit ??
+    (node.type === "path"
       ? (node.strokeMiterLimit ?? DEFAULT_VECTOR_STROKE_MITER_LIMIT)
-      : DEFAULT_VECTOR_STROKE_MITER_LIMIT;
+      : DEFAULT_VECTOR_STROKE_MITER_LIMIT);
+  const strokeWidth = path.strokeWidth ?? node.strokeWidth ?? 0;
 
   return `<path d="${path.d}"${transform}${fillRule} fill="${fill}" stroke="${stroke}" stroke-width="${format(
-    node.strokeWidth
+    strokeWidth
   )}" paint-order="fill stroke" stroke-linejoin="${strokeLineJoin}" stroke-linecap="${strokeLineCap}" stroke-miterlimit="${format(
     strokeMiterLimit
   )}"/>`;

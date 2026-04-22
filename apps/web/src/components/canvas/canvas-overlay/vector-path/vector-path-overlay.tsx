@@ -36,7 +36,12 @@ const getVectorPathOverlayScene = ({
     isPanning,
     matrix,
     metrics,
-    nodeStrokeWidth: node.strokeWidth,
+    nodeStrokeWidth: editablePathSession.contours.reduce(
+      (maxStrokeWidth, contour) => {
+        return Math.max(maxStrokeWidth, contour.strokeWidth || 0);
+      },
+      0
+    ),
     penHover,
     penPreview,
     selectedPoints: editablePathSession.selectedPoints,
@@ -50,12 +55,11 @@ const getVectorPathOverlayRenderState = ({
   editor,
   hoveredCornerHandlePoint,
   overlayState,
-  pathEditingNodeId,
   penDirectSelectionModifierPressed,
   spacePressed,
 }) => {
   const nodeId = overlayState?.node.id || null;
-  const isPathEditing = Boolean(nodeId && pathEditingNodeId === nodeId);
+  const isPathEditing = overlayState?.isPathEditing;
   const isPanning = spacePressed || activeTool === "hand";
   const isPenToolActive = activeTool === "pen";
   const isPenDirectSelectionMode =
@@ -124,59 +128,12 @@ export const CanvasVectorPathOverlay = ({ viewportRevision }) => {
     useState<VectorCornerDragSession | null>(null);
   const [transformTargetElement, setTransformTargetElement] = useState(null);
   const activeTool = useEditorValue((_, state) => state.activeTool);
-  const pathEditingNodeId = useEditorValue(
-    (_, state) => state.pathEditingNodeId
-  );
   const penDirectSelectionModifierPressed = useEditorValue(
     (_, state) => state.penDirectSelectionModifierPressed
   );
   const spacePressed = useEditorValue((_, state) => state.spacePressed);
-  const overlayState = useEditorSurfaceValue((editor, state) => {
-    if (state.editingNodeId || !state.pathEditingNodeId) {
-      return null;
-    }
-
-    const editablePathSession = editor.getEditablePathSession(
-      state.pathEditingNodeId
-    );
-
-    if (editablePathSession?.backend !== "vector-path") {
-      return null;
-    }
-
-    const node = editor.getNode(editablePathSession.nodeId);
-
-    if (!(node && editor.isNodeEffectivelyVisible(node.id))) {
-      return null;
-    }
-
-    const geometry = editor.getNodeGeometry(node.id);
-
-    if (!geometry?.bbox) {
-      return null;
-    }
-
-    const penPreview = editor.getPenPreviewState();
-    const penHover = editor.getPenHoverState();
-
-    const previewNodeIds = editor.getEffectiveSelectionNodeIds([
-      editor.getSelectionTargetNodeId(node.id) || node.id,
-    ]);
-
-    return {
-      editablePathSession,
-      geometry,
-      node,
-      penHover:
-        !state.spacePressed && penHover?.nodeId === node.id ? penHover : null,
-      penPreview:
-        !state.spacePressed &&
-        penPreview?.nodeId === node.id &&
-        penPreview.kind === "segment"
-          ? penPreview
-          : null,
-      previewDelta: editor.getSelectionPreviewDelta(previewNodeIds) || null,
-    };
+  const overlayState = useEditorSurfaceValue((editor) => {
+    return editor.getVectorPathOverlayState();
   });
   const {
     isPathEditing,
@@ -193,7 +150,6 @@ export const CanvasVectorPathOverlay = ({ viewportRevision }) => {
     editor,
     hoveredCornerHandlePoint,
     overlayState,
-    pathEditingNodeId,
     penDirectSelectionModifierPressed,
     spacePressed,
   });

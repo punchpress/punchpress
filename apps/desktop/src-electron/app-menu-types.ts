@@ -4,6 +4,12 @@ export type DesktopSelectedNodeType = "group" | "shape" | "text" | "vector";
 
 export type DesktopVectorFillRule = "evenodd" | "nonzero";
 
+export type DesktopVectorCompoundOperation =
+  | "exclude"
+  | "intersect"
+  | "subtract"
+  | "unite";
+
 export type DesktopVectorStrokeLineCap = "butt" | "round" | "square";
 
 export type DesktopVectorStrokeLineJoin = "bevel" | "miter" | "round";
@@ -23,6 +29,9 @@ export interface DesktopVectorStyleMenuState {
 export interface DesktopAppMenuState {
   canDelete: boolean;
   canEditPath: boolean;
+  canMakeCompoundPath: boolean;
+  canReleaseCompoundPath: boolean;
+  compoundOperation: DesktopMenuChoiceState<DesktopVectorCompoundOperation> | null;
   selectedNodeType: DesktopSelectedNodeType | null;
   selectionKind: DesktopSelectionKind;
   vectorStyle: DesktopVectorStyleMenuState | null;
@@ -30,7 +39,18 @@ export interface DesktopAppMenuState {
 
 export type DesktopEditorCommand =
   | { action: "redo" | "undo"; type: "history" }
-  | { action: "delete-selected" | "toggle-path-editing"; type: "selection" }
+  | {
+      type: "vector-compound-operation";
+      value: DesktopVectorCompoundOperation;
+    }
+  | {
+      action:
+        | "delete-selected"
+        | "make-compound-path"
+        | "release-compound-path"
+        | "toggle-path-editing";
+      type: "selection";
+    }
   | {
       propertyId: "fillRule";
       type: "selection-property";

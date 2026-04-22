@@ -119,7 +119,7 @@ const BOOLEAN_VECTOR_DOCUMENT = JSON.stringify({
       visible: true,
     },
   ],
-  version: "1.6",
+  version: "1.7",
 });
 
 const TOP_LEVEL_BOOLEAN_VECTOR_DOCUMENT = JSON.stringify({
@@ -247,7 +247,7 @@ const TOP_LEVEL_BOOLEAN_VECTOR_DOCUMENT = JSON.stringify({
       visible: true,
     },
   ],
-  version: "1.6",
+  version: "1.7",
 });
 
 const BOOLEAN_ACTIONS = [
@@ -425,6 +425,49 @@ test("undo and redo keyboard shortcuts restore a boolean result created from sib
   await expectVectorTransformOverlay(page);
 });
 
+test("selecting a hidden subtract operand shows a ghost path on canvas", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(page, BOOLEAN_VECTOR_DOCUMENT);
+
+  await selectSiblingPathsFromLayers(page);
+  await page.getByRole("button", { name: "Subtract selection" }).click();
+
+  await expect
+    .poll(() => {
+      return getBooleanVectorSnapshot(page);
+    })
+    .toEqual({
+      pathCount: 2,
+      pathNodeIds: expect.any(Array),
+      selectedNodeId: "vector-container",
+      selectedNodeIds: ["vector-container"],
+      vectorCount: 1,
+    });
+
+  await page.getByRole("button", { name: "Path 2" }).first().click();
+
+  await expect
+    .poll(async () => {
+      const dump = await getDebugDump(page);
+      const selectedNodeId = dump?.selection?.primaryId || null;
+      const selectedNode = dump?.nodes?.find(
+        (node) => node.id === selectedNodeId
+      );
+
+      return selectedNode?.type === "path" &&
+        selectedNode.parentId === "vector-container"
+        ? selectedNode.id
+        : null;
+    })
+    .not.toBeNull();
+
+  await expect(
+    page.locator('[data-testid="canvas-selection-path-ghost"] path')
+  ).toHaveCount(1);
+});
+
 for (const booleanAction of BOOLEAN_ACTIONS) {
   test(`layers-panel top-level vector selection keeps the result visible for ${booleanAction.buttonName}`, async ({
     page,
@@ -488,4 +531,178 @@ test("canvas shift-selection of top-level vectors exposes boolean ops and keeps 
     });
 
   await expectVectorTransformOverlay(page);
+});
+
+test("clicking a compound layer icon opens the operation menu and updates the vector op", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(page, BOOLEAN_VECTOR_DOCUMENT);
+
+  await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    editor?.setVectorPathComposition("vector-container", "unite");
+  });
+
+  await expect
+    .poll(async () => {
+      const dump = await getDebugDump(page);
+
+      return dump?.nodes.find((node) => node.id === "vector-container")
+        ?.pathComposition;
+    })
+    .toBe("unite");
+
+  const trigger = page.locator(
+    '[data-layer-compound-operation-node-id="vector-container"]'
+  );
+
+  await expect(
+    page.locator("[data-layer-compound-operation-node-id]")
+  ).toHaveCount(1);
+  await expect(trigger).toBeVisible();
+  await trigger.click();
+
+  await expect(
+    page.getByRole("menuitemradio", { name: "Unite" })
+  ).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("menuitemradio", { name: "Subtract" }).click();
+
+  await expect
+    .poll(async () => {
+      const dump = await getDebugDump(page);
+
+      return dump?.nodes.find((node) => node.id === "vector-container")
+        ?.pathComposition;
+    })
+    .toBe("subtract");
+
+  await expect
+    .poll(async () => {
+      return (await getSelectionSnapshot(page)).selectedNodeIds;
+    })
+    .toEqual(["vector-container"]);
+
+  await trigger.click();
+  await expect(
+    page.getByRole("menuitemradio", { name: "Subtract" })
+  ).toHaveAttribute("aria-checked", "true");
+});
+
+test("layer context menu swaps make and release compound path actions", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(page, BOOLEAN_VECTOR_DOCUMENT);
+
+  const layerRow = page.getByRole("button", {
+    exact: true,
+    name: "Boolean Vector",
+  });
+
+  await layerRow.click({ button: "right" });
+  await expect(
+    page.getByRole("menuitem", { name: "Make Compound Path" })
+  ).toBeVisible();
+  await expect(
+    page.getByRole("menuitem", { name: "Release Compound Path" })
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("menuitem", { name: "Compound Operation" })
+  ).toHaveCount(0);
+  await page.getByRole("menuitem", { name: "Make Compound Path" }).click();
+
+  await expect
+    .poll(async () => {
+      const dump = await getDebugDump(page);
+
+      return dump?.nodes.find((node) => node.id === "vector-container")
+        ?.pathComposition;
+    })
+    .toBe("unite");
+
+  await layerRow.click({ button: "right" });
+  await expect(
+    page.getByRole("menuitem", { name: "Release Compound Path" })
+  ).toBeVisible();
+  await expect(
+    page.getByRole("menuitem", { name: "Make Compound Path" })
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("menuitem", { name: "Compound Operation" })
+  ).toBeVisible();
+  await page.getByRole("menuitem", { name: "Release Compound Path" }).click();
+
+  await expect
+    .poll(async () => {
+      const dump = await getDebugDump(page);
+
+      return dump?.nodes.find((node) => node.id === "vector-container")
+        ?.pathComposition;
+    })
+    .toBe("independent");
+});
+
+test("layer context menu exposes compound operations for a compound vector", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(page, BOOLEAN_VECTOR_DOCUMENT);
+
+  await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    editor?.setVectorPathComposition("vector-container", "unite");
+  });
+
+  await page
+    .getByRole("button", { exact: true, name: "Boolean Vector" })
+    .click({
+      button: "right",
+    });
+
+  const duplicateItem = page.getByRole("menuitem", { name: "Duplicate" });
+  const compoundItem = page.getByRole("menuitem", {
+    name: "Compound Operation",
+  });
+
+  await expect(compoundItem).toBeVisible();
+
+  const iconOffsets = await Promise.all(
+    [duplicateItem, compoundItem].map((locator) =>
+      locator.evaluate((element) => {
+        const itemRect = element.getBoundingClientRect();
+        const iconRect = element.querySelector("svg")?.getBoundingClientRect();
+
+        if (!iconRect) {
+          throw new Error("Missing context menu icon");
+        }
+
+        return {
+          iconLeft: iconRect.left,
+          itemLeft: itemRect.left,
+        };
+      })
+    )
+  );
+
+  expect(
+    Math.abs((iconOffsets[0]?.iconLeft || 0) - (iconOffsets[1]?.iconLeft || 0))
+  ).toBeLessThanOrEqual(1);
+
+  await compoundItem.hover();
+  await expect(
+    page.getByRole("menuitemradio", { name: "Unite" })
+  ).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("menuitemradio", { name: "Exclude" }).click();
+
+  await expect
+    .poll(async () => {
+      const dump = await getDebugDump(page);
+
+      return dump?.nodes.find((node) => node.id === "vector-container")
+        ?.pathComposition;
+    })
+    .toBe("exclude");
 });

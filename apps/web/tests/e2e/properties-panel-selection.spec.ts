@@ -105,7 +105,7 @@ const loadVectorStrokeStyleDocument = (page) => {
           visible: true,
         },
       ],
-      version: "1.6",
+      version: "1.7",
     })
   );
 };
@@ -183,7 +183,7 @@ const loadIrregularVectorCornerDocument = (page) => {
           visible: true,
         },
       ],
-      version: "1.6",
+      version: "1.7",
     })
   );
 };
@@ -255,7 +255,7 @@ const loadClosedVectorCornerDocument = (page) => {
           visible: true,
         },
       ],
-      version: "1.6",
+      version: "1.7",
     })
   );
 };
@@ -374,7 +374,7 @@ const loadVectorSelectionColorsDocument = (page) => {
           visible: true,
         },
       ],
-      version: "1.6",
+      version: "1.7",
     })
   );
 };
@@ -496,7 +496,7 @@ test("shows bulk path corner controls for a selected vector outside path edit mo
           visible: true,
         },
       ],
-      version: "1.6",
+      version: "1.7",
     })
   );
   await selectNodes(page, ["vector-node"]);

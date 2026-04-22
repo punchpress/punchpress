@@ -49,7 +49,7 @@ export interface PenHoverState {
 }
 
 export const isPenEditableNode = (node) => {
-  return node?.type === "path";
+  return node?.type === "path" || node?.type === "vector";
 };
 
 export const isPenSelectionActive = (editor, node) => {
@@ -59,7 +59,8 @@ export const isPenSelectionActive = (editor, node) => {
 
   return editor.selectedNodeIds.some((selectedNodeId) => {
     return (
-      selectedNodeId === node.id || editor.isDescendantOf(node.id, selectedNodeId)
+      selectedNodeId === node.id ||
+      editor.isDescendantOf(node.id, selectedNodeId)
     );
   });
 };

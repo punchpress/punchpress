@@ -20,6 +20,14 @@ export const isPathNode = (node) => {
   return node?.type === "path";
 };
 
+const hasEditableVectorContours = (node) => {
+  return (
+    isVectorNode(node) &&
+    Array.isArray(node.contours) &&
+    node.contours.length > 0
+  );
+};
+
 export const isContainerNode = (node) => {
   return isGroupNode(node) || isVectorNode(node);
 };
@@ -182,6 +190,11 @@ export const getEffectiveSelectionNodeIds = (nodes, nodeIds) => {
     }
 
     if (!isContainerNode(node)) {
+      effectiveNodeIds.push(nodeId);
+      continue;
+    }
+
+    if (hasEditableVectorContours(node)) {
       effectiveNodeIds.push(nodeId);
       continue;
     }

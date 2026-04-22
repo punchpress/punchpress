@@ -44,6 +44,13 @@ import {
   applyBooleanOperation as applyEditorBooleanOperation,
   canApplyBooleanOperation as canEditorApplyBooleanOperation,
 } from "./document/path/path-boolean-actions";
+import { setVectorPathComposition as setEditorVectorPathComposition } from "./document/path/path-composition-actions";
+import {
+  canMakeCompoundPath as canEditorMakeCompoundPath,
+  canReleaseCompoundPath as canEditorReleaseCompoundPath,
+  makeCompoundPath as makeEditorCompoundPath,
+  releaseCompoundPath as releaseEditorCompoundPath,
+} from "./document/path/path-compound-actions";
 import {
   canRoundPathPoint as canEditorRoundPathPoint,
   getPathCornerRadiusStableMax as getEditorPathCornerRadiusStableMax,
@@ -137,6 +144,7 @@ import {
 } from "./managers/font-manager";
 import { GeometryManager } from "./managers/geometry-manager";
 import { HistoryManager } from "./managers/history-manager";
+import { VectorRenderSurfaceManager } from "./managers/vector-render-surface-manager";
 import {
   buildNodeCapabilityGeometry,
   getNodeFrameFromGeometry,
@@ -149,7 +157,14 @@ import {
   isDescendantOf,
   isGroupNode,
 } from "./nodes/node-tree";
+import { getVectorPathEditingChildId } from "./nodes/vector/vector-path-composition";
 import { beginNodePlacement as beginEditorNodePlacement } from "./placement/node-placement";
+import {
+  getCanvasTransformOverlayState as getEditorCanvasTransformOverlayState,
+  getHoveredNodePreview as getEditorHoveredNodePreview,
+  getTextPathOverlayState as getEditorTextPathOverlayState,
+  getVectorPathOverlayState as getEditorVectorPathOverlayState,
+} from "./queries/canvas-overlay-queries";
 import {
   getEditablePathSession as getEditorEditablePathSession,
   getLayerRow as getEditorLayerRow,
@@ -244,6 +259,7 @@ export class Editor {
       onChange: () => this.store.getState().bumpFontRevision(),
     });
     this.geometry = new GeometryManager(this.fonts);
+    this.vectorRenderSurfaces = new VectorRenderSurfaceManager();
     this.tools = new Map([
       ["pointer", new PointerTool(this)],
       ["hand", new HandTool(this)],
@@ -604,46 +620,40 @@ export class Editor {
       return null;
     }
 
-    if (node.type === "path") {
-      return node.id;
+    if (node.type === "vector" && this.isPathEditing(node.id)) {
+      return getVectorPathEditingChildId(this, node.id);
     }
 
-    if (node.type !== "vector") {
-      return node.id;
-    }
-
-    const childPathIds = this.getChildNodeIds(node.id).filter((childNodeId) => {
-      return this.getNode(childNodeId)?.type === "path";
-    });
-
-    if (
-      this.pathEditingNodeId &&
-      this.isDescendantOf(this.pathEditingNodeId, node.id)
-    ) {
-      return this.pathEditingNodeId;
-    }
-
-    return childPathIds.length === 1 ? childPathIds[0] : node.id;
+    return node.id;
   }
 
   getPathEditingEntryNodeId(nodeId = this.selectedNodeId) {
-    const targetNodeId = this.getPathEditingTargetNodeId(nodeId);
-
-    if (targetNodeId !== nodeId) {
-      return targetNodeId;
-    }
-
     const node = this.getNode(nodeId);
 
-    if (node?.type !== "vector") {
-      return targetNodeId;
+    if (node?.type === "vector") {
+      return getVectorPathEditingChildId(this, node.id) || node.id;
     }
 
-    const childPathIds = this.getChildNodeIds(node.id).filter((childNodeId) => {
-      return this.getNode(childNodeId)?.type === "path";
-    });
+    return this.getPathEditingTargetNodeId(nodeId);
+  }
 
-    return childPathIds[0] || targetNodeId;
+  getPathEditingVisualOwnerNodeId(nodeId = this.pathEditingNodeId) {
+    if (!nodeId) {
+      return null;
+    }
+
+    return this.getSelectionTargetNodeId(nodeId) || nodeId;
+  }
+
+  sharesPathEditingVisualOwner(nodeId, otherNodeId = this.pathEditingNodeId) {
+    if (!(nodeId && otherNodeId)) {
+      return false;
+    }
+
+    return (
+      this.getPathEditingVisualOwnerNodeId(nodeId) ===
+      this.getPathEditingVisualOwnerNodeId(otherNodeId)
+    );
   }
 
   isDescendantOf(nodeId, ancestorId) {
@@ -683,6 +693,22 @@ export class Editor {
     return getEditorNodeRenderFrame(this, nodeId);
   }
 
+  getHoveredNodePreview() {
+    return getEditorHoveredNodePreview(this);
+  }
+
+  getCanvasTransformOverlayState() {
+    return getEditorCanvasTransformOverlayState(this);
+  }
+
+  getTextPathOverlayState() {
+    return getEditorTextPathOverlayState(this);
+  }
+
+  getVectorPathOverlayState() {
+    return getEditorVectorPathOverlayState(this);
+  }
+
   getNodeRenderBounds(nodeId) {
     return getEditorNodeRenderBounds(this, nodeId);
   }
@@ -717,6 +743,26 @@ export class Editor {
 
   canApplyBooleanOperation(operation, nodeIds = this.selectedNodeIds) {
     return canEditorApplyBooleanOperation(this, operation, nodeIds);
+  }
+
+  canMakeCompoundPath(nodeIds = this.selectedNodeIds) {
+    return canEditorMakeCompoundPath(this, nodeIds);
+  }
+
+  canReleaseCompoundPath(nodeIds = this.selectedNodeIds) {
+    return canEditorReleaseCompoundPath(this, nodeIds);
+  }
+
+  makeCompoundPath(nodeIds = this.selectedNodeIds) {
+    return makeEditorCompoundPath(this, nodeIds);
+  }
+
+  releaseCompoundPath(nodeIds = this.selectedNodeIds) {
+    return releaseEditorCompoundPath(this, nodeIds);
+  }
+
+  setVectorPathComposition(nodeId, pathComposition) {
+    return setEditorVectorPathComposition(this, nodeId, pathComposition);
   }
 
   uniteSelection(nodeIds = this.selectedNodeIds) {

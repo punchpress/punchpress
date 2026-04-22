@@ -5,8 +5,11 @@ import {
   round,
 } from "@punchpress/engine";
 import { memo } from "react";
+import { NodeContextMenuItems } from "@/components/context-menus/node-context-menu-items";
+import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
 import { useEditor } from "../../editor-react/use-editor";
+import { useEditorSurfaceValue } from "../../editor-react/use-editor-surface-value";
 import { useEditorValue } from "../../editor-react/use-editor-value";
 import { usePerformanceRenderCounter } from "../../performance/use-performance-render-counter";
 import { openCanvasNodeEditingMode } from "./canvas-node-editing";
@@ -72,7 +75,7 @@ const selectNodeArtState = (editor, state, nodeId) => {
 };
 
 const getCanvasNodePathFill = (path, fill) => {
-  return path.closed === false ? "none" : fill || "none";
+  return path.closed === false ? "none" : path.fill || fill || "none";
 };
 
 const shouldStartNodeDrag = ({
@@ -99,6 +102,23 @@ const shouldStartNodeDrag = ({
         shouldDragSelectedPathNode ||
         event.altKey)
   );
+};
+
+const shouldDirectEnterPathEditing = ({ editor, event, nodeId }) => {
+  if (
+    event.shiftKey ||
+    event.altKey ||
+    editor.activeTool !== "pointer" ||
+    !editor.pathEditingNodeId
+  ) {
+    return false;
+  }
+
+  if (editor.sharesPathEditingVisualOwner(nodeId)) {
+    return false;
+  }
+
+  return editor.canStartPathEditing(nodeId);
 };
 
 const startCanvasNodeDragSession = ({
@@ -179,140 +199,203 @@ const startCanvasNodeDragSession = ({
   window.addEventListener("pointerup", handlePointerEnd);
 };
 
-const CanvasNodeComponent = ({ nodeId }) => {
+const CanvasNodeButton = ({ artState, nodeId }) => {
   usePerformanceRenderCounter("render.canvas.node");
   const editor = useEditor();
   const activeTool = useEditorValue((_, state) => state.activeTool);
+  const contextMenuNodeId = useEditorValue((editor) => {
+    return editor.getSelectionTargetNodeId(nodeId) || nodeId;
+  });
   const spacePressed = useEditorValue((_, state) => state.spacePressed);
   const isSelectionTargetSelected = useEditorValue((editor) => {
     const targetNodeId = editor.getSelectionTargetNodeId(nodeId) || nodeId;
 
     return editor.isSelected(targetNodeId);
   });
+  const cursorClassName = "canvas-cursor-default";
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger
+        data-node-id={nodeId}
+        data-selected={isSelectionTargetSelected ? "true" : "false"}
+        onContextMenuCapture={() => {
+          if (!editor.isSelected(contextMenuNodeId)) {
+            editor.select(contextMenuNodeId);
+          }
+        }}
+        ref={(element) => {
+          editor.registerNodeElement(nodeId, element);
+        }}
+        render={
+          <button
+            className={cn(
+              "canvas-node absolute block h-full w-full appearance-none border-0 bg-transparent p-0",
+              cursorClassName,
+              !artState.ready && "opacity-50"
+            )}
+            onDoubleClick={(event) => {
+              openCanvasNodeEditingMode(editor, nodeId, {
+                clientPoint: {
+                  x: event.clientX,
+                  y: event.clientY,
+                },
+              });
+            }}
+            onPointerDown={(event) => {
+              if (event.button !== 0) {
+                return;
+              }
+
+              if (spacePressed || activeTool === "hand") {
+                return;
+              }
+
+              if (event.detail >= 2) {
+                event.preventDefault();
+                event.stopPropagation();
+                openCanvasNodeEditingMode(editor, nodeId, {
+                  clientPoint: {
+                    x: event.clientX,
+                    y: event.clientY,
+                  },
+                });
+                return;
+              }
+
+              const node = editor.getNode(nodeId);
+
+              if (!node) {
+                return;
+              }
+
+              if (
+                shouldDirectEnterPathEditing({
+                  editor,
+                  event,
+                  nodeId,
+                })
+              ) {
+                event.preventDefault();
+                event.stopPropagation();
+                editor.startPathEditing(nodeId);
+                return;
+              }
+
+              const nodeEditCapabilities =
+                editor.getNodeEditCapabilities(nodeId);
+              const shouldStartDragging = shouldStartNodeDrag({
+                editor,
+                event,
+                isSelectionTargetSelected,
+                node,
+                nodeEditCapabilities,
+              });
+
+              const placementSession = editor.dispatchNodePointerDown({
+                event,
+                node,
+                point: getCanvasPoint(editor, event.clientX, event.clientY),
+              });
+
+              if (
+                startCanvasToolPlacementSession({
+                  editor,
+                  event,
+                  getCanvasPoint: (clientX, clientY) =>
+                    getCanvasPoint(editor, clientX, clientY),
+                  session: placementSession,
+                })
+              ) {
+                return;
+              }
+
+              if (activeTool !== "pointer") {
+                return;
+              }
+
+              if (shouldStartDragging) {
+                startCanvasNodeDragSession({
+                  editor,
+                  event,
+                  isSelectionTargetSelected,
+                  nodeId,
+                });
+              }
+            }}
+            onPointerEnter={() => {
+              if (spacePressed || activeTool !== "pointer") {
+                return;
+              }
+
+              editor.setHoveredNode(
+                editor.getSelectionTargetNodeId(nodeId) || nodeId
+              );
+            }}
+            onPointerLeave={() => {
+              const hoverTargetNodeId =
+                editor.getSelectionTargetNodeId(nodeId) || nodeId;
+
+              if (editor.hoveredNodeId !== hoverTargetNodeId) {
+                return;
+              }
+
+              editor.setHoveredNode(null);
+            }}
+            type="button"
+          />
+        }
+        style={{ left: 0, top: 0, transformOrigin: "center center" }}
+      >
+        <CanvasNodeArt
+          bbox={artState.bbox}
+          fill={artState.fill}
+          fillRule={artState.fillRule}
+          height={Math.max(1, artState.bbox.height)}
+          isEditing={artState.isEditing}
+          paths={artState.paths}
+          stroke={artState.stroke}
+          strokeLineCap={artState.strokeLineCap}
+          strokeLineJoin={artState.strokeLineJoin}
+          strokeMiterLimit={artState.strokeMiterLimit}
+          strokeWidth={artState.strokeWidth}
+          width={Math.max(1, artState.bbox.width)}
+        />
+      </ContextMenuTrigger>
+      <NodeContextMenuItems nodeId={contextMenuNodeId} />
+    </ContextMenu>
+  );
+};
+
+const CanvasStandardNodeComponent = ({ nodeId }) => {
   const artState = useEditorValue((editor, state) =>
     selectNodeArtState(editor, state, nodeId)
   );
 
-  if (!artState) {
-    return null;
-  }
+  return artState ? (
+    <CanvasNodeButton artState={artState} nodeId={nodeId} />
+  ) : null;
+};
 
-  const cursorClassName = "canvas-cursor-default";
+const CanvasVectorNodeComponent = ({ nodeId }) => {
+  const artState = useEditorSurfaceValue((editor, state) => {
+    return selectNodeArtState(editor, state, nodeId);
+  });
 
-  return (
-    <button
-      className={cn(
-        "canvas-node absolute block appearance-none border-0 bg-transparent p-0",
-        cursorClassName,
-        !artState.ready && "opacity-50"
-      )}
-      data-node-id={nodeId}
-      data-selected={isSelectionTargetSelected ? "true" : "false"}
-      onDoubleClick={() => {
-        openCanvasNodeEditingMode(editor, nodeId);
-      }}
-      onPointerDown={(event) => {
-        if (event.button !== 0) {
-          return;
-        }
+  return artState ? (
+    <CanvasNodeButton artState={artState} nodeId={nodeId} />
+  ) : null;
+};
 
-        if (spacePressed || activeTool === "hand") {
-          return;
-        }
+const CanvasNodeComponent = ({ nodeId }) => {
+  const isVectorNode = useEditorValue((editor) => {
+    return editor.getNode(nodeId)?.type === "vector";
+  });
 
-        if (event.detail >= 2) {
-          event.preventDefault();
-          event.stopPropagation();
-          openCanvasNodeEditingMode(editor, nodeId);
-          return;
-        }
-
-        const node = editor.getNode(nodeId);
-
-        if (!node) {
-          return;
-        }
-
-        const nodeEditCapabilities = editor.getNodeEditCapabilities(nodeId);
-        const shouldStartDragging = shouldStartNodeDrag({
-          editor,
-          event,
-          isSelectionTargetSelected,
-          node,
-          nodeEditCapabilities,
-        });
-
-        const placementSession = editor.dispatchNodePointerDown({
-          event,
-          node,
-          point: getCanvasPoint(editor, event.clientX, event.clientY),
-        });
-
-        if (
-          startCanvasToolPlacementSession({
-            editor,
-            event,
-            getCanvasPoint: (clientX, clientY) =>
-              getCanvasPoint(editor, clientX, clientY),
-            session: placementSession,
-          })
-        ) {
-          return;
-        }
-
-        if (activeTool !== "pointer") {
-          return;
-        }
-
-        if (shouldStartDragging) {
-          startCanvasNodeDragSession({
-            editor,
-            event,
-            isSelectionTargetSelected,
-            nodeId,
-          });
-        }
-      }}
-      onPointerEnter={() => {
-        if (spacePressed || activeTool !== "pointer") {
-          return;
-        }
-
-        editor.setHoveredNode(
-          editor.getSelectionTargetNodeId(nodeId) || nodeId
-        );
-      }}
-      onPointerLeave={() => {
-        const hoverTargetNodeId =
-          editor.getSelectionTargetNodeId(nodeId) || nodeId;
-
-        if (editor.hoveredNodeId !== hoverTargetNodeId) {
-          return;
-        }
-
-        editor.setHoveredNode(null);
-      }}
-      ref={(element) => {
-        editor.registerNodeElement(nodeId, element);
-      }}
-      style={{ left: 0, top: 0, transformOrigin: "center center" }}
-      type="button"
-    >
-      <CanvasNodeArt
-        bbox={artState.bbox}
-        fill={artState.fill}
-        fillRule={artState.fillRule}
-        height={Math.max(1, artState.bbox.height)}
-        isEditing={artState.isEditing}
-        paths={artState.paths}
-        stroke={artState.stroke}
-        strokeLineCap={artState.strokeLineCap}
-        strokeLineJoin={artState.strokeLineJoin}
-        strokeMiterLimit={artState.strokeMiterLimit}
-        strokeWidth={artState.strokeWidth}
-        width={Math.max(1, artState.bbox.width)}
-      />
-    </button>
+  return isVectorNode ? (
+    <CanvasVectorNodeComponent nodeId={nodeId} />
+  ) : (
+    <CanvasStandardNodeComponent nodeId={nodeId} />
   );
 };
 
@@ -336,7 +419,7 @@ const CanvasNodeArt = memo(
     return (
       <svg
         aria-label="Canvas node"
-        className="block overflow-visible"
+        className="pointer-events-none block overflow-visible"
         height={height}
         role="img"
         viewBox={`0 0 ${width} ${height}`}
@@ -348,16 +431,16 @@ const CanvasNodeArt = memo(
               <path
                 d={path.d}
                 fill={getCanvasNodePathFill(path, fill)}
-                fillRule={fillRule}
+                fillRule={path.fillRule || fillRule}
                 key={path.key || `${path.transform || "shape"}-${path.d}`}
                 opacity={isEditing ? 0 : 1}
                 paintOrder={getVectorPathPaintOrder()}
                 pointerEvents="none"
-                stroke={stroke}
-                strokeLinecap={strokeLineCap}
-                strokeLinejoin={strokeLineJoin}
-                strokeMiterlimit={strokeMiterLimit}
-                strokeWidth={strokeWidth}
+                stroke={path.stroke || stroke}
+                strokeLinecap={path.strokeLineCap || strokeLineCap}
+                strokeLinejoin={path.strokeLineJoin || strokeLineJoin}
+                strokeMiterlimit={path.strokeMiterLimit ?? strokeMiterLimit}
+                strokeWidth={path.strokeWidth ?? strokeWidth}
                 transform={path.transform || undefined}
               />
             );
