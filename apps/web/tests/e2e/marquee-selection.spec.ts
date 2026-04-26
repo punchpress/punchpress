@@ -177,7 +177,7 @@ const resizeMultiSelectionFromCorner = async (page, { corner, drag }) => {
   await page.evaluate(
     async ({ corner, drag }) => {
       const handle = document.querySelector(
-        `.canvas-multi-node-transform-overlay .moveable-control.moveable-${corner}`
+        `.canvas-multi-selection .moveable-control.moveable-${corner}`
       );
       const rect = handle?.getBoundingClientRect?.();
 
@@ -390,8 +390,10 @@ test("marquee selection shows one wrapper box around the whole group", async ({
   await pauseForUi(page);
 
   await expect
-    .poll(async () => (await getSelectionSnapshot(page)).selectedNodeIds)
-    .toEqual([firstNodeId, secondNodeId, thirdNodeId]);
+    .poll(async () => {
+      return [...(await getSelectionSnapshot(page)).selectedNodeIds].sort();
+    })
+    .toEqual([firstNodeId, secondNodeId, thirdNodeId].sort());
 
   const selection = await waitForSelectionHandles(page);
 
@@ -431,8 +433,10 @@ test("marquee selection resizes from the lower-right corner with the upper-left 
   await pauseForUi(page);
 
   await expect
-    .poll(async () => (await getSelectionSnapshot(page)).selectedNodeIds)
-    .toEqual([firstNodeId, secondNodeId, thirdNodeId]);
+    .poll(async () => {
+      return [...(await getSelectionSnapshot(page)).selectedNodeIds].sort();
+    })
+    .toEqual([firstNodeId, secondNodeId, thirdNodeId].sort());
 
   await resizeMultiSelectionFromCorner(page, {
     corner: "se",
@@ -500,7 +504,7 @@ test("marquee selection selects a compound vector container", async ({
             [
               "[data-node-id]",
               ".canvas-moveable",
-              ".canvas-node-toolbar",
+              ".canvas-selection-toolbar",
               "aside",
             ].join(",")
           )

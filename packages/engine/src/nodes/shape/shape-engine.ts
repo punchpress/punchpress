@@ -4,9 +4,14 @@ import {
   DEFAULT_VECTOR_STROKE_MITER_LIMIT,
 } from "@punchpress/punch-schema";
 import {
-  buildRoundedPolygonPath,
-  canRoundPolygonPoint,
-  getPolygonCornerRadiusSummary,
+  areCornerRadiiEquivalent,
+  clampCornerRadius,
+} from "../../primitives/corner-radius";
+import {
+  buildRoundedPointShapePath,
+  canRoundPointShapePoint,
+  getPointShapeCornerRadiusSummary,
+  getRoundedPointShapeCorner,
 } from "./shape-corner-controls";
 
 const getStrokeInset = (node) => {
@@ -114,11 +119,129 @@ const toShapeContour = (points) => {
       segments: points.map((point) => ({
         handleIn: { x: 0, y: 0 },
         handleOut: { x: 0, y: 0 },
-        point,
+        point: { x: point.x, y: point.y },
         pointType: "corner",
       })),
     },
   ];
+};
+
+const getRelativeHandle = (point, handle) => {
+  return {
+    x: handle.x - point.x,
+    y: handle.y - point.y,
+  };
+};
+
+const getShapeCornerRadiusAt = (node, segmentIndex) => {
+  return clampCornerRadius(
+    typeof node.cornerRadii?.[segmentIndex] === "number"
+      ? node.cornerRadii[segmentIndex]
+      : (node.cornerRadius ?? 0)
+  );
+};
+
+const getEffectiveShapeCornerRadii = (node, points) => {
+  return points.map((_, segmentIndex) => {
+    return getShapeCornerRadiusAt(node, segmentIndex);
+  });
+};
+
+const getNormalizedCornerRadiiPatch = (cornerRadii) => {
+  const [firstRadius = 0] = cornerRadii;
+  const isUniform = cornerRadii.every((cornerRadius) => {
+    return areCornerRadiiEquivalent(cornerRadius, firstRadius);
+  });
+
+  return isUniform
+    ? {
+        cornerRadii: undefined,
+        cornerRadius: clampCornerRadius(firstRadius),
+      }
+    : {
+        cornerRadii: cornerRadii.map((cornerRadius) =>
+          clampCornerRadius(cornerRadius)
+        ),
+      };
+};
+
+const getRoundedPointShapeContours = (
+  points,
+  cornerRadius,
+  cornerRadii = null
+) => {
+  const hasRoundedCorner = points?.some((_, index) => {
+    return (
+      clampCornerRadius(
+        typeof cornerRadii?.[index] === "number"
+          ? cornerRadii[index]
+          : (cornerRadius ?? 0)
+      ) > 0
+    );
+  });
+
+  if (!(points?.length >= 3 && hasRoundedCorner)) {
+    return toShapeContour(points);
+  }
+
+  const segments = points.flatMap((point, index) => {
+    const corner = getRoundedPointShapeCorner(
+      points,
+      index,
+      typeof cornerRadii?.[index] === "number"
+        ? cornerRadii[index]
+        : (cornerRadius ?? 0)
+    );
+
+    if (!corner) {
+      return [
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: point.x, y: point.y },
+          pointType: "corner",
+        },
+      ];
+    }
+
+    return [
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: getRelativeHandle(corner.start, corner.controlIn),
+        point: { x: corner.start.x, y: corner.start.y },
+        pointType: "corner",
+      },
+      {
+        handleIn: getRelativeHandle(corner.end, corner.controlOut),
+        handleOut: { x: 0, y: 0 },
+        point: { x: corner.end.x, y: corner.end.y },
+        pointType: "corner",
+      },
+    ];
+  });
+
+  return [
+    {
+      closed: true,
+      segments,
+    },
+  ];
+};
+
+const cloneHandle = (handle) => {
+  return {
+    x: handle.x,
+    y: handle.y,
+  };
+};
+
+const cloneSegment = (segment) => {
+  return {
+    ...segment,
+    handleIn: cloneHandle(segment.handleIn),
+    handleOut: cloneHandle(segment.handleOut),
+    point: cloneHandle(segment.point),
+  };
 };
 
 export const getShapeNodeBounds = (node) => {
@@ -261,7 +384,12 @@ const toShapePoints = (contours) => {
 };
 
 export const canRoundShapePoint = (node, point) => {
-  if (!(node?.shape === "polygon" && point)) {
+  if (
+    !(
+      point &&
+      (node?.shape === "polygon" || node?.shape === "star")
+    )
+  ) {
     return false;
   }
 
@@ -275,7 +403,7 @@ export const canRoundShapePoint = (node, point) => {
 
   const points = contour.segments.map((currentSegment) => currentSegment.point);
 
-  return canRoundPolygonPoint(points, point);
+  return canRoundPointShapePoint(points, point);
 };
 
 export const getShapePointCornerRadius = (node, point) => {
@@ -289,7 +417,12 @@ export const getShapePointCornerRadius = (node, point) => {
 };
 
 export const getShapePointCornerControl = (node, point) => {
-  if (!(node?.shape === "polygon" && point)) {
+  if (
+    !(
+      point &&
+      (node?.shape === "polygon" || node?.shape === "star")
+    )
+  ) {
     return null;
   }
 
@@ -302,7 +435,12 @@ export const getShapePointCornerControl = (node, point) => {
   }
 
   const points = contour.segments.map((currentSegment) => currentSegment.point);
-  const cornerSummary = getPolygonCornerRadiusSummary(points, node.cornerRadius);
+  const cornerSummary = getPointShapeCornerRadiusSummary(
+    points,
+    node.cornerRadius,
+    node.cornerRadii,
+    [point]
+  );
 
   if (!cornerSummary) {
     return null;
@@ -314,15 +452,134 @@ export const getShapePointCornerControl = (node, point) => {
   };
 };
 
-export const getShapeCornerRadiusSummary = (node) => {
-  if (node?.shape !== "polygon") {
+export const getShapePointCornerCurveSegment = (node, point) => {
+  if (!(point?.contourIndex === 0 && canRoundShapePoint(node, point))) {
     return null;
   }
 
-  return getPolygonCornerRadiusSummary(
-    getPolygonShapePoints(node),
-    node.cornerRadius
+  const points =
+    node.shape === "polygon" ? getPolygonShapePoints(node) : getStarShapePoints(node);
+  const corner = getRoundedPointShapeCorner(
+    points,
+    point.segmentIndex,
+    getShapeCornerRadiusAt(node, point.segmentIndex)
   );
+
+  if (!corner) {
+    return null;
+  }
+
+  return {
+    contourIndex: 0,
+    endSegment: {
+      handleIn: getRelativeHandle(corner.end, corner.controlOut),
+      handleOut: { x: 0, y: 0 },
+      point: { x: corner.end.x, y: corner.end.y },
+      pointType: "corner",
+    },
+    key: `${point.contourIndex}:${point.segmentIndex}`,
+    startSegment: {
+      handleIn: { x: 0, y: 0 },
+      handleOut: getRelativeHandle(corner.start, corner.controlIn),
+      point: { x: corner.start.x, y: corner.start.y },
+      pointType: "corner",
+    },
+  };
+};
+
+export const getShapeCornerCurveSegments = (node) => {
+  if (!(node?.shape === "polygon" || node?.shape === "star")) {
+    return [];
+  }
+
+  const points =
+    node.shape === "polygon" ? getPolygonShapePoints(node) : getStarShapePoints(node);
+
+  return points.flatMap((_, segmentIndex) => {
+    const curveSegment = getShapePointCornerCurveSegment(node, {
+      contourIndex: 0,
+      segmentIndex,
+    });
+
+    return curveSegment ? [curveSegment] : [];
+  });
+};
+
+export const getShapeCornerRadiusSummary = (node) => {
+  return getShapeCornerRadiusSummaryForPoints(node, null);
+};
+
+export const getShapeCornerRadiusSummaryForPoints = (node, points = null) => {
+  if (!(node?.shape === "polygon" || node?.shape === "star")) {
+    return null;
+  }
+
+  return getPointShapeCornerRadiusSummary(
+    node.shape === "polygon" ? getPolygonShapePoints(node) : getStarShapePoints(node),
+    node.cornerRadius,
+    node.cornerRadii,
+    points
+  );
+};
+
+export const setShapePointCornerRadius = (node, point, cornerRadius) => {
+  if (!(canRoundShapePoint(node, point) && point?.contourIndex === 0)) {
+    return null;
+  }
+
+  const control = getShapePointCornerControl(node, point);
+
+  if (!control) {
+    return null;
+  }
+
+  const points =
+    node.shape === "polygon" ? getPolygonShapePoints(node) : getStarShapePoints(node);
+  const cornerRadii = getEffectiveShapeCornerRadii(node, points);
+
+  cornerRadii[point.segmentIndex] = clampCornerRadius(
+    cornerRadius,
+    0,
+    control.maxRadius
+  );
+
+  return getNormalizedCornerRadiiPatch(cornerRadii);
+};
+
+export const setShapeCornerRadius = (node, cornerRadius, points = null) => {
+  const summary = getShapeCornerRadiusSummaryForPoints(node, points);
+
+  if (!summary) {
+    return null;
+  }
+
+  const nextCornerRadius = clampCornerRadius(cornerRadius, 0, summary.max);
+
+  if (!points?.length) {
+    return {
+      cornerRadii: undefined,
+      cornerRadius: nextCornerRadius,
+    };
+  }
+
+  const shapePoints =
+    node.shape === "polygon" ? getPolygonShapePoints(node) : getStarShapePoints(node);
+  const cornerRadii = getEffectiveShapeCornerRadii(node, shapePoints);
+
+  for (const point of points) {
+    if (point?.contourIndex !== 0 || !canRoundShapePoint(node, point)) {
+      continue;
+    }
+
+    const control = getShapePointCornerControl(node, point);
+    cornerRadii[point.segmentIndex] = clampCornerRadius(
+      nextCornerRadius,
+      0,
+      control?.maxRadius ?? nextCornerRadius
+    );
+  }
+
+  return getNormalizedCornerRadiiPatch(cornerRadii);
 };
 
 export const createVectorNodeFromShapeContours = (node, contours) => {
@@ -339,6 +596,27 @@ export const createVectorNodeFromShapeContours = (node, contours) => {
     strokeWidth: node.strokeWidth,
     transform: node.transform,
     type: "vector",
+    visible: node.visible,
+  };
+};
+
+export const createPathNodeFromShapeContour = (node, contour) => {
+  return {
+    closed: contour.closed,
+    fill: node.fill,
+    fillRule: "nonzero",
+    id: node.id,
+    parentId: node.parentId,
+    segments: contour.segments.map(cloneSegment),
+    stroke: node.stroke,
+    strokeLineCap: DEFAULT_VECTOR_STROKE_LINE_CAP,
+    strokeLineJoin: DEFAULT_VECTOR_STROKE_LINE_JOIN,
+    strokeMiterLimit: DEFAULT_VECTOR_STROKE_MITER_LIMIT,
+    strokeWidth: node.strokeWidth,
+    transform: {
+      ...node.transform,
+    },
+    type: "path",
     visible: node.visible,
   };
 };
@@ -361,6 +639,41 @@ export const getShapeEditablePathContours = (node) => {
     default:
       return toShapeContour(getPolygonShapePoints(node));
   }
+};
+
+export const getShapeRenderedPathContours = (node) => {
+  if (!supportsShapeEditablePath(node)) {
+    return null;
+  }
+
+  switch (node.shape) {
+    case "ellipse":
+      return getEllipseShapeContours(node);
+    case "star":
+      return getRoundedPointShapeContours(
+        getStarShapePoints(node),
+        node.cornerRadius ?? 0,
+        node.cornerRadii
+      );
+    case "polygon":
+    default:
+      return getRoundedPointShapeContours(
+        getPolygonShapePoints(node),
+        node.cornerRadius ?? 0,
+        node.cornerRadii
+      );
+  }
+};
+
+export const createPathNodeFromShape = (node) => {
+  const contours = getShapeRenderedPathContours(node);
+  const contour = contours?.[0];
+
+  if (!(contours?.length === 1 && contour)) {
+    return null;
+  }
+
+  return createPathNodeFromShapeContour(node, contour);
 };
 
 export const getShapePathEditResult = (
@@ -401,6 +714,16 @@ export const getShapePathEditResult = (
   return {
     kind: "shape",
     patch: {
+      cornerRadii:
+        contours[0].segments.length ===
+        getEffectiveShapeCornerRadii(
+          node,
+          node.shape === "polygon"
+            ? getPolygonShapePoints(node)
+            : getStarShapePoints(node)
+        ).length
+          ? node.cornerRadii
+          : undefined,
       height: maxY - minY,
       points,
       shape: node.shape,
@@ -412,18 +735,25 @@ export const getShapePathEditResult = (
 export const buildShapeNodePath = (node) => {
   switch (node.shape) {
     case "polygon":
-      return node.cornerRadius > 0
-        ? buildRoundedPolygonPath(
+      return (node.cornerRadius > 0 || node.cornerRadii?.some((value) => value > 0))
+        ? buildRoundedPointShapePath(
             getPolygonShapePoints(node),
-            node.cornerRadius
+            node.cornerRadius,
+            node.cornerRadii
           )
         : node.points?.length >= 3
           ? buildEditablePolygonPath(node)
           : buildPolygonPath(node);
     case "star":
-      return node.points?.length >= 3
-        ? buildEditableStarPath(node)
-        : buildStarPath(node);
+      return (node.cornerRadius > 0 || node.cornerRadii?.some((value) => value > 0))
+        ? buildRoundedPointShapePath(
+            getStarShapePoints(node),
+            node.cornerRadius,
+            node.cornerRadii
+          )
+        : node.points?.length >= 3
+          ? buildEditableStarPath(node)
+          : buildStarPath(node);
     case "ellipse":
       return buildEllipsePath(node);
     default:

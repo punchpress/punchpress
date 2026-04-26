@@ -148,6 +148,7 @@ export const SortableLayerRow = ({ nodeId, previousNodeId, nextNodeId }) => {
                   "group flex items-stretch gap-0 transition-[transform,opacity,box-shadow]",
                   isDragging && "scale-[0.985] opacity-80"
                 )}
+                data-layer-row-id={nodeId}
               >
                 <button
                   aria-pressed={layer.isSelected}

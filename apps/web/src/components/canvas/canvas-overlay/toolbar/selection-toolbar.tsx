@@ -12,11 +12,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useEditor } from "../../../../editor-react/use-editor";
-import { resolveNodeToolbarActions } from "./node-toolbar-actions";
-import { useNodeToolbarPresence } from "./use-node-toolbar-presence";
-import { useNodeToolbarState } from "./use-node-toolbar-state";
+import { resolveSelectionToolbarActions } from "./actions";
+import { useSelectionToolbarPresence } from "./use-toolbar-presence";
+import { useSelectionToolbarState } from "./use-toolbar-state";
 
-const getNodeToolbarStyle = (editor) => {
+const getSelectionToolbarStyle = (editor) => {
   const host = editor.hostRef;
   const bottomToolbar = host?.querySelector(".canvas-bottom-toolbar");
 
@@ -41,7 +41,7 @@ const getNodeToolbarStyle = (editor) => {
   };
 };
 
-export const getRenderedNodeToolbarActions = (actions, presenceState) => {
+export const getRenderedSelectionToolbarActions = (actions, presenceState) => {
   if (actions.length > 0) {
     return actions;
   }
@@ -49,18 +49,21 @@ export const getRenderedNodeToolbarActions = (actions, presenceState) => {
   return presenceState?.actions || [];
 };
 
-export const CanvasNodeToolbar = memo(function CanvasNodeToolbar() {
+export const CanvasSelectionToolbar = memo(function CanvasSelectionToolbar() {
   const editor = useEditor();
-  const toolbarState = useNodeToolbarState();
-  const actions = resolveNodeToolbarActions(editor, toolbarState);
+  const toolbarState = useSelectionToolbarState();
+  const actions = resolveSelectionToolbarActions(editor, toolbarState);
   const presenceKey = `${toolbarState?.selectionKey || "hidden"}:${actions
     .map((action) => {
       return `${action.id}:${action.variant}:${action.isActive ? "active" : "idle"}`;
     })
     .join(",")}`;
-  const presenceState = useNodeToolbarPresence(actions, presenceKey);
-  const renderedActions = getRenderedNodeToolbarActions(actions, presenceState);
-  const style = getNodeToolbarStyle(editor);
+  const presenceState = useSelectionToolbarPresence(actions, presenceKey);
+  const renderedActions = getRenderedSelectionToolbarActions(
+    actions,
+    presenceState
+  );
+  const style = getSelectionToolbarStyle(editor);
 
   if (!(presenceState && style && renderedActions.length > 0)) {
     return null;
@@ -68,7 +71,7 @@ export const CanvasNodeToolbar = memo(function CanvasNodeToolbar() {
 
   return (
     <div
-      className="canvas-node-toolbar pointer-events-none absolute z-30"
+      className="canvas-selection-toolbar pointer-events-none absolute z-30"
       data-phase={presenceState.phase}
       onPointerDown={(event) => {
         event.preventDefault();
@@ -77,7 +80,7 @@ export const CanvasNodeToolbar = memo(function CanvasNodeToolbar() {
       style={style}
     >
       <div
-        className="canvas-node-toolbar-shell"
+        className="canvas-selection-toolbar-shell"
         data-phase={presenceState.phase}
       >
         <Toolbar
@@ -94,7 +97,7 @@ export const CanvasNodeToolbar = memo(function CanvasNodeToolbar() {
                   {index > 0 ? (
                     <ToolbarSeparator orientation="vertical" />
                   ) : null}
-                  <NodeToolbarActionButton action={action} />
+                  <SelectionToolbarActionButton action={action} />
                 </Fragment>
               );
             })}
@@ -105,7 +108,7 @@ export const CanvasNodeToolbar = memo(function CanvasNodeToolbar() {
   );
 });
 
-const NodeToolbarActionButton = ({ action }) => {
+const SelectionToolbarActionButton = ({ action }) => {
   const button = (
     <Button
       aria-label={action.title}

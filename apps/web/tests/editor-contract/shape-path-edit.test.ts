@@ -78,7 +78,9 @@ describe("Shape path editing", () => {
     expect(editor.canEditNodePath(node.id)).toBe(true);
     expect(editor.canStartPathEditing(node.id)).toBe(true);
     expect(editor.startPathEditing(node.id)).toBe(true);
-    expect(editor.getEditablePathSession(node.id)).toEqual({
+    const session = editor.getEditablePathSession(node.id);
+
+    expect(session).toMatchObject({
       backend: "vector-path",
       contours: [
         {
@@ -119,6 +121,7 @@ describe("Shape path editing", () => {
       selectedPoint: null,
       selectedPoints: [],
     });
+    expect(session?.cornerCurveSegments).toEqual([]);
   });
 
   test("updating a polygon shape path keeps it as a shape", () => {

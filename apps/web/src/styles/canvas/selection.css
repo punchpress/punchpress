@@ -1,0 +1,8 @@
+@layer components {
+  .canvas-shape-indicator {
+    z-index: 8;
+    outline: var(--canvas-transform-width) solid var(--canvas-shape-indicator);
+    outline-offset: 0;
+    box-shadow: var(--canvas-shape-indicator-shadow);
+  }
+}

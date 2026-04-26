@@ -6,20 +6,20 @@ import {
 } from "@punchpress/punch-schema";
 import { useEffectEvent, useState } from "react";
 import { showToast } from "@/components/ui/toast";
+import { importSvgToNodes } from "@/platform/svg-import-document";
 import {
   clearRecentPunchDocumentFiles,
   getDocumentBaseName,
   getRecentPunchDocumentFiles,
   openPunchDocumentFile,
-  openSvgImportFile,
   openRecentPunchDocumentFile,
+  openSvgImportFile,
   type PunchDocumentHandle,
   type PunchOpenedDocumentFile,
   type PunchRecentDocument,
   savePunchDocumentFile,
   savePunchSvgFile,
 } from "@/platform/web-document-files";
-import { importSvgToNodes } from "@/platform/svg-import-document";
 import { useEditor } from "../../../editor-react/use-editor";
 import {
   type DocumentCommand,

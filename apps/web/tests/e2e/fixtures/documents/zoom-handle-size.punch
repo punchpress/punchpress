@@ -3,6 +3,7 @@
   "nodes": [
     {
       "id": "zoom-node",
+      "parentId": "root",
       "type": "text",
       "text": "Zoom me",
       "font": {

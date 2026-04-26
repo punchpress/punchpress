@@ -1,0 +1,58 @@
+@layer components {
+  .canvas-selecto {
+    z-index: 7 !important;
+  }
+
+  .canvas-selecto .selecto-selection {
+    background: var(--canvas-selection-fill);
+    border: var(--canvas-selection-width) solid var(--canvas-selection);
+    @apply rounded;
+  }
+
+  .moveable-control-box {
+    z-index: 10 !important;
+  }
+
+  .canvas-moveable .moveable-line,
+  .canvas-moveable .moveable-control {
+    background: var(--canvas-transform) !important;
+  }
+
+  .canvas-moveable .moveable-control {
+    width: 14px !important;
+    height: 14px !important;
+    margin-top: -7px !important;
+    margin-left: -7px !important;
+    background: var(--canvas-handle) !important;
+    border: var(--canvas-handle-width) solid var(--canvas-handle-surface) !important;
+    box-shadow: var(--canvas-handle-shadow) !important;
+    @apply rounded-full;
+  }
+
+  .canvas-moveable .moveable-control.moveable-rotatable {
+    display: none !important;
+  }
+
+  .canvas-moveable .moveable-line {
+    opacity: var(--canvas-transform-opacity);
+  }
+
+  .canvas-moveable .moveable-rotation {
+    height: calc(var(--canvas-rotation-offset, 28px) * var(--zoom)) !important;
+  }
+
+  .canvas-moveable .moveable-rotation-line {
+    background: var(--canvas-rotation) !important;
+    opacity: 0.9;
+  }
+
+  .canvas-moveable .moveable-rotation-control {
+    width: 20px !important;
+    height: 20px !important;
+    margin-top: -10px !important;
+    margin-left: -10px !important;
+    background: var(--canvas-rotation-surface) !important;
+    border: 3px solid var(--canvas-rotation-strong) !important;
+    box-shadow: var(--canvas-rotation-shadow) !important;
+  }
+}

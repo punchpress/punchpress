@@ -7,7 +7,7 @@ const globalWithWindow = globalThis as typeof globalThis & {
     removeEventListener: (...args: unknown[]) => void;
     electron?: {
       editorCommands?: {
-        onCommand: (...args: unknown[]) => (() => void) | void;
+        onCommand: (...args: unknown[]) => (() => void) | undefined;
       };
     };
   };

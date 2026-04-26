@@ -93,7 +93,7 @@ test("alt-drag keeps the duplicated node content visible during the drag", async
   };
 
   const overlayBox = await page
-    .locator(".canvas-single-node-transform-overlay")
+    .locator(".canvas-single-selection")
     .boundingBox();
 
   if (!overlayBox) {

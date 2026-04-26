@@ -384,7 +384,7 @@ export const updateTextPathEdit = (editor, session, { pointerCanvas } = {}) => {
 
   if (session.mode === "amplitude") {
     const amplitude = round(
-      session.startAmplitude + (localPoint.y - session.startLocalY),
+      session.startAmplitude - (localPoint.y - session.startLocalY),
       4
     );
 

@@ -91,9 +91,6 @@ test("edits arch bend from the on-canvas handle", async ({ page }) => {
       nodeBox.x + nodeBox.width / 2,
       1
     );
-    expect(handleBox.y + handleBox.height / 2).toBeLessThan(
-      nodeBox.y + nodeBox.height * 0.35
-    );
   }
 
   await page.mouse.move(
@@ -147,8 +144,8 @@ test("moves an arch node by dragging the visible text with inline warp controls"
     return;
   }
 
-  const startX = nodeBox.x + nodeBox.width / 2;
-  const startY = nodeBox.y + nodeBox.height / 2;
+  const startX = nodeBox.x + nodeBox.width * 0.22;
+  const startY = nodeBox.y + nodeBox.height * 0.72;
 
   await page.mouse.move(startX, startY);
   await page.mouse.down();
@@ -162,4 +159,56 @@ test("moves an arch node by dragging the visible text with inline warp controls"
 
   expect(movedNode?.x).toBeGreaterThan((beforeNode?.x || 0) + 50);
   expect(movedNode?.y).toBeGreaterThan((beforeNode?.y || 0) + 20);
+});
+
+test("dragging the arch handle downward moves the handle downward with the guide", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadArchDocument(page);
+  await page.locator('.canvas-node[data-node-id="arch-node"]').click();
+  await pauseForUi(page);
+
+  const bendHandle = page.getByTestId("text-path-handle-bend");
+  await expect(bendHandle).toBeVisible();
+
+  const before = await getStateSnapshot(page);
+  const beforeBox = await bendHandle.boundingBox();
+
+  expect(beforeBox).not.toBeNull();
+
+  if (!beforeBox) {
+    return;
+  }
+
+  const startX = beforeBox.x + beforeBox.width / 2;
+  const startY = beforeBox.y + beforeBox.height / 2;
+
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX, startY + 80, { steps: 6 });
+  await page.mouse.up();
+  await pauseForUi(page);
+
+  const after = await getStateSnapshot(page);
+  const afterBox = await bendHandle.boundingBox();
+  const beforeNode = before.nodes.find((node) => node.id === "arch-node");
+  const afterNode = after.nodes.find((node) => node.id === "arch-node");
+
+  expect(afterBox).not.toBeNull();
+
+  if (
+    !(
+      afterBox &&
+      beforeNode?.warp?.kind === "arch" &&
+      afterNode?.warp?.kind === "arch"
+    )
+  ) {
+    return;
+  }
+
+  expect(afterNode.warp.bend).toBeGreaterThan(beforeNode.warp.bend);
+  expect(afterBox.y + afterBox.height / 2).toBeGreaterThanOrEqual(
+    beforeBox.y + beforeBox.height / 2 - 1
+  );
 });

@@ -1,0 +1,32 @@
+@layer components {
+  .canvas-guide {
+    fill: none;
+    pointer-events: none;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .canvas-guide[data-role="passive"] {
+    stroke: var(--canvas-guide);
+    stroke-opacity: var(--canvas-guide-opacity);
+    stroke-width: var(--canvas-guide-width);
+  }
+
+  .canvas-guide[data-role="active"] {
+    stroke: var(--canvas-guide-active);
+    stroke-opacity: var(--canvas-guide-active-opacity);
+    stroke-width: var(--canvas-guide-active-width);
+    stroke-linecap: round;
+  }
+
+  [data-guide-state="editing"] .canvas-guide[data-role="passive"] {
+    stroke: var(--canvas-guide-editing);
+    stroke-opacity: var(--canvas-guide-editing-opacity);
+    stroke-width: var(--canvas-guide-editing-width);
+  }
+
+  [data-guide-state="editing"] .canvas-guide[data-role="active"] {
+    stroke: var(--canvas-guide-editing-active);
+    stroke-opacity: var(--canvas-guide-editing-active-opacity);
+    stroke-width: var(--canvas-guide-editing-active-width);
+  }
+}

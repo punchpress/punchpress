@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Editor } from "@punchpress/engine";
-import { resolveNodeToolbarActions } from "../src/components/canvas/canvas-overlay/node-toolbar/node-toolbar-actions";
+import { resolveSelectionToolbarActions } from "../src/components/canvas/canvas-overlay/toolbar/actions";
 
 const createPathNode = () => {
   return {
@@ -75,7 +75,11 @@ const createShapeNode = (id: string, x: number, fill: string) => {
   };
 };
 
-const getPathToolbarState = (editor: Editor, nodeId: string) => {
+const getPathToolbarState = (
+  editor: Editor,
+  nodeId: string,
+  isPathEditing = true
+) => {
   const selectedNode = editor.getNode(nodeId);
   const selectedPathPoint =
     editor.pathEditingPoints.length === 1 ? editor.pathEditingPoint : null;
@@ -84,7 +88,7 @@ const getPathToolbarState = (editor: Editor, nodeId: string) => {
     canBoolean: false,
     canEditPath: true,
     hasPathEditingMode: true,
-    isPathEditing: true,
+    isPathEditing,
     selectedNode,
     selectedPathPoint,
     selectedPathPointCornerControlKind: selectedPathPoint
@@ -122,7 +126,52 @@ const getBooleanToolbarState = (editor: Editor, nodeIds: string[]) => {
   };
 };
 
-describe("node toolbar actions", () => {
+describe("selection toolbar actions", () => {
+  test("uses shape wording for shape edit mode and path wording for path edit mode", () => {
+    const editor = new Editor();
+    const shapeNode = createShapeNode("shape-node", 240, "#3366FF");
+    const pathNode = createPathNode();
+
+    editor.getState().loadNodes([shapeNode, pathNode]);
+
+    const shapeActions = resolveSelectionToolbarActions(
+      editor,
+      getPathToolbarState(editor, shapeNode.id, false)
+    );
+    const pathActions = resolveSelectionToolbarActions(
+      editor,
+      getPathToolbarState(editor, pathNode.id, false)
+    );
+
+    expect(
+      shapeActions.find((action) => action.id === "toggle-path-editing")
+    ).toMatchObject({
+      label: "Edit Shape",
+      title: "Edit Shape (E)",
+    });
+    expect(
+      pathActions.find((action) => action.id === "toggle-path-editing")
+    ).toMatchObject({
+      label: "Edit Path",
+      title: "Edit Path (E)",
+    });
+
+    editor.select(shapeNode.id);
+    editor.startPathEditing(shapeNode.id);
+
+    const activeShapeActions = resolveSelectionToolbarActions(
+      editor,
+      getPathToolbarState(editor, shapeNode.id)
+    );
+
+    expect(
+      activeShapeActions.find((action) => action.id === "toggle-path-editing")
+    ).toMatchObject({
+      label: "Stop editing shape",
+      title: "Stop editing shape (E)",
+    });
+  });
+
   test("multi-point path selection exposes conversion actions instead of generic delete", () => {
     const editor = new Editor();
     const node = createPathNode();
@@ -141,7 +190,7 @@ describe("node toolbar actions", () => {
       },
     ]);
 
-    const actions = resolveNodeToolbarActions(
+    const actions = resolveSelectionToolbarActions(
       editor,
       getPathToolbarState(editor, node.id)
     );
@@ -180,7 +229,7 @@ describe("node toolbar actions", () => {
     });
     editor.setPathPointCornerRadius(24, node.id, editor.pathEditingPoint);
 
-    const actions = resolveNodeToolbarActions(
+    const actions = resolveSelectionToolbarActions(
       editor,
       getPathToolbarState(editor, node.id)
     );
@@ -207,7 +256,7 @@ describe("node toolbar actions", () => {
       ]);
     editor.setSelectedNodes(["shape-back", "shape-front"]);
 
-    const actions = resolveNodeToolbarActions(
+    const actions = resolveSelectionToolbarActions(
       editor,
       getBooleanToolbarState(editor, ["shape-back", "shape-front"])
     );

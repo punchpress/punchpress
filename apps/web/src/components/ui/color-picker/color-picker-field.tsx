@@ -1,10 +1,10 @@
 "use client";
 
 import { Popover } from "@base-ui/react/popover";
-import { useEffect, useRef, useState } from "react";
-import { useEditor } from "@/editor-react/use-editor";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useEditor } from "@/editor-react/use-editor";
 import { cn } from "@/lib/utils";
 import { ColorPicker } from "./color-picker";
 import { ColorPickerEyeDropper } from "./color-picker-eye-dropper";
@@ -61,10 +61,13 @@ const ColorPickerField = ({
   const [draftValue, setDraftValue] = useState(value ?? "");
   const [open, setOpenState] = useState(openStateEntry.open);
 
-  const setOpen = (nextOpen: boolean) => {
-    openStateEntry.open = nextOpen;
-    setOpenState(nextOpen);
-  };
+  const setOpen = useCallback(
+    (nextOpen: boolean) => {
+      openStateEntry.open = nextOpen;
+      setOpenState(nextOpen);
+    },
+    [openStateEntry]
+  );
 
   useEffect(() => {
     setDraftValue(value ?? "");
@@ -116,7 +119,7 @@ const ColorPickerField = ({
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown, true);
     };
-  }, [open]);
+  }, [open, setOpen]);
 
   useEffect(() => {
     if (!(open && typeof document !== "undefined")) {
@@ -154,14 +157,22 @@ const ColorPickerField = ({
         pointerEvent.target instanceof Node &&
         popupRef.current?.contains(pointerEvent.target)
       ) {
-        document.removeEventListener("pointerup", handleSuppressedPointerUp, true);
+        document.removeEventListener(
+          "pointerup",
+          handleSuppressedPointerUp,
+          true
+        );
         return;
       }
 
       pointerEvent.preventDefault();
       pointerEvent.stopPropagation();
       pointerEvent.stopImmediatePropagation();
-      document.removeEventListener("pointerup", handleSuppressedPointerUp, true);
+      document.removeEventListener(
+        "pointerup",
+        handleSuppressedPointerUp,
+        true
+      );
     };
 
     document.addEventListener("pointerup", handleSuppressedPointerUp, true);
@@ -195,8 +206,16 @@ const ColorPickerField = ({
         isPopupDismissSuppressedRef.current = false;
         popupDismissSuppressionTimeoutRef.current = null;
       }, 120);
-      window.removeEventListener("pointercancel", handlePointerInteractionEnd, true);
-      window.removeEventListener("pointerup", handlePointerInteractionEnd, true);
+      window.removeEventListener(
+        "pointercancel",
+        handlePointerInteractionEnd,
+        true
+      );
+      window.removeEventListener(
+        "pointerup",
+        handlePointerInteractionEnd,
+        true
+      );
     };
 
     window.addEventListener("pointercancel", handlePointerInteractionEnd, true);

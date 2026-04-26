@@ -163,8 +163,9 @@ on the canvas.
 ## Relationship To Shape Nodes
 
 - Shape nodes and vector nodes should feel like part of one coherent vector editing system even though they are distinct node families.
-- A shape should convert into a vector node when the user performs topology-changing edits or other operations that no longer fit that shape node's current live shape family.
-- A converted shape should preserve its visible geometry and styling as it becomes a vector node.
+- A shape should convert into freeform path artwork when the user performs topology-changing edits or other operations that no longer fit that shape node's current live shape family.
+- A shape should not convert into freeform path artwork for shared polygon corner-radius edits that still fit the live polygon model.
+- A converted shape should preserve its visible geometry and styling as it becomes path artwork.
 - Vector nodes should not promise shape-specific controls such as corner radius once the object no longer has a clear live shape meaning.
 - Vector nodes should support corner-rounding controls on eligible corner anchors, but that is a vector-corner feature rather than a polygon-shape-wide live control.
 - Vector corner-rounding should behave as live bezier geometry that remains editable when the path contains the canonical rounded-corner trim-point pattern, whether authored in PunchPress or imported.

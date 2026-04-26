@@ -5,11 +5,34 @@ import {
   PathfinderMinusFrontIcon,
 } from "@hugeicons-pro/core-stroke-rounded";
 
+const getEditSurfaceName = (node) => {
+  return node?.type === "shape" ? "shape" : "path";
+};
+
+const getPathEditingActionCopy = (node, isPathEditing) => {
+  const editSurfaceName = getEditSurfaceName(node);
+  const labelSurfaceName = isPathEditing
+    ? editSurfaceName
+    : `${editSurfaceName[0].toUpperCase()}${editSurfaceName.slice(1)}`;
+  const label = isPathEditing
+    ? `Stop editing ${labelSurfaceName}`
+    : `Edit ${labelSurfaceName}`;
+
+  return {
+    label,
+    title: `${label} (E)`,
+  };
+};
+
 const getPathEditingToolbarActions = (editor, state) => {
   if (!(state.selectedNode && state.canEditPath && state.hasPathEditingMode)) {
     return [];
   }
 
+  const editActionCopy = getPathEditingActionCopy(
+    state.selectedNode,
+    state.isPathEditing
+  );
   const selectedPathPoints = state.isPathEditing
     ? state.selectedPathPoints || editor.pathEditingPoints
     : [];
@@ -24,9 +47,9 @@ const getPathEditingToolbarActions = (editor, state) => {
     {
       id: "toggle-path-editing",
       isActive: false,
-      label: state.isPathEditing ? "Stop editing path" : "Edit path",
+      label: editActionCopy.label,
       shortcutLabel: "E",
-      title: state.isPathEditing ? "Stop editing path (E)" : "Edit path (E)",
+      title: editActionCopy.title,
       variant: "ghost",
       onSelect: () => {
         editor.togglePathEditing(state.selectedNode.id);
@@ -224,7 +247,7 @@ const getSharedToolbarActions = (editor, state) => {
   ];
 };
 
-export const resolveNodeToolbarActions = (editor, state) => {
+export const resolveSelectionToolbarActions = (editor, state) => {
   if (!state) {
     return [];
   }

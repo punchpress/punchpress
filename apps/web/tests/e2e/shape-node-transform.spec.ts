@@ -44,6 +44,17 @@ const getElementRect = (page, selector) => {
   }, selector);
 };
 
+const getResolvedRootColor = (page, variableName) => {
+  return page.evaluate((targetVariableName) => {
+    const probe = document.createElement("div");
+    probe.style.color = `var(${targetVariableName})`;
+    document.body.appendChild(probe);
+    const resolvedColor = window.getComputedStyle(probe).color;
+    probe.remove();
+    return resolvedColor;
+  }, variableName);
+};
+
 test("moves a rectangle shape node around the canvas", async ({ page }) => {
   await gotoEditor(page);
   await loadDocumentFixture(page, "shape-node-transform.punch");
@@ -230,10 +241,7 @@ test("rotates a rectangle shape node without drifting away from its transform ou
   const after = await waitForNodeReady(page, nodeId);
   const beforeCenter = getRectCenter(before.elementRect);
   const afterCenter = getRectCenter(after.elementRect);
-  const overlayRect = await getElementRect(
-    page,
-    ".canvas-single-node-transform-overlay"
-  );
+  const overlayRect = await getElementRect(page, ".canvas-single-selection");
   const nodeRect = await getElementRect(page, `[data-node-id="${nodeId}"]`);
 
   expect(Math.abs(after.rotation)).toBeGreaterThan(5);
@@ -260,10 +268,7 @@ test("keeps a star shape aligned with its transform outline", async ({
   await waitForNodeReady(page, nodeId);
   await pauseForUi(page);
 
-  const overlayRect = await getElementRect(
-    page,
-    ".canvas-single-node-transform-overlay"
-  );
+  const overlayRect = await getElementRect(page, ".canvas-single-selection");
   const nodeRect = await getElementRect(page, `[data-node-id="${nodeId}"]`);
 
   expect(overlayRect).not.toBeNull();
@@ -272,4 +277,32 @@ test("keeps a star shape aligned with its transform outline", async ({
   expect(nodeRect.y).toBeCloseTo(overlayRect.y, 1);
   expect(nodeRect.width).toBeCloseTo(overlayRect.width, 1);
   expect(nodeRect.height).toBeCloseTo(overlayRect.height, 1);
+});
+
+test("single selection outline uses the blue selection token", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocumentFixture(page, "shape-node-transform.punch");
+  const nodeId = "shape-node";
+
+  await page.locator(`[data-node-id="${nodeId}"]`).click();
+  await waitForNodeReady(page, nodeId);
+  await pauseForUi(page);
+
+  const selectionColor = await getResolvedRootColor(page, "--canvas-selection");
+  const selectionOutlineStyles = await page
+    .locator(".canvas-single-selection .moveable-line")
+    .first()
+    .evaluate((element) => {
+      const styles = window.getComputedStyle(element);
+
+      return {
+        backgroundColor: styles.backgroundColor,
+        opacity: styles.opacity,
+      };
+    });
+
+  expect(selectionOutlineStyles.backgroundColor).toBe(selectionColor);
+  expect(Number(selectionOutlineStyles.opacity)).toBeGreaterThan(0.8);
 });

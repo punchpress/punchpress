@@ -18,6 +18,7 @@ export interface VectorCornerDragIdentity {
 }
 
 export interface VectorCornerDragSession {
+  adjustedPoints: VectorPathPoint[];
   displayGeometry: VectorCornerWidgetGeometry;
   displayRadius: number;
   identity: VectorCornerDragIdentity;
@@ -47,6 +48,7 @@ export const getVectorCornerDragIdentity = (contours, point) => {
 };
 
 export const createVectorCornerDragSession = ({
+  adjustedPoints = [],
   contours,
   displayGeometry,
   displayRadius,
@@ -61,6 +63,7 @@ export const createVectorCornerDragSession = ({
   }
 
   return {
+    adjustedPoints,
     displayGeometry,
     displayRadius,
     identity,

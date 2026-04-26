@@ -5,12 +5,12 @@ import {
   setActiveCanvasCursorToken,
 } from "../../canvas-cursor-policy";
 import {
-  CORNER_RADIUS_HANDLE_DOT_ACTIVE_CLASS,
-  CORNER_RADIUS_HANDLE_DOT_CLASS,
-  CORNER_RADIUS_HANDLE_DOT_WARNING_CLASS,
-  FANCY_CANVAS_HANDLE_BUTTON_CLASS,
-  FANCY_CANVAS_HANDLE_WARNING_BUTTON_CLASS,
-} from "../canvas-handle-icon-styles";
+  CANVAS_HANDLE_BUTTON_CLASS,
+  CANVAS_HANDLE_DOT_ACTIVE_CLASS,
+  CANVAS_HANDLE_DOT_CLASS,
+  CANVAS_HANDLE_DOT_WARNING_CLASS,
+  CANVAS_HANDLE_WARNING_CLASS,
+} from "../visuals/handles";
 import { getVectorCornerRadiusDragContours } from "./corner-radius-drag";
 import {
   getVectorCornerRadiusFromWidgetDragDelta,
@@ -112,7 +112,11 @@ export const VectorCornerRadiusHandle = ({
     selectedPoints
   );
   const cornerControl = editor.getPathPointCornerControl(nodeId, pathPoint);
+  const adjustedPoints = adjustsSelectedPoints
+    ? getVisibleVectorCornerHandles(contours, selectedPoints, null).points
+    : [pathPoint];
   const dragSession = createVectorCornerDragSession({
+    adjustedPoints,
     contours,
     displayGeometry: baseGeometry,
     displayRadius: currentRadius,
@@ -208,6 +212,20 @@ export const VectorCornerRadiusHandle = ({
         return;
       }
 
+      if (editor.getNode(nodeId)?.type === "shape") {
+        const didSetCornerRadius = editor.setPathCornerRadius(
+          nextCornerRadius,
+          nodeId
+        );
+
+        if (didSetCornerRadius) {
+          didChange = true;
+        }
+
+        updateActiveDragState(nextCornerRadius);
+        return;
+      }
+
       const nextContours = getVectorCornerRadiusDragContours({
         contours: dragStartContours,
         dragScope,
@@ -281,7 +299,7 @@ export const VectorCornerRadiusHandle = ({
   return (
     <button
       aria-label="Adjust corner radius"
-      className={`${FANCY_CANVAS_HANDLE_BUTTON_CLASS} ${isWarningActive ? FANCY_CANVAS_HANDLE_WARNING_BUTTON_CLASS : ""}`}
+      className={`${CANVAS_HANDLE_BUTTON_CLASS} ${isWarningActive ? CANVAS_HANDLE_WARNING_CLASS : ""}`}
       data-canvas-cursor={cursorToken || undefined}
       data-selected={isSelected ? "true" : undefined}
       data-testid="path-corner-radius-handle"
@@ -318,7 +336,7 @@ export const VectorCornerRadiusHandle = ({
     >
       <span
         aria-hidden="true"
-        className={`${CORNER_RADIUS_HANDLE_DOT_CLASS} ${isHovered || isSelected ? CORNER_RADIUS_HANDLE_DOT_ACTIVE_CLASS : ""} ${isWarningActive ? CORNER_RADIUS_HANDLE_DOT_WARNING_CLASS : ""}`}
+        className={`${CANVAS_HANDLE_DOT_CLASS} ${isHovered || isSelected ? CANVAS_HANDLE_DOT_ACTIVE_CLASS : ""} ${isWarningActive ? CANVAS_HANDLE_DOT_WARNING_CLASS : ""}`}
       />
     </button>
   );

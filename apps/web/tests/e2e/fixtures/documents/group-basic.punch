@@ -3,6 +3,7 @@
   "nodes": [
     {
       "id": "basic-group-node",
+      "name": "Basic Group",
       "type": "group",
       "parentId": "root",
       "visible": true,

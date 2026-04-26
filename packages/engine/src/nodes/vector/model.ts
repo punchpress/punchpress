@@ -80,3 +80,11 @@ export const createDefaultVectorNode = () => {
     visible: true,
   };
 };
+
+export const createDefaultVectorContainerNode = () => {
+  const vectorNode = createDefaultVectorNode();
+
+  return Object.fromEntries(
+    Object.entries(vectorNode).filter(([key]) => key !== "contours")
+  );
+};

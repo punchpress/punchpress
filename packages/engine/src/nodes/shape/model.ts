@@ -20,6 +20,7 @@ export const createDefaultShapeNode = (shape = "polygon") => {
   const size = SHAPE_DEFAULTS[shape] || SHAPE_DEFAULTS.polygon;
 
   return {
+    cornerRadii: undefined,
     cornerRadius: 0,
     fill: "#000000",
     height: size.height,

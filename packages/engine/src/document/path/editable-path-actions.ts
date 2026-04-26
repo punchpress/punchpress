@@ -1,5 +1,5 @@
-import { getShapePathEditResult } from "../../nodes/shape/shape-engine";
 import { buildPathNodeGeometry } from "../../nodes/path/path-engine";
+import { getShapePathEditResult } from "../../nodes/shape/shape-engine";
 import { buildVectorNodeGeometry } from "../../nodes/vector/vector-engine";
 import { getNodeTransformForPinnedWorldPoint } from "../../primitives/rotation";
 import { toPathPointKey } from "../../state/store/path/path-point-selection";
@@ -128,12 +128,14 @@ export const updateEditablePath = (editor, nodeId, contours, options) => {
         }
 
         editor.run(() => {
-          editor.getState().updateNodeById(
-            nodeId,
-            shapeEditResult.kind === "shape"
-              ? shapeEditResult.patch
-              : shapeEditResult.node
-          );
+          editor
+            .getState()
+            .updateNodeById(
+              nodeId,
+              shapeEditResult.kind === "shape"
+                ? shapeEditResult.patch
+                : shapeEditResult.node
+            );
         });
 
         return true;
@@ -146,7 +148,9 @@ export const updateEditablePath = (editor, nodeId, contours, options) => {
 };
 
 export const offsetEditablePathPoints = (contours, points, delta) => {
-  const pointKeys = new Set((points || []).map((point) => toPathPointKey(point)));
+  const pointKeys = new Set(
+    (points || []).map((point) => toPathPointKey(point))
+  );
 
   if (pointKeys.size === 0) {
     return null;
@@ -180,7 +184,11 @@ export const moveSelectedPathPointsBy = (editor, nodeId, delta) => {
     return false;
   }
 
-  const nextContours = offsetEditablePathPoints(session.contours, points, delta);
+  const nextContours = offsetEditablePathPoints(
+    session.contours,
+    points,
+    delta
+  );
 
   if (!nextContours) {
     return false;

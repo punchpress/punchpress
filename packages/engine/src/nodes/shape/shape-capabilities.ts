@@ -1,6 +1,7 @@
 import { toTransformedWorldFrame, toWorldFrame } from "../node-frame-utils";
 import {
   buildShapeNodePath,
+  getShapeCornerCurveSegments,
   getShapeEditablePathContours,
   getShapeNodeBounds,
   supportsShapeEditablePath,
@@ -53,6 +54,7 @@ export const shapeNodeCapabilities = {
 
   getGeometrySignature: (node, fontRevision) => {
     return JSON.stringify({
+      cornerRadii: node.cornerRadii,
       cornerRadius: node.cornerRadius ?? 0,
       fill: node.fill,
       fontRevision,
@@ -109,6 +111,7 @@ export const shapeNodeCapabilities = {
 
     return {
       backend: "vector-path",
+      cornerCurveSegments: getShapeCornerCurveSegments(node),
       contours,
       interactionPolicy: {
         canInsertPoint: true,

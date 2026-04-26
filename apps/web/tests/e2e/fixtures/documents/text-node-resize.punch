@@ -3,6 +3,7 @@
   "nodes": [
     {
       "id": "resize-node",
+      "parentId": "root",
       "type": "text",
       "text": "Resize me",
       "font": {

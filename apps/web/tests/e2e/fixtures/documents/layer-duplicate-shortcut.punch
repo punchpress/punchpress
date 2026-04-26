@@ -3,6 +3,7 @@
   "nodes": [
     {
       "id": "duplicate-shortcut-node",
+      "parentId": "root",
       "type": "text",
       "text": "Duplicate me",
       "font": {

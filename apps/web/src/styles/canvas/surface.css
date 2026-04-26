@@ -1,0 +1,27 @@
+@layer components {
+  .canvas-host {
+    background-color: var(--designer-bg);
+  }
+
+  .canvas-surface {
+    background-color: var(--designer-bg);
+  }
+
+  .canvas-surface .infinite-viewer-wrapper,
+  .canvas-surface .infinite-viewer-scroll-area {
+    background-color: var(--designer-bg);
+  }
+
+  .canvas-dot-grid {
+    z-index: 0;
+    color: color-mix(in srgb, var(--foreground) 16%, transparent);
+  }
+
+  .canvas-dot-grid-dot {
+    fill: currentColor;
+  }
+
+  .dark .canvas-dot-grid {
+    color: rgb(255 255 255 / 0.12);
+  }
+}

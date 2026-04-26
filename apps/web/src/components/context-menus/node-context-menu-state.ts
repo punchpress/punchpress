@@ -61,6 +61,9 @@ export const getNodeContextMenuState = ({
 
   return {
     canGroupSelection: getCanGroupSelection(editor, targetNodeIds),
+    canConvertShapeToPath: Boolean(
+      singleTargetNodeId && editor.canConvertShapeToPath(singleTargetNodeId)
+    ),
     canMakeCompoundPath: editor.canMakeCompoundPath(targetNodeIds),
     canReleaseCompoundPath: editor.canReleaseCompoundPath(targetNodeIds),
     canUngroup: Boolean(

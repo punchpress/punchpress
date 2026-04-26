@@ -4,7 +4,11 @@ import { createId } from "../text/model";
 import { DEFAULT_VECTOR_PATH_COMPOSITION } from "./vector-path-composition";
 
 export const isContourOwnedVector = (node) => {
-  return node?.type === "vector" && Array.isArray(node.contours);
+  return (
+    node?.type === "vector" &&
+    Array.isArray(node.contours) &&
+    node.contours.length > 0
+  );
 };
 
 const createPathNodeFromContour = (

@@ -16,41 +16,37 @@ import {
 
 const createRectangleVectorNode = () => {
   return {
-    contours: [
-      {
-        closed: true,
-        segments: [
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: -120, y: -90 },
-            pointType: "corner" as const,
-          },
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: 120, y: -90 },
-            pointType: "corner" as const,
-          },
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: 120, y: 90 },
-            pointType: "corner" as const,
-          },
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: -120, y: 90 },
-            pointType: "corner" as const,
-          },
-        ],
-      },
-    ],
+    closed: true,
     fill: "#ffffff",
     fillRule: "nonzero" as const,
     id: "vector-node",
     parentId: "root",
+    segments: [
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: -120, y: -90 },
+        pointType: "corner" as const,
+      },
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: 120, y: -90 },
+        pointType: "corner" as const,
+      },
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: 120, y: 90 },
+        pointType: "corner" as const,
+      },
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: -120, y: 90 },
+        pointType: "corner" as const,
+      },
+    ],
     stroke: "#000000",
     strokeWidth: 12,
     transform: {
@@ -60,7 +56,7 @@ const createRectangleVectorNode = () => {
       x: 320,
       y: 220,
     },
-    type: "vector" as const,
+    type: "path" as const,
     visible: true,
   };
 };
@@ -89,49 +85,62 @@ const getActiveDragSession = (contours, point, overrides = {}) => {
   };
 };
 
+const getEditableContours = (node) => {
+  if (!node) {
+    return [];
+  }
+
+  if (node.type === "path") {
+    return [
+      {
+        closed: node.closed,
+        segments: node.segments,
+      },
+    ];
+  }
+
+  return node.type === "vector" ? node.contours || [] : [];
+};
+
 const createIrregularPolygonVectorNode = () => {
   return {
-    contours: [
-      {
-        closed: true,
-        segments: [
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: -50, y: -10 },
-            pointType: "corner" as const,
-          },
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: 10, y: -45 },
-            pointType: "corner" as const,
-          },
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: 95, y: -5 },
-            pointType: "corner" as const,
-          },
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: 75, y: 70 },
-            pointType: "corner" as const,
-          },
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: -20, y: 85 },
-            pointType: "corner" as const,
-          },
-        ],
-      },
-    ],
+    closed: true,
     fill: "#ffffff",
     fillRule: "nonzero" as const,
     id: "irregular-vector-node",
     parentId: "root",
+    segments: [
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: -50, y: -10 },
+        pointType: "corner" as const,
+      },
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: 10, y: -45 },
+        pointType: "corner" as const,
+      },
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: 95, y: -5 },
+        pointType: "corner" as const,
+      },
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: 75, y: 70 },
+        pointType: "corner" as const,
+      },
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: -20, y: 85 },
+        pointType: "corner" as const,
+      },
+    ],
     stroke: "#000000",
     strokeWidth: 12,
     transform: {
@@ -141,48 +150,44 @@ const createIrregularPolygonVectorNode = () => {
       x: 320,
       y: 220,
     },
-    type: "vector" as const,
+    type: "path" as const,
     visible: true,
   };
 };
 
 const createDiamondVectorNode = () => {
   return {
-    contours: [
-      {
-        closed: true,
-        segments: [
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: 0, y: -120 },
-            pointType: "corner" as const,
-          },
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: -90, y: 0 },
-            pointType: "corner" as const,
-          },
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: 0, y: 120 },
-            pointType: "corner" as const,
-          },
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: 90, y: 0 },
-            pointType: "corner" as const,
-          },
-        ],
-      },
-    ],
+    closed: true,
     fill: "#ffffff",
     fillRule: "nonzero" as const,
     id: "diamond-vector-node",
     parentId: "root",
+    segments: [
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: 0, y: -120 },
+        pointType: "corner" as const,
+      },
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: -90, y: 0 },
+        pointType: "corner" as const,
+      },
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: 0, y: 120 },
+        pointType: "corner" as const,
+      },
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: 90, y: 0 },
+        pointType: "corner" as const,
+      },
+    ],
     stroke: "#000000",
     strokeWidth: 12,
     transform: {
@@ -192,7 +197,7 @@ const createDiamondVectorNode = () => {
       x: 320,
       y: 220,
     },
-    type: "vector" as const,
+    type: "path" as const,
     visible: true,
   };
 };
@@ -206,7 +211,7 @@ describe("vector path selection chrome", () => {
     editor.select(node.id);
     editor.startPathEditing(node.id);
 
-    expect(getVisibleVectorCornerHandles(node.contours)).toEqual({
+    expect(getVisibleVectorCornerHandles(getEditableContours(node))).toEqual({
       dragScope: "all",
       points: [
         {
@@ -258,9 +263,7 @@ describe("vector path selection chrome", () => {
 
     expect(
       getVisibleVectorCornerHandles(
-        editor.getNode(node.id)?.type === "vector"
-          ? editor.getNode(node.id)?.contours || []
-          : [],
+        getEditableContours(editor.getNode(node.id)),
         editor.pathEditingPoints
       )
     ).toEqual({
@@ -286,13 +289,17 @@ describe("vector path selection chrome", () => {
     editor.select(node.id);
     editor.startPathEditing(node.id);
 
-    const activeDragSession = getActiveDragSession(node.contours, {
+    const activeDragSession = getActiveDragSession(getEditableContours(node), {
       contourIndex: 0,
       segmentIndex: 2,
     });
 
     expect(
-      getVisibleVectorCornerHandles(node.contours, [], activeDragSession)
+      getVisibleVectorCornerHandles(
+        getEditableContours(node),
+        [],
+        activeDragSession
+      )
     ).toEqual({
       dragScope: "active",
       points: [
@@ -312,7 +319,7 @@ describe("vector path selection chrome", () => {
     editor.select(node.id);
     editor.startPathEditing(node.id);
 
-    const activeDragSession = getActiveDragSession(node.contours, {
+    const activeDragSession = getActiveDragSession(getEditableContours(node), {
       contourIndex: 0,
       segmentIndex: 0,
     });
@@ -326,10 +333,7 @@ describe("vector path selection chrome", () => {
       })
     ).toBe(true);
 
-    let nextContours =
-      editor.getNode(node.id)?.type === "vector"
-        ? editor.getNode(node.id)?.contours || []
-        : [];
+    let nextContours = getEditableContours(editor.getNode(node.id));
 
     expect(
       getVisibleVectorCornerHandles(nextContours, [], activeDragSession)
@@ -350,10 +354,7 @@ describe("vector path selection chrome", () => {
       })
     ).toBe(true);
 
-    nextContours =
-      editor.getNode(node.id)?.type === "vector"
-        ? editor.getNode(node.id)?.contours || []
-        : [];
+    nextContours = getEditableContours(editor.getNode(node.id));
 
     expect(
       getVisibleVectorCornerHandles(nextContours, [], activeDragSession)
@@ -376,7 +377,7 @@ describe("vector path selection chrome", () => {
     editor.select(node.id);
     editor.startPathEditing(node.id);
 
-    const activeDragSession = getActiveDragSession(node.contours, {
+    const activeDragSession = getActiveDragSession(getEditableContours(node), {
       contourIndex: 0,
       segmentIndex: 2,
     });
@@ -389,10 +390,7 @@ describe("vector path selection chrome", () => {
       })
     ).toBe(true);
 
-    const nextContours =
-      editor.getNode(node.id)?.type === "vector"
-        ? editor.getNode(node.id)?.contours || []
-        : [];
+    const nextContours = getEditableContours(editor.getNode(node.id));
 
     expect(
       getVisibleVectorCornerHandles(nextContours, [], activeDragSession)
@@ -415,7 +413,7 @@ describe("vector path selection chrome", () => {
     editor.select(node.id);
     editor.startPathEditing(node.id);
 
-    const activeDragSession = getActiveDragSession(node.contours, {
+    const activeDragSession = getActiveDragSession(getEditableContours(node), {
       contourIndex: 0,
       segmentIndex: 2,
     });
@@ -423,10 +421,7 @@ describe("vector path selection chrome", () => {
     expect(activeDragSession?.identity.anchor).toEqual({ x: 0, y: 120 });
     expect(editor.setPathCornerRadius(24, node.id)).toBe(true);
 
-    const nextContours =
-      editor.getNode(node.id)?.type === "vector"
-        ? editor.getNode(node.id)?.contours || []
-        : [];
+    const nextContours = getEditableContours(editor.getNode(node.id));
     const renderedHandles = VectorCornerRadiusHandles({
       activeDragSession,
       contours: nextContours,
@@ -469,10 +464,7 @@ describe("vector path selection chrome", () => {
     });
     editor.setPathPointCornerRadius(24, node.id, editor.pathEditingPoint);
 
-    const nextContours =
-      editor.getNode(node.id)?.type === "vector"
-        ? editor.getNode(node.id)?.contours || []
-        : [];
+    const nextContours = getEditableContours(editor.getNode(node.id));
 
     const renderedHandles = VectorCornerRadiusHandles({
       activeDragSession: null,
@@ -510,10 +502,7 @@ describe("vector path selection chrome", () => {
       })
     ).toBe(true);
 
-    const nextContours =
-      editor.getNode(node.id)?.type === "vector"
-        ? editor.getNode(node.id)?.contours || []
-        : [];
+    const nextContours = getEditableContours(editor.getNode(node.id));
 
     expect(getMaxedVectorCornerCurveSegments(nextContours)).toEqual([]);
     expect(
@@ -724,10 +713,7 @@ describe("vector path selection chrome", () => {
       segmentIndex: 0,
     });
     editor.setPathPointCornerRadius(24, node.id, editor.pathEditingPoint);
-    const nextContours =
-      editor.getNode(node.id)?.type === "vector"
-        ? editor.getNode(node.id)?.contours || []
-        : [];
+    const nextContours = getEditableContours(editor.getNode(node.id));
 
     expect(
       getHoveredVectorCornerCurveSegment(nextContours, {
@@ -756,8 +742,7 @@ describe("vector path selection chrome", () => {
     editor.startPathEditing(node.id);
     expect(editor.setPathCornerRadius(200, node.id)).toBe(true);
 
-    const nextNode = editor.getNode(node.id);
-    const contours = nextNode?.type === "vector" ? nextNode.contours : [];
+    const contours = getEditableContours(editor.getNode(node.id));
 
     expect(getMaxedVectorCornerCurveSegments(contours)).toEqual([
       {
@@ -792,8 +777,7 @@ describe("vector path selection chrome", () => {
     editor.startPathEditing(node.id);
     expect(editor.setPathCornerRadius(35, node.id)).toBe(true);
 
-    const nextNode = editor.getNode(node.id);
-    const contours = nextNode?.type === "vector" ? nextNode.contours : [];
+    const contours = getEditableContours(editor.getNode(node.id));
 
     expect(getMaxedVectorCornerCurveSegments(contours)).toEqual([]);
   });

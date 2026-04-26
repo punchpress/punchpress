@@ -14,7 +14,10 @@ import {
   getNodeX,
   getNodeY,
 } from "../../nodes/text/model";
-import { createDefaultVectorNode } from "../../nodes/vector/model";
+import {
+  createDefaultVectorContainerNode,
+  createDefaultVectorNode,
+} from "../../nodes/vector/model";
 import { createHeadlessPaperCompiler } from "../../primitives/headless-paper-compiler";
 import { round } from "../../primitives/math";
 
@@ -372,13 +375,13 @@ const createResultNodes = (
     return pathNodes;
   }
 
-  const vectorNode = createDefaultVectorNode();
-  vectorNode.compoundWrapper = false;
-  vectorNode.id = resultVectorId;
-  vectorNode.contours = [];
-  vectorNode.pathComposition =
-    paths.length > 1 ? "compound-fill" : "independent";
-  vectorNode.parentId = parentId;
+  const vectorNode = {
+    ...createDefaultVectorContainerNode(),
+    compoundWrapper: false,
+    id: resultVectorId,
+    parentId,
+    pathComposition: paths.length > 1 ? "compound-fill" : "independent",
+  };
 
   return [vectorNode, ...pathNodes];
 };

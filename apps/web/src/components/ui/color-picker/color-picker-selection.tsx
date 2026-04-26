@@ -28,7 +28,7 @@ export const ColorPickerSelection = memo(
     );
 
     return (
-        <div
+      <div
         className={cn(
           "canvas-cursor-default relative aspect-square w-full overflow-hidden rounded-xl border shadow-xs/5",
           className

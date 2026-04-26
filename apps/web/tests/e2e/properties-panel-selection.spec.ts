@@ -18,7 +18,12 @@ const selectNodes = (page, nodeIds) => {
 };
 
 const getSection = (page, title) => {
-  return page.locator("section").filter({ hasText: title });
+  return page.locator("section").filter({
+    has: page.getByRole("heading", {
+      exact: true,
+      name: title,
+    }),
+  });
 };
 
 const getFillSection = (page) => getSection(page, "Fill");
@@ -50,25 +55,11 @@ const loadVectorStrokeStyleDocument = (page) => {
     JSON.stringify({
       nodes: [
         {
-          id: "vector-container",
-          name: "Vector",
-          parentId: "root",
-          transform: {
-            rotation: 0,
-            scaleX: 1,
-            scaleY: 1,
-            x: 0,
-            y: 0,
-          },
-          type: "vector",
-          visible: true,
-        },
-        {
           closed: false,
           fill: null,
           fillRule: "nonzero",
           id: "vector-node",
-          parentId: "vector-container",
+          parentId: "root",
           segments: [
             {
               handleIn: { x: 0, y: 0 },
@@ -116,25 +107,11 @@ const loadIrregularVectorCornerDocument = (page) => {
     JSON.stringify({
       nodes: [
         {
-          id: "irregular-vector-container",
-          name: "Vector",
-          parentId: "root",
-          transform: {
-            rotation: 0,
-            scaleX: 1,
-            scaleY: 1,
-            x: 0,
-            y: 0,
-          },
-          type: "vector",
-          visible: true,
-        },
-        {
           closed: true,
           fill: "#ffffff",
           fillRule: "nonzero",
           id: "irregular-vector-node",
-          parentId: "irregular-vector-container",
+          parentId: "root",
           segments: [
             {
               handleIn: { x: 0, y: 0 },
@@ -194,25 +171,11 @@ const loadClosedVectorCornerDocument = (page) => {
     JSON.stringify({
       nodes: [
         {
-          id: "closed-vector-container",
-          name: "Vector",
-          parentId: "root",
-          transform: {
-            rotation: 0,
-            scaleX: 1,
-            scaleY: 1,
-            x: 0,
-            y: 0,
-          },
-          type: "vector",
-          visible: true,
-        },
-        {
           closed: true,
           fill: "#ffffff",
           fillRule: "nonzero",
           id: "closed-vector-node",
-          parentId: "closed-vector-container",
+          parentId: "root",
           segments: [
             {
               handleIn: { x: 0, y: 0 },
@@ -426,7 +389,7 @@ test("shows only shared appearance controls for a mixed text and shape selection
     .toEqual(["#123456", "#123456"]);
 });
 
-test("shows bulk path corner controls for a selected vector outside path edit mode", async ({
+test("shows bulk path corner controls for a selected standalone path outside path edit mode", async ({
   page,
 }) => {
   await gotoEditor(page);
@@ -435,25 +398,11 @@ test("shows bulk path corner controls for a selected vector outside path edit mo
     JSON.stringify({
       nodes: [
         {
-          id: "vector-container",
-          name: "Vector",
-          parentId: "root",
-          transform: {
-            rotation: 0,
-            scaleX: 1,
-            scaleY: 1,
-            x: 0,
-            y: 0,
-          },
-          type: "vector",
-          visible: true,
-        },
-        {
           closed: true,
           fill: "#ffffff",
           fillRule: "nonzero",
           id: "vector-node",
-          parentId: "vector-container",
+          parentId: "root",
           segments: [
             {
               handleIn: { x: 0, y: 0 },
@@ -655,7 +604,7 @@ test("shows aggregate stroke controls for a selected multi-path vector and appli
     ]);
 });
 
-test("applies vector stroke cap and join from the properties panel without clearing selection", async ({
+test("applies path stroke cap and join from the properties panel without clearing selection", async ({
   page,
 }) => {
   await gotoEditor(page);
@@ -695,8 +644,8 @@ test("applies vector stroke cap and join from the properties panel without clear
     .click();
 
   await expect.poll(getVectorStrokeState).toMatchObject({
-    selectedNodeId: "vector-container",
-    selectedNodeIds: ["vector-container"],
+    selectedNodeId: "vector-node",
+    selectedNodeIds: ["vector-node"],
     strokeLineCap: "square",
   });
   await expect(capTrigger).toContainText("Square");
@@ -708,8 +657,8 @@ test("applies vector stroke cap and join from the properties panel without clear
     .click();
 
   await expect.poll(getVectorStrokeState).toMatchObject({
-    selectedNodeId: "vector-container",
-    selectedNodeIds: ["vector-container"],
+    selectedNodeId: "vector-node",
+    selectedNodeIds: ["vector-node"],
     strokeLineCap: "square",
     strokeLineJoin: "bevel",
   });

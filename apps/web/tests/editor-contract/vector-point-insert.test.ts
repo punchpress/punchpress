@@ -81,9 +81,7 @@ describe("vector point insertion", () => {
   test("inserting a vector point persists the new contour geometry and selects the inserted point", () => {
     const editor = new Editor();
 
-    editor.loadDocument(
-      JSON.stringify(createPathDocument())
-    );
+    editor.loadDocument(JSON.stringify(createPathDocument()));
 
     editor.setPathEditingNodeId("vector-node");
 
@@ -146,9 +144,7 @@ describe("vector point insertion", () => {
   test("inserting a point on a straight segment does not invent a live corner radius", () => {
     const editor = new Editor();
 
-    editor.loadDocument(
-      JSON.stringify(createPathDocument())
-    );
+    editor.loadDocument(JSON.stringify(createPathDocument()));
 
     editor.setPathEditingNodeId("vector-node");
 

@@ -1,43 +1,39 @@
 import { describe, expect, test } from "bun:test";
 import { Editor } from "@punchpress/engine";
 
-const createRectangleVectorNode = () => {
+const createRectanglePathNode = () => {
   return {
-    contours: [
-      {
-        closed: true,
-        segments: [
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: -120, y: -90 },
-            pointType: "corner" as const,
-          },
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: 120, y: -90 },
-            pointType: "corner" as const,
-          },
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: 120, y: 90 },
-            pointType: "corner" as const,
-          },
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: -120, y: 90 },
-            pointType: "corner" as const,
-          },
-        ],
-      },
-    ],
+    closed: true,
     fill: "#ffffff",
     fillRule: "nonzero",
     id: "vector-node",
     parentId: "root",
+    segments: [
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: -120, y: -90 },
+        pointType: "corner" as const,
+      },
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: 120, y: -90 },
+        pointType: "corner" as const,
+      },
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: 120, y: 90 },
+        pointType: "corner" as const,
+      },
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: -120, y: 90 },
+        pointType: "corner" as const,
+      },
+    ],
     stroke: "#000000",
     strokeWidth: 12,
     transform: {
@@ -47,56 +43,52 @@ const createRectangleVectorNode = () => {
       x: 320,
       y: 220,
     },
-    type: "vector",
+    type: "path",
     visible: true,
   } as const;
 };
 
-const createImportedRoundedCornerVectorNode = () => {
+const createImportedRoundedCornerPathNode = () => {
   const handleLength = 13.254_833_995_939_045;
 
   return {
-    contours: [
-      {
-        closed: true,
-        segments: [
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: -handleLength },
-            point: { x: -120, y: -66 },
-            pointType: "corner" as const,
-          },
-          {
-            handleIn: { x: -handleLength, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: -96, y: -90 },
-            pointType: "corner" as const,
-          },
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: 120, y: -90 },
-            pointType: "corner" as const,
-          },
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: 120, y: 90 },
-            pointType: "corner" as const,
-          },
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: -120, y: 90 },
-            pointType: "corner" as const,
-          },
-        ],
-      },
-    ],
+    closed: true,
     fill: "#ffffff",
     fillRule: "nonzero",
     id: "imported-rounded-corner-vector-node",
     parentId: "root",
+    segments: [
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: -handleLength },
+        point: { x: -120, y: -66 },
+        pointType: "corner" as const,
+      },
+      {
+        handleIn: { x: -handleLength, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: -96, y: -90 },
+        pointType: "corner" as const,
+      },
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: 120, y: -90 },
+        pointType: "corner" as const,
+      },
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: 120, y: 90 },
+        pointType: "corner" as const,
+      },
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: -120, y: 90 },
+        pointType: "corner" as const,
+      },
+    ],
     stroke: "#000000",
     strokeWidth: 12,
     transform: {
@@ -106,54 +98,50 @@ const createImportedRoundedCornerVectorNode = () => {
       x: 320,
       y: 220,
     },
-    type: "vector",
+    type: "path",
     visible: true,
   } as const;
 };
 
-const createIrregularPolygonVectorNode = () => {
+const createIrregularPolygonPathNode = () => {
   return {
-    contours: [
-      {
-        closed: true,
-        segments: [
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: -50, y: -10 },
-            pointType: "corner" as const,
-          },
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: 10, y: -45 },
-            pointType: "corner" as const,
-          },
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: 95, y: -5 },
-            pointType: "corner" as const,
-          },
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: 75, y: 70 },
-            pointType: "corner" as const,
-          },
-          {
-            handleIn: { x: 0, y: 0 },
-            handleOut: { x: 0, y: 0 },
-            point: { x: -20, y: 85 },
-            pointType: "corner" as const,
-          },
-        ],
-      },
-    ],
+    closed: true,
     fill: "#ffffff",
     fillRule: "nonzero",
     id: "irregular-polygon-vector-node",
     parentId: "root",
+    segments: [
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: -50, y: -10 },
+        pointType: "corner" as const,
+      },
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: 10, y: -45 },
+        pointType: "corner" as const,
+      },
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: 95, y: -5 },
+        pointType: "corner" as const,
+      },
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: 75, y: 70 },
+        pointType: "corner" as const,
+      },
+      {
+        handleIn: { x: 0, y: 0 },
+        handleOut: { x: 0, y: 0 },
+        point: { x: -20, y: 85 },
+        pointType: "corner" as const,
+      },
+    ],
     stroke: "#000000",
     strokeWidth: 12,
     transform: {
@@ -163,7 +151,7 @@ const createIrregularPolygonVectorNode = () => {
       x: 320,
       y: 220,
     },
-    type: "vector",
+    type: "path",
     visible: true,
   } as const;
 };
@@ -171,7 +159,7 @@ const createIrregularPolygonVectorNode = () => {
 describe("vector corner radius", () => {
   test("sets live corner radius on eligible vector points and rounds the rendered path", () => {
     const editor = new Editor();
-    const node = createRectangleVectorNode();
+    const node = createRectanglePathNode();
 
     editor.getState().loadNodes([node]);
     editor.select(node.id);
@@ -192,37 +180,29 @@ describe("vector corner radius", () => {
     ).toBeCloseTo(24, 6);
     const nextNode = editor.getNode(node.id);
 
-    expect(nextNode?.type).toBe("vector");
+    expect(nextNode?.type).toBe("path");
+    expect(nextNode?.type === "path" ? nextNode.segments : null).toHaveLength(
+      5
+    );
     expect(
-      nextNode?.type === "vector" ? nextNode.contours[0]?.segments : null
-    ).toHaveLength(5);
-    expect(
-      nextNode?.type === "vector"
-        ? nextNode.contours[0]?.segments[0]?.point
-        : null
+      nextNode?.type === "path" ? nextNode.segments[0]?.point : null
     ).toEqual({ x: -120, y: -66 });
     expect(
-      nextNode?.type === "vector"
-        ? nextNode.contours[0]?.segments[1]?.point
-        : null
+      nextNode?.type === "path" ? nextNode.segments[1]?.point : null
     ).toEqual({ x: -96, y: -90 });
     expect(
-      nextNode?.type === "vector"
-        ? nextNode.contours[0]?.segments[0]?.pointType
-        : null
+      nextNode?.type === "path" ? nextNode.segments[0]?.pointType : null
     ).toBe("corner");
     expect(
-      nextNode?.type === "vector"
-        ? nextNode.contours[0]?.segments[1]?.pointType
-        : null
+      nextNode?.type === "path" ? nextNode.segments[1]?.pointType : null
     ).toBe("corner");
-    expect(editor.getPathCornerRadiusSummary(node.id)?.max).toBeCloseTo(90, 6);
+    expect(editor.getPathCornerRadiusSummary(node.id)?.max).toBeCloseTo(180, 6);
     expect(editor.getNodeGeometry(node.id)?.paths[0]?.d).toContain("C");
   });
 
   test("rejects live corner radius on smooth vector points", () => {
     const editor = new Editor();
-    const node = createRectangleVectorNode();
+    const node = createRectanglePathNode();
 
     editor.getState().loadNodes([node]);
     editor.select(node.id);
@@ -243,7 +223,7 @@ describe("vector corner radius", () => {
 
   test("detects an imported rounded corner from either trim point", () => {
     const editor = new Editor();
-    const node = createImportedRoundedCornerVectorNode();
+    const node = createImportedRoundedCornerPathNode();
 
     editor.getState().loadNodes([node]);
     editor.select(node.id);
@@ -275,7 +255,7 @@ describe("vector corner radius", () => {
 
   test("editing an imported rounded corner updates both trim points", () => {
     const editor = new Editor();
-    const node = createImportedRoundedCornerVectorNode();
+    const node = createImportedRoundedCornerPathNode();
 
     editor.getState().loadNodes([node]);
     editor.select(node.id);
@@ -291,37 +271,27 @@ describe("vector corner radius", () => {
 
     const nextNode = editor.getNode(node.id);
 
-    expect(nextNode?.type).toBe("vector");
+    expect(nextNode?.type).toBe("path");
     expect(
-      nextNode?.type === "vector"
-        ? nextNode.contours[0]?.segments[0]?.point.x
-        : null
+      nextNode?.type === "path" ? nextNode.segments[0]?.point.x : null
     ).toBe(-120);
     expect(
-      nextNode?.type === "vector"
-        ? nextNode.contours[0]?.segments[0]?.point.y
-        : null
+      nextNode?.type === "path" ? nextNode.segments[0]?.point.y : null
     ).toBeCloseTo(-54, 6);
     expect(
-      nextNode?.type === "vector"
-        ? nextNode.contours[0]?.segments[1]?.point
-        : null
+      nextNode?.type === "path" ? nextNode.segments[1]?.point : null
     ).toEqual({ x: -84, y: -90 });
     expect(
-      nextNode?.type === "vector"
-        ? nextNode.contours[0]?.segments[0]?.pointType
-        : null
+      nextNode?.type === "path" ? nextNode.segments[0]?.pointType : null
     ).toBe("corner");
     expect(
-      nextNode?.type === "vector"
-        ? nextNode.contours[0]?.segments[1]?.pointType
-        : null
+      nextNode?.type === "path" ? nextNode.segments[1]?.pointType : null
     ).toBe("corner");
   });
 
   test("reducing an imported rounded corner to zero collapses it back to one sharp corner point", () => {
     const editor = new Editor();
-    const node = createImportedRoundedCornerVectorNode();
+    const node = createImportedRoundedCornerPathNode();
 
     editor.getState().loadNodes([node]);
     editor.select(node.id);
@@ -337,43 +307,30 @@ describe("vector corner radius", () => {
 
     const nextNode = editor.getNode(node.id);
 
-    expect(nextNode?.type).toBe("vector");
+    expect(nextNode?.type).toBe("path");
+    expect(nextNode?.type === "path" ? nextNode.segments : null).toHaveLength(
+      4
+    );
     expect(
-      nextNode?.type === "vector" ? nextNode.contours[0]?.segments : null
-    ).toHaveLength(4);
-    expect(
-      nextNode?.type === "vector"
-        ? nextNode.contours[0]?.segments[0]?.point
-        : null
+      nextNode?.type === "path" ? nextNode.segments[0]?.point : null
     ).toEqual({ x: -120, y: -90 });
     expect(
-      nextNode?.type === "vector"
-        ? nextNode.contours[0]?.segments[0]?.handleIn
-        : null
+      nextNode?.type === "path" ? nextNode.segments[0]?.handleIn : null
     ).toEqual({ x: 0, y: 0 });
     expect(
-      nextNode?.type === "vector"
-        ? nextNode.contours[0]?.segments[0]?.handleOut
-        : null
+      nextNode?.type === "path" ? nextNode.segments[0]?.handleOut : null
     ).toEqual({ x: 0, y: 0 });
     expect(
-      nextNode?.type === "vector"
-        ? nextNode.contours[0]?.segments[0]?.pointType
-        : null
+      nextNode?.type === "path" ? nextNode.segments[0]?.pointType : null
     ).toBe("corner");
   });
 
   test("rejects live corner radius on open-path endpoints", () => {
     const editor = new Editor();
-    const node = createRectangleVectorNode();
+    const node = createRectanglePathNode();
     const openNode = {
       ...node,
-      contours: [
-        {
-          ...node.contours[0],
-          closed: false,
-        },
-      ],
+      closed: false,
       id: "open-vector-node",
     };
 
@@ -401,7 +358,7 @@ describe("vector corner radius", () => {
 
   test("summarizes all eligible vector corners when no point is selected", () => {
     const editor = new Editor();
-    const node = createRectangleVectorNode();
+    const node = createRectanglePathNode();
 
     editor.getState().loadNodes([node]);
     editor.select(node.id);
@@ -439,12 +396,12 @@ describe("vector corner radius", () => {
       isMixed: true,
       value: null,
     });
-    expect(mixedSummary?.max).toBeCloseTo(90, 6);
+    expect(mixedSummary?.max).toBeCloseTo(180, 6);
   });
 
   test("bulk path corner radius applies to all eligible vector corners", () => {
     const editor = new Editor();
-    const node = createRectangleVectorNode();
+    const node = createRectanglePathNode();
 
     editor.getState().loadNodes([node]);
     editor.select(node.id);
@@ -461,25 +418,31 @@ describe("vector corner radius", () => {
     expect(summary?.max || 0).toBeGreaterThan(summary?.value || 0);
 
     const nextNode = editor.getNode(node.id);
-    expect(nextNode?.type).toBe("vector");
+    expect(nextNode?.type).toBe("path");
     expect(
-      nextNode?.type === "vector"
-        ? nextNode.contours[0]?.segments.map((segment) => {
+      nextNode?.type === "path"
+        ? nextNode.segments.map((segment) => {
             return Object.hasOwn(segment, "cornerRadius");
           })
         : null
     ).toEqual([false, false, false, false, false, false, false, false]);
   });
 
-  test("bulk path corner radius clamps to the stable maximum when increasing an existing uniform round", () => {
+  test("bulk path corner radius keeps the same stable maximum while increasing an existing uniform round", () => {
     const editor = new Editor();
-    const node = createRectangleVectorNode();
+    const node = createRectanglePathNode();
 
     editor.getState().loadNodes([node]);
     editor.select(node.id);
     editor.startPathEditing(node.id);
 
     expect(editor.setPathCornerRadius(40, node.id)).toBe(true);
+    expect(editor.getPathCornerRadiusSummary(node.id)?.value).toBeCloseTo(
+      40,
+      6
+    );
+    expect(editor.getPathCornerRadiusStableMax(node.id)).toBeCloseTo(90, 2);
+
     expect(editor.setPathCornerRadius(80, node.id)).toBe(true);
 
     const summary = editor.getPathCornerRadiusSummary(node.id);
@@ -488,14 +451,27 @@ describe("vector corner radius", () => {
       eligibleCount: 4,
       isMixed: false,
     });
-    expect(summary?.value).toBeCloseTo(70, 6);
+    expect(summary?.value).toBeCloseTo(80, 6);
+    expect(summary?.max || 0).toBeGreaterThan(summary?.value || 0);
+    expect(editor.getPathCornerRadiusStableMax(node.id)).toBeCloseTo(90, 2);
+
+    expect(editor.setPathCornerRadius(200, node.id)).toBe(true);
+
+    const clampedSummary = editor.getPathCornerRadiusSummary(node.id);
+
+    expect(clampedSummary).toMatchObject({
+      eligibleCount: 4,
+      isMixed: false,
+    });
+    expect(clampedSummary?.value).toBeCloseTo(90, 2);
+    expect(editor.getPathCornerRadiusStableMax(node.id)).toBeCloseTo(90, 2);
 
     const nextNode = editor.getNode(node.id);
 
-    expect(nextNode?.type).toBe("vector");
+    expect(nextNode?.type).toBe("path");
     expect(
-      nextNode?.type === "vector"
-        ? nextNode.contours[0]?.segments.filter((_, segmentIndex) => {
+      nextNode?.type === "path"
+        ? nextNode.segments.filter((_, segmentIndex) => {
             return editor.canRoundPathPoint(node.id, {
               contourIndex: 0,
               segmentIndex,
@@ -507,7 +483,7 @@ describe("vector corner radius", () => {
 
   test("bulk path corner radius summarizes only the selected vector corners when multiple points are selected", () => {
     const editor = new Editor();
-    const node = createRectangleVectorNode();
+    const node = createRectanglePathNode();
 
     editor.getState().loadNodes([node]);
     editor.select(node.id);
@@ -544,12 +520,12 @@ describe("vector corner radius", () => {
       isMixed: true,
       value: null,
     });
-    expect(summary?.max).toBeCloseTo(90, 6);
+    expect(summary?.max).toBeCloseTo(180, 6);
   });
 
   test("reports the geometric max for selected vector points", () => {
     const editor = new Editor();
-    const node = createRectangleVectorNode();
+    const node = createRectanglePathNode();
 
     editor.getState().loadNodes([node]);
     editor.select(node.id);
@@ -585,7 +561,7 @@ describe("vector corner radius", () => {
 
   test("bulk path corner radius applies only to the selected vector corners when multiple points are selected", () => {
     const editor = new Editor();
-    const node = createRectangleVectorNode();
+    const node = createRectanglePathNode();
 
     editor.getState().loadNodes([node]);
     editor.select(node.id);
@@ -604,13 +580,13 @@ describe("vector corner radius", () => {
     expect(editor.setPathCornerRadius(18, node.id)).toBe(true);
 
     const nextNode = editor.getNode(node.id);
-    expect(nextNode?.type).toBe("vector");
+    expect(nextNode?.type).toBe("path");
+    expect(nextNode?.type === "path" ? nextNode.segments : null).toHaveLength(
+      6
+    );
     expect(
-      nextNode?.type === "vector" ? nextNode.contours[0]?.segments : null
-    ).toHaveLength(6);
-    expect(
-      nextNode?.type === "vector"
-        ? nextNode.contours[0]?.segments.some((segment) => {
+      nextNode?.type === "path"
+        ? nextNode.segments.some((segment) => {
             return Object.hasOwn(segment, "cornerRadius");
           })
         : null
@@ -619,7 +595,7 @@ describe("vector corner radius", () => {
 
   test("bulk path corner radius clamps before an irregular closed polygon loses live-corner editability", () => {
     const editor = new Editor();
-    const node = createIrregularPolygonVectorNode();
+    const node = createIrregularPolygonPathNode();
 
     editor.getState().loadNodes([node]);
     editor.select(node.id);
@@ -639,10 +615,10 @@ describe("vector corner radius", () => {
 
     const nextNode = editor.getNode(node.id);
 
-    expect(nextNode?.type).toBe("vector");
+    expect(nextNode?.type).toBe("path");
     expect(
-      nextNode?.type === "vector"
-        ? nextNode.contours[0]?.segments.filter((_, segmentIndex) => {
+      nextNode?.type === "path"
+        ? nextNode.segments.filter((_, segmentIndex) => {
             return editor.canRoundPathPoint(node.id, {
               contourIndex: 0,
               segmentIndex,
@@ -654,7 +630,7 @@ describe("vector corner radius", () => {
 
   test("bulk path corner radius summary stays uniform for an irregular vector after a bulk apply", () => {
     const editor = new Editor();
-    const node = createIrregularPolygonVectorNode();
+    const node = createIrregularPolygonPathNode();
 
     editor.getState().loadNodes([node]);
     editor.select(node.id);

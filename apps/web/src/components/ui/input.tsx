@@ -29,7 +29,7 @@ function Input({
       className={
         cn(
           !unstyled &&
-            "relative inline-flex w-full rounded-lg border border-transparent bg-muted text-base text-foreground transition-[border-color,background-color] hover:border-input hover:bg-accent has-focus-visible:border-ring has-focus-visible:has-aria-invalid:border-destructive has-aria-invalid:border-destructive/36 has-autofill:bg-foreground/4 has-disabled:opacity-64 has-disabled:hover:border-transparent sm:text-sm dark:bg-input/32 dark:has-autofill:bg-foreground/8",
+            "relative inline-flex w-full rounded-lg border border-transparent bg-muted text-base text-foreground transition-[border-color,background-color] hover:border-input hover:bg-accent has-focus-visible:has-aria-invalid:border-destructive has-aria-invalid:border-destructive/36 has-focus-visible:border-ring has-autofill:bg-foreground/4 has-disabled:opacity-64 has-disabled:hover:border-transparent sm:text-sm dark:bg-input/32 dark:has-autofill:bg-foreground/8",
           className
         ) || undefined
       }

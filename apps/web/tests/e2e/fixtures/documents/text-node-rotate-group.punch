@@ -3,6 +3,7 @@
   "nodes": [
     {
       "id": "rotate-first-node",
+      "parentId": "root",
       "type": "text",
       "text": "Rotate first",
       "font": {
@@ -31,6 +32,7 @@
     },
     {
       "id": "rotate-second-node",
+      "parentId": "root",
       "type": "text",
       "text": "Rotate second",
       "font": {

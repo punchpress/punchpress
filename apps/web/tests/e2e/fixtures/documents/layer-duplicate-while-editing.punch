@@ -3,6 +3,7 @@
   "nodes": [
     {
       "id": "duplicate-editing-node",
+      "parentId": "root",
       "type": "text",
       "text": "Duplicate while editing",
       "font": {

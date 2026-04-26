@@ -467,6 +467,7 @@ export const LayerTreeRow = ({
                     isSelected: layer.isSelected,
                   })
                 )}
+                data-layer-row-id={nodeId}
                 {...(isRenaming ? {} : dragHandleProps)}
                 style={{
                   paddingLeft: `${depth * LAYER_TREE_INDENT}px`,

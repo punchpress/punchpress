@@ -3,6 +3,7 @@
   "nodes": [
     {
       "id": "reorder-back-node",
+      "parentId": "root",
       "type": "text",
       "text": "Back layer",
       "font": {
@@ -31,6 +32,7 @@
     },
     {
       "id": "reorder-front-node",
+      "parentId": "root",
       "type": "text",
       "text": "Front layer",
       "font": {

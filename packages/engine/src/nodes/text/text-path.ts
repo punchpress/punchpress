@@ -65,7 +65,12 @@ const buildGuidePathD = (points) => {
     .join(" ");
 };
 
-const getArchGuidePoint = (bounds, bend, t, baseY = bounds.minY) => {
+const getArchGuidePoint = (
+  bounds,
+  bend,
+  t,
+  baseY = (bounds.minY + bounds.maxY) / 2
+) => {
   const centerX = (bounds.minX + bounds.maxX) / 2;
   const halfWidth = Math.max(bounds.width / 2, 1);
   const halfHeight = Math.max(bounds.height / 2, 1);
@@ -141,7 +146,7 @@ const getWaveGuidePoint = (
   amplitude,
   cycles,
   t,
-  baseY = bounds.minY
+  baseY = (bounds.minY + bounds.maxY) / 2
 ) => {
   const centerX = (bounds.minX + bounds.maxX) / 2;
   const halfWidth = Math.max(bounds.width / 2, 1);
@@ -207,7 +212,7 @@ export const getWaveGuide = (
     );
   });
   const guideBounds = getPointBounds(points);
-  const centerX = (bounds.minX + bounds.maxX) / 2;
+  const centerHandlePoint = getWaveGuidePoint(bounds, amplitude, cycles, 0.5);
   const cyclesPoint = getWaveGuidePoint(
     bounds,
     amplitude,
@@ -237,12 +242,9 @@ export const getWaveGuide = (
         role: "amplitude",
       },
     ],
+    handleAnchorPoint: centerHandlePoint,
     kind: "wave",
     pathD: buildGuidePathD(points),
-    topHandlePoint: {
-      x: centerX,
-      y: guideBounds.minY,
-    },
   };
 };
 

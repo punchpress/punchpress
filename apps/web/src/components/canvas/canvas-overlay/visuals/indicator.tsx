@@ -1,4 +1,4 @@
-interface CanvasPathPreviewSvgProps {
+interface CanvasIndicatorProps {
   bbox: {
     height: number;
     maxX: number;
@@ -14,12 +14,7 @@ interface CanvasPathPreviewSvgProps {
   }>;
 }
 
-const PATH_PREVIEW_STROKE_WIDTH_PX = 1.75;
-
-export const CanvasPathPreviewSvg = ({
-  bbox,
-  paths,
-}: CanvasPathPreviewSvgProps) => {
+export const CanvasIndicator = ({ bbox, paths }: CanvasIndicatorProps) => {
   const width = Math.max(1, bbox.width);
   const height = Math.max(1, bbox.height);
 
@@ -36,16 +31,10 @@ export const CanvasPathPreviewSvg = ({
         {paths.map((path) => {
           return (
             <path
-              className="canvas-path-preview"
+              className="canvas-indicator canvas-preview"
               d={path.d}
-              fill="none"
               key={path.key || `${path.transform || "preview"}-${path.d}`}
-              stroke="var(--canvas-path-preview-stroke)"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={PATH_PREVIEW_STROKE_WIDTH_PX}
               transform={path.transform || undefined}
-              vectorEffect="non-scaling-stroke"
             />
           );
         })}

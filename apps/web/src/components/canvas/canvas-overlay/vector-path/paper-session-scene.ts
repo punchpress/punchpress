@@ -7,7 +7,6 @@ import {
   createHandleItem,
   createHandleLine,
   createHoverHaloItem,
-  GUIDE_STROKE_WIDTH_PX,
   getSceneStyles,
   HANDLE_HOVER_RADIUS_PX,
   projectPoint,
@@ -66,6 +65,7 @@ export const createPaperSessionSceneController = ({
 
     state.contours = scene.contours;
     state.activeDragSession = scene.activeDragSession || null;
+    state.cornerCurveSegments = scene.cornerCurveSegments || [];
     state.hoveredCornerHandlePoint = scene.hoveredCornerHandlePoint || null;
     state.interactionPolicy = scene.interactionPolicy || {
       canInsertPoint: true,
@@ -83,7 +83,9 @@ export const createPaperSessionSceneController = ({
 
   const clearScene = () => {
     scope.project.clear();
+    state.activeCurvePaths = [];
     state.chrome = [];
+    state.cornerCurveSegments = [];
     state.localPaths = [];
     state.maxedCurvePaths = [];
     state.paths = [];
@@ -178,9 +180,9 @@ export const createPaperSessionSceneController = ({
         fillColor: null,
         insert: true,
         strokeCap: "round",
-        strokeColor: state.styles.guide,
+        strokeColor: state.styles.selected,
         strokeJoin: "round",
-        strokeWidth: GUIDE_STROKE_WIDTH_PX,
+        strokeWidth: state.styles.indicatorWidthPx,
       });
 
       localPath.data = {

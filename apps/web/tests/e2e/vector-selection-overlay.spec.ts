@@ -795,7 +795,7 @@ const getSelectionHandleAngle = (page) => {
 };
 
 const expectVectorTransformOverlay = async (page) => {
-  const overlay = page.locator(".canvas-multi-node-transform-overlay");
+  const overlay = page.locator(".canvas-multi-selection");
   const handle = overlay.locator(".moveable-control.moveable-ne");
 
   await expect(overlay).toBeVisible();
@@ -949,7 +949,7 @@ test("rotating two compound vectors keeps the multi-selection box aligned after 
   const [overlay, firstNode, secondNode] = await getTransformedElementCorners(
     page,
     [
-      ".canvas-multi-node-transform-overlay",
+      ".canvas-multi-selection",
       '[data-node-id="compound-vector-a"]',
       '[data-node-id="compound-vector-b"]',
     ]
@@ -1014,7 +1014,7 @@ test("rotating two compound vectors keeps the multi-selection box aligned after 
   await pauseForUi(page);
 
   const [reselectedOverlay] = await getTransformedElementCorners(page, [
-    ".canvas-multi-node-transform-overlay",
+    ".canvas-multi-selection",
   ]);
 
   expect(reselectedOverlay).not.toBeNull();
@@ -1051,7 +1051,7 @@ test("rotating irregular compound vectors keeps the multi-selection box tight to
   expect(selectedNodeIds).toEqual(["compound-a", "compound-b"]);
 
   const [overlay] = await getTransformedElementCorners(page, [
-    ".canvas-multi-node-transform-overlay",
+    ".canvas-multi-selection",
   ]);
   const renderedPoints = await getRenderedPathSamplePoints(page, [
     "compound-a",

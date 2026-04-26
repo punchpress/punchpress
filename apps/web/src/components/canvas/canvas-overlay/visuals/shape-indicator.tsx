@@ -1,9 +1,9 @@
 import { isNodeVisible } from "@punchpress/engine";
-import { useEditor } from "../../../editor-react/use-editor";
-import { useEditorValue } from "../../../editor-react/use-editor-value";
-import { getHostRectFromNodeFrame } from "./canvas-overlay-geometry";
+import { useEditor } from "../../../../editor-react/use-editor";
+import { useEditorValue } from "../../../../editor-react/use-editor-value";
+import { getHostRectFromNodeFrame } from "../canvas-overlay-geometry";
 
-export const CanvasEditingSelection = ({ viewportRevision }) => {
+export const CanvasShapeIndicator = ({ viewportRevision }) => {
   const editor = useEditor();
   const editingNodeId = useEditorValue((_, state) => state.editingNodeId);
   const visibleSelectedNodeIds = useEditorValue((editor, state) => {
@@ -24,7 +24,7 @@ export const CanvasEditingSelection = ({ viewportRevision }) => {
 
   return (
     <div
-      className="canvas-edit-selection pointer-events-none absolute"
+      className="canvas-shape-indicator pointer-events-none absolute"
       data-viewport-revision={viewportRevision}
       style={{
         height: `${editingSelectionRect.height}px`,

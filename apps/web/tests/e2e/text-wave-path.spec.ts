@@ -4,6 +4,7 @@ import {
   getStateSnapshot,
   gotoEditor,
   pauseForUi,
+  zoomOut,
 } from "./helpers/editor";
 
 const TEST_FONT = {
@@ -61,6 +62,66 @@ const loadWaveDocument = async (page, rotation = 0) => {
   );
 };
 
+test("applies wave from the panel with the restrained default preset", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await page.evaluate((font) => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    if (!editor) {
+      return false;
+    }
+
+    editor.loadDocument(
+      JSON.stringify({
+        nodes: [
+          {
+            fill: "#000000",
+            font,
+            fontSize: 120,
+            id: "plain-text-node",
+            parentId: "root",
+            stroke: null,
+            strokeWidth: 0,
+            text: "PLAIN",
+            tracking: 0,
+            transform: {
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+              x: 380,
+              y: 260,
+            },
+            type: "text",
+            visible: true,
+            warp: {
+              kind: "none",
+            },
+          },
+        ],
+        version: "1.7",
+      })
+    );
+
+    return true;
+  }, TEST_FONT);
+
+  await page.locator('.canvas-node[data-node-id="plain-text-node"]').click();
+  await pauseForUi(page);
+  await page.getByRole("button", { name: "Wave" }).click();
+  await pauseForUi(page);
+
+  const after = await getStateSnapshot(page);
+  const node = after.nodes.find((entry) => entry.id === "plain-text-node");
+
+  expect(node?.warp).toEqual({
+    amplitude: 24,
+    cycles: 1,
+    kind: "wave",
+  });
+});
+
 test("edits wave amplitude and cycles from inline handles", async ({
   page,
 }) => {
@@ -108,7 +169,7 @@ test("edits wave amplitude and cycles from inline handles", async ({
 
   if (nodeBox) {
     expect(pairCenterX).toBeCloseTo(nodeBox.x + nodeBox.width / 2, 1);
-    expect(amplitudeCenterY).toBeLessThan(nodeBox.y + nodeBox.height * 0.35);
+    expect(amplitudeCenterY).toBeLessThan(nodeBox.y + nodeBox.height * 0.45);
   }
 
   await page.mouse.move(
@@ -173,11 +234,67 @@ test("edits wave amplitude and cycles from inline handles", async ({
     return;
   }
 
-  expect(afterAmplitudeNode.warp.amplitude).toBeLessThan(
+  expect(afterAmplitudeNode.warp.amplitude).toBeGreaterThan(
     beforeNode.warp.amplitude
   );
   expect(afterCyclesNode.warp.cycles).toBeGreaterThan(
     afterAmplitudeNode.warp.cycles
+  );
+});
+
+test("shrinks wave handle icons a bit at extreme zoom out", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadWaveDocument(page);
+  await page.locator('.canvas-node[data-node-id="wave-node"]').click();
+  await pauseForUi(page);
+
+  const amplitudeHandleIcon = page
+    .getByTestId("text-path-handle-amplitude")
+    .locator(".canvas-handle-icon");
+  const amplitudeHandle = page.getByTestId("text-path-handle-amplitude");
+  const node = page.locator('.canvas-node[data-node-id="wave-node"]');
+
+  const beforeBox = await amplitudeHandleIcon.boundingBox();
+  const beforeHandleBox = await amplitudeHandle.boundingBox();
+  const beforeNodeBox = await node.boundingBox();
+
+  expect(beforeBox).not.toBeNull();
+  expect(beforeHandleBox).not.toBeNull();
+  expect(beforeNodeBox).not.toBeNull();
+
+  if (!(beforeBox && beforeHandleBox && beforeNodeBox)) {
+    return;
+  }
+
+  await zoomOut(page, 8);
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => (await getStateSnapshot(page)).zoom)
+    .toBeLessThan(0.5);
+
+  const afterBox = await amplitudeHandleIcon.boundingBox();
+  const afterHandleBox = await amplitudeHandle.boundingBox();
+  const afterNodeBox = await node.boundingBox();
+
+  expect(afterBox).not.toBeNull();
+  expect(afterHandleBox).not.toBeNull();
+  expect(afterNodeBox).not.toBeNull();
+
+  if (!(afterBox && afterHandleBox && afterNodeBox)) {
+    return;
+  }
+
+  expect(afterBox.width).toBeLessThan(beforeBox.width - 4);
+  expect(afterBox.height).toBeLessThan(beforeBox.height - 4);
+  expect(
+    Math.abs(afterNodeBox.y - (afterHandleBox.y + afterHandleBox.height / 2))
+  ).toBeLessThan(
+    Math.abs(
+      beforeNodeBox.y - (beforeHandleBox.y + beforeHandleBox.height / 2)
+    ) - 8
   );
 });
 

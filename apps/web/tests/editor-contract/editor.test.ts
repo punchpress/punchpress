@@ -1141,7 +1141,7 @@ describe("Editor vector resize behavior", () => {
 describe("Editor text editing mode", () => {
   test("uses the updated default wave warp preset", () => {
     expect(getDefaultWarp("wave")).toEqual({
-      amplitude: 140,
+      amplitude: 24,
       cycles: 1,
       kind: "wave",
     });
@@ -1166,6 +1166,30 @@ describe("Editor text editing mode", () => {
 
     expect(editor.selectedNode?.warp).toEqual({
       kind: "none",
+    });
+  });
+
+  test("creates new text nodes with a balanced starter style", () => {
+    const editor = new Editor();
+    editor.applyLocalFontCatalog({
+      error: "",
+      fonts: [{ ...AVAILABLE_FONT, id: "arialmt" }],
+      state: "ready",
+    });
+
+    editor.addTextNode({ x: 320, y: 240 });
+
+    expect(editor.selectedNode).toMatchObject({
+      fill: "#ffffff",
+      fontSize: 100,
+      stroke: "#000000",
+      strokeWidth: 3,
+      text: "YOUR TEXT",
+      tracking: 10,
+      type: "text",
+      warp: {
+        kind: "none",
+      },
     });
   });
 

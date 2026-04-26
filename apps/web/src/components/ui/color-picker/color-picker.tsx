@@ -4,8 +4,8 @@
 // https://www.kibo-ui.com/components/color-picker
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
 import { getCanvasCursorStyle } from "@/components/canvas/canvas-cursor-assets";
+import { cn } from "@/lib/utils";
 import {
   ColorPickerContext,
   type ColorPickerProps,

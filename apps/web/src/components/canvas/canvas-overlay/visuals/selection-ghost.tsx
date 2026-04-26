@@ -1,6 +1,6 @@
-import { CanvasPathPreviewSvg } from "./canvas-path-preview-svg";
+import { CanvasIndicator } from "./indicator";
 
-interface CanvasSelectionPathGhostProps {
+interface CanvasSelectionGhostProps {
   ghost: {
     bbox: {
       height: number;
@@ -19,9 +19,7 @@ interface CanvasSelectionPathGhostProps {
   } | null;
 }
 
-export const CanvasSelectionPathGhost = ({
-  ghost,
-}: CanvasSelectionPathGhostProps) => {
+export const CanvasSelectionGhost = ({ ghost }: CanvasSelectionGhostProps) => {
   if (!ghost) {
     return null;
   }
@@ -33,7 +31,7 @@ export const CanvasSelectionPathGhost = ({
       data-node-id={ghost.nodeId}
       data-testid="canvas-selection-path-ghost"
     >
-      <CanvasPathPreviewSvg bbox={ghost.bbox} paths={ghost.paths} />
+      <CanvasIndicator bbox={ghost.bbox} paths={ghost.paths} />
     </div>
   );
 };

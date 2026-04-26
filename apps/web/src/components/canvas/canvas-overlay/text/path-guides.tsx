@@ -1,37 +1,39 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { CircleArrowDataTransferHorizontalIcon } from "@hugeicons-pro/core-stroke-rounded";
+import { clamp } from "@punchpress/engine";
 import { useEffect, useState } from "react";
-import { useEditor } from "../../../editor-react/use-editor";
-import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
+import { useEditor } from "../../../../editor-react/use-editor";
+import { useEditorSurfaceValue } from "../../../../editor-react/use-editor-surface-value";
 import {
   getActiveTextPathHandleCursorToken,
   getTextPathHandleCursorToken,
   setActiveCanvasCursorToken,
-} from "../canvas-cursor-policy";
+} from "../../canvas-cursor-policy";
+import { CanvasGuide } from "../visuals/guide";
 import {
-  FANCY_CANVAS_HANDLE_BUTTON_CLASS,
-  FANCY_CANVAS_HANDLE_ICON_CLASS,
-} from "./canvas-handle-icon-styles";
+  CANVAS_HANDLE_BUTTON_CLASS,
+  CANVAS_HANDLE_ICON_CLASS,
+} from "../visuals/handles";
 import {
   getTextPathGuideMatrix,
   getTextPathHostMetrics,
   getTextPathTransformTargetStyle,
   projectTextPathPoint,
-} from "./text-path-overlay-geometry";
+} from "./path-geometry";
 
 const BEND_HANDLE_ICON_SIZE = 40;
 const BEND_HANDLE_SCREEN_GAP = 10;
-const BEND_HANDLE_SCREEN_OFFSET =
-  BEND_HANDLE_ICON_SIZE / 2 + BEND_HANDLE_SCREEN_GAP;
+const ARCH_HANDLE_SCREEN_GAP = 62;
 const POSITION_HANDLE_ICON_SIZE = 40;
 const POSITION_HANDLE_SCREEN_GAP = 10;
-const POSITION_HANDLE_SCREEN_OFFSET =
-  POSITION_HANDLE_ICON_SIZE / 2 + POSITION_HANDLE_SCREEN_GAP;
+const WAVE_HANDLE_SCREEN_GAP = 65;
 const WAVE_HANDLE_PAIR_GAP = 8;
-const WAVE_HANDLE_PAIR_OFFSET =
-  BEND_HANDLE_ICON_SIZE / 2 + WAVE_HANDLE_PAIR_GAP / 2;
-const INLINE_WARP_HANDLE_ICON_CLASS = FANCY_CANVAS_HANDLE_ICON_CLASS;
+const INLINE_WARP_HANDLE_ICON_CLASS = CANVAS_HANDLE_ICON_CLASS;
 const POSITION_HANDLE_ICON_CLASS = INLINE_WARP_HANDLE_ICON_CLASS;
+
+const easeOutCubic = (t) => {
+  return 1 - (1 - t) ** 3;
+};
 
 const getBoundsCenter = (bounds) => {
   if (!bounds) {
@@ -100,9 +102,68 @@ const getProjectedUnitVector = (matrix, vector) => {
   };
 };
 
-const TextPathHandleIcon = ({ className, iconSize, rotationDeg = 0 }) => {
+const isVerticalWarpHandle = (handle) => {
   return (
-    <span aria-hidden="true" className={className}>
+    handle.role === "bend" ||
+    handle.role === "amplitude" ||
+    handle.role === "slant"
+  );
+};
+
+const getLowZoomScale = (zoom, minScale) => {
+  if (!Number.isFinite(zoom)) {
+    return 1;
+  }
+
+  return clamp((zoom - 0.12) / (0.55 - 0.12), 0, 1) * (1 - minScale) + minScale;
+};
+
+const getTextPathHandleVisualScale = (zoom) => {
+  return getLowZoomScale(zoom, 0.72);
+};
+
+const getTextPathHandleOffsetScale = (zoom) => {
+  if (!Number.isFinite(zoom)) {
+    return 1;
+  }
+
+  const t = clamp((zoom - 0.1) / (1 - 0.1), 0, 1);
+
+  return 0.28 + easeOutCubic(t) * 0.72;
+};
+
+const getScaledIconSize = (iconSize, scale) => {
+  return Math.round(iconSize * scale * 10) / 10;
+};
+
+const getScreenOffsetFromGap = (iconSize, scale, gap, offsetScale = 1) => {
+  return getScaledIconSize(iconSize, scale) / 2 + gap * offsetScale;
+};
+
+const getWavePairOffset = (scale, offsetScale = 1) => {
+  return (
+    getScaledIconSize(BEND_HANDLE_ICON_SIZE, scale) / 2 +
+    (WAVE_HANDLE_PAIR_GAP * offsetScale) / 2
+  );
+};
+
+const TextPathHandleIcon = ({
+  className,
+  iconSize,
+  rotationDeg = 0,
+  scale = 1,
+}) => {
+  const scaledIconSize = getScaledIconSize(iconSize, scale);
+
+  return (
+    <span
+      aria-hidden="true"
+      className={className}
+      style={{
+        height: `${scaledIconSize}px`,
+        width: `${scaledIconSize}px`,
+      }}
+    >
       <span
         className="flex items-center justify-center"
         style={{ transform: `rotate(${rotationDeg}deg)` }}
@@ -110,7 +171,7 @@ const TextPathHandleIcon = ({ className, iconSize, rotationDeg = 0 }) => {
         <HugeiconsIcon
           color="currentColor"
           icon={CircleArrowDataTransferHorizontalIcon}
-          size={iconSize}
+          size={scaledIconSize}
           strokeWidth={1.9}
         />
       </span>
@@ -183,47 +244,184 @@ const getCirclePathHandlePoint = (guide, handle) => {
   };
 };
 
-const TextPathGuide = ({ guide, isPathEditing, matrixTransform, metrics }) => {
-  if (!(guide && metrics && matrixTransform)) {
-    return null;
+const getTextPathHandlePoint = ({
+  guide,
+  handle,
+  matrix,
+  offsetScale,
+  scale,
+  renderCenter,
+}) => {
+  if (handle.role === "bend") {
+    return offsetProjectedPoint(
+      matrix,
+      handle.point,
+      { x: 0, y: -1 },
+      getScreenOffsetFromGap(
+        BEND_HANDLE_ICON_SIZE,
+        scale,
+        ARCH_HANDLE_SCREEN_GAP,
+        offsetScale
+      )
+    );
+  }
+
+  if (guide.kind === "wave" && guide.handleAnchorPoint) {
+    const anchoredPoint = offsetProjectedPoint(
+      matrix,
+      guide.handleAnchorPoint,
+      { x: 0, y: -1 },
+      getScreenOffsetFromGap(
+        BEND_HANDLE_ICON_SIZE,
+        scale,
+        WAVE_HANDLE_SCREEN_GAP,
+        offsetScale
+      )
+    );
+
+    return offsetScreenPoint(
+      matrix,
+      anchoredPoint,
+      { x: 1, y: 0 },
+      handle.role === "amplitude"
+        ? getWavePairOffset(scale, offsetScale)
+        : -getWavePairOffset(scale, offsetScale)
+    );
+  }
+
+  if (
+    guide.kind === "slant" &&
+    renderCenter &&
+    Number.isFinite(guide.topHandleOffsetY)
+  ) {
+    return offsetProjectedPoint(
+      matrix,
+      {
+        x: renderCenter.x,
+        y: renderCenter.y + guide.topHandleOffsetY,
+      },
+      { x: 0, y: -1 },
+      getScreenOffsetFromGap(
+        BEND_HANDLE_ICON_SIZE,
+        scale,
+        BEND_HANDLE_SCREEN_GAP,
+        offsetScale
+      )
+    );
+  }
+
+  if (guide.kind === "circle" && handle.role === "position") {
+    const circlePathPoint = getCirclePathHandlePoint(guide, handle);
+
+    return offsetProjectedPoint(
+      matrix,
+      circlePathPoint,
+      {
+        x: guide.center.x - circlePathPoint.x,
+        y: guide.center.y - circlePathPoint.y,
+      },
+      getScreenOffsetFromGap(
+        POSITION_HANDLE_ICON_SIZE,
+        scale,
+        POSITION_HANDLE_SCREEN_GAP,
+        offsetScale
+      )
+    );
+  }
+
+  return projectTextPathPoint(matrix, handle.point);
+};
+
+const getTextPathHandleIcon = ({
+  guide,
+  handle,
+  iconRotationDeg,
+  localXAxisRotationDeg,
+  matrix,
+  scale,
+}) => {
+  if (isVerticalWarpHandle(handle)) {
+    return (
+      <TextPathHandleIcon
+        className={INLINE_WARP_HANDLE_ICON_CLASS}
+        iconSize={BEND_HANDLE_ICON_SIZE}
+        rotationDeg={localXAxisRotationDeg - 90}
+        scale={scale}
+      />
+    );
+  }
+
+  if (guide.kind === "circle" && handle.role === "position") {
+    const circlePathPoint = getCirclePathHandlePoint(guide, handle);
+    const pointRotationDeg = getProjectedVectorAngleDeg(matrix, {
+      x: circlePathPoint.x - guide.center.x,
+      y: circlePathPoint.y - guide.center.y,
+    });
+
+    return (
+      <TextPathHandleIcon
+        className={POSITION_HANDLE_ICON_CLASS}
+        iconSize={POSITION_HANDLE_ICON_SIZE}
+        rotationDeg={pointRotationDeg + 90}
+        scale={scale}
+      />
+    );
   }
 
   return (
-    <svg
-      aria-hidden="true"
-      className="absolute inset-0 h-full w-full overflow-visible"
-      data-testid="text-path-guide"
-      height={metrics.height}
-      width={metrics.width}
-    >
-      <g transform={matrixTransform}>
-        <path
-          d={guide.pathD}
-          fill="none"
-          pointerEvents="none"
-          stroke={isPathEditing ? "#63a7ff" : "#a2a9b4"}
-          strokeOpacity={isPathEditing ? "0.35" : "0.1"}
-          strokeWidth="1.5"
-          vectorEffect="non-scaling-stroke"
-        />
-        <path
-          d={guide.activePathD}
-          fill="none"
-          pointerEvents="none"
-          stroke={isPathEditing ? "#2f80ff" : "#d6dbe4"}
-          strokeLinecap="round"
-          strokeOpacity={isPathEditing ? "0.95" : "0.44"}
-          strokeWidth={isPathEditing ? "2.5" : "2"}
-          vectorEffect="non-scaling-stroke"
-        />
-      </g>
-    </svg>
+    <TextPathHandleIcon
+      className={INLINE_WARP_HANDLE_ICON_CLASS}
+      iconSize={POSITION_HANDLE_ICON_SIZE}
+      rotationDeg={iconRotationDeg}
+      scale={scale}
+    />
   );
 };
 
 const SPRING_MAX_OFFSET = 5;
 const SPRING_DAMPING = 0.15;
 const SPRING_TRANSITION = "transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)";
+
+const getTextPathGuideRenderState = (editor, overlayState, isPathEditing) => {
+  const metrics = overlayState ? getTextPathHostMetrics(editor) : null;
+  const geometry = overlayState?.geometry || null;
+  const node = overlayState?.node || null;
+  const previewDelta = overlayState?.previewDelta || null;
+  const transformTargetStyle =
+    geometry && node && isPathEditing
+      ? getTextPathTransformTargetStyle(
+          editor,
+          node,
+          geometry,
+          previewDelta,
+          true
+        )
+      : null;
+  const matrix =
+    geometry && metrics && node
+      ? getTextPathGuideMatrix(
+          node,
+          geometry,
+          metrics,
+          editor.zoom,
+          previewDelta
+        )
+      : null;
+  const guide = geometry?.guide || null;
+  const matrixTransform = matrix
+    ? `matrix(${matrix.a} ${matrix.b} ${matrix.c} ${matrix.d} ${matrix.e} ${matrix.f})`
+    : null;
+
+  return {
+    geometry,
+    guide,
+    matrix,
+    matrixTransform,
+    metrics,
+    node,
+    transformTargetStyle,
+  };
+};
 
 const TextPathHandles = ({
   bbox,
@@ -247,6 +445,8 @@ const TextPathHandles = ({
     x: 1,
     y: 0,
   });
+  const handleVisualScale = getTextPathHandleVisualScale(editor.zoom);
+  const handleOffsetScale = getTextPathHandleOffsetScale(editor.zoom);
   const localXAxisUnit = getProjectedUnitVector(matrix, { x: 1, y: 0 });
   const localYAxisUnit = getProjectedUnitVector(matrix, { x: 0, y: 1 });
 
@@ -335,109 +535,25 @@ const TextPathHandles = ({
   };
 
   return guide.handles.map((handle) => {
-    const isVerticalWarpHandle =
-      handle.role === "bend" ||
-      handle.role === "amplitude" ||
-      handle.role === "slant";
     const isInlineWarpHandle = guide.kind !== "circle";
     const cursorToken = getTextPathHandleCursorToken(handle.role);
-    const circlePathPoint =
-      guide.kind === "circle" && handle.role === "position"
-        ? getCirclePathHandlePoint(guide, handle)
-        : null;
-    const pointRotationDeg = circlePathPoint
-      ? getProjectedVectorAngleDeg(matrix, {
-          x: circlePathPoint.x - guide.center.x,
-          y: circlePathPoint.y - guide.center.y,
-        })
-      : 0;
-    const point = (() => {
-      if (handle.role === "bend") {
-        return offsetProjectedPoint(
-          matrix,
-          handle.point,
-          { x: 0, y: -1 },
-          BEND_HANDLE_SCREEN_OFFSET
-        );
-      }
-
-      if (guide.kind === "wave" && guide.topHandlePoint) {
-        const topRailPoint = offsetProjectedPoint(
-          matrix,
-          guide.topHandlePoint,
-          { x: 0, y: -1 },
-          BEND_HANDLE_SCREEN_OFFSET
-        );
-
-        return offsetScreenPoint(
-          matrix,
-          topRailPoint,
-          { x: 1, y: 0 },
-          handle.role === "amplitude"
-            ? WAVE_HANDLE_PAIR_OFFSET
-            : -WAVE_HANDLE_PAIR_OFFSET
-        );
-      }
-
-      if (
-        guide.kind === "slant" &&
-        renderCenter &&
-        Number.isFinite(guide.topHandleOffsetY)
-      ) {
-        return offsetProjectedPoint(
-          matrix,
-          {
-            x: renderCenter.x,
-            y: renderCenter.y + guide.topHandleOffsetY,
-          },
-          { x: 0, y: -1 },
-          BEND_HANDLE_SCREEN_OFFSET
-        );
-      }
-
-      if (guide.kind === "circle" && handle.role === "position") {
-        return offsetProjectedPoint(
-          matrix,
-          circlePathPoint,
-          {
-            x: guide.center.x - circlePathPoint.x,
-            y: guide.center.y - circlePathPoint.y,
-          },
-          POSITION_HANDLE_SCREEN_OFFSET
-        );
-      }
-
-      return projectTextPathPoint(matrix, handle.point);
-    })();
-    const icon = (() => {
-      if (isVerticalWarpHandle) {
-        return (
-          <TextPathHandleIcon
-            className={INLINE_WARP_HANDLE_ICON_CLASS}
-            iconSize={BEND_HANDLE_ICON_SIZE}
-            rotationDeg={localXAxisRotationDeg - 90}
-          />
-        );
-      }
-
-      if (guide.kind === "circle" && handle.role === "position") {
-        return (
-          <TextPathHandleIcon
-            className={POSITION_HANDLE_ICON_CLASS}
-            iconSize={POSITION_HANDLE_ICON_SIZE}
-            rotationDeg={pointRotationDeg + 90}
-          />
-        );
-      }
-
-      return (
-        <TextPathHandleIcon
-          className={INLINE_WARP_HANDLE_ICON_CLASS}
-          iconSize={POSITION_HANDLE_ICON_SIZE}
-          rotationDeg={localXAxisRotationDeg}
-        />
-      );
-    })();
+    const rawPoint = getTextPathHandlePoint({
+      guide,
+      handle,
+      matrix,
+      offsetScale: handleOffsetScale,
+      scale: handleVisualScale,
+      renderCenter,
+    });
+    const point = rawPoint;
+    const icon = getTextPathHandleIcon({
+      guide,
+      handle,
+      iconRotationDeg: localXAxisRotationDeg,
+      localXAxisRotationDeg,
+      matrix,
+      scale: handleVisualScale,
+    });
 
     const isSpringActive = springState?.key === handle.key;
     const springDx = isSpringActive ? springState.dx : 0;
@@ -445,7 +561,7 @@ const TextPathHandles = ({
 
     return (
       <button
-        className={`${FANCY_CANVAS_HANDLE_BUTTON_CLASS} ${
+        className={`${CANVAS_HANDLE_BUTTON_CLASS} ${
           isInlineWarpHandle ? "" : "h-4 w-4"
         }`}
         data-canvas-cursor={cursorToken || undefined}
@@ -469,7 +585,7 @@ const TextPathHandles = ({
   });
 };
 
-export const CanvasTextPathOverlay = ({ viewportRevision }) => {
+export const CanvasTextPathGuides = ({ viewportRevision }) => {
   const editor = useEditor();
   const [transformTargetElement, setTransformTargetElement] = useState(null);
   const overlayState = useEditorSurfaceValue((editor) => {
@@ -506,35 +622,23 @@ export const CanvasTextPathOverlay = ({ viewportRevision }) => {
   if (!overlayState) {
     return null;
   }
-  const metrics = overlayState ? getTextPathHostMetrics(editor) : null;
-  const geometry = overlayState?.geometry || null;
   const isSelectionRotating = overlayState?.isSelectionRotating;
-  const node = overlayState?.node || null;
-  const previewDelta = overlayState?.previewDelta || null;
-  const transformTargetStyle =
-    geometry && node && isPathEditing
-      ? getTextPathTransformTargetStyle(
-          editor,
-          node,
-          geometry,
-          previewDelta,
-          true
-        )
-      : null;
-  const matrix =
-    geometry && metrics && node
-      ? getTextPathGuideMatrix(
-          node,
-          geometry,
-          metrics,
-          editor.zoom,
-          previewDelta
-        )
-      : null;
-  const guide = geometry?.guide || null;
-  const matrixTransform = matrix
-    ? `matrix(${matrix.a} ${matrix.b} ${matrix.c} ${matrix.d} ${matrix.e} ${matrix.f})`
-    : null;
+  const isTextPathPositioning = overlayState?.isTextPathPositioning;
+  const {
+    geometry,
+    guide,
+    matrix,
+    matrixTransform,
+    metrics,
+    node,
+    transformTargetStyle,
+  } = getTextPathGuideRenderState(editor, overlayState, isPathEditing);
+  const shouldRenderGuide =
+    !isSelectionRotating &&
+    guide &&
+    metrics &&
+    matrixTransform &&
+    (isPathEditing || isTextPathPositioning);
 
   return (
     <div
@@ -550,14 +654,16 @@ export const CanvasTextPathOverlay = ({ viewportRevision }) => {
         />
       ) : null}
 
-      {isSelectionRotating ? null : (
-        <TextPathGuide
-          guide={guide}
-          isPathEditing={isPathEditing}
-          matrixTransform={matrixTransform}
-          metrics={metrics}
+      {shouldRenderGuide ? (
+        <CanvasGuide
+          activePathD={guide.activePathD}
+          height={metrics.height}
+          isEditing={isPathEditing}
+          pathD={guide.pathD}
+          transform={matrixTransform}
+          width={metrics.width}
         />
-      )}
+      ) : null}
 
       <TextPathHandles
         bbox={geometry?.bbox || null}

@@ -2,6 +2,7 @@ import { isNodeVisible } from "@punchpress/engine";
 import { useEffect, useRef, useState } from "react";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
+import { getVectorPathPaintOrder } from "./vector-paint-order";
 
 const measurementCanvas =
   typeof document === "undefined" ? null : document.createElement("canvas");
@@ -151,6 +152,7 @@ export const CanvasTextEditor = () => {
       <svg
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 block overflow-visible"
+        data-testid="canvas-text-preview"
         height={frame.height}
         viewBox={`0 0 ${frame.width} ${frame.height}`}
         width={frame.width}
@@ -165,7 +167,7 @@ export const CanvasTextEditor = () => {
                   d={path.d}
                   fill={editingNode.fill}
                   key={path.key || `${path.transform || "shape"}-${path.d}`}
-                  paintOrder="stroke fill"
+                  paintOrder={getVectorPathPaintOrder()}
                   pointerEvents="none"
                   stroke={editingNode.stroke}
                   strokeLinecap="round"
@@ -182,16 +184,17 @@ export const CanvasTextEditor = () => {
       {caretLeft !== null ? (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute top-1/2 w-0.5 -translate-x-1/2 -translate-y-1/2"
+          className="pointer-events-none absolute top-1/2 z-10 -translate-x-1/2 -translate-y-1/2"
           data-testid="canvas-text-caret"
           style={{
             animation: isCaretSettling
               ? "none"
               : "canvas-caret-blink 1.1s steps(1, end) infinite",
-            backgroundColor: "#ffffff",
+            backgroundColor: "#111111",
+            boxShadow: "0 0 2px rgba(255, 255, 255, 0.95)",
             height: `${caretHeight}px`,
             left: `${caretLeft}px`,
-            mixBlendMode: "difference",
+            width: "1px",
           }}
         />
       ) : null}

@@ -52,6 +52,10 @@ import {
   releaseCompoundPath as releaseEditorCompoundPath,
 } from "./document/path/path-compound-actions";
 import {
+  canConvertShapeToPath as canEditorConvertShapeToPath,
+  convertShapeToPath as convertEditorShapeToPath,
+} from "./document/path/shape-convert-actions";
+import {
   canRoundPathPoint as canEditorRoundPathPoint,
   getPathCornerRadiusStableMax as getEditorPathCornerRadiusStableMax,
   getPathCornerRadiusSummary as getEditorPathCornerRadiusSummary,
@@ -759,6 +763,14 @@ export class Editor {
 
   releaseCompoundPath(nodeIds = this.selectedNodeIds) {
     return releaseEditorCompoundPath(this, nodeIds);
+  }
+
+  canConvertShapeToPath(nodeId = this.selectedNodeId) {
+    return canEditorConvertShapeToPath(this, nodeId);
+  }
+
+  convertShapeToPath(nodeId = this.selectedNodeId) {
+    return convertEditorShapeToPath(this, nodeId);
   }
 
   setVectorPathComposition(nodeId, pathComposition) {

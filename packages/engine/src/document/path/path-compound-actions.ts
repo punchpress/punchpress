@@ -1,5 +1,5 @@
 import { finishEditingIfNeeded } from "../../editing/editing-actions";
-import { createDefaultVectorNode } from "../../nodes/vector/model";
+import { createDefaultVectorContainerNode } from "../../nodes/vector/model";
 import {
   getVectorChildPathNodes,
   getVectorPathComposition,
@@ -153,18 +153,19 @@ export const makeCompoundPath = (editor, nodeIds = editor.selectedNodeIds) => {
         return;
       }
 
-      const vectorNode = createDefaultVectorNode();
-      vectorNode.compoundWrapper = true;
-      vectorNode.contours = [];
-      vectorNode.name = "Compound";
-      vectorNode.parentId = pathNodes[0].parentId;
-      vectorNode.pathComposition = "unite";
-      vectorNode.transform = {
-        rotation: 0,
-        scaleX: 1,
-        scaleY: 1,
-        x: 0,
-        y: 0,
+      const vectorNode = {
+        ...createDefaultVectorContainerNode(),
+        compoundWrapper: true,
+        name: "Compound",
+        parentId: pathNodes[0].parentId,
+        pathComposition: "unite",
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 0,
+          y: 0,
+        },
       };
 
       editor.getState().replaceNodeBlocks(

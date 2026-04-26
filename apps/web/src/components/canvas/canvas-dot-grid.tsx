@@ -7,12 +7,12 @@ import {
   getCanvasDotGridStepOpacity,
 } from "./canvas-dot-grid-math";
 
-type CanvasDotGridProps = {
+interface CanvasDotGridProps {
   originX: number;
   originY: number;
   stageMargin: number;
   zoom: number;
-};
+}
 
 export const CanvasDotGrid = ({
   originX,
@@ -25,10 +25,8 @@ export const CanvasDotGrid = ({
   const activeStepIndex = getCanvasDotGridStepIndex(zoom);
   const activeProgress = getCanvasDotGridBucketProgress(zoom, activeStepIndex);
   const dotRadius =
-    Math.max(
-      0.98,
-      1.18 - activeStepIndex * 0.035 - activeProgress * 0.14
-    ) / Math.max(zoom, 0.001);
+    Math.max(0.98, 1.18 - activeStepIndex * 0.035 - activeProgress * 0.14) /
+    Math.max(zoom, 0.001);
 
   return (
     <svg

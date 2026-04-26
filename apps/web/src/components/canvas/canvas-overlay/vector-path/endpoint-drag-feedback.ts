@@ -29,8 +29,8 @@ export const applyVectorEndpointDragTargetChrome = (
   haloFillColor.alpha = 0.32;
   chrome.anchorHalo.fillColor = haloFillColor;
   chrome.anchorHalo.visible = true;
-  chrome.anchor.strokeColor = styles.accentFill.clone();
-  chrome.anchor.fillColor = styles.backgroundFill.clone();
+  chrome.anchor.strokeColor = styles.selected.clone();
+  chrome.anchor.fillColor = styles.surface.clone();
   chrome.anchor.strokeWidth = 2.5;
   chrome.anchorHalo.bringToFront();
   chrome.anchor.bringToFront();

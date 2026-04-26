@@ -55,8 +55,8 @@ The durable rules are:
 
 The current implementation lives in:
 
-- `apps/web/src/components/canvas/canvas-overlay.tsx`
-- `apps/web/src/components/canvas/canvas-overlay/canvas-single-node-transform-overlay.tsx`
-- `apps/web/src/components/canvas/canvas-overlay/canvas-multi-node-transform-overlay.tsx`
-- `apps/web/src/styles/canvas-vendor.css`
+- `apps/web/src/components/canvas/canvas-overlay/host-overlays.tsx`
+- `apps/web/src/components/canvas/canvas-overlay/selection/single-selection-foreground.tsx`
+- `apps/web/src/components/canvas/canvas-overlay/selection/multi-selection-foreground.tsx`
+- `apps/web/src/styles/canvas/transform.css`
 - `apps/web/tests/e2e/text-node-rotate.spec.ts`

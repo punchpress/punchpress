@@ -1,0 +1,46 @@
+@layer components {
+  .canvas-vector-anchor {
+    width: 14px;
+    height: 14px;
+    background: var(--canvas-handle-surface);
+    border: var(--canvas-handle-width) solid var(--canvas-handle);
+    box-shadow: var(--canvas-handle-shadow);
+    @apply rounded-full;
+  }
+
+  .canvas-single-selection .canvas-single-node-control {
+    position: relative;
+    width: 26px !important;
+    height: 26px !important;
+    margin-top: 0 !important;
+    margin-left: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .canvas-multi-selection .canvas-multi-node-control {
+    position: relative;
+    width: 26px !important;
+    height: 26px !important;
+    margin-top: 0 !important;
+    margin-left: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .canvas-single-selection .canvas-single-node-control::before,
+  .canvas-multi-selection .canvas-multi-node-control::before {
+    position: absolute;
+    inset: 50% auto auto 50%;
+    width: 14px;
+    height: 14px;
+    content: "";
+    background: var(--canvas-handle-surface);
+    border: var(--canvas-handle-width) solid var(--canvas-handle);
+    border-radius: 9999px;
+    box-shadow: var(--canvas-handle-shadow);
+    transform: translate(-50%, -50%);
+  }
+}

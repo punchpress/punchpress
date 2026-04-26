@@ -225,8 +225,7 @@ describe("shape point topology", () => {
     editor.startPathEditing(node.id);
 
     const session = editor.getEditablePathSession(node.id);
-    const contours =
-      session && "contours" in session ? session.contours : null;
+    const contours = session && "contours" in session ? session.contours : null;
 
     if (!contours) {
       throw new Error("Expected editable star contours");

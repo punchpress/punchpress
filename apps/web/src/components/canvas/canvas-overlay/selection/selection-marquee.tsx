@@ -1,8 +1,8 @@
 import { useLayoutEffect, useRef } from "react";
 import Selecto from "react-selecto";
-import { useEditor } from "../../../editor-react/use-editor";
-import { useEditorValue } from "../../../editor-react/use-editor-value";
-import { shouldBlockSelectionStart } from "./canvas-overlay-interactions";
+import { useEditor } from "../../../../editor-react/use-editor";
+import { useEditorValue } from "../../../../editor-react/use-editor-value";
+import { shouldBlockSelectionStart } from "../canvas-overlay-interactions";
 
 const getNodeIdsFromSelectedTargets = (editor, targets) => {
   return (targets || [])
@@ -20,7 +20,7 @@ const getNodeIdsFromSelectedTargets = (editor, targets) => {
     .filter((nodeId, index, values) => values.indexOf(nodeId) === index);
 };
 
-export const CanvasSelectionOverlay = () => {
+export const CanvasSelectionMarquee = () => {
   const editor = useEditor();
   const selectoRef = useRef(null);
 

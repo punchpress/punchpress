@@ -3,6 +3,7 @@
   "nodes": [
     {
       "id": "select-first-node",
+      "parentId": "root",
       "type": "text",
       "text": "Select first",
       "font": {
@@ -31,6 +32,7 @@
     },
     {
       "id": "select-second-node",
+      "parentId": "root",
       "type": "text",
       "text": "Select second",
       "font": {

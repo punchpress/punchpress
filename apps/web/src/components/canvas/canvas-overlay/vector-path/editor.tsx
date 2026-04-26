@@ -6,9 +6,9 @@ import {
   getTextPathGuideMatrix,
   getTextPathHostMetrics,
   getTextPathTransformTargetStyle,
-} from "../text-path-overlay-geometry";
+} from "../text/path-geometry";
+import { CanvasAnchorGhost } from "../visuals/anchor-ghost";
 import { createVectorPathSession } from "./backend";
-import { PenInsertGhostAnchor } from "./pen-insert-ghost-anchor";
 import type { VectorCornerDragSession } from "./vector-corner-drag-session";
 import { VectorCornerRadiusHandles } from "./vector-corner-radius-handle";
 
@@ -30,6 +30,7 @@ const getVectorPathOverlayScene = ({
 
   return {
     activeDragSession,
+    cornerCurveSegments: editablePathSession.cornerCurveSegments || [],
     contours: editablePathSession.contours,
     hoveredCornerHandlePoint: isPanning ? null : hoveredCornerHandlePoint,
     interactionPolicy: editablePathSession.interactionPolicy,
@@ -116,7 +117,7 @@ const getVectorPathOverlayRenderState = ({
   };
 };
 
-export const CanvasVectorPathOverlay = ({ viewportRevision }) => {
+export const CanvasVectorEditor = ({ viewportRevision }) => {
   const editor = useEditor();
   const paperSessionRef = useRef(null);
   const sceneRef = useRef(null);
@@ -276,7 +277,7 @@ export const CanvasVectorPathOverlay = ({ viewportRevision }) => {
         ref={setPaperCanvasElement}
       />
 
-      <PenInsertGhostAnchor
+      <CanvasAnchorGhost
         matrix={scene?.matrix || null}
         penHover={
           isPenToolActive && !isPenDirectSelectionMode

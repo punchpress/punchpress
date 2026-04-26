@@ -39,7 +39,7 @@ Examples of the current drift:
 - path hover preview and selected hidden-path ghost were separate renderers
   until very recently
 - text path guide styling still lives locally in
-  `canvas-text-path-overlay.tsx`
+  `text/path-guides.tsx`
 - vector Paper chrome still owns a substantial amount of its own style
   composition in `paper-session-render.ts`
 
@@ -67,7 +67,7 @@ These should represent product-level visual roles, not one-off component names.
 
 ### 2. Shared Overlay Visual Primitives
 
-`apps/web/src/components/canvas/canvas-overlay/`
+`apps/web/src/components/canvas/canvas-overlay/visuals/`
 
 This area should own shared visual primitives used by more than one overlay,
 for example:
@@ -80,10 +80,17 @@ for example:
 Feature overlays should compose these primitives instead of restyling similar
 shapes from scratch.
 
-### 3. Feature Overlays That Consume Shared Visuals
+### 3. Capability Folders That Consume Shared Visuals
 
-Feature overlays should remain responsible for behavior and geometry, but not
+Capability folders should remain responsible for behavior and geometry, but not
 for inventing their own visual language.
+
+Expected homes:
+
+- `canvas-overlay/selection/`
+- `canvas-overlay/toolbar/`
+- `canvas-overlay/text/`
+- `canvas-overlay/vector-path/`
 
 Examples:
 
@@ -93,8 +100,8 @@ Examples:
 - transform overlays
 - vector edit overlay chrome
 
-These can still remain separate feature files. The important rule is that they
-pull from shared semantic tokens and shared visual primitives.
+These can still remain separate capability files. The important rule is that
+they pull from shared semantic tokens and shared visual primitives.
 
 ### 4. Specialized Edit Backends Stay Specialized
 
@@ -232,7 +239,8 @@ Goal:
 
 ### Phase 3. Extract Shared Overlay Primitives
 
-Create or expand shared primitives under `canvas-overlay/` for repeated visuals.
+Create or expand shared primitives under `canvas-overlay/visuals/` for repeated
+visuals.
 
 Initial expected targets:
 

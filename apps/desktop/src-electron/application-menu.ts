@@ -333,7 +333,7 @@ const buildObjectSubmenu = (
           type: "selection",
         }),
       enabled: objectMenuState.canEditPath,
-      label: "Edit Path",
+      label: getObjectEditLabel(objectMenuState),
     },
     { type: "separator" },
     {
@@ -386,6 +386,12 @@ const buildObjectSubmenu = (
       label: "Delete",
     },
   ];
+};
+
+const getObjectEditLabel = (objectMenuState: DesktopAppMenuState) => {
+  return objectMenuState.selectedNodeType === "shape"
+    ? "Edit Shape"
+    : "Edit Path";
 };
 
 const buildChoiceSubmenu = <

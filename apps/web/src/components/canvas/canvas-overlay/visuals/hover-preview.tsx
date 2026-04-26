@@ -1,23 +1,25 @@
-import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
-import { CanvasPathPreviewSvg } from "./canvas-path-preview-svg";
+import { useEditorSurfaceValue } from "../../../../editor-react/use-editor-surface-value";
+import { CanvasIndicator } from "./indicator";
 
 const HOVER_OUTSET_PX = 1;
 
 const PathHoverPreview = ({ bbox, bounds, paths, transform }) => {
+  const previewTransform = transform
+    ? `translate3d(${bounds.minX}px, ${bounds.minY}px, 0) ${transform}`
+    : `translate3d(${bounds.minX}px, ${bounds.minY}px, 0)`;
+
   return (
     <div
       className="canvas-hover-preview pointer-events-none absolute"
       data-preview-kind="path"
       style={{
         height: `${Math.max(1, bounds.height)}px`,
-        transform: transform
-          ? `translate3d(${bounds.minX}px, ${bounds.minY}px, 0) ${transform}`
-          : `translate3d(${bounds.minX}px, ${bounds.minY}px, 0)`,
+        transform: previewTransform,
         transformOrigin: "center center",
         width: `${Math.max(1, bounds.width)}px`,
       }}
     >
-      <CanvasPathPreviewSvg bbox={bbox} paths={paths} />
+      <CanvasIndicator bbox={bbox} paths={paths} />
     </div>
   );
 };

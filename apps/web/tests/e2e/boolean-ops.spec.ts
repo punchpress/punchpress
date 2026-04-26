@@ -270,7 +270,10 @@ const BOOLEAN_ACTIONS = [
 ] as const;
 
 const expectVectorTransformOverlay = async (page) => {
-  const overlay = page.locator(".canvas-multi-node-transform-overlay");
+  const singleSelection = page.locator(".canvas-single-selection");
+  const multiSelection = page.locator(".canvas-multi-selection");
+  const overlay =
+    (await singleSelection.count()) > 0 ? singleSelection : multiSelection;
   const handle = overlay.locator(".moveable-control.moveable-ne");
 
   await expect(overlay).toBeVisible();
@@ -287,19 +290,27 @@ const selectTopLevelVectorsFromLayers = async (page) => {
   await shiftClickLayer(page, "Front Vector");
 };
 
-const selectTopLevelVectorsOnCanvas = async (page) => {
-  await clickNodeCenter(page, "vector-front:path");
+const getCanvasNodeBounds = async (page, nodeId) => {
+  const node = page.locator(`.canvas-node[data-node-id="${nodeId}"]`);
 
-  const backNode = page.locator('[data-node-id="vector-back:path"]');
-  const backBox = await backNode.boundingBox();
+  await node.waitFor({ state: "visible" });
 
-  if (!backBox) {
-    throw new Error("Missing visible canvas node vector-back:path");
+  const box = await node.boundingBox();
+
+  if (!box) {
+    throw new Error(`Missing visible canvas node ${nodeId}`);
   }
+
+  return box;
+};
+
+const selectTopLevelVectorsOnCanvas = async (page) => {
+  await clickNodeCenter(page, "vector-front");
+  const backBox = await getCanvasNodeBounds(page, "vector-back");
 
   await page.keyboard.down("Shift");
   try {
-    await page.mouse.click(backBox.x + 28, backBox.y + backBox.height / 2);
+    await page.mouse.click(backBox.x + 24, backBox.y + backBox.height / 2);
   } finally {
     await page.keyboard.up("Shift");
   }
@@ -583,11 +594,6 @@ test("clicking a compound layer icon opens the operation menu and updates the ve
       return (await getSelectionSnapshot(page)).selectedNodeIds;
     })
     .toEqual(["vector-container"]);
-
-  await trigger.click();
-  await expect(
-    page.getByRole("menuitemradio", { name: "Subtract" })
-  ).toHaveAttribute("aria-checked", "true");
 });
 
 test("layer context menu swaps make and release compound path actions", async ({

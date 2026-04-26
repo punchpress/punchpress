@@ -3,6 +3,7 @@
   "nodes": [
     {
       "id": "color-node",
+      "parentId": "root",
       "type": "text",
       "text": "Color",
       "font": {

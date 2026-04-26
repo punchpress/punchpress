@@ -5,7 +5,7 @@ const createWindowStub = () => {
   let nextAnimationFrameId = 1;
 
   return {
-    cancelAnimationFrame: () => {},
+    cancelAnimationFrame: () => undefined,
     clearInterval,
     clearTimeout,
     devicePixelRatio: 1,
@@ -57,7 +57,7 @@ describe("PerformanceController", () => {
         counters: {
           "fresh-counter": 1,
         },
-        durationMs: 16.69999999999999,
+        durationMs: 16.699_999_999_999_99,
         id: 0,
         timestamp: 216.7,
       },

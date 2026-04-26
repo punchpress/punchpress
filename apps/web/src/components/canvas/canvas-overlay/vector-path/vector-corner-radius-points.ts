@@ -65,6 +65,20 @@ const getCurveSegmentFromPoint = (contours, point) => {
   };
 };
 
+const getExplicitCurveSegmentFromPoint = (cornerCurveSegments, point) => {
+  if (!(cornerCurveSegments?.length > 0 && point)) {
+    return null;
+  }
+
+  const key = `${point.contourIndex}:${point.segmentIndex}`;
+
+  return (
+    cornerCurveSegments.find((segment) => {
+      return segment.key === key;
+    }) || null
+  );
+};
+
 export const getVisibleVectorCornerHandles = (
   contours,
   selectedPoints: VectorPathPoint[] = [],
@@ -121,19 +135,45 @@ export const shouldAdjustSelectedCornerPoints = (dragScope, selectedPoints) => {
   );
 };
 
-export const getHoveredVectorCornerCurveSegment = (contours, hoveredPoint) => {
+export const getHoveredVectorCornerCurveSegment = (
+  contours,
+  hoveredPoint,
+  cornerCurveSegments = []
+) => {
   if (!(contours?.length > 0 && hoveredPoint)) {
     return null;
   }
 
-  return getCurveSegmentFromPoint(contours, hoveredPoint);
+  return (
+    getExplicitCurveSegmentFromPoint(cornerCurveSegments, hoveredPoint) ||
+    getCurveSegmentFromPoint(contours, hoveredPoint)
+  );
+};
+
+export const getVectorCornerCurveSegmentsForPoints = (
+  contours,
+  points: VectorPathPoint[] = [],
+  cornerCurveSegments = []
+) => {
+  if (!(contours?.length > 0 && points.length > 0)) {
+    return [];
+  }
+
+  return points.flatMap((point) => {
+    const curveSegment =
+      getExplicitCurveSegmentFromPoint(cornerCurveSegments, point) ||
+      getCurveSegmentFromPoint(contours, point);
+
+    return curveSegment ? [curveSegment] : [];
+  });
 };
 
 export const getMaxedVectorCornerCurveSegments = (
   contours,
   selectedPoints: VectorPathPoint[] = [],
   stableMaxRadius: number | null = null,
-  activeDragSession: VectorCornerDragSession | null = null
+  activeDragSession: VectorCornerDragSession | null = null,
+  cornerCurveSegments = []
 ) => {
   if (!contours?.length) {
     return [];
@@ -157,8 +197,13 @@ export const getMaxedVectorCornerCurveSegments = (
       return [];
     }
 
+    const explicitSegment = getExplicitCurveSegmentFromPoint(
+      cornerCurveSegments,
+      point
+    );
+
     return [
-      {
+      explicitSegment || {
         contourIndex: control.contourIndex,
         endIndex: control.endIndex,
         startIndex: control.startIndex,
@@ -175,7 +220,9 @@ export const getMaxedVectorCornerCurveSegments = (
     activeDragSession.identity
   );
   const activeSegment =
-    activePoint && getCurveSegmentFromPoint(contours, activePoint);
+    activePoint &&
+    (getExplicitCurveSegmentFromPoint(cornerCurveSegments, activePoint) ||
+      getCurveSegmentFromPoint(contours, activePoint));
 
   if (!activeSegment) {
     return maxedSegments;
@@ -185,7 +232,8 @@ export const getMaxedVectorCornerCurveSegments = (
     return (
       segment.contourIndex === activeSegment.contourIndex &&
       segment.startIndex === activeSegment.startIndex &&
-      segment.endIndex === activeSegment.endIndex
+      segment.endIndex === activeSegment.endIndex &&
+      segment.key === activeSegment.key
     );
   });
 

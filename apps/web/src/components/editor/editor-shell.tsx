@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useEditor } from "../../editor-react/use-editor";
 import { useTheme } from "../../theme/theme-provider";
 import { Canvas } from "../canvas/canvas";
+import { getCanvasCursorStyle } from "../canvas/canvas-cursor-assets";
 import {
   Designer,
   DesignerCanvas,
@@ -9,7 +10,6 @@ import {
   DesignerPanel,
   DesignerWindowDragRegion,
 } from "../designer/designer";
-import { getCanvasCursorStyle } from "../canvas/canvas-cursor-assets";
 import { LayersPanel } from "../panels/layers-panel/layers-panel";
 import { PropertiesPanel } from "../panels/properties/properties-panel";
 import { PerformanceHud } from "../performance/performance-hud";

@@ -7,6 +7,7 @@ const FONT = {
   postscriptName: "ArialMT",
   style: "Regular",
 } as const;
+const GUIDE_PATH_START_REGEX = /^M\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)/;
 
 const createWaveNode = () => {
   return {
@@ -43,6 +44,19 @@ const getBoundsCenter = (bounds) => {
   };
 };
 
+const getGuidePathStart = (pathD: string) => {
+  const match = pathD.match(GUIDE_PATH_START_REGEX);
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    x: Number.parseFloat(match[1] || "0"),
+    y: Number.parseFloat(match[2] || "0"),
+  };
+};
+
 describe("Editor text wave path sessions", () => {
   test("exposes editable wave handles", () => {
     const editor = new Editor();
@@ -60,6 +74,19 @@ describe("Editor text wave path sessions", () => {
     expect(guide?.handles.some((handle) => handle.role === "cycles")).toBe(
       true
     );
+
+    const bbox = editor.getNodeGeometry(node.id)?.bbox;
+    const guideStart = guide?.pathD ? getGuidePathStart(guide.pathD) : null;
+
+    expect(bbox).toBeDefined();
+    expect(guideStart).not.toBeNull();
+
+    if (!(bbox && guideStart)) {
+      return;
+    }
+
+    expect(guideStart.x).toBeCloseTo(bbox.minX, 2);
+    expect(guideStart.y).toBeCloseTo(getBoundsCenter(bbox).y, 2);
   });
 
   test("adjusts wave amplitude while keeping the render center pinned", () => {
@@ -123,7 +150,7 @@ describe("Editor text wave path sessions", () => {
       getBoundsCenter(afterGeometry.bbox)
     );
 
-    expect(afterNode.warp.amplitude).toBeLessThan(node.warp.amplitude);
+    expect(afterNode.warp.amplitude).toBeGreaterThan(node.warp.amplitude);
     expect(afterCenter.x).toBeCloseTo(beforeCenter.x, 2);
     expect(afterCenter.y).toBeCloseTo(beforeCenter.y, 2);
   });
@@ -198,7 +225,11 @@ describe("Editor text wave path sessions", () => {
       return;
     }
 
-    const startPoint = getNodeWorldPoint(node, geometry.bbox, cyclesHandle.point);
+    const startPoint = getNodeWorldPoint(
+      node,
+      geometry.bbox,
+      cyclesHandle.point
+    );
     const session = editor.beginTextPathEdit({
       mode: "cycles",
       nodeId: node.id,

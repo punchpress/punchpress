@@ -71,5 +71,5 @@ The current implementation lives in:
 - `packages/engine/src/transform/selection-drag.ts`
 - `packages/engine/src/editor.ts`
 - `apps/web/src/components/canvas/canvas-node.tsx`
-- `apps/web/src/components/canvas/canvas-overlay/canvas-single-node-transform-overlay.tsx`
-- `apps/web/src/components/canvas/canvas-overlay/canvas-multi-node-transform-overlay.tsx`
+- `apps/web/src/components/canvas/canvas-overlay/selection/single-selection-foreground.tsx`
+- `apps/web/src/components/canvas/canvas-overlay/selection/multi-selection-foreground.tsx`

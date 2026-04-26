@@ -3,6 +3,7 @@
   "nodes": [
     {
       "id": "marquee-move-first-node",
+      "parentId": "root",
       "type": "text",
       "text": "A",
       "font": {
@@ -31,6 +32,7 @@
     },
     {
       "id": "marquee-move-second-node",
+      "parentId": "root",
       "type": "text",
       "text": "B",
       "font": {

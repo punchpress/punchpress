@@ -2,6 +2,7 @@ import {
   includesPathPoint,
   isSamePathPoint,
   normalizePathPointSelection,
+  offsetEditablePathPoints as offsetEngineEditablePathPoints,
   toPathPointKey,
 } from "@punchpress/engine";
 import { projectPoint } from "./paper-session-render";
@@ -9,7 +10,7 @@ import { projectPoint } from "./paper-session-render";
 export const isSamePointSelection = isSamePathPoint;
 export const getPointSelectionKey = toPathPointKey;
 export const isPointSelectionIncluded = includesPathPoint;
-export { offsetEditablePathPoints } from "@punchpress/engine";
+export const offsetEditablePathPoints = offsetEngineEditablePathPoints;
 
 export const normalizePointSelections = (points, primaryPoint = null) => {
   const normalizedSelection = normalizePathPointSelection(points, primaryPoint);

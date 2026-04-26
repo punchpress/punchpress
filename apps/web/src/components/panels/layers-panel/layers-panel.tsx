@@ -89,16 +89,22 @@ const movePathLayerNode = (editor, activeId, overNode) => {
 };
 
 const reorderLayerSiblings = (editor, activeId, overId, parentId) => {
-  const nextDisplayedSiblingIds = getDisplayedChildIds(editor, parentId).filter(
-    (nodeId) => nodeId !== activeId
-  );
-  const overIndex = nextDisplayedSiblingIds.indexOf(overId);
+  const displayedSiblingIds = getDisplayedChildIds(editor, parentId);
+  const activeIndex = displayedSiblingIds.indexOf(activeId);
+  const overIndex = displayedSiblingIds.indexOf(overId);
 
-  if (overIndex < 0) {
+  if (activeIndex < 0 || overIndex < 0 || activeIndex === overIndex) {
     return;
   }
 
-  nextDisplayedSiblingIds.splice(overIndex, 0, activeId);
+  const nextDisplayedSiblingIds = [...displayedSiblingIds];
+  const [movedNodeId] = nextDisplayedSiblingIds.splice(activeIndex, 1);
+
+  if (!movedNodeId) {
+    return;
+  }
+
+  nextDisplayedSiblingIds.splice(overIndex, 0, movedNodeId);
   setDisplayedNodeOrder(editor, nextDisplayedSiblingIds, parentId);
 };
 

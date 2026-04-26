@@ -248,6 +248,7 @@ export const getTextPathOverlayState = (editor) => {
   return {
     geometry,
     isPathEditing: state.pathEditingNodeId === node.id,
+    isTextPathPositioning: state.isTextPathPositioning,
     isSelectionRotating: state.isSelectionRotating,
     node,
     previewDelta:

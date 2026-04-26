@@ -7,7 +7,7 @@ const projectPoint = (matrix, point) => {
   };
 };
 
-export const PenInsertGhostAnchor = ({ matrix, penHover }) => {
+export const CanvasAnchorGhost = ({ matrix, penHover }) => {
   if (!(matrix && penHover?.intent === "add" && penHover.role === "segment")) {
     return null;
   }
@@ -17,7 +17,7 @@ export const PenInsertGhostAnchor = ({ matrix, penHover }) => {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none absolute rounded-full border-2 border-[color:var(--canvas-handle-accent)] bg-[color:color-mix(in_srgb,var(--background)_70%,transparent)] shadow-[0_1px_3px_rgba(0,0,0,0.18)]"
+      className="canvas-anchor-ghost"
       data-testid="canvas-pen-insert-ghost-anchor"
       style={{
         height: `${GHOST_ANCHOR_SIZE_PX}px`,
