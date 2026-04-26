@@ -367,7 +367,7 @@ export const rotateSelectionFromCornerWithoutRelease = (page, options) => {
 };
 
 export const getGroupRotationPreviewRect = async (page) => {
-  const locator = page.locator(".canvas-multi-node-transform-overlay");
+  const locator = page.locator(".canvas-multi-selection");
 
   if ((await locator.count()) === 0) {
     return null;
@@ -429,8 +429,14 @@ export const getSelectionBoxRect = async (page) => {
 };
 
 export const dragLayerBelow = async (page, sourceLabel, targetLabel) => {
-  const source = page.getByRole("button", { name: sourceLabel }).first();
-  const target = page.getByRole("button", { name: targetLabel }).first();
+  const source = page
+    .getByRole("button", { name: sourceLabel })
+    .first()
+    .locator("xpath=ancestor::*[@data-layer-row-id][1]");
+  const target = page
+    .getByRole("button", { name: targetLabel })
+    .first()
+    .locator("xpath=ancestor::*[@data-layer-row-id][1]");
   const sourceBox = await source.boundingBox();
   const targetBox = await target.boundingBox();
 
@@ -438,9 +444,9 @@ export const dragLayerBelow = async (page, sourceLabel, targetLabel) => {
     throw new Error("Missing layer row bounds for drag reorder");
   }
 
-  const sourceX = sourceBox.x + Math.min(36, sourceBox.width / 2);
+  const sourceX = sourceBox.x + Math.min(48, sourceBox.width / 2);
   const sourceY = sourceBox.y + sourceBox.height / 2;
-  const targetX = targetBox.x + Math.min(36, targetBox.width / 2);
+  const targetX = targetBox.x + Math.min(48, targetBox.width / 2);
   const targetY = targetBox.y + targetBox.height * 0.8;
 
   await page.mouse.move(sourceX, sourceY);
@@ -451,8 +457,14 @@ export const dragLayerBelow = async (page, sourceLabel, targetLabel) => {
 };
 
 export const dragLayerOnto = async (page, sourceLabel, targetLabel) => {
-  const source = page.getByRole("button", { name: sourceLabel }).first();
-  const target = page.getByRole("button", { name: targetLabel }).first();
+  const source = page
+    .getByRole("button", { name: sourceLabel })
+    .first()
+    .locator("xpath=ancestor::*[@data-layer-row-id][1]");
+  const target = page
+    .getByRole("button", { name: targetLabel })
+    .first()
+    .locator("xpath=ancestor::*[@data-layer-row-id][1]");
   const sourceBox = await source.boundingBox();
   const targetBox = await target.boundingBox();
 
@@ -460,9 +472,9 @@ export const dragLayerOnto = async (page, sourceLabel, targetLabel) => {
     throw new Error("Missing layer row bounds for drag move");
   }
 
-  const sourceX = sourceBox.x + Math.min(36, sourceBox.width / 2);
+  const sourceX = sourceBox.x + Math.min(48, sourceBox.width / 2);
   const sourceY = sourceBox.y + sourceBox.height / 2;
-  const targetX = targetBox.x + Math.min(36, targetBox.width / 2);
+  const targetX = targetBox.x + Math.min(48, targetBox.width / 2);
   const targetY = targetBox.y + targetBox.height / 2;
 
   await page.mouse.move(sourceX, sourceY);

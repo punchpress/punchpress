@@ -78,6 +78,10 @@ const getCanvasNodePathFill = (path, fill) => {
   return path.closed === false ? "none" : path.fill || fill || "none";
 };
 
+const selectNodeReadyState = (editor, state, nodeId) => {
+  return Boolean(selectNodeArtState(editor, state, nodeId)?.ready);
+};
+
 const shouldStartNodeDrag = ({
   editor,
   event,
@@ -199,7 +203,7 @@ const startCanvasNodeDragSession = ({
   window.addEventListener("pointerup", handlePointerEnd);
 };
 
-const CanvasNodeButton = ({ artState, nodeId }) => {
+const CanvasNodeShell = ({ children, isReady, nodeId }) => {
   usePerformanceRenderCounter("render.canvas.node");
   const editor = useEditor();
   const activeTool = useEditorValue((_, state) => state.activeTool);
@@ -232,7 +236,7 @@ const CanvasNodeButton = ({ artState, nodeId }) => {
             className={cn(
               "canvas-node absolute block h-full w-full appearance-none border-0 bg-transparent p-0",
               cursorClassName,
-              !artState.ready && "opacity-50"
+              !isReady && "opacity-50"
             )}
             onDoubleClick={(event) => {
               openCanvasNodeEditingMode(editor, nodeId, {
@@ -347,55 +351,87 @@ const CanvasNodeButton = ({ artState, nodeId }) => {
         }
         style={{ left: 0, top: 0, transformOrigin: "center center" }}
       >
-        <CanvasNodeArt
-          bbox={artState.bbox}
-          fill={artState.fill}
-          fillRule={artState.fillRule}
-          height={Math.max(1, artState.bbox.height)}
-          isEditing={artState.isEditing}
-          paths={artState.paths}
-          stroke={artState.stroke}
-          strokeLineCap={artState.strokeLineCap}
-          strokeLineJoin={artState.strokeLineJoin}
-          strokeMiterLimit={artState.strokeMiterLimit}
-          strokeWidth={artState.strokeWidth}
-          width={Math.max(1, artState.bbox.width)}
-        />
+        {children}
       </ContextMenuTrigger>
       <NodeContextMenuItems nodeId={contextMenuNodeId} />
     </ContextMenu>
   );
 };
 
-const CanvasStandardNodeComponent = ({ nodeId }) => {
+const CanvasStandardNodeArt = ({ nodeId }) => {
   const artState = useEditorValue((editor, state) =>
     selectNodeArtState(editor, state, nodeId)
   );
 
   return artState ? (
-    <CanvasNodeButton artState={artState} nodeId={nodeId} />
+    <CanvasNodeArt
+      bbox={artState.bbox}
+      fill={artState.fill}
+      fillRule={artState.fillRule}
+      height={Math.max(1, artState.bbox.height)}
+      isEditing={artState.isEditing}
+      paths={artState.paths}
+      stroke={artState.stroke}
+      strokeLineCap={artState.strokeLineCap}
+      strokeLineJoin={artState.strokeLineJoin}
+      strokeMiterLimit={artState.strokeMiterLimit}
+      strokeWidth={artState.strokeWidth}
+      width={Math.max(1, artState.bbox.width)}
+    />
   ) : null;
 };
 
-const CanvasVectorNodeComponent = ({ nodeId }) => {
+const CanvasVectorNodeArt = ({ nodeId }) => {
   const artState = useEditorSurfaceValue((editor, state) => {
     return selectNodeArtState(editor, state, nodeId);
   });
 
   return artState ? (
-    <CanvasNodeButton artState={artState} nodeId={nodeId} />
+    <CanvasNodeArt
+      bbox={artState.bbox}
+      fill={artState.fill}
+      fillRule={artState.fillRule}
+      height={Math.max(1, artState.bbox.height)}
+      isEditing={artState.isEditing}
+      paths={artState.paths}
+      stroke={artState.stroke}
+      strokeLineCap={artState.strokeLineCap}
+      strokeLineJoin={artState.strokeLineJoin}
+      strokeMiterLimit={artState.strokeMiterLimit}
+      strokeWidth={artState.strokeWidth}
+      width={Math.max(1, artState.bbox.width)}
+    />
   ) : null;
 };
 
-const CanvasNodeComponent = ({ nodeId }) => {
+const CanvasNodeArtContent = ({ nodeId }) => {
   const isVectorNode = useEditorValue((editor) => {
     return editor.getNode(nodeId)?.type === "vector";
   });
 
   return isVectorNode ? (
-    <CanvasVectorNodeComponent nodeId={nodeId} />
+    <CanvasVectorNodeArt nodeId={nodeId} />
   ) : (
-    <CanvasStandardNodeComponent nodeId={nodeId} />
+    <CanvasStandardNodeArt nodeId={nodeId} />
+  );
+};
+
+const CanvasNodeComponent = ({ nodeId }) => {
+  const isReady = useEditorValue((editor, state) => {
+    return selectNodeReadyState(editor, state, nodeId);
+  });
+  const nodeExists = useEditorValue((editor) => {
+    return Boolean(editor.getNode(nodeId));
+  });
+
+  if (!nodeExists) {
+    return null;
+  }
+
+  return (
+    <CanvasNodeShell isReady={isReady} nodeId={nodeId}>
+      <CanvasNodeArtContent nodeId={nodeId} />
+    </CanvasNodeShell>
   );
 };
 

@@ -16,7 +16,7 @@ export const supportsShapeProperty = (node, propertyId) => {
   }
 
   if (propertyId === "cornerRadius") {
-    return node.shape === "polygon";
+    return node.shape === "polygon" || node.shape === "star";
   }
 
   return SHAPE_NODE_PROPERTY_IDS.includes(propertyId);

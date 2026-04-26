@@ -289,16 +289,16 @@ test("uses resize and rotate cursors on the single-node transform overlay", asyn
   await page.locator(`[data-node-id="${nodeId}"]`).click();
 
   const nwResizeHandle = page.locator(
-    ".canvas-single-node-transform-overlay .moveable-control.moveable-nw"
+    ".canvas-single-selection .moveable-control.moveable-nw"
   );
   const neResizeHandle = page.locator(
-    ".canvas-single-node-transform-overlay .moveable-control.moveable-ne"
+    ".canvas-single-selection .moveable-control.moveable-ne"
   );
   const neRotationZone = page.locator(
-    '.canvas-single-node-transform-overlay .canvas-single-node-rotation-zone[data-corner="ne"]'
+    '.canvas-single-selection .canvas-single-node-rotation-zone[data-corner="ne"]'
   );
   const seRotationZone = page.locator(
-    '.canvas-single-node-transform-overlay .canvas-single-node-rotation-zone[data-corner="se"]'
+    '.canvas-single-selection .canvas-single-node-rotation-zone[data-corner="se"]'
   );
 
   await expect(nwResizeHandle).toBeVisible();
@@ -354,7 +354,7 @@ test("keeps the scale cursor easier to hit at selected node corners", async ({
   await waitForNodeReady(page, nodeId);
   await page.locator(`[data-node-id="${nodeId}"]`).click();
 
-  const overlay = page.locator(".canvas-single-node-transform-overlay");
+  const overlay = page.locator(".canvas-single-selection");
   await expect(overlay).toBeVisible();
 
   const overlayBox = await overlay.boundingBox();
@@ -390,9 +390,9 @@ test("does not expose the rotate cursor inside the selected node corner", async 
   await waitForNodeReady(page, nodeId);
   await page.locator(`[data-node-id="${nodeId}"]`).click();
 
-  const overlay = page.locator(".canvas-single-node-transform-overlay");
+  const overlay = page.locator(".canvas-single-selection");
   const neRotationZone = page.locator(
-    '.canvas-single-node-transform-overlay .canvas-single-node-rotation-zone[data-corner="ne"]'
+    '.canvas-single-selection .canvas-single-node-rotation-zone[data-corner="ne"]'
   );
 
   await expect(overlay).toBeVisible();
@@ -430,9 +430,9 @@ test("keeps the rotate cursor locked while rotation is in progress", async ({
   await waitForNodeReady(page, nodeId);
   await page.locator(`[data-node-id="${nodeId}"]`).click();
 
-  const overlay = page.locator(".canvas-single-node-transform-overlay");
+  const overlay = page.locator(".canvas-single-selection");
   const neRotationZone = page.locator(
-    '.canvas-single-node-transform-overlay .canvas-single-node-rotation-zone[data-corner="ne"]'
+    '.canvas-single-selection .canvas-single-node-rotation-zone[data-corner="ne"]'
   );
 
   await expect(overlay).toBeVisible();

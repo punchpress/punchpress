@@ -103,6 +103,7 @@ export const shapePointSchema = z
 
 export const shapeNodeSchema = baseNodeSchema
   .extend({
+    cornerRadii: z.array(finiteNumber).optional(),
     cornerRadius: finiteNumber.optional(),
     fill: z.string().min(1),
     height: finiteNumber,

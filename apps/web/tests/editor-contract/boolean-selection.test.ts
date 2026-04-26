@@ -432,4 +432,33 @@ describe("boolean selection", () => {
     );
     expect(editor.nodes.filter((node) => node.type === "path")).toHaveLength(1);
   });
+
+  test("top-level boolean results stay serializable across redo", () => {
+    const editor = new Editor();
+
+    editor
+      .getState()
+      .loadNodes([
+        ...createRectangleVectorNodes(
+          "vector-back",
+          "path-back",
+          180,
+          "#3366FF"
+        ),
+        ...createRectangleVectorNodes(
+          "vector-front",
+          "path-front",
+          240,
+          "#FF3366"
+        ),
+      ]);
+    editor.setSelectedNodes(["vector-back", "vector-front"]);
+
+    expect(editor.uniteSelection()).toBe(true);
+    expect(() => editor.serializeDocument()).not.toThrow();
+
+    expect(editor.undo()).toBe(true);
+    expect(editor.redo()).toBe(true);
+    expect(() => editor.serializeDocument()).not.toThrow();
+  });
 });

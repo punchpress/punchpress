@@ -1,9 +1,9 @@
+import { HugeiconsIcon } from "@hugeicons/react";
 import {
   CircleIcon,
   SquareIcon,
   StarIcon,
 } from "@hugeicons-pro/core-stroke-rounded";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { ChevronUpIcon } from "lucide-react";
 import { useRef, useState } from "react";
 import { Menu, MenuItem, MenuPopup, MenuShortcut } from "@/components/ui/menu";
@@ -36,7 +36,7 @@ export const ShapeToolbarButton = () => {
   const isActive = activeTool === "shape";
   const [open, setOpen] = useState(false);
   const closeTimeout = useRef<ReturnType<typeof setTimeout>>(null);
-  const anchorRef = useRef<HTMLDivElement>(null);
+  const anchorRef = useRef<HTMLButtonElement>(null);
 
   const activeOption =
     SHAPE_OPTIONS.find((o) => o.key === nextShapeKind) ?? SHAPE_OPTIONS[0];
@@ -57,26 +57,26 @@ export const ShapeToolbarButton = () => {
     <Menu
       modal={false}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen) setOpen(false);
+        if (!nextOpen) {
+          setOpen(false);
+        }
       }}
       open={open}
     >
-      <div
+      <button
+        aria-label={`${activeOption.label} (${activeOption.shortcut})`}
         className={cn(
           "relative inline-flex h-9 shrink-0 cursor-pointer select-none items-center rounded-lg border border-transparent text-foreground outline-none transition-[border-color,background-color] hover:bg-accent sm:h-8",
           isActive && "bg-input/64 text-accent-foreground"
         )}
+        onClick={() => editor.setActiveTool("shape")}
         onMouseEnter={handleEnter}
         onMouseLeave={handleLeave}
         ref={anchorRef}
+        title={`${activeOption.label} (${activeOption.shortcut})`}
+        type="button"
       >
-        <button
-          aria-label={`${activeOption.label} (${activeOption.shortcut})`}
-          className="inline-flex h-full items-center justify-center pl-2 pr-0.5 outline-none"
-          onClick={() => editor.setActiveTool("shape")}
-          title={`${activeOption.label} (${activeOption.shortcut})`}
-          type="button"
-        >
+        <span className="inline-flex h-full items-center justify-center pr-0.5 pl-2">
           <HugeiconsIcon
             className="opacity-80"
             color="currentColor"
@@ -84,11 +84,11 @@ export const ShapeToolbarButton = () => {
             size={activeOption.iconSize ?? 20}
             strokeWidth={1.6}
           />
-        </button>
-        <div className="inline-flex h-full items-center justify-center pr-1.5 pl-0.5">
+        </span>
+        <span className="inline-flex h-full items-center justify-center pr-1.5 pl-0.5">
           <ChevronUpIcon className="size-3 opacity-60" />
-        </div>
-      </div>
+        </span>
+      </button>
 
       <MenuPopup
         align="center"

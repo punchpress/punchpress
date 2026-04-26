@@ -149,7 +149,7 @@ describe("Editor node placement", () => {
     });
   });
 
-  test("click placement creates and selects a vector node", () => {
+  test("click placement creates and selects a standalone path node", () => {
     const editor = new Editor();
 
     editor.setActiveTool("pen");
@@ -169,7 +169,7 @@ describe("Editor node placement", () => {
 
     expect(editor.activeTool).toBe("pointer");
     expect(editor.selectedNode).toMatchObject({
-      type: "vector",
+      type: "path",
     });
     expect(editor.selectedNodeIds).toEqual([editor.selectedNodeId]);
     expect(editor.selectedNode?.transform).toMatchObject({

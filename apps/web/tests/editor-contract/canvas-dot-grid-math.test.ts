@@ -20,8 +20,12 @@ test("canvas dot grid chooses one active step and one easing-in step", () => {
 
   expect(finestEligibleIndex).toBe(5);
   expect(getCanvasDotGridStepOpacity(zoom, finestEligibleIndex)).toBe(0);
-  expect(getCanvasDotGridStepOpacity(zoom, finestEligibleIndex - 1)).toBeGreaterThan(0);
-  expect(getCanvasDotGridStepOpacity(zoom, finestEligibleIndex - 1)).toBeLessThan(0.5);
+  expect(
+    getCanvasDotGridStepOpacity(zoom, finestEligibleIndex - 1)
+  ).toBeGreaterThan(0);
+  expect(
+    getCanvasDotGridStepOpacity(zoom, finestEligibleIndex - 1)
+  ).toBeLessThan(0.5);
   expect(getCanvasDotGridStepOpacity(zoom, finestEligibleIndex - 2)).toBe(1);
   expect(getCanvasDotGridStepOpacity(zoom, finestEligibleIndex + 1)).toBe(0);
 });

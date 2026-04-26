@@ -3,6 +3,7 @@
   "nodes": [
     {
       "id": "font-picker-node",
+      "parentId": "root",
       "type": "text",
       "text": "FONT TEST",
       "font": {

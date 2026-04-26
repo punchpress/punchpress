@@ -1,5 +1,5 @@
 import { getNodeCssTransform } from "@punchpress/engine";
-import { getHostRectFromCanvasBounds } from "./canvas-overlay-geometry";
+import { getHostRectFromCanvasBounds } from "../canvas-overlay-geometry";
 
 const getBoundsCenter = (bounds) => {
   if (!bounds) {
@@ -41,6 +41,29 @@ export const getTextPathOverlayBounds = (geometry, useGuideBounds = false) => {
   }
 
   return geometry?.selectionBounds || geometry?.bbox || null;
+};
+
+export const getTextPathOverlayHostRect = (
+  editor,
+  node,
+  geometry,
+  previewDelta = null,
+  useGuideBounds = false
+) => {
+  const overlayBounds = getTextPathOverlayBounds(geometry, useGuideBounds);
+
+  if (!(overlayBounds && node)) {
+    return null;
+  }
+
+  return getHostRectFromCanvasBounds(editor, {
+    height: overlayBounds.height,
+    maxX: node.transform.x + (previewDelta?.x || 0) + overlayBounds.maxX,
+    maxY: node.transform.y + (previewDelta?.y || 0) + overlayBounds.maxY,
+    minX: node.transform.x + (previewDelta?.x || 0) + overlayBounds.minX,
+    minY: node.transform.y + (previewDelta?.y || 0) + overlayBounds.minY,
+    width: overlayBounds.width,
+  });
 };
 
 export const getTextPathRenderCenter = (geometry) => {
@@ -151,23 +174,22 @@ export const getTextPathTransformTargetStyle = (
     };
   }
 
-  const overlayBounds = getTextPathOverlayBounds(geometry, useGuideBounds);
   const renderCenter = getTextPathRenderCenter(geometry);
 
-  if (!(overlayBounds && renderCenter)) {
+  if (!renderCenter) {
     return null;
   }
 
-  const hostRect = getHostRectFromCanvasBounds(editor, {
-    height: overlayBounds.height,
-    maxX: node.transform.x + (previewDelta?.x || 0) + overlayBounds.maxX,
-    maxY: node.transform.y + (previewDelta?.y || 0) + overlayBounds.maxY,
-    minX: node.transform.x + (previewDelta?.x || 0) + overlayBounds.minX,
-    minY: node.transform.y + (previewDelta?.y || 0) + overlayBounds.minY,
-    width: overlayBounds.width,
-  });
+  const overlayBounds = getTextPathOverlayBounds(geometry, useGuideBounds);
+  const hostRect = getTextPathOverlayHostRect(
+    editor,
+    node,
+    geometry,
+    previewDelta,
+    useGuideBounds
+  );
 
-  if (!hostRect) {
+  if (!(overlayBounds && hostRect)) {
     return null;
   }
 

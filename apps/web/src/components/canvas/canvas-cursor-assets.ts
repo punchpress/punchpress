@@ -28,20 +28,20 @@ type CursorIconStyle =
 
 type CursorColorValue = string | (() => string);
 
-type CursorHotspot = {
+interface CursorHotspot {
   scale?: number;
   x: number;
   y: number;
-};
+}
 
-type MoveDecorationConfig = {
+interface MoveDecorationConfig {
   outlineColor: CursorColorValue;
   outlineWidth: number;
   strokeColor: CursorColorValue;
   strokeWidth: number;
-};
+}
 
-type CursorConfig = {
+interface CursorConfig {
   fallback: string;
   fillColor: CursorColorValue;
   hotspot: CursorHotspot;
@@ -57,7 +57,7 @@ type CursorConfig = {
   scaleOrigin: "center" | "top-left";
   size: number;
   strokeColor: CursorColorValue;
-};
+}
 
 const CURSOR_GLOBALS = {
   activeScale: 0.66,
@@ -528,14 +528,15 @@ function serializeIcon(
             return null;
           }
 
-          const resolvedValue =
-            value === "currentColor"
-              ? iconStyle === "solid"
-                ? fillColor
-                : isSecondaryPath
-                  ? fillColor
-                  : strokeColor
-              : value;
+          let resolvedValue = value;
+
+          if (value === "currentColor") {
+            if (iconStyle === "solid" || isSecondaryPath) {
+              resolvedValue = fillColor;
+            } else {
+              resolvedValue = strokeColor;
+            }
+          }
 
           return `${toSvgAttributeName(name)}="${escapeAttributeValue(
             String(resolvedValue)
@@ -763,7 +764,7 @@ function getIconTransform(
     return "";
   }
 
-  const transforms = [];
+  const transforms: string[] = [];
 
   if (rotateDegrees !== 0) {
     transforms.push(`rotate(${rotateDegrees} 12 12)`);

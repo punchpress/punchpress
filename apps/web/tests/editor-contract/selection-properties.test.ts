@@ -83,6 +83,29 @@ const createEllipseShapeNode = (id: string) => {
   } as const;
 };
 
+const createStarShapeNode = (id: string) => {
+  return {
+    cornerRadius: 18,
+    fill: "#000000",
+    height: 200,
+    id,
+    parentId: "root",
+    shape: "star",
+    stroke: null,
+    strokeWidth: 0,
+    transform: {
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+      x: 600,
+      y: 450,
+    },
+    type: "shape",
+    visible: true,
+    width: 200,
+  } as const;
+};
+
 const createTextNode = (id: string) => {
   return {
     fill: "#ffffff",
@@ -197,10 +220,6 @@ const createVectorNodes = (id: string, pathOverrides: object[] = [{}]) => {
   ];
 };
 
-const createVectorWithSinglePath = (id: string, overrides = {}) => {
-  return createVectorNodes(id, [overrides]);
-};
-
 const createVectorWithTwoPaths = (
   id: string,
   firstOverrides = {},
@@ -253,6 +272,18 @@ describe("Editor selection properties", () => {
     const selectionProperties = editor.getSelectionProperties();
 
     expect(selectionProperties.properties.cornerRadius).toBeUndefined();
+  });
+
+  test("exposes corner radius for a star shape selection", () => {
+    const editor = new Editor();
+
+    loadNodes(editor, [createStarShapeNode("star-node")]);
+    editor.select("star-node");
+
+    const selectionProperties = editor.getSelectionProperties();
+
+    expect(selectionProperties.properties.cornerRadius?.value).toBe(18);
+    expect(selectionProperties.properties.shape?.value).toBe("star");
   });
 
   test("exposes only shared appearance controls for a mixed text and shape selection", () => {
@@ -335,6 +366,31 @@ describe("Editor selection properties", () => {
     });
   });
 
+  test("clamps shape corner radius when switching shape type", () => {
+    const editor = new Editor();
+
+    loadNodes(editor, [createShapeNode("shape-node")]);
+    editor.select("shape-node");
+    const polygonMax =
+      editor.getPathCornerRadiusSummary("shape-node")?.max || 0;
+
+    expect(editor.setSelectionProperty("cornerRadius", 999)).toBe(true);
+    expect(editor.setSelectionProperty("shape", "star")).toBe(true);
+
+    const nextNode = editor.getNode("shape-node");
+    const nextSummary = editor.getPathCornerRadiusSummary("shape-node");
+
+    expect(nextNode?.type).toBe("shape");
+    expect(nextNode?.type === "shape" ? nextNode.shape : null).toBe("star");
+    expect(nextSummary?.max).toBeGreaterThan(0);
+    expect(nextSummary?.max).toBeLessThan(polygonMax);
+    expect(nextSummary?.isMixed).toBe(false);
+    expect(nextSummary?.value).toBe(nextSummary?.max);
+    expect(
+      nextNode?.type === "shape" ? nextNode.cornerRadius : null
+    ).toBeCloseTo(nextSummary?.max || 0, 6);
+  });
+
   test("clamps irregular polygon corner radius through selection properties to the shared live-shape maximum", () => {
     const editor = new Editor();
 
@@ -359,11 +415,11 @@ describe("Editor selection properties", () => {
     });
   });
 
-  test("exposes path fill and stroke style properties for a selected single-path vector", () => {
+  test("exposes path fill and stroke style properties for a selected standalone path", () => {
     const editor = new Editor();
 
-    loadNodes(editor, createVectorWithSinglePath("vector-node"));
-    editor.select("vector-node");
+    loadNodes(editor, [createPathNode("path-node")]);
+    editor.select("path-node");
 
     const selectionProperties = editor.getSelectionProperties();
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { getRenderedNodeToolbarActions } from "../src/components/canvas/canvas-overlay/node-toolbar/canvas-node-toolbar";
+import { getRenderedSelectionToolbarActions } from "../src/components/canvas/canvas-overlay/toolbar/selection-toolbar";
 
 const createAction = (id: string, title = id) => {
   return {
@@ -12,9 +12,9 @@ const createAction = (id: string, title = id) => {
   };
 };
 
-describe("node toolbar presence", () => {
+describe("selection toolbar presence", () => {
   test("prefers the current action set while the toolbar remains visible", () => {
-    const renderedActions = getRenderedNodeToolbarActions(
+    const renderedActions = getRenderedSelectionToolbarActions(
       [
         createAction("clear-path-selection"),
         createAction("toggle-path-editing"),
@@ -39,7 +39,7 @@ describe("node toolbar presence", () => {
   });
 
   test("preserves the last visible action set while the toolbar closes", () => {
-    const renderedActions = getRenderedNodeToolbarActions([], {
+    const renderedActions = getRenderedSelectionToolbarActions([], {
       actions: [
         createAction("clear-path-selection"),
         createAction("toggle-path-editing"),

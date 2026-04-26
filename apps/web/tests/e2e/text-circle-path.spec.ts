@@ -360,10 +360,10 @@ test("does not jump the path edit selection box when resizing after rotate on th
   await page.keyboard.press("e");
   await pauseForUi(page);
 
-  const overlay = page.locator(".canvas-single-node-transform-overlay");
+  const overlay = page.locator(".canvas-single-selection");
   const target = page.locator(".canvas-text-path-target[data-node-id]");
   const handle = page.locator(
-    ".canvas-single-node-transform-overlay .moveable-control.moveable-ne"
+    ".canvas-single-selection .moveable-control.moveable-ne"
   );
 
   await expect(overlay).toBeVisible();
@@ -437,7 +437,7 @@ test("matches the circle path edit target bounds for the rotated path edit selec
   await page.keyboard.press("e");
   await pauseForUi(page);
 
-  const overlay = page.locator(".canvas-single-node-transform-overlay");
+  const overlay = page.locator(".canvas-single-selection");
   const target = page.locator(".canvas-text-path-target[data-node-id]");
 
   await expect(overlay).toBeVisible();
@@ -483,7 +483,7 @@ test("rotates a circle text node around its selected bounds center", async ({
   expect(afterCenter.y).toBeCloseTo(beforeCenter.y, 1);
 });
 
-test("keeps the circle path overlay aligned after rotating a selected node", async ({
+test("keeps the idle circle guide hidden after rotating a selected node", async ({
   page,
 }) => {
   await gotoEditor(page);
@@ -498,8 +498,7 @@ test("keeps the circle path overlay aligned after rotating a selected node", asy
   const beforeActual = await getActualTextPathGuideScreenPoint(page);
 
   expect(beforeExpected).not.toBeNull();
-  expect(beforeActual.x).toBeCloseTo(beforeExpected?.x ?? 0, 1);
-  expect(beforeActual.y).toBeCloseTo(beforeExpected?.y ?? 0, 1);
+  expect(beforeActual).toBeNull();
 
   await rotateSelectionFromCorner(page, {
     drag: { x: 160, y: 100 },
@@ -513,13 +512,10 @@ test("keeps the circle path overlay aligned after rotating a selected node", asy
   const afterActual = await getActualTextPathGuideScreenPoint(page);
 
   expect(afterExpected).not.toBeNull();
-  expect(afterActual.x).toBeCloseTo(afterExpected?.x ?? 0, 1);
-  expect(afterActual.y).toBeCloseTo(afterExpected?.y ?? 0, 1);
+  expect(afterActual).toBeNull();
 });
 
-test("hides the circle guide while rotating and restores it after", async ({
-  page,
-}) => {
+test("keeps the idle circle guide hidden while rotating", async ({ page }) => {
   await gotoEditor(page);
   await loadCircleDocument(page);
   await page.locator('.canvas-node[data-node-id="circle-node"]').click();
@@ -527,7 +523,7 @@ test("hides the circle guide while rotating and restores it after", async ({
 
   const guide = page.getByTestId("text-path-guide");
 
-  await expect(guide).toBeVisible();
+  await expect(guide).toHaveCount(0);
 
   await rotateSelectionFromCornerWithoutRelease(page, {
     drag: { x: 140, y: 90 },
@@ -538,7 +534,7 @@ test("hides the circle guide while rotating and restores it after", async ({
   await page.mouse.up();
   await pauseForUi(page);
 
-  await expect(guide).toBeVisible();
+  await expect(guide).toHaveCount(0);
 });
 
 test("keeps the circle path overlay aligned after entering path edit on a rotated node", async ({
@@ -568,7 +564,7 @@ test("keeps the circle path overlay aligned after entering path edit on a rotate
   expect(actual.y).toBeCloseTo(expected?.y ?? 0, 1);
 });
 
-test("keeps the rotated circle guide stable when entering path edit", async ({
+test("keeps the rotated circle guide aligned when entering path edit", async ({
   page,
 }) => {
   await gotoEditor(page);
@@ -581,24 +577,21 @@ test("keeps the rotated circle guide stable when entering path edit", async ({
   });
   await pauseForUi(page);
 
-  const guidePath = page.getByTestId("text-path-guide").locator("path").first();
-  await expect(guidePath).toBeVisible();
-
-  const beforeGuideBox = await guidePath.boundingBox();
-
   await page.getByRole("button", { name: "Edit path (E)" }).click();
   await pauseForUi(page);
 
-  const afterGuideBox = await guidePath.boundingBox();
+  const expected = await getExpectedTextPathGuideScreenPoint(
+    page,
+    "circle-node"
+  );
+  const actual = await getActualTextPathGuideScreenPoint(page);
 
-  if (!(beforeGuideBox && afterGuideBox)) {
-    throw new Error("Missing guide bounds before or after entering path edit");
+  if (!(expected && actual)) {
+    throw new Error("Missing guide points after entering path edit");
   }
 
-  expect(afterGuideBox.x).toBeCloseTo(beforeGuideBox.x, 1);
-  expect(afterGuideBox.y).toBeCloseTo(beforeGuideBox.y, 1);
-  expect(afterGuideBox.width).toBeCloseTo(beforeGuideBox.width, 1);
-  expect(afterGuideBox.height).toBeCloseTo(beforeGuideBox.height, 1);
+  expect(actual.x).toBeCloseTo(expected.x, 1);
+  expect(actual.y).toBeCloseTo(expected.y, 1);
 });
 
 test("centers the rotated path edit selection box on the circle guide", async ({
@@ -618,7 +611,7 @@ test("centers the rotated path edit selection box on the circle guide", async ({
   await pauseForUi(page);
 
   const overlayBox = await page
-    .locator(".canvas-single-node-transform-overlay")
+    .locator(".canvas-single-selection")
     .boundingBox();
   const guidePath = page.getByTestId("text-path-guide").locator("path").first();
   const guideBounds = await guidePath.boundingBox();
@@ -921,24 +914,23 @@ test("moves a selected circle path node by dragging the visible text", async ({
   expect(movedNode?.y).toBeGreaterThan((beforeNode?.y || 0) + 20);
 });
 
-test("keeps the circle path guide aligned while dragging a selected node", async ({
+test("keeps the idle circle guide hidden while dragging a selected node", async ({
   page,
 }) => {
   await gotoEditor(page);
   await loadCircleDocument(page);
 
   const node = page.locator('.canvas-node[data-node-id="circle-node"]');
-  const guidePath = page.getByTestId("text-path-guide").locator("path").first();
+  const guide = page.getByTestId("text-path-guide");
 
   await node.click();
   await pauseForUi(page);
-  await expect(guidePath).toBeVisible();
+  await expect(guide).toHaveCount(0);
 
   const beforeNodeBox = await node.boundingBox();
-  const beforeGuideBox = await guidePath.boundingBox();
 
-  if (!(beforeNodeBox && beforeGuideBox)) {
-    throw new Error("Missing circle node or guide bounds");
+  if (!beforeNodeBox) {
+    throw new Error("Missing circle node bounds");
   }
 
   const startX = beforeNodeBox.x + beforeNodeBox.width / 2;
@@ -951,23 +943,11 @@ test("keeps the circle path guide aligned while dragging a selected node", async
     steps: 12,
   });
 
-  const duringNodeBox = await node.boundingBox();
-  const duringGuideBox = await guidePath.boundingBox();
+  await expect(guide).toHaveCount(0);
 
   await page.mouse.up();
 
-  if (!(duringNodeBox && duringGuideBox)) {
-    throw new Error("Missing circle node or guide bounds during drag");
-  }
-
-  expect(duringGuideBox.x - beforeGuideBox.x).toBeCloseTo(
-    duringNodeBox.x - beforeNodeBox.x,
-    1
-  );
-  expect(duringGuideBox.y - beforeGuideBox.y).toBeCloseTo(
-    duringNodeBox.y - beforeNodeBox.y,
-    1
-  );
+  await expect(guide).toHaveCount(0);
 });
 
 test("moves a circle path node by dragging the visible text while path editing", async ({

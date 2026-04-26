@@ -10,8 +10,8 @@ import { getCanvasCursorStyle } from "./canvas-cursor-assets";
 import { CanvasCursorCompanion } from "./canvas-cursor-companion";
 import { CanvasDotGrid } from "./canvas-dot-grid";
 import { CanvasNodes } from "./canvas-nodes";
-import { CanvasOverlay } from "./canvas-overlay/canvas-overlay";
-import { CanvasStageOverlay } from "./canvas-overlay/canvas-stage-overlay";
+import { CanvasHostOverlays } from "./canvas-overlay/host-overlays";
+import { CanvasStageOverlays } from "./canvas-overlay/stage-overlays";
 import { resolveVectorPenHoverAction } from "./canvas-overlay/vector-path/pen-hover";
 import { CanvasTextEditor } from "./canvas-text-editor";
 import { startCanvasToolPlacementSession } from "./canvas-tool-placement-session";
@@ -390,7 +390,7 @@ export const Canvas = () => {
               stageMargin={CANVAS_STAGE_MARGIN}
               zoom={zoom}
             />
-            <CanvasStageOverlay />
+            <CanvasStageOverlays />
             <CanvasNodes />
             <CanvasTextEditor />
           </div>
@@ -402,7 +402,7 @@ export const Canvas = () => {
 
         <CanvasCursorCompanion hostElement={hostElement} />
 
-        {shouldRenderOverlay ? <CanvasOverlay /> : null}
+        {shouldRenderOverlay ? <CanvasHostOverlays /> : null}
       </div>
     </DesignerFrame>
   );

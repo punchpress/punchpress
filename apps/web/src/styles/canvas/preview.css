@@ -1,0 +1,33 @@
+@layer components {
+  .canvas-hover-preview {
+    z-index: 0;
+    background: var(--canvas-hover-fill);
+    border: 1px solid var(--canvas-hover);
+    box-shadow: var(--canvas-hover-shadow);
+    @apply rounded;
+  }
+
+  .canvas-hover-preview[data-preview-kind="path"] {
+    z-index: 9;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .canvas-hover-preview[data-preview-kind="path"] .canvas-preview {
+    filter: drop-shadow(var(--canvas-preview-glow));
+  }
+
+  .canvas-indicator {
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .canvas-preview {
+    stroke: var(--canvas-preview);
+    stroke-width: var(--canvas-preview-width);
+  }
+}

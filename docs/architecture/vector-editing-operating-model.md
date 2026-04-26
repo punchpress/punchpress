@@ -165,7 +165,7 @@ That means app-facing and engine-facing concepts should use names such as:
 
 - `VectorPathSession`
 - `EditablePathSession`
-- `CanvasVectorPathOverlay`
+- `CanvasVectorEditor`
 - `createVectorPathSession`
 
 The implementation that happens to use Paper should keep that detail local to

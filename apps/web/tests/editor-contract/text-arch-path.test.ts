@@ -7,6 +7,7 @@ const FONT = {
   postscriptName: "ArialMT",
   style: "Regular",
 } as const;
+const GUIDE_PATH_START_REGEX = /^M\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)/;
 
 const createArchNode = () => {
   return {
@@ -42,6 +43,19 @@ const getBoundsCenter = (bounds) => {
   };
 };
 
+const getGuidePathStart = (pathD: string) => {
+  const match = pathD.match(GUIDE_PATH_START_REGEX);
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    x: Number.parseFloat(match[1] || "0"),
+    y: Number.parseFloat(match[2] || "0"),
+  };
+};
+
 describe("Editor text arch path sessions", () => {
   test("exposes an editable arch guide", () => {
     const editor = new Editor();
@@ -54,6 +68,19 @@ describe("Editor text arch path sessions", () => {
     expect(guide?.kind).toBe("arch");
     expect(editor.canEditNodePath(node.id)).toBe(true);
     expect(guide?.handles.some((handle) => handle.role === "bend")).toBe(true);
+
+    const bbox = editor.getNodeGeometry(node.id)?.bbox;
+    const guideStart = guide?.pathD ? getGuidePathStart(guide.pathD) : null;
+
+    expect(bbox).toBeDefined();
+    expect(guideStart).not.toBeNull();
+
+    if (!(bbox && guideStart)) {
+      return;
+    }
+
+    expect(guideStart.x).toBeCloseTo(bbox.minX, 2);
+    expect(guideStart.y).toBeCloseTo(getBoundsCenter(bbox).y, 2);
   });
 
   test("adjusts arch bend while keeping the render center pinned", () => {

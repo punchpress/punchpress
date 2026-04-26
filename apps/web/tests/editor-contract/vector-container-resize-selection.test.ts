@@ -214,6 +214,7 @@ describe("vector container resize selection", () => {
     const afterFrame = editor.getSelectionTransformFrame(["vector-container"]);
     const afterOuterCenter = getNodeWorldCenter(editor, "outer-path");
     const afterInnerCenter = getNodeWorldCenter(editor, "inner-path");
+    const strokeWidth = 2;
     const anchor = {
       x: beforeFrame?.bounds.minX || 0,
       y: beforeFrame?.bounds.minY || 0,
@@ -221,14 +222,20 @@ describe("vector container resize selection", () => {
 
     expect(resizedNodeIds).toEqual(["outer-path", "inner-path"]);
     expect(afterFrame).not.toBeNull();
-    expect(afterFrame?.bounds.minX).toBeCloseTo(anchor.x, 2);
-    expect(afterFrame?.bounds.minY).toBeCloseTo(anchor.y, 2);
+    expect(afterFrame?.bounds.minX).toBeCloseTo(
+      anchor.x - (strokeWidth / 2) * (1 - 0.5),
+      2
+    );
+    expect(afterFrame?.bounds.minY).toBeCloseTo(
+      anchor.y - (strokeWidth / 2) * (1 - 0.5),
+      2
+    );
     expect(afterFrame?.bounds.width).toBeCloseTo(
-      (beforeFrame?.bounds.width || 0) * 0.5,
+      ((beforeFrame?.bounds.width || 0) - strokeWidth) * 0.5 + strokeWidth,
       2
     );
     expect(afterFrame?.bounds.height).toBeCloseTo(
-      (beforeFrame?.bounds.height || 0) * 0.5,
+      ((beforeFrame?.bounds.height || 0) - strokeWidth) * 0.5 + strokeWidth,
       2
     );
     expect(afterOuterCenter?.x).toBeCloseTo(

@@ -3,6 +3,7 @@
   "nodes": [
     {
       "id": "rotate-node",
+      "parentId": "root",
       "type": "text",
       "text": "Rotate me",
       "font": {

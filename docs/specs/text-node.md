@@ -22,6 +22,7 @@ Text nodes let users place and edit stylized text directly on the canvas.
 - Edit mode should keep a visible caret so text entry still feels precise and direct.
 - Placing a new text node should enter text edit mode immediately and return the canvas to pointer behavior outside the active text field.
 - Placing a new text node from the canvas should center the text on the placement click and start at the default starter size.
+- A newly placed text node should start with a balanced default outline treatment that remains readable at 100% canvas zoom, rather than a heavy poster-style stroke.
 - A newly placed text node should start with no warp applied until the user explicitly chooses one.
 
 ## Behavior
@@ -53,6 +54,8 @@ Text nodes let users place and edit stylized text directly on the canvas.
 - While path editing, that transform/selection box should stay aligned with the path-editing surface during rotate, move, and resize interactions.
 - While the user is actively dragging a path-position handle, PunchPress may temporarily hide normal selection bounds if those bounds would otherwise jitter distractingly as the text reflows.
 - Simpler direct-manipulation warps, such as arch bend, wave-style flag adjustments, and slant, may stay inline on selection instead of requiring a separate path-edit mode.
+- Inline arch, wave, and slant warp guides should be centered through the text rather than anchored to the text's top edge.
+- Applying wave warp from the default preset should start from a restrained amplitude that preserves legibility and keeps the inline handles in a sensible place before any manual adjustment.
 - Inline warp adjustment controls should still support the full intended expressive range of that warp in both directions.
 - Wave warp cycle adjustments should clamp to a maximum of three cycles.
 - Inline warp handle icons should inherit node rotation so they stay aligned in node space; the circle path position handle remains a special case that also follows the path tangent.

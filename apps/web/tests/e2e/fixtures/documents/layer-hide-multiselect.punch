@@ -3,6 +3,7 @@
   "nodes": [
     {
       "id": "hide-visible-node",
+      "parentId": "root",
       "type": "text",
       "text": "Visible after hide",
       "font": {
@@ -31,6 +32,7 @@
     },
     {
       "id": "hide-selected-node",
+      "parentId": "root",
       "type": "text",
       "text": "Hide after select",
       "font": {

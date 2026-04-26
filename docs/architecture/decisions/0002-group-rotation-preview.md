@@ -27,5 +27,5 @@ Those guarantees are now implemented by the main custom overlay rather than a de
 
 The current implementation lives in:
 
-- `apps/web/src/components/canvas/canvas-overlay/canvas-multi-node-transform-overlay.tsx`
+- `apps/web/src/components/canvas/canvas-overlay/selection/multi-selection-foreground.tsx`
 - `apps/web/tests/e2e/text-node-rotate.spec.ts`

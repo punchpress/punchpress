@@ -10,6 +10,7 @@ const TRACE_REPLAY_DOCUMENT = {
   nodes: [
     {
       id: "e47a3c2f-401a-4730-a333-00525e2a5508",
+      name: "Trace group",
       parentId: "root",
       transform: {
         rotation: 0,
@@ -193,4 +194,44 @@ test("trace replay creates a text node when clicking with the text tool", async 
     .poll(async () => (await getStateSnapshot(page)).nodes.length)
     .toBe(4);
   await expect(page.locator("[data-node-id]")).toHaveCount(3);
+});
+
+test("placing a new text node uses the starter text preset", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+
+  const stage = page.getByTestId("canvas-stage");
+  const stageBox = await stage.boundingBox();
+
+  expect(stageBox).not.toBeNull();
+
+  if (!stageBox) {
+    return;
+  }
+
+  await page.keyboard.press("t");
+  await pauseForUi(page);
+  await page.mouse.click(stageBox.x + stageBox.width * 0.5, stageBox.y + 240);
+
+  const snapshot = await getStateSnapshot(page);
+  const textNode = snapshot.nodes.find(
+    (node) => node.id === snapshot.selectedNodeId
+  );
+
+  expect(textNode).toMatchObject({
+    fill: "#ffffff",
+    fontSize: 100,
+    stroke: "#000000",
+    strokeWidth: 3,
+    text: "YOUR TEXT",
+    tracking: 10,
+    type: "text",
+    warp: {
+      kind: "none",
+    },
+  });
+  await expect(
+    page.getByRole("slider", { name: "Stroke width" })
+  ).toHaveAttribute("aria-valuenow", "3");
 });

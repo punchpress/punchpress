@@ -2,6 +2,11 @@ import {
   createLocalFontDescriptor,
   ROOT_PARENT_ID,
 } from "@punchpress/punch-schema";
+import {
+  DEFAULT_TEXT_CONTENT,
+  DEFAULT_TEXT_POSITION,
+  DEFAULT_TEXT_STYLE,
+} from "./text-defaults";
 
 export const ARCH_BEND_LIMIT = 2;
 export const WAVE_CYCLES_MAX = 3;
@@ -25,7 +30,7 @@ export const getDefaultWarp = (kind) => {
   }
 
   if (kind === "wave") {
-    return { kind: "wave", amplitude: 140, cycles: 1 };
+    return { kind: "wave", amplitude: 24, cycles: 1 };
   }
 
   if (kind === "slant") {
@@ -92,21 +97,21 @@ export const createDefaultNode = (font) => {
     id: createId(),
     parentId: ROOT_PARENT_ID,
     type: "text",
-    text: "YOUR TEXT",
+    text: DEFAULT_TEXT_CONTENT,
     font: createLocalFontDescriptor(font),
-    fontSize: 100,
-    tracking: 10,
-    fill: "#ffffff",
-    stroke: "#000000",
-    strokeWidth: 12,
+    fontSize: DEFAULT_TEXT_STYLE.fontSize,
+    tracking: DEFAULT_TEXT_STYLE.tracking,
+    fill: DEFAULT_TEXT_STYLE.fill,
+    stroke: DEFAULT_TEXT_STYLE.stroke,
+    strokeWidth: DEFAULT_TEXT_STYLE.strokeWidth,
     visible: true,
     warp: { kind: "none" },
     transform: {
       rotation: 0,
       scaleX: 1,
       scaleY: 1,
-      x: 2250,
-      y: 2700,
+      x: DEFAULT_TEXT_POSITION.x,
+      y: DEFAULT_TEXT_POSITION.y,
     },
   };
 };

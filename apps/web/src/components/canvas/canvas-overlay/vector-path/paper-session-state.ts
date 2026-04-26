@@ -55,6 +55,15 @@ export interface VectorPaperSessionInteractionPolicy {
   canInsertPoint: boolean;
 }
 
+export interface VectorCornerCurveSegment {
+  contourIndex: number;
+  endIndex?: number;
+  endSegment?: VectorContourDocument["segments"][number];
+  key?: string;
+  startIndex?: number;
+  startSegment?: VectorContourDocument["segments"][number];
+}
+
 export interface VectorPaperSessionSyncOptions {
   pinnedLocalPoint?: { x: number; y: number } | null;
   pinnedWorldPoint?: { x: number; y: number } | null;
@@ -63,6 +72,7 @@ export interface VectorPaperSessionSyncOptions {
 export interface VectorPaperSessionScene {
   activeDragSession?: VectorCornerDragSession | null;
   contours: VectorContourDocument[];
+  cornerCurveSegments?: VectorCornerCurveSegment[];
   hoveredCornerHandlePoint?: VectorPathPoint | null;
   interactionPolicy?: VectorPaperSessionInteractionPolicy | null;
   isPanning?: boolean;
@@ -101,8 +111,10 @@ export interface VectorPaperSessionOptions {
 export const createVectorPaperSessionState = (scope: paper.PaperScope) => {
   return {
     activeDrag: null as ActivePointDrag | null,
+    activeCurvePaths: [] as paper.Path[],
     activeDragSession: null as VectorCornerDragSession | null,
     chrome: [] as VectorSegmentChrome[][],
+    cornerCurveSegments: [] as VectorCornerCurveSegment[],
     contours: [] as VectorContourDocument[],
     dragCanvasPoint: null as { x: number; y: number } | null,
     endpointDragTarget: null as VectorEndpointDragTarget | null,

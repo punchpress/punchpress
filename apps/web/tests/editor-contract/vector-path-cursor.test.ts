@@ -16,9 +16,9 @@ describe("vector path cursor semantics", () => {
     expect(getVectorPathCursorMode({ role: "anchor" })).toBe("point");
     expect(getVectorPathCursorMode({ role: "handle-out" })).toBe("point");
     expect(getVectorPathCursorMode({ isInsertHit: true })).toBe("insert");
-    expect(getVectorPathCursorMode({ isBodyHit: true, isInsertHit: true })).toBe(
-      "insert"
-    );
+    expect(
+      getVectorPathCursorMode({ isBodyHit: true, isInsertHit: true })
+    ).toBe("insert");
     expect(getVectorPathCursorMode({ isBodyHit: true })).toBe("body");
     expect(getVectorPathCursorMode({ isDraggingBody: true })).toBe("body");
     expect(getVectorPathCursorMode({ role: "path", isBodyHit: false })).toBe(

@@ -15,7 +15,6 @@ import {
   createPreviewAnchorItem,
   createPreviewHandleItem,
   createPreviewHandleLine,
-  GUIDE_STROKE_WIDTH_PX,
   getZeroPoint,
   PREVIEW_DASH_ARRAY,
   projectPoint,
@@ -44,6 +43,7 @@ import {
 import {
   getHoveredVectorCornerCurveSegment,
   getMaxedVectorCornerCurveSegments,
+  getVectorCornerCurveSegmentsForPoints,
 } from "./vector-corner-radius-points";
 import {
   shouldShowBezierHandlesForPoint,
@@ -155,7 +155,7 @@ export const createPaperSessionChromeController = ({
 
     const fillColor = state.styles.hoverHalo.clone();
     fillColor.alpha = 0.12;
-    const strokeColor = state.styles.guide.clone();
+    const strokeColor = state.styles.selected.clone();
     strokeColor.alpha = 0.7;
 
     state.selectionMarqueePath = new scope.Path.Rectangle({
@@ -213,7 +213,7 @@ export const createPaperSessionChromeController = ({
       fillColor: null,
       insert: true,
       strokeCap: "round",
-      strokeColor: state.styles.accentFill.clone(),
+      strokeColor: state.styles.selected.clone(),
       strokeJoin: "round",
       strokeWidth: HOVERED_CORNER_CURVE_FALLBACK_STROKE_WIDTH_PX,
       visible: false,
@@ -232,12 +232,110 @@ export const createPaperSessionChromeController = ({
     state.maxedCurvePaths = [];
   };
 
+  const clearActiveCurveHighlights = () => {
+    for (const path of state.activeCurvePaths) {
+      path.remove();
+    }
+
+    state.activeCurvePaths = [];
+  };
+
+  const getSourceSegmentsForCurveHighlight = (curveSegment) => {
+    const contour = state.contours[curveSegment.contourIndex];
+    const startSegment =
+      curveSegment.startSegment ??
+      (typeof curveSegment.startIndex === "number"
+        ? contour?.segments?.[curveSegment.startIndex]
+        : null);
+    const endSegment =
+      curveSegment.endSegment ??
+      (typeof curveSegment.endIndex === "number"
+        ? contour?.segments?.[curveSegment.endIndex]
+        : null);
+
+    return startSegment && endSegment
+      ? {
+          endSegment,
+          startSegment,
+        }
+      : null;
+  };
+
+  const createCurveHighlightPath = (curveSegment, strokeColor, strokeWidth) => {
+    if (!state.matrix) {
+      return null;
+    }
+
+    const segments = getSourceSegmentsForCurveHighlight(curveSegment);
+
+    if (!segments) {
+      return null;
+    }
+
+    const path = new scope.Path({
+      fillColor: null,
+      insert: true,
+      strokeCap: "round",
+      strokeColor,
+      strokeJoin: "round",
+      strokeWidth,
+    });
+
+    path.add(
+      new scope.Segment(
+        projectPoint(state.matrix, segments.startSegment.point),
+        projectVector(state.matrix, segments.startSegment.handleIn),
+        projectVector(state.matrix, segments.startSegment.handleOut)
+      )
+    );
+    path.add(
+      new scope.Segment(
+        projectPoint(state.matrix, segments.endSegment.point),
+        projectVector(state.matrix, segments.endSegment.handleIn),
+        projectVector(state.matrix, segments.endSegment.handleOut)
+      )
+    );
+
+    return path;
+  };
+
+  const syncActiveCurveHighlights = () => {
+    clearActiveCurveHighlights();
+
+    if (!(state.activeDragSession && state.matrix)) {
+      return;
+    }
+
+    const activeSegments = getVectorCornerCurveSegmentsForPoints(
+      state.contours,
+      state.activeDragSession.adjustedPoints,
+      state.cornerCurveSegments
+    );
+    const strokeColor = state.styles.selected.clone();
+    strokeColor.alpha = 0.7;
+    const strokeWidth = getRenderedStrokeWidthPx(
+      state.matrix,
+      state.nodeStrokeWidth
+    );
+
+    state.activeCurvePaths = activeSegments.flatMap((curveSegment) => {
+      const path = createCurveHighlightPath(
+        curveSegment,
+        strokeColor.clone(),
+        strokeWidth
+      );
+
+      return path ? [path] : [];
+    });
+  };
+
   const syncMaxedCurveHighlights = () => {
     const maxedSegments = getMaxedVectorCornerCurveSegments(
       state.contours,
       state.selectedPoints,
       state.activeDragSession?.maxRadius ?? null,
-      state.activeDragSession
+      state.activeDragSession,
+      state.cornerCurveSegments
     );
 
     clearMaxedCurveHighlights();
@@ -249,11 +347,9 @@ export const createPaperSessionChromeController = ({
     }
 
     state.maxedCurvePaths = maxedSegments.flatMap((maxedSegment) => {
-      const contour = state.contours[maxedSegment.contourIndex];
-      const startSegment = contour?.segments?.[maxedSegment.startIndex];
-      const endSegment = contour?.segments?.[maxedSegment.endIndex];
+      const segments = getSourceSegmentsForCurveHighlight(maxedSegment);
 
-      if (!(startSegment && endSegment)) {
+      if (!segments) {
         return [];
       }
 
@@ -265,7 +361,7 @@ export const createPaperSessionChromeController = ({
         fillColor: null,
         insert: true,
         strokeCap: "round",
-        strokeColor: state.styles.destructiveHalo.clone(),
+        strokeColor: state.styles.warningSoft.clone(),
         strokeJoin: "round",
         strokeWidth: renderedStrokeWidth + MAXED_CORNER_OUTER_STROKE_PX,
       });
@@ -273,7 +369,7 @@ export const createPaperSessionChromeController = ({
         fillColor: null,
         insert: true,
         strokeCap: "round",
-        strokeColor: state.styles.destructiveHighlight.clone(),
+        strokeColor: state.styles.warningStrong.clone(),
         strokeJoin: "round",
         strokeWidth: Math.max(
           4,
@@ -284,16 +380,16 @@ export const createPaperSessionChromeController = ({
       for (const path of [outerPath, innerPath]) {
         path.add(
           new scope.Segment(
-            projectPoint(state.matrix, startSegment.point),
-            projectVector(state.matrix, startSegment.handleIn),
-            projectVector(state.matrix, startSegment.handleOut)
+            projectPoint(state.matrix, segments.startSegment.point),
+            projectVector(state.matrix, segments.startSegment.handleIn),
+            projectVector(state.matrix, segments.startSegment.handleOut)
           )
         );
         path.add(
           new scope.Segment(
-            projectPoint(state.matrix, endSegment.point),
-            projectVector(state.matrix, endSegment.handleIn),
-            projectVector(state.matrix, endSegment.handleOut)
+            projectPoint(state.matrix, segments.endSegment.point),
+            projectVector(state.matrix, segments.endSegment.handleIn),
+            projectVector(state.matrix, segments.endSegment.handleOut)
           )
         );
       }
@@ -303,9 +399,17 @@ export const createPaperSessionChromeController = ({
   };
 
   const syncHoveredCurveHighlight = () => {
+    if (state.activeDragSession) {
+      if (state.hoveredCurvePath) {
+        state.hoveredCurvePath.visible = false;
+      }
+      return;
+    }
+
     const hoveredSegment = getHoveredVectorCornerCurveSegment(
       state.contours,
-      state.hoveredCornerHandlePoint
+      state.hoveredCornerHandlePoint,
+      state.cornerCurveSegments
     );
 
     if (!(hoveredSegment && state.matrix)) {
@@ -315,11 +419,9 @@ export const createPaperSessionChromeController = ({
       return;
     }
 
-    const contour = state.contours[hoveredSegment.contourIndex];
-    const startSegment = contour?.segments?.[hoveredSegment.startIndex];
-    const endSegment = contour?.segments?.[hoveredSegment.endIndex];
+    const segments = getSourceSegmentsForCurveHighlight(hoveredSegment);
 
-    if (!(startSegment && endSegment)) {
+    if (!segments) {
       if (state.hoveredCurvePath) {
         state.hoveredCurvePath.visible = false;
       }
@@ -334,22 +436,23 @@ export const createPaperSessionChromeController = ({
     path.removeSegments();
     path.add(
       new scope.Segment(
-        projectPoint(state.matrix, startSegment.point),
-        projectVector(state.matrix, startSegment.handleIn),
-        projectVector(state.matrix, startSegment.handleOut)
+        projectPoint(state.matrix, segments.startSegment.point),
+        projectVector(state.matrix, segments.startSegment.handleIn),
+        projectVector(state.matrix, segments.startSegment.handleOut)
       )
     );
     path.add(
       new scope.Segment(
-        projectPoint(state.matrix, endSegment.point),
-        projectVector(state.matrix, endSegment.handleIn),
-        projectVector(state.matrix, endSegment.handleOut)
+        projectPoint(state.matrix, segments.endSegment.point),
+        projectVector(state.matrix, segments.endSegment.handleIn),
+        projectVector(state.matrix, segments.endSegment.handleOut)
       )
     );
     path.visible = true;
   };
 
   const syncCurveHighlightsAndUpdate = () => {
+    syncActiveCurveHighlights();
     syncMaxedCurveHighlights();
     syncHoveredCurveHighlight();
     scope.view.update();
@@ -625,7 +728,7 @@ export const createPaperSessionChromeController = ({
         insert: true,
         strokeCap: "round",
         strokeJoin: "round",
-        strokeWidth: GUIDE_STROKE_WIDTH_PX,
+        strokeWidth: state.styles.indicatorWidthPx,
         visible: false,
       });
       state.previewPath.sendToBack();
@@ -686,19 +789,19 @@ export const createPaperSessionChromeController = ({
       return;
     }
 
-    state.previewPath.strokeColor = state.styles.guide.clone();
+    state.previewPath.strokeColor = state.styles.selected.clone();
     state.previewPath.strokeColor.alpha = 0.75;
-    state.previewAnchor.fillColor = state.styles.backgroundFill.clone();
-    state.previewAnchor.strokeColor = state.styles.accentFill.clone();
+    state.previewAnchor.fillColor = state.styles.surface.clone();
+    state.previewAnchor.strokeColor = state.styles.selected.clone();
     state.previewAnchor.fillColor.alpha = 0.65;
     state.previewAnchor.strokeColor.alpha = 0.7;
-    state.previewHandleIn.fillColor = state.styles.accentFill.clone();
+    state.previewHandleIn.fillColor = state.styles.selected.clone();
     state.previewHandleIn.fillColor.alpha = 1;
-    state.previewHandleOut.fillColor = state.styles.accentFill.clone();
+    state.previewHandleOut.fillColor = state.styles.selected.clone();
     state.previewHandleOut.fillColor.alpha = 1;
-    state.previewHandleInLine.strokeColor = state.styles.guide.clone();
+    state.previewHandleInLine.strokeColor = state.styles.selected.clone();
     state.previewHandleInLine.strokeColor.alpha = 0.5;
-    state.previewHandleOutLine.strokeColor = state.styles.guide.clone();
+    state.previewHandleOutLine.strokeColor = state.styles.selected.clone();
     state.previewHandleOutLine.strokeColor.alpha = 0.5;
   };
 

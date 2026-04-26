@@ -75,7 +75,10 @@ export {
   layoutGlyphs,
 } from "./nodes/text/warp-layout";
 export { VECTOR_ANCHOR_INTERACTION_RADIUS_PX } from "./nodes/vector/interaction-constants";
-export { createDefaultVectorNode } from "./nodes/vector/model";
+export {
+  createDefaultVectorContainerNode,
+  createDefaultVectorNode,
+} from "./nodes/vector/model";
 export {
   getVectorPathCursorMode,
   isVectorPathPointRole,

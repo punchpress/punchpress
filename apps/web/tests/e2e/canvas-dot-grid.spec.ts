@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { gotoEditor } from "./helpers/editor";
 
-test("canvas dot grid renders as a visible layer under a transparent viewport shell", async ({
+test("canvas dot grid renders as a visible layer under the canvas surface", async ({
   page,
 }) => {
   await gotoEditor(page);
@@ -18,9 +18,11 @@ test("canvas dot grid renders as a visible layer under a transparent viewport sh
   expect(gridBox.width).toBeGreaterThan(100);
   expect(gridBox.height).toBeGreaterThan(100);
 
-  const surfaceBackground = await page.locator(".canvas-surface").evaluate((element) => {
-    return window.getComputedStyle(element).backgroundColor;
-  });
+  const surfaceBackground = await page
+    .locator(".canvas-surface")
+    .evaluate((element) => {
+      return window.getComputedStyle(element).backgroundColor;
+    });
 
-  expect(surfaceBackground).toBe("rgba(0, 0, 0, 0)");
+  expect(surfaceBackground).not.toBe("rgba(0, 0, 0, 0)");
 });

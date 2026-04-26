@@ -2,26 +2,54 @@ import { clamp } from "@punchpress/engine";
 import { useMemo, useRef, useState } from "react";
 import { NodeContextMenuItems } from "@/components/context-menus/node-context-menu-items";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
-import { useEditor } from "../../../editor-react/use-editor";
-import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
-import { useEditorValue } from "../../../editor-react/use-editor-value";
+import { useEditor } from "../../../../editor-react/use-editor";
+import { useEditorSurfaceValue } from "../../../../editor-react/use-editor-surface-value";
+import { useEditorValue } from "../../../../editor-react/use-editor-value";
 import {
   getCanvasRotateCursor,
   getCanvasScaleCursor,
-} from "../canvas-cursor-assets";
-import { openCanvasNodeEditingMode } from "../canvas-node-editing";
-import { getHostRectFromNodeFrame } from "./canvas-overlay-geometry";
-import { CanvasSelectionPathGhost } from "./canvas-selection-path-ghost";
-import { getTextPathTransformTargetStyle } from "./text-path-overlay-geometry";
+} from "../../canvas-cursor-assets";
+import { drillIntoGroupSelection } from "../../canvas-group-drill-in";
+import { openCanvasNodeEditingMode } from "../../canvas-node-editing";
+import { getHostRectFromNodeFrame } from "../canvas-overlay-geometry";
 import {
   getRotateCursorRotationDegrees,
   getScaleCursorRotationDegrees,
+  getTransformRotationDegrees,
   type TransformCorner,
-} from "./transform-cursor-angle";
-import { useActiveTransformCursor } from "./use-active-transform-cursor";
+} from "../transform-cursor-angle";
+import { useActiveTransformCursor } from "../use-active-transform-cursor";
 
-const EMPTY_PREVIEW = { x: 0, y: 0 };
 const ROTATION_ZONE_SIZE = 56;
+const CORNERS = ["nw", "ne", "sw", "se"] as const;
+
+const handlePositionStyle = {
+  ne: { right: 0, top: 0 },
+  nw: { left: 0, top: 0 },
+  se: { bottom: 0, right: 0 },
+  sw: { bottom: 0, left: 0 },
+};
+
+const handleTransformStyle = {
+  ne: "translate(50%, -50%)",
+  nw: "translate(-50%, -50%)",
+  se: "translate(50%, 50%)",
+  sw: "translate(-50%, 50%)",
+};
+
+const rotationZoneStyle = {
+  ne: { right: -56, top: -56 },
+  nw: { left: -56, top: -56 },
+  se: { bottom: -56, right: -56 },
+  sw: { bottom: -56, left: -56 },
+};
+
+const resizeCursorClassName = {
+  ne: "canvas-cursor-scale",
+  nw: "canvas-cursor-scale",
+  se: "canvas-cursor-scale",
+  sw: "canvas-cursor-scale",
+};
 
 const getCanvasPoint = (editor, clientX, clientY) => {
   const host = editor.hostRef;
@@ -81,80 +109,6 @@ const getRotateCursorForCorner = (
   );
 };
 
-const resizeDirection = {
-  ne: [1, -1] as const,
-  nw: [-1, -1] as const,
-  se: [1, 1] as const,
-  sw: [-1, 1] as const,
-};
-
-const oppositeResizeHandle = {
-  e: "w",
-  n: "s",
-  ne: "sw",
-  nw: "se",
-  s: "n",
-  se: "nw",
-  sw: "ne",
-  w: "e",
-} as const;
-
-const getResizeSession = (
-  editor,
-  handleElements,
-  edgeElements,
-  handle,
-  pointer,
-  nodeId,
-  useShapeBoxResize
-) => {
-  const oppositeHandle = oppositeResizeHandle[handle];
-  let anchorElement: HTMLElement | null = null;
-
-  if (oppositeHandle) {
-    anchorElement =
-      handle.length === 1
-        ? edgeElements.current[oppositeHandle]
-        : handleElements.current[oppositeHandle];
-  }
-  const anchorRect = anchorElement?.getBoundingClientRect?.();
-  const resolvedAnchorClient = anchorRect ? getRectCenter(anchorRect) : null;
-  const direction = handle.length === 2 ? resizeDirection[handle] : null;
-
-  if (!(resolvedAnchorClient && pointer)) {
-    return null;
-  }
-  const resolvedAnchorCanvas = resolvedAnchorClient
-    ? getCanvasPoint(editor, resolvedAnchorClient.x, resolvedAnchorClient.y)
-    : null;
-
-  if (!(resolvedAnchorCanvas && resolvedAnchorClient && pointer)) {
-    return null;
-  }
-
-  const resizeSession = editor.beginResizeSelection({
-    anchorCanvas: resolvedAnchorCanvas,
-    ...(useShapeBoxResize ? { handle } : { direction }),
-    nodeId,
-  });
-
-  if (!resizeSession) {
-    return null;
-  }
-
-  return {
-    anchorClient: resolvedAnchorClient,
-    resizeSession,
-    startDistance: Math.max(
-      Math.hypot(
-        pointer.x - resolvedAnchorClient.x,
-        pointer.y - resolvedAnchorClient.y
-      ),
-      1
-    ),
-  };
-};
-
 const getResizeScale = (pointer, anchorClient, startDistance) => {
   if (!(pointer && anchorClient && Number.isFinite(startDistance))) {
     return null;
@@ -168,150 +122,14 @@ const getResizeScale = (pointer, anchorClient, startDistance) => {
   );
 };
 
-const handlePositionStyle = {
-  ne: { right: 0, top: 0 },
-  nw: { left: 0, top: 0 },
-  se: { bottom: 0, right: 0 },
-  sw: { bottom: 0, left: 0 },
-};
-
-const handleTransformStyle = {
-  ne: "translate(50%, -50%)",
-  nw: "translate(-50%, -50%)",
-  se: "translate(50%, 50%)",
-  sw: "translate(-50%, 50%)",
-};
-
-const rotationZoneStyle = {
-  ne: { right: -56, top: -56 },
-  nw: { left: -56, top: -56 },
-  se: { bottom: -56, right: -56 },
-  sw: { bottom: -56, left: -56 },
-};
-
-const resizeCursorClassName = {
-  ne: "canvas-cursor-scale",
-  nw: "canvas-cursor-scale",
-  se: "canvas-cursor-scale",
-  sw: "canvas-cursor-scale",
-};
-
-const edgeCursorClassName = {
-  e: "cursor-ew-resize",
-  n: "cursor-ns-resize",
-  s: "cursor-ns-resize",
-  w: "cursor-ew-resize",
-};
-
-const EDGE_HIT_SIZE_PX = 20;
-
-const edgeHitAreaStyle = {
-  e: {
-    height: "100%",
-    right: 0,
-    top: 0,
-    transform: "translateX(50%)",
-    width: `${EDGE_HIT_SIZE_PX}px`,
-  },
-  n: {
-    height: `${EDGE_HIT_SIZE_PX}px`,
-    left: 0,
-    top: 0,
-    transform: "translateY(-50%)",
-    width: "100%",
-  },
-  s: {
-    bottom: 0,
-    height: `${EDGE_HIT_SIZE_PX}px`,
-    left: 0,
-    transform: "translateY(50%)",
-    width: "100%",
-  },
-  w: {
-    height: "100%",
-    left: 0,
-    top: 0,
-    transform: "translateX(-50%)",
-    width: `${EDGE_HIT_SIZE_PX}px`,
-  },
-};
-
-const edgeLineStyle = {
-  e: {
-    height: "100%",
-    left: "50%",
-    top: 0,
-    transform: "translateX(-50%)",
-    width: "1.5px",
-  },
-  n: {
-    height: "1.5px",
-    left: 0,
-    top: "50%",
-    transform: "translateY(-50%)",
-    width: "100%",
-  },
-  s: {
-    height: "1.5px",
-    left: 0,
-    top: "50%",
-    transform: "translateY(-50%)",
-    width: "100%",
-  },
-  w: {
-    height: "100%",
-    left: "50%",
-    top: 0,
-    transform: "translateX(-50%)",
-    width: "1.5px",
-  },
-};
-
-interface CanvasSingleNodeTransformOverlayProps {
-  isDraggable: boolean;
-  isResizable: boolean;
-  isRotatable: boolean;
-  nodeId: string;
-  selectionGhost: {
-    bbox: {
-      height: number;
-      maxX: number;
-      maxY: number;
-      minX: number;
-      minY: number;
-      width: number;
-    };
-    nodeId: string;
-    paths: Array<{
-      d: string;
-      key?: string;
-      transform?: string | null;
-    }>;
-  } | null;
-}
-
-export const CanvasSingleNodeTransformOverlay = ({
+export const CanvasMultiSelectionForeground = ({
   isDraggable,
   isResizable,
   isRotatable,
-  nodeId,
-  selectionGhost,
-}: CanvasSingleNodeTransformOverlayProps) => {
+  nodeIds,
+  selectedGroupNodeId,
+}) => {
   const editor = useEditor();
-  const isShapeNode = useEditorValue((editor) => {
-    return editor.getNode(nodeId)?.type === "shape";
-  });
-  const isPathEditing = useEditorValue((editor, state) => {
-    return state.pathEditingNodeId === nodeId && editor.isPathEditing(nodeId);
-  });
-  const edgeElementsRef = useRef<
-    Record<"e" | "n" | "s" | "w", HTMLDivElement | null>
-  >({
-    e: null,
-    n: null,
-    s: null,
-    w: null,
-  });
   const handleElementsRef = useRef<
     Record<"ne" | "nw" | "se" | "sw", HTMLButtonElement | null>
   >({
@@ -326,63 +144,16 @@ export const CanvasSingleNodeTransformOverlay = ({
     null
   );
   const frame = useEditorSurfaceValue((editor) => {
-    return editor.getNodeTransformFrame(nodeId);
-  });
-  const selectionPreview = useEditorSurfaceValue((editor) => {
-    return editor.getSelectionPreviewDelta([nodeId]) || EMPTY_PREVIEW;
-  });
-  const pathEditOverlayState = useEditorSurfaceValue((editor) => {
-    if (!isPathEditing) {
-      return null;
-    }
-
-    return {
-      geometry: editor.getNodeGeometry(nodeId),
-      node: editor.getNode(nodeId),
-    };
+    return editor.getSelectionTransformFrame(nodeIds);
   });
 
   const overlayRect = useMemo(() => {
-    if (
-      isPathEditing &&
-      pathEditOverlayState?.geometry &&
-      pathEditOverlayState.node
-    ) {
-      const targetStyle = getTextPathTransformTargetStyle(
-        editor,
-        pathEditOverlayState.node,
-        pathEditOverlayState.geometry,
-        selectionPreview,
-        true
-      );
-
-      if (!targetStyle) {
-        return null;
-      }
-
-      return {
-        height: Number.parseFloat(targetStyle.height || "0"),
-        left: Number.parseFloat(targetStyle.left || "0"),
-        top: Number.parseFloat(targetStyle.top || "0"),
-        transform: targetStyle.transform,
-        width: Number.parseFloat(targetStyle.width || "0"),
-      };
-    }
-
-    const hostRect = getHostRectFromNodeFrame(editor, frame);
-
-    if (!hostRect) {
-      return null;
-    }
-
-    return {
-      ...hostRect,
-      left: hostRect.left + selectionPreview.x * editor.zoom,
-      top: hostRect.top + selectionPreview.y * editor.zoom,
-    };
-  }, [editor, frame, isPathEditing, pathEditOverlayState, selectionPreview]);
+    return getHostRectFromNodeFrame(editor, frame);
+  }, [editor, frame]);
   const overlayRotationDegrees = useEditorValue((editor) => {
-    return editor.getNode(nodeId)?.transform.rotation || 0;
+    const selectionFrame = editor.getSelectionTransformFrame(nodeIds);
+
+    return getTransformRotationDegrees(selectionFrame?.transform);
   });
   const activeTransformCursor =
     activeRotateCursor ??
@@ -397,21 +168,15 @@ export const CanvasSingleNodeTransformOverlay = ({
 
   useActiveTransformCursor(activeTransformCursor);
 
-  if (!overlayRect) {
+  if (!(overlayRect && nodeIds.length > 0)) {
     return null;
   }
 
   const cursorClassName = "canvas-cursor-default";
+  const contextMenuNodeId = nodeIds[0] || selectedGroupNodeId || null;
 
   const startSelectionDrag = (event) => {
     if (!(event.button === 0 && isDraggable)) {
-      return;
-    }
-
-    if (event.detail >= 2) {
-      event.preventDefault();
-      event.stopPropagation();
-      openCanvasNodeEditingMode(editor, nodeId);
       return;
     }
 
@@ -442,7 +207,7 @@ export const CanvasSingleNodeTransformOverlay = ({
       if (!dragSession) {
         dragSession = editor.beginSelectionDrag({
           duplicate: event.altKey,
-          nodeId,
+          nodeIds,
         });
       }
 
@@ -485,7 +250,7 @@ export const CanvasSingleNodeTransformOverlay = ({
     window.addEventListener("pointerup", handlePointerEnd);
   };
 
-  const startResize = (handle, event) => {
+  const startResize = (corner, event) => {
     if (!(event.button === 0 && isResizable)) {
       return;
     }
@@ -493,55 +258,59 @@ export const CanvasSingleNodeTransformOverlay = ({
     event.preventDefault();
     event.stopPropagation();
 
+    const oppositeCorner = CORNERS.find((currentCorner) => {
+      return (
+        currentCorner !== corner &&
+        currentCorner.startsWith(corner.startsWith("n") ? "s" : "n") &&
+        currentCorner.endsWith(corner.endsWith("e") ? "w" : "e")
+      );
+    });
+    const anchorElement = oppositeCorner
+      ? handleElementsRef.current[oppositeCorner]
+      : null;
+    const anchorRect = anchorElement?.getBoundingClientRect?.();
     const pointer = getClientPoint(event);
-    const resizeState = getResizeSession(
-      editor,
-      handleElementsRef,
-      edgeElementsRef,
-      handle,
-      pointer,
-      nodeId,
-      isShapeNode
-    );
 
-    if (!resizeState) {
+    if (!(anchorRect && pointer)) {
       return;
     }
 
-    setActiveResizeCorner(handle.length === 2 ? handle : null);
+    const anchorClient = getRectCenter(anchorRect);
+    const anchorCanvas = getCanvasPoint(editor, anchorClient.x, anchorClient.y);
+
+    if (!anchorCanvas) {
+      return;
+    }
+
+    const resizeSession = editor.beginResizeSelection({
+      anchorCanvas,
+      nodeIds,
+    });
+
+    if (!resizeSession) {
+      return;
+    }
+
+    setActiveResizeCorner(corner);
     editor.setHoveringSuppressed(true);
     const historyMark = editor.markHistoryStep("resize selection");
+    const startDistance = Math.max(
+      Math.hypot(pointer.x - anchorClient.x, pointer.y - anchorClient.y),
+      1
+    );
 
     const handlePointerMove = (moveEvent) => {
-      if (isShapeNode) {
-        const pointCanvas = getCanvasPoint(
-          editor,
-          moveEvent.clientX,
-          moveEvent.clientY
-        );
-
-        if (!pointCanvas) {
-          return;
-        }
-
-        editor.updateResizeSelection(resizeState.resizeSession, {
-          pointCanvas,
-          preserveAspectRatio: moveEvent.shiftKey,
-        });
-        return;
-      }
-
       const scale = getResizeScale(
         getClientPoint(moveEvent),
-        resizeState.anchorClient,
-        resizeState.startDistance
+        anchorClient,
+        startDistance
       );
 
       if (!Number.isFinite(scale)) {
         return;
       }
 
-      editor.updateResizeSelection(resizeState.resizeSession, { scale });
+      editor.updateResizeSelection(resizeSession, { scale });
     };
 
     const handlePointerEnd = () => {
@@ -574,7 +343,7 @@ export const CanvasSingleNodeTransformOverlay = ({
       y: overlayRect.top + overlayRect.height / 2,
     };
     const startPoint = getClientPoint(event);
-    const rotateSession = editor.beginRotateSelection({ nodeId });
+    const rotateSession = editor.beginRotateSelection({ nodeIds });
 
     if (!(startPoint && rotateSession)) {
       return;
@@ -627,6 +396,44 @@ export const CanvasSingleNodeTransformOverlay = ({
     window.addEventListener("pointerup", handlePointerEnd);
   };
 
+  const handleDoubleClick = (event) => {
+    if (!selectedGroupNodeId) {
+      return;
+    }
+
+    const targetNodeId = document
+      .elementsFromPoint(event.clientX, event.clientY)
+      .find(
+        (element) => element instanceof HTMLElement && element.dataset.nodeId
+      )
+      ?.getAttribute("data-node-id");
+
+    if (
+      !(
+        targetNodeId && editor.isDescendantOf(targetNodeId, selectedGroupNodeId)
+      )
+    ) {
+      return;
+    }
+
+    if (
+      openCanvasNodeEditingMode(editor, targetNodeId, {
+        clientPoint: {
+          x: event.clientX,
+          y: event.clientY,
+        },
+      })
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    drillIntoGroupSelection(editor, targetNodeId);
+  };
+
   return (
     <ContextMenu>
       <ContextMenuTrigger
@@ -634,22 +441,12 @@ export const CanvasSingleNodeTransformOverlay = ({
           // biome-ignore lint/a11y/noStaticElementInteractions: editor transform overlays are pointer-only interaction surfaces
           // biome-ignore lint/a11y/noNoninteractiveElementInteractions: editor transform overlays are not semantic controls
           <div
-            className={`canvas-moveable canvas-single-node-transform-overlay moveable-control-box absolute ${cursorClassName}`}
-            onDoubleClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              openCanvasNodeEditingMode(editor, nodeId, {
-                clientPoint: {
-                  x: event.clientX,
-                  y: event.clientY,
-                },
-              });
-            }}
+            className={`canvas-moveable canvas-multi-selection moveable-control-box absolute ${cursorClassName}`}
+            onDoubleClick={handleDoubleClick}
             onPointerDown={startSelectionDrag}
             style={{
               height: `${overlayRect.height}px`,
               left: `${overlayRect.left}px`,
-              pointerEvents: isDraggable ? "auto" : "none",
               top: `${overlayRect.top}px`,
               transform: overlayRect.transform,
               transformOrigin: "center center",
@@ -658,39 +455,29 @@ export const CanvasSingleNodeTransformOverlay = ({
           />
         }
       >
-        <CanvasSelectionPathGhost ghost={selectionGhost} />
+        <div
+          className="moveable-line absolute top-0 left-0 w-full"
+          style={{ height: "1.5px" }}
+        />
+        <div
+          className="moveable-line absolute bottom-0 left-0 w-full"
+          style={{ height: "1.5px" }}
+        />
+        <div
+          className="moveable-line absolute top-0 left-0 h-full"
+          style={{ width: "1.5px" }}
+        />
+        <div
+          className="moveable-line absolute top-0 right-0 h-full"
+          style={{ width: "1.5px" }}
+        />
 
-        {(["n", "s", "w", "e"] as const).map((edge) => {
-          return (
-            <div
-              className={`absolute ${isShapeNode ? edgeCursorClassName[edge] : ""}`}
-              data-edge={edge}
-              key={edge}
-              onPointerDown={
-                isShapeNode ? (event) => startResize(edge, event) : undefined
-              }
-              ref={(element) => {
-                edgeElementsRef.current[edge] = element;
-              }}
-              style={{
-                ...edgeHitAreaStyle[edge],
-                pointerEvents: isShapeNode ? "auto" : "none",
-              }}
-            >
-              <div
-                className="moveable-line absolute"
-                style={edgeLineStyle[edge]}
-              />
-            </div>
-          );
-        })}
-
-        {(["nw", "ne", "sw", "se"] as const).map((corner) => {
+        {CORNERS.map((corner) => {
           return (
             <div key={corner}>
               {isRotatable ? (
                 <div
-                  className="canvas-rotation-zone canvas-single-node-rotation-zone canvas-cursor-rotate pointer-events-auto absolute"
+                  className="canvas-rotation-zone canvas-multi-node-rotation-zone canvas-cursor-rotate absolute"
                   data-corner={corner}
                   onPointerDown={(event) => startRotate(corner, event)}
                   style={{
@@ -706,7 +493,7 @@ export const CanvasSingleNodeTransformOverlay = ({
               ) : null}
 
               <button
-                className={`moveable-control moveable-${corner} canvas-single-node-control pointer-events-auto absolute ${resizeCursorClassName[corner]}`}
+                className={`moveable-control moveable-${corner} canvas-multi-node-control absolute ${resizeCursorClassName[corner]}`}
                 onPointerDown={(event) => startResize(corner, event)}
                 ref={(element) => {
                   handleElementsRef.current[corner] = element;
@@ -727,7 +514,9 @@ export const CanvasSingleNodeTransformOverlay = ({
           );
         })}
       </ContextMenuTrigger>
-      <NodeContextMenuItems nodeId={nodeId} />
+      {contextMenuNodeId ? (
+        <NodeContextMenuItems nodeId={contextMenuNodeId} />
+      ) : null}
     </ContextMenu>
   );
 };

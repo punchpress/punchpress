@@ -47,6 +47,7 @@ export const getEditorDebugDump = (editor) => {
 
         if (node.type === "shape") {
           return {
+            cornerRadii: node.cornerRadii || null,
             cornerRadius: node.cornerRadius ?? 0,
             fill: node.fill,
             font: null,

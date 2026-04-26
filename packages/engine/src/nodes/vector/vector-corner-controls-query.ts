@@ -310,11 +310,10 @@ const getDetectedVectorRoundCornerControlFromStart = (
     return null;
   }
 
-  const maxCutDistance =
-    Math.min(
-      getPointDistance(virtualCorner.point, previousSegment.point),
-      getPointDistance(virtualCorner.point, nextSegment.point)
-    ) / 2;
+  const maxCutDistance = Math.min(
+    getPointDistance(virtualCorner.point, previousSegment.point),
+    getPointDistance(virtualCorner.point, nextSegment.point)
+  );
 
   return {
     anchor: virtualCorner.point,

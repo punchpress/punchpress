@@ -43,7 +43,5 @@ export const getRotateCursorRotationDegrees = (
 const normalizeRotation = (rotationDegrees: number) => {
   const normalizedRotation = rotationDegrees % 360;
 
-  return normalizedRotation < 0
-    ? normalizedRotation + 360
-    : normalizedRotation;
+  return normalizedRotation < 0 ? normalizedRotation + 360 : normalizedRotation;
 };

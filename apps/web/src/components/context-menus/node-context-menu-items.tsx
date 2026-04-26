@@ -76,15 +76,22 @@ const GroupNodeContextMenuItems = ({
 };
 
 const CompoundNodeContextMenuItems = ({
+  canConvertShapeToPath,
   canMakeCompoundPath,
   canReleaseCompoundPath,
   compoundOperationTarget,
+  singleTargetNodeId,
   targetNodeIds,
 }) => {
   const editor = useEditor();
 
   if (
-    !(canMakeCompoundPath || canReleaseCompoundPath || compoundOperationTarget)
+    !(
+      canConvertShapeToPath ||
+      canMakeCompoundPath ||
+      canReleaseCompoundPath ||
+      compoundOperationTarget
+    )
   ) {
     return null;
   }
@@ -98,6 +105,18 @@ const CompoundNodeContextMenuItems = ({
   return (
     <>
       <ContextMenuSeparator />
+      {canConvertShapeToPath && singleTargetNodeId ? (
+        <ContextMenuItem
+          onClick={() => editor.convertShapeToPath(singleTargetNodeId)}
+        >
+          <LayerGlyph
+            icon={GeometricShapes01Icon}
+            size={17}
+            strokeWidth={1.7}
+          />
+          Convert to path
+        </ContextMenuItem>
+      ) : null}
       {canReleaseCompoundPath ? (
         <ContextMenuItem
           onClick={() => editor.releaseCompoundPath(targetNodeIds)}
@@ -203,12 +222,15 @@ export const NodeContextMenuItems = ({
         {contextMenuState.visibilityLabel}
       </ContextMenuItem>
       <CompoundNodeContextMenuItems
+        canConvertShapeToPath={contextMenuState.canConvertShapeToPath}
         canMakeCompoundPath={contextMenuState.canMakeCompoundPath}
         canReleaseCompoundPath={contextMenuState.canReleaseCompoundPath}
         compoundOperationTarget={contextMenuState.compoundOperationTarget}
+        singleTargetNodeId={contextMenuState.singleTargetNodeId}
         targetNodeIds={contextMenuState.targetNodeIds}
       />
-      {contextMenuState.canMakeCompoundPath ||
+      {contextMenuState.canConvertShapeToPath ||
+      contextMenuState.canMakeCompoundPath ||
       contextMenuState.canReleaseCompoundPath ||
       contextMenuState.compoundOperationTarget ? null : (
         <ContextMenuSeparator />

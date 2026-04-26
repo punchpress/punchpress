@@ -3,6 +3,7 @@
   "nodes": [
     {
       "id": "label-group-node",
+      "name": "Label Group",
       "type": "group",
       "parentId": "root",
       "visible": true,

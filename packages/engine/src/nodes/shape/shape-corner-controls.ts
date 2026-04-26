@@ -1,4 +1,5 @@
 import {
+  areCornerRadiiEquivalent,
   clampCornerRadius,
   normalizeCornerRadius,
 } from "../../primitives/corner-radius";
@@ -33,7 +34,7 @@ const addScaledPoint = (point, direction, distance) => {
   };
 };
 
-export const getRoundedPolygonCorner = (points, index, cornerRadius) => {
+export const getRoundedPointShapeCorner = (points, index, cornerRadius) => {
   const point = points[index];
   const previousPoint = points[(index - 1 + points.length) % points.length];
   const nextPoint = points[(index + 1) % points.length];
@@ -115,9 +116,58 @@ export const getRoundedPolygonCorner = (points, index, cornerRadius) => {
   };
 };
 
-export const buildRoundedPolygonPath = (points, cornerRadius) => {
+const getCornerRadiusAt = (cornerRadius, cornerRadii, index) => {
+  return clampCornerRadius(
+    typeof cornerRadii?.[index] === "number"
+      ? cornerRadii[index]
+      : (cornerRadius ?? 0)
+  );
+};
+
+const getEligibleShapeCornerControls = (
+  points,
+  cornerRadius,
+  cornerRadii = null,
+  selectedPoints = null
+) => {
+  const targetPoints =
+    selectedPoints?.length > 0
+      ? selectedPoints.filter((point) => point?.contourIndex === 0)
+      : points?.map((_, segmentIndex) => ({
+          contourIndex: 0,
+          segmentIndex,
+        })) || [];
+
+  return targetPoints
+    .map((point) => {
+      const control = getPointShapePointCornerControl(
+        points,
+        point,
+        cornerRadius,
+        cornerRadii
+      );
+
+      return control
+        ? {
+            ...control,
+            point,
+          }
+        : null;
+    })
+    .filter(Boolean);
+};
+
+export const buildRoundedPointShapePath = (
+  points,
+  cornerRadius,
+  cornerRadii = null
+) => {
   const corners = points.map((_, index) => {
-    return getRoundedPolygonCorner(points, index, cornerRadius);
+    return getRoundedPointShapeCorner(
+      points,
+      index,
+      getCornerRadiusAt(cornerRadius, cornerRadii, index)
+    );
   });
   const startPoint = corners[0]?.start || points[0];
 
@@ -147,42 +197,58 @@ export const buildRoundedPolygonPath = (points, cornerRadius) => {
     .join(" ");
 };
 
-export const canRoundPolygonPoint = (points, point) => {
+export const canRoundPointShapePoint = (points, point) => {
   if (!point) {
     return false;
   }
 
-  return Boolean(getRoundedPolygonCorner(points, point.segmentIndex, 1));
+  return Boolean(getRoundedPointShapeCorner(points, point.segmentIndex, 1));
 };
 
-export const getPolygonPointCornerControl = (points, point, cornerRadius) => {
+export const getPointShapePointCornerControl = (
+  points,
+  point,
+  cornerRadius,
+  cornerRadii = null
+) => {
   if (!point) {
     return null;
   }
 
-  return (
-    getRoundedPolygonCorner(
+  const currentRadius = getCornerRadiusAt(
+    cornerRadius,
+    cornerRadii,
+    point.segmentIndex
+  );
+  const control =
+    getRoundedPointShapeCorner(
       points,
       point.segmentIndex,
-      Math.max(cornerRadius ?? 0, 1)
-    ) || null
-  );
+      Math.max(currentRadius, 1)
+    ) || null;
+
+  if (!control) {
+    return null;
+  }
+
+  return {
+    ...control,
+    currentRadius: clampCornerRadius(currentRadius, 0, control.maxRadius),
+  };
 };
 
-export const getPolygonCornerRadiusSummary = (points, cornerRadius) => {
-  const controls =
-    points
-      ?.map((_, segmentIndex) => {
-        return getPolygonPointCornerControl(
-          points,
-          {
-            contourIndex: 0,
-            segmentIndex,
-          },
-          cornerRadius
-        );
-      })
-      .filter(Boolean) || [];
+export const getPointShapeCornerRadiusSummary = (
+  points,
+  cornerRadius,
+  cornerRadii = null,
+  selectedPoints = null
+) => {
+  const controls = getEligibleShapeCornerControls(
+    points,
+    cornerRadius,
+    cornerRadii,
+    selectedPoints
+  );
   const eligibleCount = controls.length;
 
   if (eligibleCount === 0) {
@@ -192,12 +258,30 @@ export const getPolygonCornerRadiusSummary = (points, cornerRadius) => {
   const max = controls.reduce((currentMax, control) => {
     return Math.min(currentMax, control.maxRadius);
   }, Number.POSITIVE_INFINITY);
-  const value = clampCornerRadius(cornerRadius ?? 0, 0, max);
+  const values = controls.map((control) => {
+    return clampCornerRadius(control.currentRadius ?? 0, 0, control.maxRadius);
+  });
+  const [firstValue = 0] = values;
+  const isMixed = values.some((value) => {
+    return !areCornerRadiiEquivalent(value, firstValue);
+  });
+  const value = isMixed
+    ? null
+    : normalizeCornerRadius(
+        values.reduce((sum, currentValue) => sum + currentValue, 0) /
+          Math.max(values.length, 1)
+      );
 
   return {
     eligibleCount,
-    isMixed: false,
+    isMixed,
     max: normalizeCornerRadius(max),
     value,
   };
 };
+
+export const getRoundedPolygonCorner = getRoundedPointShapeCorner;
+export const buildRoundedPolygonPath = buildRoundedPointShapePath;
+export const canRoundPolygonPoint = canRoundPointShapePoint;
+export const getPolygonPointCornerControl = getPointShapePointCornerControl;
+export const getPolygonCornerRadiusSummary = getPointShapeCornerRadiusSummary;

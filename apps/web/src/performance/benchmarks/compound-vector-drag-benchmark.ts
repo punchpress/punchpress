@@ -1,11 +1,11 @@
 import {
   createDefaultPathNode,
-  createDefaultVectorNode,
+  createDefaultVectorContainerNode,
 } from "@punchpress/engine";
 import { saveDesignDocument } from "@punchpress/punch-schema";
 import type { PerformanceBenchmarkDefinition } from "../performance-benchmark-types";
 
-type BenchmarkVectorNode = ReturnType<typeof createDefaultVectorNode>;
+type BenchmarkVectorNode = ReturnType<typeof createDefaultVectorContainerNode>;
 type BenchmarkPathNode = ReturnType<typeof createDefaultPathNode>;
 
 const createRectangleSegments = (width: number, height: number) => {
@@ -46,7 +46,7 @@ const createCompoundVectorScene = (nodeCount: number) => {
   const vectorIds: string[] = [];
 
   for (let index = 0; index < nodeCount; index += 1) {
-    const vectorNode = createDefaultVectorNode();
+    const vectorNode = createDefaultVectorContainerNode();
     const outerPath = createDefaultPathNode(vectorNode.id);
     const innerPath = createDefaultPathNode(vectorNode.id);
     const column = index % columnCount;
@@ -54,7 +54,6 @@ const createCompoundVectorScene = (nodeCount: number) => {
     const x = 1100 + column * 360;
     const y = 1300 + row * 300;
 
-    vectorNode.contours = [];
     vectorNode.parentId = "root";
     vectorNode.pathComposition = "compound-fill";
     vectorNode.transform = {

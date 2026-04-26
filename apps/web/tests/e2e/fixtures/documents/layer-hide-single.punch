@@ -3,6 +3,7 @@
   "nodes": [
     {
       "id": "hide-single-node",
+      "parentId": "root",
       "type": "text",
       "text": "Hide me",
       "font": {

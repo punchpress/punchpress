@@ -14,7 +14,7 @@ const resizeSingleNodeFromCorner = async (page, { corner, drag }) => {
   await page.evaluate(
     async ({ corner, drag }) => {
       const handle = document.querySelector(
-        `.canvas-single-node-transform-overlay .moveable-control.moveable-${corner}`
+        `.canvas-single-selection .moveable-control.moveable-${corner}`
       );
       const rect = handle?.getBoundingClientRect?.();
 

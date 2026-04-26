@@ -1,4 +1,5 @@
 import { getNodeX, getNodeY } from "../nodes/text/model";
+import { getShapeCornerRadiusSummary } from "../nodes/shape/shape-engine";
 import {
   areCornerRadiiEquivalent,
   clampCornerRadius,
@@ -53,6 +54,7 @@ const cornerRadiusDescriptor = createPropertyDescriptor({
   id: "cornerRadius",
   isEqual: areCornerRadiiEquivalent,
   setValue: (_node, value) => ({
+    cornerRadii: undefined,
     cornerRadius: clampCornerRadius(value),
   }),
 });
@@ -60,7 +62,29 @@ const cornerRadiusDescriptor = createPropertyDescriptor({
 const shapeDescriptor = createPropertyDescriptor({
   getValue: (node) => node.shape,
   id: "shape",
-  setValue: (_node, value) => ({ shape: value }),
+  setValue: (node, value) => {
+    const patch = {
+      cornerRadii: undefined,
+      shape: value,
+    };
+    const cornerSummary = getShapeCornerRadiusSummary({
+      ...node,
+      ...patch,
+    });
+
+    if (!cornerSummary) {
+      return patch;
+    }
+
+    return {
+      ...patch,
+      cornerRadius: clampCornerRadius(
+        node.cornerRadius ?? 0,
+        0,
+        cornerSummary.max
+      ),
+    };
+  },
 });
 
 const textDescriptor = createPropertyDescriptor({

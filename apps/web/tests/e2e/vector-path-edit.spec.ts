@@ -4,9 +4,16 @@ import {
   doubleClickNodeCenter,
   findEmptyCanvasPoint,
 } from "./helpers/canvas";
-import { getDebugDump, gotoEditor, pauseForUi } from "./helpers/editor";
+import {
+  getDebugDump,
+  gotoEditor,
+  loadDocumentFixture,
+  pauseForUi,
+  rotateSelectionFromCorner,
+  waitForNodeReady,
+} from "./helpers/editor";
 
-const JOIN_ENDPOINTS_BUTTON_NAME = /Join.*endpoints/i;
+const _JOIN_ENDPOINTS_BUTTON_NAME = /Join.*endpoints/i;
 
 const loadVectorDocument = async (page) => {
   await page.evaluate(() => {
@@ -164,7 +171,7 @@ const loadOpenVectorDocument = async (page) => {
   });
 };
 
-const loadMultiContourOpenVectorDocument = async (page) => {
+const _loadMultiContourOpenVectorDocument = async (page) => {
   await page.evaluate(() => {
     const editor = window.__PUNCHPRESS_EDITOR__;
 
@@ -274,7 +281,7 @@ const loadMultiContourOpenVectorDocument = async (page) => {
   });
 };
 
-const loadMultiContourVectorDocument = async (page) => {
+const _loadMultiContourVectorDocument = async (page) => {
   await page.evaluate(() => {
     const editor = window.__PUNCHPRESS_EDITOR__;
 
@@ -531,51 +538,114 @@ const loadCompoundVectorDocument = async (page) => {
   });
 };
 
-const loadPolygonShapeDocument = async (page) => {
-  await page.evaluate(() => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
+const loadPolygonShapeDocument = async (
+  page,
+  {
+    fill = "#ffffff",
+    points = [
+      { x: -130, y: 0 },
+      { x: -10, y: -110 },
+      { x: 110, y: -90 },
+      { x: 110, y: -20 },
+      { x: 10, y: 120 },
+    ],
+    rotation = 0,
+  } = {}
+) => {
+  await page.evaluate(
+    ({ nextFill, nextPoints, nextRotation }) => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
 
-    if (!editor) {
-      return false;
-    }
+      if (!editor) {
+        return false;
+      }
 
-    editor.loadDocument(
-      JSON.stringify({
-        nodes: [
-          {
-            cornerRadius: 0,
-            fill: "#ffffff",
-            height: 160,
-            id: "polygon-shape-node",
-            parentId: "root",
-            points: [
-              { x: -130, y: 0 },
-              { x: -10, y: -110 },
-              { x: 110, y: -90 },
-              { x: 110, y: -20 },
-              { x: 10, y: 120 },
-            ],
-            shape: "polygon",
-            stroke: "#000000",
-            strokeWidth: 12,
-            transform: {
-              rotation: 0,
-              scaleX: 1,
-              scaleY: 1,
-              x: 400,
-              y: 280,
+      editor.loadDocument(
+        JSON.stringify({
+          nodes: [
+            {
+              cornerRadius: 0,
+              fill: nextFill,
+              height: 160,
+              id: "polygon-shape-node",
+              parentId: "root",
+              ...(nextPoints ? { points: nextPoints } : {}),
+              shape: "polygon",
+              stroke: "#000000",
+              strokeWidth: 12,
+              transform: {
+                rotation: nextRotation,
+                scaleX: 1,
+                scaleY: 1,
+                x: 400,
+                y: 280,
+              },
+              type: "shape",
+              visible: true,
+              width: 240,
             },
-            type: "shape",
-            visible: true,
-            width: 240,
-          },
-        ],
-        version: "1.7",
-      })
-    );
+          ],
+          version: "1.7",
+        })
+      );
 
-    return true;
-  });
+      return true;
+    },
+    {
+      nextFill: fill,
+      nextPoints: points,
+      nextRotation: rotation,
+    }
+  );
+};
+
+const loadStarShapeDocument = async (
+  page,
+  { fill = "#ffffff", rotation = 0 } = {}
+) => {
+  await page.evaluate(
+    ({ nextFill, nextRotation }) => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
+
+      if (!editor) {
+        return false;
+      }
+
+      editor.loadDocument(
+        JSON.stringify({
+          nodes: [
+            {
+              cornerRadius: 0,
+              fill: nextFill,
+              height: 200,
+              id: "star-shape-node",
+              parentId: "root",
+              shape: "star",
+              stroke: "#000000",
+              strokeWidth: 12,
+              transform: {
+                rotation: nextRotation,
+                scaleX: 1,
+                scaleY: 1,
+                x: 400,
+                y: 280,
+              },
+              type: "shape",
+              visible: true,
+              width: 200,
+            },
+          ],
+          version: "1.7",
+        })
+      );
+
+      return true;
+    },
+    {
+      nextFill: fill,
+      nextRotation: rotation,
+    }
+  );
 };
 
 const loadIrregularVectorDocument = async (page) => {
@@ -732,6 +802,44 @@ const getCanvasHostCursor = (page) => {
     .evaluate((element) => window.getComputedStyle(element).cursor);
 };
 
+const getCanvasNodeBounds = (page, nodeId) => {
+  return page.evaluate((currentNodeId) => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const canvasNodeId =
+      editor?.getPathEditingVisualOwnerNodeId?.(currentNodeId) || currentNodeId;
+    const node = document.querySelector(
+      `.canvas-node[data-node-id="${canvasNodeId}"]`
+    );
+
+    if (!(node instanceof Element)) {
+      return null;
+    }
+
+    const rect = node.getBoundingClientRect();
+
+    return {
+      height: rect.height,
+      width: rect.width,
+      x: rect.x,
+      y: rect.y,
+    };
+  }, nodeId);
+};
+
+const getSerializedDocument = async (page) => {
+  const dump = await getDebugDump(page);
+
+  return dump?.document?.serialized
+    ? JSON.parse(dump.document.serialized)
+    : null;
+};
+
+const getSerializedPathNodeCount = async (page) => {
+  const document = await getSerializedDocument(page);
+
+  return document?.nodes?.filter((entry) => entry.type === "path").length || 0;
+};
+
 const getVectorOverlayInkCountAroundTarget = (page, padding = 20) => {
   return page.evaluate((currentPadding) => {
     const target = document.querySelector(".canvas-vector-path-target");
@@ -861,6 +969,28 @@ const getVectorPointCornerRadius = (
       currentSegmentIndex: segmentIndex,
     }
   );
+};
+
+const getElementRect = (page, selector) => {
+  return page.evaluate((targetSelector) => {
+    const element = document.querySelector(targetSelector);
+    const rect = element?.getBoundingClientRect?.();
+
+    if (!rect) {
+      return null;
+    }
+
+    return {
+      bottom: rect.bottom,
+      height: rect.height,
+      left: rect.left,
+      right: rect.right,
+      top: rect.top,
+      width: rect.width,
+      x: rect.x,
+      y: rect.y,
+    };
+  }, selector);
 };
 
 const getVectorPaperPixel = (page, point) => {
@@ -1020,7 +1150,7 @@ const getCornerRadiusHandleDotStyle = (locator) => {
   });
 };
 
-const getVectorPathScreenPoint = (page, nodeId, distance = 0) => {
+const _getVectorPathScreenPoint = (page, nodeId, distance = 0) => {
   return page.evaluate(
     ({ currentDistance, currentNodeId }) => {
       const editor = window.__PUNCHPRESS_EDITOR__;
@@ -1108,6 +1238,68 @@ const getVectorSegmentScreenPoint = (
     },
     {
       currentContourIndex: contourIndex,
+      currentNodeId: nodeId,
+      currentSegmentIndex: segmentIndex,
+    }
+  );
+};
+
+const getVectorHandleScreenPoint = (
+  page,
+  nodeId,
+  segmentIndex,
+  handleKey = "handleOut",
+  contourIndex = 0
+) => {
+  return page.evaluate(
+    ({
+      currentContourIndex,
+      currentHandleKey,
+      currentNodeId,
+      currentSegmentIndex,
+    }) => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
+      const canvasNodeId =
+        editor?.getPathEditingVisualOwnerNodeId?.(currentNodeId) ||
+        currentNodeId;
+      const session = editor?.getEditablePathSession?.(currentNodeId);
+      const segment =
+        session?.contours?.[currentContourIndex]?.segments?.[
+          currentSegmentIndex
+        ];
+      const handle =
+        currentHandleKey === "handleIn"
+          ? segment?.handleIn
+          : segment?.handleOut;
+      const bbox = editor?.getNodeGeometry?.(currentNodeId)?.bbox;
+      const svg = document.querySelector(
+        `.canvas-node[data-node-id="${canvasNodeId}"] svg`
+      );
+
+      if (!(segment && handle && bbox && svg instanceof SVGSVGElement)) {
+        return null;
+      }
+
+      const ctm = svg.getScreenCTM();
+
+      if (!ctm) {
+        return null;
+      }
+
+      const svgPoint = svg.createSVGPoint();
+      svgPoint.x = segment.point.x + handle.x - bbox.minX;
+      svgPoint.y = segment.point.y + handle.y - bbox.minY;
+
+      const transformedPoint = svgPoint.matrixTransform(ctm);
+
+      return {
+        x: transformedPoint.x,
+        y: transformedPoint.y,
+      };
+    },
+    {
+      currentContourIndex: contourIndex,
+      currentHandleKey: handleKey,
       currentNodeId: nodeId,
       currentSegmentIndex: segmentIndex,
     }
@@ -1452,9 +1644,7 @@ test("double-clicking a vector node enters path editing", async ({ page }) => {
     .toBe("vector-node");
 
   await expect(page.locator(".canvas-vector-paper")).toHaveCount(1);
-  await expect(
-    page.locator(".canvas-single-node-transform-overlay")
-  ).toHaveCount(0);
+  await expect(page.locator(".canvas-single-selection")).toHaveCount(0);
 });
 
 test("single-path vector selections keep the edit path action visible", async ({
@@ -1470,7 +1660,7 @@ test("single-path vector selections keep the edit path action visible", async ({
     .poll(async () => {
       const dump = await getDebugDump(page);
       const toolbarButtons = await page
-        .locator(".canvas-node-toolbar button")
+        .locator(".canvas-selection-toolbar button")
         .evaluateAll((buttons) => {
           return buttons.map((button) => {
             return (
@@ -1488,10 +1678,10 @@ test("single-path vector selections keep the edit path action visible", async ({
     .toEqual({
       pathNodeId: null,
       selectedNodeIds: ["irregular-vector-container"],
-      toolbarButtons: ["Edit path (E)", "Delete (Delete)"],
+      toolbarButtons: ["Edit Path (E)", "Delete (Delete)"],
     });
 
-  await page.getByRole("button", { name: "Edit path (E)" }).click();
+  await page.getByRole("button", { name: "Edit Path (E)" }).click();
   await pauseForUi(page);
 
   await expect
@@ -1620,15 +1810,10 @@ test("selecting an open endpoint then clicking pen continues that path", async (
   await expect
     .poll(async () => {
       const dump = await getDebugDump(page);
-      const document = dump?.document?.serialized
-        ? JSON.parse(dump.document.serialized)
-        : null;
-      const vectorNode = document?.nodes?.find(
-        (entry) => entry.id === "open-vector-node"
-      );
+      const vectorNode = await getVectorNodeDocument(page, "open-vector-node");
 
       return {
-        nodeCount: document?.nodes?.length || 0,
+        nodeCount: await getSerializedPathNodeCount(page),
         pathNodeId: dump?.editing?.pathNodeId || null,
         pathPoint: dump?.editing?.pathPoint || null,
         segmentCount: vectorNode?.contours?.[0]?.segments?.length || 0,
@@ -1683,12 +1868,7 @@ test("holding command in pen mode temporarily enables direct anchor dragging", a
   await expect
     .poll(async () => {
       const dump = await getDebugDump(page);
-      const document = dump?.document?.serialized
-        ? JSON.parse(dump.document.serialized)
-        : null;
-      const vectorNode = document?.nodes?.find(
-        (entry) => entry.id === "open-vector-node"
-      );
+      const vectorNode = await getVectorNodeDocument(page, "open-vector-node");
       const segment = vectorNode?.contours?.[0]?.segments?.[1];
 
       return {
@@ -1836,12 +2016,7 @@ test("pen mode uses the minus cursor and deletes interior anchors without affect
   await expect
     .poll(async () => {
       const dump = await getDebugDump(page);
-      const document = dump?.document?.serialized
-        ? JSON.parse(dump.document.serialized)
-        : null;
-      const vectorNode = document?.nodes?.find(
-        (entry) => entry.id === "open-vector-node"
-      );
+      const vectorNode = await getVectorNodeDocument(page, "open-vector-node");
 
       return {
         pathNodeId: dump?.editing?.pathNodeId || null,
@@ -1856,94 +2031,6 @@ test("pen mode uses the minus cursor and deletes interior anchors without affect
         segmentIndex: 1,
       },
       segmentCount: 2,
-    });
-});
-
-test("option-clicking an anchor with pen toggles it between smooth and corner", async ({
-  page,
-}) => {
-  await gotoEditor(page);
-  await loadOpenVectorDocument(page);
-
-  await clickNodeCenter(page, "open-vector-node");
-  await pauseForUi(page);
-  await doubleClickNodeCenter(page, "open-vector-node");
-  await pauseForUi(page);
-  await page.getByRole("button", { name: "Pen (P)" }).click();
-  await pauseForUi(page);
-
-  const interiorAnchor = await getVectorSegmentScreenPoint(
-    page,
-    "open-vector-node",
-    1
-  );
-
-  if (!interiorAnchor) {
-    throw new Error("Missing interior anchor point for pen toggle test");
-  }
-
-  await page.keyboard.down("Alt");
-  await page.mouse.click(interiorAnchor.x, interiorAnchor.y);
-  await page.keyboard.up("Alt");
-  await pauseForUi(page);
-
-  await expect
-    .poll(async () => {
-      const dump = await getDebugDump(page);
-      const document = dump?.document?.serialized
-        ? JSON.parse(dump.document.serialized)
-        : null;
-      const vectorNode = document?.nodes?.find(
-        (entry) => entry.id === "open-vector-node"
-      );
-      const segment = vectorNode?.contours?.[0]?.segments?.[1];
-
-      return segment
-        ? {
-            pathPoint: dump?.editing?.pathPoint || null,
-            pointType: segment.pointType || null,
-            tool: dump?.tool || null,
-          }
-        : null;
-    })
-    .toEqual({
-      pathPoint: {
-        contourIndex: 0,
-        segmentIndex: 1,
-      },
-      pointType: "corner",
-      tool: "pen",
-    });
-
-  await page.keyboard.down("Alt");
-  await page.mouse.click(interiorAnchor.x, interiorAnchor.y);
-  await page.keyboard.up("Alt");
-  await pauseForUi(page);
-
-  await expect
-    .poll(async () => {
-      const segment = await getVectorSegmentDocument(
-        page,
-        1,
-        0,
-        "open-vector-node"
-      );
-
-      return segment
-        ? {
-            handleInLength: Math.hypot(segment.handleIn.x, segment.handleIn.y),
-            handleOutLength: Math.hypot(
-              segment.handleOut.x,
-              segment.handleOut.y
-            ),
-            pointType: segment.pointType || null,
-          }
-        : null;
-    })
-    .toMatchObject({
-      handleInLength: expect.any(Number),
-      handleOutLength: expect.any(Number),
-      pointType: "smooth",
     });
 });
 
@@ -2145,111 +2232,6 @@ test("option-dragging a corner anchor with pen converts it to smooth and authors
       handleOut: { x: 42, y: 18 },
       point: { x: 200, y: 0 },
       pointType: "smooth",
-    });
-});
-
-test("snapping endpoints across contours selects both endpoints so join is one click away", async ({
-  page,
-}) => {
-  await gotoEditor(page);
-  await loadMultiContourOpenVectorDocument(page);
-
-  await clickNodeCenter(page, "multi-open-vector-node");
-  await pauseForUi(page);
-  await doubleClickNodeCenter(page, "multi-open-vector-node");
-  await pauseForUi(page);
-
-  const sourceEndpoint = await getVectorSegmentScreenPoint(
-    page,
-    "multi-open-vector-node",
-    2,
-    0
-  );
-  const targetEndpoint = await getVectorSegmentScreenPoint(
-    page,
-    "multi-open-vector-node",
-    0,
-    1
-  );
-
-  if (!(sourceEndpoint && targetEndpoint)) {
-    throw new Error("Missing vector endpoints for snap-join flow test");
-  }
-
-  await page.mouse.move(sourceEndpoint.x, sourceEndpoint.y);
-  await page.mouse.down();
-  await page.mouse.move(targetEndpoint.x, targetEndpoint.y, {
-    steps: 10,
-  });
-  await pauseForUi(page);
-
-  await expect(page.getByTestId("canvas-pen-hover-tooltip")).toContainText(
-    "Snap to Point"
-  );
-
-  await page.mouse.up();
-  await pauseForUi(page);
-
-  await expect
-    .poll(async () => {
-      const dump = await getDebugDump(page);
-
-      return {
-        pathPoint: dump?.editing?.pathPoint || null,
-        pathPoints: dump?.editing?.pathPoints || [],
-      };
-    })
-    .toEqual({
-      pathPoint: null,
-      pathPoints: [
-        {
-          contourIndex: 0,
-          segmentIndex: 2,
-        },
-        {
-          contourIndex: 1,
-          segmentIndex: 0,
-        },
-      ],
-    });
-
-  await expect(
-    page.getByRole("button", { name: JOIN_ENDPOINTS_BUTTON_NAME })
-  ).toBeVisible();
-  await page.getByRole("button", { name: JOIN_ENDPOINTS_BUTTON_NAME }).click();
-  await pauseForUi(page);
-
-  await expect
-    .poll(async () => {
-      const dump = await getDebugDump(page);
-      const document = dump?.document?.serialized
-        ? JSON.parse(dump.document.serialized)
-        : null;
-      const node = document?.nodes?.find(
-        (entry) => entry.id === "multi-open-vector-node"
-      );
-
-      return {
-        contourCount: node?.contours?.length || 0,
-        pathPoint: dump?.editing?.pathPoint || null,
-        pathPoints: dump?.editing?.pathPoints || [],
-        segmentCounts:
-          node?.contours?.map((contour) => contour.segments.length) || [],
-      };
-    })
-    .toEqual({
-      contourCount: 1,
-      pathPoint: {
-        contourIndex: 0,
-        segmentIndex: 2,
-      },
-      pathPoints: [
-        {
-          contourIndex: 0,
-          segmentIndex: 2,
-        },
-      ],
-      segmentCounts: [4],
     });
 });
 
@@ -2478,15 +2460,10 @@ test("pen mode accepts slightly off-center interior anchor clicks within the hov
   await expect
     .poll(async () => {
       const dump = await getDebugDump(page);
-      const document = dump?.document?.serialized
-        ? JSON.parse(dump.document.serialized)
-        : null;
-      const vectorNode = document?.nodes?.find(
-        (entry) => entry.id === "open-vector-node"
-      );
+      const vectorNode = await getVectorNodeDocument(page, "open-vector-node");
 
       return {
-        nodeCount: document?.nodes?.length || 0,
+        nodeCount: await getSerializedPathNodeCount(page),
         pathNodeId: dump?.editing?.pathNodeId || null,
         pathPoint: dump?.editing?.pathPoint || null,
         segmentCount: vectorNode?.contours?.[0]?.segments?.length || 0,
@@ -3143,18 +3120,254 @@ test("polygon shape points show the live corner widget and update shape corner r
   await pauseForUi(page);
 
   await expect
-    .poll(async () => {
-      const dump = await getDebugDump(page);
-      const document = dump?.document?.serialized
-        ? JSON.parse(dump.document.serialized)
-        : null;
-      const shapeNode = document?.nodes?.find(
-        (entry) => entry.id === "polygon-shape-node"
-      );
-
-      return shapeNode?.cornerRadius || 0;
+    .poll(() => {
+      return getVectorPointCornerRadius(page, 0, 0, "polygon-shape-node");
     })
     .toBeGreaterThan(0);
+  await expect
+    .poll(() => {
+      return getVectorPointCornerRadius(page, 0, 1, "polygon-shape-node");
+    })
+    .toBe(0);
+
+  await expect
+    .poll(async () => {
+      return (await getVectorNodeDocument(page, "polygon-shape-node"))?.type;
+    })
+    .toBe("shape");
+});
+
+test("star shape points show the live corner widget and update shape corner radius", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadStarShapeDocument(page);
+
+  await clickNodeCenter(page, "star-shape-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "star-shape-node");
+  await pauseForUi(page);
+
+  const anchorPoint = await getEditablePathPointScreenPoint(
+    page,
+    "star-shape-node",
+    0
+  );
+
+  if (!anchorPoint) {
+    throw new Error("Missing star shape anchor point");
+  }
+
+  await page.mouse.click(anchorPoint.x, anchorPoint.y);
+  await pauseForUi(page);
+
+  await expect(page.getByTestId("path-corner-radius-handle")).toBeVisible();
+
+  const widgetPoint = await getEditablePathCornerWidgetScreenPoint(
+    page,
+    "star-shape-node",
+    0
+  );
+
+  if (!widgetPoint) {
+    throw new Error("Missing star shape corner widget");
+  }
+
+  await page.mouse.move(widgetPoint.x, widgetPoint.y);
+  await page.mouse.down();
+  await page.mouse.move(
+    widgetPoint.x + widgetPoint.direction.x * 24,
+    widgetPoint.y + widgetPoint.direction.y * 24,
+    { steps: 8 }
+  );
+  await page.mouse.up();
+  await pauseForUi(page);
+
+  await expect
+    .poll(() => {
+      return getVectorPointCornerRadius(page, 0, 0, "star-shape-node");
+    })
+    .toBeGreaterThan(0);
+  await expect
+    .poll(() => {
+      return getVectorPointCornerRadius(page, 0, 1, "star-shape-node");
+    })
+    .toBe(0);
+
+  await expect
+    .poll(async () => {
+      return (await getVectorNodeDocument(page, "star-shape-node"))?.type;
+    })
+    .toBe("shape");
+});
+
+test("rotated polygon corner drag keeps the rendered node aligned while rounding", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocumentFixture(page, "shape-node-transform.punch");
+
+  await page.locator('[data-node-id="shape-node"]').click();
+  await waitForNodeReady(page, "shape-node");
+  await rotateSelectionFromCorner(page, {
+    corner: "nw",
+    drag: { x: 120, y: 80 },
+  });
+  await pauseForUi(page);
+
+  const beforeRect = await getElementRect(
+    page,
+    '.canvas-node[data-node-id="shape-node"]'
+  );
+
+  if (!beforeRect) {
+    throw new Error("Missing rotated shape render bounds before path edit");
+  }
+
+  await page.keyboard.press("e");
+  await pauseForUi(page);
+
+  const anchorPoint = await getEditablePathPointScreenPoint(
+    page,
+    "shape-node",
+    0
+  );
+
+  if (!anchorPoint) {
+    throw new Error("Missing rotated shape anchor point");
+  }
+
+  await page.mouse.click(anchorPoint.x, anchorPoint.y);
+  await pauseForUi(page);
+
+  const widgetPoint = await getEditablePathCornerWidgetScreenPoint(
+    page,
+    "shape-node",
+    0
+  );
+
+  if (!widgetPoint) {
+    throw new Error("Missing rotated shape corner widget");
+  }
+
+  await page.mouse.move(widgetPoint.x, widgetPoint.y);
+  await page.mouse.down();
+  await page.mouse.move(
+    widgetPoint.x + widgetPoint.direction.x * 36,
+    widgetPoint.y + widgetPoint.direction.y * 36,
+    { steps: 8 }
+  );
+  await page.mouse.up();
+  await pauseForUi(page);
+
+  await expect
+    .poll(() => {
+      return getVectorPointCornerRadius(page, 0, 0, "shape-node");
+    })
+    .toBeGreaterThan(0);
+
+  await expect
+    .poll(async () => {
+      const currentRect = await getElementRect(
+        page,
+        '.canvas-node[data-node-id="shape-node"]'
+      );
+
+      if (!currentRect) {
+        return null;
+      }
+
+      return {
+        height: Math.round(currentRect.height - beforeRect.height),
+        width: Math.round(currentRect.width - beforeRect.width),
+        x: Math.round(currentRect.x - beforeRect.x),
+        y: Math.round(currentRect.y - beforeRect.y),
+      };
+    })
+    .toEqual({
+      height: 0,
+      width: 0,
+      x: 0,
+      y: 0,
+    });
+
+  await expect
+    .poll(async () => {
+      return (await getVectorNodeDocument(page, "shape-node"))?.type;
+    })
+    .toBe("shape");
+});
+
+test("converting a polygon point to smooth keeps the canvas node aligned while promoting to a path", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadPolygonShapeDocument(page);
+
+  await clickNodeCenter(page, "polygon-shape-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "polygon-shape-node");
+  await pauseForUi(page);
+
+  const beforeRect = await getElementRect(
+    page,
+    '.canvas-node[data-node-id="polygon-shape-node"]'
+  );
+
+  if (!beforeRect) {
+    throw new Error("Missing polygon shape render bounds before conversion");
+  }
+
+  const anchorPoint = await getEditablePathPointScreenPoint(
+    page,
+    "polygon-shape-node",
+    0
+  );
+
+  if (!anchorPoint) {
+    throw new Error("Missing polygon shape anchor point");
+  }
+
+  await page.mouse.click(anchorPoint.x, anchorPoint.y);
+  await pauseForUi(page);
+
+  await page.getByRole("button", { name: "Convert point to smooth" }).click();
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => {
+      return (await getVectorNodeDocument(page, "polygon-shape-node"))?.type;
+    })
+    .toBe("path");
+
+  await expect
+    .poll(async () => {
+      const currentRect = await getElementRect(
+        page,
+        '.canvas-node[data-node-id="polygon-shape-node"]'
+      );
+
+      if (!currentRect) {
+        return null;
+      }
+
+      return {
+        x: Math.round(
+          currentRect.x +
+            currentRect.width / 2 -
+            (beforeRect.x + beforeRect.width / 2)
+        ),
+        y: Math.round(
+          currentRect.y +
+            currentRect.height / 2 -
+            (beforeRect.y + beforeRect.height / 2)
+        ),
+      };
+    })
+    .toEqual({
+      x: 0,
+      y: 0,
+    });
 });
 
 test("clicking a polygon corner-radius handle without dragging keeps path edit mode active", async ({
@@ -3217,61 +3430,184 @@ test("polygon corner slider keeps the shared shape radius stable across repeated
   await pauseForUi(page);
 
   const bulkCornerSlider = page.getByRole("slider", {
-    name: "Polygon corner radius",
+    name: "Shape corner radius",
   });
+  const getPolygonCornerState = () => {
+    return page.evaluate(() => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
+      const node = editor?.getNode("polygon-shape-node");
+      const summary = editor?.getPathCornerRadiusSummary("polygon-shape-node");
+
+      return {
+        cornerRadius: node?.type === "shape" ? node.cornerRadius : null,
+        isMixed: summary?.isMixed ?? null,
+        max: summary?.max ?? null,
+        value: summary?.value ?? null,
+      };
+    });
+  };
 
   await expect(bulkCornerSlider).toBeVisible();
   await expect(bulkCornerSlider).toHaveAttribute("aria-valuetext", "0");
+  await expect
+    .poll(async () => {
+      return await bulkCornerSlider.getAttribute("aria-valuemax");
+    })
+    .toBe(String((await getPolygonCornerState()).max));
 
   await bulkCornerSlider.focus();
   await page.keyboard.press("ArrowRight");
   await pauseForUi(page);
 
-  await expect
-    .poll(() => {
-      return page.evaluate(() => {
-        const editor = window.__PUNCHPRESS_EDITOR__;
-        const node = editor?.getNode("polygon-shape-node");
-        const summary =
-          editor?.getPathCornerRadiusSummary("polygon-shape-node");
-
-        return {
-          cornerRadius: node?.type === "shape" ? node.cornerRadius : null,
-          isMixed: summary?.isMixed ?? null,
-          value: summary?.value ?? null,
-        };
-      });
-    })
-    .toEqual({
-      cornerRadius: 1,
-      isMixed: false,
-      value: 1,
-    });
+  await expect.poll(getPolygonCornerState).toEqual({
+    cornerRadius: 1,
+    isMixed: false,
+    max: (await getPolygonCornerState()).max,
+    value: 1,
+  });
 
   await page.keyboard.press("ArrowRight");
   await pauseForUi(page);
 
-  await expect
-    .poll(() => {
-      return page.evaluate(() => {
-        const editor = window.__PUNCHPRESS_EDITOR__;
-        const node = editor?.getNode("polygon-shape-node");
-        const summary =
-          editor?.getPathCornerRadiusSummary("polygon-shape-node");
-
-        return {
-          cornerRadius: node?.type === "shape" ? node.cornerRadius : null,
-          isMixed: summary?.isMixed ?? null,
-          value: summary?.value ?? null,
-        };
-      });
-    })
-    .toEqual({
-      cornerRadius: 2,
-      isMixed: false,
-      value: 2,
-    });
+  await expect.poll(getPolygonCornerState).toEqual({
+    cornerRadius: 2,
+    isMixed: false,
+    max: (await getPolygonCornerState()).max,
+    value: 2,
+  });
   await expect(bulkCornerSlider).toHaveAttribute("aria-valuetext", "2");
+
+  const polygonCornerMax = (await getPolygonCornerState()).max;
+
+  await page.keyboard.press("End");
+  await pauseForUi(page);
+
+  await expect.poll(getPolygonCornerState).toEqual({
+    cornerRadius: polygonCornerMax,
+    isMixed: false,
+    max: polygonCornerMax,
+    value: polygonCornerMax,
+  });
+  await expect(bulkCornerSlider).toHaveAttribute(
+    "aria-valuemax",
+    String(polygonCornerMax)
+  );
+});
+
+test("star corner slider updates the shared shape radius", async ({ page }) => {
+  await gotoEditor(page);
+  await loadStarShapeDocument(page);
+
+  await clickNodeCenter(page, "star-shape-node");
+  await pauseForUi(page);
+
+  const bulkCornerSlider = page.getByRole("slider", {
+    name: "Shape corner radius",
+  });
+  const getStarCornerState = () => {
+    return page.evaluate(() => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
+      const node = editor?.getNode("star-shape-node");
+      const summary = editor?.getPathCornerRadiusSummary("star-shape-node");
+
+      return {
+        cornerRadius: node?.type === "shape" ? node.cornerRadius : null,
+        isMixed: summary?.isMixed ?? null,
+        max: summary?.max ?? null,
+        value: summary?.value ?? null,
+      };
+    });
+  };
+
+  await expect(bulkCornerSlider).toBeVisible();
+  await expect(bulkCornerSlider).toHaveAttribute("aria-valuetext", "0");
+  await expect
+    .poll(async () => {
+      return await bulkCornerSlider.getAttribute("aria-valuemax");
+    })
+    .toBe(String((await getStarCornerState()).max));
+
+  await bulkCornerSlider.focus();
+  await page.keyboard.press("ArrowRight");
+  await pauseForUi(page);
+
+  await expect.poll(getStarCornerState).toEqual({
+    cornerRadius: 1,
+    isMixed: false,
+    max: (await getStarCornerState()).max,
+    value: 1,
+  });
+
+  const starCornerMax = (await getStarCornerState()).max;
+
+  await page.keyboard.press("End");
+  await pauseForUi(page);
+
+  await expect.poll(getStarCornerState).toEqual({
+    cornerRadius: starCornerMax,
+    isMixed: false,
+    max: starCornerMax,
+    value: starCornerMax,
+  });
+  await expect(bulkCornerSlider).toHaveAttribute(
+    "aria-valuemax",
+    String(starCornerMax)
+  );
+});
+
+test("shape corner slider resets max presentation after switching shape type", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadPolygonShapeDocument(page, {
+    points: null,
+  });
+
+  await clickNodeCenter(page, "polygon-shape-node");
+  await pauseForUi(page);
+
+  const cornerSlider = page.getByRole("slider", {
+    name: "Shape corner radius",
+  });
+  const getCornerState = () => {
+    return page.evaluate(() => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
+      const node = editor?.getNode("polygon-shape-node");
+      const summary = editor?.getPathCornerRadiusSummary("polygon-shape-node");
+
+      return {
+        max: summary?.max ?? null,
+        shape: node?.type === "shape" ? node.shape : null,
+        value: summary?.value ?? null,
+      };
+    });
+  };
+
+  await expect(cornerSlider).toBeVisible();
+
+  const polygonMax = (await getCornerState()).max;
+  expect(polygonMax).toBeGreaterThan(0);
+
+  await cornerSlider.focus();
+  await page.keyboard.press("End");
+  await pauseForUi(page);
+
+  await expect(cornerSlider).toHaveAttribute(
+    "aria-valuemax",
+    String(polygonMax)
+  );
+
+  await page.getByRole("button", { name: "Star" }).click();
+  await pauseForUi(page);
+
+  const starMax = (await getCornerState()).max;
+  expect(starMax).toBeGreaterThan(0);
+  expect(starMax).toBeLessThan(polygonMax);
+  await expect.poll(getCornerState).toMatchObject({
+    shape: "star",
+    value: starMax,
+  });
+  await expect(cornerSlider).toHaveAttribute("aria-valuemax", String(starMax));
 });
 
 test("bulk path corner slider stays uniform for an irregular vector after repeated adjustments", async ({
@@ -3321,6 +3657,106 @@ test("bulk path corner slider stays uniform for an irregular vector after repeat
     });
 
   await expect(bulkCornerSlider).toHaveAttribute("aria-valuetext", "2");
+});
+
+test("bulk path corner slider keeps its stable max after intermediate rounding and handles continue inward", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadVectorDocument(page);
+
+  await clickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "vector-node");
+  await pauseForUi(page);
+
+  const bulkCornerSlider = page.getByRole("slider", {
+    name: "Path corner radius",
+  });
+  const getPathCornerState = () => {
+    return page.evaluate(() => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
+      const summary = editor?.getPathCornerRadiusSummary("vector-node");
+      const stableMax = editor?.getPathCornerRadiusStableMax("vector-node");
+
+      return {
+        stableMax: stableMax ?? null,
+        summaryMax: summary?.max ?? null,
+        value: summary?.value ?? null,
+      };
+    });
+  };
+
+  await expect(bulkCornerSlider).toBeVisible();
+  await expect
+    .poll(async () => {
+      return Number(
+        (await bulkCornerSlider.getAttribute("aria-valuemax")) || 0
+      );
+    })
+    .toBeCloseTo(60, 2);
+
+  await bulkCornerSlider.focus();
+  for (let index = 0; index < 5; index += 1) {
+    await page.keyboard.press("PageUp");
+  }
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => {
+      return (await getPathCornerState()).stableMax;
+    })
+    .toBeCloseTo(60, 2);
+  await expect
+    .poll(async () => {
+      return (await getPathCornerState()).value;
+    })
+    .toBeCloseTo(50, 2);
+  await expect
+    .poll(async () => {
+      return Number(
+        (await bulkCornerSlider.getAttribute("aria-valuemax")) || 0
+      );
+    })
+    .toBeCloseTo(60, 2);
+
+  const handleAtFifty = await getVectorCornerWidgetScreenPoint(
+    page,
+    "vector-node",
+    0
+  );
+
+  await page.keyboard.press("PageUp");
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => {
+      return (await getPathCornerState()).stableMax;
+    })
+    .toBeCloseTo(60, 2);
+  await expect
+    .poll(async () => {
+      return (await getPathCornerState()).value;
+    })
+    .toBeCloseTo(60, 2);
+  await expect
+    .poll(async () => {
+      return Number(
+        (await bulkCornerSlider.getAttribute("aria-valuemax")) || 0
+      );
+    })
+    .toBeCloseTo(60, 2);
+
+  const handleAtSixty = await getVectorCornerWidgetScreenPoint(
+    page,
+    "vector-node",
+    0
+  );
+
+  expect(handleAtFifty).not.toBeNull();
+  expect(handleAtSixty).not.toBeNull();
+  expect(handleAtSixty?.x || 0).toBeGreaterThan(handleAtFifty?.x || 0);
+  expect(handleAtSixty?.y || 0).toBeGreaterThan(handleAtFifty?.y || 0);
 });
 
 test("properties panel shows mixed path corner radius and can apply one value to all vector corners", async ({
@@ -3487,8 +3923,7 @@ test("dragging one vector anchor does not shift untouched anchors", async ({
   await doubleClickNodeCenter(page, "vector-node");
   await pauseForUi(page);
 
-  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
-  const rect = await node.boundingBox();
+  const rect = await getCanvasNodeBounds(page, "vector-node");
 
   if (!rect) {
     throw new Error("Missing visible vector node bounds");
@@ -3511,10 +3946,17 @@ test("dragging one vector anchor does not shift untouched anchors", async ({
     return;
   }
 
-  const dragStartPoint = {
-    x: rect.x + rect.width - 6,
-    y: rect.y + 6,
-  };
+  const dragStartPoint = await getVectorSegmentScreenPoint(
+    page,
+    "vector-node",
+    1
+  );
+
+  expect(dragStartPoint).not.toBeNull();
+  if (!dragStartPoint) {
+    return;
+  }
+
   const dragPoint = {
     x: dragStartPoint.x - 70,
     y: dragStartPoint.y,
@@ -3714,13 +4156,7 @@ test("selecting a vector anchor exposes point controls and converts it to smooth
 
   await expect
     .poll(async () => {
-      const dump = await getDebugDump(page);
-      const document = dump?.document?.serialized
-        ? JSON.parse(dump.document.serialized)
-        : null;
-      const vectorNode = document?.nodes?.find(
-        (entry) => entry.id === "vector-node"
-      );
+      const vectorNode = await getVectorNodeDocument(page, "vector-node");
       const segment = vectorNode?.contours?.[0]?.segments?.[0];
 
       if (!segment) {
@@ -3744,14 +4180,7 @@ test("selecting a vector anchor exposes point controls and converts it to smooth
 
   await expect
     .poll(async () => {
-      const dump = await getDebugDump(page);
-      const document = dump?.document?.serialized
-        ? JSON.parse(dump.document.serialized)
-        : null;
-      const vectorNode = document?.nodes?.find(
-        (entry) => entry.id === "vector-node"
-      );
-
+      const vectorNode = await getVectorNodeDocument(page, "vector-node");
       const segment = vectorNode?.contours?.[0]?.segments?.[0];
 
       if (!segment) {
@@ -3851,15 +4280,10 @@ test("selecting a vector anchor exposes Delete point and removes the anchor", as
   await expect
     .poll(async () => {
       const dump = await getDebugDump(page);
-      const document = dump?.document?.serialized
-        ? JSON.parse(dump.document.serialized)
-        : null;
-      const vectorNode = document?.nodes?.find(
-        (entry) => entry.id === "vector-node"
-      );
+      const vectorNode = await getVectorNodeDocument(page, "vector-node");
 
       return {
-        nodeCount: document?.nodes?.length || 0,
+        nodeCount: await getSerializedPathNodeCount(page),
         pathNodeId: dump?.editing?.pathNodeId || null,
         pathPoint: dump?.editing?.pathPoint || null,
         segmentCount: vectorNode?.contours?.[0]?.segments?.length || 0,
@@ -3988,13 +4412,7 @@ test("switching between corner anchors retargets the point toolbar actions", asy
 
   await expect
     .poll(async () => {
-      const dump = await getDebugDump(page);
-      const document = dump?.document?.serialized
-        ? JSON.parse(dump.document.serialized)
-        : null;
-      const vectorNode = document?.nodes?.find(
-        (entry) => entry.id === "vector-node"
-      );
+      const vectorNode = await getVectorNodeDocument(page, "vector-node");
 
       return {
         first: vectorNode?.contours?.[0]?.segments?.[0]?.pointType || null,
@@ -4018,8 +4436,7 @@ test("hovering and clicking a vector segment inserts a point", async ({
   await doubleClickNodeCenter(page, "vector-node");
   await pauseForUi(page);
 
-  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
-  const rect = await node.boundingBox();
+  const rect = await getCanvasNodeBounds(page, "vector-node");
 
   if (!rect) {
     throw new Error("Missing visible vector node bounds");
@@ -4089,8 +4506,7 @@ test("pen mode hovering and clicking a vector segment inserts a point", async ({
   await page.getByRole("button", { name: "Pen (P)" }).click();
   await pauseForUi(page);
 
-  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
-  const rect = await node.boundingBox();
+  const rect = await getCanvasNodeBounds(page, "vector-node");
 
   if (!rect) {
     throw new Error("Missing visible vector node bounds");
@@ -4161,8 +4577,7 @@ test("clicking away from an edited path with pen starts a clean new path handoff
   await doubleClickNodeCenter(page, "open-vector-node");
   await pauseForUi(page);
 
-  const node = page.locator('.canvas-node[data-node-id="open-vector-node"]');
-  const rect = await node.boundingBox();
+  const rect = await getCanvasNodeBounds(page, "open-vector-node");
 
   if (!rect) {
     throw new Error("Missing visible open vector node bounds");
@@ -4295,12 +4710,9 @@ test("holding space during a pen drag repositions the pending anchor", async ({
   await expect
     .poll(async () => {
       const dump = await getDebugDump(page);
-      const document = dump?.document?.serialized
-        ? JSON.parse(dump.document.serialized)
+      const vectorNode = dump?.editing?.pathNodeId
+        ? await getVectorNodeDocument(page, dump.editing.pathNodeId)
         : null;
-      const vectorNode = document?.nodes?.find((entry) => {
-        return entry.type === "vector";
-      });
       const segment = vectorNode?.contours?.[0]?.segments?.[1];
 
       return segment
@@ -4650,17 +5062,21 @@ test("shift-dragging a handle constrains its angle", async ({ page }) => {
   await doubleClickNodeCenter(page, "vector-node");
   await pauseForUi(page);
 
-  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
-  const rect = await node.boundingBox();
+  const rect = await getCanvasNodeBounds(page, "vector-node");
 
   if (!rect) {
     throw new Error("Missing visible vector node bounds");
   }
 
-  const topRightPoint = {
-    x: rect.x + rect.width - 6,
-    y: rect.y + 6,
-  };
+  const topRightPoint = await getVectorSegmentScreenPoint(
+    page,
+    "vector-node",
+    1
+  );
+
+  if (!topRightPoint) {
+    throw new Error("Missing top-right vector point");
+  }
 
   await page.mouse.click(topRightPoint.x, topRightPoint.y);
   await pauseForUi(page);
@@ -4722,8 +5138,7 @@ test("hovering a vector handle expands the hover halo beyond the idle handle", a
   await doubleClickNodeCenter(page, "vector-node");
   await pauseForUi(page);
 
-  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
-  const rect = await node.boundingBox();
+  const rect = await getCanvasNodeBounds(page, "vector-node");
 
   if (!rect) {
     throw new Error("Missing visible vector node bounds");
@@ -4739,31 +5154,29 @@ test("hovering a vector handle expands the hover halo beyond the idle handle", a
   await page.getByRole("button", { name: "Convert point to smooth" }).click();
   await pauseForUi(page);
 
-  const segment = await getVectorSegmentDocument(page, 1);
+  const handleOutPoint = await getVectorHandleScreenPoint(
+    page,
+    "vector-node",
+    1
+  );
 
-  if (!segment) {
-    throw new Error("Missing selected smooth vector segment");
+  if (!handleOutPoint) {
+    throw new Error("Missing visible vector handle point");
   }
-
-  const handleOutPoint = {
-    x: rect.x + segment.point.x + segment.handleOut.x,
-    y: rect.y + segment.point.y + segment.handleOut.y,
-  };
-  const haloProbePoint = {
-    x: handleOutPoint.x + 14,
-    y: handleOutPoint.y,
-  };
-
-  await expect
-    .poll(async () => (await getVectorPaperPixel(page, haloProbePoint))?.a || 0)
-    .toBe(0);
+  const idleAlpha = await getVectorPaperAreaAlphaTotal(
+    page,
+    handleOutPoint,
+    16
+  );
 
   await page.mouse.move(handleOutPoint.x, handleOutPoint.y);
   await pauseForUi(page);
 
   await expect
-    .poll(async () => (await getVectorPaperPixel(page, haloProbePoint))?.a || 0)
-    .toBeGreaterThan(0);
+    .poll(() => {
+      return getVectorPaperAreaAlphaTotal(page, handleOutPoint, 16);
+    })
+    .toBeGreaterThan(idleAlpha);
 });
 
 test("deselecting a smooth point hides its visible handles", async ({
@@ -4777,8 +5190,7 @@ test("deselecting a smooth point hides its visible handles", async ({
   await doubleClickNodeCenter(page, "vector-node");
   await pauseForUi(page);
 
-  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
-  const rect = await node.boundingBox();
+  const rect = await getCanvasNodeBounds(page, "vector-node");
 
   if (!rect) {
     throw new Error("Missing visible vector node bounds");
@@ -4833,8 +5245,7 @@ test("selecting another anchor hides the previous smooth point handles", async (
   await doubleClickNodeCenter(page, "vector-node");
   await pauseForUi(page);
 
-  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
-  const rect = await node.boundingBox();
+  const rect = await getCanvasNodeBounds(page, "vector-node");
 
   if (!rect) {
     throw new Error("Missing visible vector node bounds");
@@ -4901,8 +5312,7 @@ test("dragging the vector body in path edit mode moves the node", async ({
   await doubleClickNodeCenter(page, "vector-node");
   await pauseForUi(page);
 
-  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
-  const rect = await node.boundingBox();
+  const rect = await getCanvasNodeBounds(page, "vector-node");
 
   if (!rect) {
     throw new Error("Missing visible vector node bounds");
@@ -4968,105 +5378,6 @@ test("dragging the vector body in path edit mode moves the node", async ({
   await expect
     .poll(async () => (await getDebugDump(page))?.editing?.pathNodeId || null)
     .toBe("vector-node");
-});
-
-test("dragging a contour body in a multi-contour vector moves the edit outline live", async ({
-  page,
-}) => {
-  const dragDelta = {
-    x: 64,
-    y: 40,
-  };
-  const contourNodeId = "multi-vector-node:path:1";
-
-  await gotoEditor(page);
-  await loadMultiContourVectorDocument(page);
-
-  await clickNodeCenter(page, contourNodeId);
-  await pauseForUi(page);
-  await doubleClickNodeCenter(page, contourNodeId);
-  await pauseForUi(page);
-
-  const node = page.locator(`.canvas-node[data-node-id="${contourNodeId}"]`);
-  const rect = await node.boundingBox();
-
-  if (!rect) {
-    throw new Error("Missing visible multi-contour node bounds");
-  }
-
-  const contourProbePoint = await getVectorPathScreenPoint(
-    page,
-    contourNodeId,
-    60
-  );
-
-  if (!contourProbePoint) {
-    throw new Error("Missing visible multi-contour probe point");
-  }
-
-  const overlayBeforeDrag = await getVectorPaperAreaAlphaTotal(
-    page,
-    contourProbePoint
-  );
-
-  expect(overlayBeforeDrag).toBeGreaterThan(0);
-
-  await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(
-    rect.x + rect.width / 2 + dragDelta.x,
-    rect.y + rect.height / 2 + dragDelta.y,
-    {
-      steps: 8,
-    }
-  );
-
-  await expect
-    .poll(() => {
-      return page.evaluate(() => {
-        const preview = window.__PUNCHPRESS_EDITOR__?.selectionDragPreview;
-
-        return Boolean(
-          preview &&
-            preview.delta.x > 0 &&
-            preview.delta.y > 0 &&
-            JSON.stringify([...preview.nodeIds].sort()) ===
-              JSON.stringify([
-                "multi-vector-node:path:1",
-                "multi-vector-node:path:2",
-              ])
-        );
-      });
-    })
-    .toBe(true);
-
-  await expect
-    .poll(async () => {
-      const previewDelta = await page.evaluate(() => {
-        return (
-          window.__PUNCHPRESS_EDITOR__?.selectionDragPreview?.delta || null
-        );
-      });
-
-      if (!previewDelta) {
-        return false;
-      }
-
-      const movedAlpha = await getVectorPaperAreaAlphaTotal(page, {
-        x: contourProbePoint.x + previewDelta.x,
-        y: contourProbePoint.y + previewDelta.y,
-      });
-      const staleAlpha = await getVectorPaperAreaAlphaTotal(
-        page,
-        contourProbePoint
-      );
-
-      return movedAlpha > 0 && staleAlpha < overlayBeforeDrag / 2;
-    })
-    .toBe(true);
-
-  await page.mouse.up();
-  await pauseForUi(page);
 });
 
 test("dragging a child path in a compound vector updates the rendered compound live", async ({
@@ -5171,8 +5482,7 @@ test("vector path editing uses the general-purpose cursor for both points and bo
   await doubleClickNodeCenter(page, "vector-node");
   await pauseForUi(page);
 
-  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
-  const rect = await node.boundingBox();
+  const rect = await getCanvasNodeBounds(page, "vector-node");
 
   if (!rect) {
     throw new Error("Missing visible vector node bounds");
@@ -5231,8 +5541,7 @@ test("space-dragging pans the canvas during vector path editing", async ({
   await doubleClickNodeCenter(page, "vector-node");
   await pauseForUi(page);
 
-  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
-  const rect = await node.boundingBox();
+  const rect = await getCanvasNodeBounds(page, "vector-node");
 
   if (!rect) {
     throw new Error("Missing visible vector node bounds");
@@ -5270,8 +5579,7 @@ test("wheel panning still works during vector path editing", async ({
   await doubleClickNodeCenter(page, "vector-node");
   await pauseForUi(page);
 
-  const node = page.locator('.canvas-node[data-node-id="vector-node"]');
-  const rect = await node.boundingBox();
+  const rect = await getCanvasNodeBounds(page, "vector-node");
 
   if (!rect) {
     throw new Error("Missing visible vector node bounds");

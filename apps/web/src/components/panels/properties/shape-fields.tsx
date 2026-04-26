@@ -4,10 +4,12 @@ import {
   Toggle as ToggleGroupItem,
 } from "@/components/ui/toggle-group";
 import { useEditor } from "../../../editor-react/use-editor";
+import { useEditorValue } from "../../../editor-react/use-editor-value";
+import { useCornerSliderPresentation } from "./corner-slider-presentation";
 import { FieldRow, Section } from "./field-primitives";
 
 const SHAPE_SIZE_RANGE = { min: 1, max: 5000 };
-const CORNER_RADIUS_RANGE = { min: 0, max: 1000 };
+const CORNER_RADIUS_RANGE = { min: 0 };
 const CORNER_RADIUS_KEYBOARD_STEP = 1;
 const CORNER_RADIUS_STEP = 0.01;
 const formatCornerRadiusDisplay = (value: number) => {
@@ -22,6 +24,22 @@ const SHAPE_OPTIONS = [
 
 export const ShapeFields = ({ cornerRadius, height, node, shape, width }) => {
   const editor = useEditor();
+  const cornerSummary = useEditorValue((editor) => {
+    return node ? editor.getPathCornerRadiusSummary(node.id) : null;
+  });
+  const currentCornerValue =
+    cornerSummary?.value ?? cornerRadius?.value ?? node?.cornerRadius ?? 0;
+  const {
+    displayValue,
+    preserveDisplayValueWhileDragging,
+    valueBadge,
+    visualMax,
+  } = useCornerSliderPresentation({
+    currentValue: currentCornerValue,
+    formatValue: formatCornerRadiusDisplay,
+    isMixed: Boolean(cornerSummary?.isMixed || cornerRadius?.isMixed),
+    max: cornerSummary?.max ?? 0,
+  });
 
   if (!(node && shape && width && height)) {
     return null;
@@ -77,19 +95,24 @@ export const ShapeFields = ({ cornerRadius, height, node, shape, width }) => {
         />
       </FieldRow>
 
-      {cornerRadius ? (
+      {cornerRadius && cornerSummary ? (
         <FieldRow label="Corners">
           <ScrubSlider
-            ariaLabel="Polygon corner radius"
+            ariaLabel="Shape corner radius"
+            displayValue={displayValue}
             formatValue={formatCornerRadiusDisplay}
             keyboardStep={CORNER_RADIUS_KEYBOARD_STEP}
-            max={CORNER_RADIUS_RANGE.max}
+            max={visualMax || cornerSummary.max}
             min={CORNER_RADIUS_RANGE.min}
             onValueChange={(nextCornerRadius) => {
               editor.setSelectionProperty("cornerRadius", nextCornerRadius);
             }}
+            preserveDisplayValueWhileDragging={
+              preserveDisplayValueWhileDragging
+            }
             step={CORNER_RADIUS_STEP}
-            value={cornerRadius.value ?? node.cornerRadius ?? 0}
+            value={currentCornerValue}
+            valueBadge={valueBadge}
           />
         </FieldRow>
       ) : null}

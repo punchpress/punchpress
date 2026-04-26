@@ -1,10 +1,10 @@
+import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Add01Icon,
   Cursor01Icon,
   Remove01Icon,
   TextFontIcon,
 } from "@hugeicons-pro/core-stroke-rounded";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { HandIcon, PenToolIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/ui/toggle";

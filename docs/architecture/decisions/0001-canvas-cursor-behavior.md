@@ -52,5 +52,5 @@ The current implementation lives in:
 - `apps/web/src/components/canvas.tsx`
 - `apps/web/src/components/canvas-node.tsx`
 - `apps/web/src/components/canvas/canvas-cursor-policy.ts`
-- `apps/web/src/components/canvas/canvas-overlay/canvas-text-path-overlay.tsx`
+- `apps/web/src/components/canvas/canvas-overlay/text/path-guides.tsx`
 - `apps/web/src/styles/global.css`

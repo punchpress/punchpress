@@ -67,9 +67,7 @@ const getHandleRect = (handles) => {
 
 const getSingleNodeOverlayCorners = (page) => {
   return page.evaluate(() => {
-    const root = document.querySelector(
-      ".canvas-single-node-transform-overlay"
-    );
+    const root = document.querySelector(".canvas-single-selection");
 
     if (!(root instanceof HTMLElement)) {
       return null;

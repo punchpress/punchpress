@@ -16,7 +16,7 @@ export const findEmptyCanvasPoint = async (page) => {
             [
               "[data-node-id]",
               ".canvas-moveable",
-              ".canvas-node-toolbar",
+              ".canvas-selection-toolbar",
               "aside",
             ].join(",")
           )

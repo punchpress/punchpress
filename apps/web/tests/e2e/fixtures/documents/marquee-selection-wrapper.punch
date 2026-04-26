@@ -3,6 +3,7 @@
   "nodes": [
     {
       "id": "marquee-wrapper-first-node",
+      "parentId": "root",
       "type": "text",
       "text": "Top left",
       "font": {
@@ -31,6 +32,7 @@
     },
     {
       "id": "marquee-wrapper-second-node",
+      "parentId": "root",
       "type": "text",
       "text": "Middle",
       "font": {
@@ -59,6 +61,7 @@
     },
     {
       "id": "marquee-wrapper-third-node",
+      "parentId": "root",
       "type": "text",
       "text": "Bottom left",
       "font": {

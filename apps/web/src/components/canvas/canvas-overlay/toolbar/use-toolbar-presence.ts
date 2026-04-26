@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 const EXIT_DURATION_MS = 80;
 
-export const useNodeToolbarPresence = (actions, stateKey) => {
+export const useSelectionToolbarPresence = (actions, stateKey) => {
   const [presenceState, setPresenceState] = useState(null);
   const actionsRef = useRef(actions);
   const isVisible = actions.length > 0;

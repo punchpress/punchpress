@@ -72,21 +72,31 @@ const applyNodeShellState = (element, shellState, delta) => {
     : `translate3d(${x}px, ${y}px, 0)`;
 };
 
-const syncNodeShell = (editor, nodeId, shellState, appliedKeys, delta) => {
+const syncNodeShell = (
+  editor,
+  nodeId,
+  shellState,
+  appliedElements,
+  appliedKeys,
+  delta
+) => {
   const element = editor.getNodeElement(nodeId);
 
   if (!element) {
+    appliedElements.delete(nodeId);
     appliedKeys.delete(nodeId);
     return;
   }
 
   const nextKey = getShellKey(shellState, delta);
+  const previousElement = appliedElements.get(nodeId);
 
-  if (appliedKeys.get(nodeId) === nextKey) {
+  if (appliedKeys.get(nodeId) === nextKey && previousElement === element) {
     return;
   }
 
   applyNodeShellState(element, shellState, delta);
+  appliedElements.set(nodeId, element);
   appliedKeys.set(nodeId, nextKey);
 };
 
@@ -123,9 +133,15 @@ const canReusePreviewEntries = (preview, nodeIds) => {
   });
 };
 
-const pruneNodeShells = (visibleNodeIds, appliedKeys, shellStates) => {
+const pruneNodeShells = (
+  visibleNodeIds,
+  appliedElements,
+  appliedKeys,
+  shellStates
+) => {
   for (const nodeId of [...appliedKeys.keys()]) {
     if (!visibleNodeIds.includes(nodeId)) {
+      appliedElements.delete(nodeId);
       appliedKeys.delete(nodeId);
       shellStates.delete(nodeId);
     }
@@ -133,12 +149,12 @@ const pruneNodeShells = (visibleNodeIds, appliedKeys, shellStates) => {
 };
 
 const syncDurableNodeShells = (editor, visibleNodeIds, placementState) => {
-  const { appliedKeys, preview, shellStates } = placementState;
+  const { appliedElements, appliedKeys, preview, shellStates } = placementState;
   const previewNodeIdSet = new Set(
     resolvePreviewPlacementNodeIds(editor, visibleNodeIds, preview?.nodeIds)
   );
 
-  pruneNodeShells(visibleNodeIds, appliedKeys, shellStates);
+  pruneNodeShells(visibleNodeIds, appliedElements, appliedKeys, shellStates);
 
   for (const nodeId of visibleNodeIds) {
     const shellState = getNodeShellState(editor, nodeId);
@@ -148,7 +164,7 @@ const syncDurableNodeShells = (editor, visibleNodeIds, placementState) => {
       continue;
     }
 
-    syncNodeShell(editor, nodeId, shellState, appliedKeys);
+    syncNodeShell(editor, nodeId, shellState, appliedElements, appliedKeys);
   }
 };
 
@@ -218,6 +234,7 @@ const syncPreviewNodeShells = (editor, placementState, preview) => {
 
   for (const entry of entries) {
     applyPreviewTransform(entry, preview.delta);
+    placementState.appliedElements.set(entry.nodeId, entry.element);
     placementState.appliedKeys.set(
       entry.nodeId,
       getShellKey(entry.shellState, preview.delta)
@@ -233,6 +250,7 @@ export const useCanvasNodePlacement = (nodeIds) => {
   const editor = useEditor();
   const nodeIdsRef = useRef(nodeIds);
   const placementStateRef = useRef({
+    appliedElements: new Map(),
     appliedKeys: new Map(),
     preview: null,
     shellStates: new Map(),
@@ -303,10 +321,12 @@ export const useCanvasNodePlacement = (nodeIds) => {
 
   useLayoutEffect(() => {
     const frameId = window.requestAnimationFrame(() => {
-      const { appliedKeys, shellStates } = placementStateRef.current;
+      const { appliedElements, appliedKeys, shellStates } =
+        placementStateRef.current;
 
       for (const nodeId of [...shellStates.keys()]) {
         if (!nodeIds.includes(nodeId)) {
+          appliedElements.delete(nodeId);
           shellStates.delete(nodeId);
           appliedKeys.delete(nodeId);
         }
@@ -315,7 +335,7 @@ export const useCanvasNodePlacement = (nodeIds) => {
       for (const nodeId of nodeIds) {
         const shellState = getNodeShellState(editor, nodeId);
         shellStates.set(nodeId, shellState);
-        syncNodeShell(editor, nodeId, shellState, appliedKeys);
+        syncNodeShell(editor, nodeId, shellState, appliedElements, appliedKeys);
       }
     });
 

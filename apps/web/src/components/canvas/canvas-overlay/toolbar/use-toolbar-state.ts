@@ -57,7 +57,7 @@ const getEditableToolbarNodeState = (editor, visibleSelectedNodeIds) => {
   };
 };
 
-export const useNodeToolbarState = () => {
+export const useSelectionToolbarState = () => {
   return useEditorValue((editor, state) => {
     if (state.editingNodeId) {
       return null;
