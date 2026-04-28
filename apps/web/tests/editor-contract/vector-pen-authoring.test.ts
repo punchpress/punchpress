@@ -412,6 +412,83 @@ describe("vector pen authoring", () => {
     ]);
   });
 
+  test("undo removes only the last authored pen point while keeping the path active", () => {
+    const editor = new Editor();
+
+    editor.setActiveTool("pen");
+    clickPen(editor, { x: 120, y: 140 });
+    clickPen(editor, { x: 260, y: 140 });
+    clickPen(editor, { x: 320, y: 220 });
+
+    const nodeId = editor.pathEditingNodeId;
+
+    expect(getPathNode(editor, nodeId).segments).toHaveLength(3);
+
+    expect(editor.undo()).toBe(true);
+
+    const node = getPathNode(editor, nodeId);
+
+    expect(editor.nodes).toHaveLength(1);
+    expect(editor.activeTool).toBe("pen");
+    expect(editor.pathEditingNodeId).toBe(nodeId);
+    expect(editor.pathEditingPoint).toEqual({
+      contourIndex: 0,
+      segmentIndex: 1,
+    });
+    expect(node.segments.map((segment) => segment.point)).toEqual([
+      { x: 0, y: 0 },
+      { x: 140, y: 0 },
+    ]);
+
+    clickPen(editor, { x: 360, y: 220 });
+
+    expect(
+      getPathNode(editor, nodeId).segments.map((segment) => segment.point)
+    ).toEqual([
+      { x: 0, y: 0 },
+      { x: 140, y: 0 },
+      { x: 240, y: 80 },
+    ]);
+  });
+
+  test("redo restores a pen-authored point while the pen session remains active", () => {
+    const editor = new Editor();
+
+    editor.setActiveTool("pen");
+    clickPen(editor, { x: 120, y: 140 });
+    clickPen(editor, { x: 260, y: 140 });
+    clickPen(editor, { x: 320, y: 220 });
+
+    const nodeId = editor.pathEditingNodeId;
+
+    expect(editor.undo()).toBe(true);
+    expect(editor.redo()).toBe(true);
+
+    expect(editor.pathEditingNodeId).toBe(nodeId);
+    expect(editor.pathEditingPoint).toEqual({
+      contourIndex: 0,
+      segmentIndex: 2,
+    });
+    expect(
+      getPathNode(editor, nodeId).segments.map((segment) => segment.point)
+    ).toEqual([
+      { x: 0, y: 0 },
+      { x: 140, y: 0 },
+      { x: 200, y: 80 },
+    ]);
+
+    clickPen(editor, { x: 380, y: 240 });
+
+    expect(
+      getPathNode(editor, nodeId).segments.map((segment) => segment.point)
+    ).toEqual([
+      { x: 0, y: 0 },
+      { x: 140, y: 0 },
+      { x: 200, y: 80 },
+      { x: 260, y: 100 },
+    ]);
+  });
+
   test("tracks a live preview point while hovering before the next placement", () => {
     const editor = new Editor();
 

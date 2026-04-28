@@ -8,6 +8,7 @@ import {
   startAuthoringSession,
   startContinuationSession,
   startSelectedEndpointContinuationSession,
+  syncAuthoringSessionAfterHistoryChange,
 } from "./pen-tool-authoring-session";
 import {
   beginDraftPlacement,
@@ -91,6 +92,10 @@ export class PenTool extends Tool {
 
   onPathEditingStopped() {
     return finishAuthoringSession(this, { commit: true });
+  }
+
+  onHistoryChanged() {
+    return syncAuthoringSessionAfterHistoryChange(this);
   }
 
   onKeyDown({ event, key }) {

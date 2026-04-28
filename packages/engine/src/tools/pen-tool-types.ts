@@ -33,6 +33,7 @@ export interface PenAuthoringSession {
   draft: PenDraftPlacement | null;
   hasAuthoredChange: boolean;
   hasPlacedInitialPoint: boolean;
+  historyName: string;
   historyMark: unknown;
   hoverPoint: { x: number; y: number } | null;
   hoverTarget: PenDraftPlacement["target"];

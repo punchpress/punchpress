@@ -73,6 +73,10 @@ export class Tool {
     return false;
   }
 
+  onHistoryChanged() {
+    return false;
+  }
+
   onNodePointerDown({ node, ...info }) {
     return this.onCanvasPointerDown({
       ...info,
