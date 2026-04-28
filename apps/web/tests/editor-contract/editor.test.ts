@@ -1273,6 +1273,18 @@ describe("Editor text editing mode", () => {
     expect(centerY).toBeCloseTo(point.y, 2);
   });
 
+  test("preloads the default font when local fonts are ready", () => {
+    const editor = new Editor();
+
+    editor.applyLocalFontCatalog({
+      error: "",
+      fonts: [{ ...AVAILABLE_FONT, id: "arialmt" }],
+      state: "ready",
+    });
+
+    expect(editor.fonts.getLoadState(editor.getDefaultFont())).toBe("loading");
+  });
+
   test("keeps new text nodes centered on the placement click after the font loads", () => {
     const editor = new Editor();
     editor.applyLocalFontCatalog({

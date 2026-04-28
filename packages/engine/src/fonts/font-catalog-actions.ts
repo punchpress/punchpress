@@ -8,6 +8,14 @@ export const preloadFonts = (editor, nodes = editor.nodes) => {
   editor.fonts.preload(nodes);
 };
 
+const preloadDefaultFont = (editor) => {
+  if (editor.availableFonts.length === 0) {
+    return;
+  }
+
+  editor.fonts.preloadFont(editor.getDefaultFont());
+};
+
 export const preloadFontOptions = (editor, fonts) => {
   for (const font of fonts) {
     editor.fonts.preloadFont(font);
@@ -71,5 +79,6 @@ export const applyLocalFontCatalog = (
 
   editor.getState().setFontCatalogState(catalog.state, catalog.error);
   editor.getState().bumpFontRevision();
+  preloadDefaultFont(editor);
   preloadFonts(editor);
 };
