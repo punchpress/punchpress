@@ -23,6 +23,7 @@ import {
 } from "../primitives/rotation";
 
 const SLANT_DRAG_GAIN = 1.35;
+const CIRCLE_POSITION_SNAP_DEG = 15;
 
 const getEditableGuideState = (editor, nodeId) => {
   const node = editor.getNode(nodeId);
@@ -267,7 +268,11 @@ export const beginTextPathEdit = (
   return null;
 };
 
-export const updateTextPathEdit = (editor, session, { pointerCanvas } = {}) => {
+export const updateTextPathEdit = (
+  editor,
+  session,
+  { pointerCanvas, shiftKey = false } = {}
+) => {
   if (!(session && pointerCanvas)) {
     return null;
   }
@@ -288,8 +293,13 @@ export const updateTextPathEdit = (editor, session, { pointerCanvas } = {}) => {
       guideState.guide,
       localPoint
     );
+    const nextAngleDeg = pointerAngleDeg + session.angleOffsetDeg;
+    const pathAngleDeg = shiftKey
+      ? Math.round(nextAngleDeg / CIRCLE_POSITION_SNAP_DEG) *
+        CIRCLE_POSITION_SNAP_DEG
+      : nextAngleDeg;
     const pathPosition = round(
-      normalizeLoop((pointerAngleDeg + session.angleOffsetDeg) / 360),
+      normalizeLoop(pathAngleDeg / 360),
       4
     );
 

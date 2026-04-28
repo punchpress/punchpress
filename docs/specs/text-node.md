@@ -21,7 +21,7 @@ Text nodes let users place and edit stylized text directly on the canvas.
 - Edit mode may use a simplified straight preview when that provides more reliable caret and text-selection behavior, as long as the styling stays aligned with the designed text.
 - Edit mode should keep a visible caret so text entry still feels precise and direct.
 - Placing a new text node should enter text edit mode immediately and return the canvas to pointer behavior outside the active text field.
-- Placing a new text node from the canvas should center the text on the placement click and start at the default starter size.
+- Placing a new text node from the canvas should center the text on the placement click and start at the default starter size, including when the chosen font finishes loading after placement.
 - A newly placed text node should start with a balanced default outline treatment that remains readable at 100% canvas zoom, rather than a heavy poster-style stroke.
 - A newly placed text node should start with no warp applied until the user explicitly chooses one.
 
@@ -30,6 +30,9 @@ Text nodes let users place and edit stylized text directly on the canvas.
 - Committing an edit updates the same text node.
 - Cancelling an edit restores the prior text content.
 - Text remains text throughout editing, transformation, save/load, and normal document workflows.
+- Tracking should be expressed in 1/1000 em and resolved relative to the current font size at layout time.
+- Tracking should apply evenly across the selected text while remaining proportional to type size.
+- Extreme negative tracking may compress text to a near-collapsed stack, but it must not invert glyph order or cause the text to drift off center; visual centering should be based on the final laid-out glyph positions.
 - Bounded text style controls such as font size, tracking, stroke width, and circle path settings should support drag scrubbing with direct numeric entry as a fallback.
 - Future typography controls, including finer spacing controls, should carry through to editing mode once they are supported in the product.
 
@@ -53,6 +56,10 @@ Text nodes let users place and edit stylized text directly on the canvas.
 - While path editing, the visible transform/selection box should match the path-editing surface rather than a larger enclosing text bounds box.
 - While path editing, that transform/selection box should stay aligned with the path-editing surface during rotate, move, and resize interactions.
 - While the user is actively dragging a path-position handle, PunchPress may temporarily hide normal selection bounds if those bounds would otherwise jitter distractingly as the text reflows.
+- Applying circle warp from the default preset should start from a restrained sweep and a radius scaled to the current text node so the first result stays legible without immediate manual correction.
+- Circle warp should let the user place the text on either the outside or inside of the circle without changing the text order around the path.
+- Circle path tracking should remain centered on the path handle and should not reverse back through itself at extreme negative values; PunchPress may clamp circle tracking before the text order inverts.
+- Circle path tracking should use the full tracking slider range meaningfully: the minimum UI value should compress the text to a near-collapsed stack, and the maximum UI value should spread the text around the circle without wrapping past a full-circle distribution.
 - Simpler direct-manipulation warps, such as arch bend, wave-style flag adjustments, and slant, may stay inline on selection instead of requiring a separate path-edit mode.
 - Inline arch, wave, and slant warp guides should be centered through the text rather than anchored to the text's top edge.
 - Applying wave warp from the default preset should start from a restrained amplitude that preserves legibility and keeps the inline handles in a sensible place before any manual adjustment.

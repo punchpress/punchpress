@@ -38,7 +38,7 @@ export const TextWarpFields = ({ node, withTopBorder = true }) => {
         className="grid grid-cols-5 gap-1.5"
         onValueChange={(values) => {
           const nextKind = values[0] ?? "none";
-          editor.updateSelectedNode({ warp: getDefaultWarp(nextKind) });
+          editor.updateSelectedNode({ warp: getDefaultWarp(nextKind, node) });
 
           if (nextKind === "circle") {
             editor.startPathEditing(node.id);
@@ -166,6 +166,11 @@ const TextWarpKindFields = ({ node }) => {
   }
 
   if (node.warp.kind === "circle") {
+    const setSide = (values) => {
+      const nextSide = values[0] ?? "outside";
+      update({ inverted: nextSide === "inside" });
+    };
+
     const setRadius = (value) => {
       update({
         radius: Math.max(1, toNumber(value, node.warp.radius)),
@@ -180,6 +185,16 @@ const TextWarpKindFields = ({ node }) => {
 
     return (
       <>
+        <FieldRow label="Side">
+          <ToggleGroup
+            className="grid grid-cols-2 gap-1.5"
+            onValueChange={setSide}
+            value={[node.warp.inverted ? "inside" : "outside"]}
+          >
+            <ToggleGroupItem value="outside">Outside</ToggleGroupItem>
+            <ToggleGroupItem value="inside">Inside</ToggleGroupItem>
+          </ToggleGroup>
+        </FieldRow>
         <FieldRow label="Radius">
           <ScrubSlider
             ariaLabel="Radius"

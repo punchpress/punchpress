@@ -485,6 +485,7 @@ const TextPathHandles = ({
           moveEvent.clientX,
           moveEvent.clientY
         ),
+        shiftKey: moveEvent.shiftKey,
       });
 
       const springDisabled =

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Editor, estimateBounds, getNodeWorldPoint } from "@punchpress/engine";
+import { getLocalFontId } from "@punchpress/punch-schema";
 
 const FONT = {
   family: "Arial",
@@ -7,6 +8,42 @@ const FONT = {
   postscriptName: "ArialMT",
   style: "Regular",
 } as const;
+const TRANSLATE_X_PATTERN = /^translate\(([-\d.]+)/;
+
+const createFakeLoadedFont = () => {
+  return {
+    charToGlyph: () => ({
+      advanceWidth: 500,
+      getPath: (_x: number, _y: number, fontSize: number) => {
+        return {
+          commands: [
+            { type: "M", x: 0, y: -0.8 * fontSize },
+            { type: "L", x: 40, y: -0.8 * fontSize },
+            { type: "L", x: 40, y: 0.2 * fontSize },
+            { type: "L", x: 0, y: 0.2 * fontSize },
+            { type: "Z" },
+          ],
+          toPathData: () => "",
+        };
+      },
+    }),
+    unitsPerEm: 1000,
+  };
+};
+
+const getTransformTranslateX = (transform?: string) => {
+  const match = transform?.match(TRANSLATE_X_PATTERN);
+  return match ? Number.parseFloat(match[1]) : null;
+};
+
+const getCirclePoint = (radius: number, angleDeg: number) => {
+  const angleRad = (angleDeg * Math.PI) / 180;
+
+  return {
+    x: radius * Math.sin(angleRad),
+    y: radius - radius * Math.cos(angleRad),
+  };
+};
 
 const createCircleNode = () => {
   return {
@@ -63,6 +100,32 @@ describe("Editor text circle path sessions", () => {
     expect(editor.getNode(node.id)?.warp.radius).toBe(900);
   });
 
+  test("holding shift snaps circle text placement to 15 degree increments", () => {
+    const editor = new Editor();
+    const node = createCircleNode();
+
+    editor.getState().loadNodes([node]);
+
+    const bbox = estimateBounds(node);
+    const startPoint = getNodeWorldPoint(node, bbox, { x: 0, y: 0 });
+    const unsnappedLocalPoint = getCirclePoint(900, 68);
+    const unsnappedPoint = getNodeWorldPoint(node, bbox, unsnappedLocalPoint);
+    const session = editor.beginTextPathEdit({
+      mode: "position",
+      nodeId: node.id,
+      pointerCanvas: startPoint,
+    });
+
+    expect(session).not.toBeNull();
+
+    editor.updateTextPathEdit(session, {
+      pointerCanvas: unsnappedPoint,
+      shiftKey: true,
+    });
+
+    expect(editor.getNode(node.id)?.warp.pathPosition).toBeCloseTo(5 / 24, 4);
+  });
+
   test("scales the circle radius with the regular resize flow", () => {
     const editor = new Editor();
     const node = createCircleNode();
@@ -112,5 +175,66 @@ describe("Editor text circle path sessions", () => {
     const pathEditFrame = editor.getNodeFrame(node.id);
 
     expect(pathEditFrame?.bounds.height).toBeCloseTo(selectionBounds.height, 2);
+  });
+
+  test("can flip circle text to the inside without reversing the path order", () => {
+    const editor = new Editor();
+    const outsideNode = {
+      ...createCircleNode(),
+      text: "YOUR TEXT",
+      warp: {
+        ...createCircleNode().warp,
+        pathPosition: 0.5,
+      },
+    };
+    const insideNode = {
+      ...outsideNode,
+      id: "inside-circle-node",
+      warp: {
+        ...outsideNode.warp,
+        inverted: true,
+      },
+    };
+
+    editor.applyLocalFontCatalog({
+      error: "",
+      fonts: [{ ...FONT, id: "arialmt" }],
+      state: "ready",
+    });
+    editor.fonts.cache.set(getLocalFontId(FONT), {
+      descriptor: FONT,
+      font: createFakeLoadedFont(),
+      status: "ready",
+    });
+    editor.getState().loadNodes([outsideNode, insideNode]);
+
+    const outsideGeometry = editor.getNodeGeometry(outsideNode.id);
+    const insideGeometry = editor.getNodeGeometry(insideNode.id);
+    const outsideFirstX = getTransformTranslateX(
+      outsideGeometry?.paths[0]?.transform
+    );
+    const outsideLastX = getTransformTranslateX(
+      outsideGeometry?.paths.at(-1)?.transform
+    );
+    const insideFirstX = getTransformTranslateX(
+      insideGeometry?.paths[0]?.transform
+    );
+    const insideLastX = getTransformTranslateX(
+      insideGeometry?.paths.at(-1)?.transform
+    );
+
+    expect(outsideFirstX).not.toBeNull();
+    expect(outsideLastX).not.toBeNull();
+    expect(insideFirstX).not.toBeNull();
+    expect(insideLastX).not.toBeNull();
+    expect((outsideFirstX ?? 0) > (outsideLastX ?? 0)).toBe(true);
+    expect((insideFirstX ?? 0) < (insideLastX ?? 0)).toBe(true);
+    expect(insideGeometry?.paths[0]?.d).toBe(outsideGeometry?.paths[0]?.d);
+    expect(insideGeometry?.bbox.maxY ?? 0).toBeLessThan(
+      outsideGeometry?.bbox.maxY ?? 0
+    );
+    expect(insideGeometry?.bbox.height ?? 0).toBeLessThan(
+      outsideGeometry?.bbox.height ?? 0
+    );
   });
 });

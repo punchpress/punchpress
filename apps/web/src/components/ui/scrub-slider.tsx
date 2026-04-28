@@ -21,6 +21,8 @@ interface ScrubSliderProps {
   overflowRecoveryPixels?: number;
   pixelsPerStep?: number;
   preserveDisplayValueWhileDragging?: boolean;
+  scrubMax?: number;
+  scrubMin?: number;
   step?: number;
   value: number;
   valueBadge?: string | null;
@@ -95,18 +97,18 @@ const handleSliderKeyDown = ({
 };
 
 const beginScrubDrag = ({
+  dragMax,
+  dragMin,
   event,
-  max,
-  min,
   overflowRecoveryPixels,
   pixelsPerStep,
   setIsDragging,
   startValue,
   step,
 }: {
+  dragMax: number;
+  dragMin: number;
   event: React.PointerEvent<HTMLDivElement>;
-  max: number;
-  min: number;
   overflowRecoveryPixels: number;
   pixelsPerStep: number;
   setIsDragging: (value: boolean) => void;
@@ -118,8 +120,8 @@ const beginScrubDrag = ({
   event.currentTarget.setPointerCapture(event.pointerId);
 
   const dragValuePerPixel = getDragValuePerPixel(
-    min,
-    max,
+    dragMin,
+    dragMax,
     step,
     pixelsPerStep,
     event.currentTarget.getBoundingClientRect().width
@@ -129,8 +131,8 @@ const beginScrubDrag = ({
 
   return {
     dragValuePerPixel,
-    max,
-    min,
+    dragMax,
+    dragMin,
     overflowRecoveryValueSpan: overflowRecoveryPixels * dragValuePerPixel,
     pointerId: event.pointerId,
     startValue,
@@ -144,8 +146,8 @@ const getScrubDragDeltaValue = ({
 }: {
   dragState: {
     dragValuePerPixel: number;
-    max: number;
-    min: number;
+    dragMax: number;
+    dragMin: number;
     overflowRecoveryValueSpan: number;
     pointerId: number;
     startValue: number;
@@ -167,10 +169,10 @@ const getScrubDragDeltaValue = ({
 
 const handleScrubSliderPointerDown = ({
   disabled,
+  dragMax,
+  dragMin,
   event,
   isEditing,
-  max,
-  min,
   overflowRecoveryPixels,
   pixelsPerStep,
   setIsDragging,
@@ -178,10 +180,10 @@ const handleScrubSliderPointerDown = ({
   step,
 }: {
   disabled: boolean;
+  dragMax: number;
+  dragMin: number;
   event: React.PointerEvent<HTMLDivElement>;
   isEditing: boolean;
-  max: number;
-  min: number;
   overflowRecoveryPixels: number;
   pixelsPerStep: number;
   setIsDragging: (value: boolean) => void;
@@ -193,9 +195,9 @@ const handleScrubSliderPointerDown = ({
   }
 
   return beginScrubDrag({
+    dragMax,
+    dragMin,
     event,
-    max,
-    min,
     overflowRecoveryPixels,
     pixelsPerStep,
     setIsDragging,
@@ -207,19 +209,23 @@ const handleScrubSliderPointerDown = ({
 const handleScrubSliderPointerMove = ({
   dragState,
   event,
+  hardMax,
+  hardMin,
   onValueChange,
   step,
 }: {
   dragState: {
     dragValuePerPixel: number;
-    max: number;
-    min: number;
+    dragMax: number;
+    dragMin: number;
     overflowRecoveryValueSpan: number;
     pointerId: number;
     startValue: number;
     startX: number;
   } | null;
   event: React.PointerEvent<HTMLDivElement>;
+  hardMax: number;
+  hardMin: number;
   onValueChange: (value: number) => void;
   step: number;
 }) => {
@@ -236,8 +242,10 @@ const handleScrubSliderPointerMove = ({
     resolveScrubValue(
       dragUpdate.dragState.startValue,
       dragUpdate.deltaValue,
-      dragUpdate.dragState.min,
-      dragUpdate.dragState.max,
+      dragUpdate.dragState.dragMin,
+      dragUpdate.dragState.dragMax,
+      hardMin,
+      hardMax,
       step,
       dragUpdate.dragState.overflowRecoveryValueSpan
     )
@@ -319,6 +327,8 @@ export const ScrubSlider = (props: ScrubSliderProps) => {
     overflowRecoveryPixels = 80,
     pixelsPerStep = 2,
     preserveDisplayValueWhileDragging = false,
+    scrubMax = max,
+    scrubMin = min,
     step = 1,
     value,
     valueBadge = null,
@@ -326,8 +336,8 @@ export const ScrubSlider = (props: ScrubSliderProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<{
     dragValuePerPixel: number;
-    max: number;
-    min: number;
+    dragMax: number;
+    dragMin: number;
     overflowRecoveryValueSpan: number;
     pointerId: number;
     startValue: number;
@@ -338,19 +348,21 @@ export const ScrubSlider = (props: ScrubSliderProps) => {
   const [draftValue, setDraftValue] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const dragMin = dragStateRef.current?.min ?? min;
-  const dragMax = dragStateRef.current?.max ?? max;
+  const dragMin = dragStateRef.current?.dragMin ?? scrubMin;
+  const dragMax = dragStateRef.current?.dragMax ?? scrubMax;
   useAutoSelectScrubSliderInput(inputRef, isEditing);
 
   const commitScrubValue = (startValue: number, deltaValue: number) => {
     const overflowRecoveryValueSpan =
       overflowRecoveryPixels *
-      getDragValuePerPixel(min, max, step, pixelsPerStep);
+      getDragValuePerPixel(scrubMin, scrubMax, step, pixelsPerStep);
 
     onValueChange(
       resolveScrubValue(
         startValue,
         deltaValue,
+        scrubMin,
+        scrubMax,
         min,
         max,
         step,
@@ -425,8 +437,8 @@ export const ScrubSlider = (props: ScrubSliderProps) => {
     <div
       aria-disabled={disabled || undefined}
       aria-label={ariaLabel}
-      aria-valuemax={Number.isFinite(dragMax) ? dragMax : undefined}
-      aria-valuemin={Number.isFinite(dragMin) ? dragMin : undefined}
+      aria-valuemax={Number.isFinite(max) ? max : undefined}
+      aria-valuemin={Number.isFinite(min) ? min : undefined}
       aria-valuenow={value}
       aria-valuetext={ariaValueText}
       className={cn(
@@ -460,10 +472,10 @@ export const ScrubSlider = (props: ScrubSliderProps) => {
       onPointerDown={(event) => {
         dragStateRef.current = handleScrubSliderPointerDown({
           disabled,
+          dragMax: scrubMax,
+          dragMin: scrubMin,
           event,
           isEditing,
-          max,
-          min,
           overflowRecoveryPixels,
           pixelsPerStep,
           setIsDragging,
@@ -479,6 +491,8 @@ export const ScrubSlider = (props: ScrubSliderProps) => {
         handleScrubSliderPointerMove({
           dragState: dragStateRef.current,
           event,
+          hardMax: max,
+          hardMin: min,
           onValueChange,
           step,
         });
@@ -652,59 +666,65 @@ const getDragValuePerPixel = (
   return step / Math.max(pixelsPerStep, 1);
 };
 
-const resolveScrubValue = (
+export const resolveScrubValue = (
   startValue: number,
   deltaValue: number,
-  min: number,
-  max: number,
+  scrubMin: number,
+  scrubMax: number,
+  hardMin: number,
+  hardMax: number,
   step: number,
   overflowRecoveryValueSpan: number
 ) => {
   const nextValue = getScrubValue(
     startValue,
     deltaValue,
-    min,
-    max,
+    scrubMin,
+    scrubMax,
+    hardMin,
+    hardMax,
     overflowRecoveryValueSpan
   );
 
-  return normalizeValue(nextValue, min, max, step);
+  return normalizeValue(nextValue, hardMin, hardMax, step);
 };
 
 const getScrubValue = (
   startValue: number,
   deltaValue: number,
-  min: number,
-  max: number,
+  scrubMin: number,
+  scrubMax: number,
+  hardMin: number,
+  hardMax: number,
   overflowRecoveryValueSpan: number
 ) => {
-  if (startValue > max) {
+  if (startValue > scrubMax) {
     if (deltaValue >= 0) {
-      return startValue;
+      return clamp(startValue + deltaValue, hardMin, hardMax);
     }
 
     return recoverFromUpperOverflow(
       startValue,
-      max,
+      scrubMax,
       -deltaValue,
       overflowRecoveryValueSpan
     );
   }
 
-  if (startValue < min) {
+  if (startValue < scrubMin) {
     if (deltaValue <= 0) {
-      return startValue;
+      return clamp(startValue + deltaValue, hardMin, hardMax);
     }
 
     return recoverFromLowerOverflow(
       startValue,
-      min,
+      scrubMin,
       deltaValue,
       overflowRecoveryValueSpan
     );
   }
 
-  return clamp(startValue + deltaValue, min, max);
+  return clamp(startValue + deltaValue, hardMin, hardMax);
 };
 
 const recoverFromUpperOverflow = (
@@ -741,7 +761,11 @@ const recoverFromLowerOverflow = (
   return min - overshoot * (1 - easeOutQuart(progress));
 };
 
-const getScrubPercent = (value: number, min: number, max: number): string => {
+export const getScrubPercent = (
+  value: number,
+  min: number,
+  max: number
+): string => {
   const hasFiniteRange = Number.isFinite(min) && Number.isFinite(max);
   if (!hasFiniteRange || max === min) {
     return "50%";
