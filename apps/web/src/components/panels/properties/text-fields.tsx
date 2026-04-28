@@ -1,3 +1,4 @@
+import { TEXT_TRACKING_RANGE } from "@punchpress/engine";
 import {
   createLocalFontDescriptor,
   createLocalFontOption,
@@ -10,8 +11,7 @@ import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { FieldRow, Section } from "./field-primitives";
 
 const FONT_SIZE_RANGE = { min: 1, max: 2000 };
-const TRACKING_RANGE = { min: -200, max: 400 };
-
+const TRACKING_SCRUB_RANGE = { min: -500, max: 500 };
 export const TextFields = ({ node }) => {
   const editor = useEditor();
   const availableFonts = useEditorValue((editor) => editor.availableFonts);
@@ -68,11 +68,13 @@ export const TextFields = ({ node }) => {
       <FieldRow label="Tracking">
         <ScrubSlider
           ariaLabel="Tracking"
-          max={TRACKING_RANGE.max}
-          min={TRACKING_RANGE.min}
+          max={TEXT_TRACKING_RANGE.max}
+          min={TEXT_TRACKING_RANGE.min}
           onValueChange={(nextTracking) => {
             editor.setSelectionProperty("tracking", nextTracking);
           }}
+          scrubMax={TRACKING_SCRUB_RANGE.max}
+          scrubMin={TRACKING_SCRUB_RANGE.min}
           value={node.tracking}
         />
       </FieldRow>

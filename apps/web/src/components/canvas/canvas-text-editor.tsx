@@ -1,4 +1,4 @@
-import { isNodeVisible } from "@punchpress/engine";
+import { isNodeVisible, resolveTrackingPx } from "@punchpress/engine";
 import { useEffect, useRef, useState } from "react";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
@@ -12,7 +12,7 @@ const clamp = (value, min, max) => {
   return Math.min(Math.max(value, min), max);
 };
 
-const measureTextWidth = (input, text, tracking) => {
+const measureTextWidth = (input, text, tracking, fontSize) => {
   if (!measurementContext) {
     return 0;
   }
@@ -20,9 +20,10 @@ const measureTextWidth = (input, text, tracking) => {
   measurementContext.font = window.getComputedStyle(input).font;
 
   const width = measurementContext.measureText(text).width;
-  const trackingWidth = Math.max(text.length - 1, 0) * tracking;
+  const trackingWidth =
+    Math.max(text.length - 1, 0) * resolveTrackingPx(tracking, fontSize);
 
-  return width + trackingWidth;
+  return Math.max(width + trackingWidth, 0);
 };
 
 export const CanvasTextEditor = () => {
@@ -121,11 +122,17 @@ export const CanvasTextEditor = () => {
       ? measureTextWidth(
           input,
           editingText.slice(0, caretIndex),
-          editingNode.tracking
+          editingNode.tracking,
+          editingNode.fontSize
         )
       : 0;
   const totalTextWidth = input
-    ? measureTextWidth(input, editingText, editingNode.tracking)
+    ? measureTextWidth(
+        input,
+        editingText,
+        editingNode.tracking,
+        editingNode.fontSize
+      )
     : 0;
   const caretLeft =
     caretIndex !== null
@@ -239,7 +246,7 @@ export const CanvasTextEditor = () => {
           cursor: "var(--canvas-cursor-text)",
           fontFamily,
           fontSize: `${editingNode.fontSize}px`,
-          letterSpacing: `${editingNode.tracking}px`,
+          letterSpacing: `${editingNode.tracking / 1000}em`,
           WebkitTextFillColor: "transparent",
           WebkitTextStroke: "0 transparent",
         }}

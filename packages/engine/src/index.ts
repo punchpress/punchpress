@@ -69,6 +69,7 @@ export {
   WAVE_CYCLES_MIN,
   withNodeTransform,
 } from "./nodes/text/model";
+export { resolveTrackingPx, TEXT_TRACKING_RANGE } from "./nodes/text/tracking";
 export {
   estimateBounds,
   inflateBounds,

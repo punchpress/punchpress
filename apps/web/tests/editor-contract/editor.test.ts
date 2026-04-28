@@ -114,6 +114,27 @@ const createFakeLoadedFont = () => {
   };
 };
 
+const createPlacementFallbackLoadedFont = () => {
+  return {
+    charToGlyph: () => ({
+      advanceWidth: 371,
+      getPath: (_x: number, _y: number, fontSize: number) => {
+        return {
+          commands: [
+            { type: "M", x: 0, y: -0.9 * fontSize },
+            { type: "L", x: 38, y: -0.9 * fontSize },
+            { type: "L", x: 38, y: 0.1 * fontSize },
+            { type: "L", x: 0, y: 0.1 * fontSize },
+            { type: "Z" },
+          ],
+          toPathData: () => "",
+        };
+      },
+    }),
+    unitsPerEm: 1000,
+  };
+};
+
 const createRectangleSegments = () => {
   return [
     {
@@ -215,6 +236,7 @@ describe("Editor.loadDocument", () => {
 
     expect(editor.nodes[0]?.warp).toEqual({
       kind: "circle",
+      inverted: false,
       pathPosition: 0,
       radius: 900,
       sweepDeg: 140,
@@ -1154,6 +1176,34 @@ describe("Editor text editing mode", () => {
     });
   });
 
+  test("uses a restrained circle warp preset scaled to the text node", () => {
+    const smallNode = {
+      fontSize: 100,
+      text: "YOUR TEXT",
+      type: "text",
+    };
+    const largeNode = {
+      fontSize: 200,
+      text: "YOUR TEXT",
+      type: "text",
+    };
+
+    expect(getDefaultWarp("circle", smallNode)).toEqual({
+      kind: "circle",
+      inverted: false,
+      pathPosition: 0,
+      radius: 289,
+      sweepDeg: 100,
+    });
+    expect(getDefaultWarp("circle", largeNode)).toEqual({
+      kind: "circle",
+      inverted: false,
+      pathPosition: 0,
+      radius: 578,
+      sweepDeg: 100,
+    });
+  });
+
   test("creates new text nodes without a default warp", () => {
     const editor = new Editor();
     editor.applyLocalFontCatalog({
@@ -1185,7 +1235,7 @@ describe("Editor text editing mode", () => {
       stroke: "#000000",
       strokeWidth: 3,
       text: "YOUR TEXT",
-      tracking: 10,
+      tracking: 0,
       type: "text",
       warp: {
         kind: "none",
@@ -1220,6 +1270,35 @@ describe("Editor text editing mode", () => {
 
     expect(frame).not.toBeNull();
     expect(centerX).toBeCloseTo(point.x, 2);
+    expect(centerY).toBeCloseTo(point.y, 2);
+  });
+
+  test("keeps new text nodes centered on the placement click after the font loads", () => {
+    const editor = new Editor();
+    editor.applyLocalFontCatalog({
+      error: "",
+      fonts: [{ ...AVAILABLE_FONT, id: "arialmt" }],
+      state: "ready",
+    });
+
+    const point = { x: 320, y: 240 };
+
+    editor.addTextNode(point);
+
+    const defaultFont = createLocalFontDescriptor(editor.getDefaultFont());
+    editor.fonts.cache.set(getLocalFontId(defaultFont), {
+      descriptor: defaultFont,
+      font: createPlacementFallbackLoadedFont(),
+      status: "ready",
+    });
+    editor.getState().bumpFontRevision();
+
+    const frame = editor.selectedNodeId
+      ? editor.getNodeRenderFrame(editor.selectedNodeId)
+      : null;
+    const centerY = frame ? (frame.bounds.minY + frame.bounds.maxY) / 2 : null;
+
+    expect(frame).not.toBeNull();
     expect(centerY).toBeCloseTo(point.y, 2);
   });
 

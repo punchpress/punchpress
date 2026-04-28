@@ -1,8 +1,10 @@
 import { clamp, format } from "../../primitives/math";
 import { getBounds, mapContours } from "../../primitives/path-geometry";
 import { WAVE_CYCLES_MIN } from "./model";
+import { TEXT_TRACKING_RANGE } from "./tracking";
 
 const ARCH_GUIDE_SAMPLES = 16;
+const CIRCLE_MIN_COLLAPSED_GAP_EM = 0.12;
 const POSITION_HANDLE_OFFSET = 28;
 const WAVE_GUIDE_SAMPLES = 32;
 
@@ -331,32 +333,83 @@ export const getCirclePointAngleDeg = (guide, point) => {
   );
 };
 
+const getCircleTrackingSpanDeg = (node, glyphCount) => {
+  if (glyphCount <= 1) {
+    return Math.abs(node.warp.sweepDeg);
+  }
+
+  const baseSpanDeg = Math.abs(node.warp.sweepDeg);
+  const collapsedGapPx = Math.max(node.fontSize * CIRCLE_MIN_COLLAPSED_GAP_EM, 4);
+  const collapsedGapDeg =
+    (collapsedGapPx / Math.max(node.warp.radius, 1)) * (180 / Math.PI);
+  const collapsedSpanDeg = collapsedGapDeg * (glyphCount - 1);
+  const fullCircleSpanDeg = 360 - 360 / glyphCount;
+
+  if (node.tracking < 0) {
+    const progress = clamp(
+      node.tracking / TEXT_TRACKING_RANGE.min,
+      0,
+      1
+    );
+
+    return baseSpanDeg + (Math.min(collapsedSpanDeg, baseSpanDeg) - baseSpanDeg) * progress;
+  }
+
+  if (node.tracking > 0) {
+    const progress = clamp(node.tracking / TEXT_TRACKING_RANGE.max, 0, 1);
+
+    return (
+      baseSpanDeg +
+      (Math.max(fullCircleSpanDeg, baseSpanDeg) - baseSpanDeg) * progress
+    );
+  }
+
+  return baseSpanDeg;
+};
+
 export const buildCircleTextGeometry = (layout, node) => {
   const guide = getCircleGuide(node.warp);
+  const isInverted = node.warp.inverted === true;
+  const spanDeg = getCircleTrackingSpanDeg(node, layout.glyphs.length);
+  const signedSpanDeg = isInverted ? -spanDeg : spanDeg;
   const paths =
     /** @type {Array<{ d: string, key: string, transform?: string }>} */ ([]);
   const mergedContours = /** @type {ReturnType<typeof mapContours>} */ ([]);
-  const totalWidth = Math.max(layout.totalWidth, 1);
+  const baseCenters =
+    layout.naturalGlyphCenters ||
+    layout.glyphs.map((glyph) => glyph.baseX + glyph.centerX);
+  const baseCenterOrigin =
+    baseCenters.length > 0
+      ? ((baseCenters[0] ?? 0) + (baseCenters[baseCenters.length - 1] ?? 0)) / 2
+      : 0;
+  const baseSpanWidth =
+    baseCenters.length > 1
+      ? Math.max(
+          (baseCenters[baseCenters.length - 1] ?? 0) - (baseCenters[0] ?? 0),
+          1
+        )
+      : 1;
 
   for (const [index, glyph] of layout.glyphs.entries()) {
-    const centerX = glyph.baseX + glyph.advance / 2;
-    const u = clamp((centerX + totalWidth / 2) / totalWidth, 0, 1);
-    const angleDeg = guide.centerAngleDeg + (u - 0.5) * node.warp.sweepDeg;
+    const centeredX = (baseCenters[index] ?? 0) - baseCenterOrigin;
+    const angleDeg =
+      guide.centerAngleDeg + (centeredX / baseSpanWidth) * signedSpanDeg;
+    const rotationDeg = angleDeg + (isInverted ? 180 : 0);
     const point = getCirclePoint(guide.radius, angleDeg);
 
     paths.push({
       key: `glyph-${index}`,
       d: glyph.path,
-      transform: `translate(${format(point.x)} ${format(
-        point.y
-      )}) rotate(${format(angleDeg)}) translate(${format(-glyph.centerX)} 0)`,
+      transform: `translate(${format(point.x)} ${format(point.y)}) rotate(${format(
+        rotationDeg
+      )}) translate(${format(-glyph.centerX)} 0)`,
     });
 
     mergedContours.push(
       ...mapContours(glyph.contours, (contourPoint) => {
         const shiftedX = contourPoint.x - glyph.centerX;
         const shiftedY = contourPoint.y;
-        const angleRad = (angleDeg * Math.PI) / 180;
+        const angleRad = (rotationDeg * Math.PI) / 180;
         const rotatedX =
           shiftedX * Math.cos(angleRad) - shiftedY * Math.sin(angleRad);
         const rotatedY =

@@ -4,7 +4,7 @@ export const DEFAULT_TEXT_STYLE = {
   fontSize: 100,
   stroke: "#000000",
   strokeWidth: 3,
-  tracking: 10,
+  tracking: 0,
 } as const;
 
 export const DEFAULT_TEXT_POSITION = {

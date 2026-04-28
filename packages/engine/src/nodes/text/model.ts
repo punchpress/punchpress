@@ -7,11 +7,35 @@ import {
   DEFAULT_TEXT_POSITION,
   DEFAULT_TEXT_STYLE,
 } from "./text-defaults";
+import { estimateBounds } from "./warp-layout";
 
 export const ARCH_BEND_LIMIT = 2;
 export const WAVE_CYCLES_MAX = 3;
 export const WAVE_CYCLES_MIN = 0.1;
 export const DEFAULT_SLANT_RISE = -120;
+const DEFAULT_CIRCLE_SWEEP_DEG = 100;
+
+const getDefaultCircleWarp = (node) => {
+  const sampleNode =
+    node?.type === "text"
+      ? node
+      : {
+          fontSize: DEFAULT_TEXT_STYLE.fontSize,
+          text: DEFAULT_TEXT_CONTENT,
+          type: "text",
+        };
+  const bounds = estimateBounds(sampleNode);
+  const sweepRadians = (DEFAULT_CIRCLE_SWEEP_DEG * Math.PI) / 180;
+  const radius = Math.max(bounds.width / sweepRadians, bounds.height * 0.9, 1);
+
+  return {
+    kind: "circle",
+    inverted: false,
+    pathPosition: 0,
+    radius: Math.round(radius),
+    sweepDeg: DEFAULT_CIRCLE_SWEEP_DEG,
+  };
+};
 
 export const createId = () => {
   if (
@@ -24,7 +48,7 @@ export const createId = () => {
   return `node-${Math.random().toString(36).slice(2, 10)}`;
 };
 
-export const getDefaultWarp = (kind) => {
+export const getDefaultWarp = (kind, node) => {
   if (kind === "arch") {
     return { kind: "arch", bend: 0.4 };
   }
@@ -38,7 +62,7 @@ export const getDefaultWarp = (kind) => {
   }
 
   if (kind === "circle") {
-    return { kind: "circle", pathPosition: 0, radius: 1100, sweepDeg: 180 };
+    return getDefaultCircleWarp(node);
   }
 
   return { kind: "none" };
