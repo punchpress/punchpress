@@ -1640,11 +1640,25 @@ export class Editor {
   }
 
   redo() {
-    return this.history.redo();
+    const historyTool = this.currentTool;
+    const didRedo = this.history.redo();
+
+    if (didRedo) {
+      historyTool.onHistoryChanged?.("redo");
+    }
+
+    return didRedo;
   }
 
   undo() {
-    return this.history.undo();
+    const historyTool = this.currentTool;
+    const didUndo = this.history.undo();
+
+    if (didUndo) {
+      historyTool.onHistoryChanged?.("undo");
+    }
+
+    return didUndo;
   }
 
   resetHistory() {

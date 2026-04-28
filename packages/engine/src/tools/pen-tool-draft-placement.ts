@@ -7,8 +7,11 @@ import { round } from "../primitives/math";
 import { getNodeLocalPoint } from "../primitives/rotation";
 import type { PenTool } from "./pen-tool";
 import {
+  commitAuthoringHistoryStep,
+  ensureAuthoringHistoryStep,
   finishAuthoringSession,
   getActiveAuthoringSession,
+  releaseAuthoringHistoryStep,
 } from "./pen-tool-authoring-session";
 import { resolveCloseTarget } from "./pen-tool-close-target";
 import {
@@ -31,6 +34,10 @@ export const beginDraftPlacement = (
   const contour = getNodeContour(node, session.contourIndex);
 
   if (!(isPenEditableNode(node) && bbox && contour)) {
+    return;
+  }
+
+  if (!ensureAuthoringHistoryStep(tool, session)) {
     return;
   }
 
@@ -77,6 +84,7 @@ export const cancelDraftPlacement = (tool: PenTool) => {
     return finishAuthoringSession(tool, { commit: false });
   }
 
+  releaseAuthoringHistoryStep(tool, session);
   tool.editor.notifyInteractionPreviewChanged();
   return true;
 };
@@ -104,7 +112,7 @@ export const completeDraftPlacement = (tool: PenTool, point, options = {}) => {
   if (draft.kind === "first-point") {
     session.hasPlacedInitialPoint = true;
     tool.editor.notifyInteractionPreviewChanged();
-    return true;
+    return commitAuthoringHistoryStep(tool, session);
   }
 
   if (draft.target?.type === "start-anchor") {
@@ -160,7 +168,7 @@ export const completeDraftPlacement = (tool: PenTool, point, options = {}) => {
     segmentIndex: contour.segments.length,
   });
   tool.editor.notifyInteractionPreviewChanged();
-  return true;
+  return commitAuthoringHistoryStep(tool, session);
 };
 
 const finishClosedContour = (
@@ -173,11 +181,7 @@ const finishClosedContour = (
   tool.editor.setPathEditingPoint(selectedPoint || null);
   tool.editor.notifyInteractionPreviewChanged();
 
-  if (session.historyMark) {
-    return tool.editor.commitHistoryStep(session.historyMark);
-  }
-
-  return true;
+  return commitAuthoringHistoryStep(tool, session);
 };
 
 export const updateDraftPlacement = (
