@@ -460,6 +460,7 @@ test("clicking a different contour in the same vector switches the active path e
       return getStateSnapshot(page);
     })
     .toMatchObject({
+      activeTool: "node",
       pathEditingNodeId: "vector-a-path-1",
       selectedNodeId: "vector-a-path-1",
       selectedNodeIds: ["vector-a-path-1"],

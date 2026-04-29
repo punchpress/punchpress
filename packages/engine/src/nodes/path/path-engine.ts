@@ -1,3 +1,4 @@
+import { withNodeGeometryBehavior } from "../../primitives/node-geometry";
 import { buildVectorNodeGeometry } from "../vector/vector-engine";
 import { getPathNodeContours } from "./path-contours";
 
@@ -25,7 +26,7 @@ export const buildPathNodeGeometry = (node) => {
 
   const [firstPath] = geometry.paths;
 
-  return {
+  return withNodeGeometryBehavior({
     ...geometry,
     paths: [
       {
@@ -34,5 +35,5 @@ export const buildPathNodeGeometry = (node) => {
         d: geometry.paths.map((path) => path.d).join(" "),
       },
     ],
-  };
+  });
 };

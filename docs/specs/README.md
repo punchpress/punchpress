@@ -15,6 +15,7 @@ They exist to preserve product intent while implementation evolves. They are liv
 ## Current Specs
 
 - `boolean-ops.md`
+- `canvas-geometry.md`
 - `canvas-overlays.md`
 - `canvas-navigation.md`
 - `clipboard.md`

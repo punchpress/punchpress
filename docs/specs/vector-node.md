@@ -33,11 +33,13 @@ on the canvas.
 - Selecting a vector node should show one object-level selection frame for the whole vector object rather than separate frames for each child path.
 - The object-level selection frame for a vector should stay aligned with the visible object before, during, and after transforms.
 
-## Path Editing
+## Direct Vector Editing
 
-- Path editing is a distinct secondary mode for editable path artwork.
-- Vector path editing should enter through explicit intent, such as double-clicking the node, using the Node tool, or using an `Edit path` affordance.
+- Direct vector editing is the Node tool's editing state for editable path artwork.
+- Double-clicking editable path artwork with the Pointer tool should switch to the Node tool and focus the clicked editable path.
+- The action bar should not expose a generic `Edit Path` toggle; users enter direct vector editing by double-clicking, selecting the Node tool, pressing the Node tool hotkey, or clicking editable artwork while the Node tool is active.
 - The Node tool is the direct-selection tool for editable paths: clicking visible path artwork should select that path and enter path editing even when the path is inside imported or nested groups.
+- Selecting the Node tool while one eligible standalone path or live shape is selected should immediately show that node's editing chrome.
 - The default Pointer tool should continue to select the outer grouped object first unless the user has drilled into that group.
 - Once a group is drilled into, Pointer clicks on visible path artwork inside that group should target the clicked descendant path directly.
 - Entering path editing on a standalone path should keep that path as both the contour-edit owner and the visual owner.
@@ -47,7 +49,8 @@ on the canvas.
 - While path editing one child path inside a vector, the focused child path should remain the contour-edit owner while the parent vector remains the visual owner for rendered artwork, hover suppression, and object-level overlay placement.
 - Clicking another child path in the same vector while path editing is active should switch focus and active selection without requiring the user to exit and re-enter path editing.
 - Clicking another editable vector while path editing is active should switch directly into path editing for that vector and select its focused contour rather than forcing a plain-selection intermediate step.
-- Clicking empty canvas while vector path editing is active should first exit path editing while keeping the vector selected; the next empty-canvas click may clear object selection.
+- Pressing `Esc` while direct vector editing is active should first clear inner point selection, then return to the Pointer tool and keep the edited object selected.
+- Clicking empty canvas while vector path editing is active should first exit direct editing while keeping the vector selected; the next empty-canvas click may clear object selection.
 - While path editing is active, the normal object transform box should be replaced by path-editing affordances.
 - While path editing is active, canvas marquee selection should stay suppressed so path manipulation does not surface unrelated selection UI.
 - While path editing is active, users should still be able to move the vector object itself by dragging the vector body when they are not targeting an anchor or handle.

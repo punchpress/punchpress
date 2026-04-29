@@ -639,50 +639,36 @@ describe("Editor interaction mode boundaries", () => {
     expect(editor.selectedNodeIds).toEqual(["vector-container"]);
   });
 
-  test("canvas shortcut toggles vector path editing with E", () => {
+  test("node tool starts vector path editing and escape returns to pointer", () => {
     const editor = createEditor();
     const nodes = createSinglePathVectorNodes();
     let prevented = false;
 
     editor.getState().loadNodes([...nodes]);
     editor.select("vector-container");
+    editor.setActiveTool("node");
 
-    expect(
-      editor.handleCanvasShortcutKeyDown(
-        {
-          altKey: false,
-          code: "KeyE",
-          ctrlKey: false,
-          metaKey: false,
-          preventDefault: () => {
-            prevented = true;
-          },
-        },
-        "e"
-      )
-    ).toBe(true);
-    expect(prevented).toBe(true);
+    expect(editor.activeTool).toBe("node");
     expect(editor.pathEditingNodeId).toBe("vector-path");
     expect(editor.selectedNodeIds).toEqual(["vector-path"]);
     expect(editor.getPathEditingVisualOwnerNodeId()).toBe("vector-container");
 
-    prevented = false;
-
     expect(
       editor.handleCanvasShortcutKeyDown(
         {
           altKey: false,
-          code: "KeyE",
+          code: "Escape",
           ctrlKey: false,
           metaKey: false,
           preventDefault: () => {
             prevented = true;
           },
         },
-        "e"
+        "escape"
       )
     ).toBe(true);
     expect(prevented).toBe(true);
+    expect(editor.activeTool).toBe("pointer");
     expect(editor.pathEditingNodeId).toBeNull();
     expect(editor.selectedNodeIds).toEqual(["vector-container"]);
   });

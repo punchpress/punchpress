@@ -408,8 +408,8 @@ export const Canvas = () => {
               stageMargin={CANVAS_STAGE_MARGIN}
               zoom={zoom}
             />
-            <CanvasStageOverlays />
             <CanvasNodes />
+            <CanvasStageOverlays />
             <CanvasTextEditor />
           </div>
         </InfiniteViewer>

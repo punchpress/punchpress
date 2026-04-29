@@ -63,7 +63,9 @@ export const setActiveTool = (editor, toolId) => {
   const previousToolId = editor.activeTool;
 
   if (toolId !== editor.activeTool) {
-    editor.currentTool.onDeactivate?.();
+    editor.currentTool.onDeactivate?.({
+      nextToolId: toolId,
+    });
   }
 
   if (toolId !== "text" && editor.editingNodeId) {

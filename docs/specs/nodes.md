@@ -17,18 +17,18 @@ Nodes are the core building blocks of a PunchPress design.
 
 ## Editable Nodes
 
-- Editable nodes enter a dedicated editing mode without losing their node-level selection context.
+- Editable nodes enter direct-editing through the Node tool without losing their node-level selection context.
 - Editable nodes share a common editable frame or bounds concept.
 - That frame defines where selection, editing affordances, hover states, and related canvas feedback attach to the node.
 - The editable frame should feel consistent across editable node types.
 - The editable frame should stay aligned with the node's visible footprint closely enough that editing never feels detached from the object.
 - Selection and transform handles should remain screen-sized and visually consistent even when a node's durable data represents resize through transform scale.
 - Specialized editing affordances should prefer explicit secondary modes over overloading the default selected state when that keeps selection behavior clearer.
-- Standalone path nodes should behave like ordinary first-class canvas nodes outside their explicit path-edit mode.
+- Standalone path nodes should behave like ordinary first-class canvas nodes outside the Node tool's direct-editing state.
 - Multi-path vector or compound objects should also remain ordinary first-class canvas nodes rather than introducing a separate hidden object model.
 - Shape editing should enter through an explicit secondary mode when the user intends to manipulate a live shape beyond normal object transforms.
-- Vector path editing should enter through an explicit secondary mode such as double-click or an `Edit path` action rather than replacing normal object selection by default.
-- Shape nodes should label that secondary mode as `Edit Shape`, while path, vector, and path-guided text nodes should continue to label it as `Edit path`.
+- Vector path editing should enter through explicit Node-tool intent, such as selecting the Node tool, pressing its hotkey, or double-clicking editable artwork with the Pointer tool.
+- Shape nodes should use the same Node-tool entry model for live shape editing rather than exposing a separate `Edit Shape` action-bar toggle.
 - While a shape node is in live shape editing, PunchPress should hide the normal node transform box so the shape anchors and shape-specific controls become the primary editing affordances.
 - While a vector node is in path edit mode, PunchPress should hide the normal node transform box so the vector anchors become the primary editing affordance.
 - While path editing is active, canvas marquee selection should stay suppressed so path manipulation does not surface unrelated selection UI.

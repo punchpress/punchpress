@@ -108,8 +108,11 @@ const handleLayerDoubleClick = ({
     return;
   }
 
-  if (editor.getNodeEditCapabilities(nodeId)?.requiresPathEditing) {
-    editor.startPathEditing(nodeId);
+  if (
+    editor.getNodeEditCapabilities(nodeId)?.requiresPathEditing &&
+    editor.startPathEditing(nodeId)
+  ) {
+    editor.setActiveTool("node");
   }
 };
 
@@ -367,7 +370,9 @@ export const LayerTreeRow = ({
           label: `Contour ${contourIndex + 1}`,
           onSelect: () => {
             editor.select(nodeId);
-            editor.startPathEditing(nodeId);
+            if (editor.startPathEditing(nodeId)) {
+              editor.setActiveTool("node");
+            }
 
             if (contour.segments.length > 0) {
               editor.setPathEditingPoint({
@@ -398,6 +403,13 @@ export const LayerTreeRow = ({
 
     if (event.shiftKey) {
       editor.toggleSelection(nodeId);
+      return;
+    }
+
+    if (layer.node.type === "path" && editor.activeTool === "node") {
+      if (editor.startPathEditing(nodeId)) {
+        editor.setActiveTool("node");
+      }
       return;
     }
 

@@ -230,6 +230,11 @@ export const CanvasVectorEditor = ({ viewportRevision }) => {
         editor.updateEditablePath(nodeId, contours, options);
       },
       onExitPathEditing: () => {
+        if (editor.activeTool === "node") {
+          editor.setActiveTool("pointer");
+          return;
+        }
+
         editor.stopPathEditing();
       },
       onHistoryCommit: (historyMark) => {

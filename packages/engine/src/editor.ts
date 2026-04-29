@@ -197,6 +197,7 @@ import {
   getSelectionFrameKey as getEditorSelectionFrameKey,
   getSelectionPreviewDelta as getEditorSelectionPreviewDelta,
   getSelectionTransformFrame as getEditorSelectionTransformFrame,
+  hitTestNodePoint as hitTestEditorNodePoint,
 } from "./queries/node-queries";
 import {
   clearSelection as clearEditorSelection,
@@ -704,6 +705,10 @@ export class Editor {
 
   getNodeRenderGeometry(nodeId) {
     return getEditorNodeRenderGeometry(this, nodeId);
+  }
+
+  hitTestNodePoint(nodeId, point, options = {}) {
+    return hitTestEditorNodePoint(this, nodeId, point, options);
   }
 
   getNodeRenderFrame(nodeId) {

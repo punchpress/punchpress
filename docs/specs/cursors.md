@@ -17,19 +17,24 @@ signal for what will happen.
 - The Pointer tool is the default object-selection cursor.
 - The Pointer tool should use the primary pointer icon treatment in both the toolbar and the in-canvas cursor.
 - With the Pointer tool, clicking visible grouped content selects the outer useful object by default.
-- With the Pointer tool, double-clicking grouped content drills into the group when the group is selected.
+- With the Pointer tool, double-clicking editable vector or shape artwork should switch to the Node tool and focus the clicked editable target.
+- With the Pointer tool, double-clicking grouped content drills into the group when the group is selected and there is no more specific editable target.
 - With the Pointer tool inside a drilled-in group, clicking visible descendant artwork should target the descendant layer under the pointer.
 - The Node tool is the direct path-selection cursor.
 - The Node tool should use a distinct secondary pointer icon treatment from the same cursor family as the Pointer tool in both the toolbar and the in-canvas cursor.
+- Selecting the Node tool with one eligible editable node selected should immediately show that node's direct-editing chrome.
 - With the Node tool, clicking visible path artwork should select that path and enter path editing even when the path is inside imported or nested groups.
+- Leaving the Node tool should leave direct path or shape editing unless the next tool intentionally continues vector editing, such as the Pen tool.
+- `Esc` while using the Node tool should return to the Pointer tool after clearing any inner point selection that currently owns `Esc`.
 - The Pen tool is the point-authoring cursor.
 - With the Pen tool, cursor feedback should distinguish placing a new point, continuing an open path, closing a path, adding a point to a segment, and deleting or converting an existing point.
 - The Hand tool is the canvas navigation cursor.
 - Holding `Space` should temporarily use the hand-pan cursor and take precedence over editing and selection cursors until panning ends.
 
-## Path Editing
+## Direct Vector Editing
 
-- Path editing should use cursor feedback that distinguishes anchors, handles, editable path bodies, insertable segments, and external path targets.
+- Direct vector editing is the user-facing state of the Node tool, not a separate action-bar mode.
+- Direct vector editing should use cursor feedback that distinguishes anchors, handles, editable path bodies, insertable segments, and external path targets.
 - Hovering an anchor should communicate point selection or point dragging.
 - Hovering a bezier handle should communicate handle dragging.
 - Hovering a path body in the currently edited path should communicate body dragging when body dragging is available.
@@ -54,7 +59,7 @@ signal for what will happen.
 - Explicit Pen actions such as close, continue, add point, and delete point take precedence over generic body dragging.
 - External visible path targets take precedence over current-path body dragging when path editing is active.
 - Object transform cursors take precedence only when the pointer is on transform handles or transform-specific affordances.
-- Hover-only object selection cursors should not override active edit-mode cursor states.
+- Hover-only object selection cursors should not override active Node-tool editing cursor states.
 
 ## Feedback
 

@@ -410,6 +410,13 @@ textarea,
   cursor: var(--canvas-cursor-default);
 }
 
+.canvas-bottom-toolbar,
+.canvas-bottom-toolbar button:not(:disabled),
+.canvas-bottom-toolbar [role="button"]:not([aria-disabled="true"]),
+.canvas-bottom-toolbar .cursor-pointer {
+  cursor: var(--canvas-active-tool-cursor, var(--canvas-cursor-default));
+}
+
 .canvas-host .canvas-node {
   cursor: var(--canvas-cursor-default);
 }

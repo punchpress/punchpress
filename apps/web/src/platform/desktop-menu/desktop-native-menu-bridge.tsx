@@ -72,7 +72,6 @@ const handleSelectionCommand = (editor, command: DesktopEditorCommand) => {
     return true;
   }
 
-  editor.togglePathEditing();
   return true;
 };
 

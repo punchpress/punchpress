@@ -656,7 +656,7 @@ describe("vector pen authoring", () => {
     });
   });
 
-  test("exiting path editing with E finishes the active pen path so the next click starts a new path", () => {
+  test("E is not a path editing shortcut while authoring with the pen", () => {
     const editor = new Editor();
 
     editor.setActiveTool("pen");
@@ -664,23 +664,11 @@ describe("vector pen authoring", () => {
     clickPen(editor, { x: 260, y: 160 });
     clickPen(editor, { x: 260, y: 220 });
 
-    const firstPathId = editor.selectedNodeId;
     const firstNodeId = editor.pathEditingNodeId;
 
-    expect(pressKey(editor, "E", "KeyE")).toBe(true);
+    expect(pressKey(editor, "E", "KeyE")).toBe(false);
     expect(editor.activeTool).toBe("pen");
-    expect(editor.pathEditingNodeId).toBeNull();
-    expect(editor.pathEditingPoint).toBeNull();
-
-    clickPen(editor, { x: 360, y: 260 });
-
-    expect(getRootPathCount(editor)).toBe(2);
-    expect(editor.selectedNodeId).not.toBe(firstPathId);
-    expect(editor.pathEditingNodeId).not.toBe(firstNodeId);
-    expect(editor.pathEditingPoint).toEqual({
-      contourIndex: 0,
-      segmentIndex: 0,
-    });
+    expect(editor.pathEditingNodeId).toBe(firstNodeId);
   });
 
   test("continues an open path from its trailing endpoint with the pen tool", () => {

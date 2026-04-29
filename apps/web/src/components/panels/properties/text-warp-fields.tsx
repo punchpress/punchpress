@@ -41,7 +41,9 @@ export const TextWarpFields = ({ node, withTopBorder = true }) => {
           editor.updateSelectedNode({ warp: getDefaultWarp(nextKind, node) });
 
           if (nextKind === "circle") {
-            editor.startPathEditing(node.id);
+            if (editor.startPathEditing(node.id)) {
+              editor.setActiveTool("node");
+            }
             return;
           }
 

@@ -137,6 +137,16 @@ const getCanvasInteractionNodeId = (editor, activeTool, nodeId, event) => {
   );
 };
 
+const getCanvasHoverNodeId = (editor, event) => {
+  const nodeId = getCanvasDeepLeafNodeIdAtPoint(
+    editor,
+    event.clientX,
+    event.clientY
+  );
+
+  return nodeId ? editor.getSelectionTargetNodeId(nodeId) || nodeId : null;
+};
+
 const startCanvasNodeDragSession = ({
   editor,
   event,
@@ -313,6 +323,14 @@ const CanvasNodeShell = ({ children, isReady, nodeId }) => {
 
               const nodeEditCapabilities =
                 editor.getNodeEditCapabilities(interactionNodeId);
+              const canDragWithActiveTool =
+                activeTool === "pointer" ||
+                Boolean(
+                  activeTool === "node" &&
+                    editor.isPathEditing(interactionNodeId) &&
+                    nodeEditCapabilities?.pathEditingOverlayMode ===
+                      "keep-transform"
+                );
               const interactionSelectionTargetNodeId =
                 editor.getSelectionTargetNodeId(interactionNodeId) ||
                 interactionNodeId;
@@ -345,7 +363,7 @@ const CanvasNodeShell = ({ children, isReady, nodeId }) => {
                 return;
               }
 
-              if (activeTool !== "pointer") {
+              if (!canDragWithActiveTool) {
                 return;
               }
 
@@ -359,24 +377,43 @@ const CanvasNodeShell = ({ children, isReady, nodeId }) => {
                 });
               }
             }}
-            onPointerEnter={() => {
+            onPointerEnter={(event) => {
               if (spacePressed || activeTool !== "pointer") {
                 return;
               }
 
-              editor.setHoveredNode(
-                editor.getSelectionTargetNodeId(nodeId) || nodeId
-              );
+              editor.setHoveredNode(getCanvasHoverNodeId(editor, event));
             }}
-            onPointerLeave={() => {
-              const hoverTargetNodeId =
-                editor.getSelectionTargetNodeId(nodeId) || nodeId;
+            onPointerLeave={(event) => {
+              const hoverTargetNodeId = getCanvasHoverNodeId(editor, event);
 
-              if (editor.hoveredNodeId !== hoverTargetNodeId) {
+              if (hoverTargetNodeId) {
+                editor.setHoveredNode(hoverTargetNodeId);
+                return;
+              }
+
+              if (!editor.hoveredNodeId) {
                 return;
               }
 
               editor.setHoveredNode(null);
+            }}
+            onPointerMove={(event) => {
+              if (
+                spacePressed ||
+                activeTool !== "pointer" ||
+                event.buttons !== 0
+              ) {
+                return;
+              }
+
+              const hoverTargetNodeId = getCanvasHoverNodeId(editor, event);
+
+              if (editor.hoveredNodeId === hoverTargetNodeId) {
+                return;
+              }
+
+              editor.setHoveredNode(hoverTargetNodeId);
             }}
             type="button"
           />

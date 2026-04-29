@@ -1,3 +1,4 @@
+import { withNodeGeometryBehavior } from "../../primitives/node-geometry";
 import { toTransformedWorldFrame, toWorldFrame } from "../node-frame-utils";
 import {
   buildShapeNodePath,
@@ -12,7 +13,7 @@ export const shapeNodeCapabilities = {
   buildGeometry: (node) => {
     const bbox = getShapeNodeBounds(node);
 
-    return {
+    return withNodeGeometryBehavior({
       bbox,
       guide: null,
       id: node.id,
@@ -24,7 +25,7 @@ export const shapeNodeCapabilities = {
       ],
       ready: true,
       selectionBounds: bbox,
-    };
+    });
   },
 
   createDefaultNode: (shape) => {

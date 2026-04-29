@@ -1640,14 +1640,24 @@ test("double-clicking a vector node enters path editing", async ({ page }) => {
   await pauseForUi(page);
 
   await expect
-    .poll(async () => (await getDebugDump(page))?.editing?.pathNodeId || null)
-    .toBe("vector-node");
+    .poll(async () => {
+      const dump = await getDebugDump(page);
+
+      return {
+        activeTool: dump?.tool || null,
+        pathNodeId: dump?.editing?.pathNodeId || null,
+      };
+    })
+    .toEqual({
+      activeTool: "node",
+      pathNodeId: "vector-node",
+    });
 
   await expect(page.locator(".canvas-vector-paper")).toHaveCount(1);
   await expect(page.locator(".canvas-single-selection")).toHaveCount(0);
 });
 
-test("single-path vector selections keep the edit path action visible", async ({
+test("single-path vector selections enter editing through the Node tool", async ({
   page,
 }) => {
   await gotoEditor(page);
@@ -1678,10 +1688,10 @@ test("single-path vector selections keep the edit path action visible", async ({
     .toEqual({
       pathNodeId: null,
       selectedNodeIds: ["irregular-vector-container"],
-      toolbarButtons: ["Edit Path (E)", "Delete (Delete)"],
+      toolbarButtons: ["Delete (Delete)"],
     });
 
-  await page.getByRole("button", { name: "Edit Path (E)" }).click();
+  await page.getByRole("button", { name: "Node (A)" }).click();
   await pauseForUi(page);
 
   await expect
@@ -1724,7 +1734,7 @@ test("clicking the action-bar pen button preserves vector path editing", async (
       };
     })
     .toEqual({
-      activeTool: "pointer",
+      activeTool: "node",
       pathNodeId: "vector-node",
       selectedNodeIds: ["vector-node"],
     });
@@ -3224,7 +3234,7 @@ test("rotated polygon corner drag keeps the rendered node aligned while rounding
     throw new Error("Missing rotated shape render bounds before path edit");
   }
 
-  await page.keyboard.press("e");
+  await page.keyboard.press("a");
   await pauseForUi(page);
 
   const anchorPoint = await getEditablePathPointScreenPoint(
@@ -4348,7 +4358,7 @@ test("selecting a rounded vector corner handle exposes deselect and suppresses a
   ).toHaveCount(1);
   await expect(
     page.getByRole("button", { name: "Stop editing path (E)" })
-  ).toHaveCount(1);
+  ).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Delete point" })).toHaveCount(
     0
   );

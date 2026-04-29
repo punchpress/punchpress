@@ -15,10 +15,7 @@ const createAction = (id: string, title = id) => {
 describe("selection toolbar presence", () => {
   test("prefers the current action set while the toolbar remains visible", () => {
     const renderedActions = getRenderedSelectionToolbarActions(
-      [
-        createAction("clear-path-selection"),
-        createAction("toggle-path-editing"),
-      ],
+      [createAction("clear-path-selection"), createAction("delete-point")],
       {
         actions: [
           createAction("split-path"),
@@ -26,7 +23,6 @@ describe("selection toolbar presence", () => {
           createAction("set-point-corner"),
           createAction("set-point-smooth"),
           createAction("clear-path-selection"),
-          createAction("toggle-path-editing"),
         ],
         phase: "open" as const,
       }
@@ -34,7 +30,7 @@ describe("selection toolbar presence", () => {
 
     expect(renderedActions.map((action) => action.id)).toEqual([
       "clear-path-selection",
-      "toggle-path-editing",
+      "delete-point",
     ]);
   });
 
@@ -42,14 +38,14 @@ describe("selection toolbar presence", () => {
     const renderedActions = getRenderedSelectionToolbarActions([], {
       actions: [
         createAction("clear-path-selection"),
-        createAction("toggle-path-editing"),
+        createAction("delete-point"),
       ],
       phase: "closing" as const,
     });
 
     expect(renderedActions.map((action) => action.id)).toEqual([
       "clear-path-selection",
-      "toggle-path-editing",
+      "delete-point",
     ]);
   });
 });

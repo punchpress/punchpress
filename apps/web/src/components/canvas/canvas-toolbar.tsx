@@ -7,6 +7,7 @@ import {
   TextFontIcon,
 } from "@hugeicons-pro/core-stroke-rounded";
 import { HandIcon, PenToolIcon } from "lucide-react";
+import type { CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/ui/toggle";
 import {
@@ -59,12 +60,31 @@ const PEN_TOOL = {
   shortcut: "P",
 };
 
+const TOOL_CURSOR_BY_ID = {
+  hand: "var(--canvas-cursor-grab)",
+  node: "var(--canvas-cursor-node)",
+  pen: "var(--canvas-cursor-pen-tool)",
+  pointer: "var(--canvas-cursor-default)",
+  shape: "var(--canvas-cursor-add)",
+  text: "var(--canvas-cursor-text)",
+};
+
 export const CanvasToolbar = () => {
   const editor = useEditor();
+  const activeTool = useEditorValue((_, state) => state.activeTool);
   const zoom = useEditorValue((_, state) => state.viewport.zoom);
+  const activeToolCursor =
+    TOOL_CURSOR_BY_ID[activeTool] || TOOL_CURSOR_BY_ID.pointer;
 
   return (
-    <Toolbar className="canvas-bottom-toolbar">
+    <Toolbar
+      className="canvas-bottom-toolbar"
+      style={
+        {
+          "--canvas-active-tool-cursor": activeToolCursor,
+        } as CSSProperties
+      }
+    >
       <ToolbarGroup>
         {PRIMARY_TOOL_CONFIG.map((tool) => {
           return <ToolButton key={tool.id} {...tool} />;

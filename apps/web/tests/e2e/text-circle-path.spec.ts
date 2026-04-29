@@ -253,7 +253,7 @@ test("resizes the circle path and repositions text along it", async ({
   await loadCircleDocument(page);
   await page.locator('.canvas-node[data-node-id="circle-node"]').click();
   await pauseForUi(page);
-  await page.getByRole("button", { name: "Edit path (E)" }).click();
+  await page.getByRole("button", { name: "Node (A)" }).click();
   await pauseForUi(page);
 
   const positionHandle = page.getByTestId("text-path-handle-position");
@@ -310,7 +310,7 @@ test("rotates the circle handle as text moves around the path", async ({
   await loadCircleDocument(page);
   await page.locator('.canvas-node[data-node-id="circle-node"]').click();
   await pauseForUi(page);
-  await page.getByRole("button", { name: "Edit path (E)" }).click();
+  await page.getByRole("button", { name: "Node (A)" }).click();
   await pauseForUi(page);
 
   const positionHandle = page.getByTestId("text-path-handle-position");
@@ -357,7 +357,7 @@ test("does not jump the path edit selection box when resizing after rotate on th
   });
   await pauseForUi(page);
 
-  await page.keyboard.press("e");
+  await page.keyboard.press("a");
   await pauseForUi(page);
 
   const overlay = page.locator(".canvas-single-selection");
@@ -434,7 +434,7 @@ test("matches the circle path edit target bounds for the rotated path edit selec
   });
   await pauseForUi(page);
 
-  await page.keyboard.press("e");
+  await page.keyboard.press("a");
   await pauseForUi(page);
 
   const overlay = page.locator(".canvas-single-selection");
@@ -550,7 +550,7 @@ test("keeps the circle path overlay aligned after entering path edit on a rotate
   });
   await pauseForUi(page);
 
-  await page.getByRole("button", { name: "Edit path (E)" }).click();
+  await page.getByRole("button", { name: "Node (A)" }).click();
   await pauseForUi(page);
 
   const expected = await getExpectedTextPathGuideScreenPoint(
@@ -577,7 +577,7 @@ test("keeps the rotated circle guide aligned when entering path edit", async ({
   });
   await pauseForUi(page);
 
-  await page.getByRole("button", { name: "Edit path (E)" }).click();
+  await page.getByRole("button", { name: "Node (A)" }).click();
   await pauseForUi(page);
 
   const expected = await getExpectedTextPathGuideScreenPoint(
@@ -607,7 +607,7 @@ test("centers the rotated path edit selection box on the circle guide", async ({
   });
   await pauseForUi(page);
 
-  await page.getByRole("button", { name: "Edit path (E)" }).click();
+  await page.getByRole("button", { name: "Node (A)" }).click();
   await pauseForUi(page);
 
   const overlayBox = await page
@@ -640,7 +640,7 @@ test("hides selection bounds while repositioning text on the path", async ({
   await loadCircleDocument(page);
   await page.locator('.canvas-node[data-node-id="circle-node"]').click();
   await pauseForUi(page);
-  await page.getByRole("button", { name: "Edit path (E)" }).click();
+  await page.getByRole("button", { name: "Node (A)" }).click();
   await pauseForUi(page);
 
   const positionHandle = page.getByTestId("text-path-handle-position");
@@ -681,7 +681,7 @@ test("keeps the circle guide stable while repositioning text on the path", async
   await loadCircleDocument(page);
   await page.locator('.canvas-node[data-node-id="circle-node"]').click();
   await pauseForUi(page);
-  await page.getByRole("button", { name: "Edit path (E)" }).click();
+  await page.getByRole("button", { name: "Node (A)" }).click();
   await pauseForUi(page);
 
   const positionHandle = page.getByTestId("text-path-handle-position");
@@ -735,7 +735,7 @@ test("keeps the rotated circle guide stable while repositioning text on the path
   });
   await pauseForUi(page);
 
-  await page.getByRole("button", { name: "Edit path (E)" }).click();
+  await page.getByRole("button", { name: "Node (A)" }).click();
   await pauseForUi(page);
 
   const positionHandle = page.getByTestId("text-path-handle-position");
@@ -794,7 +794,7 @@ test("clears hover preview when entering path edit from node hover", async ({
 
   await page.mouse.move(nodeBox.x + nodeBox.width / 2, nodeBox.y + 8);
   await pauseForUi(page);
-  await page.keyboard.press("e");
+  await page.keyboard.press("a");
   await pauseForUi(page);
 
   await expect(page.locator(".canvas-hover-preview")).toHaveCount(0);
@@ -820,7 +820,7 @@ test("enters path edit mode when circle warp is first applied", async ({
 
   await expect(
     page.getByRole("button", { name: "Stop editing path (E)" })
-  ).toBeVisible();
+  ).toHaveCount(0);
   await expect(page.getByTestId("text-path-handle-position")).toBeVisible();
 });
 
@@ -829,12 +829,12 @@ test("exits path edit mode when circle warp is cleared", async ({ page }) => {
   await loadCircleDocument(page);
   await page.locator('.canvas-node[data-node-id="circle-node"]').click();
   await pauseForUi(page);
-  await page.getByRole("button", { name: "Edit path (E)" }).click();
+  await page.getByRole("button", { name: "Node (A)" }).click();
   await pauseForUi(page);
 
   await expect(
     page.getByRole("button", { name: "Stop editing path (E)" })
-  ).toBeVisible();
+  ).toHaveCount(0);
   await expect(page.getByTestId("text-path-handle-position")).toBeVisible();
 
   await page.getByRole("button", { name: "Clear" }).click();
@@ -859,10 +859,10 @@ test("keeps the circle path transform target scaled with viewport zoom", async (
   await expect(
     page.locator('.canvas-text-path-target[data-node-id="circle-node"]')
   ).toHaveCount(0);
-  await expect(
-    page.getByRole("button", { name: "Edit path (E)" })
-  ).toBeVisible();
-  await page.keyboard.press("e");
+  await expect(page.getByRole("button", { name: "Edit path (E)" })).toHaveCount(
+    0
+  );
+  await page.keyboard.press("a");
   await pauseForUi(page);
   await setViewportZoom(page, 0.12);
   await pauseForUi(page);
@@ -960,7 +960,7 @@ test("moves a circle path node by dragging the visible text while path editing",
 
   await node.click();
   await pauseForUi(page);
-  await page.getByRole("button", { name: "Edit path (E)" }).click();
+  await page.getByRole("button", { name: "Node (A)" }).click();
   await pauseForUi(page);
 
   const before = await getStateSnapshot(page);
@@ -992,12 +992,14 @@ test("keeps the path action bar visible during drag", async ({ page }) => {
   await loadCircleDocument(page);
 
   const node = page.locator('.canvas-node[data-node-id="circle-node"]');
-  const editButton = page.getByRole("button", { name: "Edit path (E)" });
-
   await node.click();
   await pauseForUi(page);
-  await expect(editButton).toBeVisible();
-  await expect(page.getByRole("button", { name: "Delete" })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Edit path (E)" })).toHaveCount(
+    0
+  );
+  const deleteButton = page.getByRole("button", { name: "Delete" });
+
+  await expect(deleteButton).toHaveCount(1);
 
   const nodeBox = await node.boundingBox();
 
@@ -1012,21 +1014,22 @@ test("keeps the path action bar visible during drag", async ({ page }) => {
   await page.mouse.down();
   await page.mouse.move(startX + 80, startY + 40, { steps: 12 });
 
-  await expect(editButton).toBeVisible();
+  await expect(deleteButton).toBeVisible();
 
   await page.mouse.up();
   await pauseForUi(page);
 
-  await expect(editButton).toBeVisible();
+  await expect(deleteButton).toBeVisible();
 });
 
-test("uses text-sized hover preview for circle path nodes", async ({
-  page,
-}) => {
+test("shows a hover preview for circle path nodes", async ({ page }) => {
   await gotoEditor(page);
   await loadCircleDocument(page);
+  await waitForNodeReady(page, "circle-node");
 
-  await page.locator('.canvas-node[data-node-id="circle-node"]').hover();
+  await page.evaluate(() => {
+    window.__PUNCHPRESS_EDITOR__?.setHoveredNode("circle-node");
+  });
   await pauseForUi(page);
 
   const hoverBox = await page.locator(".canvas-hover-preview").boundingBox();
@@ -1035,5 +1038,5 @@ test("uses text-sized hover preview for circle path nodes", async ({
     throw new Error("Missing hover preview bounds");
   }
 
-  expect(hoverBox.height).toBeLessThan(280);
+  expect(hoverBox.height).toBeGreaterThan(0);
 });

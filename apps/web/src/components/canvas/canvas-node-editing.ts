@@ -74,7 +74,13 @@ export const openCanvasNodeEditingMode = (editor, nodeId, options = {}) => {
   }
 
   if (nodeEditCapabilities.requiresPathEditing) {
-    return editor.startPathEditing(node.id);
+    const didStart = editor.startPathEditing(node.id);
+
+    if (didStart) {
+      editor.setActiveTool("node");
+    }
+
+    return didStart;
   }
 
   return false;

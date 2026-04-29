@@ -21,6 +21,30 @@ const focusNearestGroupAncestor = (editor, node) => {
 };
 
 export class NodeTool extends Tool {
+  onActivate() {
+    if (this.editor.pathEditingNodeId) {
+      return false;
+    }
+
+    const targetNodeId = this.editor.getPathEditingEntryNodeId(
+      this.editor.selectedNodeId
+    );
+
+    if (!this.editor.canStartPathEditing(targetNodeId)) {
+      return false;
+    }
+
+    return this.editor.startPathEditing(targetNodeId);
+  }
+
+  onDeactivate({ nextToolId } = {}) {
+    if (nextToolId === "pen" || !this.editor.pathEditingNodeId) {
+      return false;
+    }
+
+    return this.editor.stopPathEditing();
+  }
+
   onNodePointerDown({ event, node }) {
     const targetNodeId = this.editor.getPathEditingEntryNodeId(node.id);
     const targetNode = this.editor.getNode(targetNodeId);
@@ -37,8 +61,8 @@ export class NodeTool extends Tool {
   }
 
   onKeyDown({ event, key }) {
-    if (key === "escape" && this.editor.pathEditingNodeId) {
-      this.editor.stopPathEditing();
+    if (key === "escape") {
+      this.editor.setActiveTool("pointer");
       return true;
     }
 

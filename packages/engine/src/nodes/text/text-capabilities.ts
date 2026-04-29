@@ -1,3 +1,4 @@
+import { withNodeGeometryBehavior } from "../../primitives/node-geometry";
 import { toTransformedWorldFrame, toWorldFrame } from "../node-frame-utils";
 import { createDefaultNode } from "./model";
 import {
@@ -54,26 +55,26 @@ export const textNodeCapabilities = {
     if (!font) {
       const bbox = estimateBounds(node);
 
-      return {
+      return withNodeGeometryBehavior({
         bbox,
         guide: getFallbackTextGuide(node, bbox),
         id: node.id,
         paths: [],
         ready: false,
         selectionBounds: null,
-      };
+      });
     }
 
     const geometry = buildWarpTextGeometry(node, font);
 
-    return {
+    return withNodeGeometryBehavior({
       bbox: geometry.bbox,
       guide: geometry.guide || null,
       id: node.id,
       paths: geometry.paths,
       ready: geometry.ready,
       selectionBounds: geometry.selectionBounds || null,
-    };
+    });
   },
 
   createDefaultNode: (font) => {

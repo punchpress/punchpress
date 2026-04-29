@@ -51,9 +51,6 @@ export const getDesktopAppMenuState = (
 
   return {
     canDelete: selectionProperties.canDelete,
-    canEditPath: Boolean(
-      selectedNode?.id && editor.canStartPathEditing(selectedNode.id)
-    ),
     canJoinCurves: editor.canJoinCurves(selectedNodeIds),
     compoundOperation:
       getChoiceState<DesktopVectorCompoundOperation>(compoundOperation),
