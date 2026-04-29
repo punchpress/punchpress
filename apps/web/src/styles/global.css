@@ -387,6 +387,10 @@ textarea,
   cursor: var(--canvas-cursor-pointer);
 }
 
+.canvas-cursor-node {
+  cursor: var(--canvas-cursor-node);
+}
+
 .canvas-cursor-text {
   cursor: var(--canvas-cursor-text);
 }
@@ -451,6 +455,13 @@ textarea,
   cursor: var(--canvas-cursor-add);
 }
 
+.canvas-host[data-tool="node"] .canvas-surface,
+.canvas-host[data-tool="node"] .canvas-node,
+.canvas-host[data-tool="node"] .canvas-node *,
+.canvas-host[data-tool="node"] .canvas-vector-paper {
+  cursor: var(--canvas-cursor-node);
+}
+
 [data-tool="pen"] .canvas-surface,
 [data-tool="pen"] .canvas-node,
 [data-tool="pen"] .canvas-node * {
@@ -472,7 +483,8 @@ textarea,
 .canvas-host[data-panning="true"],
 .canvas-host[data-panning="true"] .canvas-surface,
 .canvas-host[data-panning="true"] .canvas-node,
-.canvas-host[data-panning="true"] .canvas-node * {
+.canvas-host[data-panning="true"] .canvas-node *,
+.canvas-host[data-panning="true"] .canvas-vector-paper {
   cursor: var(--canvas-cursor-grab) !important;
 }
 
@@ -488,12 +500,20 @@ textarea,
   cursor: var(--canvas-cursor-default);
 }
 
+.canvas-host[data-tool="node"] [data-canvas-cursor="vector-path-body"] {
+  cursor: var(--canvas-cursor-node);
+}
+
 [data-canvas-cursor="vector-path-insert"] {
   cursor: var(--canvas-cursor-pen-tool-add);
 }
 
 [data-canvas-cursor="vector-path-point"] {
   cursor: var(--canvas-cursor-default);
+}
+
+.canvas-host[data-tool="node"] [data-canvas-cursor="vector-path-point"] {
+  cursor: var(--canvas-cursor-node);
 }
 
 [data-active-canvas-cursor="text-path-slide"],
@@ -516,9 +536,21 @@ textarea,
   cursor: var(--canvas-cursor-default) !important;
 }
 
+.canvas-host[data-tool="node"][data-active-canvas-cursor="vector-path-body-active"],
+.canvas-host[data-tool="node"][data-active-canvas-cursor="vector-path-body-active"]
+  * {
+  cursor: var(--canvas-cursor-node) !important;
+}
+
 [data-active-canvas-cursor="vector-path-point-active"],
 [data-active-canvas-cursor="vector-path-point-active"] * {
   cursor: var(--canvas-cursor-default) !important;
+}
+
+.canvas-host[data-tool="node"][data-active-canvas-cursor="vector-path-point-active"],
+.canvas-host[data-tool="node"][data-active-canvas-cursor="vector-path-point-active"]
+  * {
+  cursor: var(--canvas-cursor-node) !important;
 }
 
 body[data-active-transform-cursor="true"],

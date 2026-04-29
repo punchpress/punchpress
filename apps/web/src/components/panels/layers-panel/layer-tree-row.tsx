@@ -1,4 +1,5 @@
 import { ViewIcon, ViewOffIcon } from "@hugeicons-pro/core-stroke-rounded";
+import { getPathNodeContours } from "@punchpress/engine";
 import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
@@ -314,8 +315,12 @@ export const LayerTreeRow = ({
   const childNodeIds = useEditorValue((editor) =>
     editor.getChildNodeIds(nodeId)
   );
-  const vectorContours = useEditorValue((editor) => {
+  const editableContours = useEditorValue((editor) => {
     const node = editor.getNode(nodeId);
+
+    if (node?.type === "path") {
+      return getPathNodeContours(node);
+    }
 
     return node?.type === "vector" ? node.contours || [] : [];
   });
@@ -351,10 +356,10 @@ export const LayerTreeRow = ({
   const isExpanded = !collapsedGroupIds.has(nodeId);
   const isHovered = hoveredNodeId === nodeId;
   const contourRows =
-    layer.node.type === "vector" &&
+    (layer.node.type === "vector" || layer.node.type === "path") &&
     childNodeIds.length === 0 &&
-    vectorContours.length > 1
-      ? vectorContours.map((contour, contourIndex) => ({
+    editableContours.length > 1
+      ? editableContours.map((contour, contourIndex) => ({
           id: `${nodeId}:contour:${contourIndex}`,
           isSelected:
             pathEditingState.pathEditingNodeId === nodeId &&

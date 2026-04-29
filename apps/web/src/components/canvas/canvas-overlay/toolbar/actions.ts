@@ -74,6 +74,23 @@ const getPathEditingToolbarActions = (editor, state) => {
   if (
     state.isPathEditing &&
     state.selectedNode?.type === "path" &&
+    editor.canClosePathContour(state.selectedNode.id, state.selectedPathPoint)
+  ) {
+    actions.unshift({
+      id: "close-curve",
+      isActive: false,
+      label: "Close curve",
+      title: "Close the active curve",
+      variant: "ghost",
+      onSelect: () => {
+        editor.closePathContour(state.selectedNode.id, state.selectedPathPoint);
+      },
+    });
+  }
+
+  if (
+    state.isPathEditing &&
+    state.selectedNode?.type === "path" &&
     selectedPathPoints.length === 2 &&
     editor.canJoinPathEndpoints(state.selectedNode.id, selectedPathPoints)
   ) {

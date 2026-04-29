@@ -1,5 +1,6 @@
 import { PUNCH_DOCUMENT_VERSION } from "./constants";
 import { UnsupportedDocumentVersionError } from "./errors";
+import { normalizeNodesForSchema } from "./normalize";
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -13,7 +14,12 @@ export const migrateDocument = (value: unknown) => {
   }
 
   if (value.version === PUNCH_DOCUMENT_VERSION) {
-    return value;
+    return Array.isArray(value.nodes)
+      ? {
+          ...value,
+          nodes: normalizeNodesForSchema(value.nodes),
+        }
+      : value;
   }
 
   if (typeof value.version !== "string" || value.version.length === 0) {

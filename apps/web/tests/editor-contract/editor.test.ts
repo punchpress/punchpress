@@ -1374,6 +1374,7 @@ describe("Editor text editing mode", () => {
     const selectedPath = editor.selectedNode;
 
     expect(selectedPath).toMatchObject({
+      fillRule: "evenodd",
       parentId: "root",
       type: "path",
     });

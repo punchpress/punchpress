@@ -543,6 +543,121 @@ test("shows selection colors for a selected multi-path vector and applies one sw
     ]);
 });
 
+test("keeps selection color picker open while dragging the color area", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadVectorSelectionColorsDocument(page);
+  await selectNodes(page, ["vector-container"]);
+
+  const selectionColorsSection = getSelectionColorsSection(page);
+  const redSelectionColorButton = selectionColorsSection
+    .getByRole("button", { name: "Choose color" })
+    .nth(0);
+
+  await redSelectionColorButton.click();
+
+  const picker = page.locator("[data-slot='color-picker']").last();
+  const colorArea = picker.locator("[data-slot='color-picker-selection']");
+
+  await expect(picker).toBeVisible();
+  await expect(colorArea).toBeVisible();
+  const originalPathStyles = [
+    {
+      fill: "#F63F3F",
+      id: "vector-path-1",
+      stroke: "#000000",
+    },
+    {
+      fill: "#FFFFFF",
+      id: "vector-path-2",
+      stroke: "#F63F3F",
+    },
+  ];
+
+  const colorAreaBox = await colorArea.boundingBox();
+  expect(colorAreaBox).not.toBeNull();
+  if (!colorAreaBox) {
+    return;
+  }
+
+  const startPoint = {
+    x: colorAreaBox.x + colorAreaBox.width * 0.8,
+    y: colorAreaBox.y + colorAreaBox.height * 0.25,
+  };
+  const endPoint = {
+    x: colorAreaBox.x + colorAreaBox.width * 0.25,
+    y: colorAreaBox.y + colorAreaBox.height * 0.75,
+  };
+
+  await page.mouse.move(startPoint.x, startPoint.y);
+  await page.mouse.down();
+  await page.mouse.move(endPoint.x, endPoint.y, { steps: 8 });
+  await page.mouse.up();
+
+  await expect(picker).toBeVisible();
+  await expect
+    .poll(() => {
+      return page.evaluate(() => {
+        return Boolean(window.__PUNCHPRESS_EDITOR__?.canUndo);
+      });
+    })
+    .toBe(false);
+  await expect
+    .poll(async () => {
+      const state = await getStateSnapshot(page);
+
+      return state.nodes
+        .filter((node) => {
+          return node.id === "vector-path-1" || node.id === "vector-path-2";
+        })
+        .map((node) => ({
+          fill: node.fill,
+          id: node.id,
+          stroke: node.stroke,
+        }))
+        .sort((left, right) => left.id.localeCompare(right.id));
+    })
+    .not.toEqual(originalPathStyles);
+  await expect
+    .poll(async () => {
+      const state = await getStateSnapshot(page);
+      return state?.selectedNodeId || null;
+    })
+    .toBe("vector-container");
+
+  await page.mouse.click(10, 10);
+  await expect(picker).toBeHidden();
+  await expect
+    .poll(() => {
+      return page.evaluate(() => {
+        return Boolean(window.__PUNCHPRESS_EDITOR__?.canUndo);
+      });
+    })
+    .toBe(true);
+
+  await page.evaluate(() => {
+    window.__PUNCHPRESS_EDITOR__?.undo();
+  });
+
+  await expect
+    .poll(async () => {
+      const state = await getStateSnapshot(page);
+
+      return state.nodes
+        .filter((node) => {
+          return node.id === "vector-path-1" || node.id === "vector-path-2";
+        })
+        .map((node) => ({
+          fill: node.fill,
+          id: node.id,
+          stroke: node.stroke,
+        }))
+        .sort((left, right) => left.id.localeCompare(right.id));
+    })
+    .toEqual(originalPathStyles);
+});
+
 test("shows aggregate stroke controls for a selected multi-path vector and applies them to each child path", async ({
   page,
 }) => {

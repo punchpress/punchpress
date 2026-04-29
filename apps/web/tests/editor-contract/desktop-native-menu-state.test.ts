@@ -36,9 +36,12 @@ describe("desktop native menu state", () => {
     expect(getDesktopAppMenuState(editor, [shapeNode.id])).toEqual({
       canDelete: true,
       canEditPath: true,
+      canJoinCurves: false,
       compoundOperation: null,
       canMakeCompoundPath: false,
+      canMergeCurves: false,
       canReleaseCompoundPath: false,
+      canSeparateCurves: false,
       selectedNodeType: "shape",
       selectionKind: "single",
       vectorStyle: null,

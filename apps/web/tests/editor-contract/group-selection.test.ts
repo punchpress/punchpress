@@ -64,6 +64,43 @@ describe("Editor groups", () => {
     expect(editor.getSelectionTargetNodeId(firstNodeId)).toBe(firstNodeId);
   });
 
+  test("focused groups allow direct selection of deeply nested descendants", () => {
+    const editor = createEditor();
+    const firstNodeId = createTextNode(editor, {
+      text: "First",
+      x: 520,
+      y: 320,
+    });
+    const secondNodeId = createTextNode(editor, {
+      text: "Second",
+      x: 760,
+      y: 520,
+    });
+
+    editor.setSelectedNodes([firstNodeId, secondNodeId]);
+    editor.groupSelected();
+    const innerGroupNodeId = editor.selectedNodeId;
+    const thirdNodeId = createTextNode(editor, {
+      text: "Third",
+      x: 1000,
+      y: 640,
+    });
+
+    editor.setSelectedNodes([innerGroupNodeId, thirdNodeId]);
+    editor.groupSelected();
+    const outerGroupNodeId = editor.selectedNodeId;
+
+    expect(editor.getSelectionTargetNodeId(firstNodeId)).toBe(outerGroupNodeId);
+
+    editor.setFocusedGroup(outerGroupNodeId);
+
+    expect(editor.getSelectionTargetNodeId(firstNodeId)).toBe(firstNodeId);
+    expect(editor.getSelectionTargetNodeId(innerGroupNodeId)).toBe(
+      innerGroupNodeId
+    );
+    expect(editor.getSelectionTargetNodeId(thirdNodeId)).toBe(thirdNodeId);
+  });
+
   test("exiting focused group selects the group and clears child selection", () => {
     const editor = createEditor();
     const firstNodeId = createTextNode(editor, {

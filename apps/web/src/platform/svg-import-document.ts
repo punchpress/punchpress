@@ -1,13 +1,20 @@
 import {
   ARTBOARD_HEIGHT,
   ARTBOARD_WIDTH,
-  createDefaultVectorNode,
+  createDefaultGroupNode,
+  createDefaultPathNode,
   round,
+  withPathNodeContours,
 } from "@punchpress/engine";
 import paper from "paper/dist/paper-core.js";
 
 const SUPPORTED_ITEM_CLASSES = new Set(["CompoundPath", "Path", "Shape"]);
 const SVG_SOURCE_NODE_NAME_KEY = "svgSourceNodeName";
+const SVG_SOURCE_ITEM_NAME_KEY = "svgSourceItemName";
+const RGB_STORAGE_COLOR_REGEX = /^rgb\((\d+),(\d+),(\d+)\)$/;
+type ImportedSvgNode =
+  | ReturnType<typeof createDefaultGroupNode>
+  | ReturnType<typeof createDefaultPathNode>;
 
 interface ImportSvgToNodesOptions {
   targetCenter?: {
@@ -29,13 +36,40 @@ const isSolidColor = (color: paper.Color | null | undefined) => {
   return !color || color.type !== "gradient";
 };
 
+const toHexChannel = (value: number) => {
+  return Math.round(value).toString(16).padStart(2, "0");
+};
+
+const parseRgbStorageColor = (value: string) => {
+  const match = value.match(RGB_STORAGE_COLOR_REGEX);
+
+  if (!match) {
+    return null;
+  }
+
+  return `#${toHexChannel(Number(match[1]))}${toHexChannel(Number(match[2]))}${toHexChannel(Number(match[3]))}`;
+};
+
 const toStorageColor = (color: paper.Color | null | undefined) => {
-  return color ? color.toCSS(false) : null;
+  if (!color) {
+    return null;
+  }
+
+  const value = color.toCSS(false);
+
+  return parseRgbStorageColor(value) || value;
 };
 
 const getSvgSourceNodeName = (item: paper.Item) => {
   const data = item.data as Record<string, unknown> | undefined;
   const value = data?.[SVG_SOURCE_NODE_NAME_KEY];
+
+  return typeof value === "string" ? value : null;
+};
+
+const getSvgSourceItemName = (item: paper.Item) => {
+  const data = item.data as Record<string, unknown> | undefined;
+  const value = data?.[SVG_SOURCE_ITEM_NAME_KEY];
 
   return typeof value === "string" ? value : null;
 };
@@ -76,6 +110,20 @@ const createPaperScope = () => {
   return scope;
 };
 
+const getSvgElementImportName = (node: Element) => {
+  const nameAttributes = ["inkscape:label", "data-name", "id", "name"];
+
+  for (const attribute of nameAttributes) {
+    const value = node.getAttribute(attribute)?.trim();
+
+    if (value) {
+      return value;
+    }
+  }
+
+  return null;
+};
+
 const transformHandle = (
   matrix: paper.Matrix,
   point: paper.Point,
@@ -111,28 +159,6 @@ const createContourFromPath = (path: paper.Path, center: paper.Point) => {
   };
 };
 
-const collectImportableItems = (item: paper.Item | null): paper.Item[] => {
-  if (
-    !item ||
-    item.visible === false ||
-    item.clipMask ||
-    item.guide ||
-    item.locked
-  ) {
-    return [];
-  }
-
-  if (item.className === "Group" || item.className === "Layer") {
-    return item.children.flatMap((child) => collectImportableItems(child));
-  }
-
-  if (!SUPPORTED_ITEM_CLASSES.has(item.className)) {
-    return [];
-  }
-
-  return [item];
-};
-
 const getPathChildren = (item: paper.Item) => {
   if (item.className === "CompoundPath") {
     return item.children.filter((child): child is paper.Path => {
@@ -161,9 +187,10 @@ const hasVisiblePaint = (item: paper.Item) => {
   );
 };
 
-const createVectorNodesFromItem = (
+const createPathNodeFromItem = (
   item: paper.Item,
   importedCenter: paper.Point,
+  parentId: string,
   targetCenter: { x: number; y: number }
 ) => {
   const fillColor = getItemFillColor(item);
@@ -184,48 +211,112 @@ const createVectorNodesFromItem = (
   }
 
   const center = item.bounds.center;
-  const vectorNode = createDefaultVectorNode();
-  const isCompoundPath = item.className === "CompoundPath" && paths.length > 1;
+  const basePathNode = createDefaultPathNode(parentId);
 
   return [
-    {
-      ...vectorNode,
-      compoundWrapper: isCompoundPath,
-      contours: paths.map((path, index) => {
-        const contour = createContourFromPath(path, center);
-
-        return {
-          ...vectorNode.contours[0],
-          closed: contour.closed,
-          fill: toStorageColor(fillColor),
-          fillRule: item.fillRule === "evenodd" ? "evenodd" : "nonzero",
-          id: `${vectorNode.id}-contour-${index + 1}`,
-          segments: contour.segments,
-          stroke: toStorageColor(strokeColor),
-          strokeLineCap:
-            item.strokeCap === "round" || item.strokeCap === "square"
-              ? item.strokeCap
-              : "butt",
-          strokeLineJoin:
-            item.strokeJoin === "bevel" || item.strokeJoin === "round"
-              ? item.strokeJoin
-              : "miter",
-          strokeMiterLimit: roundCoordinate(item.miterLimit || 0),
-          strokeWidth: roundCoordinate(item.strokeWidth || 0),
-          visible: true,
-        };
-      }),
-      name: item.name || vectorNode.name,
-      pathComposition: isCompoundPath ? "compound-fill" : "independent",
-      transform: {
-        rotation: 0,
-        scaleX: 1,
-        scaleY: 1,
-        x: roundCoordinate(center.x - importedCenter.x + targetCenter.x),
-        y: roundCoordinate(center.y - importedCenter.y + targetCenter.y),
+    withPathNodeContours(
+      {
+        ...basePathNode,
+        fill: toStorageColor(fillColor),
+        fillRule: item.fillRule === "evenodd" ? "evenodd" : "nonzero",
+        parentId,
+        stroke: toStorageColor(strokeColor),
+        strokeLineCap:
+          item.strokeCap === "round" || item.strokeCap === "square"
+            ? item.strokeCap
+            : "butt",
+        strokeLineJoin:
+          item.strokeJoin === "bevel" || item.strokeJoin === "round"
+            ? item.strokeJoin
+            : "miter",
+        strokeMiterLimit: roundCoordinate(item.miterLimit || 0),
+        strokeWidth: roundCoordinate(item.strokeWidth || 0),
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: roundCoordinate(center.x - importedCenter.x + targetCenter.x),
+          y: roundCoordinate(center.y - importedCenter.y + targetCenter.y),
+        },
+        visible: true,
       },
-    },
+      paths.map((path) => createContourFromPath(path, center))
+    ),
   ];
+};
+
+const isImportableContainerItem = (item: paper.Item) => {
+  return item.className === "Group" || item.className === "Layer";
+};
+
+const canImportItem = (item: paper.Item | null): item is paper.Item => {
+  return Boolean(
+    item &&
+      item.visible !== false &&
+      !item.clipMask &&
+      !item.guide &&
+      !item.locked
+  );
+};
+
+const getImportedGroupName = (item: paper.Item) => {
+  return getSvgSourceItemName(item) || item.name || "Group";
+};
+
+const createImportedNodeTree = ({
+  importedCenter,
+  item,
+  parentId,
+  rootItem,
+  targetCenter,
+}: {
+  importedCenter: paper.Point;
+  item: paper.Item | null;
+  parentId: string;
+  rootItem: paper.Item | null;
+  targetCenter: { x: number; y: number };
+}): ImportedSvgNode[] => {
+  if (!canImportItem(item)) {
+    return [];
+  }
+
+  if (isImportableContainerItem(item)) {
+    const shouldPreserveGroup =
+      item !== rootItem && getSvgSourceNodeName(item) !== "svg";
+    const groupNode = shouldPreserveGroup
+      ? createDefaultGroupNode(getImportedGroupName(item))
+      : null;
+    const childParentId = groupNode?.id || parentId;
+    const childNodes = item.children.flatMap((child) => {
+      return createImportedNodeTree({
+        importedCenter,
+        item: child,
+        parentId: childParentId,
+        rootItem,
+        targetCenter,
+      });
+    });
+
+    if (!(groupNode && childNodes.length > 0)) {
+      return childNodes;
+    }
+
+    return [
+      {
+        ...groupNode,
+        parentId,
+      },
+      ...childNodes,
+    ];
+  }
+
+  if (!SUPPORTED_ITEM_CLASSES.has(item.className)) {
+    return [];
+  }
+
+  return (
+    createPathNodeFromItem(item, importedCenter, parentId, targetCenter) || []
+  );
 };
 
 export const importSvgToNodes = (
@@ -243,13 +334,15 @@ export const importSvgToNodes = (
       onImport: (node, item) => {
         item.data = {
           ...item.data,
+          [SVG_SOURCE_ITEM_NAME_KEY]:
+            node instanceof Element ? getSvgElementImportName(node) : null,
           [SVG_SOURCE_NODE_NAME_KEY]: node.nodeName.toLowerCase(),
         };
       },
     });
-    const importableItems = collectImportableItems(importedItem);
+    const importedGroup = createDefaultGroupNode("Imported SVG");
 
-    if (importableItems.length === 0) {
+    if (!importedItem) {
       throw new Error("No supported SVG path artwork found.");
     }
 
@@ -258,17 +351,19 @@ export const importSvgToNodes = (
       x: ARTBOARD_WIDTH / 2,
       y: ARTBOARD_HEIGHT / 2,
     };
-    const nodes = importableItems.flatMap((item) => {
-      return (
-        createVectorNodesFromItem(item, importedCenter, targetCenter) || []
-      );
+    const nodes = createImportedNodeTree({
+      importedCenter,
+      item: importedItem,
+      parentId: importedGroup.id,
+      rootItem: importedItem,
+      targetCenter,
     });
 
     if (nodes.length === 0) {
       throw new Error("No supported SVG path artwork found.");
     }
 
-    return nodes;
+    return [importedGroup, ...nodes];
   } finally {
     scope.project.clear();
   }

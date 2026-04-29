@@ -29,8 +29,11 @@ export interface DesktopVectorStyleMenuState {
 export interface DesktopAppMenuState {
   canDelete: boolean;
   canEditPath: boolean;
+  canJoinCurves: boolean;
   canMakeCompoundPath: boolean;
+  canMergeCurves: boolean;
   canReleaseCompoundPath: boolean;
+  canSeparateCurves: boolean;
   compoundOperation: DesktopMenuChoiceState<DesktopVectorCompoundOperation> | null;
   selectedNodeType: DesktopSelectedNodeType | null;
   selectionKind: DesktopSelectionKind;
@@ -46,8 +49,11 @@ export type DesktopEditorCommand =
   | {
       action:
         | "delete-selected"
+        | "join-curves"
         | "make-compound-path"
+        | "merge-curves"
         | "release-compound-path"
+        | "separate-curves"
         | "toggle-path-editing";
       type: "selection";
     }

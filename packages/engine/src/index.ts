@@ -16,6 +16,14 @@ export {
 export { offsetEditablePathPoints } from "./document/path/editable-path-actions";
 export { setVectorPathComposition } from "./document/path/path-composition-actions";
 export {
+  canJoinCurves,
+  canMergeCurves,
+  canSeparateCurves,
+  joinCurves,
+  mergeCurves,
+  separateCurves,
+} from "./document/path/path-curve-actions";
+export {
   canMakeCompoundPath,
   canReleaseCompoundPath,
   makeCompoundPath,
@@ -50,6 +58,14 @@ export {
   rebuildTreeOrder,
 } from "./nodes/node-tree";
 export { createDefaultPathNode } from "./nodes/path/model";
+export {
+  getPathNodeContour,
+  getPathNodeContourCount,
+  getPathNodeContours,
+  getPathNodePrimaryContour,
+  normalizePathNodeContours,
+  withPathNodeContours,
+} from "./nodes/path/path-contours";
 export { createDefaultShapeNode } from "./nodes/shape/model";
 export {
   ARCH_BEND_LIMIT,

@@ -187,6 +187,45 @@ test("uses the add cursor on the canvas surface while placement tools are armed"
     .toBe(addSvg);
 });
 
+test("uses distinct canvas cursors for pointer and node tools", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+
+  const defaultSvg = getCursorSvgFromValue(
+    await getCanvasCursorSvg(page, "--canvas-cursor-default")
+  );
+  const nodeSvg = getCursorSvgFromValue(
+    await getCanvasCursorSvg(page, "--canvas-cursor-node")
+  );
+  const grabSvg = getCursorSvgFromValue(
+    await getCanvasCursorSvg(page, "--canvas-cursor-grab")
+  );
+  const getSurfaceCursor = () => {
+    return page
+      .locator(".canvas-surface")
+      .evaluate((element) => window.getComputedStyle(element).cursor);
+  };
+
+  expect(nodeSvg).not.toBe(defaultSvg);
+
+  await page.keyboard.press("v");
+  await expect
+    .poll(async () => getCursorSvgFromValue(await getSurfaceCursor()))
+    .toBe(defaultSvg);
+
+  await page.keyboard.press("a");
+  await expect
+    .poll(async () => getCursorSvgFromValue(await getSurfaceCursor()))
+    .toBe(nodeSvg);
+
+  await page.keyboard.down("Space");
+  await expect
+    .poll(async () => getCursorSvgFromValue(await getSurfaceCursor()))
+    .toBe(grabSvg);
+  await page.keyboard.up("Space");
+});
+
 test("uses the move cursor for both unselected and selected node hover", async ({
   page,
 }) => {

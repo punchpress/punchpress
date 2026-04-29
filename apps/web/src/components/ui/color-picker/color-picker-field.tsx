@@ -57,16 +57,40 @@ const ColorPickerField = ({
   const isPopupDismissSuppressedRef = useRef(false);
   const popupRef = useRef<HTMLDivElement>(null);
   const popupDismissSuppressionTimeoutRef = useRef<number | null>(null);
+  const historyMarkRef = useRef<unknown>(null);
   const selectionBeforePopupInteractionRef = useRef<string[]>([]);
   const [draftValue, setDraftValue] = useState(value ?? "");
   const [open, setOpenState] = useState(openStateEntry.open);
 
+  const beginHistoryStep = useCallback(() => {
+    if (historyMarkRef.current) {
+      return;
+    }
+
+    historyMarkRef.current = editor.markHistoryStep("change color");
+  }, [editor]);
+
+  const commitHistoryStep = useCallback(() => {
+    if (!historyMarkRef.current) {
+      return;
+    }
+
+    editor.commitHistoryStep(historyMarkRef.current);
+    historyMarkRef.current = null;
+  }, [editor]);
+
   const setOpen = useCallback(
     (nextOpen: boolean) => {
+      if (nextOpen) {
+        beginHistoryStep();
+      } else {
+        commitHistoryStep();
+      }
+
       openStateEntry.open = nextOpen;
       setOpenState(nextOpen);
     },
-    [openStateEntry]
+    [beginHistoryStep, commitHistoryStep, openStateEntry]
   );
 
   useEffect(() => {
@@ -84,12 +108,14 @@ const ColorPickerField = ({
     }
 
     return () => {
+      commitHistoryStep();
+
       openStateEntry.resetTimeoutId = window.setTimeout(() => {
         openStateEntry.open = false;
         openStateEntry.resetTimeoutId = null;
       }, 0);
     };
-  }, [openStateEntry]);
+  }, [commitHistoryStep, openStateEntry]);
 
   useEffect(() => {
     if (!open) {

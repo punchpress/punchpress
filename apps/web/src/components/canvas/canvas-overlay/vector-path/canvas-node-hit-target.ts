@@ -239,6 +239,19 @@ const getVectorChildPathNodeIdAtPoint = (editor, nodeId, canvasPoint) => {
   return null;
 };
 
+export const getCanvasVectorChildPathNodeIdAtPoint = (
+  editor,
+  nodeId,
+  clientX,
+  clientY
+) => {
+  const canvasPoint = getCanvasPoint(editor, clientX, clientY);
+
+  return canvasPoint
+    ? getVectorChildPathNodeIdAtPoint(editor, nodeId, canvasPoint)
+    : null;
+};
+
 export const getCanvasLeafNodeIdAtPoint = (clientX, clientY) => {
   for (const nodeElement of getCanvasNodeElementsAtPoint(clientX, clientY)) {
     const nodeId = nodeElement.dataset.nodeId;

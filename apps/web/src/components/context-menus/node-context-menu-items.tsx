@@ -77,8 +77,11 @@ const GroupNodeContextMenuItems = ({
 
 const CompoundNodeContextMenuItems = ({
   canConvertShapeToPath,
+  canJoinCurves,
   canMakeCompoundPath,
+  canMergeCurves,
   canReleaseCompoundPath,
+  canSeparateCurves,
   compoundOperationTarget,
   singleTargetNodeId,
   targetNodeIds,
@@ -88,8 +91,11 @@ const CompoundNodeContextMenuItems = ({
   if (
     !(
       canConvertShapeToPath ||
+      canJoinCurves ||
       canMakeCompoundPath ||
+      canMergeCurves ||
       canReleaseCompoundPath ||
+      canSeparateCurves ||
       compoundOperationTarget
     )
   ) {
@@ -123,6 +129,32 @@ const CompoundNodeContextMenuItems = ({
         >
           <LayerGlyph icon={UngroupLayersIcon} size={17} strokeWidth={1.7} />
           Release Compound Path
+        </ContextMenuItem>
+      ) : null}
+      {canMergeCurves ? (
+        <ContextMenuItem onClick={() => editor.mergeCurves(targetNodeIds)}>
+          <LayerGlyph
+            icon={GeometricShapes01Icon}
+            size={17}
+            strokeWidth={1.7}
+          />
+          Merge Curves
+        </ContextMenuItem>
+      ) : null}
+      {canSeparateCurves ? (
+        <ContextMenuItem onClick={() => editor.separateCurves(targetNodeIds)}>
+          <LayerGlyph icon={UngroupLayersIcon} size={17} strokeWidth={1.7} />
+          Separate Curves
+        </ContextMenuItem>
+      ) : null}
+      {canJoinCurves ? (
+        <ContextMenuItem onClick={() => editor.joinCurves(targetNodeIds)}>
+          <LayerGlyph
+            icon={GeometricShapes01Icon}
+            size={17}
+            strokeWidth={1.7}
+          />
+          Join Curves
         </ContextMenuItem>
       ) : null}
       {!canReleaseCompoundPath && canMakeCompoundPath ? (
@@ -223,15 +255,21 @@ export const NodeContextMenuItems = ({
       </ContextMenuItem>
       <CompoundNodeContextMenuItems
         canConvertShapeToPath={contextMenuState.canConvertShapeToPath}
+        canJoinCurves={contextMenuState.canJoinCurves}
         canMakeCompoundPath={contextMenuState.canMakeCompoundPath}
+        canMergeCurves={contextMenuState.canMergeCurves}
         canReleaseCompoundPath={contextMenuState.canReleaseCompoundPath}
+        canSeparateCurves={contextMenuState.canSeparateCurves}
         compoundOperationTarget={contextMenuState.compoundOperationTarget}
         singleTargetNodeId={contextMenuState.singleTargetNodeId}
         targetNodeIds={contextMenuState.targetNodeIds}
       />
       {contextMenuState.canConvertShapeToPath ||
+      contextMenuState.canJoinCurves ||
       contextMenuState.canMakeCompoundPath ||
+      contextMenuState.canMergeCurves ||
       contextMenuState.canReleaseCompoundPath ||
+      contextMenuState.canSeparateCurves ||
       contextMenuState.compoundOperationTarget ? null : (
         <ContextMenuSeparator />
       )}

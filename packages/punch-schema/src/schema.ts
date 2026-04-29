@@ -169,10 +169,9 @@ export const vectorNodeSchema = baseNodeSchema
 
 export const pathNodeSchema = baseNodeSchema
   .extend({
-    closed: z.boolean(),
+    contours: z.array(vectorContourSchema).min(1),
     fill: z.string().min(1).nullable(),
     fillRule: vectorFillRuleSchema,
-    segments: z.array(vectorSegmentSchema).min(1),
     stroke: z.string().min(1).nullable(),
     strokeLineCap: vectorStrokeLineCapSchema,
     strokeLineJoin: vectorStrokeLineJoinSchema,
@@ -234,10 +233,11 @@ export const designDocumentSchema = z
           (entry) => entry.id === node.parentId
         );
 
-        if (parentNode?.type !== "vector") {
+        if (!(parentNode?.type === "vector" || parentNode?.type === "group")) {
           context.addIssue({
             code: z.ZodIssueCode.custom,
-            message: "Path nodes may only have vector parents or the root.",
+            message:
+              "Path nodes may only have group parents, vector parents, or the root.",
             path: ["nodes", index, "parentId"],
           });
         }

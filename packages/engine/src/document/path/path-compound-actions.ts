@@ -1,4 +1,5 @@
 import { finishEditingIfNeeded } from "../../editing/editing-actions";
+import { getPathNodeContours } from "../../nodes/path/path-contours";
 import { createDefaultVectorContainerNode } from "../../nodes/vector/model";
 import {
   getVectorChildPathNodes,
@@ -17,6 +18,10 @@ const hasSameParent = (pathNodes) => {
 
 const isVectorParent = (editor, parentId) => {
   return editor.getNode(parentId)?.type === "vector";
+};
+
+const isClosedPathNode = (pathNode) => {
+  return getPathNodeContours(pathNode).every((contour) => contour.closed);
 };
 
 const isReleasablePathVector = (node) => {
@@ -40,7 +45,7 @@ const getCompoundablePathSelection = (
     const pathNodes = getVectorChildPathNodes(editor, vectorNode.id);
 
     return pathNodes.length >= 2 &&
-      pathNodes.every((pathNode) => pathNode.closed) &&
+      pathNodes.every(isClosedPathNode) &&
       getVectorPathComposition(vectorNode) === "independent"
       ? pathNodes
       : null;
@@ -59,7 +64,7 @@ const getCompoundablePathSelection = (
 
   if (
     !(
-      hasSameParent(pathNodes) && pathNodes.every((pathNode) => pathNode.closed)
+      hasSameParent(pathNodes) && pathNodes.every(isClosedPathNode)
     )
   ) {
     return null;

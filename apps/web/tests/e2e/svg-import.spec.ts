@@ -26,16 +26,7 @@ const importSvgIntoDocument = (page, source) => {
   }, source);
 };
 
-test("imports svg artwork centered in the current viewport", async ({
-  page,
-}) => {
-  await gotoEditor(page);
-  await panViewportBy(page, { x: 1400, y: 900 });
-
-  const dump = await importSvgIntoDocument(page, ARCH_WARP_SVG);
-  const viewportCenter = await page.evaluate(() => {
-    return window.__PUNCHPRESS_EDITOR__?.getViewportCenter() || null;
-  });
+const getImportedCenter = (dump) => {
   const importedBounds = (dump?.nodes || []).reduce(
     (bounds, node) => {
       const frameBounds = node.frame?.bounds;
@@ -58,17 +49,182 @@ test("imports svg artwork centered in the current viewport", async ({
       maxY: Number.NEGATIVE_INFINITY,
     }
   );
-  const importedCenter = {
+
+  return {
     x: (importedBounds.minX + importedBounds.maxX) / 2,
     y: (importedBounds.minY + importedBounds.maxY) / 2,
   };
+};
 
+const getImportedGroup = (dump) => {
+  return dump?.nodes?.find((node) => node.type === "group") || null;
+};
+
+const getGroupChildren = (dump, groupId) => {
+  return (dump?.nodes || []).filter((node) => node.parentId === groupId);
+};
+
+const dispatchSvgFileDrop = async (page, source, point) => {
+  const dataTransfer = await page.evaluateHandle((nextSource) => {
+    const transfer = new DataTransfer();
+    const file = new File([nextSource], "dropped-artwork.svg", {
+      type: "image/svg+xml",
+    });
+
+    transfer.items.add(file);
+    return transfer;
+  }, source);
+
+  const canvasHost = page.locator(".canvas-host");
+
+  await canvasHost.dispatchEvent("dragover", {
+    bubbles: true,
+    cancelable: true,
+    clientX: point.x,
+    clientY: point.y,
+    dataTransfer,
+  });
+  await canvasHost.dispatchEvent("drop", {
+    bubbles: true,
+    cancelable: true,
+    clientX: point.x,
+    clientY: point.y,
+    dataTransfer,
+  });
+};
+
+const getCanvasPointFromClientPoint = (page, point) => {
+  return page.evaluate((clientPoint) => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const host = editor?.hostRef;
+    const viewer = editor?.viewerRef;
+
+    if (!(editor && host && viewer)) {
+      return null;
+    }
+
+    const rect = host.getBoundingClientRect();
+
+    return {
+      x: viewer.getScrollLeft() + (clientPoint.x - rect.left) / editor.zoom,
+      y: viewer.getScrollTop() + (clientPoint.y - rect.top) / editor.zoom,
+    };
+  }, point);
+};
+
+test("imports svg artwork centered in the current viewport", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await panViewportBy(page, { x: 1400, y: 900 });
+
+  const dump = await importSvgIntoDocument(page, ARCH_WARP_SVG);
+  const viewportCenter = await page.evaluate(() => {
+    return window.__PUNCHPRESS_EDITOR__?.getViewportCenter() || null;
+  });
+  const importedGroup = getImportedGroup(dump);
+  const importedCenter = getImportedCenter(dump);
+
+  expect(importedGroup).not.toBeNull();
+  expect(getGroupChildren(dump, importedGroup?.id)).toHaveLength(2);
+  expect(dump?.selection?.ids).toEqual([importedGroup?.id]);
   expect(viewportCenter).not.toBeNull();
   expect(Math.abs(importedCenter.x - viewportCenter.x)).toBeLessThanOrEqual(5);
   expect(Math.abs(importedCenter.y - viewportCenter.y)).toBeLessThanOrEqual(5);
 });
 
-test("imports compound path svg artwork into the current document as an editable vector node", async ({
+test("imports an SVG file dropped from the OS onto the canvas", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await panViewportBy(page, { x: 900, y: 650 });
+
+  const canvasHost = page.locator(".canvas-host");
+  const hostBox = await canvasHost.boundingBox();
+
+  if (!hostBox) {
+    throw new Error("Expected canvas host to have layout bounds");
+  }
+
+  const dropClientPoint = {
+    x: hostBox.x + hostBox.width * 0.38,
+    y: hostBox.y + hostBox.height * 0.44,
+  };
+  const targetCanvasPoint = await getCanvasPointFromClientPoint(
+    page,
+    dropClientPoint
+  );
+
+  await dispatchSvgFileDrop(page, ARCH_WARP_SVG, dropClientPoint);
+
+  await expect
+    .poll(() => {
+      return page.evaluate(() => {
+        return window.__PUNCHPRESS_EDITOR__?.getDebugDump()?.nodes?.length || 0;
+      });
+    })
+    .toBeGreaterThan(0);
+
+  const dump = await page.evaluate(() => {
+    return window.__PUNCHPRESS_EDITOR__?.getDebugDump() || null;
+  });
+  const importedGroup = getImportedGroup(dump);
+  const importedCenter = getImportedCenter(dump);
+
+  expect(importedGroup).not.toBeNull();
+  expect(targetCanvasPoint).not.toBeNull();
+  expect(dump?.nodes?.length).toBeGreaterThan(0);
+  expect(dump?.selection?.ids).toEqual([importedGroup?.id]);
+  expect(getGroupChildren(dump, importedGroup?.id)).toHaveLength(2);
+  expect(Math.abs(importedCenter.x - targetCanvasPoint.x)).toBeLessThanOrEqual(
+    5
+  );
+  expect(Math.abs(importedCenter.y - targetCanvasPoint.y)).toBeLessThanOrEqual(
+    5
+  );
+});
+
+test("preserves non-empty SVG group hierarchy", async ({ page }) => {
+  await gotoEditor(page);
+
+  const dump = await importSvgIntoDocument(
+    page,
+    `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80">
+        <g id="body">
+          <path d="M 10 10 L 70 10 L 70 60 L 10 60 Z" fill="#f8ae46" />
+          <g id="face">
+            <circle cx="30" cy="30" r="5" fill="#111111" />
+            <circle cx="50" cy="30" r="5" fill="#111111" />
+          </g>
+        </g>
+        <g id="tail">
+          <path d="M 75 25 C 105 5 105 70 75 50" fill="none" stroke="#f8ae46" stroke-width="6" />
+        </g>
+        <g id="empty" />
+      </svg>
+    `
+  );
+  const importedGroup = getImportedGroup(dump);
+  const topLevelImportedGroups = getGroupChildren(
+    dump,
+    importedGroup?.id
+  ).filter((node) => node.type === "group");
+  const bodyChildren = getGroupChildren(dump, topLevelImportedGroups[0]?.id);
+  const bodyNestedGroups = bodyChildren.filter((node) => node.type === "group");
+  const faceChildren = getGroupChildren(dump, bodyNestedGroups[0]?.id);
+  const tailChildren = getGroupChildren(dump, topLevelImportedGroups[1]?.id);
+
+  expect(importedGroup).not.toBeNull();
+  expect(dump?.selection?.ids).toEqual([importedGroup?.id]);
+  expect(topLevelImportedGroups).toHaveLength(2);
+  expect(bodyChildren.filter((node) => node.type === "path")).toHaveLength(1);
+  expect(bodyNestedGroups).toHaveLength(1);
+  expect(faceChildren.filter((node) => node.type === "path")).toHaveLength(2);
+  expect(tailChildren.filter((node) => node.type === "path")).toHaveLength(1);
+});
+
+test("imports compound path svg artwork into the current document as one editable multi-contour path", async ({
   page,
 }) => {
   await gotoEditor(page);
@@ -97,60 +253,41 @@ test("imports compound path svg artwork into the current document as an editable
       </svg>
     `
   );
-  const importedVector = dump?.nodes?.find((node) => {
-    if (node.type !== "vector") {
-      return false;
-    }
-
+  const importedPath = dump?.nodes?.find((node) => {
     return (
-      dump.nodes.filter((candidate) => candidate.parentId === node.id)
-        .length === 2
+      node.type === "path" &&
+      node.parentId !== "root" &&
+      node.contours?.length === 2
     );
   });
-  const importedPaths = (dump?.nodes || []).filter((node) => {
-    return node.parentId === importedVector?.id;
-  });
+  const importedGroup = getImportedGroup(dump);
 
-  expect(dump?.nodes).toHaveLength(4);
-  expect(dump?.selection?.ids).toEqual([importedVector?.id]);
-  expect(importedVector).toMatchObject({
-    type: "vector",
+  expect(dump?.nodes).toHaveLength(3);
+  expect(dump?.selection?.ids).toEqual([importedGroup?.id]);
+  expect(getGroupChildren(dump, importedGroup?.id)).toEqual([importedPath]);
+  expect(importedPath).toMatchObject({
+    contours: [
+      { closed: true, segments: 4 },
+      { closed: true, segments: 4 },
+    ],
+    fill: "rgba(255,0,0,0.5)",
+    fillRule: "evenodd",
+    parentId: importedGroup?.id,
+    stroke: "rgba(0,0,0,0.25)",
+    strokeLineCap: "square",
+    strokeLineJoin: "bevel",
+    strokeMiterLimit: 9,
+    strokeWidth: 4,
+    type: "path",
   });
-  expect(importedPaths).toHaveLength(2);
-  expect(importedPaths).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({
-        contours: [{ closed: true, segments: 4 }],
-        fill: "rgba(255,0,0,0.5)",
-        fillRule: "evenodd",
-        stroke: "rgba(0,0,0,0.25)",
-        strokeLineCap: "square",
-        strokeLineJoin: "bevel",
-        strokeMiterLimit: 9,
-        strokeWidth: 4,
-        type: "path",
-      }),
-      expect.objectContaining({
-        contours: [{ closed: true, segments: 4 }],
-        fill: "rgba(255,0,0,0.5)",
-        fillRule: "evenodd",
-        stroke: "rgba(0,0,0,0.25)",
-        strokeLineCap: "square",
-        strokeLineJoin: "bevel",
-        strokeMiterLimit: 9,
-        strokeWidth: 4,
-        type: "path",
-      }),
-    ])
-  );
 
   await expect
     .poll(() => {
-      return page.evaluate((currentVectorId) => {
-        const vectorNode = document.querySelector(
-          `.canvas-node[data-node-id="${currentVectorId}"]`
+      return page.evaluate((currentPathId) => {
+        const pathNode = document.querySelector(
+          `.canvas-node[data-node-id="${currentPathId}"]`
         );
-        const renderedPaths = vectorNode?.querySelectorAll("path") || [];
+        const renderedPaths = pathNode?.querySelectorAll("path") || [];
 
         return {
           pathCommandCount:
@@ -161,7 +298,7 @@ test("imports compound path svg artwork into the current document as an editable
             renderedPaths[0]?.getAttribute("fillRule") ||
             null,
         };
-      }, importedVector?.id || null);
+      }, importedPath?.id || null);
     })
     .toEqual({
       pathCommandCount: 2,
@@ -198,14 +335,20 @@ test("round-trips imported svg path artwork back through svg export without fill
     `
   );
   const exportedSvg = await exportDocument(page);
-  const sortedNodes = [...(dump?.nodes || [])]
+  const importedGroup = getImportedGroup(dump);
+  const sortedNodes = getGroupChildren(dump, importedGroup?.id)
     .filter((node) => node.type === "path")
     .sort((left, right) => left.transform.x - right.transform.x);
 
+  expect(importedGroup).not.toBeNull();
+  expect(dump?.selection?.ids).toEqual([importedGroup?.id]);
+  expect(getGroupChildren(dump, importedGroup?.id)).toHaveLength(2);
   expect(sortedNodes).toHaveLength(2);
+  expect(sortedNodes[0]?.parentId).toBe(importedGroup?.id);
+  expect(sortedNodes[1]?.parentId).toBe(importedGroup?.id);
   expect(sortedNodes[0]).toMatchObject({
     fill: null,
-    stroke: "rgb(18,52,86)",
+    stroke: "#123456",
     strokeLineCap: "round",
     strokeWidth: 3,
     type: "path",
@@ -213,7 +356,7 @@ test("round-trips imported svg path artwork back through svg export without fill
   expect(sortedNodes[0]?.contours).toHaveLength(1);
   expect(sortedNodes[0]?.contours[0]?.closed).toBe(false);
   expect(sortedNodes[1]).toMatchObject({
-    fill: "rgb(171,205,239)",
+    fill: "#abcdef",
     stroke: null,
     type: "path",
   });
@@ -221,7 +364,7 @@ test("round-trips imported svg path artwork back through svg export without fill
     Math.round(sortedNodes[1].transform.x - sortedNodes[0].transform.x)
   ).toBe(100);
   expect(exportedSvg).toContain('fill="none"');
-  expect(exportedSvg).toContain('stroke="rgb(18,52,86)"');
+  expect(exportedSvg).toContain('stroke="#123456"');
   expect(exportedSvg).toContain('stroke-linecap="round"');
-  expect(exportedSvg).toContain('fill="rgb(171,205,239)"');
+  expect(exportedSvg).toContain('fill="#abcdef"');
 });

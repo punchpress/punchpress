@@ -2,6 +2,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Add01Icon,
   Cursor01Icon,
+  Cursor02Icon,
   Remove01Icon,
   TextFontIcon,
 } from "@hugeicons-pro/core-stroke-rounded";
@@ -25,6 +26,13 @@ const PRIMARY_TOOL_CONFIG = [
     id: "pointer",
     label: "Pointer",
     shortcut: "V",
+  },
+  {
+    icon: Cursor02Icon,
+    iconLibrary: "hugeicons",
+    id: "node",
+    label: "Node",
+    shortcut: "A",
   },
   {
     icon: HandIcon,

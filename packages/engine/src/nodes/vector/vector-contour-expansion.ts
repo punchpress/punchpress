@@ -1,5 +1,6 @@
 import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
 import { createDefaultPathNode } from "../path/model";
+import { withPathNodeContours } from "../path/path-contours";
 import { createId } from "../text/model";
 import { DEFAULT_VECTOR_PATH_COMPOSITION } from "./vector-path-composition";
 
@@ -28,14 +29,13 @@ const createPathNodeFromContour = (
 ) => {
   const baseNode = createDefaultPathNode(parentId);
 
-  return {
+  return withPathNodeContours(
+    {
     ...baseNode,
-    closed: contour.closed,
     fill: contour.fill ?? fallbackFill,
     fillRule: contour.fillRule ?? fallbackFillRule,
     id: contour.id || id || createId(),
     parentId,
-    segments: contour.segments,
     stroke: contour.stroke ?? fallbackStroke,
     strokeLineCap:
       contour.strokeLineCap ?? fallbackStrokeLineCap ?? baseNode.strokeLineCap,
@@ -51,7 +51,14 @@ const createPathNodeFromContour = (
       contour.strokeWidth ?? fallbackStrokeWidth ?? baseNode.strokeWidth,
     transform: defaultTransform,
     visible: contour.visible !== false,
-  };
+    },
+    [
+      {
+        closed: contour.closed,
+        segments: contour.segments,
+      },
+    ]
+  );
 };
 
 export const expandContourOwnedVectorNode = (node) => {

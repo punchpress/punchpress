@@ -411,7 +411,12 @@ export const CanvasSingleSelectionForeground = ({
     if (event.detail >= 2) {
       event.preventDefault();
       event.stopPropagation();
-      openCanvasNodeEditingMode(editor, nodeId);
+      openCanvasNodeEditingMode(editor, nodeId, {
+        clientPoint: {
+          x: event.clientX,
+          y: event.clientY,
+        },
+      });
       return;
     }
 

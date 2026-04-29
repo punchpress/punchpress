@@ -39,9 +39,9 @@ describe("Editor clipboard", () => {
     expect(firstPasted.text).toBe("Copy me");
     expect(secondPasted.text).toBe("Me too");
     expect(firstPasted.transform.x).toBeCloseTo(480, 6);
-    expect(firstPasted.transform.y).toBeCloseTo(380, 6);
+    expect(firstPasted.transform.y).toBeCloseTo(420, 6);
     expect(secondPasted.transform.x).toBeCloseTo(640, 6);
-    expect(secondPasted.transform.y).toBeCloseTo(460, 6);
+    expect(secondPasted.transform.y).toBeCloseTo(500, 6);
   });
 
   test("pasteText creates a selected text node from external plain text", () => {
@@ -86,9 +86,9 @@ describe("Editor clipboard", () => {
     );
 
     expect(firstPasteNode.transform.x).toBeCloseTo(480, 6);
-    expect(firstPasteNode.transform.y).toBeCloseTo(380, 6);
+    expect(firstPasteNode.transform.y).toBeCloseTo(420, 6);
     expect(secondPasteNode.transform.x).toBeCloseTo(600, 6);
-    expect(secondPasteNode.transform.y).toBeCloseTo(500, 6);
+    expect(secondPasteNode.transform.y).toBeCloseTo(540, 6);
   });
 
   test("pasteClipboardContent recenters a shape-only payload into the viewport", () => {
@@ -148,9 +148,9 @@ describe("Editor clipboard", () => {
     expect(pastedTextNode?.id).not.toBe(textNodeId);
     expect(pastedShapeNode?.id).not.toBe(shapeNodeId);
     expect(pastedTextNode?.transform.x).toBeCloseTo(340, 6);
-    expect(pastedTextNode?.transform.y).toBeCloseTo(400, 6);
+    expect(pastedTextNode?.transform.y).toBeCloseTo(430, 6);
     expect(pastedShapeNode?.transform.x).toBeCloseTo(640, 6);
-    expect(pastedShapeNode?.transform.y).toBeCloseTo(400, 6);
+    expect(pastedShapeNode?.transform.y).toBeCloseTo(390, 6);
   });
 
   test("a fresh copy of the same selection resets the paste step", () => {
@@ -182,9 +182,9 @@ describe("Editor clipboard", () => {
     );
 
     expect(firstPasteNode.transform.x).toBeCloseTo(480, 6);
-    expect(firstPasteNode.transform.y).toBeCloseTo(380, 6);
+    expect(firstPasteNode.transform.y).toBeCloseTo(420, 6);
     expect(secondPasteNode.transform.x).toBeCloseTo(480, 6);
-    expect(secondPasteNode.transform.y).toBeCloseTo(380, 6);
+    expect(secondPasteNode.transform.y).toBeCloseTo(420, 6);
   });
 });
 

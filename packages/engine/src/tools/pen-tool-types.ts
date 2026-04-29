@@ -1,4 +1,5 @@
 import { round } from "../primitives/math";
+import { getPathNodeContours } from "../nodes/path/path-contours";
 import {
   isPointerDistanceAtLeast,
   isPointerDistanceWithin,
@@ -67,12 +68,7 @@ export const isPenSelectionActive = (editor, node) => {
 
 export const getNodeContours = (node) => {
   if (node?.type === "path") {
-    return [
-      {
-        closed: node.closed,
-        segments: node.segments,
-      },
-    ];
+    return getPathNodeContours(node);
   }
 
   if (node?.type === "vector") {

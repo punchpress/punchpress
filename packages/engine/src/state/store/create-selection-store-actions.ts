@@ -10,15 +10,13 @@ export const createSelectionStoreActions = (set) => {
     },
 
     setActiveTool: (activeTool) => {
+      const keepsPathEditing =
+        activeTool === "pointer" || activeTool === "pen" || activeTool === "node";
+
       set((state) => ({
         activeTool,
-        ...(activeTool === "pointer" || activeTool === "pen"
-          ? {}
-          : exitPathEditingInteractionState()),
-        pathEditingNodeId:
-          activeTool === "pointer" || activeTool === "pen"
-            ? state.pathEditingNodeId
-            : null,
+        ...(keepsPathEditing ? {} : exitPathEditingInteractionState()),
+        pathEditingNodeId: keepsPathEditing ? state.pathEditingNodeId : null,
       }));
     },
 

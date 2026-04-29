@@ -1,5 +1,6 @@
 import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
 import { createDefaultPathNode } from "../../nodes/path/model";
+import { normalizePathNodeContours } from "../../nodes/path/path-contours";
 import { createDefaultShapeNode } from "../../nodes/shape/model";
 import { createDefaultNode } from "../../nodes/text/model";
 import { toInternalEditorNodes } from "../../nodes/vector/vector-document-conversion";
@@ -129,6 +130,8 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
         Object.assign(node, nodePatch.path || nodePatch);
       }
 
+      const normalizedNode = normalizePathNodeContours(node);
+
       set((state) =>
         withDocumentMutation(state, {
           activeTool: activatePointer ? "pointer" : state.activeTool,
@@ -136,15 +139,15 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
           editingOriginalText: "",
           editingText: "",
           focusedGroupId: null,
-          nodes: [...state.nodes, node],
+          nodes: [...state.nodes, normalizedNode],
           pathEditingNodeId: null,
           pathEditingPoint: null,
           pathEditingPoints: [],
-          selectedNodeIds: [node.id],
+          selectedNodeIds: [normalizedNode.id],
         })
       );
 
-      return node.id;
+      return normalizedNode.id;
     },
 
     addPathNode: (parentId, point, options = {}) => {
@@ -175,6 +178,8 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
         }
       }
 
+      const normalizedNode = normalizePathNodeContours(node);
+
       set((state) =>
         withDocumentMutation(state, {
           activeTool: activatePointer ? "pointer" : state.activeTool,
@@ -182,7 +187,7 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
           editingOriginalText: "",
           editingText: "",
           focusedGroupId: state.focusedGroupId,
-          nodes: [...state.nodes, node],
+          nodes: [...state.nodes, normalizedNode],
           pathEditingNodeId: null,
           pathEditingPoint: null,
           pathEditingPoints: [],
@@ -190,7 +195,7 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
         })
       );
 
-      return node.id;
+      return normalizedNode.id;
     },
 
     deleteSelected: () => {

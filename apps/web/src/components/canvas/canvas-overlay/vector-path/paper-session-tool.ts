@@ -6,8 +6,12 @@ import {
   setVectorPointHandlesFromAnchorDrag,
   updateVectorPointHandle,
 } from "@punchpress/engine";
+import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
 import type paper from "paper";
-import { getCanvasDeepLeafNodeIdAtPoint } from "./canvas-node-hit-target";
+import {
+  getCanvasDeepLeafNodeIdAtPoint,
+  getCanvasVectorChildPathNodeIdAtPoint,
+} from "./canvas-node-hit-target";
 import {
   finalizeVectorEndpointDrag,
   getVectorDraggedEndpointPreviewPoint,
@@ -56,6 +60,58 @@ const getCanvasPoint = (editor: Editor, clientX: number, clientY: number) => {
     x: viewer.getScrollLeft() + (clientX - rect.left) / editor.zoom,
     y: viewer.getScrollTop() + (clientY - rect.top) / editor.zoom,
   };
+};
+
+const getExternalCanvasNodeId = (
+  editor: Editor,
+  nodeId: string,
+  event: MouseEvent | null
+) => {
+  if (!event) {
+    return null;
+  }
+
+  const visualOwnerNodeId = editor.getPathEditingVisualOwnerNodeId(nodeId);
+  const visualOwnerNode = visualOwnerNodeId
+    ? editor.getNode(visualOwnerNodeId)
+    : null;
+  const directChildNodeId =
+    visualOwnerNode?.type === "vector"
+      ? getCanvasVectorChildPathNodeIdAtPoint(
+          editor,
+          visualOwnerNode.id,
+          event.clientX,
+          event.clientY
+        )
+      : null;
+  const hitNodeId =
+    directChildNodeId ||
+    getCanvasDeepLeafNodeIdAtPoint(editor, event.clientX, event.clientY);
+
+  if (!(hitNodeId && hitNodeId !== nodeId && hitNodeId !== visualOwnerNodeId)) {
+    return null;
+  }
+
+  return hitNodeId;
+};
+
+const focusNearestGroupAncestor = (editor: Editor, nodeId: string) => {
+  let currentNode = editor.getNode(nodeId);
+
+  while (currentNode && currentNode.parentId !== ROOT_PARENT_ID) {
+    const parentNode = editor.getNode(currentNode.parentId);
+
+    if (!parentNode) {
+      return;
+    }
+
+    if (parentNode.type === "group") {
+      editor.setFocusedGroup(parentNode.id);
+      return;
+    }
+
+    currentNode = parentNode;
+  }
 };
 
 const mapTargetSegment = (
@@ -240,17 +296,13 @@ export const createPaperSessionToolController = ({
       editor.setHoveredNode(null);
     } else {
       chrome.setHoveredPoint(null);
-      const hoveredNodeId = event?.clientX
-        ? getCanvasDeepLeafNodeIdAtPoint(editor, event.clientX, event.clientY)
-        : null;
-      editor.setHoveredNode(
-        hoveredNodeId && hoveredNodeId !== nodeId ? hoveredNodeId : null
-      );
+      editor.setHoveredNode(getExternalCanvasNodeId(editor, nodeId, event));
     }
 
+    const externalNodeId = getExternalCanvasNodeId(editor, nodeId, event);
     const hoverCursorMode = getVectorPathCursorMode({
-      isBodyHit: Boolean(bodyHit),
-      isInsertHit: Boolean(insertTarget),
+      isBodyHit: Boolean(bodyHit && !externalNodeId),
+      isInsertHit: Boolean(insertTarget && !externalNodeId),
       role,
     });
 
@@ -606,13 +658,11 @@ export const createPaperSessionToolController = ({
   };
 
   const handleEmptyCanvasRelease = (event: paper.ToolEvent) => {
-    const hoveredNodeId = event.event
-      ? getCanvasDeepLeafNodeIdAtPoint(
-          editor,
-          (event.event as MouseEvent).clientX,
-          (event.event as MouseEvent).clientY
-        )
-      : null;
+    const hoveredNodeId = getExternalCanvasNodeId(
+      editor,
+      nodeId,
+      (event.event as MouseEvent) || null
+    );
 
     if (!(hoveredNodeId && hoveredNodeId !== nodeId)) {
       onExitPathEditing();
@@ -620,6 +670,7 @@ export const createPaperSessionToolController = ({
     }
 
     if (editor.canStartPathEditing(hoveredNodeId)) {
+      focusNearestGroupAncestor(editor, hoveredNodeId);
       editor.startPathEditing(hoveredNodeId);
       return;
     }
@@ -704,6 +755,17 @@ export const createPaperSessionToolController = ({
         type: "insert",
       };
       chrome.setHoverCursorMode("insert");
+      return;
+    }
+
+    if (getExternalCanvasNodeId(editor, nodeId, event.event as MouseEvent)) {
+      state.pendingPress = {
+        additive: isAdditiveSelection,
+        origin: event.point.clone(),
+        type: "empty",
+      };
+      chrome.setHoveredPoint(null);
+      chrome.setHoverCursorMode(null);
       return;
     }
 

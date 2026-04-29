@@ -17,7 +17,7 @@ export const SelectionColorsFields = ({
       {selectionColors.map((selectionColor) => {
         return (
           <SelectionColorRow
-            key={selectionColor.id}
+            key={selectionColor.fieldId}
             selectionColor={selectionColor}
           />
         );
@@ -35,7 +35,7 @@ const SelectionColorRow = ({ selectionColor }) => {
         onChange={(nextValue) =>
           editor.setSelectionColor(selectionColor.id, nextValue)
         }
-        stateKey={`selection-color:${selectionColor.id}`}
+        stateKey={`selection-color:${selectionColor.fieldId}`}
         value={selectionColor.value}
       />
     </div>

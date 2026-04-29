@@ -417,7 +417,11 @@ export const deleteVectorPoint = (
       return [currentContour];
     }
 
-    if (nextSegments.length === 0) {
+    if (
+      nextSegments.length === 0 ||
+      (currentContour.closed && nextSegments.length < 3) ||
+      (!currentContour.closed && nextSegments.length < 2)
+    ) {
       return [];
     }
 

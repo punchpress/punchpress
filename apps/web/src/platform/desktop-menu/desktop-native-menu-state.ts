@@ -54,10 +54,13 @@ export const getDesktopAppMenuState = (
     canEditPath: Boolean(
       selectedNode?.id && editor.canStartPathEditing(selectedNode.id)
     ),
+    canJoinCurves: editor.canJoinCurves(selectedNodeIds),
     compoundOperation:
       getChoiceState<DesktopVectorCompoundOperation>(compoundOperation),
     canMakeCompoundPath: editor.canMakeCompoundPath(selectedNodeIds),
+    canMergeCurves: editor.canMergeCurves(selectedNodeIds),
     canReleaseCompoundPath: editor.canReleaseCompoundPath(selectedNodeIds),
+    canSeparateCurves: editor.canSeparateCurves(selectedNodeIds),
     selectedNodeType: selectedNode?.type || null,
     selectionKind: selectionProperties.selectionKind,
     vectorStyle:
