@@ -1442,6 +1442,61 @@ describe("Editor text editing mode", () => {
     expect(editor.activeTool).toBe("pointer");
     expect(editor.editingNodeId).toBe("editing-node");
   });
+
+  test("text tool creates a new text node when clicking an existing shape", () => {
+    const editor = new Editor();
+    editor.applyLocalFontCatalog({
+      error: "",
+      fonts: [{ ...AVAILABLE_FONT, id: "arialmt" }],
+      state: "ready",
+    });
+
+    editor.setNextShapeKind("ellipse");
+    editor.addShapeNode({ x: 320, y: 240 });
+
+    const shapeNode = editor.selectedNode;
+
+    if (!shapeNode) {
+      throw new Error("Expected created shape node");
+    }
+
+    editor.setActiveTool("text");
+    editor.dispatchNodePointerDown({
+      node: shapeNode,
+      point: { x: 320, y: 240 },
+    });
+
+    expect(editor.selectedNode?.type).toBe("text");
+    expect(editor.editingNodeId).toBe(editor.selectedNodeId);
+    expect(editor.selectedNodeId).not.toBe(shapeNode.id);
+  });
+
+  test("text tool creates a new text node when clicking an existing path", () => {
+    const editor = new Editor();
+    editor.applyLocalFontCatalog({
+      error: "",
+      fonts: [{ ...AVAILABLE_FONT, id: "arialmt" }],
+      state: "ready",
+    });
+
+    editor.addVectorNode({ x: 420, y: 180 });
+
+    const pathNode = editor.selectedNode;
+
+    if (!pathNode) {
+      throw new Error("Expected created path node");
+    }
+
+    editor.setActiveTool("text");
+    editor.dispatchNodePointerDown({
+      node: pathNode,
+      point: { x: 420, y: 180 },
+    });
+
+    expect(editor.selectedNode?.type).toBe("text");
+    expect(editor.editingNodeId).toBe(editor.selectedNodeId);
+    expect(editor.selectedNodeId).not.toBe(pathNode.id);
+  });
 });
 
 describe("Editor shape export", () => {

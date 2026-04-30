@@ -1,5 +1,8 @@
 import { commandsToContours, getBounds } from "../../primitives/path-geometry";
-import { withNodeGeometryBehavior } from "../../primitives/node-geometry";
+import {
+  createPaintedHitRegion,
+  withNodeGeometryBehavior,
+} from "../../primitives/node-geometry";
 import { getVectorContourCommands } from "./vector-corners";
 
 const formatCoordinate = (value) => {
@@ -94,13 +97,15 @@ export const buildVectorNodeGeometry = (node) => {
     minY: rawBounds.minY - strokeInset,
     width: rawBounds.width + strokeInset * 2,
   };
-  const hitRegions = paths.map((path) => ({
-    contours: commandsToContours(path.commands, 1.5),
-    filled: Boolean(path.closed && path.fill && path.fill !== "none"),
-    fillRule: path.fillRule,
-    stroked: Boolean(path.stroke && path.stroke !== "none" && path.strokeWidth > 0),
-    strokeWidth: path.strokeWidth,
-  }));
+  const hitRegions = paths.map((path) =>
+    createPaintedHitRegion({
+      contours: commandsToContours(path.commands, 1.5),
+      fill: path.closed === false ? null : path.fill,
+      fillRule: path.fillRule,
+      stroke: path.stroke,
+      strokeWidth: path.strokeWidth,
+    })
+  );
   const renderedPaths = paths.map(({ commands: _commands, ...path }) => path);
 
   return withNodeGeometryBehavior({

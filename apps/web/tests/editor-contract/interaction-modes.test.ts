@@ -673,6 +673,108 @@ describe("Editor interaction mode boundaries", () => {
     expect(editor.selectedNodeIds).toEqual(["vector-container"]);
   });
 
+  test("node tool does not auto-enter path editing from a multi-selection", () => {
+    const editor = createEditor();
+    const nodes = [
+      {
+        closed: true,
+        fill: "#ffffff",
+        fillRule: "nonzero" as const,
+        id: "path-a",
+        parentId: "root",
+        segments: [
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: -120, y: -90 },
+            pointType: "corner" as const,
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: 120, y: -90 },
+            pointType: "corner" as const,
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: 120, y: 90 },
+            pointType: "corner" as const,
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: -120, y: 90 },
+            pointType: "corner" as const,
+          },
+        ],
+        stroke: "#000000",
+        strokeWidth: 12,
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 320,
+          y: 220,
+        },
+        type: "path" as const,
+        visible: true,
+      },
+      {
+        closed: true,
+        fill: "#ffffff",
+        fillRule: "nonzero" as const,
+        id: "path-b",
+        parentId: "root",
+        segments: [
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: -80, y: -50 },
+            pointType: "corner" as const,
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: 80, y: -50 },
+            pointType: "corner" as const,
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: 80, y: 50 },
+            pointType: "corner" as const,
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: -80, y: 50 },
+            pointType: "corner" as const,
+          },
+        ],
+        stroke: "#000000",
+        strokeWidth: 12,
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 540,
+          y: 220,
+        },
+        type: "path" as const,
+        visible: true,
+      },
+    ];
+
+    editor.getState().loadNodes([...nodes]);
+    editor.setSelectedNodes(["path-a", "path-b"]);
+    editor.setActiveTool("node");
+
+    expect(editor.activeTool).toBe("node");
+    expect(editor.pathEditingNodeId).toBeNull();
+    expect(editor.selectedNodeIds).toEqual(["path-a", "path-b"]);
+  });
+
   test("groups do not advertise vector-style path editing affordances", () => {
     const editor = createEditor();
     const firstNode = {

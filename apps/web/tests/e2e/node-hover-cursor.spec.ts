@@ -185,6 +185,15 @@ test("uses the add cursor on the canvas surface while placement tools are armed"
   await expect
     .poll(async () => getCursorSvgFromValue(await getSurfaceCursor()))
     .toBe(addSvg);
+
+  await loadDocumentFixture(page, "hover-preview.punch");
+  const nodeId = "hover-node";
+  await waitForNodeReady(page, nodeId);
+  await page.keyboard.press("t");
+  await page.locator(`[data-node-id="${nodeId}"]`).hover();
+  await expect
+    .poll(async () => getCursorSvgFromValue(await getNodeCursor(page, nodeId)))
+    .toBe(addSvg);
 });
 
 test("uses distinct canvas cursors for pointer and node tools", async ({

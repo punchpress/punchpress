@@ -26,50 +26,6 @@ const getCanvasNodeElementsAtPoint = (clientX, clientY) => {
   });
 };
 
-const getLocalSvgPoint = (pathElement, x, y) => {
-  const svgElement = pathElement.ownerSVGElement;
-  const screenMatrix =
-    pathElement.getScreenCTM?.() || svgElement?.getScreenCTM?.();
-
-  if (!(svgElement && screenMatrix)) {
-    return null;
-  }
-
-  const point = svgElement.createSVGPoint();
-  point.x = x;
-  point.y = y;
-
-  return point.matrixTransform(screenMatrix.inverse());
-};
-
-const isSvgPathHit = (pathElement, x, y) => {
-  const localPoint = getLocalSvgPoint(pathElement, x, y);
-
-  if (!localPoint) {
-    return false;
-  }
-
-  const fill = pathElement.getAttribute("fill");
-  const stroke = pathElement.getAttribute("stroke");
-  const strokeWidth = Number(pathElement.getAttribute("stroke-width") || 0);
-  const canHitFill = Boolean(fill && fill !== "none");
-  const canHitStroke = Boolean(stroke && stroke !== "none" && strokeWidth > 0);
-
-  return Boolean(
-    (canHitFill && pathElement.isPointInFill(localPoint)) ||
-      (canHitStroke && pathElement.isPointInStroke?.(localPoint))
-  );
-};
-
-const isCanvasNodeHit = (nodeElement, clientX, clientY) => {
-  return [...nodeElement.querySelectorAll("path")].some((pathElement) => {
-    return (
-      pathElement instanceof SVGGeometryElement &&
-      isSvgPathHit(pathElement, clientX, clientY)
-    );
-  });
-};
-
 const getCanvasPoint = (editor, clientX, clientY) => {
   const viewer = editor.viewerRef;
   const host = editor.hostRef;
@@ -84,6 +40,10 @@ const getCanvasPoint = (editor, clientX, clientY) => {
     x: viewer.getScrollLeft() + (clientX - rect.left) / editor.zoom,
     y: viewer.getScrollTop() + (clientY - rect.top) / editor.zoom,
   };
+};
+
+const isCanvasNodeHit = (editor, nodeId, canvasPoint) => {
+  return editor.hitTestNodePoint(nodeId, canvasPoint);
 };
 
 const isChildPathNodeHit = (editor, node, canvasPoint) => {
@@ -119,11 +79,17 @@ export const getCanvasVectorChildPathNodeIdAtPoint = (
     : null;
 };
 
-export const getCanvasLeafNodeIdAtPoint = (clientX, clientY) => {
+export const getCanvasLeafNodeIdAtPoint = (editor, clientX, clientY) => {
+  const canvasPoint = getCanvasPoint(editor, clientX, clientY);
+
+  if (!canvasPoint) {
+    return null;
+  }
+
   for (const nodeElement of getCanvasNodeElementsAtPoint(clientX, clientY)) {
     const nodeId = nodeElement.dataset.nodeId;
 
-    if (!(nodeId && isCanvasNodeHit(nodeElement, clientX, clientY))) {
+    if (!(nodeId && isCanvasNodeHit(editor, nodeId, canvasPoint))) {
       continue;
     }
 
@@ -143,11 +109,7 @@ export const getCanvasDeepLeafNodeIdAtPoint = (editor, clientX, clientY) => {
   for (const nodeElement of getCanvasNodeElementsAtPoint(clientX, clientY)) {
     const nodeId = nodeElement.dataset.nodeId;
 
-    if (!(nodeId && isCanvasNodeHit(nodeElement, clientX, clientY))) {
-      if (nodeId && editor.getNode(nodeId)?.type === "text") {
-        return nodeId;
-      }
-
+    if (!(nodeId && isCanvasNodeHit(editor, nodeId, canvasPoint))) {
       continue;
     }
 

@@ -39,9 +39,6 @@ space.
 
 ## Current Scope
 
-Paths and imported vector child paths now provide contour-backed hit regions, so
-direct vector path selection can hit transformed artwork through engine geometry.
-Shapes and text are attached to the same behavior surface, but their precise hit
-regions are still incremental work; callers can use bounds-based inside hits only
-when that interaction explicitly wants them.
-
+Paths, shapes, text, and imported vector child paths now provide engine-owned
+painted hit regions, so direct selection can resolve transformed artwork through
+shared geometry behavior instead of DOM-only hit tests.

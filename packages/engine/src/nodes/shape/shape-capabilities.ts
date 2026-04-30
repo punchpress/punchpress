@@ -1,4 +1,7 @@
-import { withNodeGeometryBehavior } from "../../primitives/node-geometry";
+import {
+  createPaintedHitRegion,
+  withNodeGeometryBehavior,
+} from "../../primitives/node-geometry";
 import { toTransformedWorldFrame, toWorldFrame } from "../node-frame-utils";
 import {
   buildShapeNodePath,
@@ -12,10 +15,19 @@ import { createDefaultShapeNode } from "./model";
 export const shapeNodeCapabilities = {
   buildGeometry: (node) => {
     const bbox = getShapeNodeBounds(node);
+    const contours = getShapeEditablePathContours(node) || [];
 
     return withNodeGeometryBehavior({
       bbox,
       guide: null,
+      hitRegions: [
+        createPaintedHitRegion({
+          contours,
+          fill: node.fill,
+          stroke: node.stroke,
+          strokeWidth: node.strokeWidth,
+        }),
+      ],
       id: node.id,
       paths: [
         {

@@ -1,5 +1,24 @@
 const DEFAULT_STROKE_HIT_WIDTH = 6;
 
+export const createPaintedHitRegion = ({
+  contours,
+  fill = null,
+  fillRule = "nonzero",
+  stroke = null,
+  strokeWidth = 0,
+}) => {
+  return {
+    contours: (contours || []).map((contour) => ({
+      closed: contour.closed,
+      points: contour.points || contour.segments?.map((segment) => segment.point) || [],
+    })),
+    filled: Boolean(fill && fill !== "none"),
+    fillRule,
+    stroked: Boolean(stroke && stroke !== "none" && strokeWidth > 0),
+    strokeWidth,
+  };
+};
+
 const isPointInBounds = (point, bounds, margin = 0) => {
   return Boolean(
     bounds &&
@@ -176,4 +195,3 @@ export const withNodeGeometryBehavior = (geometry) => {
 
   return geometry;
 };
-

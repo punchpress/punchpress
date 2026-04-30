@@ -22,7 +22,10 @@ const focusNearestGroupAncestor = (editor, node) => {
 
 export class NodeTool extends Tool {
   onActivate() {
-    if (this.editor.pathEditingNodeId) {
+    if (
+      this.editor.pathEditingNodeId ||
+      this.editor.selectedNodeIds.length !== 1
+    ) {
       return false;
     }
 

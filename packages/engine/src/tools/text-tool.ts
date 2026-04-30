@@ -10,7 +10,11 @@ export class TextTool extends Tool {
     this.editor.addTextNode(point);
   }
 
-  onNodePointerDown({ node }) {
+  onNodePointerDown({ node, ...info }) {
+    if (node?.type !== "text") {
+      return super.onNodePointerDown({ node, ...info });
+    }
+
     this.editor.startEditing(node);
   }
 

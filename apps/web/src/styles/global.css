@@ -371,10 +371,6 @@ textarea,
   cursor: var(--canvas-cursor-grab);
 }
 
-[data-tool="text"] .canvas-node {
-  cursor: var(--canvas-cursor-text);
-}
-
 .canvas-cursor-default {
   cursor: var(--canvas-cursor-default);
 }
@@ -458,7 +454,8 @@ textarea,
   cursor: var(--canvas-cursor-add);
 }
 
-.canvas-host[data-tool="shape"] .canvas-node {
+.canvas-host[data-tool="shape"] .canvas-node,
+.canvas-host[data-tool="text"] .canvas-node {
   cursor: var(--canvas-cursor-add);
 }
 
