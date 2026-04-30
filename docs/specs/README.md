@@ -15,13 +15,16 @@ They exist to preserve product intent while implementation evolves. They are liv
 ## Current Specs
 
 - `boolean-ops.md`
+- `canvas-geometry.md`
 - `canvas-overlays.md`
 - `canvas-navigation.md`
 - `clipboard.md`
+- `cursors.md`
 - `groups.md`
 - `history.md`
 - `nodes.md`
 - `performance-panel.md`
 - `shape-node.md`
+- `svg-import.md`
 - `text-node.md`
 - `vector-node.md`

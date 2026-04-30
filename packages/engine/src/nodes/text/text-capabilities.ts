@@ -1,3 +1,7 @@
+import {
+  createPaintedHitRegion,
+  withNodeGeometryBehavior,
+} from "../../primitives/node-geometry";
 import { toTransformedWorldFrame, toWorldFrame } from "../node-frame-utils";
 import { createDefaultNode } from "./model";
 import {
@@ -49,31 +53,74 @@ const getTextNodeSelectionBounds = (
   return geometry?.bbox || estimateBounds(node);
 };
 
+const getTextFallbackHitRegions = (node, bbox) => {
+  return [
+    createPaintedHitRegion({
+      contours: [
+        {
+          closed: true,
+          segments: [
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: bbox.minX, y: bbox.minY },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: bbox.maxX, y: bbox.minY },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: bbox.maxX, y: bbox.maxY },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: bbox.minX, y: bbox.maxY },
+              pointType: "corner",
+            },
+          ],
+        },
+      ],
+      fill: node.fill,
+      stroke: node.stroke,
+      strokeWidth: node.strokeWidth,
+    }),
+  ];
+};
+
 export const textNodeCapabilities = {
   buildGeometry: (node, font) => {
     if (!font) {
       const bbox = estimateBounds(node);
 
-      return {
+      return withNodeGeometryBehavior({
         bbox,
         guide: getFallbackTextGuide(node, bbox),
+        hitRegions: getTextFallbackHitRegions(node, bbox),
         id: node.id,
         paths: [],
         ready: false,
         selectionBounds: null,
-      };
+      });
     }
 
     const geometry = buildWarpTextGeometry(node, font);
 
-    return {
+    return withNodeGeometryBehavior({
       bbox: geometry.bbox,
       guide: geometry.guide || null,
+      hitRegions: geometry.hitRegions || [],
       id: node.id,
       paths: geometry.paths,
       ready: geometry.ready,
       selectionBounds: geometry.selectionBounds || null,
-    };
+    });
   },
 
   createDefaultNode: (font) => {

@@ -13,8 +13,9 @@ Shape nodes let users create and edit live geometric shapes that remain easy to 
 
 ## Live Shape Editing
 
-- Live shape editing is a distinct secondary mode for shape nodes.
-- A selected shape node should expose this mode as `Edit Shape`, not `Edit path`, so users can distinguish non-destructive shape editing from `Convert to path`.
+- Live shape editing is the Node tool's editing state for shape nodes.
+- A selected shape node should not expose a generic `Edit Shape` action-bar toggle; users enter live shape editing by double-clicking the shape, selecting the Node tool, pressing the Node tool hotkey, or clicking the shape while the Node tool is active.
+- Live shape editing should remain distinct from `Convert to path`, so users can distinguish non-destructive shape editing from converting the shape into freeform path artwork.
 - Entering live shape editing should keep the node selected.
 - While live shape editing is active, the normal object transform box should be replaced by shape-editing affordances.
 - While live shape editing is active, canvas marquee selection should stay suppressed so shape manipulation does not surface unrelated selection UI.
@@ -58,5 +59,5 @@ Shape nodes let users create and edit live geometric shapes that remain easy to 
 - Pen-style topology edits on a shape should convert that shape into freeform path artwork.
 - Corner-radius edits alone should not convert a polygon shape into freeform path artwork while the result is still representable as live polygon corner-radius data.
 - Converting a shape into freeform path artwork should preserve the visible geometry and styling of the object.
-- Manually converting a shape into freeform path artwork should keep the converted object selected and leave any active shape-editing mode.
+- Manually converting a shape into freeform path artwork should keep the converted object selected and leave any active live-shape editing state unless the Node tool remains active for the converted path.
 - Once a shape has become freeform path artwork, PunchPress should no longer show shape-specific controls that no longer have a clear meaning.

@@ -155,7 +155,7 @@ describe("vector path topology", () => {
     ]);
   });
 
-  test("split cuts an open contour into two open contours at the selected interior point", () => {
+  test("split cuts an open contour into two contours on the same path", () => {
     const { editor, node } = loadVectorEditor([createOpenLineContour()], true);
 
     editor.setPathEditingPoint({
@@ -177,25 +177,20 @@ describe("vector path topology", () => {
     }
 
     expect(nextNode.closed).toBe(false);
-    expect(nextNode.segments.map((segment) => segment.point)).toEqual([
+    expect(nextNode.contours).toHaveLength(2);
+    expect(
+      nextNode.contours[0]?.segments.map((segment) => segment.point)
+    ).toEqual([
       { x: 0, y: 0 },
       { x: 120, y: 0 },
     ]);
-    expect(editor.pathEditingNodeId).not.toBe(node.id);
-    const nextEditingNode = editor.pathEditingNodeId
-      ? editor.getNode(editor.pathEditingNodeId)
-      : null;
-
-    if (nextEditingNode?.type !== "path") {
-      throw new Error(
-        "Expected a new path node for the trailing split result."
-      );
-    }
-
-    expect(nextEditingNode.segments.map((segment) => segment.point)).toEqual([
+    expect(
+      nextNode.contours[1]?.segments.map((segment) => segment.point)
+    ).toEqual([
       { x: 120, y: 0 },
       { x: 240, y: 0 },
     ]);
+    expect(editor.pathEditingNodeId).toBe(node.id);
     expect(editor.pathEditingPoints).toEqual([
       {
         contourIndex: 1,

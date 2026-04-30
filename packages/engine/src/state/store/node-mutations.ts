@@ -1,10 +1,15 @@
+import {
+  normalizePathNodeContours,
+  withPathNodeContours,
+} from "../../nodes/path/path-contours";
+
 export const applyNodeUpdate = (node, updater) => {
   const mergeNodeUpdate = (nextNode) => {
     if (!(nextNode && typeof nextNode === "object")) {
       return node;
     }
 
-    return {
+    const mergedNode = {
       ...node,
       ...nextNode,
       transform: nextNode.transform
@@ -14,6 +19,10 @@ export const applyNodeUpdate = (node, updater) => {
           }
         : node.transform,
     };
+
+    return node.type === "path" && Array.isArray(nextNode.contours)
+      ? withPathNodeContours(mergedNode, nextNode.contours)
+      : normalizePathNodeContours(mergedNode);
   };
 
   if (typeof updater === "function") {

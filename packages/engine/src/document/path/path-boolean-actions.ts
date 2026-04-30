@@ -8,6 +8,10 @@ import { finishEditingIfNeeded } from "../../editing/editing-actions";
 import { buildNodeCapabilityGeometry } from "../../nodes/node-capabilities";
 import { createDefaultPathNode } from "../../nodes/path/model";
 import {
+  getPathNodeContours,
+  withPathNodeContours,
+} from "../../nodes/path/path-contours";
+import {
   getNodeRotation,
   getNodeScaleX,
   getNodeScaleY,
@@ -40,6 +44,10 @@ const isBooleanSourceNode = (node) => {
   return (
     node?.type === "path" || node?.type === "shape" || node?.type === "vector"
   );
+};
+
+const isClosedPathNode = (pathNode) => {
+  return getPathNodeContours(pathNode).every((contour) => contour.closed);
 };
 
 const roundCoordinate = (value: number) => {
@@ -170,7 +178,7 @@ const getBooleanSourceSelection = (
 
   const sources = selectedNodes.map((node) => {
     if (node.type === "path") {
-      return node.closed ? { node, pathNodes: [node] } : null;
+      return isClosedPathNode(node) ? { node, pathNodes: [node] } : null;
     }
 
     if (node.type === "shape") {
@@ -183,7 +191,7 @@ const getBooleanSourceSelection = (
       .filter((childNode) => childNode?.type === "path");
 
     if (
-      !(pathNodes.length > 0 && pathNodes.every((pathNode) => pathNode.closed))
+      !(pathNodes.length > 0 && pathNodes.every(isClosedPathNode))
     ) {
       return null;
     }
@@ -356,19 +364,20 @@ const createResultNodes = (
     const contour = createContourFromPaperPath(path, center);
     const baseNode = createDefaultPathNode(resultVectorId);
 
-    return {
-      ...baseNode,
-      closed: contour.closed,
-      fill: styleTemplate.fill,
-      fillRule: styleTemplate.fillRule,
-      segments: contour.segments,
-      stroke: styleTemplate.stroke,
-      strokeLineCap: styleTemplate.strokeLineCap,
-      strokeLineJoin: styleTemplate.strokeLineJoin,
-      strokeMiterLimit: styleTemplate.strokeMiterLimit,
-      strokeWidth: styleTemplate.strokeWidth,
-      transform: pathTransform,
-    };
+    return withPathNodeContours(
+      {
+        ...baseNode,
+        fill: styleTemplate.fill,
+        fillRule: styleTemplate.fillRule,
+        stroke: styleTemplate.stroke,
+        strokeLineCap: styleTemplate.strokeLineCap,
+        strokeLineJoin: styleTemplate.strokeLineJoin,
+        strokeMiterLimit: styleTemplate.strokeMiterLimit,
+        strokeWidth: styleTemplate.strokeWidth,
+        transform: pathTransform,
+      },
+      [contour]
+    );
   });
 
   if (parentNode?.type === "vector") {

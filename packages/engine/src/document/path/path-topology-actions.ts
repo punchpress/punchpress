@@ -2,7 +2,7 @@ import type {
   VectorContourDocument,
   VectorHandleDocument,
 } from "@punchpress/punch-schema";
-import { createId } from "../../nodes/text/model";
+import { getPathNodeContours } from "../../nodes/path/path-contours";
 
 interface PathPoint {
   contourIndex: number;
@@ -276,7 +276,7 @@ const getJoinedSegments = (
   ];
 };
 
-const getJoinResult = (
+export const getPathContourJoinResult = (
   contours: VectorContourDocument[],
   points: PathPoint[]
 ) => {
@@ -354,20 +354,7 @@ const getJoinResult = (
 
 export const canSplitVectorPath = (node, point: PathPoint | null) => {
   if (node?.type === "path" && point) {
-    return Boolean(
-      getSplitResult(
-        [
-          {
-            closed: node.closed,
-            segments: node.segments,
-          },
-        ],
-        {
-          contourIndex: 0,
-          segmentIndex: point.segmentIndex,
-        }
-      )
-    );
+    return Boolean(getSplitResult(getPathNodeContours(node), point));
   }
 
   if (!(node?.type === "vector" && point)) {
@@ -381,18 +368,7 @@ export const splitVectorPath = (editor, nodeId, point: PathPoint | null) => {
   const node = editor.getNode(nodeId);
 
   if (node?.type === "path" && point) {
-    const result = getSplitResult(
-      [
-        {
-          closed: node.closed,
-          segments: node.segments,
-        },
-      ],
-      {
-        contourIndex: 0,
-        segmentIndex: point.segmentIndex,
-      }
-    );
+    const result = getSplitResult(getPathNodeContours(node), point);
 
     if (!result) {
       return false;
@@ -406,26 +382,12 @@ export const splitVectorPath = (editor, nodeId, point: PathPoint | null) => {
 
         return {
           ...currentNode,
-          closed: result.contours[0].closed,
-          segments: result.contours[0].segments,
+          contours: result.contours,
         };
       });
 
-      if (result.contours[1]) {
-        editor.getState().insertNodes([
-          {
-            ...node,
-            closed: result.contours[1].closed,
-            id: createId(),
-            segments: result.contours[1].segments,
-          },
-        ]);
-      }
-
       editor.getState().setFocusedGroupId(node.parentId);
-      editor.getState().setPathEditingNodeId(
-        result.contours[1] ? editor.selectedNodeId : nodeId
-      );
+      editor.getState().setPathEditingNodeId(nodeId);
       editor
         .getState()
         .setPathEditingPoints(result.selectedPoints, result.primaryPoint);
@@ -465,27 +427,14 @@ export const splitVectorPath = (editor, nodeId, point: PathPoint | null) => {
 
 export const canJoinVectorPathEndpoints = (node, points: PathPoint[]) => {
   if (node?.type === "path") {
-    return Boolean(
-      getJoinResult(
-        [
-          {
-            closed: node.closed,
-            segments: node.segments,
-          },
-        ],
-        points.map((point) => ({
-          contourIndex: 0,
-          segmentIndex: point.segmentIndex,
-        }))
-      )
-    );
+    return Boolean(getPathContourJoinResult(getPathNodeContours(node), points));
   }
 
   if (!(node?.type === "vector")) {
     return false;
   }
 
-  return Boolean(getJoinResult(node.contours, points));
+  return Boolean(getPathContourJoinResult(node.contours, points));
 };
 
 export const joinVectorPathEndpoints = (
@@ -496,18 +445,7 @@ export const joinVectorPathEndpoints = (
   const node = editor.getNode(nodeId);
 
   if (node?.type === "path") {
-    const result = getJoinResult(
-      [
-        {
-          closed: node.closed,
-          segments: node.segments,
-        },
-      ],
-      points.map((point) => ({
-        contourIndex: 0,
-        segmentIndex: point.segmentIndex,
-      }))
-    );
+    const result = getPathContourJoinResult(getPathNodeContours(node), points);
 
     if (!result) {
       return false;
@@ -521,8 +459,7 @@ export const joinVectorPathEndpoints = (
 
         return {
           ...currentNode,
-          closed: result.contours[0].closed,
-          segments: result.contours[0].segments,
+          contours: result.contours,
         };
       });
       editor
@@ -537,7 +474,7 @@ export const joinVectorPathEndpoints = (
     return false;
   }
 
-  const result = getJoinResult(node.contours, points);
+  const result = getPathContourJoinResult(node.contours, points);
 
   if (!result) {
     return false;
@@ -546,6 +483,113 @@ export const joinVectorPathEndpoints = (
   editor.run(() => {
     editor.getState().updateNodeById(nodeId, (currentNode) => {
       if (currentNode.type !== "vector") {
+        return currentNode;
+      }
+
+      return {
+        ...currentNode,
+        contours: result.contours,
+      };
+    });
+    editor
+      .getState()
+      .setPathEditingPoints(result.selectedPoints, result.primaryPoint);
+  });
+
+  return true;
+};
+
+const getClosableContourIndex = (
+  contours: VectorContourDocument[],
+  point: PathPoint | null
+) => {
+  if (point) {
+    const contour = contours[point.contourIndex];
+
+    return contour && !contour.closed && contour.segments.length > 1
+      ? point.contourIndex
+      : -1;
+  }
+
+  const openContourIndexes = contours
+    .map((contour, index) => ({ contour, index }))
+    .filter(({ contour }) => {
+      return !contour.closed && contour.segments.length > 1;
+    })
+    .map(({ index }) => index);
+
+  return openContourIndexes.length === 1 ? openContourIndexes[0] : -1;
+};
+
+const getCloseResult = (
+  contours: VectorContourDocument[],
+  point: PathPoint | null
+) => {
+  const contourIndex = getClosableContourIndex(contours, point);
+  const contour = contours[contourIndex];
+
+  if (!contour) {
+    return null;
+  }
+
+  return {
+    contours: contours.map((currentContour, currentContourIndex) => {
+      return currentContourIndex === contourIndex
+        ? {
+            ...cloneContour(currentContour),
+            closed: true,
+          }
+        : currentContour;
+    }),
+    primaryPoint: {
+      contourIndex,
+      segmentIndex: 0,
+    },
+    selectedPoints: [
+      {
+        contourIndex,
+        segmentIndex: 0,
+      },
+    ],
+  };
+};
+
+export const canCloseVectorPathContour = (
+  node,
+  point: PathPoint | null = null
+) => {
+  if (node?.type === "path") {
+    return Boolean(getCloseResult(getPathNodeContours(node), point));
+  }
+
+  if (node?.type !== "vector") {
+    return false;
+  }
+
+  return Boolean(getCloseResult(node.contours, point));
+};
+
+export const closeVectorPathContour = (
+  editor,
+  nodeId,
+  point: PathPoint | null = null
+) => {
+  const node = editor.getNode(nodeId);
+  const contours =
+    node?.type === "path"
+      ? getPathNodeContours(node)
+      : node?.type === "vector"
+        ? node.contours
+        : null;
+  const result = contours ? getCloseResult(contours, point) : null;
+
+  if (!result) {
+    return false;
+  }
+
+  editor.run(() => {
+    editor.getState().updateNodeById(nodeId, (currentNode) => {
+      if (!(currentNode.type === "path" || currentNode.type === "vector")) {
         return currentNode;
       }
 

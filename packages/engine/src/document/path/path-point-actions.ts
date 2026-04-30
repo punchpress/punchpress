@@ -1,4 +1,5 @@
 import { getShapePathEditResult } from "../../nodes/shape/shape-engine";
+import { getPathNodeContours } from "../../nodes/path/path-contours";
 import {
   deleteVectorPoint as deleteVectorPointOnContours,
   setVectorPointType as setVectorPointTypeOnContours,
@@ -63,19 +64,14 @@ export const setVectorPointType = (editor, nodeId, point, pointType) => {
 
         return {
           ...currentNode,
-          segments: setVectorPointTypeOnContours(
-            [
-              {
-                closed: currentNode.closed,
-                segments: currentNode.segments,
-              },
-            ],
+          contours: setVectorPointTypeOnContours(
+            getPathNodeContours(currentNode),
             {
-              contourIndex: 0,
+              contourIndex: point.contourIndex,
               pointType,
               segmentIndex: point.segmentIndex,
             }
-          )[0].segments,
+          ),
         };
       });
     });
@@ -123,21 +119,15 @@ export const setVectorPointTypes = (editor, nodeId, points, pointType) => {
 
         const contours = points.reduce((nextContours, point) => {
           return setVectorPointTypeOnContours(nextContours, {
-            contourIndex: 0,
+            contourIndex: point.contourIndex,
             pointType,
             segmentIndex: point.segmentIndex,
           });
-        }, [
-          {
-            closed: currentNode.closed,
-            segments: currentNode.segments,
-          },
-        ]);
+        }, getPathNodeContours(currentNode));
 
         return {
           ...currentNode,
-          closed: contours[0].closed,
-          segments: contours[0].segments,
+          contours,
         };
       });
     });
@@ -187,16 +177,10 @@ export const insertVectorPoint = (editor, nodeId, target) => {
           return currentNode;
         }
 
-        const baseContours = [
-          {
-            closed: currentNode.closed,
-            segments: currentNode.segments,
-          },
-        ];
+        const baseContours = getPathNodeContours(currentNode);
         const inheritedCornerRadius = getUniformVectorCornerRadius(baseContours);
         const insertedContours = insertVectorPointOnContours(baseContours, {
           ...target,
-          contourIndex: 0,
           segments: target.segments,
         });
         const roundedContours =
@@ -205,7 +189,7 @@ export const insertVectorPoint = (editor, nodeId, target) => {
             ? setVectorPointCornerRadius(
                 insertedContours,
                 {
-                  contourIndex: 0,
+                  contourIndex: target.contourIndex,
                   segmentIndex: target.segmentIndex,
                 },
                 inheritedCornerRadius
@@ -214,12 +198,11 @@ export const insertVectorPoint = (editor, nodeId, target) => {
 
         return {
           ...currentNode,
-          closed: roundedContours[0].closed,
-          segments: roundedContours[0].segments,
+          contours: roundedContours,
         };
       });
       editor.getState().setPathEditingPoint({
-        contourIndex: 0,
+        contourIndex: target.contourIndex,
         segmentIndex: target.segmentIndex,
       });
     });
@@ -326,14 +309,9 @@ export const deleteVectorPoint = (editor, nodeId, point) => {
 
   if (node.type === "path") {
     const result = deleteVectorPointOnContours(
-      [
-        {
-          closed: node.closed,
-          segments: node.segments,
-        },
-      ],
+      getPathNodeContours(node),
       {
-        contourIndex: 0,
+        contourIndex: point.contourIndex,
         segmentIndex: point.segmentIndex,
       }
     );
@@ -351,8 +329,7 @@ export const deleteVectorPoint = (editor, nodeId, point) => {
 
         return {
           ...currentNode,
-          closed: result.contours[0].closed,
-          segments: result.contours[0].segments,
+          contours: result.contours,
         };
       });
       editor.getState().setPathEditingPoint(result.selectedPoint);
@@ -478,7 +455,7 @@ export const deletePathPoints = (editor, nodeId, points) => {
 
   const node = editor.getNode(nodeId);
 
-  if (node?.type !== "vector") {
+  if (!(node?.type === "path" || node?.type === "vector")) {
     return false;
   }
 
@@ -496,6 +473,13 @@ export const deletePathPoints = (editor, nodeId, points) => {
 
     editor.getState().updateNodeById(nodeId, (currentNode) => {
       if (currentNode.type !== "vector") {
+        if (currentNode.type === "path") {
+          return {
+            ...currentNode,
+            contours: result.contours,
+          };
+        }
+
         return currentNode;
       }
 

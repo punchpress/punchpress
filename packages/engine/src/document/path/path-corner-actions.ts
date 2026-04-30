@@ -6,6 +6,7 @@ import {
   setShapeCornerRadius,
   setShapePointCornerRadius as setShapePointCornerRadiusValue,
 } from "../../nodes/shape/shape-engine";
+import { getPathNodeContours } from "../../nodes/path/path-contours";
 import {
   canRoundVectorPoint,
   getEligibleVectorCornerPoints,
@@ -35,19 +36,6 @@ const getScopedCornerSummaryPoints = (editor, nodeId, contours) => {
     : null;
 };
 
-const getPathContours = (node) => {
-  if (node?.type !== "path") {
-    return null;
-  }
-
-  return [
-    {
-      closed: node.closed,
-      segments: node.segments,
-    },
-  ];
-};
-
 const resolvePathCornerSourceNode = (editor, nodeId, sourceNode) => {
   if (sourceNode?.id === nodeId) {
     return sourceNode;
@@ -68,7 +56,7 @@ export const canRoundPathPoint = (editor, nodeId, point) => {
   }
 
   if (node?.type === "path") {
-    return canRoundVectorPoint(getPathContours(node), point);
+    return canRoundVectorPoint(getPathNodeContours(node), point);
   }
 
   if (node?.type !== "vector") {
@@ -90,7 +78,7 @@ export const getPathPointCornerControl = (editor, nodeId, point) => {
   }
 
   if (node?.type === "path") {
-    return getVectorPointCornerControl(getPathContours(node), point);
+    return getVectorPointCornerControl(getPathNodeContours(node), point);
   }
 
   if (node?.type !== "vector") {
@@ -123,7 +111,7 @@ export const getPathCornerRadiusSummary = (editor, nodeId) => {
   }
 
   if (node.type === "path") {
-    const contours = getPathContours(node);
+    const contours = getPathNodeContours(node);
 
     return getVectorCornerRadiusSummary(
       contours,
@@ -162,7 +150,7 @@ export const getPathCornerRadiusStableMax = (editor, nodeId) => {
   }
 
   if (node.type === "path") {
-    const contours = getPathContours(node);
+    const contours = getPathNodeContours(node);
 
     return getStableVectorCornerRadiusMax(
       contours,
@@ -218,7 +206,7 @@ export const setPathPointCornerRadius = (
 
   if (node.type === "path") {
     const nextContours = setVectorPointCornerRadius(
-      getPathContours(node),
+      getPathNodeContours(node),
       point,
       cornerRadius
     );
@@ -235,8 +223,7 @@ export const setPathPointCornerRadius = (
 
         return {
           ...currentNode,
-          closed: nextContours[0].closed,
-          segments: nextContours[0].segments,
+          contours: nextContours,
         };
       });
     });
@@ -315,7 +302,7 @@ export const setPathCornerRadius = (
 
   if (node.type === "path") {
     const nextContours = setAllVectorPointCornerRadii(
-      getPathContours(node),
+      getPathNodeContours(node),
       cornerRadius,
       getScopedCornerPoints(editor, nodeId)
     );
@@ -332,8 +319,7 @@ export const setPathCornerRadius = (
 
         return {
           ...currentNode,
-          closed: nextContours[0].closed,
-          segments: nextContours[0].segments,
+          contours: nextContours,
         };
       });
     });

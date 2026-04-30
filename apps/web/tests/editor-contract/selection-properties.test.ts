@@ -477,16 +477,19 @@ describe("Editor selection properties", () => {
     expect(selectionProperties.properties.strokeWidth?.value).toBe(14);
     expect(selectionProperties.selectionColors).toEqual([
       {
+        fieldId: "vector-node-path-1:fill",
         id: JSON.stringify("#F63F3F"),
         usageCount: 2,
         value: "#F63F3F",
       },
       {
+        fieldId: "vector-node-path-1:stroke",
         id: JSON.stringify("#000000"),
         usageCount: 1,
         value: "#000000",
       },
       {
+        fieldId: "vector-node-path-2:fill",
         id: JSON.stringify("#FFFFFF"),
         usageCount: 1,
         value: "#FFFFFF",

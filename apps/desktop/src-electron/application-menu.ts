@@ -187,10 +187,12 @@ const buildObjectSubmenu = (
 ): MenuItemConstructorOptions[] => {
   const objectMenuState = appMenuState ?? {
     canDelete: false,
-    canEditPath: false,
+    canJoinCurves: false,
     compoundOperation: null,
     canMakeCompoundPath: false,
+    canMergeCurves: false,
     canReleaseCompoundPath: false,
+    canSeparateCurves: false,
     selectedNodeType: null,
     selectionKind: "none" as const,
     vectorStyle: null,
@@ -329,11 +331,29 @@ const buildObjectSubmenu = (
     {
       click: () =>
         sendEditorCommand({
-          action: "toggle-path-editing",
+          action: "merge-curves",
           type: "selection",
         }),
-      enabled: objectMenuState.canEditPath,
-      label: getObjectEditLabel(objectMenuState),
+      enabled: objectMenuState.canMergeCurves,
+      label: "Merge Curves",
+    },
+    {
+      click: () =>
+        sendEditorCommand({
+          action: "separate-curves",
+          type: "selection",
+        }),
+      enabled: objectMenuState.canSeparateCurves,
+      label: "Separate Curves",
+    },
+    {
+      click: () =>
+        sendEditorCommand({
+          action: "join-curves",
+          type: "selection",
+        }),
+      enabled: objectMenuState.canJoinCurves,
+      label: "Join Curves",
     },
     { type: "separator" },
     {
@@ -386,12 +406,6 @@ const buildObjectSubmenu = (
       label: "Delete",
     },
   ];
-};
-
-const getObjectEditLabel = (objectMenuState: DesktopAppMenuState) => {
-  return objectMenuState.selectedNodeType === "shape"
-    ? "Edit Shape"
-    : "Edit Path";
 };
 
 const buildChoiceSubmenu = <

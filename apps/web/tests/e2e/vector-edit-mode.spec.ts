@@ -218,6 +218,175 @@ const getCanvasPointClientPoint = async (page, point) => {
   return clientPoint;
 };
 
+const getPathLocalPointClientPoint = async (page, nodeId, localPoint) => {
+  const clientPoint = await page.evaluate(
+    ({ currentNodeId, point }) => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
+      const host = editor?.hostRef;
+      const viewer = editor?.viewerRef;
+      const node = editor?.getNode(currentNodeId);
+      const bbox = editor?.getNodeRenderGeometry(currentNodeId)?.bbox;
+
+      if (!(editor && host && viewer && node && bbox && point)) {
+        return null;
+      }
+
+      const center = {
+        x: (bbox.minX + bbox.maxX) / 2,
+        y: (bbox.minY + bbox.maxY) / 2,
+      };
+      const scaleX = node.transform.scaleX ?? 1;
+      const scaleY = node.transform.scaleY ?? 1;
+      const rotation = ((node.transform.rotation || 0) * Math.PI) / 180;
+      const scaledPoint = {
+        x: (point.x - center.x) * scaleX,
+        y: (point.y - center.y) * scaleY,
+      };
+      const worldPoint = {
+        x:
+          node.transform.x +
+          center.x +
+          scaledPoint.x * Math.cos(rotation) -
+          scaledPoint.y * Math.sin(rotation),
+        y:
+          node.transform.y +
+          center.y +
+          scaledPoint.x * Math.sin(rotation) +
+          scaledPoint.y * Math.cos(rotation),
+      };
+      const rect = host.getBoundingClientRect();
+
+      return {
+        x: rect.left + (worldPoint.x - viewer.getScrollLeft()) * editor.zoom,
+        y: rect.top + (worldPoint.y - viewer.getScrollTop()) * editor.zoom,
+      };
+    },
+    { currentNodeId: nodeId, point: localPoint }
+  );
+
+  if (!clientPoint) {
+    throw new Error(`Missing client point for path node ${nodeId}`);
+  }
+
+  return clientPoint;
+};
+
+const loadTransformedSubtractCompoundDocument = async (page) => {
+  await loadDocument(
+    page,
+    JSON.stringify({
+      nodes: [
+        {
+          closed: true,
+          fill: "#111111",
+          fillRule: "nonzero",
+          id: "compound-square",
+          parentId: "root",
+          segments: [
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: -80, y: -80 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: 80, y: -80 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: 80, y: 80 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: -80, y: 80 },
+              pointType: "corner",
+            },
+          ],
+          stroke: "#111111",
+          strokeLineCap: "round",
+          strokeLineJoin: "round",
+          strokeMiterLimit: 4,
+          strokeWidth: 0,
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: 430,
+            y: 300,
+          },
+          type: "path",
+          visible: true,
+        },
+        {
+          closed: true,
+          fill: "#ffffff",
+          fillRule: "nonzero",
+          id: "compound-triangle",
+          parentId: "root",
+          segments: [
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: -60, y: 60 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: 60, y: 60 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: 0, y: -70 },
+              pointType: "corner",
+            },
+          ],
+          stroke: "#ffffff",
+          strokeLineCap: "round",
+          strokeLineJoin: "round",
+          strokeMiterLimit: 4,
+          strokeWidth: 0,
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: 430,
+            y: 300,
+          },
+          type: "path",
+          visible: true,
+        },
+      ],
+      version: "1.7",
+    })
+  );
+
+  await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    editor?.setSelectedNodes(["compound-square", "compound-triangle"]);
+    editor?.makeCompoundPath();
+    editor?.setVectorPathComposition(editor.selectedNodeId, "subtract");
+    editor?.rotateSelectionBy({ deltaRotation: 32 });
+    editor?.resizeSelectionFromCorner({ corner: "se", scale: 1.35 });
+  });
+
+  await expect(
+    page
+      .locator(".canvas-node[data-node-id='compound-square']")
+      .or(page.locator(".canvas-node[data-node-id='compound-triangle']"))
+  ).toHaveCount(0);
+  await expect(page.locator(".canvas-node[data-node-id]")).toHaveCount(1);
+};
+
 test("clicking another contour in the same vector keeps the vector edit session active", async ({
   page,
 }) => {
@@ -291,6 +460,7 @@ test("clicking a different contour in the same vector switches the active path e
       return getStateSnapshot(page);
     })
     .toMatchObject({
+      activeTool: "node",
       pathEditingNodeId: "vector-a-path-1",
       selectedNodeId: "vector-a-path-1",
       selectedNodeIds: ["vector-a-path-1"],
@@ -328,6 +498,93 @@ test("double-clicking a specific contour enters path editing on that contour", a
       pathEditingNodeId: "vector-a-path-1",
       selectedNodeId: "vector-a-path-1",
       selectedNodeIds: ["vector-a-path-1"],
+    });
+});
+
+test("transformed subtract compound direct selection uses transformed child hit targets", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadTransformedSubtractCompoundDocument(page);
+
+  const compoundNodeId = await page
+    .locator(".canvas-node[data-node-id]")
+    .first()
+    .getAttribute("data-node-id");
+
+  expect(compoundNodeId).toBeTruthy();
+  if (!compoundNodeId) {
+    return;
+  }
+
+  await page.evaluate((nodeId) => {
+    window.__PUNCHPRESS_EDITOR__?.select(nodeId);
+  }, compoundNodeId);
+
+  const transformedSquarePoint = await getPathLocalPointClientPoint(
+    page,
+    "compound-square",
+    { x: -70, y: 0 }
+  );
+
+  await page.mouse.dblclick(transformedSquarePoint.x, transformedSquarePoint.y);
+
+  await expect
+    .poll(() => getStateSnapshot(page))
+    .toMatchObject({
+      pathEditingNodeId: "compound-square",
+      selectedNodeId: "compound-square",
+      selectedNodeIds: ["compound-square"],
+    });
+
+  const transformedTrianglePoint = await getPathLocalPointClientPoint(
+    page,
+    "compound-triangle",
+    { x: 0, y: 40 }
+  );
+
+  await page.mouse.click(
+    transformedTrianglePoint.x,
+    transformedTrianglePoint.y
+  );
+
+  await expect
+    .poll(() => getStateSnapshot(page))
+    .toMatchObject({
+      pathEditingNodeId: "compound-triangle",
+      selectedNodeId: "compound-triangle",
+      selectedNodeIds: ["compound-triangle"],
+    });
+
+  await page.mouse.click(transformedSquarePoint.x, transformedSquarePoint.y);
+
+  await expect
+    .poll(() => getStateSnapshot(page))
+    .toMatchObject({
+      pathEditingNodeId: "compound-square",
+      selectedNodeId: "compound-square",
+      selectedNodeIds: ["compound-square"],
+    });
+
+  const staleUntransformedSquareCornerPoint = await getCanvasPointClientPoint(
+    page,
+    {
+      x: 350,
+      y: 220,
+    }
+  );
+
+  await page.mouse.click(
+    staleUntransformedSquareCornerPoint.x,
+    staleUntransformedSquareCornerPoint.y
+  );
+
+  await expect
+    .poll(() => getStateSnapshot(page))
+    .toMatchObject({
+      pathEditingNodeId: null,
+      selectedNodeId: compoundNodeId,
+      selectedNodeIds: [compoundNodeId],
     });
 });
 

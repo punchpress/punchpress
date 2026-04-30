@@ -1,3 +1,4 @@
+import { normalizePathNodeContours } from "../path/path-contours";
 import {
   expandContourOwnedVectorNode,
   isContourOwnedVector,
@@ -7,7 +8,7 @@ const expandVectorNodes = (nodes) => {
   return nodes.flatMap((node) => {
     return isContourOwnedVector(node)
       ? expandContourOwnedVectorNode(node)
-      : [node];
+      : [normalizePathNodeContours(node)];
   });
 };
 

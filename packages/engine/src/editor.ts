@@ -46,6 +46,14 @@ import {
 } from "./document/path/path-boolean-actions";
 import { setVectorPathComposition as setEditorVectorPathComposition } from "./document/path/path-composition-actions";
 import {
+  canJoinCurves as canEditorJoinCurves,
+  canMergeCurves as canEditorMergeCurves,
+  canSeparateCurves as canEditorSeparateCurves,
+  joinCurves as joinEditorCurves,
+  mergeCurves as mergeEditorCurves,
+  separateCurves as separateEditorCurves,
+} from "./document/path/path-curve-actions";
+import {
   canMakeCompoundPath as canEditorMakeCompoundPath,
   canReleaseCompoundPath as canEditorReleaseCompoundPath,
   makeCompoundPath as makeEditorCompoundPath,
@@ -77,8 +85,10 @@ import {
   setVectorPointTypes as setEditorVectorPointTypes,
 } from "./document/path/path-point-actions";
 import {
+  canCloseVectorPathContour as canEditorCloseVectorPathContour,
   canJoinVectorPathEndpoints as canEditorJoinVectorPathEndpoints,
   canSplitVectorPath as canEditorSplitVectorPath,
+  closeVectorPathContour as closeEditorVectorPathContour,
   joinVectorPathEndpoints as joinEditorVectorPathEndpoints,
   splitVectorPath as splitEditorVectorPath,
 } from "./document/path/path-topology-actions";
@@ -161,6 +171,7 @@ import {
   isDescendantOf,
   isGroupNode,
 } from "./nodes/node-tree";
+import { getPathNodeContours } from "./nodes/path/path-contours";
 import { getVectorPathEditingChildId } from "./nodes/vector/vector-path-composition";
 import { beginNodePlacement as beginEditorNodePlacement } from "./placement/node-placement";
 import {
@@ -186,6 +197,7 @@ import {
   getSelectionFrameKey as getEditorSelectionFrameKey,
   getSelectionPreviewDelta as getEditorSelectionPreviewDelta,
   getSelectionTransformFrame as getEditorSelectionTransformFrame,
+  hitTestNodePoint as hitTestEditorNodePoint,
 } from "./queries/node-queries";
 import {
   clearSelection as clearEditorSelection,
@@ -200,6 +212,7 @@ import {
 import { getSelectionBounds as getEditorSelectionBounds } from "./selection/selection-bounds";
 import { createEditorStore } from "./state/store/create-editor-store";
 import { HandTool } from "./tools/hand-tool";
+import { NodeTool } from "./tools/node-tool";
 import { PenTool } from "./tools/pen-tool";
 import { PointerTool } from "./tools/pointer-tool";
 import { ShapeTool } from "./tools/shape-tool";
@@ -266,6 +279,7 @@ export class Editor {
     this.vectorRenderSurfaces = new VectorRenderSurfaceManager();
     this.tools = new Map([
       ["pointer", new PointerTool(this)],
+      ["node", new NodeTool(this)],
       ["hand", new HandTool(this)],
       ["pen", new PenTool(this)],
       ["shape", new ShapeTool(this)],
@@ -693,6 +707,10 @@ export class Editor {
     return getEditorNodeRenderGeometry(this, nodeId);
   }
 
+  hitTestNodePoint(nodeId, point, options = {}) {
+    return hitTestEditorNodePoint(this, nodeId, point, options);
+  }
+
   getNodeRenderFrame(nodeId) {
     return getEditorNodeRenderFrame(this, nodeId);
   }
@@ -775,6 +793,30 @@ export class Editor {
 
   setVectorPathComposition(nodeId, pathComposition) {
     return setEditorVectorPathComposition(this, nodeId, pathComposition);
+  }
+
+  canMergeCurves(nodeIds = this.selectedNodeIds) {
+    return canEditorMergeCurves(this, nodeIds);
+  }
+
+  mergeCurves(nodeIds = this.selectedNodeIds) {
+    return mergeEditorCurves(this, nodeIds);
+  }
+
+  canSeparateCurves(nodeIds = this.selectedNodeIds) {
+    return canEditorSeparateCurves(this, nodeIds);
+  }
+
+  separateCurves(nodeIds = this.selectedNodeIds) {
+    return separateEditorCurves(this, nodeIds);
+  }
+
+  canJoinCurves(nodeIds = this.selectedNodeIds) {
+    return canEditorJoinCurves(this, nodeIds);
+  }
+
+  joinCurves(nodeIds = this.selectedNodeIds) {
+    return joinEditorCurves(this, nodeIds);
   }
 
   uniteSelection(nodeIds = this.selectedNodeIds) {
@@ -1202,7 +1244,11 @@ export class Editor {
     }
 
     if (node.type === "path") {
-      return node.segments[point.segmentIndex]?.pointType || null;
+      return (
+        getPathNodeContours(node)[point.contourIndex]?.segments[
+          point.segmentIndex
+        ]?.pointType || null
+      );
     }
 
     if (node.type !== "vector") {
@@ -1399,6 +1445,28 @@ export class Editor {
     }
 
     return joinEditorVectorPathEndpoints(this, nodeId, points);
+  }
+
+  canClosePathContour(
+    nodeId = this.pathEditingNodeId,
+    point = this.pathEditingPoint
+  ) {
+    if (!nodeId) {
+      return false;
+    }
+
+    return canEditorCloseVectorPathContour(this.getNode(nodeId), point);
+  }
+
+  closePathContour(
+    nodeId = this.pathEditingNodeId,
+    point = this.pathEditingPoint
+  ) {
+    if (!nodeId) {
+      return false;
+    }
+
+    return closeEditorVectorPathContour(this, nodeId, point);
   }
 
   insertVectorPoint(target, nodeId = this.pathEditingNodeId) {

@@ -52,12 +52,26 @@ const handleSelectionCommand = (editor, command: DesktopEditorCommand) => {
     return true;
   }
 
+  if (command.action === "merge-curves") {
+    editor.mergeCurves();
+    return true;
+  }
+
+  if (command.action === "separate-curves") {
+    editor.separateCurves();
+    return true;
+  }
+
+  if (command.action === "join-curves") {
+    editor.joinCurves();
+    return true;
+  }
+
   if (command.action === "release-compound-path") {
     editor.releaseCompoundPath();
     return true;
   }
 
-  editor.togglePathEditing();
   return true;
 };
 

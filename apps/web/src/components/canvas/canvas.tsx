@@ -16,6 +16,7 @@ import { resolveVectorPenHoverAction } from "./canvas-overlay/vector-path/pen-ho
 import { CanvasTextEditor } from "./canvas-text-editor";
 import { startCanvasToolPlacementSession } from "./canvas-tool-placement-session";
 import { CanvasToolbar } from "./canvas-toolbar";
+import { useCanvasSvgDrop } from "./use-canvas-svg-drop";
 
 const INITIAL_ZOOM = 1;
 const CANVAS_STAGE_MARGIN = 2400;
@@ -178,6 +179,21 @@ export const Canvas = () => {
     },
     [editor]
   );
+  const getCanvasDropPoint = useCallback(
+    (clientX, clientY) =>
+      getCanvasPoint(
+        viewerRef.current,
+        hostRef.current,
+        clientX,
+        clientY,
+        zoom
+      ),
+    [zoom]
+  );
+  const { handleCanvasDragOver, handleCanvasDrop } = useCanvasSvgDrop({
+    editor,
+    getCanvasPoint: getCanvasDropPoint,
+  });
   const handleCanvasWheel = useCallback(
     (event) => {
       if (!(event.metaKey || event.ctrlKey)) {
@@ -359,6 +375,8 @@ export const Canvas = () => {
           spacePressed || activeTool === "hand" ? "true" : undefined
         }
         data-tool={activeTool}
+        onDragOverCapture={handleCanvasDragOver}
+        onDropCapture={handleCanvasDrop}
         onPointerDownCapture={handleCanvasPointerDown}
         onPointerLeave={handleCanvasPointerLeave}
         onPointerMoveCapture={handleCanvasPointerMove}
@@ -390,8 +408,8 @@ export const Canvas = () => {
               stageMargin={CANVAS_STAGE_MARGIN}
               zoom={zoom}
             />
-            <CanvasStageOverlays />
             <CanvasNodes />
+            <CanvasStageOverlays />
             <CanvasTextEditor />
           </div>
         </InfiniteViewer>

@@ -333,26 +333,28 @@ export const getCirclePointAngleDeg = (guide, point) => {
   );
 };
 
-const getCircleTrackingSpanDeg = (node, glyphCount) => {
+export const getCircleTrackingSpanDeg = (node, glyphCount) => {
   if (glyphCount <= 1) {
     return Math.abs(node.warp.sweepDeg);
   }
 
   const baseSpanDeg = Math.abs(node.warp.sweepDeg);
-  const collapsedGapPx = Math.max(node.fontSize * CIRCLE_MIN_COLLAPSED_GAP_EM, 4);
+  const collapsedGapPx = Math.max(
+    node.fontSize * CIRCLE_MIN_COLLAPSED_GAP_EM,
+    4
+  );
   const collapsedGapDeg =
     (collapsedGapPx / Math.max(node.warp.radius, 1)) * (180 / Math.PI);
   const collapsedSpanDeg = collapsedGapDeg * (glyphCount - 1);
   const fullCircleSpanDeg = 360 - 360 / glyphCount;
 
   if (node.tracking < 0) {
-    const progress = clamp(
-      node.tracking / TEXT_TRACKING_RANGE.min,
-      0,
-      1
-    );
+    const progress = clamp(node.tracking / TEXT_TRACKING_RANGE.min, 0, 1);
 
-    return baseSpanDeg + (Math.min(collapsedSpanDeg, baseSpanDeg) - baseSpanDeg) * progress;
+    return (
+      baseSpanDeg +
+      (Math.min(collapsedSpanDeg, baseSpanDeg) - baseSpanDeg) * progress
+    );
   }
 
   if (node.tracking > 0) {
@@ -380,14 +382,11 @@ export const buildCircleTextGeometry = (layout, node) => {
     layout.glyphs.map((glyph) => glyph.baseX + glyph.centerX);
   const baseCenterOrigin =
     baseCenters.length > 0
-      ? ((baseCenters[0] ?? 0) + (baseCenters[baseCenters.length - 1] ?? 0)) / 2
+      ? ((baseCenters[0] ?? 0) + (baseCenters.at(-1) ?? 0)) / 2
       : 0;
   const baseSpanWidth =
     baseCenters.length > 1
-      ? Math.max(
-          (baseCenters[baseCenters.length - 1] ?? 0) - (baseCenters[0] ?? 0),
-          1
-        )
+      ? Math.max((baseCenters.at(-1) ?? 0) - (baseCenters[0] ?? 0), 1)
       : 1;
 
   for (const [index, glyph] of layout.glyphs.entries()) {
@@ -427,6 +426,7 @@ export const buildCircleTextGeometry = (layout, node) => {
 
   return {
     bbox,
+    contours: mergedContours,
     guide,
     paths,
     selectionBounds: unionBounds(bbox, guide.bounds),

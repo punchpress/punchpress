@@ -1,5 +1,8 @@
 import { drillIntoGroupSelection } from "./canvas-group-drill-in";
-import { getCanvasDeepLeafNodeIdAtPoint } from "./canvas-overlay/vector-path/canvas-node-hit-target";
+import {
+  getCanvasDeepLeafNodeIdAtPoint,
+  getCanvasVectorChildPathNodeIdAtPoint,
+} from "./canvas-overlay/vector-path/canvas-node-hit-target";
 
 const getCanvasEditingEntryNodeId = (editor, nodeId, clientPoint) => {
   const defaultTargetNodeId =
@@ -20,21 +23,32 @@ const getCanvasEditingEntryNodeId = (editor, nodeId, clientPoint) => {
     clientPoint.x,
     clientPoint.y
   );
+  const requestedNode = editor.getNode(nodeId);
+  const vectorChildHitNodeId =
+    requestedNode?.type === "vector"
+      ? getCanvasVectorChildPathNodeIdAtPoint(
+          editor,
+          nodeId,
+          clientPoint.x,
+          clientPoint.y
+        )
+      : null;
+  const targetHitNodeId = vectorChildHitNodeId || hitNodeId;
 
-  if (!hitNodeId) {
+  if (!targetHitNodeId) {
     return defaultTargetNodeId;
   }
 
   const requestedSelectionTargetNodeId =
     editor.getSelectionTargetNodeId(nodeId) || nodeId;
   const hitSelectionTargetNodeId =
-    editor.getSelectionTargetNodeId(hitNodeId) || hitNodeId;
+    editor.getSelectionTargetNodeId(targetHitNodeId) || targetHitNodeId;
 
   if (hitSelectionTargetNodeId !== requestedSelectionTargetNodeId) {
     return defaultTargetNodeId;
   }
 
-  return editor.getPathEditingEntryNodeId(hitNodeId) || hitNodeId;
+  return editor.getPathEditingEntryNodeId(targetHitNodeId) || targetHitNodeId;
 };
 
 export const openCanvasNodeEditingMode = (editor, nodeId, options = {}) => {
@@ -60,7 +74,13 @@ export const openCanvasNodeEditingMode = (editor, nodeId, options = {}) => {
   }
 
   if (nodeEditCapabilities.requiresPathEditing) {
-    return editor.startPathEditing(node.id);
+    const didStart = editor.startPathEditing(node.id);
+
+    if (didStart) {
+      editor.setActiveTool("node");
+    }
+
+    return didStart;
   }
 
   return false;

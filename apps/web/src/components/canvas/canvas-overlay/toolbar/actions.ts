@@ -5,59 +5,39 @@ import {
   PathfinderMinusFrontIcon,
 } from "@hugeicons-pro/core-stroke-rounded";
 
-const getEditSurfaceName = (node) => {
-  return node?.type === "shape" ? "shape" : "path";
-};
-
-const getPathEditingActionCopy = (node, isPathEditing) => {
-  const editSurfaceName = getEditSurfaceName(node);
-  const labelSurfaceName = isPathEditing
-    ? editSurfaceName
-    : `${editSurfaceName[0].toUpperCase()}${editSurfaceName.slice(1)}`;
-  const label = isPathEditing
-    ? `Stop editing ${labelSurfaceName}`
-    : `Edit ${labelSurfaceName}`;
-
-  return {
-    label,
-    title: `${label} (E)`,
-  };
-};
+interface SelectionToolbarAction {
+  id: string;
+  isActive: boolean;
+  label: string;
+  onSelect: () => void;
+  shortcutLabel?: string;
+  title: string;
+  variant: "ghost";
+}
 
 const getPathEditingToolbarActions = (editor, state) => {
-  if (!(state.selectedNode && state.canEditPath && state.hasPathEditingMode)) {
+  if (
+    !(
+      state.selectedNode &&
+      state.canEditPath &&
+      state.hasPathEditingMode &&
+      state.isPathEditing
+    )
+  ) {
     return [];
   }
 
-  const editActionCopy = getPathEditingActionCopy(
-    state.selectedNode,
-    state.isPathEditing
-  );
-  const selectedPathPoints = state.isPathEditing
-    ? state.selectedPathPoints || editor.pathEditingPoints
-    : [];
+  const selectedPathPoints =
+    state.selectedPathPoints || editor.pathEditingPoints;
   const hasSelectedPathPoints = selectedPathPoints.length > 0;
   const suppressAnchorPointActions = Boolean(
-    state.isPathEditing &&
-      hasSelectedPathPoints &&
+    hasSelectedPathPoints &&
       selectedPathPoints.length === 1 &&
       state.selectedPathPointCornerControlKind === "detected"
   );
-  const actions = [
-    {
-      id: "toggle-path-editing",
-      isActive: false,
-      label: editActionCopy.label,
-      shortcutLabel: "E",
-      title: editActionCopy.title,
-      variant: "ghost",
-      onSelect: () => {
-        editor.togglePathEditing(state.selectedNode.id);
-      },
-    },
-  ];
+  const actions: SelectionToolbarAction[] = [];
 
-  if (state.isPathEditing && hasSelectedPathPoints) {
+  if (hasSelectedPathPoints) {
     actions.unshift({
       id: "clear-path-selection",
       isActive: false,
@@ -72,7 +52,22 @@ const getPathEditingToolbarActions = (editor, state) => {
   }
 
   if (
-    state.isPathEditing &&
+    state.selectedNode?.type === "path" &&
+    editor.canClosePathContour(state.selectedNode.id, state.selectedPathPoint)
+  ) {
+    actions.unshift({
+      id: "close-curve",
+      isActive: false,
+      label: "Close curve",
+      title: "Close the active curve",
+      variant: "ghost",
+      onSelect: () => {
+        editor.closePathContour(state.selectedNode.id, state.selectedPathPoint);
+      },
+    });
+  }
+
+  if (
     state.selectedNode?.type === "path" &&
     selectedPathPoints.length === 2 &&
     editor.canJoinPathEndpoints(state.selectedNode.id, selectedPathPoints)
@@ -90,7 +85,6 @@ const getPathEditingToolbarActions = (editor, state) => {
   }
 
   if (
-    state.isPathEditing &&
     state.selectedNode &&
     hasSelectedPathPoints &&
     !suppressAnchorPointActions

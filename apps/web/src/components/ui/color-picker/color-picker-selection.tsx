@@ -33,6 +33,7 @@ export const ColorPickerSelection = memo(
           "canvas-cursor-default relative aspect-square w-full overflow-hidden rounded-xl border shadow-xs/5",
           className
         )}
+        data-slot="color-picker-selection"
         onPointerDown={(event) => {
           event.preventDefault();
           event.currentTarget.setPointerCapture(event.pointerId);

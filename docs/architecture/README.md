@@ -3,6 +3,7 @@
 - [Codebase Structure](./codebase-structure.md) — Current code layout, layer boundaries, and editor ownership
 - [Editor Operating Model](./editor-operating-model.md) — Editor land, React land, and automation as clients of the same editor
 - [Vector Path Editing Operating Model](./vector-editing-operating-model.md) — Engine ownership, vector path backend boundaries, shape/vector editing policy, and SVG import direction
+- [Node Geometry Model](./node-geometry-model.md) — Shared render, selection, transform, and hit-testing geometry contract
 - [Canvas Overlay Visual System Plan](./canvas-overlay-visual-system-plan.md) — Problem statement, tldraw comparison, desired output structure, and cleanup plan for overlay visuals
 - [Editor Extraction Plan](./editor-extraction-plan.md) — Remaining migration work after extracting the engine and schema packages
 - [Document Model](./document-model.md) — Persistent document schema, node invariants, and export boundaries

@@ -19,6 +19,7 @@ import {
   type TransformCorner,
 } from "../transform-cursor-angle";
 import { useActiveTransformCursor } from "../use-active-transform-cursor";
+import { getCanvasVectorChildPathNodeIdAtPoint } from "../vector-path/canvas-node-hit-target";
 
 const ROTATION_ZONE_SIZE = 56;
 const CORNERS = ["nw", "ne", "sw", "se"] as const;
@@ -401,12 +402,20 @@ export const CanvasMultiSelectionForeground = ({
       return;
     }
 
-    const targetNodeId = document
-      .elementsFromPoint(event.clientX, event.clientY)
-      .find(
-        (element) => element instanceof HTMLElement && element.dataset.nodeId
-      )
-      ?.getAttribute("data-node-id");
+    const directChildNodeId = getCanvasVectorChildPathNodeIdAtPoint(
+      editor,
+      selectedGroupNodeId,
+      event.clientX,
+      event.clientY
+    );
+    const targetNodeId =
+      directChildNodeId ||
+      document
+        .elementsFromPoint(event.clientX, event.clientY)
+        .find(
+          (element) => element instanceof HTMLElement && element.dataset.nodeId
+        )
+        ?.getAttribute("data-node-id");
 
     if (
       !(

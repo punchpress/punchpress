@@ -26,7 +26,7 @@ const createShapeNode = (id: string) => {
 };
 
 describe("desktop native menu state", () => {
-  test("enables path editing for editable shape selections", () => {
+  test("does not expose path editing as a native menu command", () => {
     const editor = new Editor();
     const shapeNode = createShapeNode("shape-node");
 
@@ -35,10 +35,12 @@ describe("desktop native menu state", () => {
 
     expect(getDesktopAppMenuState(editor, [shapeNode.id])).toEqual({
       canDelete: true,
-      canEditPath: true,
+      canJoinCurves: false,
       compoundOperation: null,
       canMakeCompoundPath: false,
+      canMergeCurves: false,
       canReleaseCompoundPath: false,
+      canSeparateCurves: false,
       selectedNodeType: "shape",
       selectionKind: "single",
       vectorStyle: null,

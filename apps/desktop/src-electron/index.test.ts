@@ -354,14 +354,16 @@ describe("desktop index bootstrap", () => {
       },
       {
         canDelete: true,
-        canEditPath: true,
+        canJoinCurves: false,
         compoundOperation: {
           enabled: true,
           isMixed: false,
           value: "unite",
         },
         canMakeCompoundPath: true,
+        canMergeCurves: false,
         canReleaseCompoundPath: false,
+        canSeparateCurves: false,
         selectedNodeType: "vector",
         selectionKind: "single",
         vectorStyle: {
@@ -405,9 +407,6 @@ describe("desktop index bootstrap", () => {
     const objectMenuLabels = objectMenu?.submenu?.map((item) => {
       return item.type === "separator" ? "---" : item.label;
     });
-    const editPathItem = objectMenu?.submenu?.find(
-      (item) => item.label === "Edit Path"
-    );
     const makeCompoundPathItem = objectMenu?.submenu?.find(
       (item) => item.label === "Make Compound Path"
     );
@@ -436,7 +435,9 @@ describe("desktop index bootstrap", () => {
     });
 
     expect(objectMenuLabels).toEqual([
-      "Edit Path",
+      "Merge Curves",
+      "Separate Curves",
+      "Join Curves",
       "---",
       "Make Compound Path",
       "Release Compound Path",
@@ -448,7 +449,6 @@ describe("desktop index bootstrap", () => {
       "---",
       "Delete",
     ]);
-    expect(editPathItem?.enabled).toBe(true);
     expect(makeCompoundPathItem?.enabled).toBe(true);
     expect(releaseCompoundPathItem?.enabled).toBe(false);
     expect(compoundOperationMenu?.enabled).toBe(true);
@@ -458,18 +458,10 @@ describe("desktop index bootstrap", () => {
     expect(evenOddItem?.checked).toBe(true);
     expect(nonZeroItem?.checked).toBe(false);
 
-    editPathItem?.click?.();
     makeCompoundPathItem?.click?.();
     subtractCompoundItem?.click?.();
     nonZeroItem?.click?.();
 
-    expect(mainWindow.webContents.send).toHaveBeenCalledWith(
-      EDITOR_COMMAND_CHANNEL,
-      {
-        action: "toggle-path-editing",
-        type: "selection",
-      }
-    );
     expect(mainWindow.webContents.send).toHaveBeenCalledWith(
       EDITOR_COMMAND_CHANNEL,
       {
@@ -490,55 +482,6 @@ describe("desktop index bootstrap", () => {
         propertyId: "fillRule",
         type: "selection-property",
         value: "nonzero",
-      }
-    );
-  });
-
-  test("labels the native edit command as Edit Shape for shape selections", async () => {
-    await importDesktopIndex();
-    await flushTasks();
-
-    const mainWindow = createdWindows[0];
-
-    ipcHandlers.get(APP_MENU_STATE_CHANNEL)?.(
-      {
-        sender: mainWindow.webContents,
-      },
-      {
-        canDelete: true,
-        canEditPath: true,
-        canMakeCompoundPath: false,
-        canReleaseCompoundPath: false,
-        compoundOperation: null,
-        selectedNodeType: "shape",
-        selectionKind: "single",
-        vectorStyle: null,
-      }
-    );
-    await flushTasks();
-
-    const template = buildFromTemplateMock.mock.calls.at(-1)?.[0] as {
-      label?: string;
-      submenu?: {
-        click?: () => void;
-        enabled?: boolean;
-        label?: string;
-      }[];
-    }[];
-    const objectMenu = template.find((item) => item.label === "Object");
-    const editShapeItem = objectMenu?.submenu?.find(
-      (item) => item.label === "Edit Shape"
-    );
-
-    expect(editShapeItem?.enabled).toBe(true);
-
-    editShapeItem?.click?.();
-
-    expect(mainWindow.webContents.send).toHaveBeenCalledWith(
-      EDITOR_COMMAND_CHANNEL,
-      {
-        action: "toggle-path-editing",
-        type: "selection",
       }
     );
   });

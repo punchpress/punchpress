@@ -1,6 +1,6 @@
 @layer components {
   .canvas-hover-preview {
-    z-index: 0;
+    z-index: 20;
     background: var(--canvas-hover-fill);
     border: 1px solid var(--canvas-hover);
     box-shadow: var(--canvas-hover-shadow);

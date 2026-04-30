@@ -4,6 +4,7 @@ import {
   DEFAULT_VECTOR_STROKE_MITER_LIMIT,
 } from "@punchpress/punch-schema";
 import { createId } from "../text/model";
+import { withPathNodeContours } from "./path-contours";
 
 const DEFAULT_WIDTH = 240;
 const DEFAULT_HEIGHT = 180;
@@ -45,26 +46,34 @@ const createRectangleSegments = (
 };
 
 export const createDefaultPathNode = (parentId: string) => {
-  return {
-    closed: true,
-    fill: "#ffffff",
-    fillRule: "nonzero",
-    id: createId(),
-    parentId,
-    segments: createRectangleSegments(),
-    stroke: "#000000",
-    strokeLineCap: DEFAULT_VECTOR_STROKE_LINE_CAP,
-    strokeLineJoin: DEFAULT_VECTOR_STROKE_LINE_JOIN,
-    strokeMiterLimit: DEFAULT_VECTOR_STROKE_MITER_LIMIT,
-    strokeWidth: DEFAULT_PATH_STROKE_WIDTH,
-    transform: {
-      rotation: 0,
-      scaleX: 1,
-      scaleY: 1,
-      x: 2250,
-      y: 2700,
+  const contours = [
+    {
+      closed: true,
+      segments: createRectangleSegments(),
     },
-    type: "path",
-    visible: true,
-  };
+  ];
+
+  return withPathNodeContours(
+    {
+      fill: "#ffffff",
+      fillRule: "evenodd",
+      id: createId(),
+      parentId,
+      stroke: "#000000",
+      strokeLineCap: DEFAULT_VECTOR_STROKE_LINE_CAP,
+      strokeLineJoin: DEFAULT_VECTOR_STROKE_LINE_JOIN,
+      strokeMiterLimit: DEFAULT_VECTOR_STROKE_MITER_LIMIT,
+      strokeWidth: DEFAULT_PATH_STROKE_WIDTH,
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: 2250,
+        y: 2700,
+      },
+      type: "path",
+      visible: true,
+    },
+    contours
+  );
 };

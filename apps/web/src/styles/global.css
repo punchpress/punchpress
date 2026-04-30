@@ -371,10 +371,6 @@ textarea,
   cursor: var(--canvas-cursor-grab);
 }
 
-[data-tool="text"] .canvas-node {
-  cursor: var(--canvas-cursor-text);
-}
-
 .canvas-cursor-default {
   cursor: var(--canvas-cursor-default);
 }
@@ -385,6 +381,10 @@ textarea,
 
 .canvas-cursor-pointer {
   cursor: var(--canvas-cursor-pointer);
+}
+
+.canvas-cursor-node {
+  cursor: var(--canvas-cursor-node);
 }
 
 .canvas-cursor-text {
@@ -404,6 +404,13 @@ textarea,
 [data-editor-shell-root] .cursor-pointer,
 [data-slot="color-picker"] .cursor-pointer {
   cursor: var(--canvas-cursor-default);
+}
+
+.canvas-bottom-toolbar,
+.canvas-bottom-toolbar button:not(:disabled),
+.canvas-bottom-toolbar [role="button"]:not([aria-disabled="true"]),
+.canvas-bottom-toolbar .cursor-pointer {
+  cursor: var(--canvas-active-tool-cursor, var(--canvas-cursor-default));
 }
 
 .canvas-host .canvas-node {
@@ -447,8 +454,16 @@ textarea,
   cursor: var(--canvas-cursor-add);
 }
 
-.canvas-host[data-tool="shape"] .canvas-node {
+.canvas-host[data-tool="shape"] .canvas-node,
+.canvas-host[data-tool="text"] .canvas-node {
   cursor: var(--canvas-cursor-add);
+}
+
+.canvas-host[data-tool="node"] .canvas-surface,
+.canvas-host[data-tool="node"] .canvas-node,
+.canvas-host[data-tool="node"] .canvas-node *,
+.canvas-host[data-tool="node"] .canvas-vector-paper {
+  cursor: var(--canvas-cursor-node);
 }
 
 [data-tool="pen"] .canvas-surface,
@@ -472,7 +487,8 @@ textarea,
 .canvas-host[data-panning="true"],
 .canvas-host[data-panning="true"] .canvas-surface,
 .canvas-host[data-panning="true"] .canvas-node,
-.canvas-host[data-panning="true"] .canvas-node * {
+.canvas-host[data-panning="true"] .canvas-node *,
+.canvas-host[data-panning="true"] .canvas-vector-paper {
   cursor: var(--canvas-cursor-grab) !important;
 }
 
@@ -488,12 +504,20 @@ textarea,
   cursor: var(--canvas-cursor-default);
 }
 
+.canvas-host[data-tool="node"] [data-canvas-cursor="vector-path-body"] {
+  cursor: var(--canvas-cursor-node);
+}
+
 [data-canvas-cursor="vector-path-insert"] {
   cursor: var(--canvas-cursor-pen-tool-add);
 }
 
 [data-canvas-cursor="vector-path-point"] {
   cursor: var(--canvas-cursor-default);
+}
+
+.canvas-host[data-tool="node"] [data-canvas-cursor="vector-path-point"] {
+  cursor: var(--canvas-cursor-node);
 }
 
 [data-active-canvas-cursor="text-path-slide"],
@@ -516,9 +540,21 @@ textarea,
   cursor: var(--canvas-cursor-default) !important;
 }
 
+.canvas-host[data-tool="node"][data-active-canvas-cursor="vector-path-body-active"],
+.canvas-host[data-tool="node"][data-active-canvas-cursor="vector-path-body-active"]
+  * {
+  cursor: var(--canvas-cursor-node) !important;
+}
+
 [data-active-canvas-cursor="vector-path-point-active"],
 [data-active-canvas-cursor="vector-path-point-active"] * {
   cursor: var(--canvas-cursor-default) !important;
+}
+
+.canvas-host[data-tool="node"][data-active-canvas-cursor="vector-path-point-active"],
+.canvas-host[data-tool="node"][data-active-canvas-cursor="vector-path-point-active"]
+  * {
+  cursor: var(--canvas-cursor-node) !important;
 }
 
 body[data-active-transform-cursor="true"],

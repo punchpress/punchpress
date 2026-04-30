@@ -126,11 +126,15 @@ export const getSelectionTargetNodeId = (nodes, nodeId, focusedGroupId) => {
     ? nodeId === focusedGroupId || isDescendantOf(nodes, nodeId, focusedGroupId)
     : false;
 
-  let currentNode = targetNode;
-
   if (focusedGroupId && !isInsideFocusedGroup) {
-    return getRootAncestorId(nodesById, currentNode) || targetNode.id;
+    return getRootAncestorId(nodesById, targetNode) || targetNode.id;
   }
+
+  if (focusedGroupId && isInsideFocusedGroup) {
+    return targetNode.id;
+  }
+
+  let currentNode = targetNode;
 
   while (currentNode && getNodeParentId(currentNode) !== scopeParentId) {
     const parentNode = nodesById.get(getNodeParentId(currentNode)) || null;

@@ -127,7 +127,7 @@ const getBooleanToolbarState = (editor: Editor, nodeIds: string[]) => {
 };
 
 describe("selection toolbar actions", () => {
-  test("uses shape wording for shape edit mode and path wording for path edit mode", () => {
+  test("does not expose a generic edit-mode toggle in the action bar", () => {
     const editor = new Editor();
     const shapeNode = createShapeNode("shape-node", 240, "#3366FF");
     const pathNode = createPathNode();
@@ -143,18 +143,12 @@ describe("selection toolbar actions", () => {
       getPathToolbarState(editor, pathNode.id, false)
     );
 
-    expect(
-      shapeActions.find((action) => action.id === "toggle-path-editing")
-    ).toMatchObject({
-      label: "Edit Shape",
-      title: "Edit Shape (E)",
-    });
-    expect(
-      pathActions.find((action) => action.id === "toggle-path-editing")
-    ).toMatchObject({
-      label: "Edit Path",
-      title: "Edit Path (E)",
-    });
+    expect(shapeActions.map((action) => action.id)).not.toContain(
+      "toggle-path-editing"
+    );
+    expect(pathActions.map((action) => action.id)).not.toContain(
+      "toggle-path-editing"
+    );
 
     editor.select(shapeNode.id);
     editor.startPathEditing(shapeNode.id);
@@ -164,12 +158,9 @@ describe("selection toolbar actions", () => {
       getPathToolbarState(editor, shapeNode.id)
     );
 
-    expect(
-      activeShapeActions.find((action) => action.id === "toggle-path-editing")
-    ).toMatchObject({
-      label: "Stop editing shape",
-      title: "Stop editing shape (E)",
-    });
+    expect(activeShapeActions.map((action) => action.id)).not.toContain(
+      "toggle-path-editing"
+    );
   });
 
   test("multi-point path selection exposes conversion actions instead of generic delete", () => {
@@ -236,7 +227,6 @@ describe("selection toolbar actions", () => {
 
     expect(actions.map((action) => action.id)).toEqual([
       "clear-path-selection",
-      "toggle-path-editing",
     ]);
 
     actions.find((action) => action.id === "clear-path-selection")?.onSelect();

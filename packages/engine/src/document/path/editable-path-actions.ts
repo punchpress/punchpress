@@ -23,9 +23,7 @@ export const updateVectorContours = (
   }
 
   if (node.type === "path") {
-    const nextContour = contours[0];
-
-    if (!nextContour) {
+    if (!contours.length) {
       return false;
     }
 
@@ -37,8 +35,7 @@ export const updateVectorContours = (
 
         const nextNode = {
           ...currentNode,
-          closed: nextContour.closed,
-          segments: nextContour.segments,
+          contours,
         };
         const nextGeometry = buildPathNodeGeometry(nextNode);
         const nextTransform =
@@ -52,8 +49,7 @@ export const updateVectorContours = (
             : null;
 
         return {
-          closed: nextContour.closed,
-          segments: nextContour.segments,
+          contours,
           transform: nextTransform
             ? {
                 ...currentNode.transform,

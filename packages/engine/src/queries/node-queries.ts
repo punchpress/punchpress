@@ -23,6 +23,8 @@ import {
 } from "../nodes/text/model";
 import {
   getLocalBoundsCenter,
+  getNodeLocalPoint,
+  getNodeTransformFrame as getPrimitiveNodeTransformFrame,
   getNodeWorldPoint,
   getWorldPointFromTransformFrame,
   rotatePointAround,
@@ -104,6 +106,25 @@ export const getNodeRenderGeometry = (editor, nodeId) => {
   return getNodeSurfaceGeometry(editor, nodeId);
 };
 
+export const hitTestNodePoint = (
+  editor,
+  nodeId,
+  point,
+  options = {}
+) => {
+  const node = editor.getNode(nodeId);
+  const geometry = editor.getNodeRenderGeometry(nodeId);
+
+  if (!(node && geometry?.bbox && geometry.hitTestPoint)) {
+    return false;
+  }
+
+  return geometry.hitTestPoint(
+    getNodeLocalPoint(node, geometry.bbox, point),
+    options
+  );
+};
+
 export const getNodeRenderBounds = (editor, nodeId) => {
   return getNodeSurfaceLocalBounds(editor, nodeId, "render");
 };
@@ -153,6 +174,12 @@ export const getNodeSelectionFrame = (editor, nodeId) => {
     return null;
   }
 
+  const vectorChildFrame = getVectorChildPathWorldFrame(editor, nodeId);
+
+  if (vectorChildFrame) {
+    return vectorChildFrame;
+  }
+
   if (editor.isPathEditing(nodeId)) {
     return getNodeSurfaceFrame(editor, nodeId, "selection", {
       useSelectionBounds: Boolean(editor.getNodeTransformElement(nodeId)),
@@ -180,6 +207,12 @@ export const getNodeTransformFrame = (editor, nodeId) => {
   }
 
   const node = getNode(editor, nodeId);
+  const vectorChildFrame = getVectorChildPathWorldFrame(editor, nodeId);
+
+  if (vectorChildFrame) {
+    return vectorChildFrame;
+  }
+
   const bounds = getNodeTransformBounds(editor, nodeId);
   const isPathEditing = editor.isPathEditing(nodeId);
   const geometry = isPathEditing ? editor.getNodeGeometry(nodeId) : null;
@@ -520,6 +553,108 @@ const getOrientedSelectionFrame = (
     : null;
 };
 
+const getVectorChildPathWorldPoints = (editor, nodeId) => {
+  const node = editor.getNode(nodeId);
+  const parentNode = node?.parentId ? editor.getNode(node.parentId) : null;
+
+  if (!(node?.type === "path" && parentNode?.type === "vector")) {
+    return [];
+  }
+
+  const bounds = getNodeSurfaceLocalBounds(editor, nodeId, "transform", {
+    useSelectionBounds: Boolean(editor.getNodeTransformElement(nodeId)),
+  });
+  const parentGeometry = editor.getNodeRenderGeometry(parentNode.id);
+
+  if (!(bounds && parentGeometry?.bbox)) {
+    return [];
+  }
+
+  const childFrame = getPrimitiveNodeTransformFrame(node, bounds);
+  const parentFrame = getPrimitiveNodeTransformFrame(
+    parentNode,
+    parentGeometry.bbox
+  );
+
+  return [
+    { x: bounds.minX, y: bounds.minY },
+    { x: bounds.maxX, y: bounds.minY },
+    { x: bounds.maxX, y: bounds.maxY },
+    { x: bounds.minX, y: bounds.maxY },
+  ].map((point) => {
+    return getWorldPointFromTransformFrame(
+      parentFrame,
+      getWorldPointFromTransformFrame(childFrame, point)
+    );
+  });
+};
+
+const getVectorChildPathWorldFrame = (editor, nodeId) => {
+  const node = editor.getNode(nodeId);
+  const parentNode = node?.parentId ? editor.getNode(node.parentId) : null;
+  const worldPoints = getVectorChildPathWorldPoints(editor, nodeId);
+  const preferredRotation =
+    node && parentNode
+      ? normalizeSelectionFrameRotation(
+          (getNodeRotation(parentNode) || 0) + (getNodeRotation(node) || 0)
+        )
+      : 0;
+  const frame =
+    getSelectionFrameAtRotation(worldPoints, preferredRotation) ||
+    getOrientedSelectionFrame(worldPoints);
+
+  if (!frame) {
+    return null;
+  }
+
+  return {
+    bounds: frame.bounds,
+    transform:
+      Math.abs(frame.rotation) > 0.1
+        ? `rotate(${frame.rotation}deg)`
+        : undefined,
+  };
+};
+
+const getSelectionFrameAtRotation = (
+  worldCorners: SelectionFramePoint[],
+  rotation: number
+): Omit<OrientedSelectionFrame, "area"> | null => {
+  if (worldCorners.length === 0) {
+    return null;
+  }
+
+  const unrotatedCorners = worldCorners.map((point) => {
+    return rotatePointAround(point, { x: 0, y: 0 }, -rotation);
+  });
+  const minX = Math.min(...unrotatedCorners.map((point) => point.x));
+  const minY = Math.min(...unrotatedCorners.map((point) => point.y));
+  const maxX = Math.max(...unrotatedCorners.map((point) => point.x));
+  const maxY = Math.max(...unrotatedCorners.map((point) => point.y));
+  const width = maxX - minX;
+  const height = maxY - minY;
+  const worldCenter = rotatePointAround(
+    {
+      x: minX + width / 2,
+      y: minY + height / 2,
+    },
+    { x: 0, y: 0 },
+    rotation
+  );
+
+  return {
+    bounds: {
+      height,
+      maxX: worldCenter.x + width / 2,
+      maxY: worldCenter.y + height / 2,
+      minX: worldCenter.x - width / 2,
+      minY: worldCenter.y - height / 2,
+      width,
+    },
+    rotation,
+  };
+};
+
 const getSelectionFrameBounds = (editor, nodeIds) => {
   const bounds = nodeIds
     .map((nodeId) => editor.getNodeSelectionFrame(nodeId)?.bounds)
@@ -580,6 +715,12 @@ const getSelectionFrameWorldPoints = (editor, nodeId) => {
 
   if (!node) {
     return [];
+  }
+
+  const vectorChildPoints = getVectorChildPathWorldPoints(editor, nodeId);
+
+  if (vectorChildPoints.length > 0) {
+    return vectorChildPoints;
   }
 
   if (isVectorNode(node)) {

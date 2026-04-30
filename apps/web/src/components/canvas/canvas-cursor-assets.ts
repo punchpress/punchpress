@@ -9,6 +9,7 @@ import {
   Add01Icon,
   ArrowDiagonalIcon,
   ArrowMoveLeftDownIcon,
+  Cursor01Icon as Cursor01SolidIcon,
   Cursor02Icon as Cursor02SolidIcon,
   CursorTextIcon,
   PenTool03Icon,
@@ -81,6 +82,22 @@ const SCROLL_HORIZONTAL_CURSOR_SIZE = scaleCursorSize(24);
 
 const CURSOR_CONFIGS = {
   default: {
+    fallback: "default",
+    fillColor: "#111111",
+    hotspot: { x: 3, y: 2 },
+    icon: Cursor01SolidIcon,
+    iconStyle: "solid-outline-blur",
+    outlineAlphaBoost: 3.4,
+    outlineColor: "#ffffff",
+    outlineScale: 0.8,
+    outlineWidth: 0,
+    rotateDegrees: 0,
+    scale: 1,
+    scaleOrigin: "center",
+    size: DEFAULT_CURSOR_SIZE,
+    strokeColor: "#ffffff",
+  },
+  node: {
     fallback: "default",
     fillColor: "#111111",
     hotspot: { x: 3, y: 2 },
@@ -322,6 +339,7 @@ export const getCanvasCursorStyle = () =>
       CURSOR_CONFIGS.grabbing
     ),
     "--canvas-cursor-move": createCanvasCursorFromConfig(CURSOR_CONFIGS.move),
+    "--canvas-cursor-node": createCanvasCursorFromConfig(CURSOR_CONFIGS.node),
     "--canvas-cursor-pen-tool": createCanvasCursorFromConfig(
       CURSOR_CONFIGS.penTool
     ),

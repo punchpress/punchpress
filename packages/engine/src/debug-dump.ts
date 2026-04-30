@@ -64,14 +64,14 @@ export const getEditorDebugDump = (editor) => {
         }
 
         if (node.type === "path") {
+          const contours = node.contours || [];
+
           return {
-            closed: node.closed,
-            contours: [
-              {
-                closed: node.closed,
-                segments: node.segments.length,
-              },
-            ],
+            closed: contours.every((contour) => contour.closed),
+            contours: contours.map((contour) => ({
+              closed: contour.closed,
+              segments: contour.segments.length,
+            })),
             fill: node.fill,
             fillRule: node.fillRule,
             font: null,

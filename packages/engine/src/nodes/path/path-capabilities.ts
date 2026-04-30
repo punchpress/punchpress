@@ -5,6 +5,7 @@ import {
 } from "@punchpress/punch-schema";
 import { toTransformedWorldFrame, toWorldFrame } from "../node-frame-utils";
 import { createDefaultPathNode } from "./model";
+import { getPathNodeContours } from "./path-contours";
 import { buildPathNodeGeometry } from "./path-engine";
 
 export const pathNodeCapabilities = {
@@ -36,11 +37,10 @@ export const pathNodeCapabilities = {
 
   getGeometrySignature: (node, fontRevision) => {
     return JSON.stringify({
-      closed: node.closed,
+      contours: getPathNodeContours(node),
       fill: node.fill,
       fillRule: node.fillRule,
       fontRevision,
-      segments: node.segments,
       stroke: node.stroke,
       strokeLineCap: node.strokeLineCap ?? DEFAULT_VECTOR_STROKE_LINE_CAP,
       strokeLineJoin: node.strokeLineJoin ?? DEFAULT_VECTOR_STROKE_LINE_JOIN,
@@ -75,12 +75,7 @@ export const pathNodeCapabilities = {
 
   getEditablePathSession: (editor, nodeId, node) => ({
     backend: "vector-path",
-    contours: [
-      {
-        closed: node.closed,
-        segments: node.segments,
-      },
-    ],
+    contours: getPathNodeContours(node),
     interactionPolicy: {
       canInsertPoint: true,
     },

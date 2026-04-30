@@ -34,7 +34,8 @@ Groups let users organize multiple layers and manipulate them as one canvas obje
 ## Drill-In
 
 - Double-clicking a selected group enters a mode where child layers inside that group become individually selectable.
-- While drilled into a group, direct selection should target the group's child layers instead of reselecting the group itself.
+- While drilled into a group, direct selection should target the visible descendant layer under the pointer instead of reselecting the group itself.
+- Drilled-in selection may pass through nested groups when the pointer clearly targets a descendant layer on the canvas.
 - PunchPress should make it clear when the user is working inside a group rather than at the top canvas level.
 - Exiting the drilled-in state should return normal single-click selection behavior for the group.
 

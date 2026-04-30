@@ -1,4 +1,5 @@
 const TOOL_SHORTCUTS = {
+  a: "node",
   h: "hand",
   p: "pen",
   t: "text",

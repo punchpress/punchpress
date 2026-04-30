@@ -247,6 +247,54 @@ describe("canvas overlay state queries", () => {
     ).toBeGreaterThan(0);
   });
 
+  test("applies a transformed compound parent frame to a selected child path", () => {
+    const editor = createEditor();
+
+    editor.getState().loadNodes([
+      {
+        ...createVectorContainerNode("vector-container", "subtract"),
+        transform: {
+          rotation: 30,
+          scaleX: 1.4,
+          scaleY: 0.8,
+          x: 40,
+          y: 80,
+        },
+      },
+      {
+        ...createPathNode("path-back", 260, 260),
+        parentId: "vector-container",
+      },
+      {
+        ...createPathNode("path-front", 320, 260),
+        parentId: "vector-container",
+      },
+    ]);
+    editor.getState().selectNodes(["path-front"]);
+
+    const frame = editor.getNodeTransformFrame("path-front");
+    const overlayState = editor.getCanvasTransformOverlayState();
+
+    expect(frame?.transform).toBe("rotate(30deg)");
+    expect(frame?.bounds.width).toBeCloseTo(172.2, 1);
+    expect(frame?.bounds.height).toBeCloseTo(66.4, 1);
+    expect(overlayState?.selectionGhost?.bbox).toMatchObject({
+      minX: 0,
+      minY: 0,
+    });
+    expect(overlayState?.selectionGhost?.bbox.width).toBeCloseTo(
+      frame?.bounds.width ?? 0,
+      1
+    );
+    expect(overlayState?.selectionGhost?.bbox.height).toBeCloseTo(
+      frame?.bounds.height ?? 0,
+      1
+    );
+    expect(overlayState?.selectionGhost?.paths[0]?.transform).toContain(
+      "matrix("
+    );
+  });
+
   test("returns text path overlay state for a selected guided text node", () => {
     const editor = createEditor();
     const node = createCircleTextNode();

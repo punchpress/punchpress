@@ -1,4 +1,5 @@
 import { ViewIcon, ViewOffIcon } from "@hugeicons-pro/core-stroke-rounded";
+import { getPathNodeContours } from "@punchpress/engine";
 import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
@@ -107,8 +108,11 @@ const handleLayerDoubleClick = ({
     return;
   }
 
-  if (editor.getNodeEditCapabilities(nodeId)?.requiresPathEditing) {
-    editor.startPathEditing(nodeId);
+  if (
+    editor.getNodeEditCapabilities(nodeId)?.requiresPathEditing &&
+    editor.startPathEditing(nodeId)
+  ) {
+    editor.setActiveTool("node");
   }
 };
 
@@ -314,8 +318,12 @@ export const LayerTreeRow = ({
   const childNodeIds = useEditorValue((editor) =>
     editor.getChildNodeIds(nodeId)
   );
-  const vectorContours = useEditorValue((editor) => {
+  const editableContours = useEditorValue((editor) => {
     const node = editor.getNode(nodeId);
+
+    if (node?.type === "path") {
+      return getPathNodeContours(node);
+    }
 
     return node?.type === "vector" ? node.contours || [] : [];
   });
@@ -351,10 +359,10 @@ export const LayerTreeRow = ({
   const isExpanded = !collapsedGroupIds.has(nodeId);
   const isHovered = hoveredNodeId === nodeId;
   const contourRows =
-    layer.node.type === "vector" &&
+    (layer.node.type === "vector" || layer.node.type === "path") &&
     childNodeIds.length === 0 &&
-    vectorContours.length > 1
-      ? vectorContours.map((contour, contourIndex) => ({
+    editableContours.length > 1
+      ? editableContours.map((contour, contourIndex) => ({
           id: `${nodeId}:contour:${contourIndex}`,
           isSelected:
             pathEditingState.pathEditingNodeId === nodeId &&
@@ -362,7 +370,9 @@ export const LayerTreeRow = ({
           label: `Contour ${contourIndex + 1}`,
           onSelect: () => {
             editor.select(nodeId);
-            editor.startPathEditing(nodeId);
+            if (editor.startPathEditing(nodeId)) {
+              editor.setActiveTool("node");
+            }
 
             if (contour.segments.length > 0) {
               editor.setPathEditingPoint({
@@ -393,6 +403,13 @@ export const LayerTreeRow = ({
 
     if (event.shiftKey) {
       editor.toggleSelection(nodeId);
+      return;
+    }
+
+    if (layer.node.type === "path" && editor.activeTool === "node") {
+      if (editor.startPathEditing(nodeId)) {
+        editor.setActiveTool("node");
+      }
       return;
     }
 

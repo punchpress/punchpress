@@ -119,6 +119,11 @@ const handlePathEditingEscapeShortcutKeyDown = (
   }
 
   event.preventDefault();
+  if (editor.activeTool === "node") {
+    editor.setActiveTool("pointer");
+    return true;
+  }
+
   editor.stopPathEditing();
   return true;
 };
@@ -154,12 +159,6 @@ export const handleCanvasShortcutKeyDown = (editor, event, key) => {
   if (
     handlePathEditingEscapeShortcutKeyDown(editor, event, key, toolOwnsEscape)
   ) {
-    return true;
-  }
-
-  if (key === "e" && editor.canStartPathEditing()) {
-    event.preventDefault();
-    editor.togglePathEditing();
     return true;
   }
 

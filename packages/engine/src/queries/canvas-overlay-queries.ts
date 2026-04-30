@@ -1,4 +1,10 @@
 import { isContainerNode, isGroupNode } from "../nodes/node-tree";
+import { format } from "../primitives/math";
+import {
+  getNodeTransformFrame as getPrimitiveNodeTransformFrame,
+  getWorldPointFromTransformFrame,
+  rotatePointAround,
+} from "../primitives/rotation";
 
 const getVisibleSelectedNodeIds = (
   editor,
@@ -22,11 +28,17 @@ const getTransformFlags = ({
   selectedEditCapabilities,
   selectedNode,
 }) => {
+  const canTransform =
+    activeTool === "pointer" ||
+    (activeTool === "node" &&
+      isPathEditingSelection &&
+      selectedEditCapabilities?.pathEditingOverlayMode === "keep-transform");
+
   if (isPathEditingSelection) {
     return {
       isDraggable: false,
       isResizable: Boolean(
-        activeTool === "pointer" &&
+        canTransform &&
           selectedNode &&
           selectedEditCapabilities &&
           !editingNodeId &&
@@ -38,21 +50,108 @@ const getTransformFlags = ({
 
   return {
     isDraggable: Boolean(
-      activeTool === "pointer" &&
-        Boolean(selectedNode || hasGroupSelection) &&
-        !editingNodeId
+      canTransform && Boolean(selectedNode || hasGroupSelection) && !editingNodeId
     ),
     isResizable: Boolean(
-      activeTool === "pointer" &&
+      canTransform &&
         (hasGroupSelection ? selectedBounds : selectedNode) &&
         (hasGroupSelection || (selectedNode && selectedEditCapabilities)) &&
         !editingNodeId
     ),
     isRotatable: Boolean(
-      activeTool === "pointer" &&
+      canTransform &&
         (hasGroupSelection ? selectedBounds : selectedEditCapabilities) &&
         !editingNodeId
     ),
+  };
+};
+
+const getFrameRotationDegrees = (frame) => {
+  const match =
+    typeof frame?.transform === "string"
+      ? frame.transform.match(/^rotate\((-?\d+(?:\.\d+)?)deg\)$/)
+      : null;
+
+  return match ? Number.parseFloat(match[1]) : 0;
+};
+
+const getFrameCenter = (frame) => {
+  return {
+    x: frame.bounds.minX + frame.bounds.width / 2,
+    y: frame.bounds.minY + frame.bounds.height / 2,
+  };
+};
+
+const buildVectorChildGhostTransform = ({
+  childFrame,
+  frame,
+  parentFrame,
+}) => {
+  const rotation = getFrameRotationDegrees(frame);
+  const frameCenter = getFrameCenter(frame);
+  const toOverlayPoint = (point) => {
+    const childPoint = getWorldPointFromTransformFrame(childFrame, point);
+    const worldPoint = getWorldPointFromTransformFrame(parentFrame, childPoint);
+    const unrotatedPoint = rotatePointAround(
+      worldPoint,
+      frameCenter,
+      -rotation
+    );
+
+    return {
+      x: unrotatedPoint.x - frame.bounds.minX,
+      y: unrotatedPoint.y - frame.bounds.minY,
+    };
+  };
+  const origin = toOverlayPoint({ x: 0, y: 0 });
+  const xAxis = toOverlayPoint({ x: 1, y: 0 });
+  const yAxis = toOverlayPoint({ x: 0, y: 1 });
+  const a = xAxis.x - origin.x;
+  const b = xAxis.y - origin.y;
+  const c = yAxis.x - origin.x;
+  const d = yAxis.y - origin.y;
+
+  return `matrix(${format(a)} ${format(b)} ${format(c)} ${format(d)} ${format(origin.x)} ${format(origin.y)})`;
+};
+
+const getVectorChildSelectionGhostPreview = ({
+  editor,
+  geometry,
+  node,
+  parentNode,
+}) => {
+  const parentGeometry = editor.getNodeRenderGeometry(parentNode.id);
+  const frame = editor.getNodeTransformFrame(node.id);
+
+  if (!(parentGeometry?.bbox && frame?.bounds)) {
+    return null;
+  }
+
+  const childFrame = getPrimitiveNodeTransformFrame(node, geometry.bbox);
+  const parentFrame = getPrimitiveNodeTransformFrame(
+    parentNode,
+    parentGeometry.bbox
+  );
+  const transform = buildVectorChildGhostTransform({
+    childFrame,
+    frame,
+    parentFrame,
+  });
+
+  return {
+    bbox: {
+      height: frame.bounds.height,
+      maxX: frame.bounds.width,
+      maxY: frame.bounds.height,
+      minX: 0,
+      minY: 0,
+      width: frame.bounds.width,
+    },
+    nodeId: node.id,
+    paths: geometry.paths.map((path) => ({
+      ...path,
+      transform,
+    })),
   };
 };
 
@@ -70,6 +169,17 @@ const getSelectionGhostPreview = (editor, nodeId) => {
     return null;
   }
 
+  const vectorChildGhost = getVectorChildSelectionGhostPreview({
+    editor,
+    geometry,
+    node,
+    parentNode,
+  });
+
+  if (vectorChildGhost) {
+    return vectorChildGhost;
+  }
+
   return {
     bbox: geometry.bbox,
     nodeId,
@@ -80,10 +190,13 @@ const getSelectionGhostPreview = (editor, nodeId) => {
 export const getHoveredNodePreview = (editor) => {
   const state = editor.getState();
   const hoveredNodeId = state.hoveredNodeId;
+  const canShowHoverPreview =
+    editor.activeTool === "pointer" ||
+    (editor.activeTool === "node" && Boolean(editor.pathEditingNodeId));
 
   if (
     state.spacePressed ||
-    editor.activeTool !== "pointer" ||
+    !canShowHoverPreview ||
     editor.editingNodeId ||
     state.isHoveringSuppressed ||
     !hoveredNodeId
@@ -102,7 +215,7 @@ export const getHoveredNodePreview = (editor) => {
       return null;
     }
 
-    const frame = editor.getNodeRenderFrame(node.id);
+    const frame = editor.getNodeFrame(node.id);
 
     if (!frame) {
       return null;
@@ -147,7 +260,7 @@ export const getCanvasTransformOverlayState = (editor) => {
 
   if (
     !(
-      state.activeTool === "pointer" &&
+      (state.activeTool === "pointer" || state.activeTool === "node") &&
       !state.editingNodeId &&
       !state.isTextPathPositioning
     )
@@ -189,6 +302,16 @@ export const getCanvasTransformOverlayState = (editor) => {
   if (
     isPathEditingSelection &&
     selectedEditCapabilities?.pathEditingOverlayMode === "replace-transform"
+  ) {
+    return null;
+  }
+
+  if (
+    state.activeTool === "node" &&
+    !(
+      isPathEditingSelection &&
+      selectedEditCapabilities?.pathEditingOverlayMode === "keep-transform"
+    )
   ) {
     return null;
   }

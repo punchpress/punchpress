@@ -1,5 +1,6 @@
 import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
 import { useState } from "react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { SortableList } from "@/components/ui/sortable-list";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
@@ -17,6 +18,12 @@ import { RecentDocumentsMenu } from "./recent-documents-menu";
 const isContainerLayerNode = (node) => {
   return node?.type === "group" || node?.type === "vector";
 };
+
+const LAYER_ROW_HEIGHT = 32;
+const LAYER_EMPTY_STATE_HEIGHT = 42;
+const LAYER_LIST_VERTICAL_PADDING = 4;
+const LAYERS_PANEL_CHROME_HEIGHT = 82;
+const LAYERS_PANEL_LIST_MAX_HEIGHT = `calc(100vh - var(--desktop-chrome-height, 0px) - var(--desktop-panel-top-gap, 16px) - 16px - ${LAYERS_PANEL_CHROME_HEIGHT}px)`;
 
 const getDisplayedChildIds = (editor, parentId = ROOT_PARENT_ID) => {
   return [...editor.getChildNodeIds(parentId)].reverse();
@@ -137,6 +144,14 @@ const moveLayerNode = (editor, activeId, overId) => {
   reorderLayerSiblings(editor, activeId, overId, activeParentId);
 };
 
+const getLayerListHeight = (visibleLayerCount, hasLayers) => {
+  if (!hasLayers) {
+    return LAYER_EMPTY_STATE_HEIGHT;
+  }
+
+  return visibleLayerCount * LAYER_ROW_HEIGHT + LAYER_LIST_VERTICAL_PADDING;
+};
+
 export const LayersPanel = () => {
   usePerformanceRenderCounter("render.panel.layers");
   const editor = useEditor();
@@ -156,6 +171,10 @@ export const LayersPanel = () => {
   } = useDocumentCommands();
   const duplicateRecentDocumentNames =
     getDuplicateRecentDocumentNames(recentDocuments);
+  const layerListHeight = getLayerListHeight(
+    visibleLayerNodeIds.length,
+    layerNodeIds.length > 0
+  );
   const toggleCollapsedGroup = (nodeId) => {
     setCollapsedGroupIds((currentCollapsedGroupIds) => {
       const nextCollapsedGroupIds = new Set(currentCollapsedGroupIds);
@@ -172,7 +191,7 @@ export const LayersPanel = () => {
 
   return (
     <>
-      <div className="flex flex-col rounded-xl border border-[var(--designer-border)] bg-[var(--designer-surface)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.06)]">
+      <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--designer-border)] bg-[var(--designer-surface)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.06)]">
         <div className="flex items-center gap-2 px-2.5 pt-2.5 pb-1.5">
           <LayersMainMenu
             onOpenSettings={setIsSettingsOpen}
@@ -195,37 +214,47 @@ export const LayersPanel = () => {
           </span>
         </div>
 
-        <div className="flex flex-col gap-[0.5px] px-1 pb-1">
-          {layerNodeIds.length > 0 ? (
-            <SortableList
-              items={visibleLayerNodeIds}
-              onMove={({ activeId, overId }) =>
-                moveLayerNode(editor, activeId, overId)
-              }
-              renderDragOverlay={(nodeId) => (
-                <LayerTreeDragGhost
-                  collapsedGroupIds={collapsedGroupIds}
-                  nodeId={nodeId}
-                />
-              )}
-            >
-              {layerNodeIds.map((nodeId) => {
-                return (
-                  <LayerTreeRow
+        <ScrollArea
+          className="min-h-0"
+          scrollbarGutter
+          scrollFade
+          style={{
+            height: `${layerListHeight}px`,
+            maxHeight: LAYERS_PANEL_LIST_MAX_HEIGHT,
+          }}
+        >
+          <div className="flex flex-col gap-[0.5px] px-1 pb-1">
+            {layerNodeIds.length > 0 ? (
+              <SortableList
+                items={visibleLayerNodeIds}
+                onMove={({ activeId, overId }) =>
+                  moveLayerNode(editor, activeId, overId)
+                }
+                renderDragOverlay={(nodeId) => (
+                  <LayerTreeDragGhost
                     collapsedGroupIds={collapsedGroupIds}
-                    key={nodeId}
                     nodeId={nodeId}
-                    onToggleCollapse={toggleCollapsedGroup}
                   />
-                );
-              })}
-            </SortableList>
-          ) : (
-            <div className="px-2 py-2.5 text-[13px] text-[var(--designer-text-muted)]">
-              No layers yet.
-            </div>
-          )}
-        </div>
+                )}
+              >
+                {layerNodeIds.map((nodeId) => {
+                  return (
+                    <LayerTreeRow
+                      collapsedGroupIds={collapsedGroupIds}
+                      key={nodeId}
+                      nodeId={nodeId}
+                      onToggleCollapse={toggleCollapsedGroup}
+                    />
+                  );
+                })}
+              </SortableList>
+            ) : (
+              <div className="px-2 py-2.5 text-[13px] text-[var(--designer-text-muted)]">
+                No layers yet.
+              </div>
+            )}
+          </div>
+        </ScrollArea>
       </div>
 
       <SettingsDialog onOpenChange={setIsSettingsOpen} open={isSettingsOpen} />

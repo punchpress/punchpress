@@ -65,6 +65,9 @@ export const getNodeContextMenuState = ({
       singleTargetNodeId && editor.canConvertShapeToPath(singleTargetNodeId)
     ),
     canMakeCompoundPath: editor.canMakeCompoundPath(targetNodeIds),
+    canMergeCurves: editor.canMergeCurves(targetNodeIds),
+    canSeparateCurves: editor.canSeparateCurves(targetNodeIds),
+    canJoinCurves: editor.canJoinCurves(targetNodeIds),
     canReleaseCompoundPath: editor.canReleaseCompoundPath(targetNodeIds),
     canUngroup: Boolean(
       singleTargetNodeId && editor.isGroupNode(singleTargetNodeId)

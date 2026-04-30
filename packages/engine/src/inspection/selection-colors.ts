@@ -8,6 +8,10 @@ const createSelectionColorId = (value) => {
   return JSON.stringify(value);
 };
 
+const createSelectionColorFieldId = (nodeId, propertyId) => {
+  return `${nodeId}:${propertyId}`;
+};
+
 const getSelectionColorTargetNodeIds = (editor, nodeIds) => {
   const targetNodeIds: string[] = [];
 
@@ -91,6 +95,7 @@ export const getSelectionColors = (
       }
 
       colorsById.set(id, {
+        fieldId: createSelectionColorFieldId(node.id, propertyId),
         id,
         usageCount: 1,
         value,

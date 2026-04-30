@@ -9,8 +9,22 @@ export const normalizeNodeForSchema = (node: Record<string, unknown>) => {
     return node;
   }
 
+  const contours =
+    Array.isArray(node.contours) && node.contours.length > 0
+      ? node.contours
+      : Array.isArray(node.segments) && node.segments.length > 0
+        ? [
+            {
+              closed: typeof node.closed === "boolean" ? node.closed : true,
+              segments: node.segments,
+            },
+          ]
+        : node.contours;
+  const { closed: _closed, segments: _segments, ...pathNode } = node;
+
   return {
-    ...node,
+    ...pathNode,
+    contours,
     strokeLineCap: node.strokeLineCap ?? DEFAULT_VECTOR_STROKE_LINE_CAP,
     strokeLineJoin: node.strokeLineJoin ?? DEFAULT_VECTOR_STROKE_LINE_JOIN,
     strokeMiterLimit:

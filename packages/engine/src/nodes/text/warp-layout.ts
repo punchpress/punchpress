@@ -34,7 +34,7 @@ export const layoutGlyphs = (node, font) => {
   const scale = node.fontSize / font.unitsPerEm;
 
   const glyphs =
-    /** @type {Array<{ advance: number, baseX: number, centerX: number, contours: ReturnType<typeof commandsToContours>, path: string }>} */ ([]);
+    /** @type {Array<{ advance: number, baseX: number, bounds: ReturnType<typeof getBounds>, centerX: number, char: string, contours: ReturnType<typeof commandsToContours>, path: string }>} */ ([]);
   const naturalGlyphCenters = /** @type {number[]} */ ([]);
   let naturalCursorX = 0;
 
@@ -49,7 +49,9 @@ export const layoutGlyphs = (node, font) => {
 
     glyphs.push({
       path: path.toPathData(3),
+      char,
       contours,
+      bounds,
       advance: naturalAdvance,
       baseX: naturalCursorX,
       centerX,
@@ -80,18 +82,18 @@ export const layoutGlyphs = (node, font) => {
       (naturalGlyphCenters[index] ?? 0) - (naturalGlyphCenters[index - 1] ?? 0);
     const previousCenter = trackedGlyphCenters[index - 1] ?? 0;
 
-    trackedGlyphCenters[index] = previousCenter + Math.max(0, naturalGap + appliedTracking);
+    trackedGlyphCenters[index] =
+      previousCenter + Math.max(0, naturalGap + appliedTracking);
   }
 
   const centerOrigin =
     trackedGlyphCenters.length > 0
-      ? ((trackedGlyphCenters[0] ?? 0) +
-          (trackedGlyphCenters[trackedGlyphCenters.length - 1] ?? 0)) /
-        2
+      ? ((trackedGlyphCenters[0] ?? 0) + (trackedGlyphCenters.at(-1) ?? 0)) / 2
       : 0;
 
   for (const [index, glyph] of glyphs.entries()) {
-    glyph.baseX = (trackedGlyphCenters[index] ?? 0) - centerOrigin - glyph.centerX;
+    glyph.baseX =
+      (trackedGlyphCenters[index] ?? 0) - centerOrigin - glyph.centerX;
   }
 
   const minX =

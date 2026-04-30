@@ -207,7 +207,11 @@ const getSelectionPropertiesKeyFromState = (selectionProperties) => {
     properties: keyedProperties,
     selectionColors: selectionProperties.selectionColors.map(
       (selectionColor) => {
-        return [selectionColor.id, selectionColor.usageCount];
+        return [
+          selectionColor.fieldId,
+          selectionColor.id,
+          selectionColor.usageCount,
+        ];
       }
     ),
     selectedNodeId: selectionProperties.selectedNode?.id || null,

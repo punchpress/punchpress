@@ -6,8 +6,17 @@ import {
   translateContours,
 } from "../../primitives/path-geometry";
 import {
+  buildWordBridgeContours,
+  createTextHitRegions,
+  getBoundsContours,
+} from "./text-hit-regions";
+import {
   buildCircleTextGeometry,
   getArchGuide,
+  getCircleCenterAngleDeg,
+  getCircleGuide,
+  getCirclePoint,
+  getCircleTrackingSpanDeg,
   getSlantGuide,
   getWaveGuide,
 } from "./text-path";
@@ -69,10 +78,57 @@ export const applySlantWarp = (contours, rise) => {
   });
 };
 
+const getMergedGlyphContours = (layout) => {
+  const contours =
+    /** @type {Array<{ closed: boolean, points: Array<{ x: number, y: number }> }>} */ ([]);
+
+  for (const glyph of layout.glyphs) {
+    contours.push(...translateContours(glyph.contours, glyph.baseX, 0));
+  }
+
+  return contours;
+};
+
+const getCircleBridgePointMapper = (layout, node) => {
+  const guide = getCircleGuide(node.warp);
+  const isInverted = node.warp.inverted === true;
+  const baseCenters =
+    layout.naturalGlyphCenters ||
+    layout.glyphs.map((glyph) => glyph.baseX + glyph.centerX);
+  const baseCenterOrigin =
+    baseCenters.length > 0
+      ? ((baseCenters[0] ?? 0) + (baseCenters.at(-1) ?? 0)) / 2
+      : 0;
+  const baseSpanWidth =
+    baseCenters.length > 1
+      ? Math.max((baseCenters.at(-1) ?? 0) - (baseCenters[0] ?? 0), 1)
+      : 1;
+  const spanDeg = getCircleTrackingSpanDeg(node, layout.glyphs.length);
+  const signedSpanDeg = isInverted ? -spanDeg : spanDeg;
+  const centerAngleDeg = getCircleCenterAngleDeg(node.warp);
+
+  return (point) => {
+    const angleDeg =
+      centerAngleDeg +
+      ((point.x - baseCenterOrigin) / baseSpanWidth) * signedSpanDeg;
+    const basePoint = getCirclePoint(guide.radius, angleDeg);
+    const rotationDeg = angleDeg + (isInverted ? 180 : 0);
+    const rotationRad = (rotationDeg * Math.PI) / 180;
+
+    return {
+      x: basePoint.x - point.y * Math.sin(rotationRad),
+      y: basePoint.y + point.y * Math.cos(rotationRad),
+    };
+  };
+};
+
 const buildFallbackGeometry = (node) => {
+  const bbox = getStrokeInflatedBounds(node, estimateBounds(node));
+
   return {
+    hitRegions: createTextHitRegions(node, getBoundsContours(bbox)),
     paths: [],
-    bbox: getStrokeInflatedBounds(node, estimateBounds(node)),
+    bbox,
     guide: null,
     ready: false,
     selectionBounds: null,
@@ -80,19 +136,20 @@ const buildFallbackGeometry = (node) => {
 };
 
 const buildArchGeometry = (layout, node) => {
-  const mergedContours =
-    /** @type {ReturnType<typeof commandsToContours>} */ ([]);
-
-  for (const glyph of layout.glyphs) {
-    mergedContours.push(...translateContours(glyph.contours, glyph.baseX, 0));
-  }
-
+  const mergedContours = getMergedGlyphContours(layout);
+  const bridgeContours = buildWordBridgeContours(layout, node);
   const flatBounds = getBounds(mergedContours);
   const warpedContours = applyArchWarp(mergedContours, node.warp.bend);
+  const warpedBridgeContours = applyArchWarp(bridgeContours, node.warp.bend);
   const warpedBounds = getBounds(warpedContours);
 
   return {
     guide: getArchGuide(flatBounds, node.warp.bend, warpedBounds),
+    hitRegions: createTextHitRegions(
+      node,
+      warpedContours,
+      warpedBridgeContours
+    ),
     paths: [{ key: "shape-0", d: contoursToPath(warpedContours) }],
     bbox: getStrokeInflatedBounds(node, warpedBounds),
     ready: true,
@@ -101,16 +158,16 @@ const buildArchGeometry = (layout, node) => {
 };
 
 const buildWaveGeometry = (layout, node) => {
-  const mergedContours =
-    /** @type {ReturnType<typeof commandsToContours>} */ ([]);
-
-  for (const glyph of layout.glyphs) {
-    mergedContours.push(...translateContours(glyph.contours, glyph.baseX, 0));
-  }
-
+  const mergedContours = getMergedGlyphContours(layout);
+  const bridgeContours = buildWordBridgeContours(layout, node);
   const flatBounds = getBounds(mergedContours);
   const warpedContours = applyWaveWarp(
     mergedContours,
+    node.warp.amplitude,
+    node.warp.cycles
+  );
+  const warpedBridgeContours = applyWaveWarp(
+    bridgeContours,
     node.warp.amplitude,
     node.warp.cycles
   );
@@ -123,6 +180,11 @@ const buildWaveGeometry = (layout, node) => {
       node.warp.cycles,
       warpedBounds
     ),
+    hitRegions: createTextHitRegions(
+      node,
+      warpedContours,
+      warpedBridgeContours
+    ),
     paths: [{ key: "shape-0", d: contoursToPath(warpedContours) }],
     bbox: getStrokeInflatedBounds(node, warpedBounds),
     ready: true,
@@ -131,19 +193,20 @@ const buildWaveGeometry = (layout, node) => {
 };
 
 const buildSlantGeometry = (layout, node) => {
-  const mergedContours =
-    /** @type {ReturnType<typeof commandsToContours>} */ ([]);
-
-  for (const glyph of layout.glyphs) {
-    mergedContours.push(...translateContours(glyph.contours, glyph.baseX, 0));
-  }
-
+  const mergedContours = getMergedGlyphContours(layout);
+  const bridgeContours = buildWordBridgeContours(layout, node);
   const flatBounds = getBounds(mergedContours);
   const warpedContours = applySlantWarp(mergedContours, node.warp.rise);
+  const warpedBridgeContours = applySlantWarp(bridgeContours, node.warp.rise);
   const warpedBounds = getBounds(warpedContours);
 
   return {
     guide: getSlantGuide(flatBounds, node.warp.rise, warpedBounds),
+    hitRegions: createTextHitRegions(
+      node,
+      warpedContours,
+      warpedBridgeContours
+    ),
     paths: [{ key: "shape-0", d: contoursToPath(warpedContours) }],
     bbox: getStrokeInflatedBounds(node, warpedBounds),
     ready: true,
@@ -153,9 +216,14 @@ const buildSlantGeometry = (layout, node) => {
 
 const buildCircleGeometry = (layout, node) => {
   const geometry = buildCircleTextGeometry(layout, node);
+  const bridgeContours = mapContours(
+    buildWordBridgeContours(layout, node),
+    getCircleBridgePointMapper(layout, node)
+  );
 
   return {
     guide: geometry.guide,
+    hitRegions: createTextHitRegions(node, geometry.contours, bridgeContours),
     paths: geometry.paths,
     bbox: getStrokeInflatedBounds(node, geometry.bbox),
     ready: true,
@@ -166,8 +234,8 @@ const buildCircleGeometry = (layout, node) => {
 const buildFlatGeometry = (layout, node) => {
   const paths =
     /** @type {Array<{ d: string, key: string, transform?: string }>} */ ([]);
-  const mergedContours =
-    /** @type {ReturnType<typeof commandsToContours>} */ ([]);
+  const mergedContours = getMergedGlyphContours(layout);
+  const bridgeContours = buildWordBridgeContours(layout, node);
 
   for (const [index, glyph] of layout.glyphs.entries()) {
     paths.push({
@@ -175,12 +243,11 @@ const buildFlatGeometry = (layout, node) => {
       d: glyph.path,
       transform: `translate(${format(glyph.baseX)} 0)`,
     });
-
-    mergedContours.push(...translateContours(glyph.contours, glyph.baseX, 0));
   }
 
   return {
     guide: null,
+    hitRegions: createTextHitRegions(node, mergedContours, bridgeContours),
     paths,
     bbox: getStrokeInflatedBounds(node, getBounds(mergedContours)),
     ready: true,
@@ -193,16 +260,19 @@ export const buildNodeGeometry = (node, font) => {
     const layout = layoutGlyphs(node, font);
 
     if (layout.glyphs.length === 0) {
+      const bbox = getStrokeInflatedBounds(node, {
+        minX: -20,
+        minY: -20,
+        maxX: 20,
+        maxY: 20,
+        width: 40,
+        height: 40,
+      });
+
       return {
+        hitRegions: createTextHitRegions(node, getBoundsContours(bbox)),
         paths: [],
-        bbox: getStrokeInflatedBounds(node, {
-          minX: -20,
-          minY: -20,
-          maxX: 20,
-          maxY: 20,
-          width: 40,
-          height: 40,
-        }),
+        bbox,
         guide: null,
         ready: true,
         selectionBounds: null,
