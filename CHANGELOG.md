@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.5.0 - 2026-04-30
+
+### Added
+
+- Vector editing is broader and more direct, with stronger point, curve, corner, and compound-path workflows for refining artwork without leaving the canvas.
+- SVG imports now come in with more of their editable structure intact, so imported vector artwork behaves more like native PunchPress layers.
+- Canvas hit testing is more precise across text, shapes, groups, and vector artwork, making selection and edit-mode entry feel more predictable.
+
+### Changed
+
+- Canvas overlays, hover previews, cursors, and transform handles now share a cleaner visual system that makes selection, editing, and drag feedback easier to read.
+- Layers and context menus expose more vector operations where you are already working, including clearer compound-vector actions and edit controls.
+- Text tracking and circular text path editing are smoother, with steadier panel controls and better layout behavior while adjusting type.
+
+### Fixed
+
+- New text placement preloads the default font before measuring, so inserted text lands in the right spot more reliably.
+- Undoing a pen path now steps back point by point while drawing on the page.
+- Detailed vector and text editing sessions have fewer rough edges around hover feedback, path guides, and selection state.
+
 ## v0.4.0 - 2026-04-16
 
 ### Added
