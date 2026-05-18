@@ -2,6 +2,8 @@ import {
   DEFAULT_DOCUMENT_BASE_NAME,
   PUNCH_DOCUMENT_EXTENSION,
   PUNCH_DOCUMENT_MIME_TYPE,
+  PUNCH_PNG_EXTENSION,
+  PUNCH_PNG_MIME_TYPE,
   PUNCH_SVG_EXTENSION,
   PUNCH_SVG_MIME_TYPE,
 } from "@punchpress/punch-schema";
@@ -289,6 +291,53 @@ export const savePunchSvgFile = async (
         mimeTypes: [PUNCH_SVG_MIME_TYPE],
       }
     );
+
+    return {
+      canceled: false,
+      fileHandle,
+      fileName: fileHandle?.name || defaultFileName,
+    };
+  } catch (error) {
+    if (isUserAbortError(error)) {
+      return {
+        canceled: true,
+        fileHandle: null,
+        fileName: null,
+      };
+    }
+
+    throw error;
+  }
+};
+
+export const savePunchPngFile = async (
+  contents: Blob,
+  baseName = DEFAULT_DOCUMENT_BASE_NAME
+): Promise<PunchFileSaveResult> => {
+  const desktopDocumentFiles = getDesktopDocumentFiles();
+  const defaultFileName = `${getDocumentBaseName(baseName)}${PUNCH_PNG_EXTENSION}`;
+
+  if (desktopDocumentFiles?.savePng) {
+    const result = await desktopDocumentFiles.savePng({
+      contents: await contents.arrayBuffer(),
+      defaultFileName,
+    });
+
+    return {
+      canceled: result.canceled,
+      fileHandle: result.fileHandle,
+      fileName: result.fileName,
+    };
+  }
+
+  try {
+    const fileHandle = await fileSave(contents, {
+      description: "PNG export",
+      excludeAcceptAllOption: true,
+      extensions: [PUNCH_PNG_EXTENSION],
+      fileName: defaultFileName,
+      mimeTypes: [PUNCH_PNG_MIME_TYPE],
+    });
 
     return {
       canceled: false,

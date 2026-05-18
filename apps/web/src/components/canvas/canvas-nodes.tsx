@@ -1,4 +1,4 @@
-import { isGroupNode } from "@punchpress/engine";
+import { isArtboardNode, isGroupNode } from "@punchpress/engine";
 import { useEditorValue } from "../../editor-react/use-editor-value";
 import { CanvasNode } from "./canvas-node";
 import { useCanvasNodePlacement } from "./use-canvas-node-placement";
@@ -6,6 +6,7 @@ import { useCanvasNodePlacement } from "./use-canvas-node-placement";
 const selectNodeIds = (editor, state) =>
   state.nodes
     .filter((node) => !isGroupNode(node))
+    .filter((node) => !isArtboardNode(node))
     .filter((node) => {
       if (node.type !== "path") {
         return true;

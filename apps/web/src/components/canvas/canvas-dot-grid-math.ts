@@ -1,5 +1,8 @@
 export const DOT_GRID_STEPS = [
-  { mid: 0.18, min: -1, step: 448 },
+  { mid: 0.018, min: -1, step: 3584 },
+  { mid: 0.035, min: 0.012, step: 1792 },
+  { mid: 0.075, min: 0.025, step: 896 },
+  { mid: 0.18, min: 0.04, step: 448 },
   { mid: 0.3, min: 0.12, step: 224 },
   { mid: 0.5, min: 0.22, step: 112 },
   { mid: 0.85, min: 0.4, step: 56 },

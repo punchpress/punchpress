@@ -1,8 +1,10 @@
 import { useLayoutEffect, useRef } from "react";
 import { useEditor } from "../../editor-react/use-editor";
+import { getArtboardClipPath } from "./artboard-clip-path";
 import { resolvePreviewPlacementNodeIds } from "./canvas-node-preview-placement";
 
 interface NodeShellState {
+  clipPath: string;
   height: number;
   transform: string;
   width: number;
@@ -11,10 +13,15 @@ interface NodeShellState {
 }
 
 interface PreviewEntry {
-  element: HTMLElement;
   nodeId: string;
+  shellElement: HTMLElement;
   shellState: NodeShellState;
-  transformSuffix: string;
+  transformElement: HTMLElement;
+}
+
+interface PlacementElements {
+  shellElement: HTMLElement;
+  transformElement: HTMLElement;
 }
 
 const getNodeShellState = (editor, nodeId): NodeShellState | null => {
@@ -26,6 +33,7 @@ const getNodeShellState = (editor, nodeId): NodeShellState | null => {
   }
 
   return {
+    clipPath: getArtboardClipPath(editor, nodeId, frame.bounds),
     height: Math.max(1, frame.bounds.height),
     transform: frame.transform || "",
     width: Math.max(1, frame.bounds.width),
@@ -45,31 +53,62 @@ const getShellKey = (shellState, delta) => {
     shellState.x,
     shellState.y,
     shellState.transform,
+    shellState.clipPath,
     delta?.x || 0,
     delta?.y || 0,
   ].join(":");
 };
 
-const applyNodeShellState = (element, shellState, delta) => {
-  if (!element) {
+const getPlacementElements = (
+  editor,
+  nodeId
+): PlacementElements | null => {
+  const transformElement = editor.getNodeElement(nodeId);
+
+  if (!transformElement) {
+    return null;
+  }
+
+  const shellElement =
+    transformElement.parentElement instanceof HTMLElement &&
+    transformElement.parentElement.dataset.nodeShell === "true"
+      ? transformElement.parentElement
+      : transformElement;
+
+  return {
+    shellElement,
+    transformElement,
+  };
+};
+
+const applyNodeShellState = (
+  elements: PlacementElements | null,
+  shellState,
+  delta
+) => {
+  if (!elements) {
     return;
   }
 
+  const { shellElement, transformElement } = elements;
+
   if (!shellState) {
-    element.style.width = "0px";
-    element.style.height = "0px";
-    element.style.transform = "translate3d(0px, 0px, 0)";
+    shellElement.style.clipPath = "";
+    shellElement.style.width = "0px";
+    shellElement.style.height = "0px";
+    shellElement.style.transform = "translate3d(0px, 0px, 0)";
+    transformElement.style.transform = "";
     return;
   }
 
   const x = shellState.x + (delta?.x || 0);
   const y = shellState.y + (delta?.y || 0);
 
-  element.style.width = `${shellState.width}px`;
-  element.style.height = `${shellState.height}px`;
-  element.style.transform = shellState.transform
-    ? `translate3d(${x}px, ${y}px, 0) ${shellState.transform}`
-    : `translate3d(${x}px, ${y}px, 0)`;
+  shellElement.style.width = `${shellState.width}px`;
+  shellElement.style.height = `${shellState.height}px`;
+  shellElement.style.clipPath = shellState.clipPath;
+  shellElement.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+  transformElement.style.transform = shellState.transform || "";
 };
 
 const syncNodeShell = (
@@ -80,34 +119,55 @@ const syncNodeShell = (
   appliedKeys,
   delta
 ) => {
-  const element = editor.getNodeElement(nodeId);
+  const elements = getPlacementElements(editor, nodeId);
 
-  if (!element) {
+  if (!elements) {
     appliedElements.delete(nodeId);
     appliedKeys.delete(nodeId);
     return;
   }
 
   const nextKey = getShellKey(shellState, delta);
-  const previousElement = appliedElements.get(nodeId);
+  const previousElements = appliedElements.get(nodeId);
 
-  if (appliedKeys.get(nodeId) === nextKey && previousElement === element) {
+  if (
+    appliedKeys.get(nodeId) === nextKey &&
+    previousElements?.shellElement === elements.shellElement &&
+    previousElements?.transformElement === elements.transformElement
+  ) {
     return;
   }
 
-  applyNodeShellState(element, shellState, delta);
-  appliedElements.set(nodeId, element);
+  applyNodeShellState(elements, shellState, delta);
+  appliedElements.set(nodeId, elements);
   appliedKeys.set(nodeId, nextKey);
 };
 
-const applyPreviewTransform = (previewEntry: PreviewEntry, delta) => {
-  const { element, shellState, transformSuffix } = previewEntry;
+const applyPreviewTransform = (editor, previewEntry: PreviewEntry, preview) => {
+  const { shellElement, shellState, transformElement } = previewEntry;
 
-  if (!(element && shellState)) {
+  if (!(shellElement && transformElement && shellState)) {
     return;
   }
 
-  element.style.transform = `translate3d(${shellState.x + delta.x}px, ${shellState.y + delta.y}px, 0)${transformSuffix}`;
+  const delta = preview.delta || { x: 0, y: 0 };
+  const previewBounds = {
+    height: shellState.height,
+    maxX: shellState.x + shellState.width + (delta.x || 0),
+    maxY: shellState.y + shellState.height + (delta.y || 0),
+    minX: shellState.x + (delta.x || 0),
+    minY: shellState.y + (delta.y || 0),
+    width: shellState.width,
+  };
+
+  shellElement.style.clipPath = getArtboardClipPath(
+    editor,
+    previewEntry.nodeId,
+    previewBounds,
+    preview
+  );
+  shellElement.style.transform = `translate3d(${previewBounds.minX}px, ${previewBounds.minY}px, 0)`;
+  transformElement.style.transform = shellState.transform || "";
 };
 
 const sameNodeIds = (left = [], right = []) => {
@@ -129,7 +189,7 @@ const canReusePreviewEntries = (preview, nodeIds) => {
   }
 
   return preview.entries.every((entry) => {
-    return entry.element?.isConnected;
+    return entry.shellElement?.isConnected && entry.transformElement?.isConnected;
   });
 };
 
@@ -179,14 +239,14 @@ const getPreviewBaseShellStates = (editor, placementState, nodeIds) => {
     const shellState =
       placementState.shellStates.get(nodeId) ||
       getNodeShellState(editor, nodeId);
-    const element = editor.getNodeElement(nodeId);
+    const elements = getPlacementElements(editor, nodeId);
 
-    if (element && shellState) {
+    if (elements && shellState) {
       entries.push({
-        element,
         nodeId,
+        shellElement: elements.shellElement,
         shellState,
-        transformSuffix: shellState.transform ? ` ${shellState.transform}` : "",
+        transformElement: elements.transformElement,
       });
     }
   }
@@ -233,7 +293,7 @@ const syncPreviewNodeShells = (editor, placementState, preview) => {
   }
 
   for (const entry of entries) {
-    applyPreviewTransform(entry, preview.delta);
+    applyPreviewTransform(editor, entry, preview);
     placementState.appliedElements.set(entry.nodeId, entry.element);
     placementState.appliedKeys.set(
       entry.nodeId,

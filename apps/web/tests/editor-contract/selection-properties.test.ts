@@ -132,6 +132,27 @@ const createTextNode = (id: string) => {
   } as const;
 };
 
+const createArtboardNode = (id: string) => {
+  return {
+    background: "#ffffff",
+    height: 5400,
+    id,
+    locked: false,
+    name: "Artboard 1",
+    parentId: "root",
+    transform: {
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+      x: 100,
+      y: 120,
+    },
+    type: "artboard" as const,
+    visible: true,
+    width: 4500,
+  };
+};
+
 const createGroupNode = (id: string, parentId = "root") => {
   return {
     id,
@@ -261,6 +282,47 @@ describe("Editor selection properties", () => {
     expect(selectionProperties.properties.shape?.value).toBe("polygon");
     expect(selectionProperties.properties.width?.value).toBe(260);
     expect(selectionProperties.properties.text).toBeUndefined();
+  });
+
+  test("exposes size and background properties for a single artboard selection", () => {
+    const editor = new Editor();
+
+    loadNodes(editor, [createArtboardNode("artboard-node")]);
+    editor.select("artboard-node");
+
+    const selectionProperties = editor.getSelectionProperties();
+
+    expect(selectionProperties.selectionKind).toBe("single");
+    expect(Object.keys(selectionProperties.properties).sort()).toEqual([
+      "background",
+      "height",
+      "width",
+    ]);
+    expect(selectionProperties.properties.background).toEqual({
+      id: "background",
+      isMixed: false,
+      value: "#ffffff",
+    });
+    expect(selectionProperties.properties.width?.value).toBe(4500);
+    expect(selectionProperties.properties.height?.value).toBe(5400);
+  });
+
+  test("applies artboard size and background through selection properties", () => {
+    const editor = new Editor();
+
+    loadNodes(editor, [createArtboardNode("artboard-node")]);
+    editor.select("artboard-node");
+
+    expect(editor.setSelectionProperty("width", 3200)).toBe(true);
+    expect(editor.setSelectionProperty("height", 2400)).toBe(true);
+    expect(editor.setSelectionProperty("background", "#f6d365")).toBe(true);
+
+    expect(editor.getNode("artboard-node")).toMatchObject({
+      background: "#f6d365",
+      height: 2400,
+      type: "artboard",
+      width: 3200,
+    });
   });
 
   test("does not expose corner radius for a non-polygon shape", () => {
@@ -582,6 +644,48 @@ describe("Editor selection properties", () => {
     expect(editor.getNode("path-node")).toMatchObject({
       fill: "#6842FF",
       stroke: "#123456",
+    });
+  });
+
+  test("includes artboard backgrounds in selection colors", () => {
+    const editor = new Editor();
+
+    loadNodes(editor, [
+      createArtboardNode("artboard-node"),
+      {
+        ...createShapeNode("shape-node"),
+        fill: "#ffffff",
+        parentId: "artboard-node",
+        stroke: "#000000",
+      },
+    ]);
+    editor.select("artboard-node");
+
+    const whiteColorId = JSON.stringify("#ffffff");
+    const selectionProperties = editor.getSelectionProperties();
+
+    expect(selectionProperties.selectionColors).toEqual([
+      {
+        fieldId: "artboard-node:background",
+        id: whiteColorId,
+        usageCount: 2,
+        value: "#ffffff",
+      },
+      {
+        fieldId: "shape-node:stroke",
+        id: JSON.stringify("#000000"),
+        usageCount: 1,
+        value: "#000000",
+      },
+    ]);
+
+    expect(editor.setSelectionColor(whiteColorId, "#123456")).toBe(true);
+    expect(editor.getNode("artboard-node")).toMatchObject({
+      background: "#123456",
+    });
+    expect(editor.getNode("shape-node")).toMatchObject({
+      fill: "#123456",
+      stroke: "#000000",
     });
   });
 

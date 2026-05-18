@@ -2,7 +2,7 @@ import { supportsNodeProperty } from "../nodes/node-property-support";
 import { isContainerNode } from "../nodes/node-tree";
 import { getPropertyDescriptor } from "./property-descriptors";
 
-const SELECTION_COLOR_PROPERTY_IDS = ["fill", "stroke"];
+const SELECTION_COLOR_PROPERTY_IDS = ["background", "fill", "stroke"];
 
 const createSelectionColorId = (value) => {
   return JSON.stringify(value);
@@ -22,6 +22,10 @@ const getSelectionColorTargetNodeIds = (editor, nodeIds) => {
       continue;
     }
 
+    if (supportsSelectionColor(node)) {
+      targetNodeIds.push(node.id);
+    }
+
     if (isContainerNode(node)) {
       targetNodeIds.push(...editor.getDescendantLeafNodeIds(node.id));
       continue;
@@ -34,15 +38,27 @@ const getSelectionColorTargetNodeIds = (editor, nodeIds) => {
       continue;
     }
 
+    if (supportsSelectionColor(targetNode)) {
+      targetNodeIds.push(targetNode.id);
+    }
+
     if (isContainerNode(targetNode)) {
       targetNodeIds.push(...editor.getDescendantLeafNodeIds(targetNode.id));
       continue;
     }
 
-    targetNodeIds.push(targetNode.id);
+    if (!supportsSelectionColor(targetNode)) {
+      targetNodeIds.push(targetNode.id);
+    }
   }
 
   return [...new Set(targetNodeIds)];
+};
+
+const supportsSelectionColor = (node) => {
+  return SELECTION_COLOR_PROPERTY_IDS.some((propertyId) => {
+    return supportsNodeProperty(node, propertyId);
+  });
 };
 
 const shouldExposeSelectionColors = (editor, nodeIds) => {

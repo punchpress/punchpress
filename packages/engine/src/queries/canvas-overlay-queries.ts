@@ -1,4 +1,8 @@
-import { isContainerNode, isGroupNode } from "../nodes/node-tree";
+import {
+  isArtboardNode,
+  isContainerNode,
+  isGroupNode,
+} from "../nodes/node-tree";
 import { format } from "../primitives/math";
 import {
   getNodeTransformFrame as getPrimitiveNodeTransformFrame,
@@ -21,6 +25,7 @@ const getVisibleSelectedNodeIds = (
 const getTransformFlags = ({
   activeTool,
   editingNodeId,
+  hasArtboardSelection,
   hasGroupSelection,
   isPathEditingSelection,
   isTextPathPositioning,
@@ -33,6 +38,14 @@ const getTransformFlags = ({
     (activeTool === "node" &&
       isPathEditingSelection &&
       selectedEditCapabilities?.pathEditingOverlayMode === "keep-transform");
+
+  if (isArtboardNode(selectedNode)) {
+    return {
+      isDraggable: false,
+      isResizable: Boolean(canTransform && selectedNode && !editingNodeId),
+      isRotatable: false,
+    };
+  }
 
   if (isPathEditingSelection) {
     return {
@@ -60,6 +73,7 @@ const getTransformFlags = ({
     ),
     isRotatable: Boolean(
       canTransform &&
+        !hasArtboardSelection &&
         (hasGroupSelection ? selectedBounds : selectedEditCapabilities) &&
         !editingNodeId
     ),
@@ -280,6 +294,9 @@ export const getCanvasTransformOverlayState = (editor) => {
     ? editor.getNodeEditCapabilities(selectedNode.id)
     : null;
   const selectedBounds = editor.getSelectionBounds(effectiveSelectedNodeIds);
+  const hasArtboardSelection = visibleSelectedNodeIds.some((nodeId) => {
+    return editor.isArtboardNode(nodeId);
+  });
   const hasGroupSelection =
     effectiveSelectedNodeIds.length > 1 ||
     Boolean(selectedNode?.id && isGroupNode(selectedNode));
@@ -291,6 +308,7 @@ export const getCanvasTransformOverlayState = (editor) => {
   const { isDraggable, isResizable, isRotatable } = getTransformFlags({
     activeTool: state.activeTool,
     editingNodeId: state.editingNodeId,
+    hasArtboardSelection,
     hasGroupSelection,
     isPathEditingSelection,
     isTextPathPositioning: state.isTextPathPositioning,

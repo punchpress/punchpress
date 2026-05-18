@@ -2,6 +2,76 @@ import { describe, expect, test } from "bun:test";
 import { Editor } from "@punchpress/engine";
 
 describe("Editor node placement", () => {
+  test("click placement uses an ergonomic shape size for the visible viewport", () => {
+    const editor = new Editor();
+
+    editor.hostRef = {
+      getBoundingClientRect: () => ({
+        height: 800,
+        width: 1000,
+      }),
+    };
+    editor.viewerRef = {
+      getScrollLeft: () => 0,
+      getScrollTop: () => 0,
+    };
+
+    editor.addShapeNode({ x: 120, y: 240 }, "polygon");
+
+    expect(editor.selectedNode).toMatchObject({
+      height: 130,
+      shape: "polygon",
+      type: "shape",
+      width: 200,
+    });
+  });
+
+  test("click placement uses an ergonomic shape size inside an artboard", () => {
+    const editor = new Editor();
+
+    editor.addArtboardNode({ x: 0, y: 0 });
+    editor.addShapeNode({ x: 120, y: 240 }, "polygon");
+
+    expect(editor.selectedNode).toMatchObject({
+      height: 580,
+      shape: "polygon",
+      type: "shape",
+      width: 900,
+    });
+  });
+
+  test("click placement ignores hidden artboards when assigning a parent", () => {
+    const editor = new Editor();
+
+    editor.getState().loadNodes([
+      {
+        background: "#ffffff",
+        height: 5400,
+        id: "artboard-1",
+        locked: false,
+        name: "Artboard 1",
+        parentId: "root",
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 0,
+          y: 0,
+        },
+        type: "artboard",
+        visible: false,
+        width: 4500,
+      },
+    ]);
+
+    editor.addShapeNode({ x: 120, y: 240 }, "polygon");
+
+    expect(editor.selectedNode).toMatchObject({
+      parentId: "root",
+      type: "shape",
+    });
+  });
+
   test("click placement keeps the default shape size", () => {
     const editor = new Editor();
 

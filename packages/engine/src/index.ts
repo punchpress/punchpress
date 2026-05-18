@@ -38,6 +38,7 @@ export {
   setSelectionColor,
   setSelectionProperty,
 } from "./inspection/selection-properties";
+export { createDefaultArtboardNode } from "./nodes/artboard/model";
 export { createDefaultGroupNode } from "./nodes/group/model";
 export {
   getAncestorNodeIds,
@@ -48,6 +49,7 @@ export {
   getSelectionTargetNodeId,
   getSubtreeNodeIds,
   getTreeScopeParentId,
+  isArtboardNode,
   isContainerNode,
   isDescendantOf,
   isGroupNode,

@@ -22,6 +22,8 @@ Text nodes let users place and edit stylized text directly on the canvas.
 - Edit mode should keep a visible caret so text entry still feels precise and direct.
 - Placing a new text node should enter text edit mode immediately and return the canvas to pointer behavior outside the active text field.
 - Placing a new text node from the canvas should center the text on the placement click and start at the default starter size, including when the chosen font finishes loading after placement.
+- Newly placed text should use an ergonomic starter size for the current working context.
+- Text starter font sizes and stroke widths should be whole-number values.
 - A newly placed text node should start with a balanced default outline treatment that remains readable at 100% canvas zoom, rather than a heavy poster-style stroke.
 - A newly placed text node should start with no warp applied until the user explicitly chooses one.
 

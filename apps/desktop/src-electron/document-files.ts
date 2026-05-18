@@ -14,6 +14,7 @@ const OPEN_SVG_CHANNEL = "document:open-svg";
 const OPEN_RECENT_DOCUMENT_CHANNEL = "document:open-recent";
 const SAVE_DOCUMENT_CHANNEL = "document:save";
 const SAVE_SVG_CHANNEL = "document:save-svg";
+const SAVE_PNG_CHANNEL = "document:save-png";
 const GET_RECENT_DOCUMENTS_CHANNEL = "document:get-recent-documents";
 const CLEAR_RECENT_DOCUMENTS_CHANNEL = "document:clear-recent-documents";
 
@@ -174,6 +175,40 @@ export const registerDocumentFileHandlers = ({
       }
 
       await writeFile(targetPath, payload.contents, "utf8");
+
+      return {
+        canceled: false,
+        fileHandle: targetPath,
+        fileName: path.basename(targetPath),
+      };
+    }
+  );
+
+  ipcMain.handle(
+    SAVE_PNG_CHANNEL,
+    async (
+      _event,
+      payload: {
+        contents: ArrayBuffer | Uint8Array;
+        defaultFileName: string;
+      }
+    ) => {
+      const targetPath = await showSaveDialogForPath(payload.defaultFileName, [
+        {
+          extensions: ["png"],
+          name: "PNG exports",
+        },
+      ]);
+
+      if (!targetPath) {
+        return {
+          canceled: true,
+          fileHandle: null,
+          fileName: null,
+        };
+      }
+
+      await writeFile(targetPath, Buffer.from(payload.contents));
 
       return {
         canceled: false,

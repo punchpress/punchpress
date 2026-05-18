@@ -105,7 +105,7 @@ export const LayersMainMenu = ({
             }}
           >
             <DownloadIcon size={15} />
-            Export SVG
+            Export
             <MenuShortcut>⌘E</MenuShortcut>
           </MenuItem>
         </MenuGroup>

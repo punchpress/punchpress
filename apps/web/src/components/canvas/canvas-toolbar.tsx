@@ -1,11 +1,13 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Add01Icon,
+  ArtboardToolIcon,
   Cursor01Icon,
   Cursor02Icon,
   Remove01Icon,
   TextFontIcon,
 } from "@hugeicons-pro/core-stroke-rounded";
+import { ARTBOARD_HEIGHT, ARTBOARD_WIDTH } from "@punchpress/engine";
 import { HandIcon, PenToolIcon } from "lucide-react";
 import type { CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
@@ -46,6 +48,7 @@ const PRIMARY_TOOL_CONFIG = [
 
 const TEXT_TOOL = {
   icon: TextFontIcon,
+  iconSize: 25,
   iconLibrary: "hugeicons",
   id: "text",
   label: "Text",
@@ -67,6 +70,22 @@ const TOOL_CURSOR_BY_ID = {
   pointer: "var(--canvas-cursor-default)",
   shape: "var(--canvas-cursor-add)",
   text: "var(--canvas-cursor-text)",
+};
+
+const addArtboardToCurrentView = (editor) => {
+  const viewportCenter = editor.getViewportCenter() || {
+    x: ARTBOARD_WIDTH / 2,
+    y: ARTBOARD_HEIGHT / 2,
+  };
+  const origin = {
+    x: viewportCenter.x - ARTBOARD_WIDTH / 2,
+    y: viewportCenter.y - ARTBOARD_HEIGHT / 2,
+  };
+  const nodeId = editor.addArtboardNode(origin);
+
+  if (!nodeId) {
+    return;
+  }
 };
 
 export const CanvasToolbar = () => {
@@ -92,6 +111,19 @@ export const CanvasToolbar = () => {
         <ToolButton {...PEN_TOOL} />
         <ToolButton {...TEXT_TOOL} />
         <ShapeToolbarButton />
+        <ToolbarButton
+          aria-label="Add artboard"
+          onClick={() => addArtboardToCurrentView(editor)}
+          render={<Button size="icon-sm" variant="ghost" />}
+          title="Add artboard"
+        >
+          <HugeiconsIcon
+            color="currentColor"
+            icon={ArtboardToolIcon}
+            size={21}
+            strokeWidth={1.6}
+          />
+        </ToolbarButton>
       </ToolbarGroup>
 
       <ToolbarSeparator />
@@ -131,7 +163,7 @@ export const CanvasToolbar = () => {
   );
 };
 
-const ToolButton = ({ icon, iconLibrary, id, label, shortcut }) => {
+const ToolButton = ({ icon, iconLibrary, iconSize, id, label, shortcut }) => {
   const editor = useEditor();
   const activeTool = useEditorValue((_, state) => state.activeTool);
   const Icon = icon;
@@ -158,7 +190,7 @@ const ToolButton = ({ icon, iconLibrary, id, label, shortcut }) => {
         <HugeiconsIcon
           color="currentColor"
           icon={icon}
-          size={20}
+          size={iconSize ?? 20}
           strokeWidth={1.6}
         />
       )}

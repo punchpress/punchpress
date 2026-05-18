@@ -223,6 +223,35 @@ const loadClosedVectorCornerDocument = (page) => {
   );
 };
 
+const loadArtboardPropertiesDocument = (page) => {
+  return loadDocument(
+    page,
+    JSON.stringify({
+      nodes: [
+        {
+          background: "#ffffff",
+          height: 260,
+          id: "artboard-node",
+          locked: false,
+          name: "Artboard 1",
+          parentId: "root",
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: 220,
+            y: 160,
+          },
+          type: "artboard",
+          visible: true,
+          width: 340,
+        },
+      ],
+      version: "1.7",
+    })
+  );
+};
+
 const loadVectorSelectionColorsDocument = (page) => {
   return loadDocument(
     page,
@@ -387,6 +416,44 @@ test("shows only shared appearance controls for a mixed text and shape selection
         .sort();
     })
     .toEqual(["#123456", "#123456"]);
+});
+
+test("shows and edits frame properties for a selected artboard", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadArtboardPropertiesDocument(page);
+  await selectNodes(page, ["artboard-node"]);
+
+  const frameSection = getSection(page, "Frame");
+  await expect(frameSection).toBeVisible();
+
+  const inputs = frameSection.getByRole("textbox");
+  await expect(inputs.nth(0)).toHaveValue("340");
+  await expect(inputs.nth(1)).toHaveValue("260");
+  await expect(inputs.nth(2)).toHaveValue("#ffffff");
+
+  await inputs.nth(0).fill("420");
+  await inputs.nth(1).fill("315");
+  await inputs.nth(2).fill("#ffcc00");
+
+  await expect
+    .poll(() => {
+      return page.evaluate(() => {
+        const node = window.__PUNCHPRESS_EDITOR__?.getNode("artboard-node");
+
+        return {
+          background: node?.background || null,
+          height: node?.height || null,
+          width: node?.width || null,
+        };
+      });
+    })
+    .toEqual({
+      background: "#FFCC00",
+      height: 315,
+      width: 420,
+    });
 });
 
 test("shows bulk path corner controls for a selected standalone path outside path edit mode", async ({

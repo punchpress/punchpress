@@ -14,6 +14,21 @@ const getCanvasStagePoint = async (page, offset) => {
   };
 };
 
+const getExpectedClickShapeSize = (page) => {
+  return page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const host = editor?.hostRef;
+    const rect = host?.getBoundingClientRect?.();
+    const worldWidth = rect && editor?.zoom ? rect.width / editor.zoom : 1400;
+    const width = Math.max(10, Math.round((worldWidth * 0.2) / 10) * 10);
+
+    return {
+      height: Math.max(10, Math.round((width * 0.64) / 10) * 10),
+      width,
+    };
+  });
+};
+
 test("clicking with the shape tool places a default-size rectangle", async ({
   page,
 }) => {
@@ -21,6 +36,7 @@ test("clicking with the shape tool places a default-size rectangle", async ({
   await page.keyboard.press("r");
 
   const point = await getCanvasStagePoint(page, { x: 260, y: 220 });
+  const expectedSize = await getExpectedClickShapeSize(page);
 
   await page.mouse.click(point.x, point.y);
 
@@ -40,9 +56,9 @@ test("clicking with the shape tool places a default-size rectangle", async ({
     .toEqual({
       activeTool: "pointer",
       count: 1,
-      height: 180,
+      height: expectedSize.height,
       type: "shape",
-      width: 280,
+      width: expectedSize.width,
     });
 });
 

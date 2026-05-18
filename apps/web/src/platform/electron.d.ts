@@ -91,6 +91,10 @@ declare global {
           contents: string;
           defaultFileName: string;
         }) => Promise<DesktopSaveFileResult>;
+        savePng: (payload: {
+          contents: ArrayBuffer;
+          defaultFileName: string;
+        }) => Promise<DesktopSaveFileResult>;
         getRecentDocuments: () => Promise<DesktopRecentDocument[]>;
         clearRecentDocuments: () => Promise<void>;
       };

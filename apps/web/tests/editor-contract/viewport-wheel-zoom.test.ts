@@ -62,4 +62,35 @@ describe("Editor.zoomViewportFromWheel", () => {
     expect(afterAnchorX).toBeCloseTo(beforeAnchorX, 6);
     expect(afterAnchorY).toBeCloseTo(beforeAnchorY, 6);
   });
+
+  test("allows wheel zooming out to one percent", () => {
+    const editor = new Editor({ initialZoom: 0.011 });
+    let nextViewport: { x: number; y: number; zoom: number } | null = null;
+
+    editor.viewerRef = {
+      getContainer: () => ({
+        getBoundingClientRect: () => ({
+          height: 300,
+          left: 0,
+          top: 0,
+          width: 400,
+        }),
+      }),
+      getScrollLeft: () => 0,
+      getScrollTop: () => 0,
+      setTo: (options) => {
+        nextViewport = options;
+      },
+    };
+
+    const didZoom = editor.zoomViewportFromWheel({
+      clientX: 200,
+      clientY: 150,
+      deltaY: 2000,
+    });
+
+    expect(didZoom).toBe(true);
+    expect(nextViewport?.zoom).toBe(0.01);
+    expect(editor.zoom).toBe(0.01);
+  });
 });

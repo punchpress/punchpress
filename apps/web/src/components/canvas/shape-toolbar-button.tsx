@@ -14,19 +14,19 @@ import { useEditorValue } from "../../editor-react/use-editor-value";
 const SHAPE_OPTIONS = [
   {
     icon: SquareIcon,
-    iconSize: 18,
+    iconSize: 16,
     key: "polygon",
     label: "Rectangle",
     shortcut: "R",
   },
   {
     icon: CircleIcon,
-    iconSize: 18,
+    iconSize: 16,
     key: "ellipse",
     label: "Ellipse",
     shortcut: "O",
   },
-  { icon: StarIcon, iconSize: 18, key: "star", label: "Star", shortcut: "S" },
+  { icon: StarIcon, iconSize: 16, key: "star", label: "Star", shortcut: "S" },
 ];
 
 export const ShapeToolbarButton = () => {

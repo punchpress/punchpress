@@ -98,7 +98,9 @@ export const renameGroup = (editor, nodeId, name) => {
 
   if (
     !(
-      (node?.type === "group" || node?.type === "vector") &&
+      (node?.type === "artboard" ||
+        node?.type === "group" ||
+        node?.type === "vector") &&
       nextName.length > 0
     )
   ) {
@@ -107,7 +109,13 @@ export const renameGroup = (editor, nodeId, name) => {
 
   editor.run(() => {
     editor.getState().updateNodeById(nodeId, (currentNode) => {
-      if (!(currentNode.type === "group" || currentNode.type === "vector")) {
+      if (
+        !(
+          currentNode.type === "artboard" ||
+          currentNode.type === "group" ||
+          currentNode.type === "vector"
+        )
+      ) {
         return currentNode;
       }
 

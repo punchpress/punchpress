@@ -93,6 +93,18 @@ export const groupNodeSchema = baseNodeSchema
   })
   .strict();
 
+export const artboardNodeSchema = baseNodeSchema
+  .extend({
+    background: z.string().min(1).nullable(),
+    height: finiteNumber,
+    locked: z.boolean(),
+    name: z.string().min(1),
+    transform: transformSchema,
+    type: z.literal("artboard"),
+    width: finiteNumber,
+  })
+  .strict();
+
 export const shapeKindSchema = z.enum(["polygon", "ellipse", "star"]);
 
 export const shapePointSchema = z
@@ -185,6 +197,7 @@ export const pathNodeSchema = baseNodeSchema
 export const nodeSchema = z.discriminatedUnion("type", [
   textNodeSchema,
   groupNodeSchema,
+  artboardNodeSchema,
   shapeNodeSchema,
   vectorNodeSchema,
   pathNodeSchema,
@@ -233,11 +246,17 @@ export const designDocumentSchema = z
           (entry) => entry.id === node.parentId
         );
 
-        if (!(parentNode?.type === "vector" || parentNode?.type === "group")) {
+        if (
+          !(
+            parentNode?.type === "vector" ||
+            parentNode?.type === "group" ||
+            parentNode?.type === "artboard"
+          )
+        ) {
           context.addIssue({
             code: z.ZodIssueCode.custom,
             message:
-              "Path nodes may only have group parents, vector parents, or the root.",
+              "Path nodes may only have artboard parents, group parents, vector parents, or the root.",
             path: ["nodes", index, "parentId"],
           });
         }
@@ -256,10 +275,33 @@ export const designDocumentSchema = z
           });
         }
       }
+
+      if (node.type === "artboard") {
+        if (node.parentId !== ROOT_PARENT_ID) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Artboards may only live at the root.",
+            path: ["nodes", index, "parentId"],
+          });
+        }
+
+        const childNodes = document.nodes.filter(
+          (entry) => entry.parentId === node.id
+        );
+
+        if (childNodes.some((entry) => entry.type === "artboard")) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Artboards may not contain other artboards.",
+            path: ["nodes", index, "id"],
+          });
+        }
+      }
     }
   });
 
 export type DesignDocument = z.infer<typeof designDocumentSchema>;
+export type ArtboardNodeDocument = z.infer<typeof artboardNodeSchema>;
 export type GroupNodeDocument = z.infer<typeof groupNodeSchema>;
 export type NodeDocument = z.infer<typeof nodeSchema>;
 export type ShapeKindDocument = z.infer<typeof shapeKindSchema>;

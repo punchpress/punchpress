@@ -4,6 +4,10 @@ export const isGroupNode = (node) => {
   return node?.type === "group";
 };
 
+export const isArtboardNode = (node) => {
+  return node?.type === "artboard";
+};
+
 export const isTextNode = (node) => {
   return node?.type === "text";
 };
@@ -29,6 +33,10 @@ const hasEditableVectorContours = (node) => {
 };
 
 export const isContainerNode = (node) => {
+  return isArtboardNode(node) || isGroupNode(node) || isVectorNode(node);
+};
+
+export const isContentContainerNode = (node) => {
   return isGroupNode(node) || isVectorNode(node);
 };
 
@@ -142,6 +150,10 @@ export const getSelectionTargetNodeId = (nodes, nodeId, focusedGroupId) => {
       break;
     }
 
+    if (isArtboardNode(parentNode)) {
+      return currentNode.id;
+    }
+
     currentNode = parentNode;
   }
 
@@ -193,7 +205,7 @@ export const getEffectiveSelectionNodeIds = (nodes, nodeIds) => {
       continue;
     }
 
-    if (!isContainerNode(node)) {
+    if (!isContentContainerNode(node)) {
       effectiveNodeIds.push(nodeId);
       continue;
     }

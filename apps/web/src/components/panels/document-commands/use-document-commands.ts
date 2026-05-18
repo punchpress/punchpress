@@ -18,6 +18,7 @@ import {
   type PunchOpenedDocumentFile,
   type PunchRecentDocument,
   savePunchDocumentFile,
+  savePunchPngFile,
   savePunchSvgFile,
 } from "@/platform/web-document-files";
 import { useEditor } from "../../../editor-react/use-editor";
@@ -37,6 +38,49 @@ const getSvgImportTargetCenter = (editor: ReturnType<typeof useEditor>) => {
       y: ARTBOARD_HEIGHT / 2,
     }
   );
+};
+
+const renderSvgToPngBlob = async (
+  svg: string,
+  width: number,
+  height: number
+) => {
+  const image = new Image();
+  const objectUrl = URL.createObjectURL(
+    new Blob([svg], { type: "image/svg+xml" })
+  );
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("Could not render artboard PNG."));
+      image.src = objectUrl;
+    });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(width));
+    canvas.height = Math.max(1, Math.round(height));
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      throw new Error("Could not create PNG canvas.");
+    }
+
+    context.drawImage(image, 0, 0);
+
+    return await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error("Could not encode artboard PNG."));
+          return;
+        }
+
+        resolve(blob);
+      }, "image/png");
+    });
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 };
 
 export const useDocumentCommands = () => {
@@ -191,6 +235,33 @@ export const useDocumentCommands = () => {
   });
 
   const handleExportDocument = useEffectEvent(async () => {
+    const selectedNode = editor.selectedNode;
+
+    if (selectedNode?.type === "artboard") {
+      const svg = await editor.exportSelectedArtboardSvg(selectedNode.id);
+
+      if (!svg) {
+        throw new Error("Select an artboard before exporting PNG.");
+      }
+
+      const png = await renderSvgToPngBlob(
+        svg,
+        selectedNode.width,
+        selectedNode.height
+      );
+      const result = await savePunchPngFile(png, selectedNode.name);
+
+      if (result.canceled) {
+        return;
+      }
+
+      showToast({
+        message: `Exported ${result.fileName || `${selectedNode.name}.png`}`,
+        type: "success",
+      });
+      return;
+    }
+
     const svg = await editor.exportDocument();
     const result = await savePunchSvgFile(svg, documentBaseName);
 

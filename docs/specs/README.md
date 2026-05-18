@@ -20,6 +20,7 @@ They exist to preserve product intent while implementation evolves. They are liv
 - `canvas-navigation.md`
 - `clipboard.md`
 - `cursors.md`
+- `artboards.md`
 - `groups.md`
 - `history.md`
 - `nodes.md`

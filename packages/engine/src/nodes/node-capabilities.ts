@@ -1,3 +1,4 @@
+import { artboardNodeCapabilities } from "./artboard/artboard-capabilities";
 import { groupNodeCapabilities } from "./group/group-capabilities";
 import { pathNodeCapabilities } from "./path/path-capabilities";
 import { shapeNodeCapabilities } from "./shape/shape-capabilities";
@@ -5,6 +6,7 @@ import { textNodeCapabilities } from "./text/text-capabilities";
 import { vectorNodeCapabilities } from "./vector/vector-capabilities";
 
 const nodeCapabilitiesByType = {
+  artboard: artboardNodeCapabilities,
   group: groupNodeCapabilities,
   path: pathNodeCapabilities,
   shape: shapeNodeCapabilities,

@@ -90,6 +90,7 @@ contextBridge.exposeInMainWorld("electron", {
       ipcRenderer.invoke("document:open-recent", filePath),
     saveDocument: (payload) => ipcRenderer.invoke("document:save", payload),
     saveSvg: (payload) => ipcRenderer.invoke("document:save-svg", payload),
+    savePng: (payload) => ipcRenderer.invoke("document:save-png", payload),
     getRecentDocuments: () =>
       ipcRenderer.invoke("document:get-recent-documents"),
     clearRecentDocuments: () =>
