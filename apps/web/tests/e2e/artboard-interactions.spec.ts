@@ -233,6 +233,82 @@ test("artboard selection outline follows label drag preview", async ({
   }
 });
 
+test("shift-click on an artboard label or empty body adds it to the selection", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(
+    page,
+    JSON.stringify({
+      nodes: [
+        ...JSON.parse(ARTBOARD_DOCUMENT).nodes,
+        {
+          cornerRadius: 0,
+          fill: "#ef4444",
+          height: 80,
+          id: "shape-2",
+          parentId: "root",
+          shape: "polygon",
+          stroke: null,
+          strokeWidth: 0,
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: 680,
+            y: 180,
+          },
+          type: "shape",
+          visible: true,
+          width: 80,
+        },
+      ],
+      version: "1.7",
+    })
+  );
+  await resetViewport(page);
+
+  const rootShape = page.locator('[data-node-id="shape-2"]');
+  const label = page.locator('button.canvas-node[data-node-id="artboard-1"]');
+  const body = page.locator('[data-artboard-body="artboard-1"]');
+
+  await rootShape.click();
+  await page.keyboard.down("Shift");
+  await label.click();
+  await page.keyboard.up("Shift");
+
+  await expect
+    .poll(async () => {
+      return [...(await getSelectionSnapshot(page)).selectedNodeIds].sort();
+    })
+    .toEqual(["artboard-1", "shape-2"]);
+
+  await page.keyboard.press("Escape");
+  await rootShape.click();
+
+  await expect
+    .poll(async () => {
+      return (await getSelectionSnapshot(page)).selectedNodeIds;
+    })
+    .toEqual(["shape-2"]);
+
+  const bodyBox = await body.boundingBox();
+
+  if (!bodyBox) {
+    throw new Error("Missing artboard body bounds");
+  }
+
+  await page.keyboard.down("Shift");
+  await page.mouse.click(bodyBox.x + bodyBox.width - 20, bodyBox.y + 20);
+  await page.keyboard.up("Shift");
+
+  await expect
+    .poll(async () => {
+      return [...(await getSelectionSnapshot(page)).selectedNodeIds].sort();
+    })
+    .toEqual(["artboard-1", "shape-2"]);
+});
+
 test("toolbar-created artboards use the production default and fit in view", async ({
   page,
 }) => {
@@ -358,12 +434,116 @@ test("artboard children stay clipped while drag preview crosses the artboard edg
   try {
     await expect
       .poll(() => {
-        return shape.evaluate((element) => element.style.clipPath);
+        return shape.evaluate((element) => {
+          const shell =
+            element.parentElement instanceof HTMLElement
+              ? element.parentElement
+              : element;
+
+          return shell.style.clipPath;
+        });
       })
       .toContain("inset(");
   } finally {
     await page.mouse.up();
   }
+});
+
+test("rotated artboard children are not selectable outside the artboard edge", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(
+    page,
+    JSON.stringify({
+      nodes: [
+        {
+          background: "#ffffff",
+          height: 260,
+          id: "artboard-1",
+          locked: false,
+          name: "Artboard 1",
+          parentId: "root",
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: 220,
+            y: 160,
+          },
+          type: "artboard",
+          visible: true,
+          width: 340,
+        },
+        {
+          closed: true,
+          fill: "#ef4444",
+          fillRule: "nonzero",
+          id: "path-1",
+          parentId: "artboard-1",
+          segments: [
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: -70, y: -20 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: 70, y: -20 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: 70, y: 20 },
+              pointType: "corner",
+            },
+            {
+              handleIn: { x: 0, y: 0 },
+              handleOut: { x: 0, y: 0 },
+              point: { x: -70, y: 20 },
+              pointType: "corner",
+            },
+          ],
+          stroke: null,
+          strokeLineCap: "butt",
+          strokeLineJoin: "miter",
+          strokeMiterLimit: 4,
+          strokeWidth: 0,
+          transform: {
+            rotation: 45,
+            scaleX: 1,
+            scaleY: 1,
+            x: 540,
+            y: 300,
+          },
+          type: "path",
+          visible: true,
+        },
+      ],
+      version: "1.7",
+    })
+  );
+  await resetViewport(page);
+
+  const body = page.locator('[data-artboard-body="artboard-1"]');
+  await expect(body).toBeVisible();
+
+  const bodyBox = await body.boundingBox();
+
+  if (!bodyBox) {
+    throw new Error("Missing artboard body bounds");
+  }
+
+  await page.mouse.click(bodyBox.x + bodyBox.width + 7, bodyBox.y + 140);
+
+  await expect
+    .poll(async () => {
+      return (await getSelectionSnapshot(page)).selectedNodeIds;
+    })
+    .toEqual([]);
 });
 
 test("text tool click inside an artboard creates selected artboard content", async ({

@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
 import { useEditor } from "../../editor-react/use-editor";
+import { getArtboardClipPath } from "./artboard-clip-path";
 import { resolvePreviewPlacementNodeIds } from "./canvas-node-preview-placement";
 
 interface NodeShellState {
@@ -12,10 +13,15 @@ interface NodeShellState {
 }
 
 interface PreviewEntry {
-  element: HTMLElement;
   nodeId: string;
+  shellElement: HTMLElement;
   shellState: NodeShellState;
-  transformSuffix: string;
+  transformElement: HTMLElement;
+}
+
+interface PlacementElements {
+  shellElement: HTMLElement;
+  transformElement: HTMLElement;
 }
 
 const getNodeShellState = (editor, nodeId): NodeShellState | null => {
@@ -27,55 +33,13 @@ const getNodeShellState = (editor, nodeId): NodeShellState | null => {
   }
 
   return {
-    clipPath: getNodeClipPath(editor, nodeId, frame.bounds),
+    clipPath: getArtboardClipPath(editor, nodeId, frame.bounds),
     height: Math.max(1, frame.bounds.height),
     transform: frame.transform || "",
     width: Math.max(1, frame.bounds.width),
     x: frame.bounds.minX,
     y: frame.bounds.minY,
   };
-};
-
-const offsetBounds = (bounds, delta) => {
-  if (!(bounds && delta)) {
-    return bounds;
-  }
-
-  return {
-    ...bounds,
-    maxX: bounds.maxX + (delta.x || 0),
-    maxY: bounds.maxY + (delta.y || 0),
-    minX: bounds.minX + (delta.x || 0),
-    minY: bounds.minY + (delta.y || 0),
-  };
-};
-
-const getNodeClipPath = (editor, nodeId, bounds, preview = null) => {
-  const node = editor.getNode(nodeId);
-  const parentNode =
-    node?.parentId && node.parentId !== "root"
-      ? editor.getNode(node.parentId)
-      : null;
-
-  if (!(bounds && parentNode?.type === "artboard")) {
-    return "";
-  }
-
-  const artboardFrame = editor.getNodeRenderFrame(parentNode.id);
-  const artboardBounds = preview?.nodeIds?.includes(parentNode.id)
-    ? offsetBounds(artboardFrame?.bounds, preview.delta)
-    : artboardFrame?.bounds;
-
-  if (!artboardBounds) {
-    return "";
-  }
-
-  const top = Math.max(0, artboardBounds.minY - bounds.minY);
-  const right = Math.max(0, bounds.maxX - artboardBounds.maxX);
-  const bottom = Math.max(0, bounds.maxY - artboardBounds.maxY);
-  const left = Math.max(0, artboardBounds.minX - bounds.minX);
-
-  return `inset(${top}px ${right}px ${bottom}px ${left}px)`;
 };
 
 const getShellKey = (shellState, delta) => {
@@ -95,28 +59,56 @@ const getShellKey = (shellState, delta) => {
   ].join(":");
 };
 
-const applyNodeShellState = (element, shellState, delta) => {
-  if (!element) {
+const getPlacementElements = (
+  editor,
+  nodeId
+): PlacementElements | null => {
+  const transformElement = editor.getNodeElement(nodeId);
+
+  if (!transformElement) {
+    return null;
+  }
+
+  const shellElement =
+    transformElement.parentElement instanceof HTMLElement &&
+    transformElement.parentElement.dataset.nodeShell === "true"
+      ? transformElement.parentElement
+      : transformElement;
+
+  return {
+    shellElement,
+    transformElement,
+  };
+};
+
+const applyNodeShellState = (
+  elements: PlacementElements | null,
+  shellState,
+  delta
+) => {
+  if (!elements) {
     return;
   }
 
+  const { shellElement, transformElement } = elements;
+
   if (!shellState) {
-    element.style.clipPath = "";
-    element.style.width = "0px";
-    element.style.height = "0px";
-    element.style.transform = "translate3d(0px, 0px, 0)";
+    shellElement.style.clipPath = "";
+    shellElement.style.width = "0px";
+    shellElement.style.height = "0px";
+    shellElement.style.transform = "translate3d(0px, 0px, 0)";
+    transformElement.style.transform = "";
     return;
   }
 
   const x = shellState.x + (delta?.x || 0);
   const y = shellState.y + (delta?.y || 0);
 
-  element.style.width = `${shellState.width}px`;
-  element.style.height = `${shellState.height}px`;
-  element.style.clipPath = shellState.clipPath;
-  element.style.transform = shellState.transform
-    ? `translate3d(${x}px, ${y}px, 0) ${shellState.transform}`
-    : `translate3d(${x}px, ${y}px, 0)`;
+  shellElement.style.width = `${shellState.width}px`;
+  shellElement.style.height = `${shellState.height}px`;
+  shellElement.style.clipPath = shellState.clipPath;
+  shellElement.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+  transformElement.style.transform = shellState.transform || "";
 };
 
 const syncNodeShell = (
@@ -127,30 +119,34 @@ const syncNodeShell = (
   appliedKeys,
   delta
 ) => {
-  const element = editor.getNodeElement(nodeId);
+  const elements = getPlacementElements(editor, nodeId);
 
-  if (!element) {
+  if (!elements) {
     appliedElements.delete(nodeId);
     appliedKeys.delete(nodeId);
     return;
   }
 
   const nextKey = getShellKey(shellState, delta);
-  const previousElement = appliedElements.get(nodeId);
+  const previousElements = appliedElements.get(nodeId);
 
-  if (appliedKeys.get(nodeId) === nextKey && previousElement === element) {
+  if (
+    appliedKeys.get(nodeId) === nextKey &&
+    previousElements?.shellElement === elements.shellElement &&
+    previousElements?.transformElement === elements.transformElement
+  ) {
     return;
   }
 
-  applyNodeShellState(element, shellState, delta);
-  appliedElements.set(nodeId, element);
+  applyNodeShellState(elements, shellState, delta);
+  appliedElements.set(nodeId, elements);
   appliedKeys.set(nodeId, nextKey);
 };
 
 const applyPreviewTransform = (editor, previewEntry: PreviewEntry, preview) => {
-  const { element, shellState, transformSuffix } = previewEntry;
+  const { shellElement, shellState, transformElement } = previewEntry;
 
-  if (!(element && shellState)) {
+  if (!(shellElement && transformElement && shellState)) {
     return;
   }
 
@@ -164,13 +160,14 @@ const applyPreviewTransform = (editor, previewEntry: PreviewEntry, preview) => {
     width: shellState.width,
   };
 
-  element.style.clipPath = getNodeClipPath(
+  shellElement.style.clipPath = getArtboardClipPath(
     editor,
     previewEntry.nodeId,
     previewBounds,
     preview
   );
-  element.style.transform = `translate3d(${previewBounds.minX}px, ${previewBounds.minY}px, 0)${transformSuffix}`;
+  shellElement.style.transform = `translate3d(${previewBounds.minX}px, ${previewBounds.minY}px, 0)`;
+  transformElement.style.transform = shellState.transform || "";
 };
 
 const sameNodeIds = (left = [], right = []) => {
@@ -192,7 +189,7 @@ const canReusePreviewEntries = (preview, nodeIds) => {
   }
 
   return preview.entries.every((entry) => {
-    return entry.element?.isConnected;
+    return entry.shellElement?.isConnected && entry.transformElement?.isConnected;
   });
 };
 
@@ -242,14 +239,14 @@ const getPreviewBaseShellStates = (editor, placementState, nodeIds) => {
     const shellState =
       placementState.shellStates.get(nodeId) ||
       getNodeShellState(editor, nodeId);
-    const element = editor.getNodeElement(nodeId);
+    const elements = getPlacementElements(editor, nodeId);
 
-    if (element && shellState) {
+    if (elements && shellState) {
       entries.push({
-        element,
         nodeId,
+        shellElement: elements.shellElement,
         shellState,
-        transformSuffix: shellState.transform ? ` ${shellState.transform}` : "",
+        transformElement: elements.transformElement,
       });
     }
   }
