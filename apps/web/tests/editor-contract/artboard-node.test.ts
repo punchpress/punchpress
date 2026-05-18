@@ -112,4 +112,21 @@ describe("Editor artboards", () => {
     expect(afterShape?.transform.x).toBe(beforeShape?.transform.x);
     expect(afterShape?.transform.y).toBe(beforeShape?.transform.y);
   });
+
+  test("does not rotate a mixed selection that includes an artboard", () => {
+    const editor = new Editor();
+
+    editor.addArtboardNode({ x: 0, y: 0 });
+    const artboardId = editor.selectedNodeId;
+    editor.addShapeNode({ x: 6000, y: 0 }, "polygon");
+    const shapeId = editor.selectedNodeId;
+
+    editor.setSelectedNodes([artboardId, shapeId]);
+
+    const rotatedNodeIds = editor.rotateSelectionBy({ deltaRotation: 15 });
+
+    expect(rotatedNodeIds).toEqual([]);
+    expect(editor.getNode(artboardId)?.transform.rotation).toBe(0);
+    expect(editor.getNode(shapeId)?.transform.rotation).toBe(0);
+  });
 });

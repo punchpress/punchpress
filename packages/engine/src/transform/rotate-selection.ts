@@ -35,7 +35,10 @@ export const beginRotateSelection = (editor, { nodeId, nodeIds } = {}) => {
     editor.selectedNodeIds;
   const resolvedNodeIds = editor.getEffectiveSelectionNodeIds(requestedNodeIds);
 
-  if (resolvedNodeIds.length === 0) {
+  if (
+    resolvedNodeIds.length === 0 ||
+    resolvedNodeIds.some((currentNodeId) => editor.isArtboardNode(currentNodeId))
+  ) {
     return null;
   }
 

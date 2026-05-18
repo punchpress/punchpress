@@ -72,7 +72,13 @@ const startArtboardLabelDrag = ({ editor, event, nodeId }) => {
 
   event.preventDefault();
   event.stopPropagation();
-  editor.ensureSelected(nodeId);
+  const wasSelected = editor.isSelected(nodeId);
+  const isAdditiveSelection = event.shiftKey;
+  const shouldDuplicate = event.altKey;
+
+  if (!isAdditiveSelection) {
+    editor.ensureSelected(nodeId);
+  }
 
   const startClientPoint = {
     x: event.clientX,
@@ -86,6 +92,10 @@ const startArtboardLabelDrag = ({ editor, event, nodeId }) => {
   let dragSession: ReturnType<typeof editor.beginSelectionDrag> = null;
 
   const handlePointerMove = (moveEvent) => {
+    if (isAdditiveSelection) {
+      return;
+    }
+
     const movedDistance = Math.hypot(
       moveEvent.clientX - startClientPoint.x,
       moveEvent.clientY - startClientPoint.y
@@ -97,7 +107,7 @@ const startArtboardLabelDrag = ({ editor, event, nodeId }) => {
 
     if (!dragSession) {
       dragSession = editor.beginSelectionDrag({
-        duplicate: event.altKey,
+        duplicate: shouldDuplicate,
         nodeId,
       });
     }
@@ -130,40 +140,15 @@ const startArtboardLabelDrag = ({ editor, event, nodeId }) => {
 
     if (dragSession) {
       editor.endSelectionDrag(dragSession);
+      return;
     }
-  };
 
-  window.addEventListener("pointermove", handlePointerMove);
-  window.addEventListener("pointercancel", handlePointerEnd);
-  window.addEventListener("pointerup", handlePointerEnd);
-};
+    if (isAdditiveSelection) {
+      editor.toggleSelection(nodeId);
+      return;
+    }
 
-const startArtboardBodyPress = ({ editor, event, nodeId }) => {
-  if (event.button !== 0 || editor.activeTool !== "pointer") {
-    return;
-  }
-
-  const startClientPoint = {
-    x: event.clientX,
-    y: event.clientY,
-  };
-  let hasDragged = false;
-
-  const handlePointerMove = (moveEvent) => {
-    hasDragged =
-      hasDragged ||
-      Math.hypot(
-        moveEvent.clientX - startClientPoint.x,
-        moveEvent.clientY - startClientPoint.y
-      ) >= 3;
-  };
-
-  const handlePointerEnd = () => {
-    window.removeEventListener("pointermove", handlePointerMove);
-    window.removeEventListener("pointercancel", handlePointerEnd);
-    window.removeEventListener("pointerup", handlePointerEnd);
-
-    if (!hasDragged) {
+    if (!wasSelected) {
       editor.select(nodeId);
     }
   };
@@ -189,13 +174,6 @@ export const CanvasArtboards = () => {
               className="pointer-events-auto absolute border border-[var(--designer-border)] shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
               data-artboard-body={artboard.id}
               key={artboard.id}
-              onPointerDown={(event) =>
-                startArtboardBodyPress({
-                  editor,
-                  event,
-                  nodeId: artboard.id,
-                })
-              }
               style={{
                 backgroundColor: artboard.background || "transparent",
                 height: `${bounds.height}px`,

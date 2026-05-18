@@ -25,6 +25,7 @@ const getVisibleSelectedNodeIds = (
 const getTransformFlags = ({
   activeTool,
   editingNodeId,
+  hasArtboardSelection,
   hasGroupSelection,
   isPathEditingSelection,
   isTextPathPositioning,
@@ -72,6 +73,7 @@ const getTransformFlags = ({
     ),
     isRotatable: Boolean(
       canTransform &&
+        !hasArtboardSelection &&
         (hasGroupSelection ? selectedBounds : selectedEditCapabilities) &&
         !editingNodeId
     ),
@@ -292,6 +294,9 @@ export const getCanvasTransformOverlayState = (editor) => {
     ? editor.getNodeEditCapabilities(selectedNode.id)
     : null;
   const selectedBounds = editor.getSelectionBounds(effectiveSelectedNodeIds);
+  const hasArtboardSelection = visibleSelectedNodeIds.some((nodeId) => {
+    return editor.isArtboardNode(nodeId);
+  });
   const hasGroupSelection =
     effectiveSelectedNodeIds.length > 1 ||
     Boolean(selectedNode?.id && isGroupNode(selectedNode));
@@ -303,6 +308,7 @@ export const getCanvasTransformOverlayState = (editor) => {
   const { isDraggable, isResizable, isRotatable } = getTransformFlags({
     activeTool: state.activeTool,
     editingNodeId: state.editingNodeId,
+    hasArtboardSelection,
     hasGroupSelection,
     isPathEditingSelection,
     isTextPathPositioning: state.isTextPathPositioning,

@@ -97,6 +97,27 @@ const createVectorContainerNode = (
   } as const;
 };
 
+const createArtboardNode = (id: string, x = 0, y = 0) => {
+  return {
+    background: "#ffffff",
+    height: 320,
+    id,
+    locked: false,
+    name: id,
+    parentId: "root",
+    transform: {
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+      x,
+      y,
+    },
+    type: "artboard",
+    visible: true,
+    width: 320,
+  } as const;
+};
+
 const createCircleTextNode = () => {
   return {
     fill: "#000000",
@@ -214,6 +235,26 @@ describe("canvas overlay state queries", () => {
       isRotatable: true,
       mode: "multi",
       nodeIds: ["path-1", "path-2"],
+    });
+  });
+
+  test("disables rotation when a multi-selection includes an artboard", () => {
+    const editor = createEditor();
+
+    editor
+      .getState()
+      .loadNodes([
+        createArtboardNode("artboard-1", 0, 0),
+        createPathNode("path-1", 420, 200),
+      ]);
+    editor.setSelectedNodes(["artboard-1", "path-1"]);
+
+    expect(editor.getCanvasTransformOverlayState()).toMatchObject({
+      isDraggable: true,
+      isResizable: true,
+      isRotatable: false,
+      mode: "multi",
+      nodeIds: ["artboard-1", "path-1"],
     });
   });
 

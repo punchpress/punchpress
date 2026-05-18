@@ -40,6 +40,38 @@ describe("Editor node placement", () => {
     });
   });
 
+  test("click placement ignores hidden artboards when assigning a parent", () => {
+    const editor = new Editor();
+
+    editor.getState().loadNodes([
+      {
+        background: "#ffffff",
+        height: 5400,
+        id: "artboard-1",
+        locked: false,
+        name: "Artboard 1",
+        parentId: "root",
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 0,
+          y: 0,
+        },
+        type: "artboard",
+        visible: false,
+        width: 4500,
+      },
+    ]);
+
+    editor.addShapeNode({ x: 120, y: 240 }, "polygon");
+
+    expect(editor.selectedNode).toMatchObject({
+      parentId: "root",
+      type: "shape",
+    });
+  });
+
   test("click placement keeps the default shape size", () => {
     const editor = new Editor();
 

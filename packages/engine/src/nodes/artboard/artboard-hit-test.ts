@@ -18,7 +18,11 @@ export const getTopmostArtboardAtPoint = (
 ) => {
   return (
     [...editor.nodes].reverse().find((node) => {
-      if (!isArtboardNode(node) || excludedNodeIds.has(node.id)) {
+      if (
+        !isArtboardNode(node) ||
+        excludedNodeIds.has(node.id) ||
+        !editor.isNodeEffectivelyVisible(node.id)
+      ) {
         return false;
       }
 

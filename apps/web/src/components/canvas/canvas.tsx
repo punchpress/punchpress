@@ -13,6 +13,7 @@ import { CanvasDotGrid } from "./canvas-dot-grid";
 import { CanvasNodes } from "./canvas-nodes";
 import { CanvasHostOverlays } from "./canvas-overlay/host-overlays";
 import { CanvasStageOverlays } from "./canvas-overlay/stage-overlays";
+import { getCanvasDeepLeafNodeIdAtPoint } from "./canvas-overlay/vector-path/canvas-node-hit-target";
 import { resolveVectorPenHoverAction } from "./canvas-overlay/vector-path/pen-hover";
 import { CanvasTextEditor } from "./canvas-text-editor";
 import { startCanvasToolPlacementSession } from "./canvas-tool-placement-session";
@@ -21,6 +22,75 @@ import { useCanvasSvgDrop } from "./use-canvas-svg-drop";
 
 const INITIAL_ZOOM = 1;
 const CANVAS_STAGE_MARGIN = 80_000;
+
+const containsPoint = (bounds, point) => {
+  return Boolean(
+    bounds &&
+      point &&
+      point.x >= bounds.minX &&
+      point.x <= bounds.maxX &&
+      point.y >= bounds.minY &&
+      point.y <= bounds.maxY
+  );
+};
+
+const getTopmostVisibleArtboardIdAtPoint = (editor, point) => {
+  return (
+    [...editor.nodes]
+      .reverse()
+      .find((node) => {
+        return (
+          node.type === "artboard" &&
+          editor.isNodeEffectivelyVisible(node.id) &&
+          containsPoint(editor.getNodeRenderFrame(node.id)?.bounds, point)
+        );
+      })
+      ?.id || null
+  );
+};
+
+const startCanvasArtboardBodyPress = (editor, event, nodeId) => {
+  const wasSelected = editor.isSelected(nodeId);
+  const isAdditiveSelection = event.shiftKey;
+  const startClientPoint = {
+    x: event.clientX,
+    y: event.clientY,
+  };
+  let hasDragged = false;
+
+  const handlePointerMove = (moveEvent) => {
+    hasDragged =
+      hasDragged ||
+      Math.hypot(
+        moveEvent.clientX - startClientPoint.x,
+        moveEvent.clientY - startClientPoint.y
+      ) >= 3;
+  };
+
+  const handlePointerEnd = () => {
+    window.removeEventListener("pointermove", handlePointerMove);
+    window.removeEventListener("pointercancel", handlePointerEnd);
+    window.removeEventListener("pointerup", handlePointerEnd);
+
+    if (hasDragged) {
+      return;
+    }
+
+    if (isAdditiveSelection) {
+      editor.toggleSelection(nodeId);
+      return;
+    }
+
+    if (!wasSelected) {
+      editor.select(nodeId);
+    }
+  };
+
+  window.addEventListener("pointermove", handlePointerMove);
+  window.addEventListener("pointercancel", handlePointerEnd);
+  window.addEventListener("pointerup", handlePointerEnd);
+};
+
 const getCanvasPoint = (viewer, host, clientX, clientY, zoom) => {
   if (!(viewer && host)) {
     return { x: 0, y: 0 };
@@ -239,6 +309,7 @@ export const Canvas = () => {
         event.target.closest(
           [
             "[data-node-id]",
+            "[data-artboard-body]",
             ".canvas-moveable",
             "[data-testid='canvas-text-input']",
           ].join(",")
@@ -254,6 +325,16 @@ export const Canvas = () => {
         event.clientY,
         zoom
       );
+      const artboardBodyNodeId =
+        activeTool === "pointer" &&
+        !getCanvasDeepLeafNodeIdAtPoint(editor, event.clientX, event.clientY)
+          ? getTopmostVisibleArtboardIdAtPoint(editor, point)
+          : null;
+
+      if (artboardBodyNodeId) {
+        startCanvasArtboardBodyPress(editor, event, artboardBodyNodeId);
+        return;
+      }
 
       startCanvasToolPlacementSession({
         editor,
