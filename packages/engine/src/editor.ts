@@ -14,6 +14,7 @@ import { getEditorDebugDump } from "./debug-dump";
 import {
   newDocument as createNewEditorDocument,
   exportDocument as exportEditorDocument,
+  exportSelectedArtboardSvg as exportEditorSelectedArtboardSvg,
   getDocument as getEditorDocument,
   loadDocument as loadEditorDocument,
   serializeDocument as serializeEditorDocument,
@@ -93,6 +94,7 @@ import {
   splitVectorPath as splitEditorVectorPath,
 } from "./document/path/path-topology-actions";
 import {
+  addArtboardNode as addEditorArtboardNode,
   addShapeNode as addEditorShapeNode,
   addTextNode as addEditorTextNode,
   addVectorNode as addEditorVectorNode,
@@ -169,6 +171,7 @@ import {
   getEffectiveSelectionNodeIds,
   getSelectionTargetNodeId,
   isDescendantOf,
+  isArtboardNode,
   isGroupNode,
 } from "./nodes/node-tree";
 import { getPathNodeContours } from "./nodes/path/path-contours";
@@ -244,6 +247,7 @@ import {
 } from "./transform/text-path-edit";
 import {
   cancelPendingViewportFocus as cancelEditorPendingViewportFocus,
+  focusCanvasBoundsInViewport as focusEditorCanvasBoundsInViewport,
   scheduleViewportFocus as scheduleEditorViewportFocus,
   zoomIn as zoomEditorIn,
   zoomOut as zoomEditorOut,
@@ -682,6 +686,10 @@ export class Editor {
     return isGroupNode(this.getNode(nodeId));
   }
 
+  isArtboardNode(nodeId) {
+    return isArtboardNode(this.getNode(nodeId));
+  }
+
   isNodeEffectivelyVisible(nodeId) {
     const node = this.getNode(nodeId);
     if (!node || node.visible === false) {
@@ -921,8 +929,12 @@ export class Editor {
     return getEditorDocument(this);
   }
 
+  addArtboardNode(point) {
+    return addEditorArtboardNode(this, point);
+  }
+
   addTextNode(point) {
-    addEditorTextNode(this, point);
+    return addEditorTextNode(this, point);
   }
 
   addShapeNode(point, shape) {
@@ -1024,6 +1036,10 @@ export class Editor {
 
   async exportDocument() {
     return await exportEditorDocument(this);
+  }
+
+  async exportSelectedArtboardSvg(nodeId = this.selectedNodeId) {
+    return await exportEditorSelectedArtboardSvg(this, nodeId);
   }
 
   finalizeEditing() {
@@ -1792,6 +1808,10 @@ export class Editor {
 
   scheduleViewportFocus(nodeIds) {
     scheduleEditorViewportFocus(this, nodeIds);
+  }
+
+  focusCanvasBounds(bounds, options) {
+    focusEditorCanvasBoundsInViewport(this, bounds, options);
   }
 
   loadLocalFontCatalog(loadCatalog, { force = false } = {}) {

@@ -11,7 +11,9 @@ import {
   getTreeOrderedNodes,
   isContainerNode,
   isDescendantOf,
+  isArtboardNode,
   isGroupNode,
+  isVectorNode,
 } from "../../nodes/node-tree";
 
 const dedupeIds = (nodeIds) => {
@@ -38,7 +40,7 @@ const cleanupEmptyGroups = (nodes) => {
     const emptyGroupIds = nextNodes
       .filter(
         (node) =>
-          isContainerNode(node) &&
+          (isGroupNode(node) || isVectorNode(node)) &&
           (childIdsByParent.get(node.id) || []).length === 0
       )
       .map((node) => node.id);
@@ -280,6 +282,13 @@ export const moveNodeBlocksState = (
   }
 
   const nodesById = createNodeMap(state.nodes);
+  if (
+    targetParentId !== ROOT_PARENT_ID &&
+    movedNodeIds.some((nodeId) => isArtboardNode(nodesById.get(nodeId)))
+  ) {
+    return {};
+  }
+
   const targetParentNode =
     targetParentId === ROOT_PARENT_ID ? null : nodesById.get(targetParentId);
 

@@ -29,6 +29,9 @@ Shape nodes let users create and edit live geometric shapes that remain easy to 
 - Shape nodes should behave like constrained vectors rather than like bitmap-like primitives.
 - The baseline live shape families should be polygon, ellipse, and star.
 - The rectangle tool should create a polygon shape with a four-corner default layout rather than introducing a separate durable rectangle family.
+- Click-created shapes should use an ergonomic starter size for the current working context.
+- Shape starter dimensions should be whole-number values.
+- Drag-created shapes should use the user's drag size exactly.
 - Moving existing shape anchors should preserve live shape behavior only when that interaction still fits the current live shape family.
 - Adjusting existing shape handles should preserve live shape behavior only when that interaction still fits the current live shape family.
 - Shape editing may distort a live shape significantly while still preserving shape-specific controls if those controls remain meaningful.

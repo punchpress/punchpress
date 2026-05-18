@@ -1,4 +1,5 @@
 import {
+  ArtboardToolIcon,
   Folder02Icon,
   GeometricShapes01Icon,
   Route01Icon,
@@ -18,6 +19,10 @@ export const LayerNodeIcon = ({
 }: LayerNodeIconProps) => {
   if (isGroup) {
     return <LayerGlyph icon={Folder02Icon} size={16} strokeWidth={1.8} />;
+  }
+
+  if (nodeType === "artboard") {
+    return <LayerGlyph icon={ArtboardToolIcon} size={16} strokeWidth={1.8} />;
   }
 
   if (nodeType === "vector") {

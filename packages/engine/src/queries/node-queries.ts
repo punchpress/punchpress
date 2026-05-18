@@ -9,6 +9,7 @@ import {
 import {
   getDescendantLeafNodeIds,
   isContainerNode,
+  isArtboardNode,
   isGroupNode,
   isPathNode,
   isShapeNode,
@@ -70,7 +71,9 @@ export const getLayerRow = (editor, nodeId) => {
   const isVisible = isNodeEffectivelyVisible(editor, node);
   let label = node.name || `Group ${containerLayerIndex + 1}`;
 
-  if (isTextNode(node)) {
+  if (isArtboardNode(node)) {
+    label = node.name || `Artboard ${containerLayerIndex + 1}`;
+  } else if (isTextNode(node)) {
     label = node.text.trim().length > 0 ? node.text : `Text ${layerIndex + 1}`;
   } else if (isShapeNode(node)) {
     label = `${node.shape[0].toUpperCase()}${node.shape.slice(1)} ${layerIndex + 1}`;
@@ -83,6 +86,7 @@ export const getLayerRow = (editor, nodeId) => {
   return {
     isBackmost: siblingIndex === 0,
     isContainer: isContainerNode(node),
+    isArtboard: isArtboardNode(node),
     isFrontmost: siblingIndex === siblingIds.length - 1,
     isGroup: isGroupNode(node),
     isSelected: editor.isSelected(node.id),
@@ -302,7 +306,6 @@ export const getSelectionPreviewDelta = (
   if (
     !(
       preview?.delta &&
-      preview.nodeIds?.length === nodeIds.length &&
       nodeIds.every((nodeId) => preview.nodeIds.includes(nodeId))
     )
   ) {
@@ -689,7 +692,7 @@ const getSelectionFrameNodeIds = (editor, requestedNodeIds) => {
       continue;
     }
 
-    if (!isContainerNode(node)) {
+    if (!isContainerNode(node) || isArtboardNode(node)) {
       selectionFrameNodeIds.push(nodeId);
       continue;
     }

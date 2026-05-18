@@ -11,6 +11,8 @@ export {
   PUNCH_DOCUMENT_EXTENSION,
   PUNCH_DOCUMENT_MIME_TYPE,
   PUNCH_DOCUMENT_VERSION,
+  PUNCH_PNG_EXTENSION,
+  PUNCH_PNG_MIME_TYPE,
   PUNCH_SVG_EXTENSION,
   PUNCH_SVG_MIME_TYPE,
   ROOT_PARENT_ID,
@@ -56,6 +58,7 @@ export {
   serializeDesignDocument,
 } from "./save";
 export type {
+  ArtboardNodeDocument,
   ClipboardContent,
   DesignDocument,
   GroupNodeDocument,
@@ -77,6 +80,7 @@ export type {
   WarpDocument,
 } from "./schema";
 export {
+  artboardNodeSchema,
   designDocumentSchema,
   groupNodeSchema,
   localFontSchema,

@@ -16,7 +16,11 @@ import { getDuplicateRecentDocumentNames } from "./recent-documents";
 import { RecentDocumentsMenu } from "./recent-documents-menu";
 
 const isContainerLayerNode = (node) => {
-  return node?.type === "group" || node?.type === "vector";
+  return (
+    node?.type === "artboard" ||
+    node?.type === "group" ||
+    node?.type === "vector"
+  );
 };
 
 const LAYER_ROW_HEIGHT = 32;
@@ -131,6 +135,11 @@ const moveLayerNode = (editor, activeId, overId) => {
     activeNode.type === "path" &&
     movePathLayerNode(editor, activeId, overNode)
   ) {
+    return;
+  }
+
+  if (overNode.type === "artboard" && activeNode.type !== "artboard") {
+    editor.moveNodeToParent(activeId, overNode.id, null);
     return;
   }
 

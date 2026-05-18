@@ -14,31 +14,37 @@ const escapeMetadata = (value: string) => {
     .replaceAll(">", "&gt;");
 };
 
-export const exportDesignDocument = async (
-  document: DesignDocument,
-  loadFont: (font: TextNodeDocument["font"]) => Promise<unknown>
-) => {
-  const nodes = document.nodes.filter((node) => {
-    if (node.type === "group" || node.visible === false) {
-      return false;
-    }
+const isNodeVisibleForExport = (document, node) => {
+  if (node.visible === false) {
+    return false;
+  }
 
-    if (
-      node.type === "path" &&
-      document.nodes.find((parentNode) => parentNode.id === node.parentId)
-        ?.type === "vector"
-    ) {
-      return false;
-    }
-
-    return !document.nodes.some((ancestorNode) => {
-      return (
-        ancestorNode.id !== node.id &&
-        ancestorNode.visible === false &&
-        isDescendantOf(document.nodes, node.id, ancestorNode.id)
-      );
-    });
+  return !document.nodes.some((ancestorNode) => {
+    return (
+      ancestorNode.id !== node.id &&
+      ancestorNode.visible === false &&
+      isDescendantOf(document.nodes, node.id, ancestorNode.id)
+    );
   });
+};
+
+const shouldExportNode = (document, node) => {
+  if (node.type === "group" || node.visible === false) {
+    return false;
+  }
+
+  if (
+    node.type === "path" &&
+    document.nodes.find((parentNode) => parentNode.id === node.parentId)
+      ?.type === "vector"
+  ) {
+    return false;
+  }
+
+  return isNodeVisibleForExport(document, node);
+};
+
+const buildGeometryById = async (document, loadFont) => {
   const fontPromises = new Map<string, ReturnType<typeof loadFont>>();
   const geometryById = new Map();
 
@@ -59,7 +65,7 @@ export const exportDesignDocument = async (
     geometryById.set(node.id, buildNodeCapabilityGeometry(node, font));
   }
 
-  for (const node of nodes) {
+  for (const node of document.nodes) {
     if (node.type !== "vector") {
       continue;
     }
@@ -76,7 +82,10 @@ export const exportDesignDocument = async (
     );
   }
 
-  const svg = buildSvgExport(nodes, geometryById);
+  return geometryById;
+};
+
+const withDocumentMetadata = (svg, document) => {
   const metadata = [
     "<metadata>",
     `<punchpress-document version="${document.version}">`,
@@ -86,4 +95,45 @@ export const exportDesignDocument = async (
   ].join("");
 
   return svg.replace("</svg>", `${metadata}</svg>`);
+};
+
+export const exportDesignDocument = async (
+  document: DesignDocument,
+  loadFont: (font: TextNodeDocument["font"]) => Promise<unknown>
+) => {
+  const nodes = document.nodes.filter((node) => shouldExportNode(document, node));
+  const geometryById = await buildGeometryById(document, loadFont);
+  const svg = buildSvgExport(nodes, geometryById);
+
+  return withDocumentMetadata(svg, document);
+};
+
+export const exportArtboardSvg = async (
+  document: DesignDocument,
+  artboardId: string,
+  loadFont: (font: TextNodeDocument["font"]) => Promise<unknown>
+) => {
+  const artboard = document.nodes.find((node) => node.id === artboardId);
+
+  if (artboard?.type !== "artboard") {
+    return null;
+  }
+
+  const nodes = document.nodes.filter((node) => {
+    return (
+      node.id !== artboard.id &&
+      isDescendantOf(document.nodes, node.id, artboard.id) &&
+      shouldExportNode(document, node)
+    );
+  });
+  const geometryById = await buildGeometryById(document, loadFont);
+  const svg = buildSvgExport(nodes, geometryById, {
+    background: artboard.background,
+    height: artboard.height,
+    offsetX: artboard.transform.x,
+    offsetY: artboard.transform.y,
+    width: artboard.width,
+  });
+
+  return withDocumentMetadata(svg, document);
 };

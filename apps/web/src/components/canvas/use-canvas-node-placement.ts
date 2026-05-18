@@ -3,6 +3,7 @@ import { useEditor } from "../../editor-react/use-editor";
 import { resolvePreviewPlacementNodeIds } from "./canvas-node-preview-placement";
 
 interface NodeShellState {
+  clipPath: string;
   height: number;
   transform: string;
   width: number;
@@ -26,12 +27,55 @@ const getNodeShellState = (editor, nodeId): NodeShellState | null => {
   }
 
   return {
+    clipPath: getNodeClipPath(editor, nodeId, frame.bounds),
     height: Math.max(1, frame.bounds.height),
     transform: frame.transform || "",
     width: Math.max(1, frame.bounds.width),
     x: frame.bounds.minX,
     y: frame.bounds.minY,
   };
+};
+
+const offsetBounds = (bounds, delta) => {
+  if (!(bounds && delta)) {
+    return bounds;
+  }
+
+  return {
+    ...bounds,
+    maxX: bounds.maxX + (delta.x || 0),
+    maxY: bounds.maxY + (delta.y || 0),
+    minX: bounds.minX + (delta.x || 0),
+    minY: bounds.minY + (delta.y || 0),
+  };
+};
+
+const getNodeClipPath = (editor, nodeId, bounds, preview = null) => {
+  const node = editor.getNode(nodeId);
+  const parentNode =
+    node?.parentId && node.parentId !== "root"
+      ? editor.getNode(node.parentId)
+      : null;
+
+  if (!(bounds && parentNode?.type === "artboard")) {
+    return "";
+  }
+
+  const artboardFrame = editor.getNodeRenderFrame(parentNode.id);
+  const artboardBounds = preview?.nodeIds?.includes(parentNode.id)
+    ? offsetBounds(artboardFrame?.bounds, preview.delta)
+    : artboardFrame?.bounds;
+
+  if (!artboardBounds) {
+    return "";
+  }
+
+  const top = Math.max(0, artboardBounds.minY - bounds.minY);
+  const right = Math.max(0, bounds.maxX - artboardBounds.maxX);
+  const bottom = Math.max(0, bounds.maxY - artboardBounds.maxY);
+  const left = Math.max(0, artboardBounds.minX - bounds.minX);
+
+  return `inset(${top}px ${right}px ${bottom}px ${left}px)`;
 };
 
 const getShellKey = (shellState, delta) => {
@@ -45,6 +89,7 @@ const getShellKey = (shellState, delta) => {
     shellState.x,
     shellState.y,
     shellState.transform,
+    shellState.clipPath,
     delta?.x || 0,
     delta?.y || 0,
   ].join(":");
@@ -56,6 +101,7 @@ const applyNodeShellState = (element, shellState, delta) => {
   }
 
   if (!shellState) {
+    element.style.clipPath = "";
     element.style.width = "0px";
     element.style.height = "0px";
     element.style.transform = "translate3d(0px, 0px, 0)";
@@ -67,6 +113,7 @@ const applyNodeShellState = (element, shellState, delta) => {
 
   element.style.width = `${shellState.width}px`;
   element.style.height = `${shellState.height}px`;
+  element.style.clipPath = shellState.clipPath;
   element.style.transform = shellState.transform
     ? `translate3d(${x}px, ${y}px, 0) ${shellState.transform}`
     : `translate3d(${x}px, ${y}px, 0)`;
@@ -100,14 +147,30 @@ const syncNodeShell = (
   appliedKeys.set(nodeId, nextKey);
 };
 
-const applyPreviewTransform = (previewEntry: PreviewEntry, delta) => {
+const applyPreviewTransform = (editor, previewEntry: PreviewEntry, preview) => {
   const { element, shellState, transformSuffix } = previewEntry;
 
   if (!(element && shellState)) {
     return;
   }
 
-  element.style.transform = `translate3d(${shellState.x + delta.x}px, ${shellState.y + delta.y}px, 0)${transformSuffix}`;
+  const delta = preview.delta || { x: 0, y: 0 };
+  const previewBounds = {
+    height: shellState.height,
+    maxX: shellState.x + shellState.width + (delta.x || 0),
+    maxY: shellState.y + shellState.height + (delta.y || 0),
+    minX: shellState.x + (delta.x || 0),
+    minY: shellState.y + (delta.y || 0),
+    width: shellState.width,
+  };
+
+  element.style.clipPath = getNodeClipPath(
+    editor,
+    previewEntry.nodeId,
+    previewBounds,
+    preview
+  );
+  element.style.transform = `translate3d(${previewBounds.minX}px, ${previewBounds.minY}px, 0)${transformSuffix}`;
 };
 
 const sameNodeIds = (left = [], right = []) => {
@@ -233,7 +296,7 @@ const syncPreviewNodeShells = (editor, placementState, preview) => {
   }
 
   for (const entry of entries) {
-    applyPreviewTransform(entry, preview.delta);
+    applyPreviewTransform(editor, entry, preview);
     placementState.appliedElements.set(entry.nodeId, entry.element);
     placementState.appliedKeys.set(
       entry.nodeId,

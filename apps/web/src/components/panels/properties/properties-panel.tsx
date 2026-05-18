@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useEditor } from "../../../editor-react/use-editor";
 import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
 import { AppearanceFields } from "./appearance-fields";
+import { ArtboardFields } from "./artboard-fields";
 import { PathCornerFields } from "./path-corner-fields";
 import { PathPointFields } from "./path-point-fields";
 import { SelectionColorsFields } from "./selection-colors-fields";
@@ -42,7 +43,8 @@ export const PropertiesPanel = () => {
       pathCornerRadiusSummary
   );
   const hasFieldsBeforeAppearance = Boolean(
-    selectedNode?.type === "text" ||
+    selectedNode?.type === "artboard" ||
+      selectedNode?.type === "text" ||
       selectedNode?.type === "shape" ||
       showsPathPointCornerRadius ||
       showsPathCornerRadiusSummary
@@ -68,6 +70,15 @@ export const PropertiesPanel = () => {
 
         {selectedNode?.type === "text" ? (
           <TextFields node={selectedNode} />
+        ) : null}
+
+        {selectedNode?.type === "artboard" ? (
+          <ArtboardFields
+            background={selectionProperties.properties.background}
+            height={selectionProperties.properties.height}
+            node={selectedNode}
+            width={selectionProperties.properties.width}
+          />
         ) : null}
 
         {selectedNode?.type === "shape" ? (

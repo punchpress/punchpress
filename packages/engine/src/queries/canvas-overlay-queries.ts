@@ -1,4 +1,8 @@
-import { isContainerNode, isGroupNode } from "../nodes/node-tree";
+import {
+  isArtboardNode,
+  isContainerNode,
+  isGroupNode,
+} from "../nodes/node-tree";
 import { format } from "../primitives/math";
 import {
   getNodeTransformFrame as getPrimitiveNodeTransformFrame,
@@ -33,6 +37,14 @@ const getTransformFlags = ({
     (activeTool === "node" &&
       isPathEditingSelection &&
       selectedEditCapabilities?.pathEditingOverlayMode === "keep-transform");
+
+  if (isArtboardNode(selectedNode)) {
+    return {
+      isDraggable: false,
+      isResizable: Boolean(canTransform && selectedNode && !editingNodeId),
+      isRotatable: false,
+    };
+  }
 
   if (isPathEditingSelection) {
     return {

@@ -71,13 +71,20 @@ const buildSvgPathMarkup = (node, path) => {
   )}"/>`;
 };
 
-export const buildSvgExport = (nodes, geometryById) => {
+export const buildSvgExport = (nodes, geometryById, options = {}) => {
+  const width = options.width ?? ARTBOARD_WIDTH;
+  const height = options.height ?? ARTBOARD_HEIGHT;
+  const offsetX = options.offsetX ?? 0;
+  const offsetY = options.offsetY ?? 0;
+  const background = options.background ?? "#2d2d2d";
   const body = [
-    `<rect width="${ARTBOARD_WIDTH}" height="${ARTBOARD_HEIGHT}" fill="#2d2d2d"/>`,
+    background
+      ? `<rect width="${format(width)}" height="${format(height)}" fill="${background}"/>`
+      : "",
   ];
 
   for (const node of nodes) {
-    if (node.visible === false) {
+    if (node.visible === false || node.type === "artboard") {
       continue;
     }
 
@@ -87,8 +94,8 @@ export const buildSvgExport = (nodes, geometryById) => {
     }
 
     body.push(
-      `<g transform="translate(${format(getNodeX(node))} ${format(
-        getNodeY(node)
+      `<g transform="translate(${format(getNodeX(node) - offsetX)} ${format(
+        getNodeY(node) - offsetY
       )})">`
     );
 
@@ -109,5 +116,5 @@ export const buildSvgExport = (nodes, geometryById) => {
     body.push("</g>");
   }
 
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${ARTBOARD_WIDTH}" height="${ARTBOARD_HEIGHT}" viewBox="0 0 ${ARTBOARD_WIDTH} ${ARTBOARD_HEIGHT}">${body.join("")}</svg>`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${format(width)}" height="${format(height)}" viewBox="0 0 ${format(width)} ${format(height)}">${body.join("")}</svg>`;
 };

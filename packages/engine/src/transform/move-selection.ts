@@ -1,3 +1,5 @@
+import { getTopmostArtboardAtPoint } from "../nodes/artboard/artboard-hit-test";
+import { getDescendantLeafNodeIds, isArtboardNode } from "../nodes/node-tree";
 import { getNodeX, getNodeY } from "../nodes/text/model";
 import { measurePerf } from "../perf/perf-hooks";
 import { round } from "../primitives/math";
@@ -9,7 +11,17 @@ export const beginMoveSelection = (editor, { nodeId, nodeIds } = {}) => {
       ? [nodeId].filter((currentNodeId) => editor.getNode(currentNodeId))
       : null) ||
     editor.selectedNodeIds;
-  const resolvedNodeIds = editor.getEffectiveSelectionNodeIds(requestedNodeIds);
+  const resolvedNodeIds = [
+    ...new Set(
+      editor.getEffectiveSelectionNodeIds(requestedNodeIds).flatMap((id) => {
+        const node = editor.getNode(id);
+
+        return isArtboardNode(node)
+          ? [id, ...getDescendantLeafNodeIds(editor.nodes, id)]
+          : [id];
+      })
+    ),
+  ];
 
   if (resolvedNodeIds.length === 0) {
     return null;
@@ -109,6 +121,80 @@ const getAbsoluteMoveDelta = (session, { dragEvents, left, top } = {}) => {
   };
 };
 
+const getNodeCenter = (editor, nodeId) => {
+  const frame = editor.getNodeRenderFrame(nodeId);
+  const bounds = frame?.bounds;
+
+  return bounds
+    ? {
+        x: bounds.minX + bounds.width / 2,
+        y: bounds.minY + bounds.height / 2,
+      }
+    : null;
+};
+
+const hasMovedArtboardAncestor = (editor, node, movedNodeIdSet) => {
+  let currentParentId = node?.parentId || "root";
+
+  while (currentParentId && currentParentId !== "root") {
+    const parentNode = editor.getNode(currentParentId);
+
+    if (isArtboardNode(parentNode) && movedNodeIdSet.has(parentNode.id)) {
+      return true;
+    }
+
+    currentParentId = parentNode?.parentId || "root";
+  }
+
+  return false;
+};
+
+const getReparentableDraggedNodeIds = (editor, nodeIds) => {
+  const movedNodeIdSet = new Set(nodeIds);
+
+  return nodeIds.filter((nodeId) => {
+    const node = editor.getNode(nodeId);
+    const parentNode =
+      node?.parentId && node.parentId !== "root"
+        ? editor.getNode(node.parentId)
+        : null;
+
+    return Boolean(
+      node &&
+        !isArtboardNode(node) &&
+        !hasMovedArtboardAncestor(editor, node, movedNodeIdSet) &&
+        (node.parentId === "root" || isArtboardNode(parentNode))
+    );
+  });
+};
+
+const reparentDraggedNodesToArtboards = (editor, nodeIds) => {
+  const reparentableNodeIds = getReparentableDraggedNodeIds(editor, nodeIds);
+  const movedNodeIdSet = new Set(nodeIds);
+
+  for (const nodeId of reparentableNodeIds) {
+    const node = editor.getNode(nodeId);
+    const center = getNodeCenter(editor, nodeId);
+
+    if (!(node && center)) {
+      continue;
+    }
+
+    const targetArtboard = getTopmostArtboardAtPoint(
+      editor,
+      center,
+      movedNodeIdSet
+    );
+    const nextParentId = targetArtboard?.id || "root";
+
+    if (node.parentId === nextParentId) {
+      continue;
+    }
+
+    editor.moveNodeToParent(node.id, nextParentId, null);
+  }
+};
+
 export const commitMoveSelection = (editor, session) => {
   if (!session) {
     return [];
@@ -136,6 +222,8 @@ export const commitMoveSelection = (editor, session) => {
       },
     };
   });
+
+  reparentDraggedNodesToArtboards(editor, session.nodeIds);
 
   return session.nodeIds;
 };
@@ -173,7 +261,17 @@ export const updateMoveSelection = (
 
 export const moveSelectionBy = (editor, { x = 0, y = 0 } = {}) => {
   return measurePerf("selection.move.by", () => {
-    const effectiveSelectedNodeIds = editor.getEffectiveSelectionNodeIds();
+    const effectiveSelectedNodeIds = [
+      ...new Set(
+        editor.getEffectiveSelectionNodeIds().flatMap((id) => {
+          const node = editor.getNode(id);
+
+          return isArtboardNode(node)
+            ? [id, ...getDescendantLeafNodeIds(editor.nodes, id)]
+            : [id];
+        })
+      ),
+    ];
 
     if (effectiveSelectedNodeIds.length === 0) {
       return [];
@@ -185,6 +283,8 @@ export const moveSelectionBy = (editor, { x = 0, y = 0 } = {}) => {
         y: round(getNodeY(node) + y, 2),
       },
     }));
+
+    reparentDraggedNodesToArtboards(editor, effectiveSelectedNodeIds);
 
     return effectiveSelectedNodeIds;
   });

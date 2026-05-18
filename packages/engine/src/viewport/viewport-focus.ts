@@ -81,7 +81,7 @@ export const scheduleViewportFocus = (editor, nodeIds) => {
   });
 };
 
-const focusCanvasBoundsInViewport = (editor, bounds) => {
+export const focusCanvasBoundsInViewport = (editor, bounds, options = {}) => {
   const viewer = editor.viewerRef;
   const host = editor.hostRef;
 
@@ -92,14 +92,16 @@ const focusCanvasBoundsInViewport = (editor, bounds) => {
   const hostRect = host.getBoundingClientRect();
   const width = Math.max(hostRect.width, 1);
   const height = Math.max(hostRect.height, 1);
-  const padding = 160;
+  const paddingX = options.paddingX ?? options.padding ?? 160;
+  const paddingY = options.paddingY ?? options.padding ?? 160;
+  const maxZoom = options.maxZoom ?? 1;
   const contentWidth = Math.max(bounds.maxX - bounds.minX, 1);
   const contentHeight = Math.max(bounds.maxY - bounds.minY, 1);
   const zoom = clamp(
     Math.min(
-      width / (contentWidth + padding * 2),
-      height / (contentHeight + padding * 2),
-      1
+      width / (contentWidth + paddingX * 2),
+      height / (contentHeight + paddingY * 2),
+      maxZoom
     ),
     MIN_ZOOM,
     MAX_ZOOM

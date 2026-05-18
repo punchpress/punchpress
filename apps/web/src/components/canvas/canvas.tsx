@@ -6,6 +6,7 @@ import { useEditorValue } from "../../editor-react/use-editor-value";
 import { shouldDisableCanvasOverlay } from "../../performance/performance-url-flags";
 import { useTheme } from "../../theme/theme-provider";
 import { DesignerFloatingToolbar, DesignerFrame } from "../designer/designer";
+import { CanvasArtboards } from "./canvas-artboards";
 import { getCanvasCursorStyle } from "./canvas-cursor-assets";
 import { CanvasCursorCompanion } from "./canvas-cursor-companion";
 import { CanvasDotGrid } from "./canvas-dot-grid";
@@ -19,7 +20,7 @@ import { CanvasToolbar } from "./canvas-toolbar";
 import { useCanvasSvgDrop } from "./use-canvas-svg-drop";
 
 const INITIAL_ZOOM = 1;
-const CANVAS_STAGE_MARGIN = 2400;
+const CANVAS_STAGE_MARGIN = 80_000;
 const getCanvasPoint = (viewer, host, clientX, clientY, zoom) => {
   if (!(viewer && host)) {
     return { x: 0, y: 0 };
@@ -408,6 +409,7 @@ export const Canvas = () => {
               stageMargin={CANVAS_STAGE_MARGIN}
               zoom={zoom}
             />
+            <CanvasArtboards />
             <CanvasNodes />
             <CanvasStageOverlays />
             <CanvasTextEditor />

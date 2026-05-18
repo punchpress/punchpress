@@ -5,6 +5,9 @@ transform, and respond to pointer interaction.
 
 ## Product Expectations
 
+- The canvas is an open workspace, not a document with one fixed pixel size.
+- World coordinates describe positions in the workspace; artboards and raster
+  images are the places where pixel dimensions become product meaning.
 - Every visible node should have one coherent geometry model that describes its visible footprint.
 - Rendering, selection bounds, hover previews, hit testing, transforms, and path-edit entry should agree on that geometry.
 - A user should not be able to click an old or untransformed version of a node after the node has moved, resized, rotated, or changed composition.
@@ -21,3 +24,13 @@ transform, and respond to pointer interaction.
 - Path-editing chrome should never reveal stale source geometry that no longer matches the transformed editable path.
 - Imported SVG artwork should behave like native artwork under the same geometry and hit-testing expectations.
 
+## Placement Scale
+
+- Imported or pasted artwork with intrinsic dimensions should enter the canvas
+  at those dimensions.
+- Newly authored primitives, such as click-created text and shapes, should start
+  at an ergonomic starter size for the current working context.
+- Ergonomic starter sizes should be rounded to whole-number values.
+- Drag-created primitives should use the user's drag size exactly.
+- Starter sizes should feel reasonable in the visible workspace without changing
+  the meaning of zoom or scaling imported assets.

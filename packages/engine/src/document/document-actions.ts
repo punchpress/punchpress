@@ -10,7 +10,7 @@ import {
   toInternalEditorNodes,
   toSerializableDocumentNodes,
 } from "../nodes/vector/vector-document-conversion";
-import { exportDesignDocument } from "./export";
+import { exportArtboardSvg, exportDesignDocument } from "./export";
 
 export const getDocument = (editor) => {
   if (editor.editingNodeId) {
@@ -31,6 +31,27 @@ export const exportDocument = (editor) => {
   }
 
   return exportDesignDocument(getDocument(editor), (font) =>
+    editor.fonts.loadFontForExport(font)
+  );
+};
+
+export const exportSelectedArtboardSvg = (editor, artboardId = editor.selectedNodeId) => {
+  const node = editor.getNode(artboardId);
+
+  if (node?.type !== "artboard") {
+    return null;
+  }
+
+  const missingFonts = getMissingDocumentFonts(
+    editor.nodes,
+    editor.availableFonts
+  );
+
+  if (missingFonts.length > 0) {
+    throw new MissingDocumentFontsError(missingFonts);
+  }
+
+  return exportArtboardSvg(getDocument(editor), node.id, (font) =>
     editor.fonts.loadFontForExport(font)
   );
 };

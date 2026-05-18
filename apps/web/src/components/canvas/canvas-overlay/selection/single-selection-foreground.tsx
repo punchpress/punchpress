@@ -301,6 +301,10 @@ export const CanvasSingleSelectionForeground = ({
   const isShapeNode = useEditorValue((editor) => {
     return editor.getNode(nodeId)?.type === "shape";
   });
+  const isArtboardNode = useEditorValue((editor) => {
+    return editor.getNode(nodeId)?.type === "artboard";
+  });
+  const usesBoxResize = isShapeNode || isArtboardNode;
   const isPathEditing = useEditorValue((editor, state) => {
     return state.pathEditingNodeId === nodeId && editor.isPathEditing(nodeId);
   });
@@ -506,7 +510,7 @@ export const CanvasSingleSelectionForeground = ({
       handle,
       pointer,
       nodeId,
-      isShapeNode
+      usesBoxResize
     );
 
     if (!resizeState) {
@@ -518,7 +522,7 @@ export const CanvasSingleSelectionForeground = ({
     const historyMark = editor.markHistoryStep("resize selection");
 
     const handlePointerMove = (moveEvent) => {
-      if (isShapeNode) {
+      if (usesBoxResize) {
         const pointCanvas = getCanvasPoint(
           editor,
           moveEvent.clientX,
@@ -668,18 +672,18 @@ export const CanvasSingleSelectionForeground = ({
         {(["n", "s", "w", "e"] as const).map((edge) => {
           return (
             <div
-              className={`absolute ${isShapeNode ? edgeCursorClassName[edge] : ""}`}
+              className={`absolute ${usesBoxResize ? edgeCursorClassName[edge] : ""}`}
               data-edge={edge}
               key={edge}
               onPointerDown={
-                isShapeNode ? (event) => startResize(edge, event) : undefined
+                usesBoxResize ? (event) => startResize(edge, event) : undefined
               }
               ref={(element) => {
                 edgeElementsRef.current[edge] = element;
               }}
               style={{
                 ...edgeHitAreaStyle[edge],
-                pointerEvents: isShapeNode ? "auto" : "none",
+                pointerEvents: usesBoxResize ? "auto" : "none",
               }}
             >
               <div

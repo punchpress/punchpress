@@ -1,6 +1,12 @@
 import { finishEditingIfNeeded } from "../editing/editing-actions";
 import { getNodePlacementCapabilities } from "../nodes/node-placement";
 import { round } from "../primitives/math";
+import { getArtboardParentPatch } from "./artboard-parent";
+import { getErgonomicShapePatch } from "./ergonomic-starter-size";
+import {
+  fitFirstAddedNode,
+  shouldFitFirstAddedNode,
+} from "./first-add-fit";
 
 const PLACEMENT_DRAG_THRESHOLD_PX = 3;
 
@@ -41,11 +47,15 @@ const beginShapePlacement = (editor, { point, shape }) => {
 
   let hasDragged = false;
   let nodeId: string | null = null;
+  const shouldFit = shouldFitFirstAddedNode(editor);
 
   const createShapeNode = (centerPoint, patch = null) => {
     const nextNodeId = editor.getState().addShapeNode(centerPoint, shape, {
       activatePointer: false,
-      ...(patch ? { patch } : null),
+      patch: mergePlacementPatches(
+        getArtboardParentPatch(editor, centerPoint),
+        patch
+      ),
     });
 
     if (!nextNodeId) {
@@ -117,11 +127,17 @@ const beginShapePlacement = (editor, { point, shape }) => {
       });
 
       if (!(placementApplied || nodeId)) {
-        createShapeNode(point);
+        createShapeNode(point, getErgonomicShapePatch(editor, point, shape));
       }
 
       editor.setActiveTool("pointer");
-      return editor.commitHistoryStep(historyMark);
+      const didCommit = editor.commitHistoryStep(historyMark);
+
+      if (shouldFit && nodeId) {
+        fitFirstAddedNode(editor, nodeId);
+      }
+
+      return didCommit;
     },
     update: ({
       dragDistancePx = 0,
@@ -143,6 +159,7 @@ const beginVectorPlacement = (editor, { point }) => {
   if (!historyMark) {
     return null;
   }
+  const shouldFit = shouldFitFirstAddedNode(editor);
 
   return {
     cancel: () => {
@@ -151,6 +168,45 @@ const beginVectorPlacement = (editor, { point }) => {
     },
     complete: () => {
       const nodeId = editor.getState().addVectorNode(point, {
+        activatePointer: false,
+        patch: getArtboardParentPatch(editor, point),
+      });
+
+      if (!nodeId) {
+        editor.revertToMark(historyMark);
+        editor.setActiveTool("pointer");
+        return false;
+      }
+
+      editor.setActiveTool("pointer");
+      const didCommit = editor.commitHistoryStep(historyMark);
+
+      if (shouldFit) {
+        fitFirstAddedNode(editor, nodeId);
+      }
+
+      return didCommit;
+    },
+    update: () => false,
+  };
+};
+
+const beginArtboardPlacement = (editor, { point }) => {
+  finishEditingIfNeeded(editor);
+
+  const historyMark = editor.markHistoryStep("add artboard");
+  if (!historyMark) {
+    return null;
+  }
+  const shouldFit = shouldFitFirstAddedNode(editor);
+
+  return {
+    cancel: () => {
+      editor.setActiveTool("pointer");
+      return editor.revertToMark(historyMark);
+    },
+    complete: () => {
+      const nodeId = editor.getState().addArtboardNode(point, {
         activatePointer: false,
       });
 
@@ -161,7 +217,13 @@ const beginVectorPlacement = (editor, { point }) => {
       }
 
       editor.setActiveTool("pointer");
-      return editor.commitHistoryStep(historyMark);
+      const didCommit = editor.commitHistoryStep(historyMark);
+
+      if (shouldFit) {
+        fitFirstAddedNode(editor, nodeId);
+      }
+
+      return didCommit;
     },
     update: () => false,
   };
@@ -185,5 +247,15 @@ export const beginNodePlacement = (editor, { point, shape, type } = {}) => {
     return beginVectorPlacement(editor, { point });
   }
 
+  if (type === "artboard" && placementCapabilities.mode === "click") {
+    return beginArtboardPlacement(editor, { point });
+  }
+
   return null;
+};
+
+const mergePlacementPatches = (...patches) => {
+  const mergedPatch = Object.assign({}, ...patches.filter(Boolean));
+
+  return Object.keys(mergedPatch).length > 0 ? mergedPatch : null;
 };

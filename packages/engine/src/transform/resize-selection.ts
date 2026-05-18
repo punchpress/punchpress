@@ -1,4 +1,4 @@
-import { isContainerNode } from "../nodes/node-tree";
+import { isArtboardNode, isContainerNode } from "../nodes/node-tree";
 import {
   getCornerPointFromBounds,
   getResizeAnchorFromBounds,
@@ -15,6 +15,38 @@ const CORNER_DIRECTION = {
   se: [1, 1],
   sw: [-1, 1],
 } as const;
+
+const getResizedArtboardNodeUpdate = (node, bbox, pointCanvas, handle) => {
+  if (!(node && bbox && pointCanvas && handle)) {
+    return null;
+  }
+
+  let minX = bbox.minX;
+  let maxX = bbox.maxX;
+  let minY = bbox.minY;
+  let maxY = bbox.maxY;
+
+  if (handle.endsWith("w")) {
+    minX = Math.min(pointCanvas.x, bbox.maxX - 1);
+  } else if (handle.endsWith("e")) {
+    maxX = Math.max(pointCanvas.x, bbox.minX + 1);
+  }
+
+  if (handle.startsWith("n")) {
+    minY = Math.min(pointCanvas.y, bbox.maxY - 1);
+  } else if (handle.startsWith("s")) {
+    maxY = Math.max(pointCanvas.y, bbox.minY + 1);
+  }
+
+  return {
+    height: Math.round((maxY - minY) * 100) / 100,
+    transform: {
+      x: Math.round(minX * 100) / 100,
+      y: Math.round(minY * 100) / 100,
+    },
+    width: Math.round((maxX - minX) * 100) / 100,
+  };
+};
 
 export const beginResizeSelection = (
   editor,
@@ -33,6 +65,29 @@ export const beginResizeSelection = (
 
   if (!(resolvedNodeIds.length > 0 && anchorCanvas)) {
     return null;
+  }
+
+  if (
+    requestedNodeIds.length === 1 &&
+    isArtboardNode(editor.getNode(requestedNodeIds[0])) &&
+    handle
+  ) {
+    const artboardNode = editor.getNode(requestedNodeIds[0]);
+    const bbox = artboardNode
+      ? editor.getNodeTransformFrame(artboardNode.id)?.bounds
+      : null;
+
+    if (!(artboardNode && bbox)) {
+      return null;
+    }
+
+    return {
+      baseBBox: { ...bbox },
+      baseNode: { ...artboardNode },
+      handle,
+      mode: "artboard-box",
+      nodeIds: [artboardNode.id],
+    };
   }
 
   if (resolvedNodeIds.length === 1 && !includesContainerSelection) {
@@ -113,6 +168,23 @@ export const updateResizeSelection = (
       pointCanvas,
       session.handle,
       { preserveAspectRatio }
+    );
+
+    if (!nodeUpdate) {
+      return [];
+    }
+
+    editor.updateNode(nodeId, nodeUpdate);
+    return [nodeId];
+  }
+
+  if (session.mode === "artboard-box") {
+    const nodeId = session.nodeIds[0];
+    const nodeUpdate = getResizedArtboardNodeUpdate(
+      session.baseNode,
+      session.baseBBox,
+      pointCanvas,
+      session.handle
     );
 
     if (!nodeUpdate) {

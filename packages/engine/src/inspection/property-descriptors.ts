@@ -30,6 +30,13 @@ const createPropertyDescriptor = ({
   };
 };
 
+const backgroundDescriptor = createPropertyDescriptor({
+  getValue: (node) => node.background,
+  id: "background",
+  scopes: ["single", "multi"],
+  setValue: (_node, value) => ({ background: value }),
+});
+
 const fontDescriptor = createPropertyDescriptor({
   getValue: (node) => node.font,
   id: "font",
@@ -133,6 +140,7 @@ const yDescriptor = createPropertyDescriptor({
 });
 
 const PROPERTY_DESCRIPTORS = {
+  background: backgroundDescriptor,
   cornerRadius: cornerRadiusDescriptor,
   fill: fillStyleDescriptor,
   fillRule: fillRuleStyleDescriptor,

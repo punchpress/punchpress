@@ -147,10 +147,10 @@ describe("Editor clipboard", () => {
 
     expect(pastedTextNode?.id).not.toBe(textNodeId);
     expect(pastedShapeNode?.id).not.toBe(shapeNodeId);
-    expect(pastedTextNode?.transform.x).toBeCloseTo(340, 6);
-    expect(pastedTextNode?.transform.y).toBeCloseTo(430, 6);
-    expect(pastedShapeNode?.transform.x).toBeCloseTo(640, 6);
-    expect(pastedShapeNode?.transform.y).toBeCloseTo(390, 6);
+    expect(pastedTextNode?.transform.x).toBeCloseTo(360, 6);
+    expect(pastedTextNode?.transform.y).toBeCloseTo(420.5, 6);
+    expect(pastedShapeNode?.transform.x).toBeCloseTo(660, 6);
+    expect(pastedShapeNode?.transform.y).toBeCloseTo(388.5, 6);
   });
 
   test("a fresh copy of the same selection resets the paste step", () => {

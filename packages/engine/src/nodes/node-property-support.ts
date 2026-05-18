@@ -1,3 +1,4 @@
+import { ARTBOARD_NODE_PROPERTY_IDS } from "./artboard/artboard-property-support";
 import { GROUP_NODE_PROPERTY_IDS } from "./group/group-property-support";
 import { VECTOR_NODE_PROPERTY_IDS } from "./vector/vector-property-support";
 import {
@@ -7,6 +8,7 @@ import {
 import { TEXT_NODE_PROPERTY_IDS } from "./text/text-property-support";
 
 const NODE_PROPERTY_IDS = {
+  artboard: ARTBOARD_NODE_PROPERTY_IDS,
   group: GROUP_NODE_PROPERTY_IDS,
   path: VECTOR_NODE_PROPERTY_IDS,
   shape: SHAPE_NODE_PROPERTY_IDS,

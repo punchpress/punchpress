@@ -1,4 +1,8 @@
 import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
+import {
+  createDefaultArtboardNode,
+  getNextArtboardName,
+} from "../../nodes/artboard/model";
 import { createDefaultPathNode } from "../../nodes/path/model";
 import { normalizePathNodeContours } from "../../nodes/path/path-contours";
 import { createDefaultShapeNode } from "../../nodes/shape/model";
@@ -44,6 +48,56 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
   };
 
   return {
+    addArtboardNode: (point, options = {}) => {
+      const activatePointer = options.activatePointer !== false;
+      const nodePatch = options.patch ? { ...options.patch } : {};
+      let insertedNodeId: string | null = null;
+
+      if (point) {
+        nodePatch.transform = {
+          ...nodePatch.transform,
+          x: point.x,
+          y: point.y,
+        };
+      }
+
+      set((state) => {
+        const node = createDefaultArtboardNode(
+          nodePatch.name || getNextArtboardName(state.nodes)
+        );
+        const patchedTransform = nodePatch.transform;
+
+        Object.assign(node, {
+          ...nodePatch,
+          transform: node.transform,
+        });
+
+        if (patchedTransform) {
+          node.transform = {
+            ...node.transform,
+            ...patchedTransform,
+          };
+        }
+
+        insertedNodeId = node.id;
+
+        return withDocumentMutation(state, {
+          activeTool: activatePointer ? "pointer" : state.activeTool,
+          editingNodeId: null,
+          editingOriginalText: "",
+          editingText: "",
+          focusedGroupId: null,
+          nodes: [...state.nodes, node],
+          pathEditingNodeId: null,
+          pathEditingPoint: null,
+          pathEditingPoints: [],
+          selectedNodeIds: [node.id],
+        });
+      });
+
+      return insertedNodeId;
+    },
+
     addShapeNode: (point, shape, options = {}) => {
       const node = createDefaultShapeNode(shape);
       const activatePointer = options.activatePointer !== false;
@@ -86,8 +140,9 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
       return node.id;
     },
 
-    addTextNode: (point, font) => {
+    addTextNode: (point, font, options = {}) => {
       const node = createDefaultNode(font || resolveDefaultFont());
+      const nodePatch = options.patch || null;
 
       if (point) {
         node.transform = {
@@ -95,6 +150,17 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
           x: point.x,
           y: point.y,
         };
+      }
+
+      if (nodePatch) {
+        Object.assign(node, nodePatch);
+
+        if (nodePatch.transform) {
+          node.transform = {
+            ...node.transform,
+            ...nodePatch.transform,
+          };
+        }
       }
 
       set((state) =>
@@ -111,6 +177,8 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
           selectedNodeIds: [node.id],
         })
       );
+
+      return node.id;
     },
 
     addVectorNode: (point, options = {}) => {

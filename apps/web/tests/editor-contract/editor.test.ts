@@ -1243,6 +1243,33 @@ describe("Editor text editing mode", () => {
     });
   });
 
+  test("creates new text nodes with an ergonomic viewport starter size", () => {
+    const editor = new Editor();
+    editor.hostRef = {
+      getBoundingClientRect: () => ({
+        height: 800,
+        width: 1000,
+      }),
+    };
+    editor.viewerRef = {
+      getScrollLeft: () => 0,
+      getScrollTop: () => 0,
+    };
+    editor.applyLocalFontCatalog({
+      error: "",
+      fonts: [{ ...AVAILABLE_FONT, id: "arialmt" }],
+      state: "ready",
+    });
+
+    editor.addTextNode({ x: 320, y: 240 });
+
+    expect(editor.selectedNode).toMatchObject({
+      fontSize: 80,
+      strokeWidth: 2,
+      type: "text",
+    });
+  });
+
   test("centers new text nodes on the requested point", () => {
     const editor = new Editor();
     editor.applyLocalFontCatalog({
