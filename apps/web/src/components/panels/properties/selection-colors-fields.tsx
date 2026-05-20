@@ -11,7 +11,7 @@ export const SelectionColorsFields = ({
 
   return (
     <Section
-      className={withTopBorder ? "border-black/6 border-t" : undefined}
+      className={withTopBorder ? "border-black/4 border-t" : undefined}
       title="Selection colors"
     >
       {selectionColors.map((selectionColor) => {

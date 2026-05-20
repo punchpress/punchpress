@@ -11,6 +11,7 @@ import { ColorField, FieldRow, Section } from "./field-primitives";
 import { NumberField } from "./number-field";
 
 const STROKE_WIDTH_RANGE = { min: 0, max: 200 };
+const STROKE_WIDTH_SCRUB_RANGE = { min: 0, max: 50 };
 const STROKE_MITER_LIMIT_RANGE = { min: 0, max: 100 };
 
 const SelectField = ({ onChange, options, placeholder, value }) => {
@@ -91,7 +92,7 @@ const FillSection = ({ fill, withTopBorder }) => {
 
   return (
     <Section
-      className={withTopBorder ? "border-black/6 border-t" : undefined}
+      className={withTopBorder ? "border-black/4 border-t" : undefined}
       title="Fill"
     >
       <FieldRow label="Color">
@@ -116,7 +117,7 @@ const StrokeSection = ({
   withTopBorder,
 }) => {
   const sectionClassName =
-    withTopBorder || showsFillSection ? "border-black/6 border-t" : undefined;
+    withTopBorder || showsFillSection ? "border-black/4 border-t" : undefined;
 
   return (
     <Section className={sectionClassName} title="Stroke">
@@ -176,6 +177,11 @@ const StrokeWidthField = ({ strokeWidth }) => {
           onValueChange={(nextStrokeWidth) => {
             editor.setSelectionProperty("strokeWidth", nextStrokeWidth);
           }}
+          scrubMax={Math.max(
+            STROKE_WIDTH_SCRUB_RANGE.max,
+            strokeWidth.value ?? 0
+          )}
+          scrubMin={STROKE_WIDTH_SCRUB_RANGE.min}
           value={strokeWidth.value ?? 0}
         />
       )}

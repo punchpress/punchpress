@@ -11,7 +11,6 @@ import {
   ArrowMoveLeftDownIcon,
   Cursor01Icon as Cursor01SolidIcon,
   Cursor02Icon as Cursor02SolidIcon,
-  CursorTextIcon,
   PenTool03Icon,
   PenToolAddIcon,
   PenToolMinusIcon,
@@ -73,7 +72,6 @@ const scaleCursorSize = (size: number) => {
 const DEFAULT_CURSOR_SIZE = scaleCursorSize(17);
 const ADD_CURSOR_SIZE = scaleCursorSize(24);
 const BASE_CURSOR_SIZE = scaleCursorSize(19);
-const TEXT_CURSOR_SIZE = scaleCursorSize(26);
 const MOVE_CURSOR_SIZE = scaleCursorSize(25);
 const HAND_CURSOR_SIZE = scaleCursorSize(25);
 const ROTATE_CURSOR_SIZE = scaleCursorSize(23);
@@ -235,22 +233,6 @@ const CURSOR_CONFIGS = {
     size: BASE_CURSOR_SIZE,
     strokeColor: "#ffffff",
   },
-  text: {
-    fallback: "text",
-    fillColor: "#111111",
-    hotspot: { x: 15, y: 17 },
-    icon: CursorTextIcon,
-    iconStyle: "solid-outline-blur",
-    outlineAlphaBoost: 3.4,
-    outlineColor: "#ffffff",
-    outlineScale: 0.72,
-    outlineWidth: 0,
-    rotateDegrees: 0,
-    scale: 0.8,
-    scaleOrigin: "center",
-    size: TEXT_CURSOR_SIZE,
-    strokeColor: "#ffffff",
-  },
   pointer: {
     fallback: "pointer",
     fillColor: "#111111",
@@ -349,7 +331,6 @@ export const getCanvasCursorStyle = () =>
     "--canvas-cursor-pen-tool-minus": createCanvasCursorFromConfig(
       CURSOR_CONFIGS.penToolMinus
     ),
-    "--canvas-cursor-text": createCanvasCursorFromConfig(CURSOR_CONFIGS.text),
     "--canvas-cursor-pointer": createCanvasCursorFromConfig(
       CURSOR_CONFIGS.pointer
     ),

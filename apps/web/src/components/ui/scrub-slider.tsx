@@ -2,7 +2,7 @@
 
 import { clamp, format, toNumber } from "@punchpress/engine";
 import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -28,10 +28,6 @@ interface ScrubSliderProps {
   valueBadge?: string | null;
 }
 
-const TICK_SPACING = 6;
-const TICK_HEIGHT_SMALL = 4;
-const TICK_HEIGHT_LARGE = 7;
-const LARGE_TICK_INTERVAL = 5;
 const SCRUB_PERCENT_PADDING = 4;
 const SCRUB_PERCENT_SPAN = 100 - SCRUB_PERCENT_PADDING * 2;
 
@@ -310,7 +306,6 @@ const useAutoSelectScrubSliderInput = (
   }, [isEditing, inputRef]);
 };
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: shared slider handles display, typing, keyboard scrub, and pointer scrub in one control.
 export const ScrubSlider = (props: ScrubSliderProps) => {
   const {
     ariaLabel,
@@ -400,16 +395,6 @@ export const ScrubSlider = (props: ScrubSliderProps) => {
     setIsEditing(false);
   };
 
-  const tickCount = useCallback(() => {
-    if (!containerRef.current) {
-      return 0;
-    }
-
-    const width = containerRef.current.offsetWidth;
-    return Math.floor(width / TICK_SPACING);
-  }, []);
-
-  const [ticks, setTicks] = useState(0);
   const visibleValue =
     displayValue && (!isDragging || preserveDisplayValueWhileDragging)
       ? displayValue
@@ -418,20 +403,6 @@ export const ScrubSlider = (props: ScrubSliderProps) => {
     .filter(Boolean)
     .join(" ");
   const resolvedKeyboardStep = keyboardStep ?? step;
-
-  useEffect(() => {
-    setTicks(tickCount());
-
-    const observer = new ResizeObserver(() => {
-      setTicks(tickCount());
-    });
-
-    if (containerRef.current) {
-      observer.observe(containerRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, [tickCount]);
 
   return (
     <div
@@ -442,9 +413,10 @@ export const ScrubSlider = (props: ScrubSliderProps) => {
       aria-valuenow={value}
       aria-valuetext={ariaValueText}
       className={cn(
-        "canvas-cursor-scroll-horizontal group relative flex min-h-9 w-full touch-none select-none items-center overflow-hidden rounded-lg border border-transparent bg-muted px-[calc(--spacing(3)-1px)] text-base text-foreground outline-none transition-[border-color,background-color] hover:border-input hover:bg-accent focus-visible:border-ring sm:min-h-8 sm:text-sm dark:bg-input/32 dark:hover:bg-input/64",
+        "canvas-cursor-scroll-horizontal group relative flex h-8 w-full touch-none select-none items-center overflow-hidden rounded-full border border-[var(--control-border)] bg-[var(--control-surface)] px-4 text-base text-foreground outline-none transition-[border-color,background-color] hover:border-[var(--control-border-hover)] hover:bg-[var(--control-surface-hover)] focus-visible:border-[var(--control-border-focus)] sm:text-sm",
         disabled && "pointer-events-none opacity-64",
-        isDragging && "border-input bg-accent dark:bg-input/64",
+        isDragging &&
+          "border-[var(--control-border-hover)] bg-[var(--control-surface-active)]",
         className
       )}
       data-dragging={isDragging ? "true" : undefined}
@@ -503,50 +475,24 @@ export const ScrubSlider = (props: ScrubSliderProps) => {
       tabIndex={disabled ? -1 : 0}
       title="Drag horizontally to scrub. Double-click or press Enter to type a value."
     >
-      {/* Ruler tick marks */}
       {!isEditing && (
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 flex items-center justify-center"
-        >
-          <svg
-            aria-hidden="true"
-            className={cn(
-              "h-full w-full text-foreground/[0.13] transition-opacity dark:text-foreground/[0.16]",
-              isDragging && "text-foreground/[0.2] dark:text-foreground/[0.24]"
-            )}
-            focusable="false"
-            preserveAspectRatio="none"
-          >
-            {Array.from({ length: ticks }, (_, i) => {
-              const x = (i + 1) * TICK_SPACING;
-              const isLarge = (i + 1) % LARGE_TICK_INTERVAL === 0;
-              const tickH = isLarge ? TICK_HEIGHT_LARGE : TICK_HEIGHT_SMALL;
-              return (
-                <line
-                  key={x}
-                  stroke="currentColor"
-                  strokeWidth={1}
-                  x1={x}
-                  x2={x}
-                  y1={`calc(50% - ${tickH / 2}px)`}
-                  y2={`calc(50% + ${tickH / 2}px)`}
-                />
-              );
-            })}
-          </svg>
-        </div>
+          className="pointer-events-none absolute inset-y-0 left-0 bg-muted"
+          style={{
+            width: getScrubPercent(value, dragMin, dragMax),
+          }}
+        />
       )}
 
-      {/* Scrub line indicator */}
       {!isEditing && (
         <div
           aria-hidden
           className={cn(
-            "pointer-events-none absolute top-1.5 bottom-1.5 w-0.5 -translate-x-1/2 rounded-full",
+            "pointer-events-none absolute top-2 bottom-2 w-0.5 -translate-x-1/2 rounded-full",
             isDragging
-              ? "bg-foreground/50 dark:bg-foreground/60"
-              : "bg-foreground/20 dark:bg-foreground/25"
+              ? "bg-foreground/45"
+              : "bg-foreground/24 group-hover:bg-foreground/36"
           )}
           data-slot="scrub-slider-indicator"
           ref={scrubLineRef}
@@ -558,7 +504,7 @@ export const ScrubSlider = (props: ScrubSliderProps) => {
 
       {isEditing ? (
         <input
-          className="relative z-10 h-8.5 w-full min-w-0 bg-transparent leading-8.5 outline-none sm:h-7.5 sm:leading-7.5"
+          className="relative z-10 h-full w-full min-w-0 bg-transparent leading-8 outline-none"
           inputMode="decimal"
           onBlur={commitDraftValue}
           onChange={(event) => {
@@ -577,7 +523,7 @@ export const ScrubSlider = (props: ScrubSliderProps) => {
           value={draftValue}
         />
       ) : (
-        <span className="pointer-events-none relative z-10 ml-auto flex min-w-0 items-center gap-1.5 font-medium tabular-nums tracking-[-0.01em]">
+        <span className="pointer-events-none relative z-10 ml-auto flex min-w-0 items-center gap-1.5 font-medium text-foreground/84 tabular-nums">
           {valueBadge ? (
             <span className="shrink-0 rounded-full bg-foreground/7 px-1.5 py-0.5 font-semibold text-[10px] text-foreground/56 uppercase tracking-[0.08em]">
               {valueBadge}

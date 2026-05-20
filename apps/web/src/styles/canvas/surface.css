@@ -12,9 +12,13 @@
     background-color: var(--designer-bg);
   }
 
+  .canvas-surface .infinite-viewer-scroll-bar {
+    display: none !important;
+  }
+
   .canvas-dot-grid {
     z-index: 0;
-    color: color-mix(in srgb, var(--foreground) 16%, transparent);
+    color: color-mix(in srgb, var(--foreground) 22%, transparent);
   }
 
   .canvas-dot-grid-dot {
@@ -22,6 +26,6 @@
   }
 
   .dark .canvas-dot-grid {
-    color: rgb(255 255 255 / 0.12);
+    color: rgb(255 255 255 / 0.18);
   }
 }

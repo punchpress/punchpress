@@ -195,7 +195,7 @@ export const LayersPanel = ({ documentCommands }) => {
 
   return (
     <>
-      <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--designer-border)] bg-[var(--designer-surface)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.06)]">
+      <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--designer-border)] bg-[var(--designer-surface)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.06)]">
         <div className="flex items-center gap-2 px-2.5 pt-2.5 pb-1.5">
           <LayersMainMenu
             onOpenSettings={setIsSettingsOpen}
@@ -210,7 +210,7 @@ export const LayersPanel = ({ documentCommands }) => {
           </LayersMainMenu>
         </div>
 
-        <div className="mx-2.5 h-px bg-[var(--designer-border)]" />
+        <div className="mx-2.5 h-px bg-foreground/4" />
 
         <div className="px-3 pt-2.5 pb-1.5">
           <span className="font-semibold text-[12px] text-foreground/70 tracking-[-0.01em]">

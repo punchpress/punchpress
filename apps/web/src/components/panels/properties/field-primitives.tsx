@@ -4,24 +4,34 @@ import { cn } from "@/lib/utils";
 
 export const Section = ({ children, className, title }) => {
   return (
-    <section className={cn("py-3 first:pt-0 last:pb-0", className)}>
-      <h3 className="mb-2.5 font-semibold text-[12px] text-sidebar-foreground tracking-[-0.01em]">
-        {title}
-      </h3>
+    <section className={cn("py-4 first:pt-0 last:pb-0", className)}>
+      {title ? (
+        <h3 className="mb-3 font-semibold text-[12px] text-foreground/70 tracking-[-0.01em]">
+          {title}
+        </h3>
+      ) : null}
       <div className="grid gap-2">{children}</div>
     </section>
   );
 };
 
 const ROW_GRID = "grid grid-cols-[60px_24px_minmax(0,1fr)] items-center";
-const ROW_LABEL = "select-none text-[12px] text-sidebar-foreground/70";
+const ROW_LABEL =
+  "select-none text-[13px] text-sidebar-foreground/72 leading-normal";
 
-export const FieldRow = ({ action, children, label }) => {
+export const FieldRow = ({
+  action,
+  children,
+  className,
+  contentClassName,
+  label,
+  labelClassName,
+}) => {
   return (
-    <div className={ROW_GRID}>
-      <Label className={ROW_LABEL}>{label}</Label>
+    <div className={cn(ROW_GRID, className)}>
+      <Label className={cn(ROW_LABEL, labelClassName)}>{label}</Label>
       <div className="flex items-center justify-center">{action}</div>
-      <div className="min-w-0">{children}</div>
+      <div className={cn("min-w-0", contentClassName)}>{children}</div>
     </div>
   );
 };

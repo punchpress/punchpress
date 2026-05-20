@@ -69,7 +69,7 @@ const TOOL_CURSOR_BY_ID = {
   pen: "var(--canvas-cursor-pen-tool)",
   pointer: "var(--canvas-cursor-default)",
   shape: "var(--canvas-cursor-add)",
-  text: "var(--canvas-cursor-text)",
+  text: "text",
 };
 
 const addArtboardToCurrentView = (editor) => {

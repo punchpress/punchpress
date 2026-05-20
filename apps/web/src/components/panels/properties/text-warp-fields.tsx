@@ -6,6 +6,11 @@ import {
   WAVE_CYCLES_MAX,
   WAVE_CYCLES_MIN,
 } from "@punchpress/engine";
+import { Button } from "@/components/ui/button";
+import {
+  IconSegmentedControl,
+  IconSegmentedControlItem,
+} from "@/components/ui/icon-segmented-control";
 import { ScrubSlider } from "@/components/ui/scrub-slider";
 import {
   ToggleGroup,
@@ -31,59 +36,79 @@ export const TextWarpFields = ({ node, withTopBorder = true }) => {
 
   return (
     <Section
-      className={withTopBorder ? "border-black/6 border-t" : undefined}
+      className={withTopBorder ? "border-black/4 border-t" : undefined}
       title="Warp"
     >
-      <ToggleGroup
-        className="grid grid-cols-5 gap-1.5"
-        onValueChange={(values) => {
-          const nextKind = values[0] ?? "none";
-          editor.updateSelectedNode({ warp: getDefaultWarp(nextKind, node) });
+      <FieldRow className="items-start" label="Type" labelClassName="pt-2.5">
+        <IconSegmentedControl
+          className="grid-cols-3"
+          onValueChange={(values) => {
+            const nextKind = values[0] ?? "none";
+            editor.updateSelectedNode({
+              warp: getDefaultWarp(nextKind, node),
+            });
 
-          if (nextKind === "circle") {
-            if (editor.startPathEditing(node.id)) {
-              editor.setActiveTool("node");
+            if (nextKind === "circle") {
+              if (editor.startPathEditing(node.id)) {
+                editor.setActiveTool("node");
+              }
+              return;
             }
-            return;
-          }
 
-          if (editor.isPathEditing(node.id)) {
-            editor.stopPathEditing();
-          }
-        }}
-        value={node.warp.kind === "none" ? [] : [node.warp.kind]}
-      >
-        {(["arch", "wave", "circle", "slant"] as const).map((kind) => {
-          const { icon: Icon, label } = warpIcons[kind];
+            if (editor.isPathEditing(node.id)) {
+              editor.stopPathEditing();
+            }
+          }}
+          value={node.warp.kind === "none" ? [] : [node.warp.kind]}
+          variant="unframed"
+        >
+          {(["arch", "wave", "circle", "slant"] as const).map((kind) => {
+            const { icon: Icon, label } = warpIcons[kind];
 
-          return (
-            <ToggleGroupItem
-              aria-label={label}
-              className="[&_svg]:!size-7 h-auto flex-1 px-0 py-2"
-              key={kind}
-              title={label}
-              value={kind}
-            >
-              <Icon />
-            </ToggleGroupItem>
-          );
-        })}
-      </ToggleGroup>
-
-      <TextWarpKindFields node={node} />
+            return (
+              <IconSegmentedControlItem
+                aria-label={label}
+                key={kind}
+                title={label}
+                value={kind}
+              >
+                <Icon />
+              </IconSegmentedControlItem>
+            );
+          })}
+          <WarpOptionPlaceholder />
+          <WarpOptionPlaceholder />
+        </IconSegmentedControl>
+      </FieldRow>
 
       {node.warp.kind !== "none" ? (
-        <button
-          className="w-full text-center text-[11px] text-foreground/40 transition-colors hover:text-foreground/70"
+        <div className="mt-2 grid gap-2">
+          <TextWarpKindFields node={node} />
+        </div>
+      ) : null}
+
+      {node.warp.kind !== "none" ? (
+        <Button
+          className="mt-1 w-full"
           onClick={() =>
             editor.updateSelectedNode({ warp: getDefaultWarp("none") })
           }
+          size="sm"
           type="button"
+          variant="outline"
         >
-          Clear
-        </button>
+          Clear warp
+        </Button>
       ) : null}
     </Section>
+  );
+};
+
+const WarpOptionPlaceholder = () => {
+  return (
+    <span aria-hidden="true" className="flex h-8 items-center justify-center">
+      <span className="size-2.5 rounded-full bg-muted-foreground/10" />
+    </span>
   );
 };
 
