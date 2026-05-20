@@ -11,7 +11,6 @@ type ElectronDocumentCommands = NonNullable<
 
 interface UseDocumentCommandTriggersProps {
   confirmQuittingDirtyDocument: () => Promise<boolean>;
-  confirmReplacingDirtyDocument: () => Promise<boolean>;
   electronDocumentCommands: ElectronDocumentCommands | undefined;
   finishOpenedDocument: (
     openedDocument: PunchOpenedDocumentFile | null
@@ -24,7 +23,6 @@ interface UseDocumentCommandTriggersProps {
 
 export const useDocumentCommandTriggers = ({
   confirmQuittingDirtyDocument,
-  confirmReplacingDirtyDocument,
   electronDocumentCommands,
   finishOpenedDocument,
   handleActionError,
@@ -55,17 +53,9 @@ export const useDocumentCommandTriggers = ({
   useElectronIpcEvent(
     electronDocumentCommands?.onOpenDocument,
     (openedDocument) => {
-      confirmReplacingDirtyDocument()
-        .then((shouldReplace) => {
-          if (!shouldReplace) {
-            return;
-          }
-
-          return finishOpenedDocument(openedDocument);
-        })
-        .catch((error) => {
-          handleActionError("open", error);
-        });
+      finishOpenedDocument(openedDocument).catch((error) => {
+        handleActionError("open", error);
+      });
     }
   );
 

@@ -11,7 +11,9 @@ export const createSelectionStoreActions = (set) => {
 
     setActiveTool: (activeTool) => {
       const keepsPathEditing =
-        activeTool === "pointer" || activeTool === "pen" || activeTool === "node";
+        activeTool === "pointer" ||
+        activeTool === "pen" ||
+        activeTool === "node";
 
       set((state) => ({
         activeTool,
@@ -126,6 +128,16 @@ export const createSelectionStoreActions = (set) => {
         viewport: {
           ...state.viewport,
           zoom,
+        },
+      }));
+    },
+
+    setViewport: (viewport) => {
+      set((state) => ({
+        viewport: {
+          x: viewport.x ?? state.viewport.x,
+          y: viewport.y ?? state.viewport.y,
+          zoom: viewport.zoom ?? state.viewport.zoom,
         },
       }));
     },

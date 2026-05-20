@@ -1,4 +1,6 @@
 import { useEffect } from "react";
+import { NewFileDialog } from "@/workspace/new-file-dialog";
+import { WorkspaceTabs } from "@/workspace/workspace-tabs";
 import { useEditor } from "../../editor-react/use-editor";
 import { useTheme } from "../../theme/theme-provider";
 import { Canvas } from "../canvas/canvas";
@@ -10,22 +12,25 @@ import {
   DesignerPanel,
   DesignerWindowDragRegion,
 } from "../designer/designer";
+import { useDocumentCommands } from "../panels/document-commands/use-document-commands";
 import { LayersPanel } from "../panels/layers-panel/layers-panel";
+import { MissingFontsExportDialog } from "../panels/missing-fonts-export-dialog";
 import { PropertiesPanel } from "../panels/properties/properties-panel";
+import { UnsavedDocumentDialog } from "../panels/unsaved-document-dialog";
 import { PerformanceHud } from "../performance/performance-hud";
 import { DesktopUpdateIndicator } from "./desktop-update-indicator";
 
 const SHELL_CHROME_VARS = {
   desktop: {
     "--desktop-chrome-height": "40px",
-    "--desktop-drag-left-inset": "72px",
+    "--desktop-drag-left-inset": "84px",
     "--desktop-update-indicator-left": "16px",
     "--desktop-update-indicator-top": "14.5px",
     "--desktop-panel-top-gap": "4px",
     "--shell-logo-offset-x": "-7px",
   },
   web: {
-    "--desktop-chrome-height": "0px",
+    "--desktop-chrome-height": "40px",
     "--desktop-drag-left-inset": "0px",
     "--desktop-update-indicator-left": "8px",
     "--desktop-update-indicator-top": "8px",
@@ -43,6 +48,7 @@ export const EditorShell = () => {
     ? SHELL_CHROME_VARS.desktop
     : SHELL_CHROME_VARS.web;
   const cursorStyle = getCanvasCursorStyle();
+  const documentCommands = useDocumentCommands();
 
   useEffect(() => {
     if (typeof document === "undefined") {
@@ -86,15 +92,28 @@ export const EditorShell = () => {
         {isDesktopShell ? (
           <DesignerWindowDragRegion>
             <DesktopUpdateIndicator />
+            <WorkspaceTabs
+              onCloseTab={documentCommands.closeTabSafely}
+              onNewFile={() => documentCommands.runDocumentCommandSafely("new")}
+            />
           </DesignerWindowDragRegion>
         ) : null}
+
+        {isDesktopShell ? null : (
+          <div className="absolute top-0 right-0 left-0 z-20 h-10">
+            <WorkspaceTabs
+              onCloseTab={documentCommands.closeTabSafely}
+              onNewFile={() => documentCommands.runDocumentCommandSafely("new")}
+            />
+          </div>
+        )}
 
         <DesignerCanvas>
           <Canvas />
         </DesignerCanvas>
 
         <DesignerPanel side="left">
-          <LayersPanel />
+          <LayersPanel documentCommands={documentCommands} />
         </DesignerPanel>
 
         <DesignerPanel side="right">
@@ -103,6 +122,11 @@ export const EditorShell = () => {
 
         <PerformanceHud />
       </DesignerContent>
+      <NewFileDialog {...documentCommands.newFileDialogProps} />
+      <MissingFontsExportDialog
+        {...documentCommands.missingFontsExportDialogProps}
+      />
+      <UnsavedDocumentDialog {...documentCommands.unsavedDocumentDialogProps} />
     </Designer>
   );
 };

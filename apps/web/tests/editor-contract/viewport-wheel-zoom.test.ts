@@ -58,6 +58,8 @@ describe("Editor.zoomViewportFromWheel", () => {
 
     expect(didZoom).toBe(true);
     expect(nextViewport.zoom).toBeCloseTo(1.1, 6);
+    expect(editor.viewport.x).toBeCloseTo(nextViewport.x, 6);
+    expect(editor.viewport.y).toBeCloseTo(nextViewport.y, 6);
     expect(editor.zoom).toBeCloseTo(1.1, 6);
     expect(afterAnchorX).toBeCloseTo(beforeAnchorX, 6);
     expect(afterAnchorY).toBeCloseTo(beforeAnchorY, 6);

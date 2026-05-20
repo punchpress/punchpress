@@ -33,7 +33,7 @@ export const cancelPendingViewportFocus = (editor) => {
   editor.pendingViewportFocusFrame = null;
 };
 
-export const scheduleViewportFocus = (editor, nodeIds) => {
+export const scheduleViewportFocus = (editor, nodeIds, options = {}) => {
   if (typeof window === "undefined") {
     return;
   }
@@ -57,7 +57,13 @@ export const scheduleViewportFocus = (editor, nodeIds) => {
     }
 
     const bounds = getSelectionBounds(editor, visibleNodeIds);
+    const hasViewport = Boolean(editor.viewerRef && editor.hostRef);
     const isReady = visibleNodeIds.every((nodeId) => {
+      const node = editor.getNode(nodeId);
+      if (node?.type === "artboard") {
+        return Boolean(editor.getNodeGeometry(nodeId)?.ready);
+      }
+
       return Boolean(
         (editor.getNodeTransformElement(nodeId) ||
           editor.getNodeElement(nodeId)) &&
@@ -65,8 +71,8 @@ export const scheduleViewportFocus = (editor, nodeIds) => {
       );
     });
 
-    if (bounds && (isReady || attempt >= 120)) {
-      focusCanvasBoundsInViewport(editor, bounds);
+    if (bounds && hasViewport && (isReady || attempt >= 120)) {
+      focusCanvasBoundsInViewport(editor, bounds, options);
       editor.pendingViewportFocusFrame = null;
       return;
     }
@@ -112,5 +118,6 @@ export const focusCanvasBoundsInViewport = (editor, bounds, options = {}) => {
   const y = bounds.minY - (canvasHeight - contentHeight) / 2;
 
   viewer.setTo?.({ x, y, zoom });
-  editor.setViewportZoom(zoom);
+  editor.setViewport({ x, y, zoom });
+  editor.onViewportChange?.();
 };

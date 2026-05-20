@@ -171,9 +171,8 @@ export const DesignerPaneBody = ({ children, className, ...props }) => {
 export const DesignerCanvas = ({ children, className, style, ...props }) => {
   return (
     <section
-      className={cn("absolute right-0 bottom-0 left-0", className)}
+      className={cn("absolute inset-0", className)}
       style={{
-        top: "var(--desktop-chrome-height, 0px)",
         ...style,
       }}
       {...props}
@@ -220,7 +219,10 @@ export const DesignerWindowDragRegion = ({
   return (
     <div
       aria-hidden={children ? undefined : true}
-      className={cn("absolute top-0 right-0 z-20", className)}
+      className={cn(
+        "pointer-events-none absolute top-0 right-0 z-20",
+        className
+      )}
       style={{
         WebkitAppRegion: "drag",
         height: "var(--desktop-chrome-height, 0px)",

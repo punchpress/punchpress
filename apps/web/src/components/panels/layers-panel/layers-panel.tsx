@@ -6,9 +6,6 @@ import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
 import { SettingsDialog } from "../../settings-dialog";
-import { useDocumentCommands } from "../document-commands/use-document-commands";
-import { MissingFontsExportDialog } from "../missing-fonts-export-dialog";
-import { UnsavedDocumentDialog } from "../unsaved-document-dialog";
 import { LayerTreeDragGhost } from "./layer-tree-drag-ghost";
 import { LayerTreeRow } from "./layer-tree-row";
 import { LayersMainMenu } from "./layers-main-menu";
@@ -161,7 +158,7 @@ const getLayerListHeight = (visibleLayerCount, hasLayers) => {
   return visibleLayerCount * LAYER_ROW_HEIGHT + LAYER_LIST_VERTICAL_PADDING;
 };
 
-export const LayersPanel = () => {
+export const LayersPanel = ({ documentCommands }) => {
   usePerformanceRenderCounter("render.panel.layers");
   const editor = useEditor();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -172,12 +169,10 @@ export const LayersPanel = () => {
   });
   const {
     clearRecentDocumentsSafely,
-    missingFontsExportDialogProps,
     openRecentDocumentSafely,
     recentDocuments,
     runDocumentCommandSafely,
-    unsavedDocumentDialogProps,
-  } = useDocumentCommands();
+  } = documentCommands;
   const duplicateRecentDocumentNames =
     getDuplicateRecentDocumentNames(recentDocuments);
   const layerListHeight = getLayerListHeight(
@@ -267,8 +262,6 @@ export const LayersPanel = () => {
       </div>
 
       <SettingsDialog onOpenChange={setIsSettingsOpen} open={isSettingsOpen} />
-      <MissingFontsExportDialog {...missingFontsExportDialogProps} />
-      <UnsavedDocumentDialog {...unsavedDocumentDialogProps} />
     </>
   );
 };

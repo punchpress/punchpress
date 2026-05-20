@@ -1,5 +1,11 @@
 import { MAX_ZOOM, MIN_ZOOM, round } from "@punchpress/engine";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import InfiniteViewer from "react-infinite-viewer";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
@@ -36,16 +42,13 @@ const containsPoint = (bounds, point) => {
 
 const getTopmostVisibleArtboardIdAtPoint = (editor, point) => {
   return (
-    [...editor.nodes]
-      .reverse()
-      .find((node) => {
-        return (
-          node.type === "artboard" &&
-          editor.isNodeEffectivelyVisible(node.id) &&
-          containsPoint(editor.getNodeRenderFrame(node.id)?.bounds, point)
-        );
-      })
-      ?.id || null
+    [...editor.nodes].reverse().find((node) => {
+      return (
+        node.type === "artboard" &&
+        editor.isNodeEffectivelyVisible(node.id) &&
+        containsPoint(editor.getNodeRenderFrame(node.id)?.bounds, point)
+      );
+    })?.id || null
   );
 };
 
@@ -162,7 +165,7 @@ export const Canvas = () => {
     setHostElement(nextHostElement);
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const viewer = viewerRef.current;
     if (!(viewer && hostElement)) {
       return;
@@ -171,17 +174,20 @@ export const Canvas = () => {
     editor.viewerRef = viewer;
     editor.hostRef = hostElement;
 
-    const rafId = window.requestAnimationFrame(() => {
-      viewer.setTo?.({
-        x: 0,
-        y: 0,
-        zoom: INITIAL_ZOOM,
-      });
-      editor.setViewportZoom(INITIAL_ZOOM);
+    const viewport = editor.viewport;
+
+    viewer.setTo?.({
+      x: viewport.x ?? 0,
+      y: viewport.y ?? 0,
+      zoom: viewport.zoom ?? INITIAL_ZOOM,
+    });
+    editor.setViewport({
+      x: viewport.x ?? 0,
+      y: viewport.y ?? 0,
+      zoom: viewport.zoom ?? INITIAL_ZOOM,
     });
 
     return () => {
-      window.cancelAnimationFrame(rafId);
       editor.viewerRef = null;
       editor.hostRef = null;
     };
@@ -245,7 +251,12 @@ export const Canvas = () => {
 
   const handleScroll = useCallback(
     (event) => {
-      editor.setViewportZoom(event.zoomX);
+      const viewer = viewerRef.current;
+      editor.setViewport({
+        x: viewer?.getScrollLeft?.() ?? editor.viewport.x ?? 0,
+        y: viewer?.getScrollTop?.() ?? editor.viewport.y ?? 0,
+        zoom: event.zoomX,
+      });
       editor.onViewportChange?.();
     },
     [editor]

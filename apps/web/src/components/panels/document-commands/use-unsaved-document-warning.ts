@@ -37,7 +37,10 @@ export const useUnsavedDocumentWarning = (
   });
 
   const confirmDirtyDocument = useEffectEvent(
-    async (nextReason: UnsavedDocumentReason) => {
+    async (
+      nextReason: UnsavedDocumentReason,
+      saveDirtyDocument = saveDocument
+    ) => {
       if (!isDirty()) {
         return true;
       }
@@ -53,26 +56,39 @@ export const useUnsavedDocumentWarning = (
       });
 
       if (choice === "save") {
-        return saveDocument();
+        return saveDirtyDocument();
       }
 
       return choice === "discard";
     }
   );
 
-  const confirmCreatingNewDirtyDocument = useEffectEvent(() => {
-    return confirmDirtyDocument("new");
-  });
+  const confirmClosingDirtyDocument = useEffectEvent(
+    (saveDirtyDocument?: () => Promise<boolean>) => {
+      return confirmDirtyDocument("close", saveDirtyDocument);
+    }
+  );
 
-  const confirmQuittingDirtyDocument = useEffectEvent(() => {
-    return confirmDirtyDocument("quit");
-  });
+  const confirmCreatingNewDirtyDocument = useEffectEvent(
+    (saveDirtyDocument?: () => Promise<boolean>) => {
+      return confirmDirtyDocument("new", saveDirtyDocument);
+    }
+  );
 
-  const confirmReplacingDirtyDocument = useEffectEvent(() => {
-    return confirmDirtyDocument("replace");
-  });
+  const confirmQuittingDirtyDocument = useEffectEvent(
+    (saveDirtyDocument?: () => Promise<boolean>) => {
+      return confirmDirtyDocument("quit", saveDirtyDocument);
+    }
+  );
+
+  const confirmReplacingDirtyDocument = useEffectEvent(
+    (saveDirtyDocument?: () => Promise<boolean>) => {
+      return confirmDirtyDocument("replace", saveDirtyDocument);
+    }
+  );
 
   return {
+    confirmClosingDirtyDocument,
     confirmCreatingNewDirtyDocument,
     confirmQuittingDirtyDocument,
     confirmReplacingDirtyDocument,

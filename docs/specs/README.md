@@ -29,3 +29,4 @@ They exist to preserve product intent while implementation evolves. They are liv
 - `svg-import.md`
 - `text-node.md`
 - `vector-node.md`
+- `workspace-tabs.md`

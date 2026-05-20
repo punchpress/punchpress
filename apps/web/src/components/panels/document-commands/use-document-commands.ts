@@ -1,9 +1,6 @@
 import { ARTBOARD_HEIGHT, ARTBOARD_WIDTH } from "@punchpress/engine";
 import type { LocalFontDescriptor } from "@punchpress/punch-schema";
-import {
-  DEFAULT_DOCUMENT_BASE_NAME,
-  MissingDocumentFontsError,
-} from "@punchpress/punch-schema";
+import { MissingDocumentFontsError } from "@punchpress/punch-schema";
 import { useEffectEvent, useState } from "react";
 import { showToast } from "@/components/ui/toast";
 import { importSvgToNodes } from "@/platform/svg-import-document";
@@ -14,13 +11,12 @@ import {
   openPunchDocumentFile,
   openRecentPunchDocumentFile,
   openSvgImportFile,
-  type PunchDocumentHandle,
-  type PunchOpenedDocumentFile,
   type PunchRecentDocument,
   savePunchDocumentFile,
   savePunchPngFile,
   savePunchSvgFile,
 } from "@/platform/web-document-files";
+import { useWorkspace } from "@/workspace/use-workspace";
 import { useEditor } from "../../../editor-react/use-editor";
 import {
   type DocumentCommand,
@@ -85,15 +81,12 @@ const renderSvgToPngBlob = async (
 
 export const useDocumentCommands = () => {
   const editor = useEditor();
+  const workspace = useWorkspace();
   const electronDocumentCommands =
     typeof window === "undefined"
       ? undefined
       : window.electron?.documentCommands;
-  const [documentBaseName, setDocumentBaseName] = useState(
-    DEFAULT_DOCUMENT_BASE_NAME
-  );
-  const [documentHandle, setDocumentHandle] =
-    useState<PunchDocumentHandle>(null);
+  const [isNewFileDialogOpen, setIsNewFileDialogOpen] = useState(false);
   const [isMissingFontsExportDialogOpen, setIsMissingFontsExportDialogOpen] =
     useState(false);
   const [missingFontsForExport, setMissingFontsForExport] = useState<
@@ -128,91 +121,92 @@ export const useDocumentCommands = () => {
     }
   );
 
-  const applyOpenedDocument = useEffectEvent(
-    async (openedDocument: PunchOpenedDocumentFile) => {
-      await editor.initializeLocalFonts().catch(() => undefined);
-      const resolution = editor.loadDocument(openedDocument.contents);
-      setDocumentHandle(openedDocument.fileHandle);
-      setDocumentBaseName(getDocumentBaseName(openedDocument.fileName));
-
-      if (resolution.missingFonts.length > 0 && resolution.replacementFont) {
-        showToast({
-          message: `Replaced missing font${
-            resolution.missingFonts.length === 1 ? "" : "s"
-          } ${formatFontList(resolution.missingFonts)} with ${
-            resolution.replacementFont.fullName
-          }.`,
-          type: "warning",
-        });
-      }
-    }
-  );
-
-  const finishOpenedDocument = useEffectEvent(
-    async (openedDocument: PunchOpenedDocumentFile | null) => {
-      if (!openedDocument) {
-        return;
-      }
-
-      try {
-        await applyOpenedDocument(openedDocument);
-      } finally {
-        await refreshRecentDocuments();
-      }
-    }
-  );
-
-  const handleSaveDocument = useEffectEvent(async (forceDialog = false) => {
-    const result = await savePunchDocumentFile(
-      editor.serializeDocument(),
-      documentBaseName,
-      documentHandle,
-      forceDialog
-    );
-
-    if (result.canceled) {
-      return false;
-    }
-
-    setDocumentHandle(result.fileHandle || documentHandle);
-    if (result.fileName) {
-      setDocumentBaseName(getDocumentBaseName(result.fileName));
-    }
-    editor.markDocumentSaved();
-
-    showToast({
-      message: `Saved ${result.fileName || `${documentBaseName}.punch`}`,
-      type: "success",
-    });
-    await refreshRecentDocuments();
-    return true;
-  });
-
-  const isDocumentDirty = useEffectEvent(() => editor.isDirty);
-  const {
-    confirmCreatingNewDirtyDocument,
-    confirmQuittingDirtyDocument,
-    confirmReplacingDirtyDocument,
-    unsavedDocumentDialogProps,
-  } = useUnsavedDocumentWarning(isDocumentDirty, () => handleSaveDocument());
-
-  const handleNewDocument = useEffectEvent(async () => {
-    if (editor.isDirty && !(await confirmCreatingNewDirtyDocument())) {
+  const showMissingFontWarning = useEffectEvent((resolution) => {
+    if (resolution.missingFonts.length === 0 || !resolution.replacementFont) {
       return;
     }
 
-    editor.newDocument();
-    setDocumentHandle(null);
-    setDocumentBaseName(DEFAULT_DOCUMENT_BASE_NAME);
+    showToast({
+      message: `Replaced missing font${
+        resolution.missingFonts.length === 1 ? "" : "s"
+      } ${formatFontList(resolution.missingFonts)} with ${
+        resolution.replacementFont.fullName
+      }.`,
+      type: "warning",
+    });
+  });
+
+  const finishOpenedDocument = useEffectEvent(async (openedDocument) => {
+    if (!openedDocument) {
+      return;
+    }
+
+    try {
+      const resolution = await workspace.openDocumentTab(openedDocument);
+      showMissingFontWarning(resolution);
+    } finally {
+      await refreshRecentDocuments();
+    }
+  });
+
+  const saveDocumentTab = useEffectEvent(
+    async (tab = workspace.activeTab, forceDialog = false) => {
+      if (tab.kind === "scratchpad") {
+        showToast({
+          message: "Scratchpad saves automatically.",
+          type: "info",
+        });
+        return false;
+      }
+
+      const result = await savePunchDocumentFile(
+        tab.editor.serializeDocument(),
+        tab.baseName,
+        tab.fileHandle,
+        forceDialog
+      );
+
+      if (result.canceled) {
+        return false;
+      }
+
+      workspace.updateTabFileIdentity(tab.id, {
+        baseName: result.fileName ? getDocumentBaseName(result.fileName) : null,
+        fileHandle: result.fileHandle || tab.fileHandle,
+      });
+      tab.editor.markDocumentSaved();
+
+      showToast({
+        message: `Saved ${result.fileName || `${tab.baseName}.punch`}`,
+        type: "success",
+      });
+      await refreshRecentDocuments();
+      return true;
+    }
+  );
+
+  const isAnyFileBackedDocumentDirty = useEffectEvent(() => {
+    return workspace.tabs.some((tab) => tab.kind === "file" && tab.isDirty);
+  });
+  const {
+    confirmClosingDirtyDocument,
+    confirmQuittingDirtyDocument,
+    unsavedDocumentDialogProps,
+  } = useUnsavedDocumentWarning(isAnyFileBackedDocumentDirty, () =>
+    saveDocumentTab(workspace.activeTab)
+  );
+
+  const handleNewDocument = useEffectEvent(() => {
+    setIsNewFileDialogOpen(true);
+  });
+
+  const handleCreateNewDocument = useEffectEvent((request) => {
+    workspace.createNewFileTab(request);
+    setIsNewFileDialogOpen(false);
   });
 
   const handleOpenDocument = useEffectEvent(async () => {
-    if (!(await confirmReplacingDirtyDocument())) {
-      return;
-    }
-
     const openedDocument = await openPunchDocumentFile();
-
     await finishOpenedDocument(openedDocument);
   });
 
@@ -236,6 +230,7 @@ export const useDocumentCommands = () => {
 
   const handleExportDocument = useEffectEvent(async () => {
     const selectedNode = editor.selectedNode;
+    const documentBaseName = workspace.activeTab.baseName;
 
     if (selectedNode?.type === "artboard") {
       const svg = await editor.exportSelectedArtboardSvg(selectedNode.id);
@@ -278,7 +273,7 @@ export const useDocumentCommands = () => {
   const runDocumentCommand = useEffectEvent(
     async (command: DocumentCommand) => {
       if (command === "new") {
-        await handleNewDocument();
+        handleNewDocument();
         return;
       }
 
@@ -293,12 +288,12 @@ export const useDocumentCommands = () => {
       }
 
       if (command === "save") {
-        await handleSaveDocument();
+        await saveDocumentTab(workspace.activeTab);
         return;
       }
 
       if (command === "save-as") {
-        await handleSaveDocument(true);
+        await saveDocumentTab(workspace.activeTab, true);
         return;
       }
 
@@ -314,13 +309,31 @@ export const useDocumentCommands = () => {
     }
   );
 
+  const closeTabSafely = useEffectEvent(async (tabId) => {
+    const tab = workspace.tabs.find((entry) => entry.id === tabId);
+
+    if (!tab) {
+      return;
+    }
+
+    if (tab.kind !== "file" || !tab.isDirty) {
+      workspace.closeTab(tabId);
+      return;
+    }
+
+    workspace.focusTab(tabId);
+    const shouldClose = await confirmClosingDirtyDocument(() =>
+      saveDocumentTab(tab)
+    );
+
+    if (shouldClose) {
+      workspace.closeTab(tabId);
+    }
+  });
+
   const openRecentDocumentSafely = useEffectEvent(
     async (recentDocument: PunchRecentDocument) => {
       try {
-        if (!(await confirmReplacingDirtyDocument())) {
-          return;
-        }
-
         const openedDocument =
           await openRecentPunchDocumentFile(recentDocument);
 
@@ -341,27 +354,53 @@ export const useDocumentCommands = () => {
       });
   });
 
+  const confirmQuittingAllDirtyTabs = useEffectEvent(async () => {
+    const dirtyTabs = workspace.tabs.filter(
+      (tab) => tab.kind === "file" && tab.isDirty
+    );
+
+    for (const tab of dirtyTabs) {
+      workspace.focusTab(tab.id);
+      const shouldContinue = await confirmQuittingDirtyDocument(() =>
+        saveDocumentTab(tab)
+      );
+
+      if (!shouldContinue) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
   useDocumentCommandTriggers({
-    confirmQuittingDirtyDocument,
-    confirmReplacingDirtyDocument,
+    confirmQuittingDirtyDocument: confirmQuittingAllDirtyTabs,
     electronDocumentCommands,
     finishOpenedDocument,
     handleActionError,
-    isDocumentDirty,
+    isDocumentDirty: isAnyFileBackedDocumentDirty,
     refreshRecentDocuments,
     runDocumentCommandSafely,
   });
 
   useEditorModalBlocking(
-    isMissingFontsExportDialogOpen || unsavedDocumentDialogProps.open
+    isMissingFontsExportDialogOpen ||
+      isNewFileDialogOpen ||
+      unsavedDocumentDialogProps.open
   );
 
   return {
     clearRecentDocumentsSafely,
+    closeTabSafely,
     missingFontsExportDialogProps: {
       missingFonts: missingFontsForExport,
       onOpenChange: setIsMissingFontsExportDialogOpen,
       open: isMissingFontsExportDialogOpen,
+    },
+    newFileDialogProps: {
+      onCreate: handleCreateNewDocument,
+      onOpenChange: setIsNewFileDialogOpen,
+      open: isNewFileDialogOpen,
     },
     openRecentDocumentSafely,
     recentDocuments,

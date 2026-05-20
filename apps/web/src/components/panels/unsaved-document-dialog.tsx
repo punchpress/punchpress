@@ -10,9 +10,15 @@ import {
 } from "@/components/ui/dialog";
 
 export type UnsavedDocumentChoice = "cancel" | "discard" | "save";
-export type UnsavedDocumentReason = "new" | "quit" | "replace";
+export type UnsavedDocumentReason = "close" | "new" | "quit" | "replace";
 
 const DIALOG_CONTENT_BY_REASON = {
+  close: {
+    destructiveActionLabel: "Close Without Saving",
+    description:
+      "Closing this tab will discard its unsaved changes. Save your work first, close without saving, or cancel.",
+    title: "Save changes before closing?",
+  },
   new: {
     destructiveActionLabel: "Continue Without Saving",
     description:

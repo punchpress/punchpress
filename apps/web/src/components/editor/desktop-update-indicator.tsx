@@ -101,7 +101,7 @@ export const DesktopUpdateIndicator = () => {
 
   return (
     <div
-      className="no-drag absolute z-30"
+      className="no-drag pointer-events-auto absolute z-30"
       style={{
         left: "var(--desktop-update-indicator-left, 8px)",
         top: "var(--desktop-update-indicator-top, 6px)",

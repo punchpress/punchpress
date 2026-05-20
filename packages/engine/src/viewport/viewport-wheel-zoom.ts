@@ -87,7 +87,7 @@ export const zoomViewportFromWheel = (editor, { clientX, clientY, deltaY }) => {
     viewer.setZoom?.(nextViewport.zoom);
   }
 
-  editor.setViewportZoom(nextViewport.zoom);
+  editor.setViewport(nextViewport);
   editor.onViewportChange?.();
 
   return true;

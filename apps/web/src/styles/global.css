@@ -113,6 +113,7 @@
 }
 
 @utility no-drag {
+  app-region: no-drag;
   -webkit-app-region: no-drag;
 }
 
@@ -223,6 +224,12 @@
   --canvas-guide-editing-active: var(--canvas-selected-strong);
   --canvas-guide-editing-active-opacity: 0.95;
   --canvas-guide-editing-active-width: 2.5px;
+  --workspace-tab-bg: transparent;
+  --workspace-tab-bg-hover: --alpha(var(--color-neutral-400) / 8%);
+  --workspace-tab-bg-active: --alpha(var(--color-neutral-500) / 10%);
+  --workspace-tab-text: color-mix(in srgb, var(--foreground) 72%, transparent);
+  --workspace-tab-text-active: var(--foreground);
+  --workspace-tab-shadow: 0 6px 14px rgb(15 23 42 / 0.035);
   --canvas-selection-fill: color-mix(
     in srgb,
     var(--canvas-selected) 10%,
@@ -414,7 +421,21 @@ textarea,
 }
 
 .canvas-host .canvas-node {
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
   cursor: var(--canvas-cursor-default);
+}
+
+.canvas-host
+  :where(
+    [data-artboard-body],
+    [data-node-id],
+    [data-testid="canvas-text-input"],
+    .canvas-moveable,
+    .canvas-vector-paper
+  ) {
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
 }
 
 .canvas-cursor-move {
@@ -729,6 +750,10 @@ body[data-color-picker-open="true"] {
   --code-foreground: var(--foreground);
   --code-highlight: --alpha(var(--color-white) / 4%);
   --surface-hover: --alpha(var(--color-white) / 7%);
+  --workspace-tab-bg: transparent;
+  --workspace-tab-bg-hover: --alpha(var(--color-white) / 8%);
+  --workspace-tab-bg-active: --alpha(var(--color-white) / 10%);
+  --workspace-tab-shadow: 0 6px 14px rgb(0 0 0 / 0.2);
   --canvas-transform-box-lines: oklch(0.32 0 0);
   --canvas-transform-box-handles: oklch(0.32 0 0);
   --canvas-transform-box-handles-border: oklch(0.42 0 0);

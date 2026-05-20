@@ -1,33 +1,10 @@
-import { Editor } from "@punchpress/engine";
 import { useEffect, useState } from "react";
-import {
-  getInitialLocalFontCatalog,
-  readLocalFontBytes,
-  requestLocalFontCatalog,
-} from "../platform/local-fonts";
-import { getStoredLastUsedFont, rememberLastUsedFont } from "./default-font";
+import { createConfiguredEditor } from "./create-configured-editor";
 import { EditorContext } from "./editor-context";
 import { useEditorClipboardEvents } from "./use-editor-clipboard-events";
 
 export const EditorProvider = ({ children }) => {
-  const [editor] = useState(() => {
-    const nextEditor = new Editor();
-    const storedLastUsedFont = getStoredLastUsedFont();
-
-    if (storedLastUsedFont) {
-      nextEditor.setDefaultFont(storedLastUsedFont);
-      nextEditor.setLastUsedFont(storedLastUsedFont);
-    }
-
-    nextEditor.setFontBytesLoader(readLocalFontBytes);
-    nextEditor.setLastUsedFontPersistence(rememberLastUsedFont);
-    nextEditor.setLocalFontCatalogLoaders({
-      getInitialCatalog: getInitialLocalFontCatalog,
-      requestCatalog: requestLocalFontCatalog,
-    });
-
-    return nextEditor;
-  });
+  const [editor] = useState(createConfiguredEditor);
 
   useEditorClipboardEvents(editor);
 

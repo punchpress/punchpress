@@ -558,6 +558,10 @@ export class Editor {
     return this.getState().viewport.zoom;
   }
 
+  get viewport() {
+    return this.getState().viewport;
+  }
+
   preloadFonts(nodes = this.nodes) {
     preloadEditorFonts(this, nodes);
   }
@@ -1549,6 +1553,10 @@ export class Editor {
     this.getState().setViewportZoom(zoom);
   }
 
+  setViewport(viewport) {
+    this.getState().setViewport(viewport);
+  }
+
   startPathEditing(nodeId = this.selectedNodeId) {
     return startEditorPathEditing(this, this.getPathEditingEntryNodeId(nodeId));
   }
@@ -1806,8 +1814,8 @@ export class Editor {
     pasteEditorText(this, text);
   }
 
-  scheduleViewportFocus(nodeIds) {
-    scheduleEditorViewportFocus(this, nodeIds);
+  scheduleViewportFocus(nodeIds, options) {
+    scheduleEditorViewportFocus(this, nodeIds, options);
   }
 
   focusCanvasBounds(bounds, options) {

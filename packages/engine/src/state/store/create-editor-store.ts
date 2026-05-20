@@ -42,6 +42,8 @@ export const createEditorStore = ({
     selectedNodeIds: [],
     spacePressed: false,
     viewport: {
+      x: 0,
+      y: 0,
       zoom: initialZoom,
     },
     ...createDocumentStoreActions(set, getDefaultFont),
