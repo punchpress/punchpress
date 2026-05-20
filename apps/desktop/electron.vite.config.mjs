@@ -27,6 +27,11 @@ export default defineConfig({
   },
   renderer: {
     cacheDir: resolve(__dirname, "node_modules/.vite-electron-renderer"),
+    server: {
+      host: "127.0.0.1",
+      port: 5274,
+      strictPort: true,
+    },
     build: {
       rollupOptions: {
         input: {
