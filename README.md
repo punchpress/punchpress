@@ -23,7 +23,7 @@ shared document schema package, and app shells:
 
 ## Development
 
-- `bun install` installs all workspace dependencies.
+- `bun install --frozen-lockfile` installs all workspace dependencies without changing the lockfile.
 - `bun run dev` starts the standalone web app.
 - `bun run dev:desktop` starts the Electron shell against the web app dev server.
 - `bun run build:web` builds the web app only.
