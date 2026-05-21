@@ -14,6 +14,7 @@
     "build:web": "bun run --cwd apps/web build",
     "build:desktop": "bun run --cwd apps/desktop build",
     "build:desktop:unsigned": "bun run --cwd apps/desktop build:unsigned",
+    "docs:list": "docs-list",
     "preview": "bun run --cwd apps/web preview",
     "publish:desktop": "bun run --cwd apps/desktop publish",
     "release:bump": "node scripts/release/bump-version.mjs",
