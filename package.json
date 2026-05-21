@@ -40,7 +40,7 @@
     "test:performance:desktop:trace": "PUNCHPRESS_CAPTURE_ELECTRON_TRACE=1 playwright test --config playwright.desktop-performance.config.ts"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2"
+    "@playwright/test": "1.58.2"
   },
   "overrides": {
     "@hono/node-server": "1.19.13",
