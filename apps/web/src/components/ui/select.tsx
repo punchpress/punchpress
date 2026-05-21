@@ -38,7 +38,7 @@ const selectTriggerVariants = cva(
       size: {
         default: "",
         lg: "min-h-9.5 sm:min-h-8.5",
-        sm: "min-h-7.5 gap-1.5 px-[calc(--spacing(2.5)-1px)] sm:min-h-6.5",
+        sm: "min-h-8 gap-1.5 px-[calc(--spacing(2.5)-1px)]",
       },
     },
   }
