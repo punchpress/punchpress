@@ -1,3 +1,11 @@
+---
+summary: Defines PunchPress UI component ownership, Base UI policy, COSS UI sourcing, and stale Radix guidance.
+read_when:
+  - adding or changing shared UI primitives, component wrappers, or feature-level controls
+  - deciding whether to copy a COSS UI pattern, use Base UI directly, or extend a local component
+  - finding old Radix guidance in docs, examples, dependencies, or copied component code
+---
+
 # Design System
 
 ## Summary

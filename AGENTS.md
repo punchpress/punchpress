@@ -56,8 +56,10 @@ Use these standards for new code and touched code during refactors.
 
 ## Architecture
 
-See `docs/architecture/codebase-structure.md` for the current code layout and layer rationale.
-See `docs/architecture/editor-operating-model.md` for the conceptual model of editor land, React land, and automation.
+See `docs/internals/architecture-overview.md` for the current code layout and layer rationale.
+See `docs/internals/editor-facade.md` for the editor command surface.
+See `docs/internals/react-bindings.md` for the React bridge and subscription model.
+See `docs/docs-policy.md` before adding, moving, or retiring docs.
 
 The editor follows a five-layer architecture:
 
@@ -93,33 +95,26 @@ Tests, CLI workflows, and AI automation should converge on the same editor comma
 
 ## Docs Index
 
-- `docs/architecture/README.md` — Architecture docs index
-- `docs/architecture/codebase-structure.md` — Current editor architecture and file structure
-- `docs/architecture/editor-operating-model.md` — Editor, React, and automation operating model
-- `docs/architecture/vector-editing-operating-model.md` — Engine ownership, Paper overlay responsibilities, and SVG import direction
-- `docs/architecture/editor-extraction-plan.md` — remaining migration work after extracting the engine and schema packages
-- `docs/architecture/document-model.md` — Design recipe schema, invariants, and export boundaries
+- `docs/README.md` — top-level docs map
+- `docs/docs-policy.md` — docs surfaces, frontmatter, brevity, review, and migration rules
+- `docs/product/README.md` — product behavior docs index
+- `docs/internals/README.md` — editor systems and ownership docs index
+- `docs/reference/README.md` — exact contracts, formats, commands, and API references
+- `docs/operations/README.md` — development, testing, performance, and release workflows
+- `docs/decisions/README.md` — durable architecture decisions
 - `docs/design/system.md` — UI component system, Base UI policy, COSS UI workflow
-- `docs/testing/README.md` — testing docs index
-- `docs/testing/strategy.md` — high-level testing split: `editor-contract` and `playwright`
-- `docs/testing/editor-contract.md` — direct `Editor` tests using the debug dump
-- `docs/testing/playwright.md` — browser-backed tests for UI wiring and visual behavior
-- `docs/release/desktop.md` — macOS signing, notarization, S3 publishing, and auto-update setup
-- `docs/release/runbook.md` — canonical version bump, changelog, tag, and publish flow
-- `docs/ai-commands/version-bump/README.md` — agent workflow for `do a version bump`
-- `docs/architecture/decisions/` — Durable architectural decisions
 
-## Product Specs
+## Product Docs
 
-- `docs/specs/` contains high-level product specs for PunchPress behavior.
-- Specs are living docs: concise, product-facing, and implementation-agnostic.
-- Do not put code pointers, architecture notes, or technical recommendations into `docs/specs/`.
-- When behavior changes or becomes clearer, update the relevant spec in `docs/specs/` in the same task.
+- `docs/product/` contains high-level product behavior and contracts.
+- Product docs are concise, product-facing, and focused on behavior that is hard to infer from code search.
+- Keep architecture notes in `docs/internals/`, exact formats in `docs/reference/`, workflows in `docs/operations/`, and durable tradeoffs in `docs/decisions/`.
+- When behavior changes or becomes clearer, update the relevant product doc in the same task.
 
 ## Release Workflow
 
-- Treat `docs/release/runbook.md` as the source of truth for version bumps, changelog updates, GitHub tags, and desktop publish steps.
-- If the user says `do a version bump`, follow `docs/ai-commands/version-bump/README.md`.
+- Treat `docs/operations/releases.md` as the source of truth for version bumps, changelog updates, GitHub tags, and desktop publish steps.
+- If the user says `do a version bump`, follow `docs/operations/version-bumps.md`.
 - Keep `CHANGELOG.md`, `apps/desktop/package.json`, and `apps/web/package.json` synchronized for each release.
 - Write changelog entries for end users in product-release language, not engineering implementation language.
 

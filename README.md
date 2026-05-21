@@ -42,13 +42,13 @@ shared document schema package, and app shells:
 - `bun run test:performance:benchmark:headed text-nodes-dragging-500` runs one web benchmark in a visible browser window and prints its summary when complete.
 - `bun run test:performance:benchmark --json text-nodes-dragging-500` returns a structured benchmark summary on stdout for scripts or local comparison.
 - Web benchmark artifacts are written to `.context/performance/<benchmark-id>-result.json` and `.context/performance/<benchmark-id>-snapshot.json`.
-- See `docs/testing/performance.md` for the broader performance workflow and trace-based debugging commands.
+- See `docs/operations/performance.md` for the broader performance workflow and trace-based debugging commands.
 
 ## Release
 
-- Canonical runbook: `docs/release/runbook.md`
+- Canonical runbook: `docs/operations/releases.md`
 - One-command bump: `bun run release:bump patch` (or `minor` / `major` / explicit `X.Y.Z`)
-- AI command (`do a version bump`): `docs/ai-commands/version-bump/README.md`
+- AI command (`do a version bump`): `docs/operations/version-bumps.md`
 - GitHub Release notes export: `bun run release:notes -- --version X.Y.Z`
 - Changelog context export: `bun run release:collect-changelog-context`
 - Release integrity checks: `bun run release:check && bun run build:desktop:unsigned && bun run release:check-desktop-artifacts`
@@ -195,7 +195,7 @@ PunchPress now ships macOS desktop releases through Electron Builder with:
 - S3-hosted update artifacts in `s3://punchpress-electron-app-209596837609-us-east-1-an`
 - automatic update checks on launch and every 10 minutes in packaged builds
 
-Release setup is documented in [docs/release/desktop.md](./docs/release/desktop.md).
+Release setup is documented in [docs/operations/desktop-releases.md](./docs/operations/desktop-releases.md).
 
 ---
 
