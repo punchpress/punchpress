@@ -48,6 +48,22 @@ Prefer clean breaks over compatibility layers unless the user asks otherwise.
   `s3:GetObject` for published updater artifacts.
 - Release branch contains only intended release changes.
 
+## Dependency Update Gate
+
+Release dependency changes must stay locked and reviewable:
+
+- Keep direct dependency versions exact.
+- Keep `bunfig.toml` frozen by default.
+- Use `package.json` `overrides` only for known transitive-risk mitigation or
+  toolchain compatibility. Avoid broad overrides that cross incompatible major
+  ranges for transitive consumers.
+- Before committing any dependency update, refresh `bun.lock`, run
+  `bun install --force`, then run `bun audit --audit-level=moderate`.
+- If `bun pm scan` is configured, run it too. If no scanner is configured,
+  `bun audit` is the required vulnerability gate.
+- Re-run the package or release command that motivated the dependency update,
+  such as `bun run build:desktop:unsigned`.
+
 ## Procedure
 
 1. Bump the version:
@@ -64,6 +80,10 @@ bun run release:bump X.Y.Z
 ```bash
 bun install
 ```
+
+When dependency pins or overrides need to change, temporarily thaw installs,
+refresh the lockfile, restore frozen installs, and force-reinstall from the
+updated lockfile before validation.
 
 3. Collect changelog context:
 

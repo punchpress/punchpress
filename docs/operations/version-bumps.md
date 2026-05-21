@@ -67,6 +67,11 @@ bun run release:check-desktop-artifacts
 
 See [Releases](releases.md) for the full release sequence.
 
+If the release requires dependency changes, follow the dependency update gate in
+[Releases](releases.md): keep exact pins, refresh `bun.lock` deliberately,
+force-reinstall from the updated lockfile, and run `bun audit
+--audit-level=moderate` before packaging.
+
 ## Editing Rules
 
 - Keep web and desktop package versions synchronized.

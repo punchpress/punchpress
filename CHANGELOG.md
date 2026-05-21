@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.6.0 - 2026-05-21
+
+### Added
+
+- Artboards are now first-class framed production surfaces with canvas frames, layer icons, property controls, clipping behavior, and export boundaries.
+- Workspace tabs let you keep a scratchpad and file-backed documents open side by side, with new-file presets and unsaved-change prompts.
+
+### Changed
+
+- Editor controls are more consistent across the properties panel, color picker, sliders, segmented controls, and select fields.
+- Text-on-circle editing is easier to discover, with path edit actions in the inspector and toolbar plus a clickable selected-circle guide.
+
+### Fixed
+
+- New text placement now stays centered on the click point more reliably.
+- Circle path editing now exits from outside clicks, keeps text size stable while resizing the path, and preserves visible text dragging behavior.
+- Desktop release packaging now uses refreshed vulnerability-scanned dependency pins so mac artifacts build reliably from a clean install.
+
 ## v0.5.0 - 2026-04-30
 
 ### Added
