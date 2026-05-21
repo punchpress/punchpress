@@ -268,12 +268,15 @@ test("resizes the circle path and repositions text along it", async ({
   await pauseForUi(page);
 
   const afterResize = await getStateSnapshot(page);
+  const beforeNode = before.nodes.find((node) => node.id === "circle-node");
   const resizedNode = afterResize.nodes.find(
     (node) => node.id === "circle-node"
   );
   expect(resizedNode?.warp?.radius).toBeGreaterThan(
-    before.nodes.find((node) => node.id === "circle-node")?.warp?.radius ?? 0
+    beforeNode?.warp?.radius ?? 0
   );
+  expect(resizedNode?.fontSize).toBe(beforeNode?.fontSize);
+  expect(resizedNode?.strokeWidth).toBe(beforeNode?.strokeWidth);
 
   const positionBox = await positionHandle.boundingBox();
 
@@ -877,6 +880,89 @@ test("keeps the circle path transform target scaled with viewport zoom", async (
 
   expect(targetBox.width).toBeLessThan(160);
   expect(targetBox.height).toBeLessThan(160);
+});
+
+test("selected circle text exposes path edit affordances", async ({ page }) => {
+  await gotoEditor(page);
+  await loadCircleDocument(page);
+  await page.locator('.canvas-node[data-node-id="circle-node"]').click();
+  await pauseForUi(page);
+
+  await expect(page.getByTestId("text-path-guide")).toBeVisible();
+  const editPathButton = page.getByRole("button", {
+    exact: true,
+    name: "Edit path",
+  });
+  await expect(editPathButton).toBeVisible();
+
+  await editPathButton.click();
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => (await getStateSnapshot(page)).pathEditingNodeId)
+    .toBe("circle-node");
+  await expect(
+    page.getByRole("button", { exact: true, name: "Done editing" })
+  ).toBeVisible();
+});
+
+test("clicking the selected circle guide enters path edit mode", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadCircleDocument(page);
+  await page.locator('.canvas-node[data-node-id="circle-node"]').click();
+  await pauseForUi(page);
+
+  const guidePoint = await getActualTextPathGuideScreenPoint(page);
+
+  if (!guidePoint) {
+    throw new Error("Missing selected circle guide point");
+  }
+
+  await page.mouse.click(guidePoint.x, guidePoint.y);
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => (await getStateSnapshot(page)).pathEditingNodeId)
+    .toBe("circle-node");
+});
+
+test("empty circle path target click exits path edit mode", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadCircleDocument(page);
+  await page.locator('.canvas-node[data-node-id="circle-node"]').click();
+  await pauseForUi(page);
+  await page.getByRole("button", { name: "Node (A)" }).click();
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => (await getStateSnapshot(page)).pathEditingNodeId)
+    .toBe("circle-node");
+
+  const targetBox = await page
+    .locator('.canvas-text-path-target[data-node-id="circle-node"]')
+    .boundingBox();
+
+  if (!targetBox) {
+    throw new Error("Missing circle path edit target");
+  }
+
+  await page.mouse.click(
+    targetBox.x + targetBox.width / 2,
+    targetBox.y + targetBox.height / 2
+  );
+  await pauseForUi(page);
+
+  await expect
+    .poll(() => getStateSnapshot(page))
+    .toMatchObject({
+      pathEditingNodeId: null,
+      selectedNodeId: "circle-node",
+      selectedNodeIds: ["circle-node"],
+    });
 });
 
 test("moves a selected circle path node by dragging the visible text", async ({

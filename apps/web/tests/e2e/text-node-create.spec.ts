@@ -41,3 +41,41 @@ test("creates and commits a text layer", async ({ page }) => {
   ).toBeVisible();
   await expect(page.locator("[data-node-id]")).toHaveCount(1);
 });
+
+test("centers the placed text editor over the click point", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+
+  const stage = page.getByTestId("canvas-stage");
+  const stageBox = await stage.boundingBox();
+
+  expect(stageBox).not.toBeNull();
+
+  if (!stageBox) {
+    return;
+  }
+
+  const clickPoint = {
+    x: stageBox.x + stageBox.width * 0.5,
+    y: stageBox.y + 300,
+  };
+
+  await page.keyboard.press("t");
+  await pauseForUi(page);
+  await page.mouse.click(clickPoint.x, clickPoint.y);
+  await pauseForUi(page);
+
+  const textInputBox = await page
+    .getByTestId("canvas-text-input")
+    .boundingBox();
+
+  expect(textInputBox).not.toBeNull();
+
+  if (!textInputBox) {
+    return;
+  }
+
+  expect(textInputBox.x + textInputBox.width / 2).toBeCloseTo(clickPoint.x, 1);
+  expect(textInputBox.y + textInputBox.height / 2).toBeCloseTo(clickPoint.y, 1);
+});

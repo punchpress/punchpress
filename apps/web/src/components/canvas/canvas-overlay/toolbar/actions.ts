@@ -1,4 +1,5 @@
 import {
+  NodeEditIcon,
   PathfinderExcludeIcon,
   PathfinderIntersectIcon,
   PathfinderMergeIcon,
@@ -6,8 +7,11 @@ import {
 } from "@hugeicons-pro/core-stroke-rounded";
 
 interface SelectionToolbarAction {
+  icon?: unknown;
+  iconLibrary?: "hugeicons";
   id: string;
   isActive: boolean;
+  isIconOnly?: boolean;
   label: string;
   onSelect: () => void;
   shortcutLabel?: string;
@@ -36,6 +40,20 @@ const getPathEditingToolbarActions = (editor, state) => {
       state.selectedPathPointCornerControlKind === "detected"
   );
   const actions: SelectionToolbarAction[] = [];
+
+  actions.push({
+    icon: NodeEditIcon,
+    iconLibrary: "hugeicons",
+    id: "stop-path-editing",
+    isActive: true,
+    isIconOnly: true,
+    label: "Done editing path",
+    title: "Done editing path",
+    variant: "ghost",
+    onSelect: () => {
+      editor.setActiveTool("pointer");
+    },
+  });
 
   if (hasSelectedPathPoints) {
     actions.unshift({
@@ -154,6 +172,37 @@ const getPathEditingToolbarActions = (editor, state) => {
   return actions;
 };
 
+const getPathModeToolbarActions = (editor, state) => {
+  if (
+    !(
+      state.selectedNode &&
+      state.canEditPath &&
+      state.hasPathEditingMode &&
+      !state.isPathEditing
+    )
+  ) {
+    return [];
+  }
+
+  return [
+    {
+      icon: NodeEditIcon,
+      iconLibrary: "hugeicons",
+      id: "start-path-editing",
+      isActive: false,
+      isIconOnly: true,
+      label: "Edit path",
+      title: "Edit path with Node",
+      variant: "ghost",
+      onSelect: () => {
+        if (editor.startPathEditing(state.selectedNode.id)) {
+          editor.setActiveTool("node");
+        }
+      },
+    },
+  ];
+};
+
 const getBooleanToolbarActions = (editor, state) => {
   if (
     !state.canBoolean ||
@@ -226,6 +275,7 @@ const getSharedToolbarActions = (editor, state) => {
   }
 
   return [
+    ...getPathModeToolbarActions(editor, state),
     ...getBooleanToolbarActions(editor, state),
     {
       id: "delete-selection",

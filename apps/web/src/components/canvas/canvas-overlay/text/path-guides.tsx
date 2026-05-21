@@ -639,7 +639,19 @@ export const CanvasTextPathGuides = ({ viewportRevision }) => {
     guide &&
     metrics &&
     matrixTransform &&
-    (isPathEditing || isTextPathPositioning);
+    (isPathEditing || isTextPathPositioning || guide.kind === "circle");
+  const startCirclePathEditing = (event) => {
+    if (guide?.kind !== "circle" || isPathEditing) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (editor.startPathEditing(node.id)) {
+      editor.setActiveTool("node");
+    }
+  };
 
   return (
     <div
@@ -660,6 +672,11 @@ export const CanvasTextPathGuides = ({ viewportRevision }) => {
           activePathD={guide.activePathD}
           height={metrics.height}
           isEditing={isPathEditing}
+          onActivePathPointerDown={
+            guide.kind === "circle" && !isPathEditing
+              ? startCirclePathEditing
+              : undefined
+          }
           pathD={guide.pathD}
           transform={matrixTransform}
           width={metrics.width}

@@ -5,6 +5,7 @@ import {
   getResizeCorner,
   getResizedNodeUpdate,
   getScaledGroupNodeUpdate,
+  getScaledPathEditingNodeUpdate,
 } from "../primitives/group-resize";
 import { getNodeWorldPoint } from "../primitives/rotation";
 import { getResizedShapeNodeUpdate } from "../primitives/shape-resize";
@@ -48,6 +49,80 @@ const getResizedArtboardNodeUpdate = (node, bbox, pointCanvas, handle) => {
   };
 };
 
+const getArtboardBoxResizeSession = (editor, requestedNodeIds, handle) => {
+  if (
+    !(
+      requestedNodeIds.length === 1 &&
+      isArtboardNode(editor.getNode(requestedNodeIds[0])) &&
+      handle
+    )
+  ) {
+    return undefined;
+  }
+
+  const artboardNode = editor.getNode(requestedNodeIds[0]);
+  const bbox = artboardNode
+    ? editor.getNodeTransformFrame(artboardNode.id)?.bounds
+    : null;
+
+  if (!(artboardNode && bbox)) {
+    return null;
+  }
+
+  return {
+    baseBBox: { ...bbox },
+    baseNode: { ...artboardNode },
+    handle,
+    mode: "artboard-box",
+    nodeIds: [artboardNode.id],
+  };
+};
+
+const getSingleNodeResizeSession = (
+  editor,
+  { anchorCanvas, direction, handle, includesContainerSelection, nodeIds }
+) => {
+  if (!(nodeIds.length === 1 && !includesContainerSelection)) {
+    return undefined;
+  }
+
+  const resizedNodeId = nodeIds[0];
+  const resizedNode = editor.getNode(resizedNodeId);
+  const bbox = resizedNode
+    ? editor.getNodeTransformBounds(resizedNodeId)
+    : null;
+
+  if (
+    !(
+      resizedNode &&
+      bbox &&
+      (direction || (resizedNode.type === "shape" && handle))
+    )
+  ) {
+    return null;
+  }
+
+  if (resizedNode.type === "shape" && handle) {
+    return {
+      anchorCanvas: { ...anchorCanvas },
+      baseBBox: { ...bbox },
+      baseNode: { ...resizedNode },
+      handle,
+      mode: "shape-box",
+      nodeIds: [resizedNodeId],
+    };
+  }
+
+  return {
+    anchorCanvas: { ...anchorCanvas },
+    baseBBox: { ...bbox },
+    baseNode: { ...resizedNode },
+    direction: [...direction],
+    nodeIds: [resizedNodeId],
+    pathEditing: editor.isPathEditing(resizedNodeId),
+  };
+};
+
 export const beginResizeSelection = (
   editor,
   { anchorCanvas, direction, handle, nodeId, nodeIds } = {}
@@ -67,65 +142,26 @@ export const beginResizeSelection = (
     return null;
   }
 
-  if (
-    requestedNodeIds.length === 1 &&
-    isArtboardNode(editor.getNode(requestedNodeIds[0])) &&
+  const artboardSession = getArtboardBoxResizeSession(
+    editor,
+    requestedNodeIds,
     handle
-  ) {
-    const artboardNode = editor.getNode(requestedNodeIds[0]);
-    const bbox = artboardNode
-      ? editor.getNodeTransformFrame(artboardNode.id)?.bounds
-      : null;
+  );
 
-    if (!(artboardNode && bbox)) {
-      return null;
-    }
-
-    return {
-      baseBBox: { ...bbox },
-      baseNode: { ...artboardNode },
-      handle,
-      mode: "artboard-box",
-      nodeIds: [artboardNode.id],
-    };
+  if (artboardSession !== undefined) {
+    return artboardSession;
   }
 
-  if (resolvedNodeIds.length === 1 && !includesContainerSelection) {
-    const resolvedNodeId = resolvedNodeIds[0];
-    const resizedNode = editor.getNode(resolvedNodeId);
-    const bbox = resizedNode
-      ? editor.getNodeTransformBounds(resolvedNodeId)
-      : null;
+  const singleNodeSession = getSingleNodeResizeSession(editor, {
+    anchorCanvas,
+    direction,
+    handle,
+    includesContainerSelection,
+    nodeIds: resolvedNodeIds,
+  });
 
-    if (
-      !(
-        resizedNode &&
-        bbox &&
-        (direction || (resizedNode.type === "shape" && handle))
-      )
-    ) {
-      return null;
-    }
-
-    if (resizedNode.type === "shape" && handle) {
-      return {
-        anchorCanvas: { ...anchorCanvas },
-        baseBBox: { ...bbox },
-        baseNode: { ...resizedNode },
-        handle,
-        mode: "shape-box",
-        nodeIds: [resolvedNodeId],
-      };
-    }
-
-    return {
-      anchorCanvas: { ...anchorCanvas },
-      baseBBox: { ...bbox },
-      baseNode: { ...resizedNode },
-      direction: [...direction],
-      nodeIds: [resolvedNodeId],
-      pathEditing: editor.isPathEditing(resolvedNodeId),
-    };
+  if (singleNodeSession !== undefined) {
+    return singleNodeSession;
   }
 
   return {
@@ -205,7 +241,7 @@ export const updateResizeSelection = (
     editor.updateNode(
       nodeId,
       session.pathEditing
-        ? getScaledGroupNodeUpdate(
+        ? getScaledPathEditingNodeUpdate(
             session.baseNode,
             session.baseBBox,
             session.anchorCanvas,

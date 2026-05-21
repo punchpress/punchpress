@@ -73,7 +73,7 @@ export const CanvasTextEditor = () => {
     }
 
     ignoreInitialBlurRef.current = true;
-    input.focus();
+    input.focus({ preventScroll: true });
     const caretPosition = input.value.length;
     input.setSelectionRange(caretPosition, caretPosition);
     setSelectionRange({

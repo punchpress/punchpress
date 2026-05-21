@@ -16,7 +16,7 @@ import {
 export const addArtboardNode = (editor, point) => {
   finishEditingIfNeeded(editor);
   const defaultNode = createDefaultArtboardNode();
-  let nodeId = null;
+  let nodeId: string | null = null;
   const shouldFit = shouldFitFirstAddedNode(editor);
 
   editor.run(() => {
@@ -38,7 +38,7 @@ export const addArtboardNode = (editor, point) => {
 export const addShapeNode = (editor, point, shape) => {
   finishEditingIfNeeded(editor);
   const resolvedShape = shape || editor.nextShapeKind;
-  let nodeId = null;
+  let nodeId: string | null = null;
   const shouldFit = shouldFitFirstAddedNode(editor);
 
   editor.run(() => {
@@ -78,7 +78,7 @@ export const addTextNode = (editor, point) => {
     patch: nodePatch,
   });
 
-  if (shouldFit && nodeId) {
+  if (shouldFit && nodeId && !point) {
     fitFirstAddedNode(editor, nodeId);
   }
 
@@ -88,7 +88,7 @@ export const addTextNode = (editor, point) => {
 export const addVectorNode = (editor, point) => {
   finishEditingIfNeeded(editor);
   const defaultNode = createDefaultPathNode(ROOT_PARENT_ID);
-  let nodeId = null;
+  let nodeId: string | null = null;
   const shouldFit = shouldFitFirstAddedNode(editor);
 
   editor.run(() => {

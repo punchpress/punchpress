@@ -1,3 +1,5 @@
+import { HugeiconsIcon } from "@hugeicons/react";
+import { NodeEditIcon } from "@hugeicons-pro/core-stroke-rounded";
 import {
   ARCH_BEND_LIMIT,
   clamp,
@@ -16,6 +18,11 @@ import {
   ToggleGroup,
   Toggle as ToggleGroupItem,
 } from "@/components/ui/toggle-group";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useEditor } from "../../../editor-react/use-editor";
 import { FieldRow, Section } from "./field-primitives";
 import { warpIcons } from "./warp-icons";
@@ -26,6 +33,12 @@ const CIRCLE_SWEEP_RANGE = { min: -360, max: 360 };
 const WAVE_AMPLITUDE_RANGE = { min: -500, max: 500 };
 const WAVE_CYCLES_RANGE = { min: WAVE_CYCLES_MIN, max: WAVE_CYCLES_MAX };
 const SLANT_RISE_RANGE = { min: -400, max: 400 };
+
+const startPathEditing = (editor, nodeId) => {
+  if (editor.startPathEditing(nodeId)) {
+    editor.setActiveTool("node");
+  }
+};
 
 export const TextWarpFields = ({ node, withTopBorder = true }) => {
   const editor = useEditor();
@@ -49,9 +62,7 @@ export const TextWarpFields = ({ node, withTopBorder = true }) => {
             });
 
             if (nextKind === "circle") {
-              if (editor.startPathEditing(node.id)) {
-                editor.setActiveTool("node");
-              }
+              startPathEditing(editor, node.id);
               return;
             }
 
@@ -193,6 +204,7 @@ const TextWarpKindFields = ({ node }) => {
   }
 
   if (node.warp.kind === "circle") {
+    const isPathEditing = editor.isPathEditing(node.id);
     const setSide = (values) => {
       const nextSide = values[0] ?? "outside";
       update({ inverted: nextSide === "inside" });
@@ -212,6 +224,39 @@ const TextWarpKindFields = ({ node }) => {
 
     return (
       <>
+        <FieldRow label="Path">
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  className="w-full justify-center"
+                  onClick={() => {
+                    if (isPathEditing) {
+                      editor.setActiveTool("pointer");
+                      return;
+                    }
+
+                    startPathEditing(editor, node.id);
+                  }}
+                  size="sm"
+                  type="button"
+                  variant={isPathEditing ? "secondary" : "outline"}
+                >
+                  <HugeiconsIcon
+                    color="currentColor"
+                    icon={NodeEditIcon}
+                    size={16}
+                    strokeWidth={1.7}
+                  />
+                  {isPathEditing ? "Done editing" : "Edit path"}
+                </Button>
+              }
+            />
+            <TooltipContent>
+              {isPathEditing ? "Return to selection" : "Edit path with Node"}
+            </TooltipContent>
+          </Tooltip>
+        </FieldRow>
         <FieldRow label="Side">
           <ToggleGroup
             className="grid grid-cols-2 gap-1.5"

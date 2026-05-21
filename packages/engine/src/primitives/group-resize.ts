@@ -118,6 +118,21 @@ export const getScaledGroupNodeUpdate = (node, bbox, anchor, scale) => {
   };
 };
 
+export const getScaledPathEditingNodeUpdate = (node, bbox, anchor, scale) => {
+  if (node.type !== "text") {
+    return getScaledGroupNodeUpdate(node, bbox, anchor, scale);
+  }
+
+  return {
+    tracking: node.tracking,
+    transform: {
+      x: round(anchor.x + (getNodeX(node) - anchor.x) * scale, 2),
+      y: round(anchor.y + (getNodeY(node) - anchor.y) * scale, 2),
+    },
+    warp: getScaledWarp(node.warp, scale),
+  };
+};
+
 export const getResizedNodeUpdate = (node, bbox, anchor, scale, direction) => {
   const fixedCorner = getCornerPointFromBounds(
     bbox,

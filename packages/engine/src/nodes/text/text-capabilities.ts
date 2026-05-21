@@ -10,6 +10,7 @@ import {
   getSlantGuide,
   getWaveGuide,
 } from "./text-path";
+import { getEstimatedPlacementBounds } from "./text-placement";
 import { buildNodeGeometry as buildWarpTextGeometry } from "./warp-engine";
 import { estimateBounds } from "./warp-layout";
 
@@ -97,7 +98,7 @@ const getTextFallbackHitRegions = (node, bbox) => {
 export const textNodeCapabilities = {
   buildGeometry: (node, font) => {
     if (!font) {
-      const bbox = estimateBounds(node);
+      const bbox = getEstimatedPlacementBounds(node);
 
       return withNodeGeometryBehavior({
         bbox,

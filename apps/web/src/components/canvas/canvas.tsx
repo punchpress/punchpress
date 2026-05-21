@@ -94,6 +94,15 @@ const startCanvasArtboardBodyPress = (editor, event, nodeId) => {
   window.addEventListener("pointerup", handlePointerEnd);
 };
 
+const stopPathEditingFromCanvasPress = (editor, activeTool) => {
+  if (activeTool === "node") {
+    editor.setActiveTool("pointer");
+    return;
+  }
+
+  editor.stopPathEditing();
+};
+
 const getCanvasPoint = (viewer, host, clientX, clientY, zoom) => {
   if (!(viewer && host)) {
     return { x: 0, y: 0 };
@@ -336,6 +345,14 @@ export const Canvas = () => {
         event.clientY,
         zoom
       );
+
+      if (pathEditingNodeId && activeTool !== "pen") {
+        event.preventDefault();
+        event.stopPropagation();
+        stopPathEditingFromCanvasPress(editor, activeTool);
+        return;
+      }
+
       const artboardBodyNodeId =
         activeTool === "pointer" &&
         !getCanvasDeepLeafNodeIdAtPoint(editor, event.clientX, event.clientY)

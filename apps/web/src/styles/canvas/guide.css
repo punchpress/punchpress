@@ -5,6 +5,15 @@
     vector-effect: non-scaling-stroke;
   }
 
+  .canvas-guide-hit-target {
+    fill: none;
+    pointer-events: stroke;
+    stroke: transparent;
+    stroke-linecap: round;
+    stroke-width: 18px;
+    vector-effect: non-scaling-stroke;
+  }
+
   .canvas-guide[data-role="passive"] {
     stroke: var(--canvas-guide);
     stroke-opacity: var(--canvas-guide-opacity);

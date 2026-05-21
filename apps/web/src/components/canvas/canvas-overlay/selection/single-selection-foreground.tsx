@@ -412,6 +412,28 @@ export const CanvasSingleSelectionForeground = ({
       return;
     }
 
+    const startCanvasPoint = getCanvasPoint(
+      editor,
+      event.clientX,
+      event.clientY
+    );
+
+    if (
+      isPathEditing &&
+      !(startCanvasPoint && editor.hitTestNodePoint(nodeId, startCanvasPoint))
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (editor.activeTool === "node") {
+        editor.setActiveTool("pointer");
+        return;
+      }
+
+      editor.stopPathEditing();
+      return;
+    }
+
     if (event.detail >= 2) {
       event.preventDefault();
       event.stopPropagation();
@@ -431,11 +453,7 @@ export const CanvasSingleSelectionForeground = ({
       x: event.clientX,
       y: event.clientY,
     };
-    let previousCanvasPoint = getCanvasPoint(
-      editor,
-      event.clientX,
-      event.clientY
-    );
+    let previousCanvasPoint = startCanvasPoint;
     let dragSession: ReturnType<typeof editor.beginSelectionDrag> = null;
 
     const handlePointerMove = (moveEvent) => {

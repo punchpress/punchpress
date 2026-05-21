@@ -4,7 +4,7 @@ import { estimateBounds } from "./warp-layout";
 const ESTIMATED_ASCENDER_RATIO = 0.9;
 const ESTIMATED_DESCENDER_RATIO = 0.1;
 
-const getEstimatedPlacementBounds = (node) => {
+export const getEstimatedPlacementBounds = (node) => {
   const bounds = estimateBounds(node);
   const ascender = Math.max(20, node.fontSize * ESTIMATED_ASCENDER_RATIO);
   const descender = Math.max(0, node.fontSize * ESTIMATED_DESCENDER_RATIO);
@@ -22,7 +22,9 @@ const getPlacementBounds = (node, font) => {
     return getEstimatedPlacementBounds(node);
   }
 
-  return buildNodeGeometry(node, font).bbox || getEstimatedPlacementBounds(node);
+  return (
+    buildNodeGeometry(node, font).bbox || getEstimatedPlacementBounds(node)
+  );
 };
 
 export const getTextNodePlacementOrigin = (node, point, font) => {

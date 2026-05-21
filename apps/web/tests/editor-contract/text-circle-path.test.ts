@@ -142,6 +142,26 @@ describe("Editor text circle path sessions", () => {
     expect(editor.getNode(node.id)?.warp.radius).toBeCloseTo(1350, 2);
   });
 
+  test("path editing resize changes the circle radius without scaling the text", () => {
+    const editor = new Editor();
+    const node = createCircleNode();
+
+    editor.getState().loadNodes([node]);
+    editor.select(node.id);
+    editor.startPathEditing(node.id);
+
+    editor.resizeSelectionFromCorner({
+      corner: "se",
+      scale: 0.5,
+    });
+
+    const resizedNode = editor.getNode(node.id);
+
+    expect(resizedNode?.fontSize).toBe(node.fontSize);
+    expect(resizedNode?.strokeWidth).toBe(node.strokeWidth);
+    expect(resizedNode?.warp.radius).toBeCloseTo(450, 2);
+  });
+
   test("only uses full path bounds while path editing is active", () => {
     const editor = new Editor();
     const node = createCircleNode();
