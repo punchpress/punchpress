@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.7.0 - 2026-05-27
+
+### Added
+
+- Performance diagnostics now include durable large-SVG interaction benchmarks for tracking dense vector drag behavior over time.
+
+### Changed
+
+- Imported SVG artwork is much faster to select, hover, drag, resize, rotate, zoom around, and recolor, especially for deeply nested vector files.
+- Group, vector, and shape transforms now use steadier transform frames, so rotated and resized artwork stays aligned with its selection handles.
+- Drawing and resizing shape layers feels more direct, with less preview jitter while dragging.
+
+### Fixed
+
+- Complex SVG imports now preserve more visible appearance details, including opacity and nested vector rendering cases that previously looked wrong.
+- Dense layer trees and selection color summaries no longer cause broad panel refreshes during common canvas interactions.
+- Desktop development installs now repair missing Electron binaries more reliably in fresh worktrees.
+
 ## v0.6.0 - 2026-05-21
 
 ### Added
