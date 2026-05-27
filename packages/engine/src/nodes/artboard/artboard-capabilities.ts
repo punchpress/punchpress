@@ -116,6 +116,10 @@ export const artboardNodeCapabilities = {
     requiresPathEditing: false,
   }),
 
+  getResizeMode: () => "bounds",
+
+  getRotateMode: () => "none",
+
   canPersistPathEditing: () => false,
 
   getEditablePathSession: () => null,

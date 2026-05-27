@@ -17,6 +17,13 @@ Transforms move, resize, and rotate selected objects.
 - Rotation starts from the corner perimeter.
 - Rotated resize anchors to the opposite corner.
 - Multi-selection and group transforms follow the same model as single objects.
+- Resizing a selected group, imported SVG, or other container treats the
+  selected container as the interactive object. Nested descendants stay
+  editable, but they are not individually transformed on every pointer tick.
+- Rotating a selected group, imported SVG, or other container follows the same
+  preview-and-commit contract as resize. The selected root rotates as one live
+  object during the gesture; nested descendants receive durable transform
+  updates only when the gesture commits.
 - Artboards can resize but do not rotate.
 
 ## Feedback
@@ -27,3 +34,9 @@ Transforms move, resize, and rotate selected objects.
   affordances.
 - Path-edit or shape-edit modes may replace normal transform chrome with editing
   affordances.
+
+## Performance
+
+Active transforms use a preview surface first and update durable document nodes
+at the gesture boundary. Complex selections and deeply nested groups must not
+fan out through every descendant during pointer movement.

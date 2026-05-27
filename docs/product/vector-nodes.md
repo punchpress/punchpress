@@ -14,16 +14,18 @@ Vector nodes group child path nodes that need one object identity.
 
 - A vector node is a first-class canvas object with identity, visibility,
   transform, layer behavior, and object-level selection.
-- A vector contains one or more child paths.
+- A vector may contain one or more child paths.
 - Child path order is durable and controls composition.
 - A vector may render children independently or as a compound filled result.
-- Vector nodes preserve editable source geometry rather than only flattened SVG
-  output.
+- Dense vector or group subtrees may render through a cached canvas surface, but
+  that surface is derived renderer state rather than vector source content.
 
 ## Layers And Properties
 
-- A vector appears as one parent layer row with child path rows nested beneath.
-- During path editing, the focused child path row becomes active.
+- A vector appears as one parent layer row.
+- Child path rows appear for editable child paths.
+- During path editing, the focused child path row becomes active when the vector
+  has child paths.
 - Selecting a vector exposes object-level controls and aggregate appearance.
 - Selection colors list distinct child fill and stroke colors.
 - Path-specific geometry and appearance stay on direct child path selection.

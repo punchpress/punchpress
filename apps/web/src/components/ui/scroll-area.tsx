@@ -9,8 +9,10 @@ const ScrollAreaPrimitive = BaseScrollAreaPrimitive;
 function ScrollArea({
   className,
   children,
+  onViewportScroll,
   scrollFade = false,
   scrollbarGutter = false,
+  viewportRef,
   ...props
 }) {
   return (
@@ -27,6 +29,8 @@ function ScrollArea({
             "data-has-overflow-y:pe-2.5 data-has-overflow-x:pb-2.5"
         )}
         data-slot="scroll-area-viewport"
+        onScroll={onViewportScroll}
+        ref={viewportRef}
       >
         {children}
       </BaseScrollAreaPrimitive.Viewport>

@@ -1,4 +1,4 @@
-import { MAX_ZOOM, MIN_ZOOM, round } from "@punchpress/engine";
+import { MAX_ZOOM, MIN_ZOOM, measurePerf, round } from "@punchpress/engine";
 import {
   useCallback,
   useEffect,
@@ -9,6 +9,11 @@ import {
 import InfiniteViewer from "react-infinite-viewer";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
+import {
+  getInteractionTimingStart,
+  logInteractionCheckpoint,
+  logInteractionNextPaint,
+} from "../../performance/interaction-timing-log";
 import { shouldDisableCanvasOverlay } from "../../performance/performance-url-flags";
 import { useTheme } from "../../theme/theme-provider";
 import { DesignerFloatingToolbar, DesignerFrame } from "../designer/designer";
@@ -103,6 +108,28 @@ const stopPathEditingFromCanvasPress = (editor, activeTool) => {
   editor.stopPathEditing();
 };
 
+const logCanvasPointerDownAccepted = ({
+  activeTool,
+  editor,
+  event,
+  timingStartedAt,
+}) => {
+  logInteractionCheckpoint("canvas.pointerDown.accepted", timingStartedAt, {
+    activeTool,
+    selectedNodeCount: editor.selectedNodeIds.length,
+    target: event.target instanceof Element ? event.target.tagName : null,
+  });
+};
+
+const logCanvasPointerDownDispatched = (editor, timingStartedAt) => {
+  logInteractionCheckpoint("canvas.pointerDown.dispatched", timingStartedAt, {
+    selectedNodeCount: editor.selectedNodeIds.length,
+  });
+  logInteractionNextPaint("canvas.pointerDown", timingStartedAt, () => ({
+    selectedNodeCount: editor.selectedNodeIds.length,
+  }));
+};
+
 const getCanvasPoint = (viewer, host, clientX, clientY, zoom) => {
   if (!(viewer && host)) {
     return { x: 0, y: 0 };
@@ -164,6 +191,7 @@ export const Canvas = () => {
 
   const viewerRef = useRef(null);
   const hostRef = useRef(null);
+  const viewportInteractionTimeoutRef = useRef<number | null>(null);
   const lastPenHoverClientPointRef = useRef<{ x: number; y: number } | null>(
     null
   );
@@ -197,6 +225,11 @@ export const Canvas = () => {
     });
 
     return () => {
+      if (viewportInteractionTimeoutRef.current !== null) {
+        window.clearTimeout(viewportInteractionTimeoutRef.current);
+        viewportInteractionTimeoutRef.current = null;
+      }
+      editor.setViewportInteracting(false);
       editor.viewerRef = null;
       editor.hostRef = null;
     };
@@ -261,6 +294,17 @@ export const Canvas = () => {
   const handleScroll = useCallback(
     (event) => {
       const viewer = viewerRef.current;
+      editor.setViewportInteracting(true);
+
+      if (viewportInteractionTimeoutRef.current !== null) {
+        window.clearTimeout(viewportInteractionTimeoutRef.current);
+      }
+
+      viewportInteractionTimeoutRef.current = window.setTimeout(() => {
+        viewportInteractionTimeoutRef.current = null;
+        editor.setViewportInteracting(false);
+      }, 120);
+
       editor.setViewport({
         x: viewer?.getScrollLeft?.() ?? editor.viewport.x ?? 0,
         y: viewer?.getScrollTop?.() ?? editor.viewport.y ?? 0,
@@ -299,6 +343,17 @@ export const Canvas = () => {
 
       event.preventDefault();
       event.stopPropagation();
+      editor.setViewportInteracting(true);
+
+      if (viewportInteractionTimeoutRef.current !== null) {
+        window.clearTimeout(viewportInteractionTimeoutRef.current);
+      }
+
+      viewportInteractionTimeoutRef.current = window.setTimeout(() => {
+        viewportInteractionTimeoutRef.current = null;
+        editor.setViewportInteracting(false);
+      }, 120);
+
       editor.zoomViewportFromWheel({
         clientX: event.clientX,
         clientY: event.clientY,
@@ -309,6 +364,8 @@ export const Canvas = () => {
   );
   const handleCanvasPointerDown = useCallback(
     (event) => {
+      const timingStartedAt = getInteractionTimingStart();
+
       if (spacePressed || activeTool === "hand") {
         return;
       }
@@ -346,6 +403,13 @@ export const Canvas = () => {
         zoom
       );
 
+      logCanvasPointerDownAccepted({
+        activeTool,
+        editor,
+        event,
+        timingStartedAt,
+      });
+
       if (pathEditingNodeId && activeTool !== "pen") {
         event.preventDefault();
         event.stopPropagation();
@@ -353,10 +417,21 @@ export const Canvas = () => {
         return;
       }
 
+      const hitNodeId =
+        activeTool === "pointer"
+          ? measurePerf("canvas.pointerDown.deepHitTest", () =>
+              getCanvasDeepLeafNodeIdAtPoint(
+                editor,
+                event.clientX,
+                event.clientY
+              )
+            )
+          : null;
       const artboardBodyNodeId =
-        activeTool === "pointer" &&
-        !getCanvasDeepLeafNodeIdAtPoint(editor, event.clientX, event.clientY)
-          ? getTopmostVisibleArtboardIdAtPoint(editor, point)
+        activeTool === "pointer" && !hitNodeId
+          ? measurePerf("canvas.pointerDown.artboardHitTest", () =>
+              getTopmostVisibleArtboardIdAtPoint(editor, point)
+            )
           : null;
 
       if (artboardBodyNodeId) {
@@ -383,6 +458,7 @@ export const Canvas = () => {
           },
         }),
       });
+      logCanvasPointerDownDispatched(editor, timingStartedAt);
       syncHostPenCursorMode(
         hostRef.current,
         activeTool,

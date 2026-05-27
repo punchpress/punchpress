@@ -37,7 +37,7 @@ type DesignDocument = {
 | `group` | Named container with transform. |
 | `text` | Editable text, local font descriptor, size, tracking, fill, stroke, warp, transform. |
 | `shape` | Live polygon, ellipse, or star with size, points, optional corner radius, appearance, transform. |
-| `vector` | Container for child paths and optional path composition. |
+| `vector` | Vector object with optional child paths and path composition. |
 | `path` | Editable contours, fill rule, stroke style, appearance, transform. |
 
 ## Common Fields
@@ -90,6 +90,16 @@ Each segment stores `point`, `handleIn`, `handleOut`, and `pointType`
 
 Path fill rules are `evenodd` or `nonzero`. Vector path composition is
 `independent`, `compound-fill`, `unite`, `subtract`, `intersect`, or `exclude`.
+Source-backed vectors may store:
+
+```ts
+type VectorSvgSource = {
+  type: "svg";
+  source: string;
+  width: number;
+  height: number;
+};
+```
 
 ## Validation Rules
 

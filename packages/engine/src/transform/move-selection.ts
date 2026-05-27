@@ -53,6 +53,7 @@ export const beginMoveSelection = (editor, { nodeId, nodeIds } = {}) => {
     baseBBoxes,
     baseTransforms,
     nodeIds: [...resolvedNodeIds],
+    previewNodeIds: [...requestedNodeIds],
     previewDelta: { x: 0, y: 0 },
   };
 };
@@ -68,12 +69,15 @@ const setMoveSelectionPreview = (editor, session, nextDelta) => {
   };
 
   session.previewDelta = resolvedDelta;
+  const previewNodeIds = session.previewNodeIds || session.nodeIds;
   editor.setSelectionDragPreview({
     delta: resolvedDelta,
-    nodeIds: session.nodeIds,
+    effectiveNodeIdSet: new Set(session.nodeIds),
+    nodeIdSet: new Set([...session.nodeIds, ...previewNodeIds]),
+    nodeIds: previewNodeIds,
   });
 
-  return session.nodeIds;
+  return previewNodeIds;
 };
 
 const getAbsoluteMoveDelta = (session, { dragEvents, left, top } = {}) => {

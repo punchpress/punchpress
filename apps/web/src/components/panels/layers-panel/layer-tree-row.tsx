@@ -2,7 +2,7 @@ import { ViewIcon, ViewOffIcon } from "@hugeicons-pro/core-stroke-rounded";
 import { getPathNodeContours } from "@punchpress/engine";
 import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useLayoutEffect, useRef, useState } from "react";
+import { memo, useLayoutEffect, useRef, useState } from "react";
 import { NodeContextMenuItems } from "@/components/context-menus/node-context-menu-items";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { SortableItem } from "@/components/ui/sortable-list";
@@ -16,6 +16,7 @@ import { LayerGlyph } from "./layer-glyph";
 import { LayerNodeIcon } from "./layer-node-icon";
 
 const LAYER_TREE_INDENT = 24;
+const DENSE_LAYER_CHILD_COUNT = 300;
 
 const getLayerPrimaryButtonClassName = ({ isSelected }) => {
   return cn(
@@ -219,15 +220,19 @@ const LayerTreeChildren = ({
   collapsedGroupIds,
   contourRows,
   depth,
+  expandedDenseGroupIds,
   isExpanded,
   isContainer,
   onToggleCollapse,
+  renderNodeChildren = true,
+  sortable,
 }) => {
   if (
     !(
       isContainer &&
       isExpanded &&
-      (childNodeIds.length > 0 || contourRows.length > 0)
+      ((renderNodeChildren && childNodeIds.length > 0) ||
+        (renderNodeChildren && contourRows.length > 0))
     )
   ) {
     return null;
@@ -237,35 +242,47 @@ const LayerTreeChildren = ({
 
   return (
     <div className="flex flex-col">
-      {orderedChildNodeIds.map((childNodeId) => {
-        return (
-          <LayerTreeRow
-            collapsedGroupIds={collapsedGroupIds}
-            depth={depth + 1}
-            key={childNodeId}
-            nodeId={childNodeId}
-            onToggleCollapse={onToggleCollapse}
-          />
-        );
-      })}
+      {renderNodeChildren
+        ? orderedChildNodeIds.map((childNodeId) => {
+            return (
+              <LayerTreeRow
+                collapsedGroupIds={collapsedGroupIds}
+                depth={depth + 1}
+                expandedDenseGroupIds={expandedDenseGroupIds}
+                key={childNodeId}
+                nodeId={childNodeId}
+                onToggleCollapse={onToggleCollapse}
+                sortable={sortable}
+              />
+            );
+          })
+        : null}
 
-      {contourRows.map((contourRow) => {
-        return (
-          <LayerContourRow
-            depth={depth + 1}
-            isSelected={contourRow.isSelected}
-            key={contourRow.id}
-            label={contourRow.label}
-            onSelect={contourRow.onSelect}
-            tone={contourRow.tone}
-          />
-        );
-      })}
+      {renderNodeChildren
+        ? contourRows.map((contourRow) => {
+            return (
+              <LayerContourRow
+                depth={depth + 1}
+                isSelected={contourRow.isSelected}
+                key={contourRow.id}
+                label={contourRow.label}
+                onSelect={contourRow.onSelect}
+                tone={contourRow.tone}
+              />
+            );
+          })
+        : null}
     </div>
   );
 };
 
-const LayerContourRow = ({ depth, isSelected, label, onSelect, tone }) => {
+export const LayerContourRow = ({
+  depth,
+  isSelected,
+  label,
+  onSelect,
+  tone,
+}) => {
   return (
     <div
       className="flex w-full items-stretch"
@@ -299,43 +316,79 @@ const LayerContourRow = ({ depth, isSelected, label, onSelect, tone }) => {
   );
 };
 
-export const LayerTreeRow = ({
+export const LayerTreeRow = memo(function LayerTreeRow({
   collapsedGroupIds,
   depth = 0,
+  expandedDenseGroupIds,
   nodeId,
   onToggleCollapse,
-}) => {
+  renderChildren = true,
+  sortable = true,
+}) {
   usePerformanceRenderCounter("render.panel.layer-row");
   const editor = useEditor();
   const renameInputRef = useRef(null);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
-  const hoveredNodeId = useEditorValue((_, state) => state.hoveredNodeId);
-  const selectedCount = useEditorValue(
-    (_, state) => state.selectedNodeIds.length
+  const layer = useEditorValue(
+    (editor) => editor.getLayerRow(nodeId),
+    "selector.layerRow.layer"
   );
-  const layer = useEditorValue((editor) => editor.getLayerRow(nodeId));
-  const childNodeIds = useEditorValue((editor) =>
-    editor.getChildNodeIds(nodeId)
-  );
-  const editableContours = useEditorValue((editor) => {
+  const layerState = useEditorValue((editor, state) => {
     const node = editor.getNode(nodeId);
+    const childNodeIds = editor.getChildNodeIds(nodeId);
+    let editableContourCount = 0;
 
     if (node?.type === "path") {
-      return getPathNodeContours(node);
+      editableContourCount = getPathNodeContours(node).length;
+    } else if (node?.type === "vector") {
+      editableContourCount = node.contours?.length || 0;
     }
 
-    return node?.type === "vector" ? node.contours || [] : [];
-  });
-  const compoundOperationTarget = useEditorValue((nextEditor) => {
-    const target = getCompoundVectorOperationTarget(nextEditor, nodeId);
+    const compoundOperationTarget = getCompoundVectorOperationTarget(
+      editor,
+      nodeId
+    );
 
-    return target?.nodeId === nodeId ? target : null;
-  });
-  const pathEditingState = useEditorValue((_, state) => ({
-    pathEditingNodeId: state.pathEditingNodeId,
-    pathEditingPoint: state.pathEditingPoint,
-  }));
+    return {
+      childNodeKey: childNodeIds.join("|"),
+      compoundNodeId:
+        compoundOperationTarget?.nodeId === nodeId
+          ? compoundOperationTarget.nodeId
+          : null,
+      compoundPathComposition:
+        compoundOperationTarget?.nodeId === nodeId
+          ? compoundOperationTarget.pathComposition
+          : null,
+      editableContourCount,
+      isHovered: state.hoveredNodeId === nodeId,
+      pathEditingNodeId: state.pathEditingNodeId,
+      pathEditingPoint: state.pathEditingPoint,
+    };
+  }, "selector.layerRow.state");
+  const compoundOperationTarget = layerState.compoundNodeId
+    ? {
+        nodeId: layerState.compoundNodeId,
+        pathComposition: layerState.compoundPathComposition,
+      }
+    : null;
+  const pathEditingState = {
+    pathEditingNodeId: layerState.pathEditingNodeId,
+    pathEditingPoint: layerState.pathEditingPoint,
+  };
+  const childNodeIds = editor.getChildNodeIds(nodeId);
+  let editableContours: ReturnType<typeof getPathNodeContours> = [];
+
+  if (layerState.editableContourCount > 1 && layer?.node.type === "path") {
+    editableContours = getPathNodeContours(layer.node);
+  } else if (
+    layerState.editableContourCount > 1 &&
+    layer?.node.type === "vector"
+  ) {
+    editableContours = layer.node.contours || [];
+  }
+
+  const { isHovered } = layerState;
 
   useLayoutEffect(() => {
     if (!layer) {
@@ -356,8 +409,10 @@ export const LayerTreeRow = ({
   }
 
   const isContainer = layer.isContainer;
-  const isExpanded = !collapsedGroupIds.has(nodeId);
-  const isHovered = hoveredNodeId === nodeId;
+  const isDenseContainer = childNodeIds.length > DENSE_LAYER_CHILD_COUNT;
+  const isExpanded =
+    !collapsedGroupIds.has(nodeId) &&
+    (!isDenseContainer || expandedDenseGroupIds.has(nodeId));
   const contourRows =
     (layer.node.type === "vector" || layer.node.type === "path") &&
     childNodeIds.length === 0 &&
@@ -428,7 +483,7 @@ export const LayerTreeRow = ({
       isSelected: layer.isSelected,
       node: layer.node,
       nodeId,
-      selectedCount,
+      selectedCount: editor.selectedNodeIds.length,
     });
   };
 
@@ -448,130 +503,145 @@ export const LayerTreeRow = ({
     setIsRenaming(false);
   };
 
-  return (
-    <SortableItem id={nodeId}>
-      {({ dragHandleProps, isDragging, itemStyle, setItemRef }) => (
-        <div
-          className={cn(
-            "flex w-full flex-col",
-            isDragging && "z-20 opacity-35"
-          )}
-          ref={setItemRef}
-          style={itemStyle}
-        >
-          <ContextMenu>
-            <ContextMenuTrigger
-              className="block w-full"
-              onContextMenuCapture={() => {
-                if (!layer.isSelected) {
-                  handleSelect({ shiftKey: false });
-                }
-              }}
-              onPointerEnter={() => editor.setHoveredNode(nodeId)}
-              onPointerLeave={() => {
-                if (editor.hoveredNodeId !== nodeId) {
-                  return;
-                }
+  const renderRow = ({
+    dragHandleProps = {},
+    isDragging = false,
+    itemStyle,
+    setItemRef,
+  } = {}) => {
+    return (
+      <div
+        className={cn("flex w-full flex-col", isDragging && "z-20 opacity-35")}
+        ref={setItemRef}
+        style={itemStyle}
+      >
+        <ContextMenu>
+          <ContextMenuTrigger
+            className="block w-full"
+            onContextMenuCapture={() => {
+              if (!layer.isSelected) {
+                handleSelect({ shiftKey: false });
+              }
+            }}
+            onPointerEnter={() => editor.setHoveredNode(nodeId)}
+            onPointerLeave={() => {
+              if (editor.hoveredNodeId !== nodeId) {
+                return;
+              }
 
-                editor.setHoveredNode(null);
+              editor.setHoveredNode(null);
+            }}
+          >
+            <div
+              className={cn(
+                "group box-border flex w-full items-stretch gap-0 overflow-hidden rounded-[8px]",
+                getLayerRowClassName({
+                  isHovered,
+                  isSelected: layer.isSelected,
+                })
+              )}
+              data-layer-row-id={nodeId}
+              {...(isRenaming ? {} : dragHandleProps)}
+              style={{
+                paddingLeft: `${depth * LAYER_TREE_INDENT}px`,
               }}
             >
-              <div
-                className={cn(
-                  "group box-border flex w-full items-stretch gap-0 overflow-hidden rounded-[8px]",
-                  getLayerRowClassName({
-                    isHovered,
-                    isSelected: layer.isSelected,
-                  })
-                )}
-                data-layer-row-id={nodeId}
-                {...(isRenaming ? {} : dragHandleProps)}
-                style={{
-                  paddingLeft: `${depth * LAYER_TREE_INDENT}px`,
-                }}
-              >
-                {isContainer ? (
-                  <button
-                    aria-label={
-                      isExpanded ? "Collapse container" : "Expand container"
-                    }
-                    className={getLayerDisclosureClassName({
-                      isSelected: layer.isSelected,
-                    })}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onToggleCollapse(nodeId);
-                    }}
-                    type="button"
-                  >
-                    {isExpanded ? (
-                      <ChevronDown size={14} />
-                    ) : (
-                      <ChevronRight size={14} />
-                    )}
-                  </button>
-                ) : null}
-
-                <LayerRowPrimaryControl
-                  isContainer={isContainer}
-                  isRenaming={isRenaming}
-                  labelClassName={labelClassName}
-                  layer={layer}
-                  onCancelRename={cancelRename}
-                  onChangeRenameValue={setRenameValue}
-                  onCommitRename={commitRename}
-                  onDoubleClick={handleDoubleClick}
-                  onSelect={handleSelect}
-                  primaryButtonClassName={primaryButtonClassName}
-                  renameInputRef={renameInputRef}
-                  renameValue={renameValue}
-                  showCompoundOperationMenu={Boolean(compoundOperationTarget)}
-                />
-
+              {isContainer ? (
                 <button
-                  aria-label={layer.visibilityLabel}
-                  className={visibilityButtonClassName}
+                  aria-label={
+                    isExpanded ? "Collapse container" : "Expand container"
+                  }
+                  className={getLayerDisclosureClassName({
+                    isSelected: layer.isSelected,
+                  })}
                   onClick={(event) => {
                     event.stopPropagation();
-                    editor.toggleVisibility(nodeId);
+                    onToggleCollapse(nodeId, {
+                      defaultCollapsed: isDenseContainer,
+                    });
                   }}
-                  onPointerDown={(event) => event.stopPropagation()}
-                  tabIndex={-1}
                   type="button"
                 >
-                  <span
-                    className={getLayerVisibilityIconClassName({
-                      isSelected: layer.isSelected,
-                      isVisible: layer.isVisible,
-                    })}
-                  >
-                    <LayerGlyph
-                      icon={VisibilityIcon}
-                      size={16}
-                      strokeWidth={1.8}
-                    />
-                  </span>
+                  {isExpanded ? (
+                    <ChevronDown size={14} />
+                  ) : (
+                    <ChevronRight size={14} />
+                  )}
                 </button>
-              </div>
-            </ContextMenuTrigger>
+              ) : null}
 
-            <NodeContextMenuItems
-              nodeId={nodeId}
-              onStartRenaming={startRenaming}
-            />
-          </ContextMenu>
+              <LayerRowPrimaryControl
+                isContainer={isContainer}
+                isRenaming={isRenaming}
+                labelClassName={labelClassName}
+                layer={layer}
+                onCancelRename={cancelRename}
+                onChangeRenameValue={setRenameValue}
+                onCommitRename={commitRename}
+                onDoubleClick={handleDoubleClick}
+                onSelect={handleSelect}
+                primaryButtonClassName={primaryButtonClassName}
+                renameInputRef={renameInputRef}
+                renameValue={renameValue}
+                showCompoundOperationMenu={Boolean(compoundOperationTarget)}
+              />
 
-          <LayerTreeChildren
-            childNodeIds={childNodeIds}
-            collapsedGroupIds={collapsedGroupIds}
-            contourRows={contourRows}
-            depth={depth}
-            isContainer={isContainer}
-            isExpanded={isExpanded}
-            onToggleCollapse={onToggleCollapse}
+              <button
+                aria-label={layer.visibilityLabel}
+                className={visibilityButtonClassName}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  editor.toggleVisibility(nodeId);
+                }}
+                onPointerDown={(event) => event.stopPropagation()}
+                tabIndex={-1}
+                type="button"
+              >
+                <span
+                  className={getLayerVisibilityIconClassName({
+                    isSelected: layer.isSelected,
+                    isVisible: layer.isVisible,
+                  })}
+                >
+                  <LayerGlyph
+                    icon={VisibilityIcon}
+                    size={16}
+                    strokeWidth={1.8}
+                  />
+                </span>
+              </button>
+            </div>
+          </ContextMenuTrigger>
+
+          <NodeContextMenuItems
+            nodeId={nodeId}
+            onStartRenaming={startRenaming}
           />
-        </div>
-      )}
+        </ContextMenu>
+
+        <LayerTreeChildren
+          childNodeIds={childNodeIds}
+          collapsedGroupIds={collapsedGroupIds}
+          contourRows={contourRows}
+          depth={depth}
+          expandedDenseGroupIds={expandedDenseGroupIds}
+          isContainer={isContainer}
+          isExpanded={isExpanded}
+          onToggleCollapse={onToggleCollapse}
+          renderNodeChildren={renderChildren}
+          sortable={sortable}
+        />
+      </div>
+    );
+  };
+
+  return sortable ? (
+    <SortableItem id={nodeId}>
+      {({ dragHandleProps, isDragging, itemStyle, setItemRef }) =>
+        renderRow({ dragHandleProps, isDragging, itemStyle, setItemRef })
+      }
     </SortableItem>
+  ) : (
+    renderRow()
   );
-};
+});

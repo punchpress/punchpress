@@ -1,9 +1,12 @@
-import { isVectorPathPointRole } from "@punchpress/engine";
+import {
+  getGestureTolerancePx,
+  isVectorPathPointRole,
+} from "@punchpress/engine";
 
 const HIT_TEST_OPTIONS = {
   fill: true,
   stroke: true,
-  tolerance: 10,
+  tolerance: getGestureTolerancePx("vectorPathHit"),
 };
 
 export const findPathBodyHit = (paths, point) => {

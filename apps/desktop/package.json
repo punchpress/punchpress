@@ -7,12 +7,13 @@
   "description": "The Electron desktop app for PunchPress.",
   "scripts": {
     "dev": "bun run scripts/dev-desktop.ts",
+    "postinstall": "bun run scripts/ensure-electron.ts",
     "build": "bun run clean && bun run build:web && bun run build:electron",
     "build:web": "bun run --cwd ../web build",
-    "build:electron": "dotenv -e ../../.env -- sh -c 'electron-vite build && electron-builder --mac'",
-    "build:unsigned": "electron-vite build && electron-builder --mac --config.mac.identity=null --config.mac.notarize=false",
+    "build:electron": "dotenv -e ../../.env -- sh -c 'bun run scripts/ensure-electron.ts && electron-vite build && electron-builder --mac'",
+    "build:unsigned": "bun run scripts/ensure-electron.ts && electron-vite build && electron-builder --mac --config.mac.identity=null --config.mac.notarize=false",
     "clean": "rimraf artifacts out",
-    "publish": "dotenv -e ../../.env -- sh -c 'bun run clean && bun run build:web && electron-vite build && electron-builder --mac --publish always'"
+    "publish": "dotenv -e ../../.env -- sh -c 'bun run clean && bun run build:web && bun run scripts/ensure-electron.ts && electron-vite build && electron-builder --mac --publish always'"
   },
   "build": {
     "extends": "./electron-builder.yml"

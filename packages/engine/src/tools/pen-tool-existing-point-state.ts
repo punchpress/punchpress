@@ -21,9 +21,9 @@ import { startInsertPointAction } from "./pen-tool-insert-point-action";
 import { startPointTypeToggleAction } from "./pen-tool-point-type-toggle-action";
 import {
   createPlacementSession,
-  DRAG_THRESHOLD_PX,
   isPenEditableNode,
 } from "./pen-tool-types";
+import { getGestureTolerancePx } from "../primitives/pointer-distance";
 
 export const startExistingPointAction = (
   tool: PenTool,
@@ -157,7 +157,7 @@ export const completeDeletePointPlacement = (
   target,
   dragDistancePx
 ) => {
-  if (dragDistancePx >= DRAG_THRESHOLD_PX) {
+  if (dragDistancePx >= getGestureTolerancePx("penDrag")) {
     return false;
   }
 

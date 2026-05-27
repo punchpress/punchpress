@@ -1,7 +1,45 @@
 import { measurePerf } from "../perf/perf-hooks";
 
+const getSelectionBoundsCache = (editor) => {
+  if (
+    editor.selectionBoundsCache?.nodes === editor.nodes &&
+    editor.selectionBoundsCache?.fontRevision === editor.fontRevision
+  ) {
+    return editor.selectionBoundsCache.entries;
+  }
+
+  const entries = new Map();
+
+  editor.selectionBoundsCache = {
+    entries,
+    fontRevision: editor.fontRevision,
+    nodes: editor.nodes,
+  };
+
+  return entries;
+};
+
 export const getSelectionBounds = (editor, nodeIds) => {
   return measurePerf("selection.bounds", () => {
+    const previewDelta = editor.getSelectionPreviewDelta(nodeIds);
+    const cacheKey = nodeIds.join("\0");
+    const cache = cacheKey ? getSelectionBoundsCache(editor) : null;
+    const cachedBounds = cacheKey ? cache?.get(cacheKey) : null;
+
+    if (cachedBounds) {
+      if (previewDelta) {
+        return {
+          ...cachedBounds,
+          maxX: cachedBounds.maxX + previewDelta.x,
+          maxY: cachedBounds.maxY + previewDelta.y,
+          minX: cachedBounds.minX + previewDelta.x,
+          minY: cachedBounds.minY + previewDelta.y,
+        };
+      }
+
+      return cachedBounds;
+    }
+
     const bounds = nodeIds
       .map((nodeId) => {
         const frame = editor.getNodeSelectionFrame(nodeId);
@@ -31,7 +69,8 @@ export const getSelectionBounds = (editor, nodeIds) => {
       width: maxX - minX,
     };
 
-    const previewDelta = editor.getSelectionPreviewDelta(nodeIds);
+    cache?.set(cacheKey, selectionBounds);
+
     if (!previewDelta) {
       return selectionBounds;
     }

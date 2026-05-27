@@ -113,6 +113,10 @@ export const shapeNodeCapabilities = {
     requiresPathEditing: supportsShapeEditablePath(node),
   }),
 
+  getResizeMode: () => "bounds",
+
+  getRotateMode: () => "self",
+
   canPersistPathEditing: (node) => supportsShapeEditablePath(node),
 
   getEditablePathSession: (editor, nodeId, node) => {

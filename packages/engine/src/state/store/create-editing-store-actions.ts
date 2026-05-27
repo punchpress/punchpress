@@ -1,3 +1,4 @@
+import { measurePerf } from "../../perf/perf-hooks";
 import { commitEditingState, finalizeEditingState } from "./editing-state";
 import {
   enterTextEditingInteractionState,
@@ -36,15 +37,19 @@ export const createEditingStoreActions = (set) => {
     },
 
     clearSelection: () => {
-      set((state) => {
-        if (state.editingNodeId) {
-          return withDocumentMutation(state, commitEditingState(state, []));
-        }
+      measurePerf("store.clearSelection.set", () => {
+        set((state) => {
+          return measurePerf("store.clearSelection.reducer", () => {
+            if (state.editingNodeId) {
+              return withDocumentMutation(state, commitEditingState(state, []));
+            }
 
-        return {
-          ...exitPathEditingInteractionState(),
-          selectedNodeIds: [],
-        };
+            return {
+              ...exitPathEditingInteractionState(),
+              selectedNodeIds: [],
+            };
+          });
+        });
       });
     },
 
@@ -126,37 +131,44 @@ export const createEditingStoreActions = (set) => {
     },
 
     selectNodes: (nodeIds) => {
-      set((state) => {
-        const nextSelectedNodeIds = getSelectedNodeIds(state, nodeIds);
-        const preservesPathEditing = shouldPreservePathEditingSelection(
-          state,
-          nextSelectedNodeIds
-        );
+      measurePerf("store.selectNodes.set", () => {
+        set((state) => {
+          return measurePerf("store.selectNodes.reducer", () => {
+            const nextSelectedNodeIds = measurePerf(
+              "store.selectNodes.normalize",
+              () => getSelectedNodeIds(state, nodeIds)
+            );
+            const preservesPathEditing = shouldPreservePathEditingSelection(
+              state,
+              nextSelectedNodeIds
+            );
 
-        if (
-          state.editingNodeId &&
-          (nextSelectedNodeIds.length !== 1 ||
-            nextSelectedNodeIds[0] !== state.editingNodeId)
-        ) {
-          return withDocumentMutation(
-            state,
-            finalizeEditingState(state, nextSelectedNodeIds)
-          );
-        }
+            if (
+              state.editingNodeId &&
+              (nextSelectedNodeIds.length !== 1 ||
+                nextSelectedNodeIds[0] !== state.editingNodeId)
+            ) {
+              return withDocumentMutation(
+                state,
+                finalizeEditingState(state, nextSelectedNodeIds)
+              );
+            }
 
-        return {
-          ...(preservesPathEditing ? {} : exitPathEditingInteractionState()),
-          pathEditingNodeId: preservesPathEditing
-            ? state.pathEditingNodeId
-            : null,
-          pathEditingPoint: preservesPathEditing
-            ? state.pathEditingPoint
-            : null,
-          pathEditingPoints: preservesPathEditing
-            ? state.pathEditingPoints
-            : [],
-          selectedNodeIds: nextSelectedNodeIds,
-        };
+            return {
+              ...(preservesPathEditing ? {} : exitPathEditingInteractionState()),
+              pathEditingNodeId: preservesPathEditing
+                ? state.pathEditingNodeId
+                : null,
+              pathEditingPoint: preservesPathEditing
+                ? state.pathEditingPoint
+                : null,
+              pathEditingPoints: preservesPathEditing
+                ? state.pathEditingPoints
+                : [],
+              selectedNodeIds: nextSelectedNodeIds,
+            };
+          });
+        });
       });
     },
 

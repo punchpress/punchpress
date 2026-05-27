@@ -1539,6 +1539,17 @@ describe("Editor text editing mode", () => {
 });
 
 describe("Editor shape export", () => {
+  test("persists pan-only viewport updates to editor state", () => {
+    const editor = new Editor();
+
+    editor.setViewport({ x: 120, y: -80, zoom: editor.zoom });
+
+    expect(editor.viewport.x).toBe(120);
+    expect(editor.viewport.y).toBe(-80);
+    expect(editor.getState().viewport.x).toBe(120);
+    expect(editor.getState().viewport.y).toBe(-80);
+  });
+
   test("exports visible shape nodes without requiring fonts", async () => {
     const editor = new Editor();
 
@@ -1584,7 +1595,7 @@ describe("Editor shape export", () => {
       },
       {
         closed: false,
-        fill: "#ffffff",
+        fill: null,
         fillRule: "nonzero",
         id: "open-vector-path",
         parentId: "open-vector-node",
@@ -1636,6 +1647,198 @@ describe("Editor shape export", () => {
     expect(svg).toContain('fill="none"');
     expect(svg).toContain('stroke="#000000"');
     expect(svg).toContain('"closed":false');
+  });
+
+  test("preserves inherited group opacity in SVG export", async () => {
+    const editor = new Editor();
+
+    editor.getState().loadNodes([
+      {
+        id: "transparent-group",
+        name: "Group",
+        opacity: 0.5,
+        parentId: "root",
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 0,
+          y: 0,
+        },
+        type: "group",
+        visible: true,
+      },
+      {
+        id: "transparent-path",
+        parentId: "transparent-group",
+        type: "path",
+        visible: true,
+        closed: true,
+        fill: "#ffffff",
+        fillRule: "nonzero",
+        opacity: 1,
+        segments: [
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: 0, y: 0 },
+            pointType: "corner",
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: 100, y: 0 },
+            pointType: "corner",
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: 100, y: 100 },
+            pointType: "corner",
+          },
+        ],
+        stroke: null,
+        strokeLineCap: "round",
+        strokeLineJoin: "round",
+        strokeMiterLimit: 4,
+        strokeWidth: 0,
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 100,
+          y: 100,
+        },
+      },
+    ] as never);
+
+    const svg = await editor.exportDocument();
+
+    expect(svg).toContain('opacity="0.5"');
+  });
+
+  test("does not square path node opacity in render geometry or export", async () => {
+    const editor = new Editor();
+
+    editor.getState().loadNodes([
+      {
+        id: "transparent-path",
+        parentId: "root",
+        type: "path",
+        visible: true,
+        closed: true,
+        fill: "#ffffff",
+        fillRule: "nonzero",
+        opacity: 0.5,
+        segments: [
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: 0, y: 0 },
+            pointType: "corner",
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: 100, y: 0 },
+            pointType: "corner",
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: 100, y: 100 },
+            pointType: "corner",
+          },
+        ],
+        stroke: null,
+        strokeLineCap: "round",
+        strokeLineJoin: "round",
+        strokeMiterLimit: 4,
+        strokeWidth: 0,
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 100,
+          y: 100,
+        },
+      },
+    ] as never);
+
+    const geometry = editor.getNodeRenderGeometry("transparent-path");
+    const svg = await editor.exportDocument();
+
+    expect(geometry?.paths[0]?.opacity).toBeUndefined();
+    expect(svg).toContain('opacity="0.5"');
+    expect(svg).not.toContain('opacity="0.25"');
+  });
+
+  test("keeps vector node opacity available for contour render geometry", () => {
+    const editor = new Editor();
+
+    editor.getState().loadNodes([
+      {
+        compoundWrapper: false,
+        contours: [
+          {
+            closed: true,
+            fill: "#ffffff",
+            fillRule: "nonzero",
+            id: "contour-1",
+            segments: [
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: -40, y: -40 },
+                pointType: "corner",
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 40, y: -40 },
+                pointType: "corner",
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: 40, y: 40 },
+                pointType: "corner",
+              },
+              {
+                handleIn: { x: 0, y: 0 },
+                handleOut: { x: 0, y: 0 },
+                point: { x: -40, y: 40 },
+                pointType: "corner",
+              },
+            ],
+            stroke: null,
+            strokeLineCap: "round",
+            strokeLineJoin: "round",
+            strokeMiterLimit: 4,
+            strokeWidth: 0,
+            visible: true,
+          },
+        ],
+        id: "vector-opacity",
+        name: "Vector",
+        opacity: 0.4,
+        parentId: "root",
+        pathComposition: "independent",
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 100,
+          y: 100,
+        },
+        type: "vector",
+        visible: true,
+      },
+    ] as never);
+
+    const geometry = editor.getNodeRenderGeometry("vector-opacity");
+
+    expect(geometry?.paths[0]?.opacity).toBeUndefined();
   });
 });
 

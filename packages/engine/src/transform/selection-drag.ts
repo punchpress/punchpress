@@ -13,6 +13,14 @@ const hasAbsoluteMoveInput = ({ dragEvents, left, top } = {}) => {
   );
 };
 
+const hasVisibleMoveInput = ({ delta, dragEvents, left, top } = {}) => {
+  if (delta) {
+    return Boolean(delta.x || delta.y);
+  }
+
+  return hasAbsoluteMoveInput({ dragEvents, left, top });
+};
+
 export const beginSelectionDrag = (
   editor,
   { duplicate = false, nodeId, nodeIds } = {}
@@ -64,7 +72,7 @@ export const updateSelectionDrag = (editor, session, options = {}) => {
       movedNodeIds = updateMoveSelection(editor, session.moveSession, options);
     }
 
-    if (movedNodeIds.length > 0) {
+    if (movedNodeIds.length > 0 && hasVisibleMoveInput(options)) {
       session.changed = true;
 
       if (!session.isActive) {
@@ -88,6 +96,8 @@ export const endSelectionDrag = (editor, session, options = {}) => {
     }
 
     if (options.cancel || !session.changed) {
+      editor.setSelectionDragPreview(null);
+
       if (session.isActive) {
         editor.endSelectionDragInteraction();
       } else {

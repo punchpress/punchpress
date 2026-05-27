@@ -11,6 +11,7 @@ import {
 import { resetPasteSequence as resetEditorPasteSequence } from "./clipboard/clipboard-placement";
 import { UI_ACCENT } from "./constants";
 import { getEditorDebugDump } from "./debug-dump";
+import { measurePerf } from "./perf/perf-hooks";
 import {
   newDocument as createNewEditorDocument,
   exportDocument as exportEditorDocument,
@@ -144,6 +145,10 @@ import {
   setSelectionProperty as setEditorSelectionProperty,
 } from "./inspection/selection-properties";
 import {
+  beginSelectionColorChange as beginEditorSelectionColorChange,
+  commitSelectionColorChange as commitEditorSelectionColorChange,
+} from "./inspection/selection-colors";
+import {
   beginSelectionDragInteraction as beginEditorSelectionDragInteraction,
   beginSelectionRotationInteraction as beginEditorSelectionRotationInteraction,
   beginTextPathPositioningInteraction as beginEditorTextPathPositioningInteraction,
@@ -160,14 +165,13 @@ import {
 } from "./managers/font-manager";
 import { GeometryManager } from "./managers/geometry-manager";
 import { HistoryManager } from "./managers/history-manager";
+import { NodeTreeManager } from "./managers/node-tree-manager";
 import { VectorRenderSurfaceManager } from "./managers/vector-render-surface-manager";
 import {
   buildNodeCapabilityGeometry,
   getNodeFrameFromGeometry,
 } from "./nodes/node-capabilities";
 import {
-  getChildNodeIds,
-  getDescendantLeafNodeIds,
   getEffectiveSelectionNodeIds,
   getSelectionTargetNodeId,
   isDescendantOf,
@@ -186,11 +190,12 @@ import {
 import {
   getEditablePathSession as getEditorEditablePathSession,
   getLayerRow as getEditorLayerRow,
-  getNode as getEditorNode,
   getNodeEditCapabilities as getEditorNodeEditCapabilities,
   getNodeFrame as getEditorNodeFrame,
   getNodeGeometry as getEditorNodeGeometry,
   getNodeHitBounds as getEditorNodeHitBounds,
+  getNodeResizeMode as getEditorNodeResizeMode,
+  getNodeRotateMode as getEditorNodeRotateMode,
   getNodeRenderBounds as getEditorNodeRenderBounds,
   getNodeRenderFrame as getEditorNodeRenderFrame,
   getNodeRenderGeometry as getEditorNodeRenderGeometry,
@@ -228,11 +233,13 @@ import {
 } from "./transform/move-selection";
 import {
   beginResizeSelection as beginEditorResizeSelection,
+  commitResizeSelection as commitEditorResizeSelection,
   resizeSelectionFromCorner as resizeEditorSelectionFromCorner,
   updateResizeSelection as updateEditorResizeSelection,
 } from "./transform/resize-selection";
 import {
   beginRotateSelection as beginEditorRotateSelection,
+  commitRotateSelection as commitEditorRotateSelection,
   rotateSelectionBy as rotateEditorSelectionBy,
   updateRotateSelection as updateEditorRotateSelection,
 } from "./transform/rotate-selection";
@@ -276,10 +283,12 @@ export class Editor {
       initialZoom,
       resolveDefaultFont: () => this.defaultFont,
     });
+    this.viewportState = { ...this.getState().viewport };
     this.fonts = new FontManager({
       onChange: () => this.store.getState().bumpFontRevision(),
     });
     this.geometry = new GeometryManager(this.fonts);
+    this.nodeTree = new NodeTreeManager();
     this.vectorRenderSurfaces = new VectorRenderSurfaceManager();
     this.tools = new Map([
       ["pointer", new PointerTool(this)],
@@ -296,7 +305,9 @@ export class Editor {
     this.localFontCatalogPromise = null;
     this.interactionPreviewListeners = new Set();
     this.interactionPreviewRevision = 0;
+    this.selectionColorPreviewState = null;
     this.placementSurfaceListeners = new Set();
+    this.viewportInteracting = false;
     this.history = new HistoryManager({
       applyChange: applyDocumentChange,
       applyState: (nodes) => {
@@ -336,6 +347,7 @@ export class Editor {
     this.handleSpaceUp = this.handleSpaceUp.bind(this);
     this.handleWindowBlur = this.handleWindowBlur.bind(this);
     this.onViewportChange = null;
+    this.selectionBoundsCache = null;
     this.selectionPropertiesSnapshotCache = null;
     this.selectionDragPreviewState = null;
   }
@@ -468,6 +480,12 @@ export class Editor {
     return this.geometry.getAll(this.nodes, this.fontRevision);
   }
 
+  buildPreviewNodeGeometry(node) {
+    const font = "font" in node ? this.fonts.getLoadedFont(node.font) : null;
+
+    return buildNodeCapabilityGeometry(node, font);
+  }
+
   get nodes() {
     return this.getState().nodes;
   }
@@ -517,7 +535,7 @@ export class Editor {
   }
 
   get layerNodeIds() {
-    return [...getChildNodeIds(this.nodes, ROOT_PARENT_ID)].reverse();
+    return [...this.getChildNodeIds(ROOT_PARENT_ID)].reverse();
   }
 
   get selectedNode() {
@@ -555,11 +573,11 @@ export class Editor {
   }
 
   get zoom() {
-    return this.getState().viewport.zoom;
+    return this.viewportState.zoom;
   }
 
   get viewport() {
-    return this.getState().viewport;
+    return this.viewportState;
   }
 
   preloadFonts(nodes = this.nodes) {
@@ -620,15 +638,15 @@ export class Editor {
   }
 
   getNode(nodeId) {
-    return getEditorNode(this, nodeId);
+    return this.nodeTree.getNode(this.nodes, nodeId);
   }
 
   getChildNodeIds(parentId = ROOT_PARENT_ID) {
-    return getChildNodeIds(this.nodes, parentId);
+    return this.nodeTree.getChildNodeIds(this.nodes, parentId);
   }
 
   getDescendantLeafNodeIds(nodeId) {
-    return getDescendantLeafNodeIds(this.nodes, nodeId);
+    return this.nodeTree.getDescendantLeafNodeIds(this.nodes, nodeId);
   }
 
   getEffectiveSelectionNodeIds(nodeIds = this.selectedNodeIds) {
@@ -755,6 +773,14 @@ export class Editor {
     return getEditorNodeEditCapabilities(this, nodeId);
   }
 
+  getNodeResizeMode(nodeId) {
+    return getEditorNodeResizeMode(this, nodeId);
+  }
+
+  getNodeRotateMode(nodeId) {
+    return getEditorNodeRotateMode(this, nodeId);
+  }
+
   getEditablePathSession(nodeId = this.pathEditingNodeId) {
     return getEditorEditablePathSession(this, nodeId);
   }
@@ -769,6 +795,92 @@ export class Editor {
 
   setSelectionColor(selectionColorId, value, nodeIds = this.selectedNodeIds) {
     return setEditorSelectionColor(this, selectionColorId, value, nodeIds);
+  }
+
+  beginSelectionColorChange(selectionColorId, nodeIds = this.selectedNodeIds) {
+    return beginEditorSelectionColorChange(this, selectionColorId, nodeIds);
+  }
+
+  updateSelectionColorChange(session, value) {
+    if (!session) {
+      return false;
+    }
+
+    this.selectionColorPreviewState = {
+      baseValue: session.baseValue,
+      targetPropertyIdsByNodeId: session.targetPropertyIdsByNodeId,
+      value,
+    };
+    this.notifyInteractionPreviewChanged();
+
+    return true;
+  }
+
+  commitSelectionColorChange(session, value) {
+    this.selectionColorPreviewState = null;
+    this.notifyInteractionPreviewChanged();
+
+    return commitEditorSelectionColorChange(this, session, value);
+  }
+
+  cancelSelectionColorChange() {
+    if (!this.selectionColorPreviewState) {
+      return;
+    }
+
+    this.selectionColorPreviewState = null;
+    this.notifyInteractionPreviewChanged();
+  }
+
+  get selectionColorPreview() {
+    return this.selectionColorPreviewState;
+  }
+
+  getSelectionColorPreviewValue(nodeId, propertyId, currentValue) {
+    const preview = this.selectionColorPreviewState;
+
+    if (!preview || currentValue !== preview.baseValue) {
+      return currentValue;
+    }
+
+    if (!preview.targetPropertyIdsByNodeId.get(nodeId)?.includes(propertyId)) {
+      return currentValue;
+    }
+
+    return preview.value;
+  }
+
+  isSelectionColorPreviewAffectingNode(nodeId) {
+    const preview = this.selectionColorPreviewState;
+
+    if (!preview) {
+      return false;
+    }
+
+    if (preview.targetPropertyIdsByNodeId.has(nodeId)) {
+      return true;
+    }
+
+    for (const targetNodeId of preview.targetPropertyIdsByNodeId.keys()) {
+      if (this.isDescendantOf(targetNodeId, nodeId)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  getSelectionColorPreviewForNode(nodeId) {
+    const preview = this.selectionColorPreviewState;
+
+    if (!preview || !this.isSelectionColorPreviewAffectingNode(nodeId)) {
+      return null;
+    }
+
+    return {
+      baseValue: preview.baseValue,
+      value: preview.value,
+    };
   }
 
   getSelectionBooleanOperations(nodeIds = this.selectedNodeIds) {
@@ -863,8 +975,8 @@ export class Editor {
     return getEditorNodeFrame(this, nodeId);
   }
 
-  getSelectionTransformFrame(nodeIds = this.selectedNodeIds) {
-    return getEditorSelectionTransformFrame(this, nodeIds);
+  getSelectionTransformFrame(nodeIds = this.selectedNodeIds, options) {
+    return getEditorSelectionTransformFrame(this, nodeIds, options);
   }
 
   getSelectionPreviewDelta(nodeIds = this.selectedNodeIds) {
@@ -1107,7 +1219,9 @@ export class Editor {
   }
 
   setHoveredNode(nodeId) {
-    this.getState().setHoveredNodeId(nodeId);
+    return measurePerf("hover.setHoveredNode", () => {
+      this.getState().setHoveredNodeId(nodeId);
+    });
   }
 
   setFocusedGroup(nodeId) {
@@ -1140,6 +1254,20 @@ export class Editor {
 
   setSelectionDragPreview(selectionDragPreview) {
     this.selectionDragPreviewState = selectionDragPreview || null;
+    this.notifyInteractionPreviewChanged();
+  }
+
+  setViewportInteracting(isViewportInteracting) {
+    if (this.viewportInteracting === isViewportInteracting) {
+      return;
+    }
+
+    this.viewportInteracting = isViewportInteracting;
+
+    if (!isViewportInteracting) {
+      this.getState().setViewport(this.viewportState);
+    }
+
     this.notifyInteractionPreviewChanged();
   }
 
@@ -1550,11 +1678,29 @@ export class Editor {
   }
 
   setViewportZoom(zoom) {
-    this.getState().setViewportZoom(zoom);
+    this.setViewport({ zoom });
   }
 
   setViewport(viewport) {
-    this.getState().setViewport(viewport);
+    const previousViewport = this.viewportState;
+    const nextViewport = {
+      x: viewport.x ?? previousViewport.x,
+      y: viewport.y ?? previousViewport.y,
+      zoom: viewport.zoom ?? previousViewport.zoom,
+    };
+
+    this.viewportState = nextViewport;
+
+    const storeViewport = this.getState().viewport;
+
+    if (
+      !this.viewportInteracting &&
+      (nextViewport.x !== storeViewport.x ||
+        nextViewport.y !== storeViewport.y ||
+        nextViewport.zoom !== storeViewport.zoom)
+    ) {
+      this.getState().setViewport(nextViewport);
+    }
   }
 
   startPathEditing(nodeId = this.selectedNodeId) {
@@ -1595,6 +1741,10 @@ export class Editor {
     return updateEditorResizeSelection(this, session, options);
   }
 
+  commitResizeSelection(session) {
+    return commitEditorResizeSelection(this, session);
+  }
+
   beginMoveSelection(options) {
     return beginEditorMoveSelection(this, options);
   }
@@ -1625,6 +1775,10 @@ export class Editor {
 
   updateRotateSelection(session, options) {
     return updateEditorRotateSelection(this, session, options);
+  }
+
+  commitRotateSelection(session) {
+    return commitEditorRotateSelection(this, session);
   }
 
   beginTextPathEdit(options) {

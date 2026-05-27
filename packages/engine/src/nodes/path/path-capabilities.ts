@@ -71,6 +71,10 @@ export const pathNodeCapabilities = {
     requiresPathEditing: true,
   }),
 
+  getResizeMode: () => "scale",
+
+  getRotateMode: () => "self",
+
   canPersistPathEditing: () => true,
 
   getEditablePathSession: (editor, nodeId, node) => ({

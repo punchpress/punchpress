@@ -758,9 +758,10 @@ const getCursorAtPoint = (page, point) => {
 
 const getCursorVariableValue = (page, variableName) => {
   return page.evaluate((currentVariableName) => {
-    return getComputedStyle(document.documentElement)
-      .getPropertyValue(currentVariableName)
-      .trim();
+    const host = document.querySelector(".canvas-host");
+    const owner = host instanceof HTMLElement ? host : document.documentElement;
+
+    return getComputedStyle(owner).getPropertyValue(currentVariableName).trim();
   }, variableName);
 };
 
@@ -891,19 +892,27 @@ const getVectorNodeDocument = (page, nodeId = "vector-node") => {
       return null;
     }
 
+    const getPathContours = (pathNode) => {
+      if (Array.isArray(pathNode.contours)) {
+        return pathNode.contours;
+      }
+
+      return [
+        {
+          closed: pathNode.closed,
+          fill: pathNode.fill,
+          fillRule: pathNode.fillRule,
+          segments: pathNode.segments || [],
+          stroke: pathNode.stroke,
+          strokeWidth: pathNode.strokeWidth,
+        },
+      ];
+    };
+
     if (node.type === "path") {
       return {
         ...node,
-        contours: [
-          {
-            closed: node.closed,
-            fill: node.fill,
-            fillRule: node.fillRule,
-            segments: node.segments || [],
-            stroke: node.stroke,
-            strokeWidth: node.strokeWidth,
-          },
-        ],
+        contours: getPathContours(node),
       };
     }
 
@@ -915,14 +924,7 @@ const getVectorNodeDocument = (page, nodeId = "vector-node") => {
             return entry.parentId === node.id && entry.type === "path";
           })
           .map((entry) => {
-            return {
-              closed: entry.closed,
-              fill: entry.fill,
-              fillRule: entry.fillRule,
-              segments: entry.segments || [],
-              stroke: entry.stroke,
-              strokeWidth: entry.strokeWidth,
-            };
+            return getPathContours(entry)[0];
           }),
       };
     }
@@ -1150,42 +1152,52 @@ const getCornerRadiusHandleDotStyle = (locator) => {
   });
 };
 
-const _getVectorPathScreenPoint = (page, nodeId, distance = 0) => {
+const getNodeLocalPointScreenPoint = (page, nodeId, localPoint) => {
   return page.evaluate(
-    ({ currentDistance, currentNodeId }) => {
+    ({ currentLocalPoint, currentNodeId }) => {
       const editor = window.__PUNCHPRESS_EDITOR__;
-      const canvasNodeId =
-        editor?.getPathEditingVisualOwnerNodeId?.(currentNodeId) ||
-        currentNodeId;
-      const path = document.querySelector(
-        `.canvas-node[data-node-id="${canvasNodeId}"] path`
-      );
+      const bbox = editor?.getNodeGeometry?.(currentNodeId)?.bbox;
+      const node = editor?.getNode?.(currentNodeId);
+      const viewer = editor?.viewerRef;
+      const host = editor?.hostRef;
+      const hostRect = host?.getBoundingClientRect?.();
 
-      if (!(path instanceof SVGPathElement)) {
+      if (!(currentLocalPoint && bbox && node && viewer && hostRect)) {
         return null;
       }
 
-      const svg = path.ownerSVGElement;
-      const ctm = path.getScreenCTM();
-
-      if (!(svg && ctm)) {
-        return null;
-      }
-
-      const pathPoint = path.getPointAtLength(currentDistance);
-      const screenPoint = svg.createSVGPoint();
-      screenPoint.x = pathPoint.x;
-      screenPoint.y = pathPoint.y;
-
-      const transformedPoint = screenPoint.matrixTransform(ctm);
+      const localCenter = {
+        x: (bbox.minX + bbox.maxX) / 2,
+        y: (bbox.minY + bbox.maxY) / 2,
+      };
+      const scaleX = node.transform?.scaleX ?? 1;
+      const scaleY = node.transform?.scaleY ?? 1;
+      const rotation = ((node.transform?.rotation || 0) * Math.PI) / 180;
+      const offset = {
+        x: (currentLocalPoint.x - localCenter.x) * scaleX,
+        y: (currentLocalPoint.y - localCenter.y) * scaleY,
+      };
+      const worldPoint = {
+        x:
+          (node.transform?.x || 0) +
+          localCenter.x +
+          offset.x * Math.cos(rotation) -
+          offset.y * Math.sin(rotation),
+        y:
+          (node.transform?.y || 0) +
+          localCenter.y +
+          offset.x * Math.sin(rotation) +
+          offset.y * Math.cos(rotation),
+      };
 
       return {
-        x: transformedPoint.x,
-        y: transformedPoint.y,
+        x:
+          hostRect.left + (worldPoint.x - viewer.getScrollLeft()) * editor.zoom,
+        y: hostRect.top + (worldPoint.y - viewer.getScrollTop()) * editor.zoom,
       };
     },
     {
-      currentDistance: distance,
+      currentLocalPoint: localPoint,
       currentNodeId: nodeId,
     }
   );
@@ -1197,51 +1209,26 @@ const getVectorSegmentScreenPoint = (
   segmentIndex,
   contourIndex = 0
 ) => {
-  return page.evaluate(
-    ({ currentContourIndex, currentNodeId, currentSegmentIndex }) => {
-      const editor = window.__PUNCHPRESS_EDITOR__;
-      const canvasNodeId =
-        editor?.getPathEditingVisualOwnerNodeId?.(currentNodeId) ||
-        currentNodeId;
-      const session = editor?.getEditablePathSession?.(currentNodeId);
-      const localPoint =
-        session?.backend === "vector-path"
+  return page
+    .evaluate(
+      ({ currentContourIndex, currentNodeId, currentSegmentIndex }) => {
+        const editor = window.__PUNCHPRESS_EDITOR__;
+        const session = editor?.getEditablePathSession?.(currentNodeId);
+        return session?.backend === "vector-path"
           ? session.contours?.[currentContourIndex]?.segments?.[
               currentSegmentIndex
-            ]?.point
+            ]?.point || null
           : null;
-      const bbox = editor?.getNodeGeometry?.(currentNodeId)?.bbox;
-      const svg = document.querySelector(
-        `.canvas-node[data-node-id="${canvasNodeId}"] svg`
-      );
-
-      if (!(localPoint && bbox && svg instanceof SVGSVGElement)) {
-        return null;
+      },
+      {
+        currentContourIndex: contourIndex,
+        currentNodeId: nodeId,
+        currentSegmentIndex: segmentIndex,
       }
-
-      const ctm = svg.getScreenCTM();
-
-      if (!ctm) {
-        return null;
-      }
-
-      const svgPoint = svg.createSVGPoint();
-      svgPoint.x = localPoint.x - bbox.minX;
-      svgPoint.y = localPoint.y - bbox.minY;
-
-      const transformedPoint = svgPoint.matrixTransform(ctm);
-
-      return {
-        x: transformedPoint.x,
-        y: transformedPoint.y,
-      };
-    },
-    {
-      currentContourIndex: contourIndex,
-      currentNodeId: nodeId,
-      currentSegmentIndex: segmentIndex,
-    }
-  );
+    )
+    .then((localPoint) =>
+      localPoint ? getNodeLocalPointScreenPoint(page, nodeId, localPoint) : null
+    );
 };
 
 const getVectorHandleScreenPoint = (
@@ -1251,59 +1238,44 @@ const getVectorHandleScreenPoint = (
   handleKey = "handleOut",
   contourIndex = 0
 ) => {
-  return page.evaluate(
-    ({
-      currentContourIndex,
-      currentHandleKey,
-      currentNodeId,
-      currentSegmentIndex,
-    }) => {
-      const editor = window.__PUNCHPRESS_EDITOR__;
-      const canvasNodeId =
-        editor?.getPathEditingVisualOwnerNodeId?.(currentNodeId) ||
-        currentNodeId;
-      const session = editor?.getEditablePathSession?.(currentNodeId);
-      const segment =
-        session?.contours?.[currentContourIndex]?.segments?.[
-          currentSegmentIndex
-        ];
-      const handle =
-        currentHandleKey === "handleIn"
-          ? segment?.handleIn
-          : segment?.handleOut;
-      const bbox = editor?.getNodeGeometry?.(currentNodeId)?.bbox;
-      const svg = document.querySelector(
-        `.canvas-node[data-node-id="${canvasNodeId}"] svg`
-      );
+  return page
+    .evaluate(
+      ({
+        currentContourIndex,
+        currentHandleKey,
+        currentNodeId,
+        currentSegmentIndex,
+      }) => {
+        const editor = window.__PUNCHPRESS_EDITOR__;
+        const session = editor?.getEditablePathSession?.(currentNodeId);
+        const segment =
+          session?.contours?.[currentContourIndex]?.segments?.[
+            currentSegmentIndex
+          ];
+        const handle =
+          currentHandleKey === "handleIn"
+            ? segment?.handleIn
+            : segment?.handleOut;
 
-      if (!(segment && handle && bbox && svg instanceof SVGSVGElement)) {
-        return null;
+        if (!(segment && handle)) {
+          return null;
+        }
+
+        return {
+          x: segment.point.x + handle.x,
+          y: segment.point.y + handle.y,
+        };
+      },
+      {
+        currentContourIndex: contourIndex,
+        currentHandleKey: handleKey,
+        currentNodeId: nodeId,
+        currentSegmentIndex: segmentIndex,
       }
-
-      const ctm = svg.getScreenCTM();
-
-      if (!ctm) {
-        return null;
-      }
-
-      const svgPoint = svg.createSVGPoint();
-      svgPoint.x = segment.point.x + handle.x - bbox.minX;
-      svgPoint.y = segment.point.y + handle.y - bbox.minY;
-
-      const transformedPoint = svgPoint.matrixTransform(ctm);
-
-      return {
-        x: transformedPoint.x,
-        y: transformedPoint.y,
-      };
-    },
-    {
-      currentContourIndex: contourIndex,
-      currentHandleKey: handleKey,
-      currentNodeId: nodeId,
-      currentSegmentIndex: segmentIndex,
-    }
-  );
+    )
+    .then((localPoint) =>
+      localPoint ? getNodeLocalPointScreenPoint(page, nodeId, localPoint) : null
+    );
 };
 
 const getVectorCornerWidgetScreenPoint = (
@@ -1312,42 +1284,55 @@ const getVectorCornerWidgetScreenPoint = (
   segmentIndex,
   contourIndex = 0
 ) => {
-  return page.evaluate(
-    ({ currentContourIndex, currentNodeId, currentSegmentIndex }) => {
-      const editor = window.__PUNCHPRESS_EDITOR__;
-      const canvasNodeId =
-        editor?.getPathEditingVisualOwnerNodeId?.(currentNodeId) ||
-        currentNodeId;
-      const control = editor?.getPathPointCornerControl?.(currentNodeId, {
-        contourIndex: currentContourIndex,
-        segmentIndex: currentSegmentIndex,
-      });
-      const svg = document.querySelector(
-        `.canvas-node[data-node-id="${canvasNodeId}"] svg`
+  return page
+    .evaluate(
+      ({ currentContourIndex, currentNodeId, currentSegmentIndex }) => {
+        const editor = window.__PUNCHPRESS_EDITOR__;
+        const control = editor?.getPathPointCornerControl?.(currentNodeId, {
+          contourIndex: currentContourIndex,
+          segmentIndex: currentSegmentIndex,
+        });
+
+        if (!control) {
+          return null;
+        }
+
+        return {
+          anchor: control.anchor,
+          bisectorTarget: {
+            x: control.anchor.x + control.bisector.x,
+            y: control.anchor.y + control.bisector.y,
+          },
+          cornerAngle: control.cornerAngle,
+          currentRadius: control.currentRadius,
+        };
+      },
+      {
+        currentContourIndex: contourIndex,
+        currentNodeId: nodeId,
+        currentSegmentIndex: segmentIndex,
+      }
+    )
+    .then(async (control) => {
+      if (!control) {
+        return null;
+      }
+
+      const anchor = await getNodeLocalPointScreenPoint(
+        page,
+        nodeId,
+        control.anchor
       );
-      const bbox = editor?.getNodeGeometry?.(currentNodeId)?.bbox;
+      const bisectorTarget = await getNodeLocalPointScreenPoint(
+        page,
+        nodeId,
+        control.bisectorTarget
+      );
 
-      if (!(control && bbox && svg instanceof SVGSVGElement)) {
+      if (!(anchor && bisectorTarget)) {
         return null;
       }
-      const ctm = svg.getScreenCTM();
 
-      if (!ctm) {
-        return null;
-      }
-
-      const toScreenPoint = (point) => {
-        const svgPoint = svg.createSVGPoint();
-        svgPoint.x = point.x - bbox.minX;
-        svgPoint.y = point.y - bbox.minY;
-        return svgPoint.matrixTransform(ctm);
-      };
-
-      const anchor = toScreenPoint(control.anchor);
-      const bisectorTarget = toScreenPoint({
-        x: control.anchor.x + control.bisector.x,
-        y: control.anchor.y + control.bisector.y,
-      });
       const projectedBisector = {
         x: bisectorTarget.x - anchor.x,
         y: bisectorTarget.y - anchor.y,
@@ -1374,13 +1359,7 @@ const getVectorCornerWidgetScreenPoint = (
         x: anchor.x + screenDirection.x * distancePx,
         y: anchor.y + screenDirection.y * distancePx,
       };
-    },
-    {
-      currentContourIndex: contourIndex,
-      currentNodeId: nodeId,
-      currentSegmentIndex: segmentIndex,
-    }
-  );
+    });
 };
 
 const getEditablePathPointScreenPoint = (
@@ -1389,53 +1368,26 @@ const getEditablePathPointScreenPoint = (
   segmentIndex,
   contourIndex = 0
 ) => {
-  return page.evaluate(
-    ({ currentContourIndex, currentNodeId, currentSegmentIndex }) => {
-      const editor = window.__PUNCHPRESS_EDITOR__;
-      const canvasNodeId =
-        editor?.getPathEditingVisualOwnerNodeId?.(currentNodeId) ||
-        currentNodeId;
-      const dump = editor?.getDebugDump();
-      const nodeSnapshot = dump?.nodes?.find(
-        (entry) => entry.id === currentNodeId
-      );
-      const session = editor?.getEditablePathSession?.(currentNodeId);
-      const localPoint =
-        session?.contours?.[currentContourIndex]?.segments?.[
-          currentSegmentIndex
-        ]?.point;
-      const bbox = nodeSnapshot?.geometry?.bbox;
-      const svg = document.querySelector(
-        `.canvas-node[data-node-id="${canvasNodeId}"] svg`
-      );
-
-      if (!(localPoint && bbox && svg instanceof SVGSVGElement)) {
-        return null;
+  return page
+    .evaluate(
+      ({ currentContourIndex, currentNodeId, currentSegmentIndex }) => {
+        const editor = window.__PUNCHPRESS_EDITOR__;
+        const session = editor?.getEditablePathSession?.(currentNodeId);
+        return (
+          session?.contours?.[currentContourIndex]?.segments?.[
+            currentSegmentIndex
+          ]?.point || null
+        );
+      },
+      {
+        currentContourIndex: contourIndex,
+        currentNodeId: nodeId,
+        currentSegmentIndex: segmentIndex,
       }
-
-      const ctm = svg.getScreenCTM();
-
-      if (!ctm) {
-        return null;
-      }
-
-      const svgPoint = svg.createSVGPoint();
-      svgPoint.x = localPoint.x - bbox.minX;
-      svgPoint.y = localPoint.y - bbox.minY;
-
-      const transformedPoint = svgPoint.matrixTransform(ctm);
-
-      return {
-        x: transformedPoint.x,
-        y: transformedPoint.y,
-      };
-    },
-    {
-      currentContourIndex: contourIndex,
-      currentNodeId: nodeId,
-      currentSegmentIndex: segmentIndex,
-    }
-  );
+    )
+    .then((localPoint) =>
+      localPoint ? getNodeLocalPointScreenPoint(page, nodeId, localPoint) : null
+    );
 };
 
 const getEditablePathCornerWidgetScreenPoint = (
@@ -1444,142 +1396,146 @@ const getEditablePathCornerWidgetScreenPoint = (
   segmentIndex,
   contourIndex = 0
 ) => {
-  return page.evaluate(
-    ({ currentContourIndex, currentNodeId, currentSegmentIndex }) => {
-      const editor = window.__PUNCHPRESS_EDITOR__;
-      const canvasNodeId =
-        editor?.getPathEditingVisualOwnerNodeId?.(currentNodeId) ||
-        currentNodeId;
-      const dump = editor?.getDebugDump();
-      const nodeSnapshot = dump?.nodes?.find(
-        (entry) => entry.id === currentNodeId
-      );
-      const session = editor?.getEditablePathSession?.(currentNodeId);
-      const contour = session?.contours?.[currentContourIndex];
-      const segment = contour?.segments?.[currentSegmentIndex];
-      const currentRadius = editor?.getPathPointCornerRadius?.(currentNodeId, {
-        contourIndex: currentContourIndex,
-        segmentIndex: currentSegmentIndex,
-      });
-      const svg = document.querySelector(
-        `.canvas-node[data-node-id="${canvasNodeId}"] svg`
-      );
-      const bbox = nodeSnapshot?.geometry?.bbox;
-
-      if (
-        !(
-          contour &&
-          segment &&
-          bbox &&
-          svg instanceof SVGSVGElement &&
-          segment.pointType === "corner"
-        )
-      ) {
-        return null;
-      }
-
-      let previousIndex = -1;
-
-      if (currentSegmentIndex > 0) {
-        previousIndex = currentSegmentIndex - 1;
-      } else if (contour.closed) {
-        previousIndex = contour.segments.length - 1;
-      }
-
-      let nextIndex = -1;
-
-      if (currentSegmentIndex < contour.segments.length - 1) {
-        nextIndex = currentSegmentIndex + 1;
-      } else if (contour.closed) {
-        nextIndex = 0;
-      }
-      const previousSegment = contour.segments[previousIndex];
-      const nextSegment = contour.segments[nextIndex];
-
-      if (!(previousSegment && nextSegment)) {
-        return null;
-      }
-
-      const hasHandle = (handle) => {
-        return (
-          Math.abs(handle?.x || 0) > 0.01 || Math.abs(handle?.y || 0) > 0.01
+  return page
+    .evaluate(
+      ({ currentContourIndex, currentNodeId, currentSegmentIndex }) => {
+        const editor = window.__PUNCHPRESS_EDITOR__;
+        const session = editor?.getEditablePathSession?.(currentNodeId);
+        const contour = session?.contours?.[currentContourIndex];
+        const segment = contour?.segments?.[currentSegmentIndex];
+        const currentRadius = editor?.getPathPointCornerRadius?.(
+          currentNodeId,
+          {
+            contourIndex: currentContourIndex,
+            segmentIndex: currentSegmentIndex,
+          }
         );
-      };
 
-      if (
-        hasHandle(previousSegment.handleOut) ||
-        hasHandle(segment.handleIn) ||
-        hasHandle(segment.handleOut) ||
-        hasHandle(nextSegment.handleIn)
-      ) {
-        return null;
-      }
-
-      const getDirection = (from, to) => {
-        const dx = to.x - from.x;
-        const dy = to.y - from.y;
-        const length = Math.hypot(dx, dy);
-
-        if (length <= 0.0001) {
+        if (!(contour && segment && segment.pointType === "corner")) {
           return null;
         }
 
-        return {
-          x: dx / length,
-          y: dy / length,
+        let previousIndex = -1;
+
+        if (currentSegmentIndex > 0) {
+          previousIndex = currentSegmentIndex - 1;
+        } else if (contour.closed) {
+          previousIndex = contour.segments.length - 1;
+        }
+
+        let nextIndex = -1;
+
+        if (currentSegmentIndex < contour.segments.length - 1) {
+          nextIndex = currentSegmentIndex + 1;
+        } else if (contour.closed) {
+          nextIndex = 0;
+        }
+        const previousSegment = contour.segments[previousIndex];
+        const nextSegment = contour.segments[nextIndex];
+
+        if (!(previousSegment && nextSegment)) {
+          return null;
+        }
+
+        const hasHandle = (handle) => {
+          return (
+            Math.abs(handle?.x || 0) > 0.01 || Math.abs(handle?.y || 0) > 0.01
+          );
         };
-      };
-      const previousDirection = getDirection(
-        segment.point,
-        previousSegment.point
-      );
-      const nextDirection = getDirection(segment.point, nextSegment.point);
 
-      if (!(previousDirection && nextDirection)) {
-        return null;
-      }
+        if (
+          hasHandle(previousSegment.handleOut) ||
+          hasHandle(segment.handleIn) ||
+          hasHandle(segment.handleOut) ||
+          hasHandle(nextSegment.handleIn)
+        ) {
+          return null;
+        }
 
-      const bisectorLength = Math.hypot(
-        previousDirection.x + nextDirection.x,
-        previousDirection.y + nextDirection.y
-      );
+        const getDirection = (from, to) => {
+          const dx = to.x - from.x;
+          const dy = to.y - from.y;
+          const length = Math.hypot(dx, dy);
 
-      if (bisectorLength <= 0.0001) {
-        return null;
-      }
+          if (length <= 0.0001) {
+            return null;
+          }
 
-      const bisector = {
-        x: (previousDirection.x + nextDirection.x) / bisectorLength,
-        y: (previousDirection.y + nextDirection.y) / bisectorLength,
-      };
-      const cornerAngle = Math.acos(
-        Math.min(
-          1,
-          Math.max(
-            -1,
-            previousDirection.x * nextDirection.x +
-              previousDirection.y * nextDirection.y
+          return {
+            x: dx / length,
+            y: dy / length,
+          };
+        };
+        const previousDirection = getDirection(
+          segment.point,
+          previousSegment.point
+        );
+        const nextDirection = getDirection(segment.point, nextSegment.point);
+
+        if (!(previousDirection && nextDirection)) {
+          return null;
+        }
+
+        const bisectorLength = Math.hypot(
+          previousDirection.x + nextDirection.x,
+          previousDirection.y + nextDirection.y
+        );
+
+        if (bisectorLength <= 0.0001) {
+          return null;
+        }
+
+        const bisector = {
+          x: (previousDirection.x + nextDirection.x) / bisectorLength,
+          y: (previousDirection.y + nextDirection.y) / bisectorLength,
+        };
+        const cornerAngle = Math.acos(
+          Math.min(
+            1,
+            Math.max(
+              -1,
+              previousDirection.x * nextDirection.x +
+                previousDirection.y * nextDirection.y
+            )
           )
-        )
-      );
-      const ctm = svg.getScreenCTM();
+        );
 
-      if (!ctm) {
+        return {
+          anchor: segment.point,
+          bisectorTarget: {
+            x: segment.point.x + bisector.x,
+            y: segment.point.y + bisector.y,
+          },
+          cornerAngle,
+          currentRadius: currentRadius || 0,
+        };
+      },
+      {
+        currentContourIndex: contourIndex,
+        currentNodeId: nodeId,
+        currentSegmentIndex: segmentIndex,
+      }
+    )
+    .then(async (control) => {
+      if (!control) {
         return null;
       }
 
-      const toScreenPoint = (point) => {
-        const svgPoint = svg.createSVGPoint();
-        svgPoint.x = point.x - bbox.minX;
-        svgPoint.y = point.y - bbox.minY;
-        return svgPoint.matrixTransform(ctm);
-      };
+      const anchor = await getNodeLocalPointScreenPoint(
+        page,
+        nodeId,
+        control.anchor
+      );
+      const bisectorTarget = await getNodeLocalPointScreenPoint(
+        page,
+        nodeId,
+        control.bisectorTarget
+      );
 
-      const anchor = toScreenPoint(segment.point);
-      const bisectorTarget = toScreenPoint({
-        x: segment.point.x + bisector.x,
-        y: segment.point.y + bisector.y,
-      });
+      if (!(anchor && bisectorTarget)) {
+        return null;
+      }
+
       const projectedBisector = {
         x: bisectorTarget.x - anchor.x,
         y: bisectorTarget.y - anchor.y,
@@ -1597,22 +1553,16 @@ const getEditablePathCornerWidgetScreenPoint = (
         x: projectedBisector.x / pixelsPerLocalUnit,
         y: projectedBisector.y / pixelsPerLocalUnit,
       };
-      const distancePerRadius = 1 / Math.sin(cornerAngle / 2);
+      const distancePerRadius = 1 / Math.sin(control.cornerAngle / 2);
       const distancePx =
-        30 + (currentRadius || 0) * distancePerRadius * pixelsPerLocalUnit;
+        30 + control.currentRadius * distancePerRadius * pixelsPerLocalUnit;
 
       return {
         direction: screenDirection,
         x: anchor.x + screenDirection.x * distancePx,
         y: anchor.y + screenDirection.y * distancePx,
       };
-    },
-    {
-      currentContourIndex: contourIndex,
-      currentNodeId: nodeId,
-      currentSegmentIndex: segmentIndex,
-    }
-  );
+    });
 };
 
 test("double-clicking a vector node enters path editing", async ({ page }) => {
@@ -1688,7 +1638,7 @@ test("single-path vector selections enter editing through the Node tool", async 
     .toEqual({
       pathNodeId: null,
       selectedNodeIds: ["irregular-vector-container"],
-      toolbarButtons: ["Delete (Delete)"],
+      toolbarButtons: ["Edit path with Node", "Delete (Delete)"],
     });
 
   await page.getByRole("button", { name: "Node (A)" }).click();
@@ -4041,6 +3991,7 @@ test("dragging an open endpoint onto the opposite endpoint closes the contour", 
   await page.mouse.move(endPoint.x, endPoint.y);
   await page.mouse.down();
   await page.mouse.move(startPoint.x, startPoint.y, { steps: 12 });
+  await page.mouse.move(startPoint.x + 6, startPoint.y + 4, { steps: 4 });
   await page.mouse.up();
   await pauseForUi(page);
 
@@ -5420,10 +5371,18 @@ test("dragging a child path in a compound vector updates the rendered compound l
   });
   await pauseForUi(page);
 
-  const compoundPath = page
-    .locator('.canvas-node[data-node-id="compound-vector"] path')
-    .first();
-  const beforePathData = await compoundPath.getAttribute("d");
+  const getCompoundRenderPathData = () => {
+    return page.evaluate(() => {
+      const geometry =
+        window.__PUNCHPRESS_EDITOR__?.getNodeRenderGeometry?.(
+          "compound-vector"
+        );
+
+      return geometry?.paths?.map((path) => path.d).join("|") || null;
+    });
+  };
+
+  const beforePathData = await getCompoundRenderPathData();
 
   if (!beforePathData) {
     throw new Error("Missing visible compound render path");
@@ -5441,14 +5400,7 @@ test("dragging a child path in a compound vector updates the rendered compound l
     return true;
   }, dragDelta);
 
-  await expect
-    .poll(() => {
-      return page
-        .locator('.canvas-node[data-node-id="compound-vector"] path')
-        .first()
-        .getAttribute("d");
-    })
-    .not.toBe(beforePathData);
+  await expect.poll(() => getCompoundRenderPathData()).not.toBe(beforePathData);
 
   await page.evaluate(() => {
     const editor = window.__PUNCHPRESS_EDITOR__;
@@ -5465,7 +5417,7 @@ test("dragging a child path in a compound vector updates the rendered compound l
   await pauseForUi(page);
 });
 
-test("vector path editing uses the general-purpose cursor for both points and body drag", async ({
+test("vector path editing keeps the current cursor policy while dragging", async ({
   page,
 }) => {
   await gotoEditor(page);
@@ -5473,6 +5425,7 @@ test("vector path editing uses the general-purpose cursor for both points and bo
     page,
     "--canvas-cursor-default"
   );
+  const nodeCursor = await getCursorVariableValue(page, "--canvas-cursor-node");
 
   await expect(
     await getCursorForCanvasToken(page, "canvasCursor", "vector-path-point")
@@ -5515,7 +5468,7 @@ test("vector path editing uses the general-purpose cursor for both points and bo
     .toBe("vector-path-point-active");
   await expect
     .poll(async () => await getCanvasHostCursor(page))
-    .toBe(defaultCursor);
+    .toBe(nodeCursor);
   await page.mouse.up();
 
   await page.mouse.move(bodyPoint.x, bodyPoint.y);

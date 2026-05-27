@@ -46,10 +46,19 @@ export const PairedRow = ({ action, children, label }) => {
   );
 };
 
-export const ColorField = ({ onChange, placeholder, stateKey, value }) => {
+export const ColorField = ({
+  onChange,
+  onInteractionEnd,
+  onInteractionStart,
+  placeholder,
+  stateKey,
+  value,
+}) => {
   return (
     <ColorPickerField
       onChange={onChange}
+      onInteractionEnd={onInteractionEnd}
+      onInteractionStart={onInteractionStart}
       placeholder={placeholder}
       stateKey={stateKey}
       value={value}

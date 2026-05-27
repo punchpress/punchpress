@@ -119,6 +119,30 @@ export const getNodeEditCapabilities = (editor, nodeId) => {
   );
 };
 
+export const getNodeResizeMode = (editor, nodeId) => {
+  const node = editor.getNode(nodeId);
+
+  if (!node) {
+    return "none";
+  }
+
+  return (
+    getNodeCapabilities(node)?.getResizeMode?.(editor, nodeId, node) || "none"
+  );
+};
+
+export const getNodeRotateMode = (editor, nodeId) => {
+  const node = editor.getNode(nodeId);
+
+  if (!node) {
+    return "none";
+  }
+
+  return (
+    getNodeCapabilities(node)?.getRotateMode?.(editor, nodeId, node) || "none"
+  );
+};
+
 export const getNodeEditablePathSession = (editor, nodeId) => {
   const node = editor.getNode(nodeId);
 

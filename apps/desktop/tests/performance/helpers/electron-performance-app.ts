@@ -1,10 +1,12 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
-import { expect } from "@playwright/test";
 import {
   type ElectronApplication,
+  expect,
   _electron as electron,
   type Page,
-} from "playwright";
+} from "@playwright/test";
 
 const DEFAULT_DESKTOP_DEV_SERVER_URL = "http://127.0.0.1:4173";
 const DEFAULT_TRACE_BUFFER_SIZE_KB = 150 * 1024;
@@ -49,8 +51,11 @@ export const launchDesktopPerformanceApp = async (): Promise<{
   electronApp: ElectronApplication;
   page: Page;
 }> => {
+  const userDataDirectory = mkdtempSync(
+    path.join(tmpdir(), "punchpress-performance-")
+  );
   const electronApp = await electron.launch({
-    args: [getDesktopAppPath()],
+    args: [`--user-data-dir=${userDataDirectory}`, getDesktopAppPath()],
     cwd: getDesktopWorkingDirectory(),
     env: {
       ...process.env,

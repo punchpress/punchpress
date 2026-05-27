@@ -33,6 +33,7 @@ Node capabilities are the shared extension seam for canvas behavior.
 | `getEditCapabilities` | Tell UI which direct-edit affordances apply. |
 | `getEditablePathSession` | Expose path-edit source for eligible nodes. |
 | `canPersistPathEditing` | Whether path editing can persist across mode changes. |
+| `getResizeMode` | Tell transform code whether a node resizes through bounds, scale transform, descendant geometry, or no resize. |
 
 ## Rules
 
@@ -40,3 +41,14 @@ Node capabilities are the shared extension seam for canvas behavior.
 - Extend the capability contract before adding canvas-wide type branches.
 - Geometry is engine-owned and derived without reading the DOM.
 - Transient interaction previews are not node geometry.
+- Selection owns interaction scope; node capabilities own node-specific resize
+  behavior.
+
+## Resize Modes
+
+| Mode | Meaning |
+| --- | --- |
+| `bounds` | Resize by changing node-owned bounds such as artboard or live-shape width and height. |
+| `scale` | Resize by scaling the selected node from the transform anchor. |
+| `children` | Resize by previewing the selected container and committing descendant geometry once. |
+| `none` | Do not expose normal resize behavior. |

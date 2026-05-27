@@ -154,7 +154,6 @@ export const CanvasVectorEditor = ({ viewportRevision }) => {
     penDirectSelectionModifierPressed,
     spacePressed,
   });
-
   sceneRef.current = scene;
 
   const forwardWheelToCanvasSurface = useCallback(

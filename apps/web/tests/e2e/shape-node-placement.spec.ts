@@ -14,6 +14,19 @@ const getCanvasStagePoint = async (page, offset) => {
   };
 };
 
+const getViewportSnapshot = (page) => {
+  return page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const viewer = editor?.viewerRef;
+
+    return {
+      x: viewer?.getScrollLeft?.() ?? null,
+      y: viewer?.getScrollTop?.() ?? null,
+      zoom: editor?.zoom ?? null,
+    };
+  });
+};
+
 const getExpectedClickShapeSize = (page) => {
   return page.evaluate(() => {
     const editor = window.__PUNCHPRESS_EDITOR__;
@@ -68,8 +81,8 @@ test("dragging with the shape tool places and sizes a rectangle in one gesture",
   await gotoEditor(page);
   await page.keyboard.press("r");
 
-  const start = await getCanvasStagePoint(page, { x: 180, y: 160 });
-  const end = await getCanvasStagePoint(page, { x: 420, y: 340 });
+  const start = await getCanvasStagePoint(page, { x: 300, y: 160 });
+  const end = await getCanvasStagePoint(page, { x: 540, y: 340 });
 
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
@@ -103,17 +116,39 @@ test("dragging with the shape tool places and sizes a rectangle in one gesture",
       count: 1,
       height: 180,
       width: 240,
-      x: 300,
+      x: 420,
       y: 250,
     });
+});
+
+test("dragging the first shape does not refocus the viewport on release", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await page.keyboard.press("r");
+
+  const start = await getCanvasStagePoint(page, { x: 300, y: 160 });
+  const end = await getCanvasStagePoint(page, { x: 540, y: 340 });
+  const beforeViewport = await getViewportSnapshot(page);
+
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(end.x, end.y, { steps: 8 });
+  await page.mouse.up();
+
+  await page.waitForFunction(() => {
+    return !window.__PUNCHPRESS_EDITOR__?.pendingViewportFocusFrame;
+  });
+
+  await expect.poll(() => getViewportSnapshot(page)).toEqual(beforeViewport);
 });
 
 test("holding shift while dragging places a square shape", async ({ page }) => {
   await gotoEditor(page);
   await page.keyboard.press("r");
 
-  const start = await getCanvasStagePoint(page, { x: 180, y: 160 });
-  const end = await getCanvasStagePoint(page, { x: 420, y: 340 });
+  const start = await getCanvasStagePoint(page, { x: 300, y: 160 });
+  const end = await getCanvasStagePoint(page, { x: 540, y: 340 });
 
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
@@ -141,7 +176,62 @@ test("holding shift while dragging places a square shape", async ({ page }) => {
       count: 1,
       height: 240,
       width: 240,
-      x: 300,
+      x: 420,
       y: 280,
     });
+});
+
+test("keeps live square artwork pinned to the placement shell while dragging", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await page.keyboard.press("r");
+
+  const start = await getCanvasStagePoint(page, { x: 300, y: 160 });
+  const first = await getCanvasStagePoint(page, { x: 520, y: 260 });
+  const second = await getCanvasStagePoint(page, { x: 570, y: 420 });
+
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.keyboard.down("Shift");
+  await page.mouse.move(first.x, first.y, { steps: 4 });
+
+  await expect
+    .poll(async () => {
+      const state = await getStateSnapshot(page);
+      return state.nodes.some((node) => node.type === "shape");
+    })
+    .toBe(true);
+
+  await page.mouse.move(second.x, second.y, { steps: 1 });
+
+  const liveRects = await page.evaluate(() => {
+    const shell = document.querySelector<HTMLElement>(
+      "[data-node-shell='true']"
+    );
+    const path = shell?.querySelector<SVGPathElement>("svg path");
+    const shellRect = shell?.getBoundingClientRect();
+    const pathRect = path?.getBoundingClientRect();
+
+    return shellRect && pathRect
+      ? {
+          pathHeight: pathRect.height,
+          pathLeft: pathRect.left,
+          pathTop: pathRect.top,
+          pathWidth: pathRect.width,
+          shellHeight: shellRect.height,
+          shellLeft: shellRect.left,
+          shellTop: shellRect.top,
+          shellWidth: shellRect.width,
+        }
+      : null;
+  });
+
+  await page.mouse.up();
+  await page.keyboard.up("Shift");
+
+  expect(liveRects?.pathLeft).toBeCloseTo(liveRects?.shellLeft ?? 0, 1);
+  expect(liveRects?.pathTop).toBeCloseTo(liveRects?.shellTop ?? 0, 1);
+  expect(liveRects?.pathWidth).toBeCloseTo(liveRects?.shellWidth ?? 0, 1);
+  expect(liveRects?.pathHeight).toBeCloseTo(liveRects?.shellHeight ?? 0, 1);
 });

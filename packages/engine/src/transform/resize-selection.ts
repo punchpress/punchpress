@@ -1,5 +1,10 @@
 import { isArtboardNode, isContainerNode } from "../nodes/node-tree";
 import {
+  buildNodeCapabilityGeometry,
+  getNodeFrameFromGeometry,
+} from "../nodes/node-capabilities";
+import { measurePerf } from "../perf/perf-hooks";
+import {
   getCornerPointFromBounds,
   getResizeAnchorFromBounds,
   getResizeCorner,
@@ -54,6 +59,7 @@ const getArtboardBoxResizeSession = (editor, requestedNodeIds, handle) => {
     !(
       requestedNodeIds.length === 1 &&
       isArtboardNode(editor.getNode(requestedNodeIds[0])) &&
+      editor.getNodeResizeMode(requestedNodeIds[0]) === "bounds" &&
       handle
     )
   ) {
@@ -102,7 +108,9 @@ const getSingleNodeResizeSession = (
     return null;
   }
 
-  if (resizedNode.type === "shape" && handle) {
+  const resizeMode = editor.getNodeResizeMode(resizedNodeId);
+
+  if (resizeMode === "bounds" && resizedNode.type === "shape" && handle) {
     return {
       anchorCanvas: { ...anchorCanvas },
       baseBBox: { ...bbox },
@@ -111,6 +119,15 @@ const getSingleNodeResizeSession = (
       mode: "shape-box",
       nodeIds: [resizedNodeId],
     };
+  }
+
+  if (
+    !(
+      resizeMode === "scale" ||
+      (resizeMode === "bounds" && resizedNode.type === "shape" && direction)
+    )
+  ) {
+    return null;
   }
 
   return {
@@ -123,7 +140,94 @@ const getSingleNodeResizeSession = (
   };
 };
 
+const isAggregateResizeSession = (session) => {
+  return Boolean(session?.baseNodes);
+};
+
+const mergeNodeUpdate = (node, nodeUpdate) => {
+  return {
+    ...node,
+    ...nodeUpdate,
+    transform: {
+      ...node.transform,
+      ...(nodeUpdate?.transform || {}),
+    },
+  };
+};
+
+const getShapeBoxResizePreview = (baseNode, nodeUpdate) => {
+  if (!(baseNode && nodeUpdate)) {
+    return null;
+  }
+
+  const previewNode = mergeNodeUpdate(baseNode, nodeUpdate);
+  const geometry = buildNodeCapabilityGeometry(previewNode);
+
+  return {
+    renderFrame: getNodeFrameFromGeometry(previewNode, geometry, "render"),
+    transformFrame: getNodeFrameFromGeometry(previewNode, geometry, "transform"),
+  };
+};
+
+const setShapeBoxResizePreview = (editor, session, nodeUpdate) => {
+  const nodeId = session?.nodeIds?.[0];
+  const frames = getShapeBoxResizePreview(session?.baseNode, nodeUpdate);
+
+  if (!(nodeId && frames?.renderFrame && frames?.transformFrame)) {
+    return [];
+  }
+
+  session.previewNodeUpdate = nodeUpdate;
+  editor.setSelectionDragPreview({
+    effectiveNodeIdSet: new Set([nodeId]),
+    nodeIdSet: new Set([nodeId]),
+    nodeIds: [nodeId],
+    resize: {
+      frame: frames.renderFrame,
+      nodeUpdate,
+      transformFrame: frames.transformFrame,
+    },
+  });
+
+  return [nodeId];
+};
+
+const setResizeSelectionPreview = (editor, session, scale) => {
+  if (!(isAggregateResizeSession(session) && Number.isFinite(scale))) {
+    return [];
+  }
+
+  session.previewScale = scale;
+  const previewNodeIds = session.previewNodeIds || session.nodeIds;
+  editor.setSelectionDragPreview({
+    effectiveNodeIdSet: new Set(session.nodeIds),
+    nodeIdSet: new Set([...session.nodeIds, ...previewNodeIds]),
+    nodeIds: previewNodeIds,
+    resize: {
+      anchorCanvas: { ...session.anchorCanvas },
+      scale,
+    },
+  });
+
+  return previewNodeIds;
+};
+
 export const beginResizeSelection = (
+  editor,
+  { anchorCanvas, direction, handle, nodeId, nodeIds } = {}
+) => {
+  return measurePerf("selection.resize.begin", () =>
+    beginResizeSelectionMeasured(editor, {
+      anchorCanvas,
+      direction,
+      handle,
+      nodeId,
+      nodeIds,
+    })
+  );
+};
+
+const beginResizeSelectionMeasured = (
   editor,
   { anchorCanvas, direction, handle, nodeId, nodeIds } = {}
 ) => {
@@ -183,20 +287,36 @@ export const beginResizeSelection = (
     nodeIds: resolvedNodeIds.filter((resolvedNodeId) => {
       return editor.getNodeTransformBounds(resolvedNodeId);
     }),
+    previewNodeIds: requestedNodeIds,
+    previewScale: 1,
   };
 };
 
 export const updateResizeSelection = (
   editor,
   session,
-  { pointCanvas, preserveAspectRatio = false, scale = 1 } = {}
+  { pointCanvas, preserveAspectRatio = false, preview = false, scale = 1 } = {}
+) => {
+  return measurePerf("selection.resize.update", () =>
+    updateResizeSelectionMeasured(editor, session, {
+      pointCanvas,
+      preserveAspectRatio,
+      preview,
+      scale,
+    })
+  );
+};
+
+const updateResizeSelectionMeasured = (
+  editor,
+  session,
+  { pointCanvas, preserveAspectRatio = false, preview = false, scale = 1 } = {}
 ) => {
   if (!session) {
     return [];
   }
 
   if (session.mode === "shape-box") {
-    const nodeId = session.nodeIds[0];
     const nodeUpdate = getResizedShapeNodeUpdate(
       session.baseNode,
       session.baseBBox,
@@ -210,8 +330,12 @@ export const updateResizeSelection = (
       return [];
     }
 
-    editor.updateNode(nodeId, nodeUpdate);
-    return [nodeId];
+    if (preview) {
+      return setShapeBoxResizePreview(editor, session, nodeUpdate);
+    }
+
+    editor.updateNode(session.nodeIds[0], nodeUpdate);
+    return session.nodeIds;
   }
 
   if (session.mode === "artboard-box") {
@@ -263,22 +387,58 @@ export const updateResizeSelection = (
     return [];
   }
 
-  editor.updateNodes(session.nodeIds, (node) => {
-    const baseNode = session.baseNodes.get(node.id);
+  if (isAggregateResizeSession(session)) {
+    return setResizeSelectionPreview(editor, session, scale);
+  }
 
-    if (!baseNode) {
-      return node;
+  return [];
+};
+
+export const commitResizeSelection = (editor, session) => {
+  return measurePerf("selection.resize.commit", () => {
+    if (session?.mode === "shape-box") {
+      const nodeId = session.nodeIds?.[0];
+      const nodeUpdate = session.previewNodeUpdate;
+
+      editor.setSelectionDragPreview(null);
+
+      if (!(nodeId && nodeUpdate)) {
+        return [];
+      }
+
+      editor.updateNode(nodeId, nodeUpdate);
+      return [nodeId];
     }
 
-    return getScaledGroupNodeUpdate(
-      baseNode,
-      baseNode.bbox,
-      session.anchorCanvas,
-      scale
-    );
-  });
+    if (!isAggregateResizeSession(session)) {
+      editor.setSelectionDragPreview(null);
+      return [];
+    }
 
-  return session.nodeIds;
+    const scale = session.previewScale;
+    editor.setSelectionDragPreview(null);
+
+    if (!Number.isFinite(scale) || scale === 1) {
+      return [];
+    }
+
+    editor.updateNodes(session.nodeIds, (node) => {
+      const baseNode = session.baseNodes.get(node.id);
+
+      if (!baseNode) {
+        return node;
+      }
+
+      return getScaledGroupNodeUpdate(
+        baseNode,
+        baseNode.bbox,
+        session.anchorCanvas,
+        scale
+      );
+    });
+
+    return session.nodeIds;
+  });
 };
 
 export const resizeSelectionFromCorner = (
@@ -350,8 +510,10 @@ export const resizeSelectionFromCorner = (
         : effectiveSelectedNodeIds,
   });
 
-  return updateResizeSelection(editor, resizeSession, {
+  updateResizeSelection(editor, resizeSession, {
     queueRefresh: true,
     scale,
   });
+
+  return commitResizeSelection(editor, resizeSession);
 };

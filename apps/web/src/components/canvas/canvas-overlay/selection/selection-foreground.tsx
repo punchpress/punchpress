@@ -1,10 +1,10 @@
-import { useEditorSurfaceValue } from "../../../../editor-react/use-editor-surface-value";
+import { useEditorValue } from "../../../../editor-react/use-editor-value";
 import { CanvasShapeIndicator } from "../visuals/shape-indicator";
 import { CanvasMultiSelectionForeground } from "./multi-selection-foreground";
 import { CanvasSingleSelectionForeground } from "./single-selection-foreground";
 
 export const CanvasSelectionForeground = ({ viewportRevision }) => {
-  const overlayState = useEditorSurfaceValue((editor) => {
+  const overlayState = useEditorValue((editor) => {
     return editor.getCanvasTransformOverlayState();
   });
 

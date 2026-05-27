@@ -10,6 +10,7 @@ export const createDefaultGroupNode = (name = "Group") => {
   return {
     id: createId(),
     name,
+    opacity: 1,
     parentId: ROOT_PARENT_ID,
     transform: {
       rotation: 0,

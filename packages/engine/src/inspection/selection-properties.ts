@@ -3,6 +3,7 @@ import {
   supportsNodeProperty,
 } from "../nodes/node-property-support";
 import { isGroupNode } from "../nodes/node-tree";
+import { measurePerf } from "../perf/perf-hooks";
 import { getShapeCornerRadiusSummary } from "../nodes/shape/shape-engine";
 import { getPropertyDescriptor } from "./property-descriptors";
 import {
@@ -141,56 +142,60 @@ const getPropertyState = (selectedNodes, propertyId) => {
 };
 
 const buildSelectionProperties = (editor, nodeIds) => {
-  const selectedNodeIds = [...nodeIds];
-  const singleSelectedNodeId =
-    selectedNodeIds.length === 1 ? selectedNodeIds[0] : null;
+  return measurePerf("selection.properties", () => {
+    const selectedNodeIds = [...nodeIds];
+    const singleSelectedNodeId =
+      selectedNodeIds.length === 1 ? selectedNodeIds[0] : null;
 
-  if (
-    singleSelectedNodeId &&
-    isVectorAggregatePropertySelection(editor, singleSelectedNodeId)
-  ) {
-    return buildVectorAggregateSelectionProperties(
-      editor,
-      singleSelectedNodeId
-    );
-  }
-
-  const propertyTargetNodeIds = getPropertyTargetNodeIds(
-    editor,
-    selectedNodeIds
-  );
-  const selectedNodes = propertyTargetNodeIds
-    .map((nodeId) => editor.getNode(nodeId))
-    .filter(Boolean);
-  const selectionColors = getSelectionColors(editor, selectedNodeIds);
-  const selectedNode = selectedNodes.length === 1 ? selectedNodes[0] : null;
-  const selectionKind = getSelectionKind(selectedNodes);
-  const propertyIds = getSharedPropertyIds(selectedNodes, selectionKind);
-  const properties = propertyIds.reduce((nextProperties, propertyId) => {
-    const propertyState = getPropertyState(selectedNodes, propertyId);
-
-    if (!propertyState) {
-      return nextProperties;
+    if (
+      singleSelectedNodeId &&
+      isVectorAggregatePropertySelection(editor, singleSelectedNodeId)
+    ) {
+      return buildVectorAggregateSelectionProperties(
+        editor,
+        singleSelectedNodeId
+      );
     }
 
-    nextProperties[propertyId] = propertyState;
-    return nextProperties;
-  }, {});
-  const hasPathGuide = Boolean(
-    selectedNode?.id && editor.getNodeEditCapabilities(selectedNode.id)?.guide
-  );
+    const propertyTargetNodeIds = getPropertyTargetNodeIds(
+      editor,
+      selectedNodeIds
+    );
+    const selectedNodes = propertyTargetNodeIds
+      .map((nodeId) => editor.getNode(nodeId))
+      .filter(Boolean);
+    const selectionColors = getSelectionColors(editor, selectedNodeIds);
+    const selectedNode = selectedNodes.length === 1 ? selectedNodes[0] : null;
+    const selectionKind = getSelectionKind(selectedNodes);
+    const propertyIds = getSharedPropertyIds(selectedNodes, selectionKind);
+    const properties = propertyIds.reduce((nextProperties, propertyId) => {
+      const propertyState = getPropertyState(selectedNodes, propertyId);
 
-  return {
-    canDelete:
-      selectionKind === "single" && !isGroupNode(selectedNode) && !hasPathGuide,
-    properties:
-      Object.keys(properties).length > 0 ? properties : EMPTY_PROPERTIES,
-    selectionColors,
-    selectedCount: selectedNodes.length,
-    selectedNode,
-    selectedNodeIds,
-    selectionKind,
-  };
+      if (!propertyState) {
+        return nextProperties;
+      }
+
+      nextProperties[propertyId] = propertyState;
+      return nextProperties;
+    }, {});
+    const hasPathGuide = Boolean(
+      selectedNode?.id && editor.getNodeEditCapabilities(selectedNode.id)?.guide
+    );
+
+    return {
+      canDelete:
+        selectionKind === "single" &&
+        !isGroupNode(selectedNode) &&
+        !hasPathGuide,
+      properties:
+        Object.keys(properties).length > 0 ? properties : EMPTY_PROPERTIES,
+      selectionColors,
+      selectedCount: selectedNodes.length,
+      selectedNode,
+      selectedNodeIds,
+      selectionKind,
+    };
+  });
 };
 
 const getSelectionPropertiesKeyFromState = (selectionProperties) => {

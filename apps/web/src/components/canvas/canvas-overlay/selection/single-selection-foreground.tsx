@@ -1,4 +1,4 @@
-import { clamp } from "@punchpress/engine";
+import { clamp, hasPointerMovedAtLeast } from "@punchpress/engine";
 import { useMemo, useRef, useState } from "react";
 import { NodeContextMenuItems } from "@/components/context-menus/node-context-menu-items";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
@@ -21,7 +21,42 @@ import { useActiveTransformCursor } from "../use-active-transform-cursor";
 import { CanvasSelectionGhost } from "../visuals/selection-ghost";
 
 const EMPTY_PREVIEW = { x: 0, y: 0 };
+
+const getRotatePreviewDelta = (editor, nodeId) => {
+  const preview = editor.selectionDragPreview;
+  const rotate = preview?.rotate;
+
+  if (!(rotate && preview.nodeIds?.includes(nodeId))) {
+    return 0;
+  }
+
+  return Number.isFinite(rotate.deltaRotation) ? rotate.deltaRotation : 0;
+};
+
+const getResizePreviewFrame = (editor, nodeId) => {
+  const preview = editor.selectionDragPreview;
+  const resize = preview?.resize;
+
+  if (!(resize?.transformFrame && preview.nodeIds?.includes(nodeId))) {
+    return null;
+  }
+
+  return resize.transformFrame;
+};
 const ROTATION_ZONE_SIZE = 56;
+
+const isNodeOrDescendantHit = (editor, nodeId, canvasPoint) => {
+  if (editor.hitTestNodePoint(nodeId, canvasPoint)) {
+    return true;
+  }
+
+  return editor.getDescendantLeafNodeIds(nodeId).some((descendantNodeId) => {
+    return (
+      editor.isNodeEffectivelyVisible(descendantNodeId) &&
+      editor.hitTestNodePoint(descendantNodeId, canvasPoint)
+    );
+  });
+};
 
 const getCanvasPoint = (editor, clientX, clientY) => {
   const host = editor.hostRef;
@@ -329,11 +364,18 @@ export const CanvasSingleSelectionForeground = ({
   const [activeRotateCursor, setActiveRotateCursor] = useState<string | null>(
     null
   );
-  const frame = useEditorSurfaceValue((editor) => {
+  const frame = useEditorValue((editor) => {
     return editor.getNodeTransformFrame(nodeId);
   });
   const selectionPreview = useEditorSurfaceValue((editor) => {
-    return editor.getSelectionPreviewDelta([nodeId]) || EMPTY_PREVIEW;
+    return {
+      delta: editor.getSelectionPreviewDelta([nodeId]) || EMPTY_PREVIEW,
+      resizeFrame: getResizePreviewFrame(editor, nodeId),
+      rotation: getRotatePreviewDelta(editor, nodeId),
+    };
+  });
+  const overlayRotationDegrees = useEditorValue((editor) => {
+    return editor.getNode(nodeId)?.transform.rotation || 0;
   });
   const pathEditOverlayState = useEditorSurfaceValue((editor) => {
     if (!isPathEditing) {
@@ -356,7 +398,7 @@ export const CanvasSingleSelectionForeground = ({
         editor,
         pathEditOverlayState.node,
         pathEditOverlayState.geometry,
-        selectionPreview,
+        selectionPreview.delta,
         true
       );
 
@@ -373,21 +415,34 @@ export const CanvasSingleSelectionForeground = ({
       };
     }
 
-    const hostRect = getHostRectFromNodeFrame(editor, frame);
+    const hostRect = getHostRectFromNodeFrame(
+      editor,
+      selectionPreview.resizeFrame || frame
+    );
 
     if (!hostRect) {
       return null;
     }
 
+    const previewRotation = overlayRotationDegrees + selectionPreview.rotation;
+    const previewTransform = selectionPreview.rotation
+      ? `rotate(${previewRotation}deg)`
+      : hostRect.transform;
+
     return {
       ...hostRect,
-      left: hostRect.left + selectionPreview.x * editor.zoom,
-      top: hostRect.top + selectionPreview.y * editor.zoom,
+      left: hostRect.left + selectionPreview.delta.x * editor.zoom,
+      top: hostRect.top + selectionPreview.delta.y * editor.zoom,
+      transform: previewTransform,
     };
-  }, [editor, frame, isPathEditing, pathEditOverlayState, selectionPreview]);
-  const overlayRotationDegrees = useEditorValue((editor) => {
-    return editor.getNode(nodeId)?.transform.rotation || 0;
-  });
+  }, [
+    editor,
+    frame,
+    isPathEditing,
+    overlayRotationDegrees,
+    pathEditOverlayState,
+    selectionPreview,
+  ]);
   const activeTransformCursor =
     activeRotateCursor ??
     (activeResizeCorner !== null
@@ -420,7 +475,10 @@ export const CanvasSingleSelectionForeground = ({
 
     if (
       isPathEditing &&
-      !(startCanvasPoint && editor.hitTestNodePoint(nodeId, startCanvasPoint))
+      !(
+        startCanvasPoint &&
+        isNodeOrDescendantHit(editor, nodeId, startCanvasPoint)
+      )
     ) {
       event.preventDefault();
       event.stopPropagation();
@@ -431,6 +489,21 @@ export const CanvasSingleSelectionForeground = ({
       }
 
       editor.stopPathEditing();
+      return;
+    }
+
+    if (
+      !(
+        startCanvasPoint &&
+        isNodeOrDescendantHit(editor, nodeId, startCanvasPoint)
+      )
+    ) {
+      if (editor.activeTool === "pointer") {
+        event.preventDefault();
+        event.stopPropagation();
+        editor.clearSelection();
+      }
+
       return;
     }
 
@@ -455,25 +528,44 @@ export const CanvasSingleSelectionForeground = ({
     };
     let previousCanvasPoint = startCanvasPoint;
     let dragSession: ReturnType<typeof editor.beginSelectionDrag> = null;
+    let didMove = false;
+    const beginDragSession = () => {
+      dragSession ??= editor.beginSelectionDrag({
+        duplicate: event.altKey,
+        nodeId,
+      });
+
+      return dragSession;
+    };
+    const prewarmFrameId = window.requestAnimationFrame(() => {
+      if (!didMove) {
+        const nextDragSession = beginDragSession();
+
+        if (nextDragSession) {
+          editor.updateSelectionDrag(nextDragSession, {
+            delta: { x: 0, y: 0 },
+          });
+        }
+      }
+    });
 
     const handlePointerMove = (moveEvent) => {
-      const movedDistance = Math.hypot(
-        moveEvent.clientX - startClientPoint.x,
-        moveEvent.clientY - startClientPoint.y
-      );
-
-      if (!(dragSession || movedDistance >= 3)) {
+      if (
+        !(
+          dragSession ||
+          hasPointerMovedAtLeast(
+            startClientPoint,
+            { x: moveEvent.clientX, y: moveEvent.clientY },
+            "selectionDrag"
+          )
+        )
+      ) {
         return;
       }
 
-      if (!dragSession) {
-        dragSession = editor.beginSelectionDrag({
-          duplicate: event.altKey,
-          nodeId,
-        });
-      }
+      didMove = true;
 
-      if (!(dragSession && previousCanvasPoint)) {
+      if (!(beginDragSession() && previousCanvasPoint)) {
         return;
       }
 
@@ -501,9 +593,10 @@ export const CanvasSingleSelectionForeground = ({
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointercancel", handlePointerEnd);
       window.removeEventListener("pointerup", handlePointerEnd);
+      window.cancelAnimationFrame(prewarmFrameId);
 
       if (dragSession) {
-        editor.endSelectionDrag(dragSession);
+        editor.endSelectionDrag(dragSession, { cancel: !didMove });
       }
     };
 
@@ -553,6 +646,7 @@ export const CanvasSingleSelectionForeground = ({
 
         editor.updateResizeSelection(resizeState.resizeSession, {
           pointCanvas,
+          preview: true,
           preserveAspectRatio: moveEvent.shiftKey,
         });
         return;
@@ -577,6 +671,7 @@ export const CanvasSingleSelectionForeground = ({
       window.removeEventListener("pointerup", handlePointerEnd);
       setActiveResizeCorner(null);
       editor.setHoveringSuppressed(false);
+      editor.commitResizeSelection(resizeState.resizeSession);
 
       if (historyMark) {
         editor.commitHistoryStep(historyMark);
@@ -643,6 +738,7 @@ export const CanvasSingleSelectionForeground = ({
       editor.endSelectionRotationInteraction();
       setActiveRotateCursor(null);
       editor.setHoveringSuppressed(false);
+      editor.commitRotateSelection(rotateSession);
 
       if (historyMark) {
         editor.commitHistoryStep(historyMark);
@@ -676,7 +772,6 @@ export const CanvasSingleSelectionForeground = ({
             style={{
               height: `${overlayRect.height}px`,
               left: `${overlayRect.left}px`,
-              pointerEvents: isDraggable ? "auto" : "none",
               top: `${overlayRect.top}px`,
               transform: overlayRect.transform,
               transformOrigin: "center center",

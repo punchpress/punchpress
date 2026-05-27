@@ -1,8 +1,10 @@
 import { supportsNodeProperty } from "../nodes/node-property-support";
 import { isContainerNode } from "../nodes/node-tree";
+import { measurePerf } from "../perf/perf-hooks";
 import { getPropertyDescriptor } from "./property-descriptors";
 
 const SELECTION_COLOR_PROPERTY_IDS = ["background", "fill", "stroke"];
+const MAX_VISIBLE_SELECTION_COLORS = 12;
 
 const createSelectionColorId = (value) => {
   return JSON.stringify(value);
@@ -73,15 +75,18 @@ const shouldExposeSelectionColors = (editor, nodeIds) => {
   return isContainerNode(editor.getNode(nodeIds[0]));
 };
 
-export const getSelectionColors = (
-  editor,
-  nodeIds = editor.selectedNodeIds
-) => {
-  if (!shouldExposeSelectionColors(editor, nodeIds)) {
-    return [];
-  }
+const resolveSelectionColor = (editor, selectionColorId, nodeIds) => {
+  return getSelectionColors(editor, nodeIds).find((color) => {
+    return color.id === selectionColorId;
+  });
+};
 
-  const colorsById = new Map();
+const resolveSelectionColorTargetProperties = (
+  editor,
+  selectionColor,
+  nodeIds
+) => {
+  const targetPropertyIdsByNodeId = new Map();
 
   for (const nodeId of getSelectionColorTargetNodeIds(editor, nodeIds)) {
     const node = editor.getNode(nodeId);
@@ -96,30 +101,141 @@ export const getSelectionColors = (
       }
 
       const descriptor = getPropertyDescriptor(propertyId);
-      const value = descriptor?.getValue(node);
 
-      if (value == null) {
+      if (descriptor?.getValue(node) !== selectionColor.value) {
         continue;
       }
 
-      const id = createSelectionColorId(value);
-      const existingColor = colorsById.get(id);
-
-      if (existingColor) {
-        existingColor.usageCount += 1;
-        continue;
-      }
-
-      colorsById.set(id, {
-        fieldId: createSelectionColorFieldId(node.id, propertyId),
-        id,
-        usageCount: 1,
-        value,
-      });
+      const propertyIds = targetPropertyIdsByNodeId.get(node.id) || [];
+      propertyIds.push(propertyId);
+      targetPropertyIdsByNodeId.set(node.id, propertyIds);
     }
   }
 
-  return [...colorsById.values()];
+  return targetPropertyIdsByNodeId;
+};
+
+export const getSelectionColors = (editor, nodeIds = editor.selectedNodeIds) => {
+  return measurePerf("selection.colors", () => {
+    if (!shouldExposeSelectionColors(editor, nodeIds)) {
+      return [];
+    }
+
+    const colorsById = new Map();
+
+    for (const nodeId of measurePerf("selection.color.targets", () =>
+      getSelectionColorTargetNodeIds(editor, nodeIds)
+    )) {
+      const node = editor.getNode(nodeId);
+
+      if (!node) {
+        continue;
+      }
+
+      for (const propertyId of SELECTION_COLOR_PROPERTY_IDS) {
+        if (!supportsNodeProperty(node, propertyId)) {
+          continue;
+        }
+
+        const descriptor = getPropertyDescriptor(propertyId);
+        const value = descriptor?.getValue(node);
+
+        if (value == null) {
+          continue;
+        }
+
+        const id = createSelectionColorId(value);
+        const existingColor = colorsById.get(id);
+
+        if (existingColor) {
+          existingColor.usageCount += 1;
+          continue;
+        }
+
+        colorsById.set(id, {
+          fieldId: createSelectionColorFieldId(node.id, propertyId),
+          id,
+          usageCount: 1,
+          value,
+        });
+
+        if (colorsById.size > MAX_VISIBLE_SELECTION_COLORS) {
+          return [...colorsById.values()].slice(0, MAX_VISIBLE_SELECTION_COLORS);
+        }
+      }
+    }
+
+    return [...colorsById.values()];
+  });
+};
+
+export const beginSelectionColorChange = (
+  editor,
+  selectionColorId,
+  nodeIds = editor.selectedNodeIds
+) => {
+  return measurePerf("selection.color.change.begin", () => {
+    const selectionColor = measurePerf("selection.color.change.resolve", () =>
+      resolveSelectionColor(editor, selectionColorId, nodeIds)
+    );
+
+    if (!selectionColor) {
+      return null;
+    }
+
+    const targetPropertyIdsByNodeId = measurePerf(
+      "selection.color.change.targets",
+      () => resolveSelectionColorTargetProperties(editor, selectionColor, nodeIds)
+    );
+
+    if (targetPropertyIdsByNodeId.size === 0) {
+      return null;
+    }
+
+    return {
+      baseValue: selectionColor.value,
+      nodeIds: [...nodeIds],
+      selectionColorId,
+      targetPropertyIdsByNodeId,
+    };
+  });
+};
+
+export const commitSelectionColorChange = (editor, session, value) => {
+  if (!session) {
+    return false;
+  }
+
+  const targetNodeIds = [...session.targetPropertyIdsByNodeId.keys()];
+
+  if (targetNodeIds.length === 0) {
+    return false;
+  }
+
+  measurePerf("selection.color.change.commit", () => {
+    editor.updateNodes(targetNodeIds, (node) => {
+      const propertyIds = session.targetPropertyIdsByNodeId.get(node.id) || [];
+      const nextNode = {};
+
+      for (const propertyId of propertyIds) {
+        if (!supportsNodeProperty(node, propertyId)) {
+          continue;
+        }
+
+        const descriptor = getPropertyDescriptor(propertyId);
+
+        if (descriptor?.getValue(node) !== session.baseValue) {
+          continue;
+        }
+
+        Object.assign(nextNode, descriptor.setValue(node, value));
+      }
+
+      return nextNode;
+    });
+  });
+
+  return true;
 };
 
 export const setSelectionColor = (
@@ -128,57 +244,17 @@ export const setSelectionColor = (
   value,
   nodeIds = editor.selectedNodeIds
 ) => {
-  const selectionColor = getSelectionColors(editor, nodeIds).find((color) => {
-    return color.id === selectionColorId;
-  });
+  return measurePerf("selection.color.set", () => {
+    const session = beginSelectionColorChange(
+      editor,
+      selectionColorId,
+      nodeIds
+    );
 
-  if (!selectionColor) {
-    return false;
-  }
-
-  const targetNodeIds = getSelectionColorTargetNodeIds(editor, nodeIds).filter(
-    (nodeId) => {
-      const node = editor.getNode(nodeId);
-
-      if (!node) {
-        return false;
-      }
-
-      return SELECTION_COLOR_PROPERTY_IDS.some((propertyId) => {
-        if (!supportsNodeProperty(node, propertyId)) {
-          return false;
-        }
-
-        return (
-          getPropertyDescriptor(propertyId)?.getValue(node) ===
-          selectionColor.value
-        );
-      });
-    }
-  );
-
-  if (targetNodeIds.length === 0) {
-    return false;
-  }
-
-  editor.updateNodes(targetNodeIds, (node) => {
-    const nextNode = {};
-
-    for (const propertyId of SELECTION_COLOR_PROPERTY_IDS) {
-      if (!supportsNodeProperty(node, propertyId)) {
-        continue;
-      }
-
-      const descriptor = getPropertyDescriptor(propertyId);
-      if (descriptor?.getValue(node) !== selectionColor.value) {
-        continue;
-      }
-
-      Object.assign(nextNode, descriptor.setValue(node, value));
+    if (!session) {
+      return false;
     }
 
-    return nextNode;
+    return commitSelectionColorChange(editor, session, value);
   });
-
-  return true;
 };

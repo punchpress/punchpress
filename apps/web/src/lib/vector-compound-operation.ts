@@ -40,20 +40,52 @@ export const getCompoundVectorOperationTarget = (
     return null;
   }
 
-  const ownerNodeId = editor.getSelectionTargetNodeId(nodeId) || nodeId;
-  const ownerNode = editor.getNode(ownerNodeId);
+  let ownerNodeId: string | null = null;
+  let currentNode = editor.getNode(nodeId);
 
-  if (ownerNode?.type !== "vector") {
+  while (currentNode) {
+    if (currentNode.type === "vector") {
+      ownerNodeId = currentNode.id;
+      break;
+    }
+
+    if (!currentNode.parentId || currentNode.parentId === "root") {
+      break;
+    }
+
+    currentNode = editor.getNode(currentNode.parentId);
+  }
+
+  if (!ownerNodeId) {
     return null;
   }
 
-  const childPathCount = editor
-    .getChildNodeIds(ownerNodeId)
-    .map((childNodeId) => editor.getNode(childNodeId))
-    .filter((childNode) => childNode?.type === "path").length;
+  const ownerNode = editor.getNode(ownerNodeId);
+
+  if (!ownerNode || ownerNode.type !== "vector") {
+    return null;
+  }
+
   const pathComposition = ownerNode.pathComposition || "independent";
 
-  if (childPathCount < 2 || pathComposition === "independent") {
+  if (pathComposition === "independent") {
+    return null;
+  }
+
+  let childPathCount = 0;
+
+  for (const childNodeId of editor.getChildNodeIds(ownerNodeId)) {
+    if (editor.getNode(childNodeId)?.type !== "path") {
+      continue;
+    }
+
+    childPathCount += 1;
+    if (childPathCount >= 2) {
+      break;
+    }
+  }
+
+  if (childPathCount < 2) {
     return null;
   }
 

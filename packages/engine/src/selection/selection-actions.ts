@@ -2,6 +2,7 @@ import {
   finalizeEditing,
   finishEditingIfNeeded,
 } from "../editing/editing-actions";
+import { measurePerf } from "../perf/perf-hooks";
 
 const getResolvedNodeIds = (editor, nodeIds) => {
   let shouldExitFocusedGroup = false;
@@ -30,18 +31,32 @@ const getResolvedNodeIds = (editor, nodeIds) => {
 };
 
 export const clearSelection = (editor) => {
-  finishEditingIfNeeded(editor);
+  return measurePerf("selection.clearSelection", () => {
+    measurePerf("selection.clear.finishEditing", () =>
+      finishEditingIfNeeded(editor)
+    );
 
-  if (editor.focusedGroupId) {
-    editor.getState().setFocusedGroupId(null);
-  }
+    if (editor.focusedGroupId) {
+      measurePerf("selection.clear.focusedGroup", () =>
+        editor.getState().setFocusedGroupId(null)
+      );
+    }
 
-  editor.getState().clearSelection();
+    measurePerf("selection.clear.store", () =>
+      editor.getState().clearSelection()
+    );
+  });
 };
 
 export const clearSelectionPreservingFocus = (editor) => {
-  finishEditingIfNeeded(editor);
-  editor.getState().clearSelection();
+  return measurePerf("selection.clearSelectionPreservingFocus", () => {
+    measurePerf("selection.clear.finishEditing", () =>
+      finishEditingIfNeeded(editor)
+    );
+    measurePerf("selection.clear.store", () =>
+      editor.getState().clearSelection()
+    );
+  });
 };
 
 export const select = (editor, nodeId) => {
@@ -63,16 +78,23 @@ export const select = (editor, nodeId) => {
 };
 
 export const setSelectedNodes = (editor, nodeIds) => {
-  const resolvedNodeIds = getResolvedNodeIds(editor, nodeIds);
+  return measurePerf("selection.setSelectedNodes", () => {
+    const resolvedNodeIds = measurePerf("selection.resolveTargets", () =>
+      getResolvedNodeIds(editor, nodeIds)
+    );
 
-  if (
-    editor.editingNodeId &&
-    (resolvedNodeIds.length !== 1 || resolvedNodeIds[0] !== editor.editingNodeId)
-  ) {
-    finalizeEditing(editor);
-  }
+    if (
+      editor.editingNodeId &&
+      (resolvedNodeIds.length !== 1 ||
+        resolvedNodeIds[0] !== editor.editingNodeId)
+    ) {
+      measurePerf("selection.finalizeEditing", () => finalizeEditing(editor));
+    }
 
-  editor.getState().selectNodes(resolvedNodeIds);
+    measurePerf("selection.store.selectNodes", () =>
+      editor.getState().selectNodes(resolvedNodeIds)
+    );
+  });
 };
 
 export const toggleSelection = (editor, nodeId) => {

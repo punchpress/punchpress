@@ -58,6 +58,7 @@ export const createDefaultPathNode = (parentId: string) => {
       fill: "#ffffff",
       fillRule: "evenodd",
       id: createId(),
+      opacity: 1,
       parentId,
       stroke: "#000000",
       strokeLineCap: DEFAULT_VECTOR_STROKE_LINE_CAP,

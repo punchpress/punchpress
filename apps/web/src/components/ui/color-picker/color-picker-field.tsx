@@ -10,6 +10,8 @@ import { formatStorageValue, parseColorValue } from "./color-picker-value";
 interface ColorPickerFieldProps {
   className?: string;
   onChange: (value: string) => void;
+  onInteractionEnd?: () => void;
+  onInteractionStart?: () => void;
   placeholder?: string;
   stateKey?: string;
   value?: string | null;
@@ -94,6 +96,8 @@ const selectInputText = (event) => {
 const ColorPickerField = ({
   className,
   onChange,
+  onInteractionEnd,
+  onInteractionStart,
   placeholder,
   stateKey = "default",
   value,
@@ -118,16 +122,18 @@ const ColorPickerField = ({
     }
 
     historyMarkRef.current = editor.markHistoryStep("change color");
-  }, [editor]);
+    onInteractionStart?.();
+  }, [editor, onInteractionStart]);
 
   const commitHistoryStep = useCallback(() => {
     if (!historyMarkRef.current) {
       return;
     }
 
+    onInteractionEnd?.();
     editor.commitHistoryStep(historyMarkRef.current);
     historyMarkRef.current = null;
-  }, [editor]);
+  }, [editor, onInteractionEnd]);
 
   const setOpen = useCallback(
     (nextOpen: boolean) => {

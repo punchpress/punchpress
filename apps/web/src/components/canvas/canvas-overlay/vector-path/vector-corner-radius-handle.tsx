@@ -1,4 +1,4 @@
-import { isPointerDistanceAtLeast } from "@punchpress/engine";
+import { hasPointerMovedAtLeast } from "@punchpress/engine";
 import {
   getActiveVectorPathCursorToken,
   getVectorPathCursorToken,
@@ -24,7 +24,6 @@ import {
 } from "./vector-corner-radius-points";
 
 const CORNER_RADIUS_MAX_EPSILON = 0.01;
-const CORNER_RADIUS_HANDLE_DRAG_THRESHOLD_PX = 4;
 
 const roundDelta = (value: number) => Math.round(value * 100) / 100;
 const getEventClientPoint = (event) => ({
@@ -167,10 +166,10 @@ export const VectorCornerRadiusHandle = ({
     const shouldStartDrag = (moveEvent) => {
       return (
         didStartDrag ||
-        isPointerDistanceAtLeast(
+        hasPointerMovedAtLeast(
           dragStartClientPoint,
           getEventClientPoint(moveEvent),
-          CORNER_RADIUS_HANDLE_DRAG_THRESHOLD_PX
+          "vectorCornerRadiusHandleDrag"
         )
       );
     };

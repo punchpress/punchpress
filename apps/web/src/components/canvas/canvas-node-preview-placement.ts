@@ -1,14 +1,17 @@
 export const resolvePreviewPlacementNodeIds = (
   editor,
   visibleNodeIds,
-  previewNodeIds
+  preview
 ) => {
+  const previewNodeIds = preview?.nodeIds || [];
+
   if (!(visibleNodeIds.length > 0 && previewNodeIds?.length > 0)) {
     return [];
   }
 
   const visibleNodeIdSet = new Set(visibleNodeIds);
   const previewNodeIdSet = new Set(previewNodeIds);
+  const effectiveNodeIdSet = preview.effectiveNodeIdSet || previewNodeIdSet;
   const resolvedNodeIds: string[] = [];
 
   for (const previewNodeId of previewNodeIds) {
@@ -27,6 +30,15 @@ export const resolvePreviewPlacementNodeIds = (
         ? editor.getNode(currentNode.parentId)
         : null;
     }
+
+    for (const visibleNodeId of visibleNodeIds) {
+      if (
+        effectiveNodeIdSet.has(visibleNodeId) &&
+        editor.isDescendantOf(visibleNodeId, previewNodeId)
+      ) {
+        resolvedNodeIds.push(visibleNodeId);
+      }
+    }
   }
 
   return [...new Set(resolvedNodeIds)];
@@ -37,6 +49,10 @@ const canMapPreviewToVisibleNode = (
   visibleNodeId,
   previewNodeIdSet
 ) => {
+  if (editor.pathEditingNodeId) {
+    return false;
+  }
+
   if (previewNodeIdSet.has(visibleNodeId)) {
     return true;
   }

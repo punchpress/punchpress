@@ -18,6 +18,8 @@ import type {
   VectorPaperSessionState,
 } from "./paper-session-state";
 
+const MAX_INITIAL_CHROME_SEGMENTS = 5000;
+
 interface CreatePaperSessionSceneControllerOptions {
   chrome: PaperSessionChromeController;
   scope: paper.PaperScope;
@@ -173,6 +175,11 @@ export const createPaperSessionSceneController = ({
       return;
     }
 
+    const shouldCreateSegmentChrome =
+      scene.contours.reduce((count, contour) => {
+        return count + contour.segments.length;
+      }, 0) <= MAX_INITIAL_CHROME_SEGMENTS;
+
     scene.contours.forEach((contour, contourIndex) => {
       const localPath = createLocalContourPath(scope, contour);
       const path = new scope.Path({
@@ -206,22 +213,26 @@ export const createPaperSessionSceneController = ({
             projectVector(scene.matrix, segment.handleOut)
           )
         );
-        contourChrome.push(
-          createContourChrome(contourIndex, point, segmentIndex)
-        );
+        if (shouldCreateSegmentChrome) {
+          contourChrome.push(
+            createContourChrome(contourIndex, point, segmentIndex)
+          );
+        }
       });
 
       path.sendToBack();
       state.localPaths.push(localPath);
       state.paths.push(path);
-      state.chrome.push(contourChrome);
+      state.chrome.push(shouldCreateSegmentChrome ? contourChrome : []);
     });
 
-    state.paths.forEach((path, contourIndex) => {
-      path.segments.forEach((segment, segmentIndex) => {
-        chrome.refreshPathSegmentChrome(contourIndex, segmentIndex, segment);
+    if (shouldCreateSegmentChrome) {
+      state.paths.forEach((path, contourIndex) => {
+        path.segments.forEach((segment, segmentIndex) => {
+          chrome.refreshPathSegmentChrome(contourIndex, segmentIndex, segment);
+        });
       });
-    });
+    }
 
     chrome.syncPreviewPath(scene.penPreview || null);
     chrome.syncHoveredChrome();

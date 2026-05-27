@@ -1,5 +1,10 @@
 import { finishEditingIfNeeded } from "../editing/editing-actions";
+import {
+  buildNodeCapabilityGeometry,
+  getNodeFrameFromGeometry,
+} from "../nodes/node-capabilities";
 import { getNodePlacementCapabilities } from "../nodes/node-placement";
+import { getGestureTolerancePx } from "../primitives/pointer-distance";
 import { round } from "../primitives/math";
 import { getArtboardParentPatch } from "./artboard-parent";
 import { getErgonomicShapePatch } from "./ergonomic-starter-size";
@@ -7,8 +12,6 @@ import {
   fitFirstAddedNode,
   shouldFitFirstAddedNode,
 } from "./first-add-fit";
-
-const PLACEMENT_DRAG_THRESHOLD_PX = 3;
 
 const getBoxPlacementBounds = (
   originPoint,
@@ -37,6 +40,52 @@ const getBoxPlacementBounds = (
   };
 };
 
+const mergeNodeUpdate = (node, nodeUpdate) => {
+  return {
+    ...node,
+    ...nodeUpdate,
+    transform: {
+      ...node.transform,
+      ...(nodeUpdate?.transform || {}),
+    },
+  };
+};
+
+const getShapePlacementPreviewFrames = (baseNode, nodeUpdate) => {
+  if (!(baseNode && nodeUpdate)) {
+    return null;
+  }
+
+  const previewNode = mergeNodeUpdate(baseNode, nodeUpdate);
+  const geometry = buildNodeCapabilityGeometry(previewNode);
+
+  return {
+    renderFrame: getNodeFrameFromGeometry(previewNode, geometry, "render"),
+    transformFrame: getNodeFrameFromGeometry(previewNode, geometry, "transform"),
+  };
+};
+
+const setShapePlacementPreview = (editor, nodeId, baseNode, nodeUpdate) => {
+  const frames = getShapePlacementPreviewFrames(baseNode, nodeUpdate);
+
+  if (!(frames?.renderFrame && frames?.transformFrame)) {
+    return false;
+  }
+
+  editor.setSelectionDragPreview({
+    effectiveNodeIdSet: new Set([nodeId]),
+    nodeIdSet: new Set([nodeId]),
+    nodeIds: [nodeId],
+    resize: {
+      frame: frames.renderFrame,
+      nodeUpdate,
+      transformFrame: frames.transformFrame,
+    },
+  });
+
+  return true;
+};
+
 const beginShapePlacement = (editor, { point, shape }) => {
   finishEditingIfNeeded(editor);
 
@@ -47,6 +96,7 @@ const beginShapePlacement = (editor, { point, shape }) => {
 
   let hasDragged = false;
   let nodeId: string | null = null;
+  let previewNodeUpdate = null;
   const shouldFit = shouldFitFirstAddedNode(editor);
 
   const createShapeNode = (centerPoint, patch = null) => {
@@ -71,7 +121,7 @@ const beginShapePlacement = (editor, { point, shape }) => {
     nextPoint,
     { dragDistancePx = 0, preserveAspectRatio = false } = {}
   ) => {
-    if (!hasDragged && dragDistancePx < PLACEMENT_DRAG_THRESHOLD_PX) {
+    if (!hasDragged && dragDistancePx < getGestureTolerancePx("placementDrag")) {
       return false;
     }
 
@@ -96,23 +146,38 @@ const beginShapePlacement = (editor, { point, shape }) => {
       );
     }
 
-    if (!editor.getNode(nodeId)) {
+    const node = editor.getNode(nodeId);
+
+    if (!node) {
       return false;
     }
 
-    editor.updateNode(nodeId, {
+    previewNodeUpdate = {
       height: nextBounds.height,
       transform: {
         x: nextBounds.centerX,
         y: nextBounds.centerY,
       },
       width: nextBounds.width,
-    });
-    return true;
+    };
+
+    return setShapePlacementPreview(editor, nodeId, node, previewNodeUpdate);
+  };
+
+  const commitPreview = () => {
+    editor.setSelectionDragPreview(null);
+
+    if (!(nodeId && previewNodeUpdate)) {
+      return;
+    }
+
+    editor.updateNode(nodeId, previewNodeUpdate);
+    previewNodeUpdate = null;
   };
 
   return {
     cancel: () => {
+      editor.setSelectionDragPreview(null);
       editor.setActiveTool("pointer");
       return editor.revertToMark(historyMark);
     },
@@ -130,10 +195,11 @@ const beginShapePlacement = (editor, { point, shape }) => {
         createShapeNode(point, getErgonomicShapePatch(editor, point, shape));
       }
 
+      commitPreview();
       editor.setActiveTool("pointer");
       const didCommit = editor.commitHistoryStep(historyMark);
 
-      if (shouldFit && nodeId) {
+      if (shouldFit && nodeId && !hasDragged) {
         fitFirstAddedNode(editor, nodeId);
       }
 

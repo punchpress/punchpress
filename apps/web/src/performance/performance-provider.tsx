@@ -1,4 +1,7 @@
-import { shouldIgnoreGlobalShortcutTarget } from "@punchpress/engine";
+import {
+  setPerfLogConfig,
+  shouldIgnoreGlobalShortcutTarget,
+} from "@punchpress/engine";
 import { useEffect, useState } from "react";
 import { useEditor } from "../editor-react/use-editor";
 import {
@@ -7,6 +10,7 @@ import {
 } from "./performance-benchmarks";
 import { PerformanceContext } from "./performance-context";
 import { PerformanceController } from "./performance-controller";
+import { getPerfTimingLogConfig } from "./performance-url-flags";
 
 const HUD_SHORTCUT_KEY = "p";
 
@@ -15,11 +19,14 @@ export const PerformanceProvider = ({ children }) => {
   const [controller] = useState(() => new PerformanceController());
 
   useEffect(() => {
+    setPerfLogConfig(getPerfTimingLogConfig());
+
     if (!controller.getSnapshot().selectedBenchmarkId) {
       controller.setSelectedBenchmarkId(performanceBenchmarks[0]?.id || "");
     }
 
     return () => {
+      setPerfLogConfig(null);
       controller.dispose();
     };
   }, [controller]);
@@ -103,6 +110,7 @@ export const PerformanceProvider = ({ children }) => {
       __PUNCHPRESS_PERF__?: {
         getSnapshot: () => ReturnType<PerformanceController["getSnapshot"]>;
         listBenchmarks: () => typeof performanceBenchmarks;
+        setTimingLogEnabled: (enabled: boolean) => void;
         setHudOpen: (open: boolean) => void;
         runBenchmark: (
           benchmarkId: string
@@ -114,6 +122,25 @@ export const PerformanceProvider = ({ children }) => {
     win.__PUNCHPRESS_PERF__ = {
       getSnapshot: controller.getSnapshot,
       listBenchmarks: () => performanceBenchmarks,
+      setTimingLogEnabled: (enabled: boolean) => {
+        setPerfLogConfig(
+          enabled
+            ? {
+                enabled: true,
+                labels: [
+                  "canvas.pointerDown*",
+                  "selection.*",
+                  "store.clearSelection*",
+                  "store.selectNodes*",
+                  "selector.layerRow*",
+                  "selector.layers*",
+                  "render.*",
+                ],
+                thresholdMs: 0,
+              }
+            : null
+        );
+      },
       setHudOpen: controller.setHudOpen,
       runBenchmark: (benchmarkId: string) => {
         const benchmark = findPerformanceBenchmark(benchmarkId);

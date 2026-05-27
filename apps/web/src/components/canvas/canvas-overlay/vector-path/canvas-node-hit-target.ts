@@ -66,6 +66,23 @@ const getVectorChildPathNodeIdAtPoint = (editor, nodeId, canvasPoint) => {
   return null;
 };
 
+const getDescendantLeafNodeIdAtPoint = (editor, nodeId, canvasPoint) => {
+  const descendantLeafNodeIds = editor
+    .getDescendantLeafNodeIds(nodeId)
+    .reverse();
+
+  for (const descendantNodeId of descendantLeafNodeIds) {
+    if (
+      editor.isNodeEffectivelyVisible(descendantNodeId) &&
+      editor.hitTestNodePoint(descendantNodeId, canvasPoint)
+    ) {
+      return descendantNodeId;
+    }
+  }
+
+  return null;
+};
+
 export const getCanvasVectorChildPathNodeIdAtPoint = (
   editor,
   nodeId,
@@ -108,20 +125,27 @@ export const getCanvasDeepLeafNodeIdAtPoint = (editor, clientX, clientY) => {
 
   for (const nodeElement of getCanvasNodeElementsAtPoint(clientX, clientY)) {
     const nodeId = nodeElement.dataset.nodeId;
+    const node = nodeId ? editor.getNode(nodeId) : null;
 
-    if (!(nodeId && isCanvasNodeHit(editor, nodeId, canvasPoint))) {
-      continue;
+    if (node?.type === "group" || node?.type === "vector") {
+      const childPathNodeId = getDescendantLeafNodeIdAtPoint(
+        editor,
+        nodeId,
+        canvasPoint
+      );
+
+      if (childPathNodeId) {
+        return childPathNodeId;
+      }
+
+      if (nodeId && isCanvasNodeHit(editor, nodeId, canvasPoint)) {
+        return nodeId;
+      }
     }
 
-    const node = editor.getNode(nodeId);
-
-    if (node?.type !== "vector") {
+    if (nodeId && isCanvasNodeHit(editor, nodeId, canvasPoint)) {
       return nodeId;
     }
-
-    return (
-      getVectorChildPathNodeIdAtPoint(editor, nodeId, canvasPoint) || nodeId
-    );
   }
 
   return null;

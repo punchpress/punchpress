@@ -18,7 +18,12 @@ export const clipboardContentSchema = z
   .strict();
 
 export const parseClipboardContent = (value) => {
-  return clipboardContentSchema.parse(JSON.parse(value));
+  const content = JSON.parse(value);
+
+  return clipboardContentSchema.parse({
+    ...content,
+    nodes: normalizeNodesForSchema(content.nodes),
+  });
 };
 
 export const serializeClipboardContent = (content) => {

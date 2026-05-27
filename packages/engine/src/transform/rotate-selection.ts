@@ -1,4 +1,95 @@
-import { getRotatedNodeUpdate } from "../primitives/rotation";
+import {
+  getLocalBoundsCenter,
+  getRotatedNodeUpdate,
+  rotatePointAround,
+} from "../primitives/rotation";
+import { isContainerNode } from "../nodes/node-tree";
+import { measurePerf } from "../perf/perf-hooks";
+import { round } from "../primitives/math";
+import {
+  applyMatrixToPoint,
+  IDENTITY_MATRIX,
+  invertMatrix,
+  getMatrixRotation,
+  getNodeLocalMatrix,
+  multiplyMatrix,
+} from "./node-transform-matrix";
+
+const getTransformNumber = (node, key, fallback = 0) => {
+  const value = node?.transform?.[key];
+
+  return Number.isFinite(value) ? value : fallback;
+};
+
+const getParentWorldMatrix = (editor, node, baseNodes) => {
+  const ancestors = [];
+  let currentParentId = node?.parentId;
+
+  while (currentParentId && currentParentId !== "root") {
+    const parentNode = baseNodes.get(currentParentId) || editor.getNode(currentParentId);
+
+    if (!parentNode) {
+      break;
+    }
+
+    const parentBounds =
+      parentNode.bbox || editor.getNodeTransformBounds(parentNode.id);
+
+    if (!parentBounds) {
+      break;
+    }
+
+    ancestors.push({ bbox: parentBounds, node: parentNode });
+    currentParentId = parentNode.parentId;
+  }
+
+  return ancestors.reverse().reduce((matrix, ancestor) => {
+    return multiplyMatrix(matrix, getNodeLocalMatrix(ancestor.node, ancestor.bbox));
+  }, IDENTITY_MATRIX);
+};
+
+const getWorldRotateNodeUpdate = (
+  editor,
+  baseNode,
+  bbox,
+  baseNodes,
+  selectionCenter,
+  deltaRotation
+) => {
+  const localCenter = getLocalBoundsCenter(bbox);
+  const parentMatrix = getParentWorldMatrix(editor, baseNode, baseNodes);
+  const nodeCenterInParent = {
+    x: getTransformNumber(baseNode, "x") + localCenter.x,
+    y: getTransformNumber(baseNode, "y") + localCenter.y,
+  };
+  const nodeWorldCenter = applyMatrixToPoint(parentMatrix, nodeCenterInParent);
+  const nextWorldCenter = rotatePointAround(
+    nodeWorldCenter,
+    selectionCenter,
+    deltaRotation
+  );
+  const inverseParentMatrix = invertMatrix(parentMatrix);
+
+  if (!inverseParentMatrix) {
+    return getRotatedNodeUpdate(baseNode, bbox, selectionCenter, deltaRotation);
+  }
+
+  const nextParentCenter = applyMatrixToPoint(
+    inverseParentMatrix,
+    nextWorldCenter
+  );
+  const parentRotation = getMatrixRotation(parentMatrix);
+  const nodeWorldRotation =
+    parentRotation + getTransformNumber(baseNode, "rotation");
+
+  return {
+    transform: {
+      rotation: round(nodeWorldRotation + deltaRotation - parentRotation, 2),
+      x: round(nextParentCenter.x - localCenter.x, 2),
+      y: round(nextParentCenter.y - localCenter.y, 2),
+    },
+  };
+};
 
 const getBoundsCenter = (bounds) => {
   if (!bounds) {
@@ -27,6 +118,12 @@ const getRotateSelectionCenter = (
 };
 
 export const beginRotateSelection = (editor, { nodeId, nodeIds } = {}) => {
+  return measurePerf("selection.rotate.begin", () =>
+    beginRotateSelectionMeasured(editor, { nodeId, nodeIds })
+  );
+};
+
+const beginRotateSelectionMeasured = (editor, { nodeId, nodeIds } = {}) => {
   const requestedNodeIds =
     nodeIds?.filter((currentNodeId) => editor.getNode(currentNodeId)) ||
     (nodeId
@@ -34,10 +131,15 @@ export const beginRotateSelection = (editor, { nodeId, nodeIds } = {}) => {
       : null) ||
     editor.selectedNodeIds;
   const resolvedNodeIds = editor.getEffectiveSelectionNodeIds(requestedNodeIds);
+  const includesContainerSelection = requestedNodeIds.some((currentNodeId) => {
+    return isContainerNode(editor.getNode(currentNodeId));
+  });
 
   if (
     resolvedNodeIds.length === 0 ||
-    resolvedNodeIds.some((currentNodeId) => editor.isArtboardNode(currentNodeId))
+    requestedNodeIds.some(
+      (currentNodeId) => editor.getNodeRotateMode(currentNodeId) === "none"
+    )
   ) {
     return null;
   }
@@ -74,9 +176,25 @@ export const beginRotateSelection = (editor, { nodeId, nodeIds } = {}) => {
     return null;
   }
 
+  if (
+    requestedNodeIds.length === 1 &&
+    !includesContainerSelection &&
+    editor.getNodeRotateMode(requestedNodeIds[0]) === "self"
+  ) {
+    return {
+      baseNodes,
+      mode: "live",
+      nodeIds: [...resolvedNodeIds],
+      selectionCenter,
+    };
+  }
+
   return {
     baseNodes,
+    mode: "aggregate",
     nodeIds: [...resolvedNodeIds],
+    previewDeltaRotation: 0,
+    previewNodeIds: requestedNodeIds,
     selectionCenter,
   };
 };
@@ -86,26 +204,84 @@ export const updateRotateSelection = (
   session,
   { deltaRotation = 0 } = {}
 ) => {
-  if (!(session && Number.isFinite(deltaRotation))) {
-    return [];
-  }
-
-  editor.updateNodes(session.nodeIds, (node) => {
-    const baseNode = session.baseNodes.get(node.id);
-
-    if (!baseNode) {
-      return node;
+  return measurePerf("selection.rotate.update", () => {
+    if (!(session && Number.isFinite(deltaRotation))) {
+      return [];
     }
 
-    return getRotatedNodeUpdate(
-      baseNode,
-      baseNode.bbox,
-      session.selectionCenter,
-      deltaRotation
-    );
-  });
+    if (session.mode === "aggregate") {
+      session.previewDeltaRotation = deltaRotation;
+      const previewNodeIds = session.previewNodeIds || session.nodeIds;
 
-  return session.nodeIds;
+      editor.setSelectionDragPreview({
+        effectiveNodeIdSet: new Set(session.nodeIds),
+        nodeIdSet: new Set([...session.nodeIds, ...previewNodeIds]),
+        nodeIds: previewNodeIds,
+        rotate: {
+          centerCanvas: { ...session.selectionCenter },
+          deltaRotation,
+        },
+      });
+
+      return previewNodeIds;
+    }
+
+    editor.updateNodes(session.nodeIds, (node) => {
+      const baseNode = session.baseNodes.get(node.id);
+
+      if (!baseNode) {
+        return node;
+      }
+
+      return getRotatedNodeUpdate(
+        baseNode,
+        baseNode.bbox,
+        session.selectionCenter,
+        deltaRotation
+      );
+    });
+
+    return session.nodeIds;
+  });
+};
+
+export const commitRotateSelection = (editor, session) => {
+  return measurePerf("selection.rotate.commit", () => {
+    if (!session) {
+      editor.setSelectionDragPreview(null);
+      return [];
+    }
+
+    if (session.mode !== "aggregate") {
+      return session.nodeIds || [];
+    }
+
+    const deltaRotation = session.previewDeltaRotation || 0;
+    editor.setSelectionDragPreview(null);
+
+    if (!Number.isFinite(deltaRotation) || deltaRotation === 0) {
+      return [];
+    }
+
+    editor.updateNodes(session.nodeIds, (node) => {
+      const baseNode = session.baseNodes.get(node.id);
+
+      if (!baseNode) {
+        return node;
+      }
+
+      return getWorldRotateNodeUpdate(
+        editor,
+        baseNode,
+        baseNode.bbox,
+        session.baseNodes,
+        session.selectionCenter,
+        deltaRotation
+      );
+    });
+
+    return session.nodeIds;
+  });
 };
 
 export const rotateSelectionBy = (
@@ -128,8 +304,10 @@ export const rotateSelectionBy = (
     nodeIds: selectedNodeIds,
   });
 
-  return updateRotateSelection(editor, rotateSession, {
+  updateRotateSelection(editor, rotateSession, {
     deltaRotation,
     queueRefresh,
   });
+
+  return commitRotateSelection(editor, rotateSession);
 };

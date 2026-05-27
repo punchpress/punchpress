@@ -59,10 +59,58 @@ const getShellKey = (shellState, delta) => {
   ].join(":");
 };
 
-const getPlacementElements = (
-  editor,
-  nodeId
-): PlacementElements | null => {
+const getResizePreviewBounds = (shellState, preview) => {
+  const resize = preview?.resize;
+
+  if (!(shellState && resize)) {
+    return null;
+  }
+
+  if (resize.frame?.bounds) {
+    return resize.frame.bounds;
+  }
+
+  const scale = Number.isFinite(resize.scale) ? resize.scale : 1;
+  const anchor = resize.anchorCanvas;
+
+  if (!anchor) {
+    return null;
+  }
+
+  const minX = anchor.x + (shellState.x - anchor.x) * scale;
+  const minY = anchor.y + (shellState.y - anchor.y) * scale;
+  const width = Math.max(1, shellState.width * scale);
+  const height = Math.max(1, shellState.height * scale);
+
+  return {
+    height,
+    maxX: minX + width,
+    maxY: minY + height,
+    minX,
+    minY,
+    width,
+  };
+};
+
+const getRotatePreviewTransform = (previewBounds, preview) => {
+  const rotate = preview?.rotate;
+
+  if (!(previewBounds && rotate?.centerCanvas)) {
+    return null;
+  }
+
+  const deltaRotation = Number.isFinite(rotate.deltaRotation)
+    ? rotate.deltaRotation
+    : 0;
+
+  return {
+    originX: rotate.centerCanvas.x - previewBounds.minX,
+    originY: rotate.centerCanvas.y - previewBounds.minY,
+    rotation: deltaRotation,
+  };
+};
+
+const getPlacementElements = (editor, nodeId): PlacementElements | null => {
   const transformElement = editor.getNodeElement(nodeId);
 
   if (!transformElement) {
@@ -97,6 +145,8 @@ const applyNodeShellState = (
     shellElement.style.width = "0px";
     shellElement.style.height = "0px";
     shellElement.style.transform = "translate3d(0px, 0px, 0)";
+    shellElement.style.transformOrigin = "";
+    shellElement.style.willChange = "";
     transformElement.style.transform = "";
     return;
   }
@@ -108,6 +158,8 @@ const applyNodeShellState = (
   shellElement.style.height = `${shellState.height}px`;
   shellElement.style.clipPath = shellState.clipPath;
   shellElement.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+  shellElement.style.transformOrigin = "";
+  shellElement.style.willChange = "";
   transformElement.style.transform = shellState.transform || "";
 };
 
@@ -151,7 +203,9 @@ const applyPreviewTransform = (editor, previewEntry: PreviewEntry, preview) => {
   }
 
   const delta = preview.delta || { x: 0, y: 0 };
-  const previewBounds = {
+  const resizeBounds = getResizePreviewBounds(shellState, preview);
+  const resizeFrame = preview?.resize?.frame || null;
+  const previewBounds = resizeBounds || {
     height: shellState.height,
     maxX: shellState.x + shellState.width + (delta.x || 0),
     maxY: shellState.y + shellState.height + (delta.y || 0),
@@ -159,6 +213,7 @@ const applyPreviewTransform = (editor, previewEntry: PreviewEntry, preview) => {
     minY: shellState.y + (delta.y || 0),
     width: shellState.width,
   };
+  const rotateTransform = getRotatePreviewTransform(previewBounds, preview);
 
   shellElement.style.clipPath = getArtboardClipPath(
     editor,
@@ -166,8 +221,17 @@ const applyPreviewTransform = (editor, previewEntry: PreviewEntry, preview) => {
     previewBounds,
     preview
   );
-  shellElement.style.transform = `translate3d(${previewBounds.minX}px, ${previewBounds.minY}px, 0)`;
-  transformElement.style.transform = shellState.transform || "";
+  shellElement.style.width = `${previewBounds.width}px`;
+  shellElement.style.height = `${previewBounds.height}px`;
+  shellElement.style.willChange = "transform";
+  shellElement.style.transformOrigin = rotateTransform
+    ? `${rotateTransform.originX}px ${rotateTransform.originY}px`
+    : "";
+  shellElement.style.transform = rotateTransform
+    ? `translate3d(${previewBounds.minX}px, ${previewBounds.minY}px, 0) rotate(${rotateTransform.rotation}deg)`
+    : `translate3d(${previewBounds.minX}px, ${previewBounds.minY}px, 0)`;
+  transformElement.style.transform =
+    resizeFrame?.transform || shellState.transform || "";
 };
 
 const sameNodeIds = (left = [], right = []) => {
@@ -189,7 +253,9 @@ const canReusePreviewEntries = (preview, nodeIds) => {
   }
 
   return preview.entries.every((entry) => {
-    return entry.shellElement?.isConnected && entry.transformElement?.isConnected;
+    return (
+      entry.shellElement?.isConnected && entry.transformElement?.isConnected
+    );
   });
 };
 
@@ -211,7 +277,7 @@ const pruneNodeShells = (
 const syncDurableNodeShells = (editor, visibleNodeIds, placementState) => {
   const { appliedElements, appliedKeys, preview, shellStates } = placementState;
   const previewNodeIdSet = new Set(
-    resolvePreviewPlacementNodeIds(editor, visibleNodeIds, preview?.nodeIds)
+    resolvePreviewPlacementNodeIds(editor, visibleNodeIds, preview)
   );
 
   pruneNodeShells(visibleNodeIds, appliedElements, appliedKeys, shellStates);
@@ -261,7 +327,12 @@ const getPreviewBaseShellStates = (editor, placementState, nodeIds) => {
 };
 
 const syncPreviewNodeShells = (editor, placementState, preview) => {
-  if (!(preview?.nodeIds?.length && preview.delta)) {
+  if (
+    !(
+      preview?.nodeIds?.length &&
+      (preview.delta || preview.resize || preview.rotate)
+    )
+  ) {
     placementState.preview = null;
     return false;
   }
@@ -269,7 +340,7 @@ const syncPreviewNodeShells = (editor, placementState, preview) => {
   const previewPlacementNodeIds = resolvePreviewPlacementNodeIds(
     editor,
     [...placementState.shellStates.keys()],
-    preview.nodeIds
+    preview
   );
 
   if (previewPlacementNodeIds.length === 0) {
@@ -282,7 +353,17 @@ const syncPreviewNodeShells = (editor, placementState, preview) => {
     placementState,
     previewPlacementNodeIds
   );
-  const deltaKey = `${preview.delta.x}:${preview.delta.y}`;
+  const delta = preview.delta || { x: 0, y: 0 };
+  let deltaKey = `move:${delta.x}:${delta.y}`;
+
+  if (preview.resize) {
+    const frame = preview.resize.frame;
+    deltaKey = frame
+      ? `resize-frame:${frame.bounds?.minX}:${frame.bounds?.minY}:${frame.bounds?.width}:${frame.bounds?.height}:${frame.transform || ""}`
+      : `resize:${preview.resize.anchorCanvas?.x}:${preview.resize.anchorCanvas?.y}:${preview.resize.scale}`;
+  } else if (preview.rotate) {
+    deltaKey = `rotate:${preview.rotate.centerCanvas?.x}:${preview.rotate.centerCanvas?.y}:${preview.rotate.deltaRotation}`;
+  }
 
   if (!(entries && placementState.preview)) {
     return true;
@@ -294,11 +375,11 @@ const syncPreviewNodeShells = (editor, placementState, preview) => {
 
   for (const entry of entries) {
     applyPreviewTransform(editor, entry, preview);
-    placementState.appliedElements.set(entry.nodeId, entry.element);
-    placementState.appliedKeys.set(
-      entry.nodeId,
-      getShellKey(entry.shellState, preview.delta)
-    );
+    placementState.appliedElements.set(entry.nodeId, {
+      shellElement: entry.shellElement,
+      transformElement: entry.transformElement,
+    });
+    placementState.appliedKeys.set(entry.nodeId, `preview:${deltaKey}`);
   }
 
   placementState.preview.lastDeltaKey = deltaKey;

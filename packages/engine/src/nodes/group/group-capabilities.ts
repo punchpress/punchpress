@@ -1,4 +1,3 @@
-import { getDescendantLeafNodeIds } from "../node-tree";
 import { createDefaultGroupNode } from "./model";
 
 export const groupNodeCapabilities = {
@@ -11,10 +10,7 @@ export const groupNodeCapabilities = {
   getFrameFromGeometry: () => null,
 
   getFrame: (editor, nodeId) => {
-    const descendantLeafNodeIds = getDescendantLeafNodeIds(
-      editor.nodes,
-      nodeId
-    );
+    const descendantLeafNodeIds = editor.getDescendantLeafNodeIds(nodeId);
     if (descendantLeafNodeIds.length === 0) {
       return null;
     }
@@ -48,6 +44,10 @@ export const groupNodeCapabilities = {
     pathEditingOverlayMode: "keep-transform",
     requiresPathEditing: false,
   }),
+
+  getResizeMode: () => "children",
+
+  getRotateMode: () => "children",
 
   canPersistPathEditing: () => false,
 

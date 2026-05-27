@@ -229,7 +229,9 @@ export const getHoveredNodePreview = (editor) => {
       return null;
     }
 
-    const frame = editor.getNodeFrame(node.id);
+    const frame =
+      editor.getSelectionTransformFrame([node.id], { includePreview: false }) ||
+      editor.getNodeFrame(node.id);
 
     if (!frame) {
       return null;

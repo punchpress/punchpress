@@ -204,6 +204,10 @@ export const textNodeCapabilities = {
     };
   },
 
+  getResizeMode: () => "scale",
+
+  getRotateMode: () => "self",
+
   canPersistPathEditing: (node) => {
     return node?.warp?.kind === "circle";
   },

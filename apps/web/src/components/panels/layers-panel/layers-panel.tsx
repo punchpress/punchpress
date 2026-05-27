@@ -1,5 +1,6 @@
+import { getPathNodeContours } from "@punchpress/engine";
 import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
-import { useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SortableList } from "@/components/ui/sortable-list";
 import { useEditor } from "../../../editor-react/use-editor";
@@ -7,7 +8,7 @@ import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
 import { SettingsDialog } from "../../settings-dialog";
 import { LayerTreeDragGhost } from "./layer-tree-drag-ghost";
-import { LayerTreeRow } from "./layer-tree-row";
+import { LayerContourRow, LayerTreeRow } from "./layer-tree-row";
 import { LayersMainMenu } from "./layers-main-menu";
 import { getDuplicateRecentDocumentNames } from "./recent-documents";
 import { RecentDocumentsMenu } from "./recent-documents-menu";
@@ -21,6 +22,7 @@ const isContainerLayerNode = (node) => {
 };
 
 const LAYER_ROW_HEIGHT = 32;
+const LAYER_ROW_OVERSCAN = 8;
 const LAYER_EMPTY_STATE_HEIGHT = 42;
 const LAYER_LIST_VERTICAL_PADDING = 4;
 const LAYERS_PANEL_CHROME_HEIGHT = 82;
@@ -30,23 +32,91 @@ const getDisplayedChildIds = (editor, parentId = ROOT_PARENT_ID) => {
   return [...editor.getChildNodeIds(parentId)].reverse();
 };
 
-const getVisibleLayerNodeIds = (
+const getEditableContourCount = (node) => {
+  return getLayerEditableContours(node).length;
+};
+
+const getLayerEditableContours = (node) => {
+  if (node?.type === "path") {
+    return getPathNodeContours(node);
+  }
+
+  if (node?.type === "vector") {
+    return node.contours || [];
+  }
+
+  return [];
+};
+
+const getLayerContourRows = (editor, nodeId, depth) => {
+  const node = editor.getNode(nodeId);
+  const childNodeIds = editor.getChildNodeIds(nodeId);
+  const contourCount = getEditableContourCount(node);
+
+  if (
+    !(
+      isContainerLayerNode(node) &&
+      childNodeIds.length === 0 &&
+      contourCount > 1
+    )
+  ) {
+    return [];
+  }
+
+  return Array.from({ length: contourCount }, (_, index) => ({
+    contourIndex: index,
+    depth,
+    kind: "contour",
+    nodeId,
+  }));
+};
+
+const getVisibleLayerRowKeys = (
   editor,
   collapsedGroupIds,
-  parentId = ROOT_PARENT_ID
+  expandedDenseGroupIds,
+  parentId = ROOT_PARENT_ID,
+  depth = 0
 ) => {
   return getDisplayedChildIds(editor, parentId).flatMap((nodeId) => {
     const node = editor.getNode(nodeId);
+    const childNodeIds = editor.getChildNodeIds(nodeId);
+    const isDenseContainer = childNodeIds.length > 300;
 
-    if (!(isContainerLayerNode(node) && !collapsedGroupIds.has(nodeId))) {
-      return [nodeId];
+    if (
+      !(
+        isContainerLayerNode(node) &&
+        !collapsedGroupIds.has(nodeId) &&
+        (!isDenseContainer || expandedDenseGroupIds.has(nodeId))
+      )
+    ) {
+      return [{ depth, kind: "node", nodeId }];
     }
 
     return [
-      nodeId,
-      ...getVisibleLayerNodeIds(editor, collapsedGroupIds, nodeId),
+      { depth, kind: "node", nodeId },
+      ...getLayerContourRows(editor, nodeId, depth + 1),
+      ...getVisibleLayerRowKeys(
+        editor,
+        collapsedGroupIds,
+        expandedDenseGroupIds,
+        nodeId,
+        depth + 1
+      ),
     ];
   });
+};
+
+const getVirtualLayerRange = (scrollTop, viewportHeight, rowCount) => {
+  const visibleStartIndex = Math.floor(scrollTop / LAYER_ROW_HEIGHT);
+  const visibleRowCount = Math.ceil(viewportHeight / LAYER_ROW_HEIGHT);
+  const startIndex = Math.max(0, visibleStartIndex - LAYER_ROW_OVERSCAN);
+  const endIndex = Math.min(
+    rowCount,
+    visibleStartIndex + visibleRowCount + LAYER_ROW_OVERSCAN
+  );
+
+  return { endIndex, startIndex };
 };
 
 const setDisplayedNodeOrder = (
@@ -161,12 +231,34 @@ const getLayerListHeight = (visibleLayerCount, hasLayers) => {
 export const LayersPanel = ({ documentCommands }) => {
   usePerformanceRenderCounter("render.panel.layers");
   const editor = useEditor();
+  const scrollViewportRef = useRef(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isLayerPointerInside, setIsLayerPointerInside] = useState(false);
+  const [isLayerReorderActive, setIsLayerReorderActive] = useState(false);
+  const [layerScrollTop, setLayerScrollTop] = useState(0);
+  const [layerViewportHeight, setLayerViewportHeight] = useState(0);
   const [collapsedGroupIds, setCollapsedGroupIds] = useState(() => new Set());
-  const layerNodeIds = useEditorValue((editor) => editor.layerNodeIds);
-  const visibleLayerNodeIds = useEditorValue((editor) => {
-    return getVisibleLayerNodeIds(editor, collapsedGroupIds);
-  });
+  const [expandedDenseGroupIds, setExpandedDenseGroupIds] = useState(
+    () => new Set()
+  );
+  const layerNodeIds = useEditorValue(
+    (editor) => editor.layerNodeIds,
+    "selector.layers.nodeIds"
+  );
+  const isCanvasSelectionDragging = useEditorValue((_, state) => {
+    return state.isSelectionDragging;
+  }, "selector.layers.dragging");
+  const visibleLayerRowKeys = useEditorValue((editor) => {
+    return getVisibleLayerRowKeys(
+      editor,
+      collapsedGroupIds,
+      expandedDenseGroupIds
+    );
+  }, "selector.layers.visibleNodeIds");
+  const visibleLayerRows = useMemo(
+    () => visibleLayerRowKeys,
+    [visibleLayerRowKeys]
+  );
   const {
     clearRecentDocumentsSafely,
     openRecentDocumentSafely,
@@ -176,10 +268,28 @@ export const LayersPanel = ({ documentCommands }) => {
   const duplicateRecentDocumentNames =
     getDuplicateRecentDocumentNames(recentDocuments);
   const layerListHeight = getLayerListHeight(
-    visibleLayerNodeIds.length,
+    visibleLayerRows.length,
     layerNodeIds.length > 0
   );
-  const toggleCollapsedGroup = (nodeId) => {
+  const isLayerSortingEnabled =
+    !isCanvasSelectionDragging &&
+    (isLayerPointerInside || isLayerReorderActive);
+  const toggleCollapsedGroup = useCallback((nodeId, options = {}) => {
+    if (options.defaultCollapsed) {
+      setExpandedDenseGroupIds((currentExpandedGroupIds) => {
+        const nextExpandedGroupIds = new Set(currentExpandedGroupIds);
+
+        if (nextExpandedGroupIds.has(nodeId)) {
+          nextExpandedGroupIds.delete(nodeId);
+        } else {
+          nextExpandedGroupIds.add(nodeId);
+        }
+
+        return nextExpandedGroupIds;
+      });
+      return;
+    }
+
     setCollapsedGroupIds((currentCollapsedGroupIds) => {
       const nextCollapsedGroupIds = new Set(currentCollapsedGroupIds);
 
@@ -191,7 +301,119 @@ export const LayersPanel = ({ documentCommands }) => {
 
       return nextCollapsedGroupIds;
     });
-  };
+  }, []);
+  const { endIndex, startIndex } = getVirtualLayerRange(
+    layerScrollTop,
+    layerViewportHeight,
+    visibleLayerRows.length
+  );
+  const renderedLayerRows = visibleLayerRows.slice(startIndex, endIndex);
+  const isRenderedLayerSortingEnabled =
+    isLayerSortingEnabled &&
+    renderedLayerRows.every((row) => row.kind === "node");
+  const renderedLayerNodeIds = renderedLayerRows
+    .filter((row) => row.kind === "node")
+    .map((row) => row.nodeId);
+  const virtualTopPadding = startIndex * LAYER_ROW_HEIGHT;
+  const virtualBottomPadding = Math.max(
+    0,
+    (visibleLayerRows.length - endIndex) * LAYER_ROW_HEIGHT
+  );
+  const layerRows = renderedLayerRows.map((row) => {
+    if (row.kind === "contour") {
+      const node = editor.getNode(row.nodeId);
+      const contours = getLayerEditableContours(node);
+      const contour = contours[row.contourIndex];
+      const isSelected =
+        editor.pathEditingNodeId === row.nodeId &&
+        editor.pathEditingPoint?.contourIndex === row.contourIndex;
+
+      return (
+        <LayerContourRow
+          depth={row.depth}
+          isSelected={isSelected}
+          key={`${row.nodeId}:contour:${row.contourIndex}`}
+          label={`Contour ${row.contourIndex + 1}`}
+          onSelect={() => {
+            editor.select(row.nodeId);
+            if (editor.startPathEditing(row.nodeId)) {
+              editor.setActiveTool("node");
+            }
+
+            if (contour?.segments.length > 0) {
+              editor.setPathEditingPoint({
+                contourIndex: row.contourIndex,
+                segmentIndex: 0,
+              });
+            }
+          }}
+          tone={contour?.closed ? "closed" : "open"}
+        />
+      );
+    }
+
+    return (
+      <LayerTreeRow
+        collapsedGroupIds={collapsedGroupIds}
+        depth={row.depth}
+        expandedDenseGroupIds={expandedDenseGroupIds}
+        key={row.nodeId}
+        nodeId={row.nodeId}
+        onToggleCollapse={toggleCollapsedGroup}
+        renderChildren={false}
+        sortable={isRenderedLayerSortingEnabled}
+      />
+    );
+  });
+
+  useLayoutEffect(() => {
+    const viewportElement = scrollViewportRef.current;
+
+    if (!viewportElement) {
+      return;
+    }
+
+    const updateViewportHeight = () => {
+      setLayerViewportHeight(viewportElement.clientHeight);
+    };
+
+    updateViewportHeight();
+
+    const resizeObserver = new ResizeObserver(updateViewportHeight);
+    resizeObserver.observe(viewportElement);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+  let layerListContent = (
+    <div className="px-2 py-2.5 text-[13px] text-[var(--designer-text-muted)]">
+      No layers yet.
+    </div>
+  );
+
+  if (layerNodeIds.length > 0) {
+    layerListContent = isRenderedLayerSortingEnabled ? (
+      <SortableList
+        items={renderedLayerNodeIds}
+        onMove={({ activeId, overId }) =>
+          moveLayerNode(editor, activeId, overId)
+        }
+        onReorderEnd={() => setIsLayerReorderActive(false)}
+        onReorderStart={() => setIsLayerReorderActive(true)}
+        renderDragOverlay={(nodeId) => (
+          <LayerTreeDragGhost
+            collapsedGroupIds={collapsedGroupIds}
+            nodeId={nodeId}
+          />
+        )}
+      >
+        {layerRows}
+      </SortableList>
+    ) : (
+      layerRows
+    );
+  }
 
   return (
     <>
@@ -220,43 +442,27 @@ export const LayersPanel = ({ documentCommands }) => {
 
         <ScrollArea
           className="min-h-0"
+          onPointerEnter={() => setIsLayerPointerInside(true)}
+          onPointerLeave={() => setIsLayerPointerInside(false)}
+          onViewportScroll={(event) => {
+            setLayerScrollTop(event.currentTarget.scrollTop);
+          }}
           scrollbarGutter
           scrollFade
           style={{
             height: `${layerListHeight}px`,
             maxHeight: LAYERS_PANEL_LIST_MAX_HEIGHT,
           }}
+          viewportRef={scrollViewportRef}
         >
           <div className="flex flex-col gap-[0.5px] px-1 pb-1">
-            {layerNodeIds.length > 0 ? (
-              <SortableList
-                items={visibleLayerNodeIds}
-                onMove={({ activeId, overId }) =>
-                  moveLayerNode(editor, activeId, overId)
-                }
-                renderDragOverlay={(nodeId) => (
-                  <LayerTreeDragGhost
-                    collapsedGroupIds={collapsedGroupIds}
-                    nodeId={nodeId}
-                  />
-                )}
-              >
-                {layerNodeIds.map((nodeId) => {
-                  return (
-                    <LayerTreeRow
-                      collapsedGroupIds={collapsedGroupIds}
-                      key={nodeId}
-                      nodeId={nodeId}
-                      onToggleCollapse={toggleCollapsedGroup}
-                    />
-                  );
-                })}
-              </SortableList>
-            ) : (
-              <div className="px-2 py-2.5 text-[13px] text-[var(--designer-text-muted)]">
-                No layers yet.
-              </div>
-            )}
+            {virtualTopPadding > 0 ? (
+              <div style={{ height: `${virtualTopPadding}px` }} />
+            ) : null}
+            {layerListContent}
+            {virtualBottomPadding > 0 ? (
+              <div style={{ height: `${virtualBottomPadding}px` }} />
+            ) : null}
           </div>
         </ScrollArea>
       </div>

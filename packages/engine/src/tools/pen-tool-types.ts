@@ -1,14 +1,10 @@
 import { round } from "../primitives/math";
 import { getPathNodeContours } from "../nodes/path/path-contours";
 import {
-  isPointerDistanceAtLeast,
-  isPointerDistanceWithin,
+  hasPointerMovedAtLeast,
+  hasPointerMovedWithin,
 } from "../primitives/pointer-distance";
 
-export const DRAG_THRESHOLD_PX = 3;
-export const PEN_HANDLE_LENGTH_THRESHOLD = 12;
-export const POINT_EPSILON = 0.5;
-export const SEGMENT_INSERT_INTERACTION_TOLERANCE_PX = 10;
 export type PenHoverIntent =
   | "add"
   | "close"
@@ -90,7 +86,7 @@ export const getContourSegmentCount = (node, contourIndex) => {
 export const getZeroHandle = () => ({ x: 0, y: 0 });
 
 export const isSamePoint = (a, b) => {
-  return isPointerDistanceWithin(a, b, POINT_EPSILON);
+  return hasPointerMovedWithin(a, b, "pointEpsilon");
 };
 
 export const roundHandle = (handle) => {
@@ -107,10 +103,10 @@ export const getPenDragHandle = ({
   currentLocalPoint,
 }) => {
   if (
-    !isPointerDistanceAtLeast(
+    !hasPointerMovedAtLeast(
       anchorCanvasPoint,
       currentCanvasPoint,
-      PEN_HANDLE_LENGTH_THRESHOLD
+      "penHandleLength"
     )
   ) {
     return null;

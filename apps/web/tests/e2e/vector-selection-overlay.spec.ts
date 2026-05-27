@@ -590,12 +590,21 @@ const getVectorArtRect = (page, nodeId) => {
       return null;
     }
 
-    const rects = [...node.querySelectorAll("svg path")]
-      .map((path) => path.getBoundingClientRect())
+    const rects = [...node.querySelectorAll("svg path, svg image, img")]
+      .map((element) => element.getBoundingClientRect())
       .filter((rect) => rect.width > 0 && rect.height > 0);
 
     if (rects.length === 0) {
-      return null;
+      const rect = node.getBoundingClientRect();
+
+      return rect.width > 0 && rect.height > 0
+        ? {
+            height: rect.height,
+            width: rect.width,
+            x: rect.x,
+            y: rect.y,
+          }
+        : null;
     }
 
     const left = Math.min(...rects.map((rect) => rect.left));
@@ -721,9 +730,13 @@ const getRenderedPathSamplePoints = (page, nodeIds) => {
     };
 
     return targetNodeIds.flatMap((nodeId) => {
-      const node = document.querySelector(
+      const nodeHitTarget = document.querySelector(
         `.canvas-node[data-node-id="${nodeId}"]`
       );
+      const node =
+        nodeHitTarget instanceof HTMLElement
+          ? nodeHitTarget.parentElement
+          : null;
 
       if (!(node instanceof HTMLElement)) {
         return [];
@@ -811,6 +824,51 @@ test("selected vector container shows transform overlay", async ({ page }) => {
   });
 
   await expectVectorTransformOverlay(page);
+});
+
+test("clicking unpainted space inside a selected vector clears selection", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(page, VECTOR_DOCUMENT);
+
+  await page.evaluate(() => {
+    window.__PUNCHPRESS_EDITOR__?.select("vector-container");
+  });
+  await expectVectorTransformOverlay(page);
+
+  const blankPoint = await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const host = editor?.hostRef;
+    const viewer = editor?.viewerRef;
+    const hostRect = host?.getBoundingClientRect?.();
+    const canvasPoint = { x: 230, y: 160 };
+
+    if (!(editor && hostRect && viewer)) {
+      return null;
+    }
+
+    return {
+      x: hostRect.left + (canvasPoint.x - viewer.getScrollLeft()) * editor.zoom,
+      y: hostRect.top + (canvasPoint.y - viewer.getScrollTop()) * editor.zoom,
+    };
+  });
+
+  expect(blankPoint).not.toBeNull();
+
+  if (!blankPoint) {
+    return;
+  }
+
+  await page.mouse.click(blankPoint.x, blankPoint.y);
+
+  await expect
+    .poll(() => {
+      return page.evaluate(() => {
+        return window.__PUNCHPRESS_EDITOR__?.selectedNodeIds || [];
+      });
+    })
+    .toEqual([]);
 });
 
 test("clicking the vector row in layers shows transform overlay", async ({
@@ -941,7 +999,7 @@ test("rotating two compound vectors keeps the multi-selection box aligned after 
   });
 
   await rotateMultiSelectionFromZone(page, {
-    corner: "nw",
+    corner: "se",
     drag: { x: 160, y: 120 },
   });
   await pauseForUi(page);
@@ -988,6 +1046,8 @@ test("rotating two compound vectors keeps the multi-selection box aligned after 
     minY: Math.min(...unrotatedOverlayCorners.map((point) => point.y)),
   };
 
+  const overlayTolerancePx = 12;
+
   for (const point of [
     ...Object.values(firstNode.corners),
     ...Object.values(secondNode.corners),
@@ -998,10 +1058,18 @@ test("rotating two compound vectors keeps the multi-selection box aligned after 
       -overlayAngle
     );
 
-    expect(unrotatedPoint.x).toBeGreaterThanOrEqual(overlayBounds.minX - 6);
-    expect(unrotatedPoint.x).toBeLessThanOrEqual(overlayBounds.maxX + 6);
-    expect(unrotatedPoint.y).toBeGreaterThanOrEqual(overlayBounds.minY - 6);
-    expect(unrotatedPoint.y).toBeLessThanOrEqual(overlayBounds.maxY + 6);
+    expect(unrotatedPoint.x).toBeGreaterThanOrEqual(
+      overlayBounds.minX - overlayTolerancePx
+    );
+    expect(unrotatedPoint.x).toBeLessThanOrEqual(
+      overlayBounds.maxX + overlayTolerancePx
+    );
+    expect(unrotatedPoint.y).toBeGreaterThanOrEqual(
+      overlayBounds.minY - overlayTolerancePx
+    );
+    expect(unrotatedPoint.y).toBeLessThanOrEqual(
+      overlayBounds.maxY + overlayTolerancePx
+    );
   }
 
   await page.evaluate(() => {

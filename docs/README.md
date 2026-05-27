@@ -22,11 +22,13 @@ are hard to recover from code search alone.
 | Task | Read |
 | --- | --- |
 | Understand product behavior | [Product docs](product/README.md) |
-| Understand editor architecture | [Architecture overview](internals/architecture-overview.md) |
+| Understand editor architecture | [Internals](internals/README.md), [Architecture overview](internals/architecture-overview.md) |
+| Look up exact contracts | [Reference](reference/README.md) |
 | Change the saved document format | [Punch format](reference/punch-format.md) |
-| Change editor tests | [Testing](operations/testing.md) |
+| Change editor tests | [Operations](operations/README.md), [Testing](operations/testing.md) |
 | Change UI primitives or styling | [Design system](design/system.md) |
 | Ship a desktop release | [Releases](operations/releases.md) |
+| Review architecture tradeoffs | [Decisions](decisions/README.md) |
 
 ## Product
 
@@ -50,7 +52,7 @@ are hard to recover from code search alone.
 | State and files | [Store and history](internals/store-and-history.md), [Document files](internals/document-files.md), [Clipboard data](internals/clipboard-data.md), [Font loading](internals/font-loading.md) |
 | Canvas systems | [Infinite canvas](internals/infinite-canvas.md), [Overlay system](internals/overlays.md), [Selection and transform](internals/selection-and-transform.md), [Cursor system](internals/cursors.md) |
 | Node systems | [Node contract](internals/node-contract.md), [Node engines](internals/node-engines.md), [Geometry model](internals/geometry-model.md), [Export pipeline](internals/export-pipeline.md) |
-| Editing systems | [Tools](internals/tools.md), [Vector editor](internals/vector-editor.md), [Text system](internals/text-system.md), [Shape system](internals/shape-system.md) |
+| Editing systems | [Tools](internals/tools.md), [Vector editor](internals/vector-editor.md), [Vector render performance plan](internals/vector-render-performance-plan.md), [Text system](internals/text-system.md), [Shape system](internals/shape-system.md) |
 | App systems | [Panels and commands](internals/panels-and-commands.md), [Workspace tabs](internals/workspace-tabs.md), [Desktop shell](internals/desktop-shell.md), [Performance](internals/performance.md) |
 
 ## Reference

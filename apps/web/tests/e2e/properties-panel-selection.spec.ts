@@ -431,7 +431,7 @@ test("shows and edits frame properties for a selected artboard", async ({
   const inputs = frameSection.getByRole("textbox");
   await expect(inputs.nth(0)).toHaveValue("340");
   await expect(inputs.nth(1)).toHaveValue("260");
-  await expect(inputs.nth(2)).toHaveValue("#ffffff");
+  await expect(inputs.nth(2)).toHaveValue("FFFFFF");
 
   await inputs.nth(0).fill("420");
   await inputs.nth(1).fill("315");
@@ -571,12 +571,12 @@ test("shows selection colors for a selected multi-path vector and applies one sw
   await selectNodes(page, ["vector-container"]);
 
   const selectionColorsSection = getSelectionColorsSection(page);
-  const selectionColorInputs = selectionColorsSection.getByRole("textbox");
+  const selectionColorInputs = selectionColorsSection.getByLabel("Hex color");
   const redSelectionColorInput = selectionColorInputs.nth(0);
 
   await expect(selectionColorsSection).toBeVisible();
   await expect(selectionColorInputs).toHaveCount(3);
-  await expect(redSelectionColorInput).toHaveValue("#F63F3F");
+  await expect(redSelectionColorInput).toHaveValue("F63F3F");
 
   await redSelectionColorInput.fill("#112233");
   await page.locator("body").click();
@@ -619,10 +619,18 @@ test("keeps selection color picker open while dragging the color area", async ({
 
   const selectionColorsSection = getSelectionColorsSection(page);
   const redSelectionColorButton = selectionColorsSection
-    .getByRole("button", { name: "Choose color" })
+    .getByRole("button")
     .nth(0);
 
-  await redSelectionColorButton.click();
+  const redSelectionColorButtonBox =
+    await redSelectionColorButton.boundingBox();
+  if (!redSelectionColorButtonBox) {
+    throw new Error("Missing selection color button bounds");
+  }
+  await page.mouse.click(
+    redSelectionColorButtonBox.x + 14,
+    redSelectionColorButtonBox.y + redSelectionColorButtonBox.height / 2
+  );
 
   const picker = page.locator("[data-slot='color-picker']").last();
   const colorArea = picker.locator("[data-slot='color-picker-selection']");
@@ -685,7 +693,7 @@ test("keeps selection color picker open while dragging the color area", async ({
         }))
         .sort((left, right) => left.id.localeCompare(right.id));
     })
-    .not.toEqual(originalPathStyles);
+    .toEqual(originalPathStyles);
   await expect
     .poll(async () => {
       const state = await getStateSnapshot(page);
@@ -702,6 +710,22 @@ test("keeps selection color picker open while dragging the color area", async ({
       });
     })
     .toBe(true);
+  await expect
+    .poll(async () => {
+      const state = await getStateSnapshot(page);
+
+      return state.nodes
+        .filter((node) => {
+          return node.id === "vector-path-1" || node.id === "vector-path-2";
+        })
+        .map((node) => ({
+          fill: node.fill,
+          id: node.id,
+          stroke: node.stroke,
+        }))
+        .sort((left, right) => left.id.localeCompare(right.id));
+    })
+    .not.toEqual(originalPathStyles);
 
   await page.evaluate(() => {
     window.__PUNCHPRESS_EDITOR__?.undo();

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { findEmptyCanvasPoint } from "./helpers/canvas";
 import {
   getDebugDump,
   getHoverPreviewRect,
@@ -77,6 +78,42 @@ test("hover preview stays aligned when the viewport scrolls", async ({
       left: Math.round(initialPreview.left - 120),
       top: Math.round(initialPreview.top - 80),
     });
+});
+
+test("hover preview clears when the pointer leaves a canvas node", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocumentFixture(page, "hover-preview.punch");
+  const nodeId = "hover-node";
+  const node = await waitForNodeReady(page, nodeId);
+
+  await page.keyboard.press("Escape");
+
+  await page.mouse.move(
+    node.elementRect.x + node.elementRect.width / 2,
+    node.elementRect.y + node.elementRect.height / 2
+  );
+
+  await expect
+    .poll(async () => {
+      const dump = await getDebugDump(page);
+
+      return dump?.hoveredNodeId || null;
+    })
+    .toBe(nodeId);
+
+  const emptyPoint = await findEmptyCanvasPoint(page);
+  await page.mouse.move(emptyPoint.x, emptyPoint.y);
+
+  await expect
+    .poll(async () => {
+      const dump = await getDebugDump(page);
+
+      return dump?.hoveredNodeId || null;
+    })
+    .toBeNull();
+  await expect(page.locator(".canvas-hover-preview")).toHaveCount(0);
 });
 
 test("hover preview uses the painted node under the pointer, not overlapping empty bounds", async ({

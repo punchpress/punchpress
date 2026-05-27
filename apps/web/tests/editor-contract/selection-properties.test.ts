@@ -647,6 +647,55 @@ describe("Editor selection properties", () => {
     });
   });
 
+  test("previews a selection color across matching descendants before committing", () => {
+    const editor = new Editor();
+
+    loadNodes(
+      editor,
+      createGroupedNodes(
+        {
+          ...createShapeNode("shape-node"),
+          fill: "#E81D1D",
+          parentId: "group-node",
+          stroke: "#0ACEFF",
+        },
+        {
+          ...createPathNode("path-node", "group-node"),
+          fill: "#6842FF",
+          stroke: "#E81D1D",
+        }
+      )
+    );
+    editor.select("group-node");
+
+    const redColorId = JSON.stringify("#E81D1D");
+    const session = editor.beginSelectionColorChange(redColorId);
+
+    expect(session).not.toBeNull();
+    expect(editor.updateSelectionColorChange(session, "#123456")).toBe(true);
+    expect(
+      editor.getSelectionColorPreviewValue("shape-node", "fill", "#E81D1D")
+    ).toBe("#123456");
+    expect(editor.getNode("shape-node")).toMatchObject({
+      fill: "#E81D1D",
+      stroke: "#0ACEFF",
+    });
+    expect(editor.getNode("path-node")).toMatchObject({
+      fill: "#6842FF",
+      stroke: "#E81D1D",
+    });
+
+    expect(editor.commitSelectionColorChange(session, "#123456")).toBe(true);
+    expect(editor.getNode("shape-node")).toMatchObject({
+      fill: "#123456",
+      stroke: "#0ACEFF",
+    });
+    expect(editor.getNode("path-node")).toMatchObject({
+      fill: "#6842FF",
+      stroke: "#123456",
+    });
+  });
+
   test("includes artboard backgrounds in selection colors", () => {
     const editor = new Editor();
 

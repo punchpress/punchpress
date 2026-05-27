@@ -28,11 +28,12 @@ PunchPress keeps three explicit layers for vector artwork.
 
 | Layer | Ownership |
 | --- | --- |
-| Durable document nodes | `path` nodes own geometry and styling; `vector` nodes own child-path composition. |
+| Durable document nodes | `path` nodes own geometry and styling; `vector` nodes own child-path composition. Imported SVGs normalize into editable groups and paths. |
 | Compiled render surfaces | Engine-derived SVG-ready output used for normal canvas rendering. |
 | Specialized edit overlays | Paper-backed path editing and related transient interaction state. |
 
-Outside edit mode, React paints compiled vector output as ordinary SVG. Compiled
+Outside edit mode, React paints vector output as one normal-mode surface. That
+surface may be derived from child paths or from a dense subtree cache. Compiled
 surfaces are derived state, not saved document state.
 
 Paper-backed helpers are allowed only in:

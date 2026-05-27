@@ -1,13 +1,14 @@
 import {
   getNodeEditablePathSession as getNodeSurfaceEditablePathSession,
   getNodeEditCapabilities as getNodeSurfaceEditCapabilities,
+  getNodeResizeMode as getNodeSurfaceResizeMode,
+  getNodeRotateMode as getNodeSurfaceRotateMode,
   getNodeSurfaceFrame,
   getNodeSurfaceGeometry,
   getNodeHitBounds as getNodeSurfaceHitBounds,
   getNodeSurfaceLocalBounds,
 } from "../nodes/node-capabilities";
 import {
-  getDescendantLeafNodeIds,
   isContainerNode,
   isArtboardNode,
   isGroupNode,
@@ -37,7 +38,9 @@ export const getNode = (editor, nodeId) => {
     return null;
   }
 
-  return editor.nodes.find((node) => node.id === nodeId) || null;
+  return editor.nodeTree?.getNode(editor.nodes, nodeId) ||
+    editor.nodes.find((node) => node.id === nodeId) ||
+    null;
 };
 
 const isNodeEffectivelyVisible = (editor, node) => {
@@ -53,41 +56,34 @@ const isNodeEffectivelyVisible = (editor, node) => {
 };
 
 export const getLayerRow = (editor, nodeId) => {
-  const nodeIndex = editor.nodes.findIndex((node) => node.id === nodeId);
-  if (nodeIndex < 0) {
+  const node = editor.getNode(nodeId);
+  const layerMeta = editor.nodeTree?.getLayerMeta(editor.nodes, nodeId) || null;
+
+  if (!(node && layerMeta)) {
     return null;
   }
 
-  const node = editor.nodes[nodeIndex];
-  const siblingIds = editor.getChildNodeIds(node.parentId);
-  const siblingIndex = siblingIds.indexOf(node.id);
-  const layerIndex = siblingIds.length - 1 - siblingIndex;
-  const containerSiblingIds = siblingIds.filter((siblingId) => {
-    return isContainerNode(editor.getNode(siblingId));
-  });
-  const containerIndex = containerSiblingIds.indexOf(node.id);
-  const containerLayerIndex =
-    containerIndex >= 0 ? containerSiblingIds.length - 1 - containerIndex : -1;
   const isVisible = isNodeEffectivelyVisible(editor, node);
-  let label = node.name || `Group ${containerLayerIndex + 1}`;
+  let label = node.name || `Group ${layerMeta.containerLayerIndex + 1}`;
 
   if (isArtboardNode(node)) {
-    label = node.name || `Artboard ${containerLayerIndex + 1}`;
+    label = node.name || `Artboard ${layerMeta.containerLayerIndex + 1}`;
   } else if (isTextNode(node)) {
-    label = node.text.trim().length > 0 ? node.text : `Text ${layerIndex + 1}`;
+    label =
+      node.text.trim().length > 0 ? node.text : `Text ${layerMeta.layerIndex + 1}`;
   } else if (isShapeNode(node)) {
-    label = `${node.shape[0].toUpperCase()}${node.shape.slice(1)} ${layerIndex + 1}`;
+    label = `${node.shape[0].toUpperCase()}${node.shape.slice(1)} ${layerMeta.layerIndex + 1}`;
   } else if (isVectorNode(node)) {
-    label = node.name || `Vector ${containerLayerIndex + 1}`;
+    label = node.name || `Vector ${layerMeta.containerLayerIndex + 1}`;
   } else if (isPathNode(node)) {
-    label = `Path ${layerIndex + 1}`;
+    label = `Path ${layerMeta.layerIndex + 1}`;
   }
 
   return {
-    isBackmost: siblingIndex === 0,
+    isBackmost: layerMeta.isBackmost,
     isContainer: isContainerNode(node),
     isArtboard: isArtboardNode(node),
-    isFrontmost: siblingIndex === siblingIds.length - 1,
+    isFrontmost: layerMeta.isFrontmost,
     isGroup: isGroupNode(node),
     isSelected: editor.isSelected(node.id),
     isVector: isVectorNode(node),
@@ -149,6 +145,14 @@ export const getNodeHitBounds = (editor, nodeId) => {
 
 export const getNodeEditCapabilities = (editor, nodeId) => {
   return getNodeSurfaceEditCapabilities(editor, nodeId);
+};
+
+export const getNodeResizeMode = (editor, nodeId) => {
+  return getNodeSurfaceResizeMode(editor, nodeId);
+};
+
+export const getNodeRotateMode = (editor, nodeId) => {
+  return getNodeSurfaceRotateMode(editor, nodeId);
 };
 
 export const getEditablePathSession = (editor, nodeId) => {
@@ -303,12 +307,12 @@ export const getSelectionPreviewDelta = (
 ) => {
   const preview = editor.selectionDragPreview;
 
-  if (
-    !(
-      preview?.delta &&
-      nodeIds.every((nodeId) => preview.nodeIds.includes(nodeId))
-    )
-  ) {
+  if (!preview?.delta) {
+    return null;
+  }
+
+  const previewNodeIdSet = preview.nodeIdSet || new Set(preview.nodeIds);
+  if (!nodeIds.every((nodeId) => previewNodeIdSet.has(nodeId))) {
     return null;
   }
 
@@ -705,9 +709,7 @@ const getSelectionFrameNodeIds = (editor, requestedNodeIds) => {
       continue;
     }
 
-    selectionFrameNodeIds.push(
-      ...getDescendantLeafNodeIds(editor.nodes, nodeId)
-    );
+    selectionFrameNodeIds.push(...editor.getDescendantLeafNodeIds(nodeId));
   }
 
   return [...new Set(selectionFrameNodeIds)];
@@ -746,7 +748,8 @@ const getSelectionFrameWorldPoints = (editor, nodeId) => {
 
 export const getSelectionTransformFrame = (
   editor,
-  nodeIds = editor.selectedNodeIds
+  nodeIds = editor.selectedNodeIds,
+  { includePreview = true } = {}
 ) => {
   const requestedNodeIds = nodeIds.filter((nodeId) => editor.getNode(nodeId));
 
@@ -759,7 +762,9 @@ export const getSelectionTransformFrame = (
     editor,
     requestedNodeIds
   );
-  const previewDelta = getSelectionPreviewDelta(editor, previewNodeIds);
+  const previewDelta = includePreview
+    ? getSelectionPreviewDelta(editor, previewNodeIds)
+    : null;
 
   if (
     requestedNodeIds.length === 1 &&

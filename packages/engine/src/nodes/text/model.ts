@@ -126,6 +126,7 @@ export const createDefaultNode = (font) => {
     fontSize: DEFAULT_TEXT_STYLE.fontSize,
     tracking: DEFAULT_TEXT_STYLE.tracking,
     fill: DEFAULT_TEXT_STYLE.fill,
+    opacity: 1,
     stroke: DEFAULT_TEXT_STYLE.stroke,
     strokeWidth: DEFAULT_TEXT_STYLE.strokeWidth,
     visible: true,

@@ -4,6 +4,7 @@ import {
   expectCoordinateShift,
   expectHandleAlignedToNodeCorner,
   expectRectShift,
+  getSelectionBoxRect,
   gotoEditor,
   loadDocumentFixture,
   pauseForUi,
@@ -125,6 +126,55 @@ test("resizes a rectangle shape node from the lower-right corner", async ({
     after.elementRect,
     "se"
   );
+});
+
+test("keeps rectangle artwork aligned with the selection box during live resize", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocumentFixture(page, "shape-node-transform.punch");
+  const nodeId = "shape-node";
+  const handle = page.locator(".canvas-moveable .moveable-control.moveable-se");
+
+  await page.locator(`[data-node-id="${nodeId}"]`).click();
+  await expect(handle).toBeVisible();
+
+  const box = await handle.boundingBox();
+
+  if (!box) {
+    throw new Error("Missing se resize handle");
+  }
+
+  const start = {
+    x: box.x + box.width / 2,
+    y: box.y + box.height / 2,
+  };
+
+  await handle.hover();
+  await page.mouse.down();
+  await page.mouse.move(start.x + 180, start.y + 40, { steps: 24 });
+  await page.waitForTimeout(50);
+
+  const selectionBox = await getSelectionBoxRect(page);
+  const artworkRect = await page
+    .locator(`[data-node-id="${nodeId}"]`)
+    .evaluate((element) => {
+      const shell = element.closest("[data-node-shell='true']");
+      const path = shell?.querySelector("svg path");
+      const rect = path?.getBoundingClientRect();
+
+      return rect
+        ? {
+            height: rect.height,
+            width: rect.width,
+          }
+        : null;
+    });
+
+  await page.mouse.up();
+
+  expect(artworkRect?.width).toBeGreaterThan(selectionBox.width - 8);
+  expect(artworkRect?.height).toBeGreaterThan(selectionBox.height - 8);
 });
 
 test("resizes a rectangle shape node from the east edge without changing its height", async ({

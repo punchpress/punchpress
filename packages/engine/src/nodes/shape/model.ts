@@ -25,6 +25,7 @@ export const createDefaultShapeNode = (shape = "polygon") => {
     fill: "#000000",
     height: size.height,
     id: createId(),
+    opacity: 1,
     parentId: ROOT_PARENT_ID,
     points: undefined,
     shape,

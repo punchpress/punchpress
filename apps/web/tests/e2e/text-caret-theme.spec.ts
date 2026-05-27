@@ -94,7 +94,7 @@ test("uses a visible caret color in dark mode while editing text", async ({
   expect(customCaretStyles.boxShadow).not.toBe("none");
   expect(customCaretStyles.mixBlendMode).toBe("normal");
   expect(customCaretStyles.width).toBe("1px");
-  expect(inputCursor).toContain("data:image/svg+xml");
+  expect(inputCursor).toBe("text");
   expect(editingSelectionStyles).toEqual({
     borderTopWidth: "0px",
     outlineStyle: "solid",

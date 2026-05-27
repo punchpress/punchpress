@@ -14,6 +14,7 @@ export const createDefaultArtboardNode = (name = "Artboard") => {
     id: createId(),
     locked: false,
     name,
+    opacity: 1,
     parentId: ROOT_PARENT_ID,
     transform: {
       rotation: 0,

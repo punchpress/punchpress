@@ -3,8 +3,8 @@ import {
   findVectorPathInsertTarget,
   splitVectorContourAtParameter,
 } from "../nodes/vector/point-insert";
+import { getGestureTolerancePx } from "../primitives/pointer-distance";
 import { getNodeLocalPoint, getNodeWorldPoint } from "../primitives/rotation";
-import { SEGMENT_INSERT_INTERACTION_TOLERANCE_PX } from "./pen-tool-types";
 import {
   getNodeContours,
   isPenEditableNode,
@@ -268,7 +268,7 @@ export const resolveInsertPointTarget = (editor, node, point) => {
   const target = findVectorPathInsertTarget(
     getNodeContours(node),
     localPoint,
-    SEGMENT_INSERT_INTERACTION_TOLERANCE_PX /
+    getGestureTolerancePx("vectorSegmentInsertHit") /
       (Math.max(editor.zoom || 1, 1) * interactionScale)
   );
 

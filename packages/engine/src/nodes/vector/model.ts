@@ -67,6 +67,7 @@ export const createDefaultVectorNode = () => {
     contours: [createDefaultVectorContour()],
     id: createId(),
     name: "Vector",
+    opacity: 1,
     pathComposition: "independent",
     parentId: ROOT_PARENT_ID,
     transform: {

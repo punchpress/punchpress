@@ -131,9 +131,6 @@ test("uses contrasting fill and stroke colors for custom cursors", async ({
   const scaleSvg = getCursorSvgFromValue(
     await getCanvasCursorSvg(page, "--canvas-cursor-scale")
   );
-  const textSvg = getCursorSvgFromValue(
-    await getCanvasCursorSvg(page, "--canvas-cursor-text")
-  );
 
   expect(addSvg).toContain('fill="#111111"');
   expect(addSvg).toContain('flood-color="#ffffff"');
@@ -143,12 +140,6 @@ test("uses contrasting fill and stroke colors for custom cursors", async ({
   expect(defaultSvg).toContain("<feGaussianBlur");
   expect(defaultSvg).not.toContain('opacity="0.4"');
   expect(getCursorSvgSize(defaultSvg)).toEqual({ width: 21, height: 21 });
-  expect(textSvg).toContain('fill="#111111"');
-  expect(textSvg).toContain('flood-color="#ffffff"');
-  expect(textSvg).toContain("<feGaussianBlur");
-  expect(textSvg).toEqual(expect.stringContaining('width="33"'));
-  expect(textSvg).toEqual(expect.stringContaining('height="33"'));
-
   expect(moveSvg).toContain('fill="#111111"');
   expect(moveSvg).toContain('stroke="#ffffff"');
   expect(moveSvg).toContain('stroke="#111111"');

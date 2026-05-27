@@ -1,4 +1,4 @@
-import { round } from "@punchpress/engine";
+import { hasPointerMovedAtLeast, round } from "@punchpress/engine";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorSurfaceValue } from "../../editor-react/use-editor-surface-value";
 
@@ -96,12 +96,16 @@ const startArtboardLabelDrag = ({ editor, event, nodeId }) => {
       return;
     }
 
-    const movedDistance = Math.hypot(
-      moveEvent.clientX - startClientPoint.x,
-      moveEvent.clientY - startClientPoint.y
-    );
-
-    if (!(dragSession || movedDistance >= 3)) {
+    if (
+      !(
+        dragSession ||
+        hasPointerMovedAtLeast(
+          startClientPoint,
+          { x: moveEvent.clientX, y: moveEvent.clientY },
+          "pointerDrag"
+        )
+      )
+    ) {
       return;
     }
 

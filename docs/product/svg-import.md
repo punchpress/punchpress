@@ -8,8 +8,9 @@ read_when:
 
 # SVG Import
 
-SVG import brings external vector artwork into PunchPress as editable source
-content.
+SVG import brings external vector artwork into PunchPress as editable document
+structure. Imported SVGs should behave like native vector content, not like
+opaque image assets.
 
 ## Import Paths
 
@@ -17,37 +18,28 @@ content.
 - Users can drag a `.svg` file from the OS onto the canvas.
 - Menu import centers artwork in the current viewport.
 - Drop import centers artwork on the drop point.
-- Imported SVG lands as one selected top-level group.
+- Imported SVG lands as one selected top-level group named `Imported SVG`.
 
 ## Structure
 
-- Non-empty SVG group hierarchy becomes nested PunchPress groups.
-- Empty groups are skipped unless they carry visible behavior PunchPress can
-  represent.
-- Author names are preserved when available from `inkscape:label`, `data-name`,
-  `id`, or `name`.
-- SVG path objects become editable PunchPress path nodes.
-- A path with multiple subpaths becomes one path node with multiple contours.
-- Imported groups become PunchPress groups only when the SVG contains group
-  structure, not merely because a path has multiple contours.
+- Non-empty SVG groups are preserved as PunchPress groups.
+- Supported SVG path artwork is converted to editable path nodes.
+- Compound SVG paths import as one path node with multiple editable contours.
+- Dense imported groups may use a cached canvas render surface in normal mode,
+  but the cached surface is derived renderer state. It is not the document
+  model and must not hide editable path rows when the group is expanded.
 
 ## Fidelity
 
-- Imported open paths remain open on canvas and export.
-- Compound SVG paths preserve fill-rule behavior for holes and cutouts.
-- Matching fill, stroke, alpha, stroke width, line cap, line join, and miter
-  values remain editable.
-- Unsupported SVG features fail gracefully by preserving importable editable
-  artwork when possible.
+- Normal canvas rendering may optimize dense or large imported groups as one
+  compiled vector surface for panning, dragging, resizing, and rotating.
+- Editing, layers, selection, save/load, and export use the canonical editable
+  groups and paths.
+- Import does not simplify vectors unless the user invokes an explicit future
+  simplification command.
 
 ## Not Yet Preserved
 
-- Clip paths, masks, filters, gradients, patterns, blend modes, group opacity.
-- Full CSS cascade, external stylesheets, reusable defs, symbols, and `<use>`.
-- Raster `<image>` import.
-- Editable SVG text or text outline fallback.
-- Stroke dash styles, markers, non-scaling stroke.
-- Durable group transforms.
-- Live shape preservation for SVG primitive elements.
-- Animation, scripting, accessibility metadata, color profiles, and print color
-  management.
+- Automatic conversion of SVG text, symbols, masks, filters, gradients,
+  patterns, and images into editable PunchPress child nodes.
+- Automatic vector simplification.

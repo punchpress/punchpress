@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { Editor } from "@punchpress/engine";
+import {
+  PUNCH_CLIPBOARD_MIME_TYPE,
+  PUNCH_DOCUMENT_VERSION,
+  parseClipboardContent,
+} from "@punchpress/punch-schema";
 
 const ARIAL_FONT = {
   family: "Arial",
@@ -148,9 +153,9 @@ describe("Editor clipboard", () => {
     expect(pastedTextNode?.id).not.toBe(textNodeId);
     expect(pastedShapeNode?.id).not.toBe(shapeNodeId);
     expect(pastedTextNode?.transform.x).toBeCloseTo(360, 6);
-    expect(pastedTextNode?.transform.y).toBeCloseTo(420.5, 6);
+    expect(pastedTextNode?.transform.y).toBeCloseTo(432, 6);
     expect(pastedShapeNode?.transform.x).toBeCloseTo(660, 6);
-    expect(pastedShapeNode?.transform.y).toBeCloseTo(388.5, 6);
+    expect(pastedShapeNode?.transform.y).toBeCloseTo(400, 6);
   });
 
   test("a fresh copy of the same selection resets the paste step", () => {
@@ -185,6 +190,40 @@ describe("Editor clipboard", () => {
     expect(firstPasteNode.transform.y).toBeCloseTo(420, 6);
     expect(secondPasteNode.transform.x).toBeCloseTo(480, 6);
     expect(secondPasteNode.transform.y).toBeCloseTo(420, 6);
+  });
+
+  test("clipboard parsing accepts same-version nodes copied before opacity existed", () => {
+    const content = parseClipboardContent(
+      JSON.stringify({
+        documentVersion: PUNCH_DOCUMENT_VERSION,
+        nodes: [
+          {
+            fill: "#000000",
+            height: 10,
+            id: "shape-node",
+            parentId: "root",
+            shape: "polygon",
+            stroke: null,
+            strokeWidth: 0,
+            transform: {
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+              x: 0,
+              y: 0,
+            },
+            type: "shape",
+            visible: true,
+            width: 10,
+          },
+        ],
+        rootNodeIds: ["shape-node"],
+        type: PUNCH_CLIPBOARD_MIME_TYPE,
+        version: 1,
+      })
+    );
+
+    expect(content.nodes[0].opacity).toBe(1);
   });
 });
 

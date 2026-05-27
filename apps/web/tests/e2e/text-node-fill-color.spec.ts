@@ -13,13 +13,25 @@ const getFillAndStrokeSection = (page) => {
 };
 
 const getFillColorInput = (page) => {
-  return getFillAndStrokeSection(page).getByRole("textbox").nth(0);
+  return getFillAndStrokeSection(page).getByLabel("Hex color").nth(0);
+};
+
+const getFillOpacityInput = (page) => {
+  return getFillAndStrokeSection(page).getByLabel("Color opacity").nth(0);
 };
 
 const getFillColorButton = (page) => {
-  return getFillAndStrokeSection(page)
-    .getByRole("button", { name: "Choose color" })
-    .nth(0);
+  return getFillAndStrokeSection(page).getByRole("button").nth(0);
+};
+
+const clickColorSwatch = async (locator) => {
+  const box = await locator.boundingBox();
+
+  if (!box) {
+    throw new Error("Missing color swatch bounds");
+  }
+
+  await locator.page().mouse.click(box.x + 14, box.y + box.height / 2);
 };
 
 const getSelectedNodeFill = async (page, nodeId) => {
@@ -61,7 +73,7 @@ test("normalizes a typed fill color and applies it to the selected node", async 
   await fillInput.fill("#11aa22");
   await fillInput.blur();
 
-  await expect(fillInput).toHaveValue("#11AA22");
+  await expect(fillInput).toHaveValue("11AA22");
   await expect.poll(() => getSelectedNodeFill(page, nodeId)).toBe("#11AA22");
 });
 
@@ -76,12 +88,12 @@ test("reverts an invalid fill draft to the last committed color on blur", async 
 
   await fillInput.fill("#112233");
   await fillInput.blur();
-  await expect(fillInput).toHaveValue("#112233");
+  await expect(fillInput).toHaveValue("112233");
 
   await fillInput.fill("not-a-color");
   await fillInput.blur();
 
-  await expect(fillInput).toHaveValue("#112233");
+  await expect(fillInput).toHaveValue("112233");
   await expect.poll(() => getSelectedNodeFill(page, nodeId)).toBe("#112233");
 });
 
@@ -93,11 +105,12 @@ test("updates the selected node when the alpha slider changes", async ({
   const nodeId = "color-node";
   await page.getByRole("button", { name: "Color" }).first().click();
   const fillInput = getFillColorInput(page);
+  const fillOpacityInput = getFillOpacityInput(page);
 
   await fillInput.fill("#FF0000");
   await fillInput.blur();
 
-  await getFillColorButton(page).click();
+  await clickColorSwatch(getFillColorButton(page));
 
   const picker = page.locator("[data-slot='color-picker']").last();
   const alphaSlider = picker
@@ -110,7 +123,8 @@ test("updates the selected node when the alpha slider changes", async ({
   await expect
     .poll(() => getSelectedNodeFill(page, nodeId))
     .toBe("rgba(255, 0, 0, 0)");
-  await expect(fillInput).toHaveValue("rgba(255, 0, 0, 0)");
+  await expect(fillInput).toHaveValue("FF0000");
+  await expect(fillOpacityInput).toHaveValue("0");
 });
 
 test("clicking the alpha slider applies the clicked value instead of resetting to zero", async ({
@@ -125,7 +139,7 @@ test("clicking the alpha slider applies the clicked value instead of resetting t
   await fillInput.fill("#FF0000");
   await fillInput.blur();
 
-  await getFillColorButton(page).click();
+  await clickColorSwatch(getFillColorButton(page));
 
   const picker = page.locator("[data-slot='color-picker']").last();
   const alphaSlider = picker
@@ -164,7 +178,7 @@ test("keeps the color picker open while dragging the alpha slider with the mouse
   await fillInput.fill("#FF0000");
   await fillInput.blur();
 
-  await getFillColorButton(page).click();
+  await clickColorSwatch(getFillColorButton(page));
 
   const picker = page.locator("[data-slot='color-picker']").last();
   const alphaSlider = picker

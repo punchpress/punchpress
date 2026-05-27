@@ -28,12 +28,7 @@ const getAncestorArtboardId = (editor, nodeId) => {
   return null;
 };
 
-export const getArtboardClipPath = (
-  editor,
-  nodeId,
-  bounds,
-  preview = null
-) => {
+export const getArtboardClipPath = (editor, nodeId, bounds, preview = null) => {
   const artboardId = getAncestorArtboardId(editor, nodeId);
 
   if (!(bounds && artboardId)) {

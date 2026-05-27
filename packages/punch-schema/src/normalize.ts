@@ -5,8 +5,16 @@ import {
 } from "./vector-stroke-style";
 
 export const normalizeNodeForSchema = (node: Record<string, unknown>) => {
+  const opacity =
+    typeof node.opacity === "number" && Number.isFinite(node.opacity)
+      ? Math.min(1, Math.max(0, node.opacity))
+      : 1;
+
   if (node.type !== "path") {
-    return node;
+    return {
+      ...node,
+      opacity,
+    };
   }
 
   const contours =
@@ -25,6 +33,7 @@ export const normalizeNodeForSchema = (node: Record<string, unknown>) => {
   return {
     ...pathNode,
     contours,
+    opacity,
     strokeLineCap: node.strokeLineCap ?? DEFAULT_VECTOR_STROKE_LINE_CAP,
     strokeLineJoin: node.strokeLineJoin ?? DEFAULT_VECTOR_STROKE_LINE_JOIN,
     strokeMiterLimit:

@@ -11,6 +11,7 @@ import paper from "paper/dist/paper-core.js";
 const SUPPORTED_ITEM_CLASSES = new Set(["CompoundPath", "Path", "Shape"]);
 const SVG_SOURCE_NODE_NAME_KEY = "svgSourceNodeName";
 const SVG_SOURCE_ITEM_NAME_KEY = "svgSourceItemName";
+const SVG_SOURCE_OPACITY_KEY = "svgSourceOpacity";
 const RGB_STORAGE_COLOR_REGEX = /^rgb\((\d+),(\d+),(\d+)\)$/;
 type ImportedSvgNode =
   | ReturnType<typeof createDefaultGroupNode>
@@ -24,6 +25,22 @@ interface ImportSvgToNodesOptions {
 }
 
 const roundCoordinate = (value: number) => round(value, 3);
+
+const clampOpacity = (value: unknown) => {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.min(1, Math.max(0, value))
+    : 1;
+};
+
+const parseSvgOpacity = (value: string | null | undefined) => {
+  if (!value) {
+    return null;
+  }
+
+  const opacity = Number.parseFloat(value);
+
+  return Number.isFinite(opacity) ? clampOpacity(opacity) : null;
+};
 
 const roundHandle = (point: { x: number; y: number }) => {
   return {
@@ -72,6 +89,36 @@ const getSvgSourceItemName = (item: paper.Item) => {
   const value = data?.[SVG_SOURCE_ITEM_NAME_KEY];
 
   return typeof value === "string" ? value : null;
+};
+
+const getSvgSourceOpacity = (item: paper.Item) => {
+  const data = item.data as Record<string, unknown> | undefined;
+  const value = data?.[SVG_SOURCE_OPACITY_KEY];
+
+  return typeof value === "number" ? value : null;
+};
+
+const getSvgElementOpacity = (node: Element) => {
+  const opacity = parseSvgOpacity(node.getAttribute("opacity"));
+
+  if (opacity !== null) {
+    return opacity;
+  }
+
+  const styleOpacity = node
+    .getAttribute("style")
+    ?.split(";")
+    .map((entry) => entry.trim())
+    .find((entry) => entry.startsWith("opacity:"))
+    ?.split(":")
+    .at(1)
+    ?.trim();
+
+  return parseSvgOpacity(styleOpacity);
+};
+
+const getItemOpacity = (item: paper.Item) => {
+  return getSvgSourceOpacity(item) ?? clampOpacity(item.opacity);
 };
 
 const getItemFillColor = (item: paper.Item) => {
@@ -219,6 +266,7 @@ const createPathNodeFromItem = (
         ...basePathNode,
         fill: toStorageColor(fillColor),
         fillRule: item.fillRule === "evenodd" ? "evenodd" : "nonzero",
+        opacity: getItemOpacity(item),
         parentId,
         stroke: toStorageColor(strokeColor),
         strokeLineCap:
@@ -304,6 +352,7 @@ const createImportedNodeTree = ({
     return [
       {
         ...groupNode,
+        opacity: getItemOpacity(item),
         parentId,
       },
       ...childNodes,
@@ -337,6 +386,8 @@ export const importSvgToNodes = (
           [SVG_SOURCE_ITEM_NAME_KEY]:
             node instanceof Element ? getSvgElementImportName(node) : null,
           [SVG_SOURCE_NODE_NAME_KEY]: node.nodeName.toLowerCase(),
+          [SVG_SOURCE_OPACITY_KEY]:
+            node instanceof Element ? getSvgElementOpacity(node) : null,
         };
       },
     });

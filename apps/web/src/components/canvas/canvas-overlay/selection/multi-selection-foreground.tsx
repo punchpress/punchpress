@@ -1,4 +1,4 @@
-import { clamp } from "@punchpress/engine";
+import { clamp, hasPointerMovedAtLeast } from "@punchpress/engine";
 import { useMemo, useRef, useState } from "react";
 import { NodeContextMenuItems } from "@/components/context-menus/node-context-menu-items";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
@@ -11,7 +11,10 @@ import {
 } from "../../canvas-cursor-assets";
 import { drillIntoGroupSelection } from "../../canvas-group-drill-in";
 import { openCanvasNodeEditingMode } from "../../canvas-node-editing";
-import { getHostRectFromNodeFrame } from "../canvas-overlay-geometry";
+import {
+  getHostRectFromCanvasBounds,
+  getHostRectFromNodeFrame,
+} from "../canvas-overlay-geometry";
 import {
   getRotateCursorRotationDegrees,
   getScaleCursorRotationDegrees,
@@ -123,6 +126,67 @@ const getResizeScale = (pointer, anchorClient, startDistance) => {
   );
 };
 
+const hasSameNodeIds = (left = [], right = []) => {
+  return (
+    left.length === right.length &&
+    left.every((nodeId) => right.includes(nodeId))
+  );
+};
+
+const getResizePreviewBounds = (editor, frame, nodeIds) => {
+  const preview = editor.selectionDragPreview;
+  const resize = preview?.resize;
+
+  if (!(frame?.bounds && resize && hasSameNodeIds(preview.nodeIds, nodeIds))) {
+    return null;
+  }
+
+  const scale = Number.isFinite(resize.scale) ? resize.scale : 1;
+  const anchor = resize.anchorCanvas;
+
+  if (!anchor) {
+    return null;
+  }
+
+  const minX = anchor.x + (frame.bounds.minX - anchor.x) * scale;
+  const minY = anchor.y + (frame.bounds.minY - anchor.y) * scale;
+  const width = Math.max(1, frame.bounds.width * scale);
+  const height = Math.max(1, frame.bounds.height * scale);
+
+  return {
+    height,
+    maxX: minX + width,
+    maxY: minY + height,
+    minX,
+    minY,
+    width,
+  };
+};
+
+const getRotatePreviewDelta = (editor, nodeIds) => {
+  const preview = editor.selectionDragPreview;
+  const rotate = preview?.rotate;
+
+  if (!(rotate && hasSameNodeIds(preview.nodeIds, nodeIds))) {
+    return 0;
+  }
+
+  return Number.isFinite(rotate.deltaRotation) ? rotate.deltaRotation : 0;
+};
+
+const isNodeOrDescendantHit = (editor, nodeId, canvasPoint) => {
+  if (editor.hitTestNodePoint(nodeId, canvasPoint)) {
+    return true;
+  }
+
+  return editor.getDescendantLeafNodeIds(nodeId).some((descendantNodeId) => {
+    return (
+      editor.isNodeEffectivelyVisible(descendantNodeId) &&
+      editor.hitTestNodePoint(descendantNodeId, canvasPoint)
+    );
+  });
+};
+
 export const CanvasMultiSelectionForeground = ({
   isDraggable,
   isResizable,
@@ -144,18 +208,48 @@ export const CanvasMultiSelectionForeground = ({
   const [activeRotateCursor, setActiveRotateCursor] = useState<string | null>(
     null
   );
-  const frame = useEditorSurfaceValue((editor) => {
-    return editor.getSelectionTransformFrame(nodeIds);
+  const frame = useEditorValue((editor) => {
+    return editor.getSelectionTransformFrame(nodeIds, {
+      includePreview: false,
+    });
   });
-
-  const overlayRect = useMemo(() => {
-    return getHostRectFromNodeFrame(editor, frame);
-  }, [editor, frame]);
+  const selectionPreview = useEditorSurfaceValue((editor) => {
+    return {
+      delta: editor.getSelectionPreviewDelta(nodeIds) || { x: 0, y: 0 },
+      rotation: getRotatePreviewDelta(editor, nodeIds),
+      resizeBounds: getResizePreviewBounds(editor, frame, nodeIds),
+    };
+  });
   const overlayRotationDegrees = useEditorValue((editor) => {
-    const selectionFrame = editor.getSelectionTransformFrame(nodeIds);
+    const selectionFrame = editor.getSelectionTransformFrame(nodeIds, {
+      includePreview: false,
+    });
 
     return getTransformRotationDegrees(selectionFrame?.transform);
   });
+
+  const overlayRect = useMemo(() => {
+    const hostRect = selectionPreview.resizeBounds
+      ? getHostRectFromCanvasBounds(editor, selectionPreview.resizeBounds)
+      : getHostRectFromNodeFrame(editor, frame);
+
+    if (!hostRect) {
+      return null;
+    }
+
+    const previewRotation = overlayRotationDegrees + selectionPreview.rotation;
+    const previewTransform =
+      selectionPreview.resizeBounds || selectionPreview.rotation
+        ? `rotate(${previewRotation}deg)`
+        : hostRect.transform;
+
+    return {
+      ...hostRect,
+      left: hostRect.left + selectionPreview.delta.x * editor.zoom,
+      top: hostRect.top + selectionPreview.delta.y * editor.zoom,
+      transform: previewTransform,
+    };
+  }, [editor, frame, overlayRotationDegrees, selectionPreview]);
   const activeTransformCursor =
     activeRotateCursor ??
     (activeResizeCorner !== null
@@ -181,6 +275,29 @@ export const CanvasMultiSelectionForeground = ({
       return;
     }
 
+    const startCanvasPoint = getCanvasPoint(
+      editor,
+      event.clientX,
+      event.clientY
+    );
+
+    if (
+      !(
+        startCanvasPoint &&
+        nodeIds.some((nodeId) => {
+          return isNodeOrDescendantHit(editor, nodeId, startCanvasPoint);
+        })
+      )
+    ) {
+      if (editor.activeTool === "pointer") {
+        event.preventDefault();
+        event.stopPropagation();
+        editor.clearSelection();
+      }
+
+      return;
+    }
+
     event.preventDefault();
     event.stopPropagation();
 
@@ -188,31 +305,46 @@ export const CanvasMultiSelectionForeground = ({
       x: event.clientX,
       y: event.clientY,
     };
-    let previousCanvasPoint = getCanvasPoint(
-      editor,
-      event.clientX,
-      event.clientY
-    );
+    let previousCanvasPoint = startCanvasPoint;
     let dragSession: ReturnType<typeof editor.beginSelectionDrag> = null;
+    let didMove = false;
+    const beginDragSession = () => {
+      dragSession ??= editor.beginSelectionDrag({
+        duplicate: event.altKey,
+        nodeIds,
+      });
+
+      return dragSession;
+    };
+    const prewarmFrameId = window.requestAnimationFrame(() => {
+      if (!didMove) {
+        const nextDragSession = beginDragSession();
+
+        if (nextDragSession) {
+          editor.updateSelectionDrag(nextDragSession, {
+            delta: { x: 0, y: 0 },
+          });
+        }
+      }
+    });
 
     const handlePointerMove = (moveEvent) => {
-      const movedDistance = Math.hypot(
-        moveEvent.clientX - startClientPoint.x,
-        moveEvent.clientY - startClientPoint.y
-      );
-
-      if (!(dragSession || movedDistance >= 3)) {
+      if (
+        !(
+          dragSession ||
+          hasPointerMovedAtLeast(
+            startClientPoint,
+            { x: moveEvent.clientX, y: moveEvent.clientY },
+            "selectionDrag"
+          )
+        )
+      ) {
         return;
       }
 
-      if (!dragSession) {
-        dragSession = editor.beginSelectionDrag({
-          duplicate: event.altKey,
-          nodeIds,
-        });
-      }
+      didMove = true;
 
-      if (!(dragSession && previousCanvasPoint)) {
+      if (!(beginDragSession() && previousCanvasPoint)) {
         return;
       }
 
@@ -240,9 +372,10 @@ export const CanvasMultiSelectionForeground = ({
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointercancel", handlePointerEnd);
       window.removeEventListener("pointerup", handlePointerEnd);
+      window.cancelAnimationFrame(prewarmFrameId);
 
       if (dragSession) {
-        editor.endSelectionDrag(dragSession);
+        editor.endSelectionDrag(dragSession, { cancel: !didMove });
       }
     };
 
@@ -320,6 +453,7 @@ export const CanvasMultiSelectionForeground = ({
       window.removeEventListener("pointerup", handlePointerEnd);
       setActiveResizeCorner(null);
       editor.setHoveringSuppressed(false);
+      editor.commitResizeSelection(resizeSession);
 
       if (historyMark) {
         editor.commitHistoryStep(historyMark);
@@ -386,6 +520,7 @@ export const CanvasMultiSelectionForeground = ({
       editor.endSelectionRotationInteraction();
       setActiveRotateCursor(null);
       editor.setHoveringSuppressed(false);
+      editor.commitRotateSelection(rotateSession);
 
       if (historyMark) {
         editor.commitHistoryStep(historyMark);
@@ -486,7 +621,7 @@ export const CanvasMultiSelectionForeground = ({
             <div key={corner}>
               {isRotatable ? (
                 <div
-                  className="canvas-rotation-zone canvas-multi-node-rotation-zone canvas-cursor-rotate absolute"
+                  className="canvas-rotation-zone canvas-multi-node-rotation-zone canvas-cursor-rotate pointer-events-auto absolute"
                   data-corner={corner}
                   onPointerDown={(event) => startRotate(corner, event)}
                   style={{
@@ -502,7 +637,7 @@ export const CanvasMultiSelectionForeground = ({
               ) : null}
 
               <button
-                className={`moveable-control moveable-${corner} canvas-multi-node-control absolute ${resizeCursorClassName[corner]}`}
+                className={`moveable-control moveable-${corner} canvas-multi-node-control pointer-events-auto absolute ${resizeCursorClassName[corner]}`}
                 onPointerDown={(event) => startResize(corner, event)}
                 ref={(element) => {
                   handleElementsRef.current[corner] = element;

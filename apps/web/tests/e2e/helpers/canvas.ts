@@ -50,6 +50,117 @@ const getNodeCenter = async (page, nodeId) => {
 
     return [...new Set([requestedNodeId, visualOwnerNodeId].filter(Boolean))];
   }, nodeId);
+  const framePoint = await page.evaluate((nodeIds) => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const viewer = editor?.viewerRef;
+    const host = editor?.hostRef;
+    const rect = host?.getBoundingClientRect?.();
+
+    if (!(editor && viewer && rect)) {
+      return null;
+    }
+
+    const worldPointToScreenPoint = (point) => {
+      return {
+        x: rect.left + (point.x - viewer.getScrollLeft()) * editor.zoom,
+        y: rect.top + (point.y - viewer.getScrollTop()) * editor.zoom,
+      };
+    };
+    const localPointToWorldPoint = (nodeId, point) => {
+      const node = editor.getNode?.(nodeId);
+      const bbox = editor.getNodeGeometry?.(nodeId)?.bbox;
+
+      if (!(node && bbox)) {
+        return null;
+      }
+
+      const localCenter = {
+        x: (bbox.minX + bbox.maxX) / 2,
+        y: (bbox.minY + bbox.maxY) / 2,
+      };
+      const scaleX = node.transform?.scaleX ?? 1;
+      const scaleY = node.transform?.scaleY ?? 1;
+      const rotation = ((node.transform?.rotation || 0) * Math.PI) / 180;
+      const offset = {
+        x: (point.x - localCenter.x) * scaleX,
+        y: (point.y - localCenter.y) * scaleY,
+      };
+      const worldPoint = {
+        x:
+          (node.transform?.x || 0) +
+          localCenter.x +
+          offset.x * Math.cos(rotation) -
+          offset.y * Math.sin(rotation),
+        y:
+          (node.transform?.y || 0) +
+          localCenter.y +
+          offset.x * Math.sin(rotation) +
+          offset.y * Math.cos(rotation),
+      };
+
+      return {
+        x: worldPoint.x,
+        y: worldPoint.y,
+      };
+    };
+    const getPaintedFramePoint = (nodeId, bounds) => {
+      const center = {
+        x: bounds.minX + bounds.width / 2,
+        y: bounds.minY + bounds.height / 2,
+      };
+
+      if (editor.hitTestNodePoint(nodeId, center)) {
+        return center;
+      }
+
+      for (let row = 0; row <= 8; row += 1) {
+        for (let column = 0; column <= 8; column += 1) {
+          const point = {
+            x: bounds.minX + (bounds.width * column) / 8,
+            y: bounds.minY + (bounds.height * row) / 8,
+          };
+
+          if (editor.hitTestNodePoint(nodeId, point)) {
+            return point;
+          }
+        }
+      }
+
+      return null;
+    };
+    const getSelectionFallbackPoint = (nodeId) => {
+      const selectionPoint =
+        editor.getNodeRenderGeometry?.(nodeId)?.selectionPoints?.[0];
+
+      if (!selectionPoint) {
+        return null;
+      }
+
+      return localPointToWorldPoint(nodeId, selectionPoint) || selectionPoint;
+    };
+
+    for (const candidateNodeId of nodeIds) {
+      const bounds = editor.getNodeRenderFrame?.(candidateNodeId)?.bounds;
+
+      if (!bounds) {
+        continue;
+      }
+
+      const point =
+        getPaintedFramePoint(candidateNodeId, bounds) ||
+        getSelectionFallbackPoint(candidateNodeId);
+
+      if (point) {
+        return worldPointToScreenPoint(point);
+      }
+    }
+
+    return null;
+  }, candidateNodeIds);
+
+  if (framePoint) {
+    return framePoint;
+  }
 
   for (const candidateNodeId of candidateNodeIds) {
     const node = page.locator(

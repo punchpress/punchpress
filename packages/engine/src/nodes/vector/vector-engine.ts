@@ -38,6 +38,7 @@ const getContourStyle = (contour) => {
   return {
     fill: contour.fill ?? null,
     fillRule: contour.fillRule ?? "nonzero",
+    opacity: contour.opacity,
     stroke: contour.stroke ?? null,
     strokeLineCap: contour.strokeLineCap ?? "round",
     strokeLineJoin: contour.strokeLineJoin ?? "round",
@@ -47,6 +48,7 @@ const getContourStyle = (contour) => {
 };
 
 export const buildVectorNodeGeometry = (node) => {
+  const nodeOpacity = node.opacity ?? 1;
   const visibleContours = (node.contours || []).filter(
     (contour) => contour?.visible !== false
   );
@@ -61,6 +63,8 @@ export const buildVectorNodeGeometry = (node) => {
       fill: style.fill,
       fillRule: style.fillRule,
       key: contour.id || `vector-${index}`,
+      opacity:
+        style.opacity == null ? undefined : style.opacity * nodeOpacity,
       stroke: style.stroke,
       strokeLineCap: style.strokeLineCap,
       strokeLineJoin: style.strokeLineJoin,
@@ -100,7 +104,7 @@ export const buildVectorNodeGeometry = (node) => {
   const hitRegions = paths.map((path) =>
     createPaintedHitRegion({
       contours: commandsToContours(path.commands, 1.5),
-      fill: path.closed === false ? null : path.fill,
+      fill: path.fill,
       fillRule: path.fillRule,
       stroke: path.stroke,
       strokeWidth: path.strokeWidth,

@@ -194,14 +194,22 @@ export const getCanvasNodeIds = (page) => {
   });
 };
 
-export const loadDocument = (page, contents) => {
-  return page.evaluate((nextContents) => {
+export const loadDocument = async (page, contents) => {
+  await page.evaluate((nextContents) => {
     return window.__PUNCHPRESS_EDITOR__?.loadDocument(nextContents);
   }, contents);
+
+  await page.waitForFunction(() => {
+    return !window.__PUNCHPRESS_EDITOR__?.pendingViewportFocusFrame;
+  });
 };
 
 export const resetViewport = (page) => {
-  return page.evaluate(() => {
+  return setViewport(page, { x: 0, y: 0, zoom: 1 });
+};
+
+export const setViewport = (page, viewport) => {
+  return page.evaluate((nextViewport) => {
     const editor = window.__PUNCHPRESS_EDITOR__;
     const viewer = editor?.viewerRef;
 
@@ -210,16 +218,12 @@ export const resetViewport = (page) => {
     }
 
     editor.cancelPendingViewportFocus();
-    viewer.setTo?.({
-      x: 0,
-      y: 0,
-      zoom: 1,
-    });
-    editor.setViewportZoom(1);
+    viewer.setTo?.(nextViewport);
+    editor.setViewport(nextViewport);
     editor.onViewportChange?.();
 
     return true;
-  });
+  }, viewport);
 };
 
 export const loadDocumentFixture = async (page, fileName) => {
@@ -259,26 +263,85 @@ const getHandleCenter = (handle) => {
   };
 };
 
-const dragFromSelectionCorner = async (
-  page,
-  { corner = "nw", drag = { x: 120, y: 80 }, offset = 0, release = true } = {}
-) => {
-  const selection = await waitForSelectionHandles(page);
-  const handle = selection.handles[corner];
-
-  if (!handle) {
-    throw new Error(`Missing ${corner} selection handle for corner rotation`);
-  }
-
+const getSelectionCornerDragPoints = (handle, corner, drag, offset) => {
   const handleCenter = getHandleCenter(handle);
   const start = {
     x: handleCenter.x + (corner.endsWith("e") ? offset : -offset),
     y: handleCenter.y + (corner.startsWith("s") ? offset : -offset),
   };
-  const end = {
-    x: start.x + drag.x,
-    y: start.y + drag.y,
+
+  return {
+    end: {
+      x: start.x + drag.x,
+      y: start.y + drag.y,
+    },
+    start,
   };
+};
+
+const isPointOnSelectionRotationZone = (page, point) => {
+  return page.evaluate(({ x, y }) => {
+    return Boolean(
+      document
+        .elementFromPoint(x, y)
+        ?.closest(".canvas-moveable .canvas-rotation-zone")
+    );
+  }, point);
+};
+
+const getVisibleSelectionCornerDragPoints = async (
+  page,
+  selection,
+  requestedCorner,
+  drag,
+  offset
+) => {
+  const cornerOrder = [requestedCorner, "ne", "nw", "se", "sw"].filter(
+    (corner, index, corners) => corners.indexOf(corner) === index
+  );
+
+  for (const corner of cornerOrder) {
+    const handle = selection.handles[corner];
+
+    if (!handle) {
+      continue;
+    }
+
+    const points = getSelectionCornerDragPoints(handle, corner, drag, offset);
+
+    if (await isPointOnSelectionRotationZone(page, points.start)) {
+      return points;
+    }
+  }
+
+  const requestedHandle = selection.handles[requestedCorner];
+
+  if (!requestedHandle) {
+    throw new Error(
+      `Missing ${requestedCorner} selection handle for corner rotation`
+    );
+  }
+
+  return getSelectionCornerDragPoints(
+    requestedHandle,
+    requestedCorner,
+    drag,
+    offset
+  );
+};
+
+const dragFromSelectionCorner = async (
+  page,
+  { corner = "nw", drag = { x: 120, y: 80 }, offset = 0, release = true } = {}
+) => {
+  const selection = await waitForSelectionHandles(page);
+  const { end, start } = await getVisibleSelectionCornerDragPoints(
+    page,
+    selection,
+    corner,
+    drag,
+    offset
+  );
 
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();

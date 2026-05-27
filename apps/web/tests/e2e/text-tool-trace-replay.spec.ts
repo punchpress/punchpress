@@ -225,7 +225,7 @@ test("placing a new text node uses the starter text preset", async ({
     stroke: "#000000",
     strokeWidth: 3,
     text: "YOUR TEXT",
-    tracking: 10,
+    tracking: 0,
     type: "text",
     warp: {
       kind: "none",

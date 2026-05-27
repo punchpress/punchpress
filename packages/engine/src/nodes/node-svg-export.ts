@@ -39,7 +39,18 @@ const getNodeLocalTransform = (node, bbox) => {
   return transforms.join(" ");
 };
 
-const buildSvgPathMarkup = (node, path) => {
+const getPathOpacity = (node, path, inheritedOpacity) => {
+  const nodeOpacity = node.opacity ?? 1;
+  const pathOpacity = path.opacity;
+
+  if (node.type === "vector") {
+    return (pathOpacity ?? 1) * nodeOpacity * inheritedOpacity;
+  }
+
+  return (pathOpacity ?? nodeOpacity) * inheritedOpacity;
+};
+
+const buildSvgPathMarkup = (node, path, inheritedOpacity) => {
   const fill =
     path.closed === false ? "none" : (path.fill ?? node.fill ?? "none");
   const stroke = path.stroke ?? node.stroke ?? "none";
@@ -63,8 +74,11 @@ const buildSvgPathMarkup = (node, path) => {
       ? (node.strokeMiterLimit ?? DEFAULT_VECTOR_STROKE_MITER_LIMIT)
       : DEFAULT_VECTOR_STROKE_MITER_LIMIT);
   const strokeWidth = path.strokeWidth ?? node.strokeWidth ?? 0;
+  const opacityValue = getPathOpacity(node, path, inheritedOpacity);
+  const opacity =
+    opacityValue === 1 ? "" : ` opacity="${format(opacityValue)}"`;
 
-  return `<path d="${path.d}"${transform}${fillRule} fill="${fill}" stroke="${stroke}" stroke-width="${format(
+  return `<path d="${path.d}"${transform}${fillRule}${opacity} fill="${fill}" stroke="${stroke}" stroke-width="${format(
     strokeWidth
   )}" paint-order="fill stroke" stroke-linejoin="${strokeLineJoin}" stroke-linecap="${strokeLineCap}" stroke-miterlimit="${format(
     strokeMiterLimit
@@ -76,6 +90,7 @@ export const buildSvgExport = (nodes, geometryById, options = {}) => {
   const height = options.height ?? ARTBOARD_HEIGHT;
   const offsetX = options.offsetX ?? 0;
   const offsetY = options.offsetY ?? 0;
+  const inheritedOpacityById = options.inheritedOpacityById ?? new Map();
   const background = options.background ?? "#2d2d2d";
   const body = [
     background
@@ -105,8 +120,10 @@ export const buildSvgExport = (nodes, geometryById, options = {}) => {
       body.push(`<g transform="${localTransform}">`);
     }
 
+    const inheritedOpacity = inheritedOpacityById.get(node.id) ?? 1;
+
     for (const path of geometry.paths) {
-      body.push(buildSvgPathMarkup(node, path));
+      body.push(buildSvgPathMarkup(node, path, inheritedOpacity));
     }
 
     if (localTransform) {

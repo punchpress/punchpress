@@ -62,7 +62,9 @@ describe("canvas node preview placement", () => {
     ]);
 
     expect(
-      resolvePreviewPlacementNodeIds(editor, ["vector-1"], ["path-1"])
+      resolvePreviewPlacementNodeIds(editor, ["vector-1"], {
+        nodeIds: ["path-1"],
+      })
     ).toEqual(["vector-1"]);
   });
 
@@ -163,7 +165,9 @@ describe("canvas node preview placement", () => {
     ]);
 
     expect(
-      resolvePreviewPlacementNodeIds(editor, ["vector-1"], ["path-1", "path-2"])
+      resolvePreviewPlacementNodeIds(editor, ["vector-1"], {
+        nodeIds: ["path-1", "path-2"],
+      })
     ).toEqual(["vector-1"]);
   });
 
@@ -266,7 +270,9 @@ describe("canvas node preview placement", () => {
     editor.startPathEditing("vector-1");
 
     expect(
-      resolvePreviewPlacementNodeIds(editor, ["vector-1"], ["path-1"])
+      resolvePreviewPlacementNodeIds(editor, ["vector-1"], {
+        nodeIds: ["path-1"],
+      })
     ).toEqual([]);
   });
 
@@ -315,7 +321,75 @@ describe("canvas node preview placement", () => {
     ]);
 
     expect(
-      resolvePreviewPlacementNodeIds(editor, ["path-1"], ["path-1"])
+      resolvePreviewPlacementNodeIds(editor, ["path-1"], {
+        nodeIds: ["path-1"],
+      })
+    ).toEqual(["path-1"]);
+  });
+
+  test("maps a selected container preview onto visible descendants", () => {
+    const editor = new Editor();
+
+    editor.getState().loadNodes([
+      {
+        id: "group-1",
+        name: "Imported SVG",
+        parentId: "root",
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 0,
+          y: 0,
+        },
+        type: "group",
+        visible: true,
+      },
+      {
+        closed: true,
+        fill: "#ff0000",
+        fillRule: "nonzero",
+        id: "path-1",
+        parentId: "group-1",
+        segments: [
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: 0, y: 0 },
+            pointType: "corner",
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: 50, y: 0 },
+            pointType: "corner",
+          },
+          {
+            handleIn: { x: 0, y: 0 },
+            handleOut: { x: 0, y: 0 },
+            point: { x: 50, y: 50 },
+            pointType: "corner",
+          },
+        ],
+        stroke: null,
+        strokeWidth: 0,
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 20,
+          y: 30,
+        },
+        type: "path",
+        visible: true,
+      },
+    ]);
+
+    expect(
+      resolvePreviewPlacementNodeIds(editor, ["path-1"], {
+        effectiveNodeIdSet: new Set(["path-1"]),
+        nodeIds: ["group-1"],
+      })
     ).toEqual(["path-1"]);
   });
 });

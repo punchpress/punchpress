@@ -126,6 +126,33 @@ describe("Editor.getHoveredNodePreview", () => {
     });
   });
 
+  test("uses an oriented bounds preview for a hovered rotated group", () => {
+    const editor = new Editor();
+
+    editor.insertNodes([
+      {
+        id: "group-1",
+        name: "Imported SVG",
+        parentId: "root",
+        transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+        type: "group",
+        visible: true,
+      },
+      createPathNode({
+        id: "path-1",
+        parentId: "group-1",
+        transform: { rotation: 28, scaleX: 1, scaleY: 1, x: 240, y: 180 },
+      }),
+    ]);
+    editor.setSelectedNodes([]);
+    editor.setHoveredNode("group-1");
+
+    expect(editor.getHoveredNodePreview()).toMatchObject({
+      kind: "bounds",
+      transform: "rotate(28deg)",
+    });
+  });
+
   test("does not preview the parent vector while editing one contour of a compound vector", () => {
     const editor = new Editor();
 
@@ -149,3 +176,54 @@ describe("Editor.getHoveredNodePreview", () => {
     });
   });
 });
+
+const createPathNode = ({ id, parentId, transform }) => {
+  const zeroHandle = { x: 0, y: 0 };
+  const contour = {
+    closed: true,
+    segments: [
+      {
+        handleIn: zeroHandle,
+        handleOut: zeroHandle,
+        point: { x: 0, y: 0 },
+        pointType: "corner",
+      },
+      {
+        handleIn: zeroHandle,
+        handleOut: zeroHandle,
+        point: { x: 100, y: 0 },
+        pointType: "corner",
+      },
+      {
+        handleIn: zeroHandle,
+        handleOut: zeroHandle,
+        point: { x: 100, y: 100 },
+        pointType: "corner",
+      },
+      {
+        handleIn: zeroHandle,
+        handleOut: zeroHandle,
+        point: { x: 0, y: 100 },
+        pointType: "corner",
+      },
+    ],
+  };
+
+  return {
+    closed: true,
+    contours: [contour],
+    fill: "#3AAAFF",
+    fillRule: "nonzero",
+    id,
+    parentId,
+    segments: contour.segments,
+    stroke: null,
+    strokeLineCap: "butt",
+    strokeLineJoin: "miter",
+    strokeMiterLimit: 4,
+    strokeWidth: 0,
+    transform,
+    type: "path",
+    visible: true,
+  };
+};

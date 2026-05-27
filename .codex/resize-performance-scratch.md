@@ -1,0 +1,35 @@
+# Resize performance scratch
+
+- goal: docs + tests/timings first, then resize preview/commit, then node-owned resize policy
+- decision: keep scratch in `.codex/` not product docs; concise compaction aid only
+- evidence so far: aggregate resize mutates all effective descendants on every update in `resize-selection.ts`
+- direction: match existing transform docs: transient preview during gesture, one durable commit at boundary
+- tradeoff: phase 1 can fix hot path before full node capability refactor; phase 2 moves policy onto node engines once behavior measured
+- baseline correctness: editor resize tests + SVG handle e2e pass before resize changes
+- timing setup: added `selection.resize.begin/update` perf spans and `large-svg-corgi-resize` shared benchmark
+- baseline timing: `large-svg-corgi-resize` p50 33.3ms, p95 41.8ms, max 108.3ms, slow 120/120; `selection.resize.update` p95 4.2ms -> fanout/render dominates
+- docs: product/internals/reference/ops now describe root preview + commit-boundary resize model and resize benchmark
+- phase1: aggregate resize publishes root resize preview during pointer/update and commits child geometry once
+- phase1 timing: `large-svg-corgi-resize` p50 8.3ms, p95 8.9ms, max 25.0ms, slow 1/120; update p95 0.2ms
+- phase2: added `getResizeMode` node capability (`bounds|scale|children|none`) and routed resize session policy through it
+- review fix: `bun run check` caught formatter issue in resize preview placement; fixed and check passes
+- review fix: full editor tests found stale open-path export fixture using `fill:"#ffffff"` while expecting no fill; set fixture fill null
+- verification: full `bun run test:editor` now passes 332 tests
+- rotation bug: grouped render tree wrapped nested groups and also put full ancestor transform chain on each child path; nested art could rotate differently from shallow bg. Fixed leaf path transform to use only its own node transform when the tree already owns ancestor groups. Added zoomed-out dense group rotation e2e.
+- rotation audit: tldraw uses resize capability methods but rotation lifecycle hooks + composed page transforms; PunchPress direction is node-owned rotate mode + aggregate preview/commit for containers/multi-select.
+- rotation phase1: add `getRotateMode`, aggregate rotate preview with selected roots, commit descendants once; add `large-svg-corgi-rotate` benchmark.
+- rotation phase1 timing: `large-svg-corgi-rotate` p50 8.3ms, p95 8.5ms, max 34.3ms, slow 2/120; `selection.rotate.update` p95 0.1ms, commit 5.1ms.
+- resize recheck after rotation: `large-svg-corgi-resize` p50 8.3ms, p95 8.9ms, max 24.6ms, slow 2/120; no meaningful regression from rotate preview plumbing.
+- rotation release bug: prior test only checked descendant deltas. Added nested group commit regression comparing composed/rendered centers before/after aggregate rotation; currently red as expected (`background x expected 352.94 got 162.75`).
+- rotation visual e2e: synthetic imported SVG fixture now has readable blue bg + large orange nested shape, drives editor rotate session directly, attaches `active-rotation-preview` and `post-rotation-release`; red at post-commit center mismatch (`expected 374.67 got 136.72`).
+- rotation fix: aggregate commit now rotates leaf centers in composed/world space and converts back through inverse parent matrix; group SVG renderer now serializes center-origin matrix transforms instead of origin-based translate/rotate. New rotate contract + SVG e2e pass. Benchmark p50 8.3ms, p95 9.3ms, max 33.4ms, slow 2.
+- rotation release bug: real corgi e2e showed post-mouseup bg corners diverged from selection handles; root cause was stale aggregate rotate preview shell transform cached under durable shell key, so durable placement skipped reset and visible art got preview rotate + committed child rotate. Fixed preview placement keys to force durable reapply after release. Target e2e red -> green; full svg-import e2e, editor tests, check pass. Rotate benchmark p50 8.3ms, p95 8.6ms, max 225.1ms, slow 1.
+- rotation clipping bug: user still saw rotated corgi bg clipped into octagon. Root cause: `contain: paint` on node shell clips overflow-visible SVG children after committed child rotation. Changed shell containment to `layout style`; e2e now asserts real corgi shell does not include paint containment. Full svg-import e2e + check + rotate contract pass. Rotate benchmark p50 8.3ms, p95 9.3ms, slow 2.
+- rotated resize overlay bug: scaling a rotated imported group could show an axis-aligned selection overlay because resize preview swaps to bounds-only host rects and dropped existing frame rotation. Added real corgi e2e reading rendered handle angle during live resize; multi-selection overlay now reapplies base rotation during resize preview. Svg-import e2e + resize contract pass.
+- selection color scrub: baseline `large-svg-corgi-selection-color` with direct mutations p50 225.1ms, p95 291.5ms, slow 60/60. Added color-change session: resolve targets once, preview via interaction state, commit once on picker close.
+- selection color scrub fix: first preview still rebuilt corgi path tree each frame (p50 74.5ms). Switched live preview to CSS paint variables on stable SVG DOM; final timing p50 8.3ms, p95 16.7ms, slow 4/60. Remaining max 225ms is commit/refresh frame after close.
+- shape responsiveness: single shape box resize still mutated width/height every pointermove, unlike aggregate resize. Added preview-frame payload for shape-box resize and commit-on-pointerup; durable width/height now stable during update. Shape placement pointermove coalesced to rAF to avoid mousemove flood while drawing.
+- verification: resize contract, node placement contract, shape placement e2e, and check pass. Shape transform e2e resize cases pass, but existing rotate case still fails threshold with 3.47deg vs >5deg.
+- shape drawing jitter: rAF coalescing exposed placement session listening to both mouse and pointer streams; stale mousemove could overwrite newer pointermove before frame flush. Placement now chooses pointer-only for pointer-originated gestures, mouse-only fallback otherwise. Added event policy unit test. Shape placement e2e + check pass.
+- shape live resize art: bug was selection preview frame updated via interaction channel while standard node art still read durable geometry until mouseup. Added failing e2e that inspects live artwork bounds during held resize; fixed standard node art to render from the preview node update. Target e2e, resize contract, placement session unit, shape placement e2e, and check pass. Full shape transform e2e still has unrelated rotate threshold fail (3.47deg vs >5deg).
+- shape placement jitter follow-up: live draw still mutated durable shape width/height every frame, so React/properties and imperative shell placement could race visually. Shape placement now uses resize-style preview after first node creation and commits final dimensions once on mouseup. Added live square shell/art alignment e2e. Shape placement e2e, live resize target e2e, resize contract, placement session unit, and check pass.

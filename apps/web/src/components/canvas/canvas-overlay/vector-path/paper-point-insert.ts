@@ -1,7 +1,9 @@
+import { getGestureTolerancePx } from "@punchpress/engine";
+
 const INSERT_HIT_TEST_OPTIONS = {
   fill: false,
   stroke: true,
-  tolerance: 10,
+  tolerance: getGestureTolerancePx("vectorSegmentInsertHit"),
 };
 
 const HANDLE_EPSILON = 0.01;

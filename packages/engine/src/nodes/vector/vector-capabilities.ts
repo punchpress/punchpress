@@ -111,6 +111,12 @@ export const vectorNodeCapabilities = {
     };
   },
 
+  getResizeMode: (_editor, _nodeId, node) =>
+    supportsEditableContours(node) ? "scale" : "children",
+
+  getRotateMode: (_editor, _nodeId, node) =>
+    supportsEditableContours(node) ? "self" : "children",
+
   canPersistPathEditing: (node) => supportsEditableContours(node),
 
   getEditablePathSession: (editor, nodeId, node) => {

@@ -118,6 +118,7 @@ export {
 export {
   incrementPerfCounter,
   measurePerf,
+  setPerfLogConfig,
   setPerfSink,
 } from "./perf/perf-hooks";
 export {
@@ -127,15 +128,26 @@ export {
 export { getResizeCorner } from "./primitives/group-resize";
 export { clamp, format, round, toNumber, toSafeHex } from "./primitives/math";
 export {
+  GESTURE_TOLERANCES_PX,
+  getGestureTolerancePx,
+  getGestureToleranceSquared,
+  getPointerDistanceSquared,
   getPointerDistancePx,
+  hasPointerMovedAtLeast,
+  hasPointerMovedWithin,
   isPointerDistanceAtLeast,
   isPointerDistanceWithin,
 } from "./primitives/pointer-distance";
+export type { GestureTolerance } from "./primitives/pointer-distance";
 export {
   getNodeLocalPoint,
   getNodeRotationCenter,
   getNodeWorldPoint,
 } from "./primitives/rotation";
+export {
+  getNodeLocalMatrix,
+  getNodeLocalTransformBounds,
+} from "./transform/node-transform-matrix";
 export {
   includesPathPoint,
   isSamePathPoint,

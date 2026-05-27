@@ -61,6 +61,10 @@ const loadCircleDocument = async (page) => {
 
     return true;
   }, TEST_FONT);
+
+  await page.waitForFunction(() => {
+    return !window.__PUNCHPRESS_EDITOR__?.pendingViewportFocusFrame;
+  });
 };
 
 const loadPlainTextDocument = async (page) => {
@@ -486,7 +490,7 @@ test("rotates a circle text node around its selected bounds center", async ({
   expect(afterCenter.y).toBeCloseTo(beforeCenter.y, 1);
 });
 
-test("keeps the idle circle guide hidden after rotating a selected node", async ({
+test("keeps the selected circle guide aligned after rotating a selected node", async ({
   page,
 }) => {
   await gotoEditor(page);
@@ -501,7 +505,9 @@ test("keeps the idle circle guide hidden after rotating a selected node", async 
   const beforeActual = await getActualTextPathGuideScreenPoint(page);
 
   expect(beforeExpected).not.toBeNull();
-  expect(beforeActual).toBeNull();
+  expect(beforeActual).not.toBeNull();
+  expect(beforeActual?.x).toBeCloseTo(beforeExpected?.x || 0, 1);
+  expect(beforeActual?.y).toBeCloseTo(beforeExpected?.y || 0, 1);
 
   await rotateSelectionFromCorner(page, {
     drag: { x: 160, y: 100 },
@@ -515,10 +521,14 @@ test("keeps the idle circle guide hidden after rotating a selected node", async 
   const afterActual = await getActualTextPathGuideScreenPoint(page);
 
   expect(afterExpected).not.toBeNull();
-  expect(afterActual).toBeNull();
+  expect(afterActual).not.toBeNull();
+  expect(afterActual?.x).toBeCloseTo(afterExpected?.x || 0, 1);
+  expect(afterActual?.y).toBeCloseTo(afterExpected?.y || 0, 1);
 });
 
-test("keeps the idle circle guide hidden while rotating", async ({ page }) => {
+test("hides the selected circle guide only while rotating", async ({
+  page,
+}) => {
   await gotoEditor(page);
   await loadCircleDocument(page);
   await page.locator('.canvas-node[data-node-id="circle-node"]').click();
@@ -526,7 +536,7 @@ test("keeps the idle circle guide hidden while rotating", async ({ page }) => {
 
   const guide = page.getByTestId("text-path-guide");
 
-  await expect(guide).toHaveCount(0);
+  await expect(guide).toHaveCount(1);
 
   await rotateSelectionFromCornerWithoutRelease(page, {
     drag: { x: 140, y: 90 },
@@ -537,7 +547,7 @@ test("keeps the idle circle guide hidden while rotating", async ({ page }) => {
   await page.mouse.up();
   await pauseForUi(page);
 
-  await expect(guide).toHaveCount(0);
+  await expect(guide).toHaveCount(1);
 });
 
 test("keeps the circle path overlay aligned after entering path edit on a rotated node", async ({
@@ -1000,7 +1010,7 @@ test("moves a selected circle path node by dragging the visible text", async ({
   expect(movedNode?.y).toBeGreaterThan((beforeNode?.y || 0) + 20);
 });
 
-test("keeps the idle circle guide hidden while dragging a selected node", async ({
+test("keeps one selected circle guide visible while dragging a selected node", async ({
   page,
 }) => {
   await gotoEditor(page);
@@ -1011,7 +1021,7 @@ test("keeps the idle circle guide hidden while dragging a selected node", async 
 
   await node.click();
   await pauseForUi(page);
-  await expect(guide).toHaveCount(0);
+  await expect(guide).toHaveCount(1);
 
   const beforeNodeBox = await node.boundingBox();
 
@@ -1029,11 +1039,11 @@ test("keeps the idle circle guide hidden while dragging a selected node", async 
     steps: 12,
   });
 
-  await expect(guide).toHaveCount(0);
+  await expect(guide).toHaveCount(1);
 
   await page.mouse.up();
 
-  await expect(guide).toHaveCount(0);
+  await expect(guide).toHaveCount(1);
 });
 
 test("moves a circle path node by dragging the visible text while path editing", async ({

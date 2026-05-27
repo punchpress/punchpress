@@ -15,6 +15,73 @@ const SCALED_TEXT_DOCUMENT = readFileSync(
 );
 
 describe("Editor.resizeSelectionFromCorner", () => {
+  test("resizes a selected shape through the public corner resize command", () => {
+    const editor = new Editor();
+
+    editor.addShapeNode({ x: 400, y: 300 }, "polygon");
+    const nodeId = editor.selectedNodeId;
+    const beforeNode = nodeId ? editor.getNode(nodeId) : null;
+
+    if (!(nodeId && beforeNode?.type === "shape")) {
+      throw new Error("Expected a selected shape node");
+    }
+
+    const resizedNodeIds = editor.resizeSelectionFromCorner({
+      corner: "se",
+      scale: 1.5,
+    });
+    const afterNode = editor.getNode(nodeId);
+
+    expect(resizedNodeIds).toEqual([nodeId]);
+    expect(afterNode?.type).toBe("shape");
+    expect(afterNode?.width).toBeGreaterThan(beforeNode.width);
+    expect(afterNode?.height).toBeGreaterThan(beforeNode.height);
+  });
+
+  test("previews shape box resize without rewriting width and height until commit", () => {
+    const editor = new Editor();
+
+    editor.addShapeNode({ x: 400, y: 300 }, "polygon");
+    const nodeId = editor.selectedNodeId;
+    const beforeNode = nodeId ? editor.getNode(nodeId) : null;
+    const beforeFrame = nodeId ? editor.getNodeTransformFrame(nodeId) : null;
+
+    if (!(nodeId && beforeNode?.type === "shape" && beforeFrame)) {
+      throw new Error("Expected a selected shape node");
+    }
+
+    const resizeSession = editor.beginResizeSelection({
+      anchorCanvas: {
+        x: beforeFrame.bounds.minX,
+        y: beforeFrame.bounds.minY,
+      },
+      handle: "se",
+      nodeId,
+    });
+
+    const previewedNodeIds = editor.updateResizeSelection(resizeSession, {
+      pointCanvas: {
+        x: beforeFrame.bounds.maxX + 120,
+        y: beforeFrame.bounds.maxY + 80,
+      },
+      preview: true,
+    });
+    const previewNode = editor.getNode(nodeId);
+
+    expect(previewedNodeIds).toEqual([nodeId]);
+    expect(previewNode?.width).toBe(beforeNode.width);
+    expect(previewNode?.height).toBe(beforeNode.height);
+    expect(editor.selectionDragPreview?.resize?.transformFrame).not.toBeNull();
+
+    const committedNodeIds = editor.commitResizeSelection(resizeSession);
+    const committedNode = editor.getNode(nodeId);
+
+    expect(committedNodeIds).toEqual([nodeId]);
+    expect(editor.selectionDragPreview).toBeNull();
+    expect(committedNode?.width).toBeGreaterThan(beforeNode.width);
+    expect(committedNode?.height).toBeGreaterThan(beforeNode.height);
+  });
+
   test("keeps the opposite corner anchored for a loaded scaled node", () => {
     const editor = new Editor();
     editor.applyLocalFontCatalog({
@@ -88,6 +155,101 @@ describe("Editor.resizeSelectionFromCorner", () => {
     expect(afterBounds?.maxX).toBeCloseTo(beforeBounds?.maxX ?? 0, 1);
     expect(afterBounds?.minY).toBeCloseTo(beforeBounds?.minY ?? 0, 1);
   });
+
+  test("previews selected group resize before committing child geometry", () => {
+    const editor = new Editor();
+
+    editor.getState().loadNodes([
+      {
+        id: "group",
+        name: "Group",
+        parentId: "root",
+        transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+        type: "group",
+        visible: true,
+      },
+      createRectanglePath("first-path", "group", 200, 160),
+      createRectanglePath("second-path", "group", 360, 260),
+    ]);
+    editor.select("group");
+
+    expect(editor.getNodeResizeMode("group")).toBe("children");
+    expect(editor.getNodeResizeMode("first-path")).toBe("scale");
+
+    const beforeFrame = editor.getSelectionTransformFrame(["group"]);
+    const beforeFirstPath = editor.getNode("first-path");
+    const beforeSecondPath = editor.getNode("second-path");
+
+    expect(beforeFrame).not.toBeNull();
+
+    const resizeSession = editor.beginResizeSelection({
+      anchorCanvas: {
+        x: beforeFrame?.bounds.minX || 0,
+        y: beforeFrame?.bounds.minY || 0,
+      },
+      nodeIds: ["group"],
+    });
+
+    const previewedNodeIds = editor.updateResizeSelection(resizeSession, {
+      scale: 1.4,
+    });
+    const previewFirstPath = editor.getNode("first-path");
+    const previewSecondPath = editor.getNode("second-path");
+
+    expect(previewedNodeIds).toEqual(["group"]);
+    expect(previewFirstPath?.transform.scaleX).toBe(
+      beforeFirstPath?.transform.scaleX
+    );
+    expect(previewSecondPath?.transform.scaleX).toBe(
+      beforeSecondPath?.transform.scaleX
+    );
+    expect(editor.selectionDragPreview?.resize?.scale).toBe(1.4);
+
+    const committedNodeIds = editor.commitResizeSelection(resizeSession);
+    const committedFirstPath = editor.getNode("first-path");
+    const committedSecondPath = editor.getNode("second-path");
+
+    expect(committedNodeIds).toEqual(["first-path", "second-path"]);
+    expect(editor.selectionDragPreview).toBeNull();
+    expect(committedFirstPath?.transform.scaleX).toBeCloseTo(1.4, 6);
+    expect(committedSecondPath?.transform.scaleX).toBeCloseTo(1.4, 6);
+  });
+
+  test("keeps selected group frame rotated after resizing rotated descendants", () => {
+    const editor = new Editor();
+
+    editor.getState().loadNodes([
+      {
+        id: "group",
+        name: "Group",
+        parentId: "root",
+        transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+        type: "group",
+        visible: true,
+      },
+      createRectanglePath("first-path", "group", 200, 160),
+      createRectanglePath("second-path", "group", 360, 260),
+    ]);
+    editor.select("group");
+
+    const rotateSession = editor.beginRotateSelection({ nodeIds: ["group"] });
+
+    editor.updateRotateSelection(rotateSession, { deltaRotation: 30 });
+    editor.commitRotateSelection(rotateSession);
+
+    const beforeFrame = editor.getSelectionTransformFrame(["group"]);
+
+    expect(beforeFrame?.transform).toBe("rotate(30deg)");
+
+    const resizedNodeIds = editor.resizeSelectionFromCorner({
+      corner: "se",
+      scale: 1.25,
+    });
+    const afterFrame = editor.getSelectionTransformFrame(["group"]);
+
+    expect(resizedNodeIds).toEqual(["first-path", "second-path"]);
+    expect(afterFrame?.transform).toBe("rotate(30deg)");
+  });
 });
 
 const createTextNode = (editor, { text, x, y }) => {
@@ -101,6 +263,54 @@ const createTextNode = (editor, { text, x, y }) => {
 
   return editor.selectedNodeId;
 };
+
+const createRectanglePath = (id, parentId, x, y) => ({
+  closed: true,
+  fill: "#ffffff",
+  fillRule: "nonzero" as const,
+  id,
+  parentId,
+  segments: [
+    {
+      handleIn: { x: 0, y: 0 },
+      handleOut: { x: 0, y: 0 },
+      point: { x: 0, y: 0 },
+      pointType: "corner" as const,
+    },
+    {
+      handleIn: { x: 0, y: 0 },
+      handleOut: { x: 0, y: 0 },
+      point: { x: 120, y: 0 },
+      pointType: "corner" as const,
+    },
+    {
+      handleIn: { x: 0, y: 0 },
+      handleOut: { x: 0, y: 0 },
+      point: { x: 120, y: 80 },
+      pointType: "corner" as const,
+    },
+    {
+      handleIn: { x: 0, y: 0 },
+      handleOut: { x: 0, y: 0 },
+      point: { x: 0, y: 80 },
+      pointType: "corner" as const,
+    },
+  ],
+  stroke: "#000000",
+  strokeLineCap: "round" as const,
+  strokeLineJoin: "round" as const,
+  strokeMiterLimit: 4,
+  strokeWidth: 2,
+  transform: {
+    rotation: 0,
+    scaleX: 1,
+    scaleY: 1,
+    x,
+    y,
+  },
+  type: "path" as const,
+  visible: true,
+});
 
 const getDebugNode = (dump, nodeId) => {
   const node = dump.nodes.find((item) => item.id === nodeId);

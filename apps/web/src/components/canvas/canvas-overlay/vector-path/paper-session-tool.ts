@@ -1,7 +1,7 @@
 import {
   type Editor,
   getVectorPathCursorMode,
-  isPointerDistanceAtLeast,
+  hasPointerMovedAtLeast,
   offsetEditablePathPoints,
   setVectorPointHandlesFromAnchorDrag,
   updateVectorPointHandle,
@@ -41,9 +41,6 @@ import type {
 import type { VectorPathPoint } from "./vector-corner-drag-session";
 
 const ENDPOINT_CLOSE_SNAP_DISTANCE_PX = 14;
-const PATH_POINT_DRAG_THRESHOLD_PX = 4;
-const SELECTION_MARQUEE_THRESHOLD_PX = 4;
-
 const roundDelta = (value: number) => Math.round(value * 100) / 100;
 
 const getCanvasPoint = (editor: Editor, clientX: number, clientY: number) => {
@@ -572,10 +569,10 @@ export const createPaperSessionToolController = ({
 
     if (
       !state.selectionMarquee &&
-      isPointerDistanceAtLeast(
+      hasPointerMovedAtLeast(
         state.pendingPress.origin,
         event.point,
-        SELECTION_MARQUEE_THRESHOLD_PX
+        "vectorSelectionMarqueeDrag"
       )
     ) {
       state.selectionMarquee = {
@@ -613,10 +610,10 @@ export const createPaperSessionToolController = ({
       !(
         state.pendingPress?.type === "point" &&
         !state.activeDrag &&
-        isPointerDistanceAtLeast(
+        hasPointerMovedAtLeast(
           state.pendingPress.origin,
           event.point,
-          PATH_POINT_DRAG_THRESHOLD_PX
+          "vectorPathPointDrag"
         )
       )
     ) {

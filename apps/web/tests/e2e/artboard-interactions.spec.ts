@@ -5,6 +5,7 @@ import {
   gotoEditor,
   loadDocument,
   resetViewport,
+  setViewport,
 } from "./helpers/editor";
 
 const ARTBOARD_DOCUMENT = JSON.stringify({
@@ -80,6 +81,7 @@ test("artboard labels drag the artboard and the body allows marquee selection", 
   await gotoEditor(page);
   await loadDocument(page, ARTBOARD_DOCUMENT);
   await resetViewport(page);
+  await setViewport(page, { x: -320, y: -80, zoom: 1 });
 
   const label = page.locator('button.canvas-node[data-node-id="artboard-1"]');
   await expect(label).toBeVisible();
@@ -155,6 +157,7 @@ test("artboard selection outline follows label drag preview", async ({
   await gotoEditor(page);
   await loadDocument(page, ARTBOARD_DOCUMENT);
   await resetViewport(page);
+  await setViewport(page, { x: -320, y: -80, zoom: 1 });
 
   const label = page.locator('button.canvas-node[data-node-id="artboard-1"]');
   await expect(label).toBeVisible();
@@ -267,6 +270,7 @@ test("shift-click on an artboard label or empty body adds it to the selection", 
     })
   );
   await resetViewport(page);
+  await setViewport(page, { x: -320, y: -80, zoom: 1 });
 
   const rootShape = page.locator('[data-node-id="shape-2"]');
   const label = page.locator('button.canvas-node[data-node-id="artboard-1"]');

@@ -72,11 +72,11 @@ export type {
   VectorContourDocument,
   VectorFillRuleDocument,
   VectorHandleDocument,
-  VectorStrokeLineCapDocument,
-  VectorStrokeLineJoinDocument,
   VectorNodeDocument,
   VectorPointTypeDocument,
   VectorSegmentDocument,
+  VectorStrokeLineCapDocument,
+  VectorStrokeLineJoinDocument,
   WarpDocument,
 } from "./schema";
 export {

@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import net from "node:net";
+import { ensureElectronInstalled } from "./ensure-electron";
 
 const devServerTimeoutMs = 60_000;
 const host = "127.0.0.1";
@@ -78,6 +79,8 @@ const killProcess = (child?: ReturnType<typeof spawn>) => {
 };
 
 const run = async () => {
+  ensureElectronInstalled();
+
   const vitePort = await findAvailablePort(defaultPort);
   const env = {
     ...process.env,

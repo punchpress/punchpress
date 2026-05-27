@@ -8,12 +8,18 @@ import {
 const finiteNumber = z.number().refine(Number.isFinite, {
   message: "Expected a finite number.",
 });
+const opacityNumber = z.number().refine((value) => {
+  return Number.isFinite(value) && value >= 0 && value <= 1;
+}, {
+  message: "Expected a number between 0 and 1.",
+});
 
 const parentIdSchema = z.string().min(1);
 
 const baseNodeSchema = z
   .object({
     id: z.string().min(1),
+    opacity: opacityNumber,
     parentId: parentIdSchema,
     visible: z.boolean(),
   })
