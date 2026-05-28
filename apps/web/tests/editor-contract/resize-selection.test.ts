@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { Editor } from "@punchpress/engine";
+import { createDefaultImageNode, Editor } from "@punchpress/engine";
 
 const ARIAL_FONT = {
   family: "Arial",
@@ -36,6 +36,56 @@ describe("Editor.resizeSelectionFromCorner", () => {
     expect(afterNode?.type).toBe("shape");
     expect(afterNode?.width).toBeGreaterThan(beforeNode.width);
     expect(afterNode?.height).toBeGreaterThan(beforeNode.height);
+  });
+
+  test("resizes a selected image through the public corner resize command", () => {
+    const editor = new Editor();
+    const imageNode = {
+      ...createDefaultImageNode({
+        height: 180,
+        name: "Dropped image",
+        src: "data:image/png;base64,test",
+        width: 240,
+      }),
+      id: "image-node",
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: 320,
+        y: 240,
+      },
+    };
+
+    editor.getState().loadNodes([imageNode]);
+    editor.select("image-node");
+
+    const beforeNode = editor.getNode("image-node");
+    const beforeFrame = editor.getNodeTransformFrame("image-node");
+    const fixedCornerBefore = beforeFrame
+      ? { x: beforeFrame.bounds.minX, y: beforeFrame.bounds.minY }
+      : null;
+    const resizedNodeIds = editor.resizeSelectionFromCorner({
+      corner: "se",
+      scale: 1.5,
+    });
+    const afterNode = editor.getNode("image-node");
+    const afterFrame = editor.getNodeTransformFrame("image-node");
+
+    expect(resizedNodeIds).toEqual(["image-node"]);
+    expect(afterNode?.type).toBe("image");
+    expect(afterNode?.width).toBeCloseTo((beforeNode?.width || 0) * 1.5, 2);
+    expect(afterNode?.height).toBeCloseTo((beforeNode?.height || 0) * 1.5, 2);
+    expect(afterFrame?.bounds.width).toBeCloseTo(
+      (beforeFrame?.bounds.width || 0) * 1.5,
+      2
+    );
+    expect(afterFrame?.bounds.height).toBeCloseTo(
+      (beforeFrame?.bounds.height || 0) * 1.5,
+      2
+    );
+    expect(afterFrame?.bounds.minX).toBeCloseTo(fixedCornerBefore?.x || 0, 2);
+    expect(afterFrame?.bounds.minY).toBeCloseTo(fixedCornerBefore?.y || 0, 2);
   });
 
   test("previews shape box resize without rewriting width and height until commit", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createDefaultImageNode, Editor } from "@punchpress/engine";
 
 const createVectorNodes = () => {
   return [
@@ -81,5 +81,27 @@ describe("vector svg export", () => {
     expect(svg).toContain('stroke-linecap="square"');
     expect(svg).toContain('stroke-linejoin="miter"');
     expect(svg).toContain('stroke-miterlimit="12"');
+  });
+
+  test("exports image nodes with canvas stretching semantics", async () => {
+    const editor = new Editor();
+    const imageNode = {
+      ...createDefaultImageNode({
+        height: 180,
+        name: "Wide image",
+        src: "data:image/png;base64,test",
+        width: 360,
+      }),
+      id: "wide-image",
+    };
+
+    editor.getState().loadNodes([imageNode] as never);
+
+    const svg = await editor.exportDocument();
+
+    expect(svg).toContain('href="data:image/png;base64,test"');
+    expect(svg).toContain('width="360"');
+    expect(svg).toContain('height="180"');
+    expect(svg).toContain('preserveAspectRatio="none"');
   });
 });

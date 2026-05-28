@@ -12,6 +12,7 @@ import {
   isContainerNode,
   isArtboardNode,
   isGroupNode,
+  isImageNode,
   isPathNode,
   isShapeNode,
   isTextNode,
@@ -73,6 +74,8 @@ export const getLayerRow = (editor, nodeId) => {
       node.text.trim().length > 0 ? node.text : `Text ${layerMeta.layerIndex + 1}`;
   } else if (isShapeNode(node)) {
     label = `${node.shape[0].toUpperCase()}${node.shape.slice(1)} ${layerMeta.layerIndex + 1}`;
+  } else if (isImageNode(node)) {
+    label = node.name || `Image ${layerMeta.layerIndex + 1}`;
   } else if (isVectorNode(node)) {
     label = node.name || `Vector ${layerMeta.containerLayerIndex + 1}`;
   } else if (isPathNode(node)) {

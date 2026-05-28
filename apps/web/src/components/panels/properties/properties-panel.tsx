@@ -4,6 +4,7 @@ import { useEditor } from "../../../editor-react/use-editor";
 import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
 import { AppearanceFields } from "./appearance-fields";
 import { ArtboardFields } from "./artboard-fields";
+import { ImageFields } from "./image-fields";
 import { PathCornerFields } from "./path-corner-fields";
 import { PathPointFields } from "./path-point-fields";
 import { SelectionColorsFields } from "./selection-colors-fields";
@@ -44,6 +45,7 @@ export const PropertiesPanel = () => {
   );
   const hasFieldsBeforeAppearance = Boolean(
     selectedNode?.type === "artboard" ||
+      selectedNode?.type === "image" ||
       selectedNode?.type === "text" ||
       selectedNode?.type === "shape" ||
       showsPathPointCornerRadius ||
@@ -87,6 +89,14 @@ export const PropertiesPanel = () => {
             height={selectionProperties.properties.height}
             node={selectedNode}
             shape={selectionProperties.properties.shape}
+            width={selectionProperties.properties.width}
+          />
+        ) : null}
+
+        {selectedNode?.type === "image" ? (
+          <ImageFields
+            height={selectionProperties.properties.height}
+            node={selectedNode}
             width={selectionProperties.properties.width}
           />
         ) : null}

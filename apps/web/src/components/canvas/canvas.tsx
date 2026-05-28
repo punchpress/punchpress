@@ -29,7 +29,7 @@ import { resolveVectorPenHoverAction } from "./canvas-overlay/vector-path/pen-ho
 import { CanvasTextEditor } from "./canvas-text-editor";
 import { startCanvasToolPlacementSession } from "./canvas-tool-placement-session";
 import { CanvasToolbar } from "./canvas-toolbar";
-import { useCanvasSvgDrop } from "./use-canvas-svg-drop";
+import { useCanvasDrop } from "./use-canvas-drop";
 
 const INITIAL_ZOOM = 1;
 const CANVAS_STAGE_MARGIN = 80_000;
@@ -325,7 +325,7 @@ export const Canvas = () => {
       ),
     [zoom]
   );
-  const { handleCanvasDragOver, handleCanvasDrop } = useCanvasSvgDrop({
+  const { handleCanvasDragOver, handleCanvasDrop } = useCanvasDrop({
     editor,
     getCanvasPoint: getCanvasDropPoint,
   });

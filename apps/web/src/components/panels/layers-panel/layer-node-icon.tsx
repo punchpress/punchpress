@@ -1,5 +1,6 @@
 import {
   ArtboardToolIcon,
+  FileImageIcon,
   Folder02Icon,
   GeometricShapes01Icon,
   Route01Icon,
@@ -37,6 +38,10 @@ export const LayerNodeIcon = ({
 
   if (nodeType === "shape") {
     return <LayerGlyph icon={SquareIcon} size={16} strokeWidth={1.8} />;
+  }
+
+  if (nodeType === "image") {
+    return <LayerGlyph icon={FileImageIcon} size={16} strokeWidth={1.8} />;
   }
 
   return <LayerGlyph icon={TextFontIcon} size={16} strokeWidth={1.8} />;

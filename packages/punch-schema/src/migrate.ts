@@ -22,6 +22,19 @@ export const migrateDocument = (value: unknown) => {
       : value;
   }
 
+  if (value.version === "1.7") {
+    return Array.isArray(value.nodes)
+      ? {
+          ...value,
+          nodes: normalizeNodesForSchema(value.nodes),
+          version: PUNCH_DOCUMENT_VERSION,
+        }
+      : {
+          ...value,
+          version: PUNCH_DOCUMENT_VERSION,
+        };
+  }
+
   if (typeof value.version !== "string" || value.version.length === 0) {
     throw new UnsupportedDocumentVersionError(
       "Document is missing a supported version."

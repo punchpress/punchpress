@@ -14,7 +14,7 @@ read_when:
 | --- | --- |
 | Extension | `.punch` |
 | MIME type | `application/vnd.punchpress+json` |
-| Current version | `1.7` |
+| Current version | `1.8` |
 | Root parent id | `root` |
 | Default basename | `untitled-design` |
 
@@ -22,7 +22,7 @@ read_when:
 
 ```ts
 type DesignDocument = {
-  version: "1.7";
+  version: "1.8";
   nodes: Node[];
 };
 ```

@@ -11,6 +11,9 @@ contextBridge.exposeInMainWorld("electron", {
       ipcRenderer.send(APP_MENU_STATE_CHANNEL, state);
     },
   },
+  assets: {
+    isSearchAvailable: Boolean(process.env.MAGNIFIC_API_KEY),
+  },
   documentCommands: {
     markReady: () => {
       ipcRenderer.send("document:renderer-ready");

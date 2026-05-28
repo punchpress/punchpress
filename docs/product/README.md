@@ -15,6 +15,8 @@ edge cases, and intentional omissions without becoming source tours.
 | Behavior | Doc |
 | --- | --- |
 | Overall editor workspace | [Workspace](workspace.md) |
+| Cmd+K workspace action menu | [Command menu](command-menu.md) |
+| External asset search and active-canvas import | [Assets](assets.md) |
 | Canvas pan, zoom, coordinates, grid, and viewport focus | [Infinite canvas](infinite-canvas.md) |
 | Production surfaces and export boundaries | [Artboards](artboards.md) |
 | Scratchpad and file-backed tabs | [Workspace tabs](workspace-tabs.md) |
@@ -75,6 +77,7 @@ edge cases, and intentional omissions without becoming source tours.
 | --- | --- |
 | Shared node behavior | [Nodes](nodes.md) |
 | Artboard nodes | [Artboard nodes](artboard-nodes.md) |
+| Image nodes | [Image nodes](image-nodes.md) |
 | Text nodes | [Text nodes](text-nodes.md) |
 | Shape nodes | [Shape nodes](shape-nodes.md) |
 | Vector nodes | [Vector nodes](vector-nodes.md) |

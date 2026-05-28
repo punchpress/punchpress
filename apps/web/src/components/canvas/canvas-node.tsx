@@ -103,6 +103,7 @@ const selectNodeArtState = (editor, state, nodeId, previewNode = null) => {
     opacity: getNodeOpacity(node),
     paths: getNodeRenderPaths(editor, node, geometry?.paths || []),
     ready: Boolean(geometry?.ready),
+    image: node.type === "image" ? node : null,
     renderMode: "paths",
     renderTree: null,
     stroke: node.stroke,
@@ -304,6 +305,20 @@ const getGroupNodeRenderTree = (
     }
 
     const geometry = editor.getNodeRenderGeometry(childNode.id);
+
+    if (childNode.type === "image" && geometry?.bbox) {
+      return [
+        {
+          height: childNode.height,
+          key: childNode.id,
+          opacity: getNodeOpacity(childNode),
+          src: childNode.src,
+          transform: getSvgNodeTransform(childNode, geometry.bbox),
+          type: "image",
+          width: childNode.width,
+        },
+      ];
+    }
 
     if (!geometry?.paths?.length) {
       return [];
@@ -859,6 +874,7 @@ const CanvasStandardNodeArt = ({ nodeId }) => {
       fill={artState.fill}
       fillRule={artState.fillRule}
       height={Math.max(1, artState.bbox.height)}
+      image={artState.image}
       isEditing={artState.isEditing}
       isInteractionProxy={artState.isInteractionProxy}
       opacity={artState.opacity}
@@ -898,6 +914,7 @@ const CanvasVectorNodeArt = ({ nodeId }) => {
       fill={artState.fill}
       fillRule={artState.fillRule}
       height={Math.max(1, artState.bbox.height)}
+      image={artState.image}
       isEditing={artState.isEditing}
       isInteractionProxy={artState.isInteractionProxy}
       opacity={artState.opacity}
@@ -998,6 +1015,23 @@ const CanvasNodeRenderTree = ({
       );
     }
 
+    if (item.type === "image") {
+      return (
+        <image
+          height={item.height}
+          href={item.src}
+          key={item.key}
+          opacity={isEditing ? 0 : (item.opacity ?? 1)}
+          pointerEvents="none"
+          preserveAspectRatio="none"
+          transform={item.transform || undefined}
+          width={item.width}
+          x={0}
+          y={0}
+        />
+      );
+    }
+
     return (
       <CanvasNodePath
         fill={fill}
@@ -1044,6 +1078,7 @@ const CanvasNodeArt = memo(
     height,
     isEditing,
     isInteractionProxy,
+    image,
     opacity,
     paintPreview,
     paths,
@@ -1059,20 +1094,34 @@ const CanvasNodeArt = memo(
     let renderedContent: ReactNode = null;
 
     if (!(isInteractionProxy || renderMode === "image")) {
-      renderedContent = renderTree ? (
-        <CanvasNodeRenderTree
-          fill={fill}
-          fillRule={fillRule}
-          isEditing={isEditing}
-          items={renderTree}
-          stroke={stroke}
-          strokeLineCap={strokeLineCap}
-          strokeLineJoin={strokeLineJoin}
-          strokeMiterLimit={strokeMiterLimit}
-          strokeWidth={strokeWidth}
-        />
-      ) : (
-        paths.map((path) => {
+      if (image) {
+        renderedContent = (
+          <image
+            height={image.height}
+            href={image.src}
+            pointerEvents="none"
+            preserveAspectRatio="none"
+            width={image.width}
+            x={0}
+            y={0}
+          />
+        );
+      } else if (renderTree) {
+        renderedContent = (
+          <CanvasNodeRenderTree
+            fill={fill}
+            fillRule={fillRule}
+            isEditing={isEditing}
+            items={renderTree}
+            stroke={stroke}
+            strokeLineCap={strokeLineCap}
+            strokeLineJoin={strokeLineJoin}
+            strokeMiterLimit={strokeMiterLimit}
+            strokeWidth={strokeWidth}
+          />
+        );
+      } else {
+        renderedContent = paths.map((path) => {
           return (
             <CanvasNodePath
               fill={fill}
@@ -1087,8 +1136,8 @@ const CanvasNodeArt = memo(
               strokeWidth={strokeWidth}
             />
           );
-        })
-      );
+        });
+      }
     }
 
     return (

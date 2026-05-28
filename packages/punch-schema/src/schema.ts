@@ -136,6 +136,18 @@ export const shapeNodeSchema = baseNodeSchema
   })
   .strict();
 
+export const imageNodeSchema = baseNodeSchema
+  .extend({
+    height: finiteNumber,
+    mimeType: z.enum(["image/jpeg", "image/png"]),
+    name: z.string().min(1),
+    src: z.string().min(1),
+    transform: transformSchema,
+    type: z.literal("image"),
+    width: finiteNumber,
+  })
+  .strict();
+
 export const vectorHandleSchema = z
   .object({
     x: finiteNumber,
@@ -205,6 +217,7 @@ export const nodeSchema = z.discriminatedUnion("type", [
   groupNodeSchema,
   artboardNodeSchema,
   shapeNodeSchema,
+  imageNodeSchema,
   vectorNodeSchema,
   pathNodeSchema,
 ]);
@@ -309,6 +322,7 @@ export const designDocumentSchema = z
 export type DesignDocument = z.infer<typeof designDocumentSchema>;
 export type ArtboardNodeDocument = z.infer<typeof artboardNodeSchema>;
 export type GroupNodeDocument = z.infer<typeof groupNodeSchema>;
+export type ImageNodeDocument = z.infer<typeof imageNodeSchema>;
 export type NodeDocument = z.infer<typeof nodeSchema>;
 export type ShapeKindDocument = z.infer<typeof shapeKindSchema>;
 export type ShapePointDocument = z.infer<typeof shapePointSchema>;

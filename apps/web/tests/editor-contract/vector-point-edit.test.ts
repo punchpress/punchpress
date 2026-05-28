@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Editor } from "@punchpress/engine";
+import { PUNCH_DOCUMENT_VERSION } from "@punchpress/punch-schema";
 import {
   setVectorPointHandlesFromAnchorDrag,
   setVectorPointType,
@@ -320,6 +321,6 @@ describe("vector point editing", () => {
     const segment = node?.type === "path" ? node.segments[0] : null;
 
     expect(segment?.pointType).toBe("corner");
-    expect(editor.getDebugDump().document.version).toBe("1.7");
+    expect(editor.getDebugDump().document.version).toBe(PUNCH_DOCUMENT_VERSION);
   });
 });

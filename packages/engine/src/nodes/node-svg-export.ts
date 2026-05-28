@@ -85,6 +85,19 @@ const buildSvgPathMarkup = (node, path, inheritedOpacity) => {
   )}"/>`;
 };
 
+const buildSvgImageMarkup = (node, geometry, inheritedOpacity, offsetX, offsetY) => {
+  const opacityValue = (node.opacity ?? 1) * inheritedOpacity;
+  const opacity =
+    opacityValue === 1 ? "" : ` opacity="${format(opacityValue)}"`;
+  const localTransform = getNodeLocalTransform(node, geometry.bbox);
+  const openLocalTransform = localTransform ? `<g transform="${localTransform}">` : "";
+  const closeLocalTransform = localTransform ? "</g>" : "";
+
+  return `<g transform="translate(${format(getNodeX(node) - offsetX)} ${format(
+    getNodeY(node) - offsetY
+  )})">${openLocalTransform}<image href="${node.src}" width="${format(node.width)}" height="${format(node.height)}" preserveAspectRatio="none"${opacity}/>${closeLocalTransform}</g>`;
+};
+
 export const buildSvgExport = (nodes, geometryById, options = {}) => {
   const width = options.width ?? ARTBOARD_WIDTH;
   const height = options.height ?? ARTBOARD_HEIGHT;
@@ -104,7 +117,24 @@ export const buildSvgExport = (nodes, geometryById, options = {}) => {
     }
 
     const geometry = geometryById.get(node.id);
-    if (!geometry || geometry.paths.length === 0) {
+    if (!geometry) {
+      continue;
+    }
+
+    if (node.type === "image") {
+      body.push(
+        buildSvgImageMarkup(
+          node,
+          geometry,
+          inheritedOpacityById.get(node.id) ?? 1,
+          offsetX,
+          offsetY
+        )
+      );
+      continue;
+    }
+
+    if (geometry.paths.length === 0) {
       continue;
     }
 

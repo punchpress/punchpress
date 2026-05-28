@@ -28,6 +28,12 @@ export const serveStaticAt = async (appDir: string) => {
   const sharedSession = session.fromPartition("persist:shared-session");
 
   sharedSession.protocol.handle(appScheme, async (request) => {
+    const routedResponse = await handleStaticAppRoute?.(request);
+
+    if (routedResponse) {
+      return routedResponse;
+    }
+
     const filePath = path.join(
       request.url.replace(`${appScheme}://${appHost}`, appDir),
     );
@@ -44,6 +50,16 @@ export const serveStaticAt = async (appDir: string) => {
 
     return net.fetch(`file://${resolvedPath}`);
   });
+};
+
+let handleStaticAppRoute:
+  | ((request: Request) => Promise<Response | null>)
+  | null = null;
+
+export const setStaticAppRouteHandler = (
+  routeHandler: (request: Request) => Promise<Response | null>
+) => {
+  handleStaticAppRoute = routeHandler;
 };
 
 const resolvePath = async (targetPath: string): Promise<string | null> => {

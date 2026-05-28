@@ -27,7 +27,7 @@ const getLayerPrimaryButtonClassName = ({ isSelected }) => {
 
 const getLayerVisibilityButtonClassName = ({ isSelected, isVisible }) => {
   return cn(
-    "h-auto shrink-0 border-0 bg-transparent px-2 text-foreground/42 shadow-none",
+    "inline-flex h-auto shrink-0 items-center justify-center border-0 bg-transparent px-2 text-foreground/42 shadow-none",
     !isVisible && "text-foreground/30 opacity-100",
     isSelected && "text-white/72"
   );

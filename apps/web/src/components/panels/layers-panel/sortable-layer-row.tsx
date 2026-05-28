@@ -42,7 +42,7 @@ const getLayerVisibilityButtonClassName = ({
   joinWithPrevious,
 }) => {
   return cn(
-    "h-auto shrink-0 rounded-l-none border-0 bg-transparent px-2 text-foreground/34 shadow-none hover:bg-[var(--designer-hover)] hover:text-foreground/70",
+    "inline-flex h-auto shrink-0 items-center justify-center rounded-l-none border-0 bg-transparent px-2 text-foreground/34 shadow-none hover:bg-[var(--designer-hover)] hover:text-foreground/70",
     joinWithPrevious ? "rounded-tr-none" : "rounded-tr-[8px]",
     joinWithNext ? "rounded-br-none" : "rounded-br-[8px]",
     isVisible && !isSelected && "opacity-0 group-hover:opacity-100",

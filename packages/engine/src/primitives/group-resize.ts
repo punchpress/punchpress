@@ -75,6 +75,17 @@ export const getScaledGroupNodeUpdate = (node, bbox, anchor, scale) => {
     };
   }
 
+  if (node.type === "image") {
+    return {
+      height: round(Math.max(1, node.height * scale), 2),
+      transform: {
+        x: round(anchor.x + (getNodeX(node) - anchor.x) * scale, 2),
+        y: round(anchor.y + (getNodeY(node) - anchor.y) * scale, 2),
+      },
+      width: round(Math.max(1, node.width * scale), 2),
+    };
+  }
+
   if (node.type === "path" || node.type === "vector") {
     const localCenter = bbox ? getLocalBoundsCenter(bbox) : null;
     const nextWorldCenter = localCenter
@@ -166,6 +177,14 @@ export const getResizedNodeUpdate = (node, bbox, anchor, scale, direction) => {
     return {
       height: round(Math.max(1, node.height * scale), 2),
       strokeWidth: round(Math.max(0, node.strokeWidth * scale), 2),
+      transform,
+      width: round(Math.max(1, node.width * scale), 2),
+    };
+  }
+
+  if (node.type === "image") {
+    return {
+      height: round(Math.max(1, node.height * scale), 2),
       transform,
       width: round(Math.max(1, node.width * scale), 2),
     };

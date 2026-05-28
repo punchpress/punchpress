@@ -16,6 +16,10 @@ export const isShapeNode = (node) => {
   return node?.type === "shape";
 };
 
+export const isImageNode = (node) => {
+  return node?.type === "image";
+};
+
 export const isVectorNode = (node) => {
   return node?.type === "vector";
 };

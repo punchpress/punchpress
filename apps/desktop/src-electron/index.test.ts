@@ -134,6 +134,7 @@ const registerDocumentFileHandlersMock = mock(
 const registerLocalFontHandlersMock = mock(() => undefined);
 const requestSingleInstanceLockMock = mock(() => requestSingleInstanceLock);
 const serveStaticAtMock = mock(async (_path: string) => undefined);
+const setStaticAppRouteHandlerMock = mock((_routeHandler: unknown) => undefined);
 const setApplicationMenuMock = mock((_menu: unknown) => undefined);
 const shellOpenExternalMock = mock((_url: string) => undefined);
 const getAutoUpdaterStatusMock = mock(() => ({ phase: "idle" }));
@@ -200,6 +201,7 @@ mock.module("./helpers/app-updater.js", () => ({
 mock.module("./helpers/serve-static-app.js", () => ({
   configurePrivilegedStaticAppScheme: configurePrivilegedStaticAppSchemeMock,
   serveStaticAt: serveStaticAtMock,
+  setStaticAppRouteHandler: setStaticAppRouteHandlerMock,
 }));
 
 mock.module("./local-fonts.js", () => ({
@@ -269,6 +271,7 @@ describe("desktop index bootstrap", () => {
     registerLocalFontHandlersMock.mockClear();
     requestSingleInstanceLockMock.mockClear();
     serveStaticAtMock.mockClear();
+    setStaticAppRouteHandlerMock.mockClear();
     setApplicationMenuMock.mockClear();
     shellOpenExternalMock.mockClear();
     startAutoUpdaterMock.mockClear();

@@ -12,7 +12,7 @@ PunchPress documents are versioned and validated on load.
 
 ## Rules
 
-- The current schema version is `1.7`.
+- The current schema version is `1.8`.
 - Saved documents should be explicit and canonical.
 - Missing required fields are validation errors unless migration owns the
   upgrade.

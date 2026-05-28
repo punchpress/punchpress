@@ -43,6 +43,9 @@ declare global {
       appMenu?: {
         updateState: (state: DesktopAppMenuState) => void;
       };
+      assets?: {
+        isSearchAvailable: boolean;
+      };
       documentCommands?: {
         markReady: () => void;
         onCommand: (

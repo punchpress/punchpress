@@ -5,6 +5,7 @@ import type {
   DesktopEditorCommand,
 } from "./app-menu-types.js";
 import { installApplicationMenu } from "./application-menu.js";
+import { createMagnificAssetsProtocolHandler } from "./assets/magnific-assets-api.js";
 import {
   APP_MENU_STATE_CHANNEL,
   DESKTOP_UPDATE_GET_STATUS_CHANNEL,
@@ -31,6 +32,7 @@ import {
 import {
   configurePrivilegedStaticAppScheme,
   serveStaticAt,
+  setStaticAppRouteHandler,
 } from "./helpers/serve-static-app.js";
 import { registerLocalFontHandlers } from "./local-fonts.js";
 import { createMainWindowController } from "./main-window-controller.js";
@@ -170,6 +172,9 @@ const launch = async () => {
   registerLocalFontHandlers();
 
   if (!isDev) {
+    setStaticAppRouteHandler(
+      createMagnificAssetsProtocolHandler(process.env.MAGNIFIC_API_KEY)
+    );
     await serveStaticAt(path.join(app.getAppPath(), "dist"));
   }
 

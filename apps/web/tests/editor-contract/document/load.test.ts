@@ -12,6 +12,7 @@ const VALID_DOCUMENT = {
   nodes: [
     {
       id: "node_1",
+      parentId: "root",
       type: "text",
       text: "TEST",
       font: {
@@ -67,7 +68,18 @@ describe("parseDesignDocument", () => {
     ).toThrow(DocumentValidationError);
   });
 
-  test("rejects older document versions", () => {
+  test("migrates 1.7 documents to the current version", () => {
+    expect(
+      parseDesignDocument(
+        JSON.stringify({
+          ...VALID_DOCUMENT,
+          version: "1.7",
+        })
+      ).version
+    ).toBe(PUNCH_DOCUMENT_VERSION);
+  });
+
+  test("rejects older unsupported document versions", () => {
     expect(() =>
       parseDesignDocument(
         JSON.stringify({

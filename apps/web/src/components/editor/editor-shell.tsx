@@ -5,6 +5,7 @@ import { useEditor } from "../../editor-react/use-editor";
 import { useTheme } from "../../theme/theme-provider";
 import { Canvas } from "../canvas/canvas";
 import { getCanvasCursorStyle } from "../canvas/canvas-cursor-assets";
+import { CommandMenu } from "../command-menu/command-menu";
 import {
   Designer,
   DesignerCanvas,
@@ -120,6 +121,7 @@ export const EditorShell = () => {
         </DesignerPanel>
 
         <PerformanceHud />
+        <CommandMenu />
       </DesignerContent>
       <NewFileDialog {...documentCommands.newFileDialogProps} />
       <MissingFontsExportDialog

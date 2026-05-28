@@ -40,6 +40,7 @@ export {
 } from "./inspection/selection-properties";
 export { createDefaultArtboardNode } from "./nodes/artboard/model";
 export { createDefaultGroupNode } from "./nodes/group/model";
+export { createDefaultImageNode } from "./nodes/image/model";
 export {
   getAncestorNodeIds,
   getChildNodeIds,
@@ -53,6 +54,7 @@ export {
   isContainerNode,
   isDescendantOf,
   isGroupNode,
+  isImageNode,
   isPathNode,
   isShapeNode,
   isTextNode,

@@ -41,6 +41,8 @@ Nodes are the building blocks of PunchPress documents.
 - Path nodes are first-class durable nodes.
 - Vector nodes preserve editable source geometry rather than only SVG path
   strings.
+- Image nodes preserve raster source artwork instead of pretending bitmap pixels
+  are editable vector content.
 - New containers make containment explicit in the node contract.
 - Specialized editing subsystems may exist, but PunchPress remains the durable
   owner of node data.
