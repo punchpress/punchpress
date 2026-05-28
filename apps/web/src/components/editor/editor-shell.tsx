@@ -24,16 +24,12 @@ const SHELL_CHROME_VARS = {
   desktop: {
     "--desktop-chrome-height": "40px",
     "--desktop-drag-left-inset": "84px",
-    "--desktop-update-indicator-left": "16px",
-    "--desktop-update-indicator-top": "14.5px",
     "--desktop-panel-top-gap": "4px",
     "--shell-logo-offset-x": "-7px",
   },
   web: {
     "--desktop-chrome-height": "40px",
     "--desktop-drag-left-inset": "0px",
-    "--desktop-update-indicator-left": "8px",
-    "--desktop-update-indicator-top": "8px",
     "--desktop-panel-top-gap": "16px",
     "--shell-logo-offset-x": "-7px",
   },
@@ -42,8 +38,11 @@ const SHELL_CHROME_VARS = {
 export const EditorShell = () => {
   const editor = useEditor();
   useTheme();
+  const shouldPreviewDesktopUpdater =
+    import.meta.env.VITE_PUNCHPRESS_PREVIEW_DESKTOP_UPDATER === "1";
   const isDesktopShell =
-    typeof window !== "undefined" && Boolean(window.electron?.versions);
+    (typeof window !== "undefined" && Boolean(window.electron?.versions)) ||
+    shouldPreviewDesktopUpdater;
   const shellChromeVars = isDesktopShell
     ? SHELL_CHROME_VARS.desktop
     : SHELL_CHROME_VARS.web;
@@ -90,12 +89,12 @@ export const EditorShell = () => {
     >
       <DesignerContent>
         {isDesktopShell ? (
-          <DesignerWindowDragRegion>
-            <DesktopUpdateIndicator />
+          <DesignerWindowDragRegion className="flex items-start gap-2">
             <WorkspaceTabs
               onCloseTab={documentCommands.closeTabSafely}
               onNewFile={() => documentCommands.runDocumentCommandSafely("new")}
             />
+            <DesktopUpdateIndicator />
           </DesignerWindowDragRegion>
         ) : null}
 

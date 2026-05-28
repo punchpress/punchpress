@@ -85,6 +85,7 @@ const run = async () => {
   const env = {
     ...process.env,
     ELECTRON_IS_DEV: "1",
+    VITE_PUNCHPRESS_PREVIEW_DESKTOP_UPDATER: "1",
     VITE_PORT: String(vitePort),
     VITE_DEV_SERVER_URL: `http://${host}:${vitePort}`,
   };
