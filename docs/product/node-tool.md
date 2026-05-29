@@ -13,6 +13,10 @@ The Node tool directly edits eligible shapes, paths, and vectors.
   chrome.
 - Clicking visible path artwork selects that path and enters path editing, even
   inside imported or nested groups.
+- Dragging a marquee with no active path-edit session previews intersecting
+  editable curve candidates, then selects them on release. This includes curves
+  nested inside groups and vectors. Selected curves enter Node edit chrome with
+  editable anchors visible on canvas.
 - In path editing, another visible topmost path under the pointer wins over body
   interaction with the current path.
 - Hidden, clipped, or invisible paths do not win ordinary cursor targeting.

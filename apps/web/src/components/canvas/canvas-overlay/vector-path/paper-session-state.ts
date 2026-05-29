@@ -106,6 +106,7 @@ export interface VectorPaperSessionOptions {
   onExitPathEditing: () => void;
   onHistoryCommit: (historyMark: unknown) => void;
   onHistoryStart: () => unknown;
+  syncPathSelection?: boolean;
 }
 
 export const createVectorPaperSessionState = (scope: paper.PaperScope) => {

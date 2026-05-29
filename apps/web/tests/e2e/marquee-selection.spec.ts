@@ -8,6 +8,7 @@ import {
   loadDocumentFixture,
   marqueeSelect,
   pauseForUi,
+  setViewport,
   waitForNodeReady,
   waitForSelectionHandles,
 } from "./helpers/editor";
@@ -127,6 +128,11 @@ const COMPOUND_VECTOR_DOCUMENT = JSON.stringify({
   version: "1.7",
 });
 
+const EMPTY_DOCUMENT = JSON.stringify({
+  nodes: [],
+  version: "1.7",
+});
+
 const SIMPLE_MULTISELECT_DOCUMENT = JSON.stringify({
   nodes: [
     {
@@ -168,6 +174,192 @@ const SIMPLE_MULTISELECT_DOCUMENT = JSON.stringify({
       type: "shape",
       visible: true,
       width: 130,
+    },
+  ],
+  version: "1.7",
+});
+
+const NESTED_CURVE_DOCUMENT = JSON.stringify({
+  nodes: [
+    {
+      id: "nested-group",
+      name: "Nested Group",
+      parentId: "root",
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: 0,
+        y: 0,
+      },
+      type: "group",
+      visible: true,
+    },
+    {
+      closed: true,
+      fill: "#3366ff",
+      fillRule: "nonzero",
+      id: "nested-path-a",
+      parentId: "nested-group",
+      segments: [
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 0, y: 0 },
+          pointType: "corner",
+        },
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 100, y: 0 },
+          pointType: "corner",
+        },
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 100, y: 100 },
+          pointType: "corner",
+        },
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 0, y: 100 },
+          pointType: "corner",
+        },
+      ],
+      stroke: null,
+      strokeWidth: 0,
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: 220,
+        y: 190,
+      },
+      type: "path",
+      visible: true,
+    },
+    {
+      closed: true,
+      fill: "#ff6633",
+      fillRule: "nonzero",
+      id: "nested-path-b",
+      parentId: "nested-group",
+      segments: [
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 0, y: 0 },
+          pointType: "corner",
+        },
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 100, y: 0 },
+          pointType: "corner",
+        },
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 100, y: 100 },
+          pointType: "corner",
+        },
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 0, y: 100 },
+          pointType: "corner",
+        },
+      ],
+      stroke: null,
+      strokeWidth: 0,
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: 380,
+        y: 240,
+      },
+      type: "path",
+      visible: true,
+    },
+  ],
+  version: "1.7",
+});
+
+const TRANSFORMED_NESTED_CURVE_DOCUMENT = JSON.stringify({
+  nodes: [
+    {
+      id: "transformed-parent",
+      name: "Transformed Parent",
+      parentId: "root",
+      transform: {
+        rotation: 0,
+        scaleX: 1.4,
+        scaleY: 1.4,
+        x: 120,
+        y: 80,
+      },
+      type: "group",
+      visible: true,
+    },
+    {
+      id: "transformed-child",
+      name: "Transformed Child",
+      parentId: "transformed-parent",
+      transform: {
+        rotation: 0,
+        scaleX: 0.8,
+        scaleY: 0.8,
+        x: 160,
+        y: 120,
+      },
+      type: "group",
+      visible: true,
+    },
+    {
+      closed: true,
+      fill: "#3366ff",
+      fillRule: "nonzero",
+      id: "transformed-nested-path",
+      parentId: "transformed-child",
+      segments: [
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 0, y: 0 },
+          pointType: "corner",
+        },
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 140, y: 0 },
+          pointType: "corner",
+        },
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 140, y: 90 },
+          pointType: "corner",
+        },
+        {
+          handleIn: { x: 0, y: 0 },
+          handleOut: { x: 0, y: 0 },
+          point: { x: 0, y: 90 },
+          pointType: "corner",
+        },
+      ],
+      stroke: null,
+      strokeWidth: 0,
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: 40,
+        y: 40,
+      },
+      type: "path",
+      visible: true,
     },
   ],
   version: "1.7",
@@ -358,6 +550,42 @@ test("marquee selection still selects ordinary top-level nodes", async ({
     .toEqual(["shape-a", "shape-b"]);
 });
 
+test("marquee selection ignores partially intersected objects by default", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(page, SIMPLE_MULTISELECT_DOCUMENT);
+
+  const firstNode = page.locator('[data-node-id="shape-a"]');
+
+  await expect(firstNode).toBeVisible();
+
+  const firstRect = await firstNode.boundingBox();
+
+  expect(firstRect).not.toBeNull();
+
+  if (!firstRect) {
+    return;
+  }
+
+  await marqueeSelect(
+    page,
+    {
+      x: firstRect.x - 24,
+      y: firstRect.y - 24,
+    },
+    {
+      x: firstRect.x + firstRect.width / 2,
+      y: firstRect.y + firstRect.height + 24,
+    }
+  );
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => (await getSelectionSnapshot(page)).selectedNodeIds)
+    .toEqual([]);
+});
+
 test("marquee selection shows one wrapper box around the whole group", async ({
   page,
 }) => {
@@ -540,4 +768,569 @@ test("marquee selection selects a compound vector container", async ({
   await expect
     .poll(async () => (await getSelectionSnapshot(page)).selectedNodeIds)
     .toEqual(["compound-vector"]);
+});
+
+test("node tool marquee selection selects compound vector curves", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(page, COMPOUND_VECTOR_DOCUMENT);
+  await page.getByRole("button", { name: "Node (A)" }).click();
+
+  const vectorNode = page.locator('[data-node-id="compound-vector"]');
+
+  await expect(vectorNode).toBeVisible();
+
+  const vectorRect = await vectorNode.boundingBox();
+
+  expect(vectorRect).not.toBeNull();
+
+  if (!vectorRect) {
+    return;
+  }
+
+  await marqueeSelect(
+    page,
+    {
+      x: vectorRect.x - 24,
+      y: vectorRect.y - 24,
+    },
+    {
+      x: vectorRect.x + vectorRect.width + 24,
+      y: vectorRect.y + vectorRect.height + 24,
+    }
+  );
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () =>
+      [...(await getSelectionSnapshot(page)).selectedNodeIds].sort()
+    )
+    .toEqual(["compound-vector:inner", "compound-vector:outer"]);
+});
+
+test("node tool marquee selection selects editable vector nodes", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(page, EMPTY_DOCUMENT);
+  const vectorId = await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    editor.addVectorNode({ x: 320, y: 260 });
+    const nodeId = editor.selectedNodeIds[0];
+    editor.clearSelection();
+
+    return nodeId;
+  });
+  await page.getByRole("button", { name: "Node (A)" }).click();
+
+  const vectorNode = page.locator(`[data-node-id="${vectorId}"]`);
+
+  await expect(vectorNode).toBeVisible();
+
+  const vectorRect = await vectorNode.boundingBox();
+
+  expect(vectorRect).not.toBeNull();
+
+  if (!vectorRect) {
+    return;
+  }
+
+  await marqueeSelect(
+    page,
+    {
+      x: vectorRect.x - 24,
+      y: vectorRect.y - 24,
+    },
+    {
+      x: vectorRect.x + vectorRect.width + 24,
+      y: vectorRect.y + vectorRect.height + 24,
+    }
+  );
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => (await getSelectionSnapshot(page)).selectedNodeIds)
+    .toEqual([vectorId]);
+  await expect(
+    page.locator(`.canvas-multi-vector-paper[data-node-id="${vectorId}"]`)
+  ).toBeVisible();
+});
+
+test("node tool marquee selection selects nested curves", async ({ page }) => {
+  await gotoEditor(page);
+  await loadDocument(page, NESTED_CURVE_DOCUMENT);
+  await page.getByRole("button", { name: "Node (A)" }).click();
+
+  const firstPath = page.locator('[data-node-id="nested-path-a"]');
+  const secondPath = page.locator('[data-node-id="nested-path-b"]');
+
+  await expect(firstPath).toBeVisible();
+  await expect(secondPath).toBeVisible();
+
+  const firstRect = await firstPath.boundingBox();
+  const secondRect = await secondPath.boundingBox();
+
+  expect(firstRect).not.toBeNull();
+  expect(secondRect).not.toBeNull();
+
+  if (!(firstRect && secondRect)) {
+    return;
+  }
+
+  await marqueeSelect(
+    page,
+    {
+      x: Math.min(firstRect.x, secondRect.x) - 24,
+      y: Math.min(firstRect.y, secondRect.y) - 24,
+    },
+    {
+      x:
+        Math.max(
+          firstRect.x + firstRect.width,
+          secondRect.x + secondRect.width
+        ) + 24,
+      y:
+        Math.max(
+          firstRect.y + firstRect.height,
+          secondRect.y + secondRect.height
+        ) + 24,
+    }
+  );
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () =>
+      [...(await getSelectionSnapshot(page)).selectedNodeIds].sort()
+    )
+    .toEqual(["nested-path-a", "nested-path-b"]);
+  await expect(
+    page.locator('.canvas-multi-vector-paper[data-node-id="nested-path-a"]')
+  ).toBeVisible();
+  await expect(
+    page.locator('.canvas-multi-vector-paper[data-node-id="nested-path-b"]')
+  ).toBeVisible();
+});
+
+test("node tool marquee selected curves expose editable anchors", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(page, NESTED_CURVE_DOCUMENT);
+  await page.getByRole("button", { name: "Node (A)" }).click();
+
+  const firstPath = page.locator('[data-node-id="nested-path-a"]');
+  const secondPath = page.locator('[data-node-id="nested-path-b"]');
+
+  await expect(firstPath).toBeVisible();
+  await expect(secondPath).toBeVisible();
+
+  const firstRect = await firstPath.boundingBox();
+  const secondRect = await secondPath.boundingBox();
+
+  expect(firstRect).not.toBeNull();
+  expect(secondRect).not.toBeNull();
+
+  if (!(firstRect && secondRect)) {
+    return;
+  }
+
+  await marqueeSelect(
+    page,
+    {
+      x: Math.min(firstRect.x, secondRect.x) - 24,
+      y: Math.min(firstRect.y, secondRect.y) - 24,
+    },
+    {
+      x:
+        Math.max(
+          firstRect.x + firstRect.width,
+          secondRect.x + secondRect.width
+        ) + 24,
+      y:
+        Math.max(
+          firstRect.y + firstRect.height,
+          secondRect.y + secondRect.height
+        ) + 24,
+    }
+  );
+  await pauseForUi(page);
+
+  const editCanvas = page.locator(
+    '.canvas-multi-vector-paper[data-node-id="nested-path-a"]'
+  );
+
+  await expect(editCanvas).toBeVisible();
+
+  await page.mouse.move(firstRect.x + 2, firstRect.y + 2);
+  await expect(editCanvas).toHaveAttribute("data-active", "true");
+
+  await page.mouse.down();
+  await page.mouse.move(firstRect.x + 26, firstRect.y + 18, { steps: 8 });
+  await page.mouse.up();
+
+  await expect
+    .poll(() => {
+      return page.evaluate(() => {
+        const node = window.__PUNCHPRESS_EDITOR__?.getNode("nested-path-a");
+        const contour = node?.contours?.[0];
+
+        return contour?.segments?.[0]?.point || null;
+      });
+    })
+    .not.toEqual({ x: 0, y: 0 });
+});
+
+test("node tool marquee drag does not select the curve under the pointer before release", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(page, NESTED_CURVE_DOCUMENT);
+  await page.getByRole("button", { name: "Node (A)" }).click();
+
+  const firstPath = page.locator('[data-node-id="nested-path-a"]');
+
+  await expect(firstPath).toBeVisible();
+
+  const firstRect = await firstPath.boundingBox();
+
+  expect(firstRect).not.toBeNull();
+
+  if (!firstRect) {
+    return;
+  }
+
+  await page.mouse.move(
+    firstRect.x + firstRect.width / 2,
+    firstRect.y + firstRect.height / 2
+  );
+  await page.mouse.down();
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => (await getSelectionSnapshot(page)).selectedNodeIds)
+    .toEqual([]);
+
+  await page.mouse.up();
+});
+
+test("node tool marquee can start over unselected artwork", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(page, NESTED_CURVE_DOCUMENT);
+  await page.getByRole("button", { name: "Node (A)" }).click();
+
+  const firstPath = page.locator('[data-node-id="nested-path-a"]');
+  const secondPath = page.locator('[data-node-id="nested-path-b"]');
+
+  await expect(firstPath).toBeVisible();
+  await expect(secondPath).toBeVisible();
+
+  const firstRect = await firstPath.boundingBox();
+  const secondRect = await secondPath.boundingBox();
+
+  expect(firstRect).not.toBeNull();
+  expect(secondRect).not.toBeNull();
+
+  if (!(firstRect && secondRect)) {
+    return;
+  }
+
+  await page.mouse.move(
+    firstRect.x + firstRect.width / 2,
+    firstRect.y + firstRect.height / 2
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    secondRect.x + secondRect.width + 24,
+    secondRect.y + secondRect.height + 24,
+    { steps: 12 }
+  );
+
+  await expect(
+    page.locator(
+      '.canvas-marquee-candidate-preview[data-node-id="nested-path-a"]'
+    )
+  ).toBeVisible();
+  await expect
+    .poll(async () => (await getSelectionSnapshot(page)).selectedNodeIds)
+    .toEqual([]);
+
+  await page.mouse.up();
+
+  await expect
+    .poll(async () =>
+      [...(await getSelectionSnapshot(page)).selectedNodeIds].sort()
+    )
+    .toEqual(["nested-path-a", "nested-path-b"]);
+});
+
+test("node tool marquee can start over unselected artwork with an existing selection", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(page, NESTED_CURVE_DOCUMENT);
+  await page.getByRole("button", { name: "Node (A)" }).click();
+
+  const firstPath = page.locator('[data-node-id="nested-path-a"]');
+  const secondPath = page.locator('[data-node-id="nested-path-b"]');
+
+  await expect(firstPath).toBeVisible();
+  await expect(secondPath).toBeVisible();
+
+  const firstRect = await firstPath.boundingBox();
+  const secondRect = await secondPath.boundingBox();
+
+  expect(firstRect).not.toBeNull();
+  expect(secondRect).not.toBeNull();
+
+  if (!(firstRect && secondRect)) {
+    return;
+  }
+
+  await marqueeSelect(
+    page,
+    {
+      x: firstRect.x - 24,
+      y: firstRect.y - 24,
+    },
+    {
+      x: firstRect.x + firstRect.width + 24,
+      y: firstRect.y + firstRect.height + 24,
+    }
+  );
+  await pauseForUi(page);
+
+  await expect
+    .poll(async () => (await getSelectionSnapshot(page)).selectedNodeIds)
+    .toEqual(["nested-path-a"]);
+
+  await page.keyboard.down("Shift");
+  await page.mouse.move(
+    secondRect.x + secondRect.width / 2,
+    secondRect.y + secondRect.height / 2
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    secondRect.x + secondRect.width + 24,
+    secondRect.y + secondRect.height + 24,
+    { steps: 12 }
+  );
+  await page.mouse.up();
+  await page.keyboard.up("Shift");
+
+  await expect
+    .poll(async () =>
+      [...(await getSelectionSnapshot(page)).selectedNodeIds].sort()
+    )
+    .toEqual(["nested-path-a", "nested-path-b"]);
+});
+
+test("node tool marquee previews intersecting curve candidates while dragging", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(page, NESTED_CURVE_DOCUMENT);
+  await page.getByRole("button", { name: "Node (A)" }).click();
+
+  const firstPath = page.locator('[data-node-id="nested-path-a"]');
+  const secondPath = page.locator('[data-node-id="nested-path-b"]');
+
+  await expect(firstPath).toBeVisible();
+  await expect(secondPath).toBeVisible();
+
+  const firstRect = await firstPath.boundingBox();
+  const secondRect = await secondPath.boundingBox();
+
+  expect(firstRect).not.toBeNull();
+  expect(secondRect).not.toBeNull();
+
+  if (!(firstRect && secondRect)) {
+    return;
+  }
+
+  await page.mouse.move(
+    Math.min(firstRect.x, secondRect.x) - 24,
+    Math.max(firstRect.y, secondRect.y) + 16
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    Math.max(firstRect.x + firstRect.width, secondRect.x + secondRect.width) +
+      24,
+    Math.max(firstRect.y, secondRect.y) + 28,
+    { steps: 12 }
+  );
+
+  await expect(
+    page.locator(
+      '.canvas-marquee-candidate-preview[data-node-id="nested-path-a"]'
+    )
+  ).toBeVisible();
+  await expect(
+    page.locator(
+      '.canvas-marquee-candidate-preview[data-node-id="nested-path-b"]'
+    )
+  ).toBeVisible();
+  await expect
+    .poll(async () => (await getSelectionSnapshot(page)).selectedNodeIds)
+    .toEqual([]);
+
+  await page.mouse.up();
+
+  await expect(page.locator(".canvas-marquee-candidate-preview")).toHaveCount(
+    0
+  );
+  await expect
+    .poll(async () =>
+      [...(await getSelectionSnapshot(page)).selectedNodeIds].sort()
+    )
+    .toEqual(["nested-path-a", "nested-path-b"]);
+});
+
+test("node tool marquee uses current zoom for curve candidate geometry", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(page, NESTED_CURVE_DOCUMENT);
+  await setViewport(page, { x: 0, y: 0, zoom: 0.25 });
+  await page.getByRole("button", { name: "Node (A)" }).click();
+
+  const firstPath = page.locator('[data-node-id="nested-path-a"]');
+  const secondPath = page.locator('[data-node-id="nested-path-b"]');
+
+  await expect(firstPath).toBeVisible();
+  await expect(secondPath).toBeVisible();
+
+  const firstRect = await firstPath.boundingBox();
+  const secondRect = await secondPath.boundingBox();
+
+  expect(firstRect).not.toBeNull();
+  expect(secondRect).not.toBeNull();
+
+  if (!(firstRect && secondRect)) {
+    return;
+  }
+
+  await page.mouse.move(
+    Math.min(firstRect.x, secondRect.x) - 12,
+    Math.max(firstRect.y, secondRect.y) + 4
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    Math.max(firstRect.x + firstRect.width, secondRect.x + secondRect.width) +
+      12,
+    Math.max(firstRect.y, secondRect.y) + 12,
+    { steps: 12 }
+  );
+
+  await expect(page.locator(".canvas-marquee-candidate-preview")).toHaveCount(
+    2
+  );
+
+  const previewRects = await page
+    .locator(".canvas-marquee-candidate-preview")
+    .evaluateAll((elements) => {
+      return elements.map((element) => {
+        const rect = element.getBoundingClientRect();
+
+        return {
+          height: rect.height,
+          nodeId: element.getAttribute("data-node-id"),
+          width: rect.width,
+          x: rect.x,
+          y: rect.y,
+        };
+      });
+    });
+  const paintedRects = await page
+    .locator('[data-node-id="nested-path-a"], [data-node-id="nested-path-b"]')
+    .evaluateAll((elements) => {
+      return elements.map((element) => {
+        const rect = element.getBoundingClientRect();
+
+        return {
+          height: rect.height,
+          nodeId: element.getAttribute("data-node-id"),
+          width: rect.width,
+          x: rect.x,
+          y: rect.y,
+        };
+      });
+    });
+
+  for (const paintedRect of paintedRects) {
+    const previewRect = previewRects.find(
+      (candidate) => candidate.nodeId === paintedRect.nodeId
+    );
+
+    expect(previewRect).toBeDefined();
+    expect(previewRect?.x).toBeCloseTo(paintedRect.x, 1);
+    expect(previewRect?.y).toBeCloseTo(paintedRect.y, 1);
+    expect(previewRect?.width).toBeCloseTo(paintedRect.width, 1);
+    expect(previewRect?.height).toBeCloseTo(paintedRect.height, 1);
+  }
+
+  await page.mouse.up();
+
+  await expect
+    .poll(async () =>
+      [...(await getSelectionSnapshot(page)).selectedNodeIds].sort()
+    )
+    .toEqual(["nested-path-a", "nested-path-b"]);
+});
+
+test("node tool marquee preview follows transformed ancestor groups", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(page, TRANSFORMED_NESTED_CURVE_DOCUMENT);
+  await setViewport(page, { x: 0, y: 0, zoom: 0.2 });
+  await page.getByRole("button", { name: "Node (A)" }).click();
+
+  const targetPath = page.locator('[data-node-id="transformed-nested-path"]');
+
+  await expect(targetPath).toBeVisible();
+
+  const targetRect = await targetPath.boundingBox();
+
+  expect(targetRect).not.toBeNull();
+
+  if (!targetRect) {
+    return;
+  }
+
+  await page.mouse.move(targetRect.x - 12, targetRect.y + 8);
+  await page.mouse.down();
+  await page.mouse.move(
+    targetRect.x + targetRect.width + 12,
+    targetRect.y + targetRect.height - 8,
+    { steps: 12 }
+  );
+
+  const preview = page.locator(
+    '.canvas-marquee-candidate-preview[data-node-id="transformed-nested-path"]'
+  );
+
+  await expect(preview).toBeVisible();
+
+  const previewRect = await preview.boundingBox();
+
+  expect(previewRect).not.toBeNull();
+
+  if (!previewRect) {
+    return;
+  }
+
+  expect(previewRect.x).toBeCloseTo(targetRect.x, 1);
+  expect(previewRect.y).toBeCloseTo(targetRect.y, 1);
+  expect(previewRect.width).toBeCloseTo(targetRect.width, 1);
+  expect(previewRect.height).toBeCloseTo(targetRect.height, 1);
+
+  await page.mouse.up();
+
+  await expect
+    .poll(async () => (await getSelectionSnapshot(page)).selectedNodeIds)
+    .toEqual(["transformed-nested-path"]);
 });

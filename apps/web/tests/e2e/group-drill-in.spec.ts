@@ -283,7 +283,7 @@ test("double-clicking grouped content drills into the group and allows child sel
     .toEqual([groupNodeId]);
 });
 
-test("focused group clicks target deeply nested path layers", async ({
+test("pointer double-click targets deeply nested path layers directly", async ({
   page,
 }) => {
   await gotoEditor(page);
@@ -307,31 +307,14 @@ test("focused group clicks target deeply nested path layers", async ({
         focusedGroupId: dump?.editing?.focusedGroupId || null,
         pathEditingNodeId: dump?.editing?.pathNodeId || null,
         selectedNodeIds: dump?.selection?.ids || [],
+        tool: dump?.tool || null,
       };
     })
     .toEqual({
-      focusedGroupId: "outer-group",
-      pathEditingNodeId: null,
+      focusedGroupId: "inner-group",
+      pathEditingNodeId: "left-path",
       selectedNodeIds: ["left-path"],
-    });
-
-  await clickNodeCenter(page, "right-path");
-  await pauseForUi(page);
-
-  await expect
-    .poll(async () => {
-      const dump = await getDebugDump(page);
-
-      return {
-        focusedGroupId: dump?.editing?.focusedGroupId || null,
-        pathEditingNodeId: dump?.editing?.pathNodeId || null,
-        selectedNodeIds: dump?.selection?.ids || [],
-      };
-    })
-    .toEqual({
-      focusedGroupId: "outer-group",
-      pathEditingNodeId: null,
-      selectedNodeIds: ["right-path"],
+      tool: "node",
     });
 });
 

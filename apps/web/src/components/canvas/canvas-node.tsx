@@ -600,6 +600,83 @@ const startCanvasNodeDragSession = ({
   window.addEventListener("pointerup", handlePointerEnd);
 };
 
+const shouldIgnoreCanvasNodePointerDown = ({
+  activeTool,
+  event,
+  spacePressed,
+}) => {
+  return event.button !== 0 || spacePressed || activeTool === "hand";
+};
+
+const shouldDeferNodeToolIdleSelection = (editor, activeTool) => {
+  return activeTool === "node" && !editor.pathEditingNodeId;
+};
+
+const handleNodeToolIdlePointerDown = ({
+  activeTool,
+  editor,
+  event,
+  nodeId,
+  spacePressed,
+}) => {
+  if (
+    event.detail >= 2 ||
+    spacePressed ||
+    activeTool !== "node" ||
+    editor.pathEditingNodeId
+  ) {
+    return;
+  }
+
+  const startClientPoint = {
+    x: event.clientX,
+    y: event.clientY,
+  };
+  const interactionNodeId = getCanvasInteractionNodeId(
+    editor,
+    activeTool,
+    nodeId,
+    event
+  );
+  const node = editor.getNode(interactionNodeId);
+
+  if (!node) {
+    return;
+  }
+
+  let didMove = false;
+  const handlePointerMove = (moveEvent) => {
+    if (
+      hasPointerMovedAtLeast(
+        startClientPoint,
+        { x: moveEvent.clientX, y: moveEvent.clientY },
+        "selectionDrag"
+      )
+    ) {
+      didMove = true;
+    }
+  };
+  const handlePointerEnd = (upEvent) => {
+    window.removeEventListener("pointermove", handlePointerMove);
+    window.removeEventListener("pointercancel", handlePointerEnd);
+    window.removeEventListener("pointerup", handlePointerEnd);
+
+    if (didMove || editor.pathEditingNodeId) {
+      return;
+    }
+
+    editor.dispatchNodePointerDown({
+      event: upEvent,
+      node,
+      point: getCanvasPoint(editor, startClientPoint.x, startClientPoint.y),
+    });
+  };
+
+  window.addEventListener("pointermove", handlePointerMove);
+  window.addEventListener("pointercancel", handlePointerEnd);
+  window.addEventListener("pointerup", handlePointerEnd);
+};
+
 const CanvasNodeShell = ({ children, isReady, nodeId }) => {
   usePerformanceRenderCounter("render.canvas.node");
   const editor = useEditor();
@@ -667,11 +744,13 @@ const CanvasNodeShell = ({ children, isReady, nodeId }) => {
                 onPointerDown={(event) => {
                   const timingStartedAt = getInteractionTimingStart();
 
-                  if (event.button !== 0) {
-                    return;
-                  }
-
-                  if (spacePressed || activeTool === "hand") {
+                  if (
+                    shouldIgnoreCanvasNodePointerDown({
+                      activeTool,
+                      event,
+                      spacePressed,
+                    })
+                  ) {
                     return;
                   }
 
@@ -690,6 +769,17 @@ const CanvasNodeShell = ({ children, isReady, nodeId }) => {
                         x: event.clientX,
                         y: event.clientY,
                       },
+                    });
+                    return;
+                  }
+
+                  if (shouldDeferNodeToolIdleSelection(editor, activeTool)) {
+                    handleNodeToolIdlePointerDown({
+                      activeTool,
+                      editor,
+                      event,
+                      nodeId,
+                      spacePressed,
                     });
                     return;
                   }

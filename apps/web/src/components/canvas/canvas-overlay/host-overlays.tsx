@@ -5,7 +5,10 @@ import { CanvasSelectionForeground } from "./selection/selection-foreground";
 import { CanvasSelectionMarquee } from "./selection/selection-marquee";
 import { CanvasTextPathGuides } from "./text/path-guides";
 import { CanvasSelectionToolbar } from "./toolbar/selection-toolbar";
-import { CanvasVectorEditor } from "./vector-path/editor";
+import {
+  CanvasMultiVectorEditor,
+  CanvasVectorEditor,
+} from "./vector-path/editor";
 
 // Host-anchored overlay stack. Stage-local previews live in CanvasStageOverlays.
 export const CanvasHostOverlays = () => {
@@ -31,6 +34,7 @@ export const CanvasHostOverlays = () => {
       <CanvasSelectionMarquee />
       <CanvasSelectionToolbar />
       <CanvasTextPathGuides viewportRevision={viewportRevision} />
+      <CanvasMultiVectorEditor viewportRevision={viewportRevision} />
       <CanvasVectorEditor viewportRevision={viewportRevision} />
       <CanvasSelectionForeground viewportRevision={viewportRevision} />
     </>

@@ -187,6 +187,23 @@ const isNodeOrDescendantHit = (editor, nodeId, canvasPoint) => {
   });
 };
 
+const isNodeElementBoundsHit = (editor, nodeId, point) => {
+  const element =
+    editor.getNodeTransformElement(nodeId) || editor.getNodeElement(nodeId);
+  const rect = element?.getBoundingClientRect?.();
+
+  if (!rect) {
+    return false;
+  }
+
+  return (
+    point.x >= rect.left &&
+    point.x <= rect.right &&
+    point.y >= rect.top &&
+    point.y <= rect.bottom
+  );
+};
+
 export const CanvasMultiSelectionForeground = ({
   isDraggable,
   isResizable,
@@ -281,14 +298,19 @@ export const CanvasMultiSelectionForeground = ({
       event.clientY
     );
 
-    if (
-      !(
-        startCanvasPoint &&
-        nodeIds.some((nodeId) => {
-          return isNodeOrDescendantHit(editor, nodeId, startCanvasPoint);
-        })
-      )
-    ) {
+    const startClientPoint = {
+      x: event.clientX,
+      y: event.clientY,
+    };
+    const didPressSelectedNode = nodeIds.some((nodeId) => {
+      return (
+        (startCanvasPoint &&
+          isNodeOrDescendantHit(editor, nodeId, startCanvasPoint)) ||
+        isNodeElementBoundsHit(editor, nodeId, startClientPoint)
+      );
+    });
+
+    if (!didPressSelectedNode) {
       if (editor.activeTool === "pointer") {
         event.preventDefault();
         event.stopPropagation();
@@ -301,10 +323,10 @@ export const CanvasMultiSelectionForeground = ({
     event.preventDefault();
     event.stopPropagation();
 
-    const startClientPoint = {
-      x: event.clientX,
-      y: event.clientY,
-    };
+    if (!startCanvasPoint) {
+      return;
+    }
+
     let previousCanvasPoint = startCanvasPoint;
     let dragSession: ReturnType<typeof editor.beginSelectionDrag> = null;
     let didMove = false;

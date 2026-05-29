@@ -19,7 +19,11 @@ Path editing manipulates editable curve geometry while preserving node identity.
 - Straight and one-sided curve points are valid states, not separate primary
   modes.
 - Users can select one or multiple anchors by click, additive click, or marquee.
+- Path-edit marquee is rectangular. Freehand lasso point selection is not
+  exposed.
 - Dragging one selected anchor moves the full selected set.
+- Selected anchors can move together by drag or keyboard nudge. PunchPress does
+  not expose a scale/rotate transform box for selected anchors.
 
 ## Point Controls
 

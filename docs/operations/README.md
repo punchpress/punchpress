@@ -18,6 +18,7 @@ recover when a workflow fails.
 | Direct `Editor` and plain TypeScript tests | [Editor contract](editor-contract.md) |
 | Browser-backed interaction tests | [Playwright](playwright.md) |
 | Performance benchmarks, traces, and slow-frame diagnosis | [Performance](performance.md) |
+| Affinity-style Pointer and Node selection parity audit | [Affinity selection audit](affinity-selection-audit.md) |
 | Version, changelog, tags, GitHub releases, and publish order | [Releases](releases.md) |
 | Electron signing, notarization, S3 publishing, and updater checks | [Desktop releases](desktop-releases.md) |
 | AI-assisted version bump workflow | [Version bumps](version-bumps.md) |

@@ -4,6 +4,25 @@ import {
   getCanvasVectorChildPathNodeIdAtPoint,
 } from "./canvas-overlay/vector-path/canvas-node-hit-target";
 
+const focusNearestGroupAncestor = (editor, nodeId) => {
+  let currentNode = editor.getNode(nodeId);
+
+  while (currentNode?.parentId) {
+    const parentNode = editor.getNode(currentNode.parentId);
+
+    if (!parentNode) {
+      return;
+    }
+
+    if (parentNode.type === "group") {
+      editor.setFocusedGroup(parentNode.id);
+      return;
+    }
+
+    currentNode = parentNode;
+  }
+};
+
 const getCanvasEditingEntryNodeId = (editor, nodeId, clientPoint) => {
   const defaultTargetNodeId =
     editor.getPathEditingEntryNodeId(nodeId) || nodeId;
@@ -52,10 +71,6 @@ const getCanvasEditingEntryNodeId = (editor, nodeId, clientPoint) => {
 };
 
 export const openCanvasNodeEditingMode = (editor, nodeId, options = {}) => {
-  if (drillIntoGroupSelection(editor, nodeId)) {
-    return true;
-  }
-
   const targetNodeId = getCanvasEditingEntryNodeId(
     editor,
     nodeId,
@@ -68,12 +83,8 @@ export const openCanvasNodeEditingMode = (editor, nodeId, options = {}) => {
     return false;
   }
 
-  if (nodeEditCapabilities.canEditText) {
-    editor.startEditing(node);
-    return true;
-  }
-
   if (nodeEditCapabilities.requiresPathEditing) {
+    focusNearestGroupAncestor(editor, node.id);
     const didStart = editor.startPathEditing(node.id);
 
     if (didStart) {
@@ -81,6 +92,15 @@ export const openCanvasNodeEditingMode = (editor, nodeId, options = {}) => {
     }
 
     return didStart;
+  }
+
+  if (drillIntoGroupSelection(editor, nodeId)) {
+    return true;
+  }
+
+  if (nodeEditCapabilities.canEditText) {
+    editor.startEditing(node);
+    return true;
   }
 
   return false;

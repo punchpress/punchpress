@@ -15,6 +15,7 @@ export const createVectorPaperSession = ({
   onExitPathEditing,
   onHistoryCommit,
   onHistoryStart,
+  syncPathSelection = true,
 }: VectorPaperSessionOptions) => {
   const scope = new paper.PaperScope();
   scope.setup(canvas);
@@ -27,6 +28,7 @@ export const createVectorPaperSession = ({
     onChange,
     scope,
     state,
+    syncPathSelection,
   });
   const scene = createPaperSessionSceneController({
     chrome,

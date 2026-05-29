@@ -112,6 +112,7 @@ interface CreatePaperSessionChromeControllerOptions {
   ) => void;
   scope: paper.PaperScope;
   state: VectorPaperSessionState;
+  syncPathSelection?: boolean;
 }
 
 export const createPaperSessionChromeController = ({
@@ -121,6 +122,7 @@ export const createPaperSessionChromeController = ({
   onChange,
   scope,
   state,
+  syncPathSelection = true,
 }: CreatePaperSessionChromeControllerOptions): PaperSessionChromeController => {
   const setHoverCursorMode = (mode: string | null) => {
     setCanvasCursorToken(canvas, getVectorPathCursorToken(mode));
@@ -664,7 +666,9 @@ export const createPaperSessionChromeController = ({
       applySourceSegmentToPaper(point.contourIndex, point.segmentIndex);
     }
 
-    editor.setPathEditingPoints(nextPoints, nextPrimaryPoint);
+    if (syncPathSelection) {
+      editor.setPathEditingPoints(nextPoints, nextPrimaryPoint);
+    }
     scope.view.update();
   };
 
