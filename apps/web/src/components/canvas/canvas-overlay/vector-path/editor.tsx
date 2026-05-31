@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditor } from "../../../../editor-react/use-editor";
-import { useEditorSurfaceValue } from "../../../../editor-react/use-editor-surface-value";
+import { useEditorPathEditingPreviewSurfaceValue } from "../../../../editor-react/use-editor-path-editing-preview-surface-value";
 import { useEditorValue } from "../../../../editor-react/use-editor-value";
 import {
   getTextPathGuideMatrix,
@@ -134,7 +134,7 @@ export const CanvasVectorEditor = ({ viewportRevision }) => {
     (_, state) => state.penDirectSelectionModifierPressed
   );
   const spacePressed = useEditorValue((_, state) => state.spacePressed);
-  const overlayState = useEditorSurfaceValue((editor) => {
+  const overlayState = useEditorPathEditingPreviewSurfaceValue((editor) => {
     return editor.getVectorPathOverlayState();
   });
   const {
@@ -227,7 +227,17 @@ export const CanvasVectorEditor = ({ viewportRevision }) => {
           return;
         }
 
+        if (options?.transient) {
+          editor.setPathEditingPreview(
+            nodeId,
+            contours,
+            getPersistentSyncOptions(options)
+          );
+          return;
+        }
+
         editor.updateEditablePath(nodeId, contours, options);
+        editor.clearPathEditingPreview(nodeId);
       },
       onExitPathEditing: () => {
         if (editor.activeTool === "node") {
@@ -352,6 +362,16 @@ const getActiveMultiPathNodeId = (editor, overlayStates, clientPoint) => {
   );
 };
 
+const getPersistentSyncOptions = (options) => {
+  if (!options?.transient) {
+    return options;
+  }
+
+  const persistentOptions = { ...options };
+  persistentOptions.transient = undefined;
+  return persistentOptions;
+};
+
 const getNodeMultiPathScene = ({
   activeTool,
   editor,
@@ -425,7 +445,17 @@ const MultiVectorPathCanvas = ({
       editor,
       nodeId: node.id,
       onChange: (contours, options) => {
+        if (options?.transient) {
+          editor.setPathEditingPreview(
+            node.id,
+            contours,
+            getPersistentSyncOptions(options)
+          );
+          return;
+        }
+
         editor.updateEditablePath(node.id, contours, options);
+        editor.clearPathEditingPreview(node.id);
       },
       onExitPathEditing: () => {
         editor.clearSelection();
@@ -468,27 +498,29 @@ export const CanvasMultiVectorEditor = ({ viewportRevision }) => {
   const editor = useEditor();
   const [activeNodeId, setActiveNodeId] = useState(null);
   const lastClientPointRef = useRef(null);
-  const overlayStates = useEditorSurfaceValue((editor, state) => {
-    if (
-      state.activeTool !== "node" ||
-      state.editingNodeId ||
-      state.pathEditingNodeId ||
-      state.isTextPathPositioning
-    ) {
-      return [];
-    }
+  const overlayStates = useEditorPathEditingPreviewSurfaceValue(
+    (editor, state) => {
+      if (
+        state.activeTool !== "node" ||
+        state.editingNodeId ||
+        state.pathEditingNodeId ||
+        state.isTextPathPositioning
+      ) {
+        return [];
+      }
 
-    return state.selectedNodeIds
-      .map((nodeId) =>
-        getNodeMultiPathScene({
-          activeTool: state.activeTool,
-          editor,
-          nodeId,
-          spacePressed: state.spacePressed,
-        })
-      )
-      .filter(Boolean);
-  });
+      return state.selectedNodeIds
+        .map((nodeId) =>
+          getNodeMultiPathScene({
+            activeTool: state.activeTool,
+            editor,
+            nodeId,
+            spacePressed: state.spacePressed,
+          })
+        )
+        .filter(Boolean);
+    }
+  );
 
   useEffect(() => {
     if (

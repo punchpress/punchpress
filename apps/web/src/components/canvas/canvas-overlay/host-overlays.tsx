@@ -1,3 +1,4 @@
+import { PERF_COUNTERS } from "@punchpress/engine";
 import { useEffect, useState } from "react";
 import { useEditor } from "../../../editor-react/use-editor";
 import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
@@ -12,7 +13,7 @@ import {
 
 // Host-anchored overlay stack. Stage-local previews live in CanvasStageOverlays.
 export const CanvasHostOverlays = () => {
-  usePerformanceRenderCounter("render.canvas.overlay");
+  usePerformanceRenderCounter(PERF_COUNTERS.renderCanvasOverlay);
   const editor = useEditor();
   const [viewportRevision, setViewportRevision] = useState(0);
 

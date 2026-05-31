@@ -4,6 +4,7 @@ import {
 } from "../nodes/node-property-support";
 import { isGroupNode } from "../nodes/node-tree";
 import { measurePerf } from "../perf/perf-hooks";
+import { PERF_SPANS } from "../perf/perf-labels";
 import { getShapeCornerRadiusSummary } from "../nodes/shape/shape-engine";
 import { getPropertyDescriptor } from "./property-descriptors";
 import {
@@ -142,7 +143,7 @@ const getPropertyState = (selectedNodes, propertyId) => {
 };
 
 const buildSelectionProperties = (editor, nodeIds) => {
-  return measurePerf("selection.properties", () => {
+  return measurePerf(PERF_SPANS.selectionPropertiesAggregate, () => {
     const selectedNodeIds = [...nodeIds];
     const singleSelectedNodeId =
       selectedNodeIds.length === 1 ? selectedNodeIds[0] : null;

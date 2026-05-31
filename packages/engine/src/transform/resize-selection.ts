@@ -4,6 +4,7 @@ import {
   getNodeFrameFromGeometry,
 } from "../nodes/node-capabilities";
 import { measurePerf } from "../perf/perf-hooks";
+import { PERF_SPANS } from "../perf/perf-labels";
 import {
   getCornerPointFromBounds,
   getResizeAnchorFromBounds,
@@ -216,7 +217,7 @@ export const beginResizeSelection = (
   editor,
   { anchorCanvas, direction, handle, nodeId, nodeIds } = {}
 ) => {
-  return measurePerf("selection.resize.begin", () =>
+  return measurePerf(PERF_SPANS.transformResizeBegin, () =>
     beginResizeSelectionMeasured(editor, {
       anchorCanvas,
       direction,
@@ -297,7 +298,7 @@ export const updateResizeSelection = (
   session,
   { pointCanvas, preserveAspectRatio = false, preview = false, scale = 1 } = {}
 ) => {
-  return measurePerf("selection.resize.update", () =>
+  return measurePerf(PERF_SPANS.transformResizeUpdate, () =>
     updateResizeSelectionMeasured(editor, session, {
       pointCanvas,
       preserveAspectRatio,
@@ -395,7 +396,7 @@ const updateResizeSelectionMeasured = (
 };
 
 export const commitResizeSelection = (editor, session) => {
-  return measurePerf("selection.resize.commit", () => {
+  return measurePerf(PERF_SPANS.transformResizeCommit, () => {
     if (session?.mode === "shape-box") {
       const nodeId = session.nodeIds?.[0];
       const nodeUpdate = session.previewNodeUpdate;

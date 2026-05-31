@@ -17,11 +17,8 @@ const ARCH_WARP_SVG = `
 `;
 const TRANSLATE_TRANSFORM_RE = /^translate(3d)?\(/;
 const WHITESPACE_RE = /\s+/;
-const LARGE_CORGI_SVG = readFileSync(
-  new URL(
-    "../../public/performance/large-corgi-11560740_20729591.svg",
-    import.meta.url
-  ),
+const LARGE_SVG_FIXTURE = readFileSync(
+  new URL("../../public/performance/large-svg.svg", import.meta.url),
   "utf8"
 );
 
@@ -980,7 +977,7 @@ test("keeps real imported svg background aligned after rotate release", async ({
   page,
 }, testInfo) => {
   await gotoEditor(page);
-  const dump = await importSvgIntoDocument(page, LARGE_CORGI_SVG);
+  const dump = await importSvgIntoDocument(page, LARGE_SVG_FIXTURE);
   const importedGroup = getImportedGroup(dump);
 
   expect(importedGroup).not.toBeNull();
@@ -1005,7 +1002,7 @@ test("keeps real imported svg background aligned after rotate release", async ({
 
   expect(sessionCreated).toBe(true);
 
-  await testInfo.attach("real-corgi-post-rotation-release", {
+  await testInfo.attach("large-svg-post-rotation-release", {
     body: await page.screenshot({ fullPage: true }),
     contentType: "image/png",
   });
@@ -1101,7 +1098,7 @@ test("keeps rotated imported svg selection box rotated while resizing", async ({
 }, testInfo) => {
   await gotoEditor(page);
 
-  const dump = await importSvgIntoDocument(page, LARGE_CORGI_SVG);
+  const dump = await importSvgIntoDocument(page, LARGE_SVG_FIXTURE);
   const importedGroup = getImportedGroup(dump);
 
   expect(importedGroup).not.toBeNull();

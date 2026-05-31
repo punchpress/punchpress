@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import { IDLE_SOAK_2MIN_DURATION_MS } from "../../../src/performance/benchmarks/idle-soak-benchmark";
+import type { PerformanceBenchmarkOptions } from "../../../src/performance/performance-benchmark-types";
 import type {
   PerformanceBenchmarkResult,
   PerformanceState,
@@ -70,12 +71,16 @@ export const formatBenchmarkReadout = (
 
 export const triggerPerformanceBenchmark = async (
   page: Page,
-  benchmarkId: string
+  benchmarkId: string,
+  options?: PerformanceBenchmarkOptions
 ) => {
-  await page.evaluate((benchmarkId) => {
-    window.__PUNCHPRESS_PERF__?.runBenchmark(benchmarkId);
-    return undefined;
-  }, benchmarkId);
+  await page.evaluate(
+    ({ benchmarkId, options }) => {
+      window.__PUNCHPRESS_PERF__?.runBenchmark(benchmarkId, options);
+      return undefined;
+    },
+    { benchmarkId, options }
+  );
 };
 
 export const waitForBenchmarkCompletion = async ({

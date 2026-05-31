@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from "react";
 import { NodeContextMenuItems } from "@/components/context-menus/node-context-menu-items";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { useEditor } from "../../../../editor-react/use-editor";
+import { useEditorSelectionDragPreviewValue } from "../../../../editor-react/use-editor-selection-drag-preview-value";
 import { useEditorSurfaceValue } from "../../../../editor-react/use-editor-surface-value";
 import { useEditorValue } from "../../../../editor-react/use-editor-value";
 import {
@@ -367,7 +368,7 @@ export const CanvasSingleSelectionForeground = ({
   const frame = useEditorValue((editor) => {
     return editor.getNodeTransformFrame(nodeId);
   });
-  const selectionPreview = useEditorSurfaceValue((editor) => {
+  const selectionPreview = useEditorSelectionDragPreviewValue((editor) => {
     return {
       delta: editor.getSelectionPreviewDelta([nodeId]) || EMPTY_PREVIEW,
       resizeFrame: getResizePreviewFrame(editor, nodeId),

@@ -120,9 +120,13 @@ export {
 export {
   incrementPerfCounter,
   measurePerf,
+  recordPerfSpan,
   setPerfLogConfig,
   setPerfSink,
 } from "./perf/perf-hooks";
+export { PERF_COUNTERS, PERF_SPANS } from "./perf/perf-labels";
+export type { PerfCounterName, PerfSpanLabel } from "./perf/perf-labels";
+export type { PerfSpanSample } from "./perf/perf-hooks";
 export {
   isInputElement,
   shouldIgnoreGlobalShortcutTarget,

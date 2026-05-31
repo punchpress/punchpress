@@ -39,11 +39,8 @@ const SHELL_CHROME_VARS = {
 export const EditorShell = () => {
   const editor = useEditor();
   useTheme();
-  const shouldPreviewDesktopUpdater =
-    import.meta.env.VITE_PUNCHPRESS_PREVIEW_DESKTOP_UPDATER === "1";
   const isDesktopShell =
-    (typeof window !== "undefined" && Boolean(window.electron?.versions)) ||
-    shouldPreviewDesktopUpdater;
+    typeof window !== "undefined" && Boolean(window.electron?.versions);
   const shellChromeVars = isDesktopShell
     ? SHELL_CHROME_VARS.desktop
     : SHELL_CHROME_VARS.web;

@@ -200,8 +200,10 @@ const updateNodeStats = (
 
 export const PerformanceHudLiveStrip = ({
   children,
+  onHoverBucketChange,
 }: {
   children?: ReactNode;
+  onHoverBucketChange?: (bucket: PerformanceSecondBucket | null) => void;
 }) => {
   const controller = usePerformanceController();
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
@@ -265,6 +267,12 @@ export const PerformanceHudLiveStrip = ({
             ? null
             : findHoveredSlot(slotsRef.current, hoverOffsetXRef.current),
       });
+      onHoverBucketChange?.(
+        hoverOffsetXRef.current === null
+          ? null
+          : findHoveredSlot(slotsRef.current, hoverOffsetXRef.current)
+              ?.second || null
+      );
     };
 
     const handlePointerMove = (event: PointerEvent) => {
@@ -284,6 +292,7 @@ export const PerformanceHudLiveStrip = ({
         hoverRefs,
         slot,
       });
+      onHoverBucketChange?.(slot?.second || null);
     };
 
     const handlePointerLeave = () => {
@@ -293,6 +302,7 @@ export const PerformanceHudLiveStrip = ({
         hoverRefs,
         slot: null,
       });
+      onHoverBucketChange?.(null);
     };
 
     render();
@@ -316,10 +326,38 @@ export const PerformanceHudLiveStrip = ({
         chartContainer.removeEventListener("pointerleave", handlePointerLeave);
       }
     };
-  }, [controller]);
+  }, [controller, onHoverBucketChange]);
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 items-stretch divide-x divide-border border-black/7 border-b dark:border-white/7">
+        <div className="flex items-center gap-4 px-4 py-2.5">
+          <HudStatCell label="FPS" valueRef={fpsRef} />
+          <HudStatCell label="P50" valueRef={p50Ref} />
+          <HudStatCell label="P95" valueRef={p95Ref} />
+          <HudStatCell label="Slow" valueRef={slowRef} />
+        </div>
+
+        <div className="flex items-center px-4 py-2.5">
+          <span
+            className="font-semibold text-xl tabular-nums tracking-tight"
+            ref={headlineRef}
+          >
+            0.0ms
+          </span>
+          <span className="ml-1.5 text-[11px] text-muted-foreground">
+            / 8ms
+          </span>
+        </div>
+
+        <div className="flex items-center gap-4 px-4 py-2.5">
+          <HudStatCell label="Nodes" valueRef={nodesRef} />
+          <HudStatCell label="Text" valueRef={textNodesRef} />
+          <HudStatCell label="Selected" valueRef={selectedNodesRef} />
+        </div>
+        {children ? children : null}
+      </div>
+
       <div className="border-black/7 border-b dark:border-white/7">
         <div className="relative h-[112px] w-full px-2 pt-2">
           <span
@@ -362,34 +400,6 @@ export const PerformanceHudLiveStrip = ({
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="flex min-w-0 items-stretch divide-x divide-border">
-        <div className="flex items-center gap-4 px-4 py-2.5">
-          <HudStatCell label="FPS" valueRef={fpsRef} />
-          <HudStatCell label="P50" valueRef={p50Ref} />
-          <HudStatCell label="P95" valueRef={p95Ref} />
-          <HudStatCell label="Slow" valueRef={slowRef} />
-        </div>
-
-        <div className="flex items-center px-4 py-2.5">
-          <span
-            className="font-semibold text-xl tabular-nums tracking-tight"
-            ref={headlineRef}
-          >
-            0.0ms
-          </span>
-          <span className="ml-1.5 text-[11px] text-muted-foreground">
-            / 8ms
-          </span>
-        </div>
-
-        <div className="flex items-center gap-4 px-4 py-2.5">
-          <HudStatCell label="Nodes" valueRef={nodesRef} />
-          <HudStatCell label="Text" valueRef={textNodesRef} />
-          <HudStatCell label="Selected" valueRef={selectedNodesRef} />
-        </div>
-        {children ? children : null}
       </div>
     </div>
   );

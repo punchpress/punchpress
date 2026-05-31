@@ -1,0 +1,83 @@
+export const PERF_SPANS = {
+  pointerDownHandle: "pointer.down.handle",
+  pointerDownHitTestArtboard: "pointer.down.hitTest.artboard",
+  pointerDownHitTestDeep: "pointer.down.hitTest.deep",
+  pointerMoveHandle: "pointer.move.handle",
+  pointerUpHandle: "pointer.up.handle",
+
+  hoverNodeSet: "hover.node.set",
+
+  selectionAppearanceAggregate: "selection.appearance.aggregate",
+  selectionAppearanceChangeBegin: "selection.appearance.change.begin",
+  selectionAppearanceChangeCommit: "selection.appearance.change.commit",
+  selectionAppearanceChangeResolve: "selection.appearance.change.resolve",
+  selectionAppearanceChangeTargets: "selection.appearance.change.targets",
+  selectionAppearanceSet: "selection.appearance.set",
+  selectionAppearanceTargets: "selection.appearance.targets",
+  selectionBoundsCompute: "selection.bounds.compute",
+  selectionClearApply: "selection.clear.apply",
+  selectionClearFinishEditing: "selection.clear.finishEditing",
+  selectionClearFocusedGroup: "selection.clear.focusedGroup",
+  selectionClearStore: "selection.clear.store",
+  selectionFinalizeEditing: "selection.finalizeEditing",
+  selectionPropertiesAggregate: "selection.properties.aggregate",
+  selectionSelectApply: "selection.select.apply",
+  selectionStoreSelect: "selection.store.select",
+  selectionTargetsResolve: "selection.targets.resolve",
+
+  transformDragBegin: "transform.drag.begin",
+  transformDragEnd: "transform.drag.end",
+  transformDragUpdate: "transform.drag.update",
+  transformMoveAbsolute: "transform.move.absolute",
+  transformMovePreviewSet: "transform.move.preview.set",
+  transformMoveBy: "transform.move.by",
+  transformResizeBegin: "transform.resize.begin",
+  transformResizeCommit: "transform.resize.commit",
+  transformResizeUpdate: "transform.resize.update",
+  transformRotateBegin: "transform.rotate.begin",
+  transformRotateCommit: "transform.rotate.commit",
+  transformRotateUpdate: "transform.rotate.update",
+
+  interactionPreviewNotify: "interaction.preview.notify",
+  selectionDragPreviewNotify: "selection.dragPreview.notify",
+
+  storeSelectionClearReduce: "store.selection.clear.reduce",
+  storeSelectionClearSet: "store.selection.clear.set",
+  storeSelectionSelectReduce: "store.selection.select.reduce",
+  storeSelectionSelectResolveTargets: "store.selection.select.resolveTargets",
+  storeSelectionSelectSet: "store.selection.select.set",
+
+  importSvgParse: "import.svg.parse",
+  documentLoadApply: "document.load.apply",
+
+  pathPointMove: "path.point.move",
+  pathContoursUpdate: "path.contours.update",
+  pathEditPreviewSet: "path.edit.preview.set",
+
+  renderCanvasReact: "render.canvas.react",
+
+  layersSelectorDragging: "layers.selector.dragging",
+  layersSelectorNodeIds: "layers.selector.nodeIds",
+  layersSelectorVisibleNodeIds: "layers.selector.visibleNodeIds",
+  layerRowSelectorLayer: "layers.row.selector.layer",
+  layerRowSelectorState: "layers.row.selector.state",
+} as const;
+
+export const PERF_COUNTERS = {
+  largeSvgCanvasNodes: "fixture.largeSvg.canvasNodes",
+  largeSvgGroupNodes: "fixture.largeSvg.groupNodes",
+  largeSvgImageSurfaces: "fixture.largeSvg.imageSurfaces",
+  largeSvgPathNodes: "fixture.largeSvg.pathNodes",
+  largeSvgRasterSurfaces: "fixture.largeSvg.rasterSurfaces",
+  largeSvgRenderedPaths: "fixture.largeSvg.renderedPaths",
+  largeSvgTotalNodes: "fixture.largeSvg.totalNodes",
+  renderCanvasNode: "render.canvasNode.count",
+  renderCanvasOverlay: "render.canvasOverlay.count",
+  renderCanvasStageOverlay: "render.canvasStageOverlay.count",
+  renderPanelLayerRow: "render.panelLayerRow.count",
+  renderPanelLayers: "render.panelLayers.count",
+  renderPanelProperties: "render.panelProperties.count",
+} as const;
+
+export type PerfCounterName = (typeof PERF_COUNTERS)[keyof typeof PERF_COUNTERS];
+export type PerfSpanLabel = (typeof PERF_SPANS)[keyof typeof PERF_SPANS];

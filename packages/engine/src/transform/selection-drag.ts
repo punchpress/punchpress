@@ -1,6 +1,7 @@
 import { duplicateForDrag } from "../document/node-actions";
 import { finishEditingIfNeeded } from "../editing/editing-actions";
 import { measurePerf } from "../perf/perf-hooks";
+import { PERF_SPANS } from "../perf/perf-labels";
 import {
   beginMoveSelection,
   commitMoveSelection,
@@ -25,7 +26,7 @@ export const beginSelectionDrag = (
   editor,
   { duplicate = false, nodeId, nodeIds } = {}
 ) => {
-  return measurePerf("selection.drag.begin", () => {
+  return measurePerf(PERF_SPANS.transformDragBegin, () => {
     finishEditingIfNeeded(editor);
 
     const historyMark = editor.markHistoryStep(
@@ -61,7 +62,7 @@ export const beginSelectionDrag = (
 };
 
 export const updateSelectionDrag = (editor, session, options = {}) => {
-  return measurePerf("selection.drag.update", () => {
+  return measurePerf(PERF_SPANS.transformDragUpdate, () => {
     if (!session) {
       return [];
     }
@@ -86,7 +87,7 @@ export const updateSelectionDrag = (editor, session, options = {}) => {
 };
 
 export const endSelectionDrag = (editor, session, options = {}) => {
-  return measurePerf("selection.drag.end", () => {
+  return measurePerf(PERF_SPANS.transformDragEnd, () => {
     if (!session) {
       return false;
     }

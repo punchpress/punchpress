@@ -11,6 +11,10 @@ import {
   getNodeX,
   getNodeY,
   hasPointerMovedAtLeast,
+  measurePerf,
+  PERF_COUNTERS,
+  PERF_SPANS,
+  recordPerfSpan,
   round,
 } from "@punchpress/engine";
 import { memo, type ReactNode, useMemo } from "react";
@@ -45,6 +49,18 @@ const getCanvasPoint = (editor, clientX, clientY) => {
     x: viewer.getScrollLeft() + (clientX - rect.left) / editor.zoom,
     y: viewer.getScrollTop() + (clientY - rect.top) / editor.zoom,
   };
+};
+
+const recordPointerHandlerSpan = (label, startMs) => {
+  const endMs = performance.now();
+
+  recordPerfSpan({
+    depth: 0,
+    durationMs: Math.max(0, endMs - startMs),
+    endMs,
+    label,
+    startMs,
+  });
 };
 
 const mergeNodeUpdate = (node, nodeUpdate) => {
@@ -547,53 +563,55 @@ const startCanvasNodeDragSession = ({
       })
     : 0;
 
-  const handlePointerMove = (moveEvent) => {
-    if (
-      !(
-        dragSession ||
-        hasPointerMovedAtLeast(
-          startClientPoint,
-          { x: moveEvent.clientX, y: moveEvent.clientY },
-          "pointerDrag"
+  const handlePointerMove = (moveEvent) =>
+    measurePerf(PERF_SPANS.pointerMoveHandle, () => {
+      if (
+        !(
+          dragSession ||
+          hasPointerMovedAtLeast(
+            startClientPoint,
+            { x: moveEvent.clientX, y: moveEvent.clientY },
+            "pointerDrag"
+          )
         )
-      )
-    ) {
-      return;
-    }
+      ) {
+        return;
+      }
 
-    didMove = true;
+      didMove = true;
 
-    if (!beginDragSession()) {
-      return;
-    }
+      if (!beginDragSession()) {
+        return;
+      }
 
-    const nextCanvasPoint = getCanvasPoint(
-      editor,
-      moveEvent.clientX,
-      moveEvent.clientY
-    );
+      const nextCanvasPoint = getCanvasPoint(
+        editor,
+        moveEvent.clientX,
+        moveEvent.clientY
+      );
 
-    editor.updateSelectionDrag(dragSession, {
-      delta: {
-        x: round(nextCanvasPoint.x - previousCanvasPoint.x, 2),
-        y: round(nextCanvasPoint.y - previousCanvasPoint.y, 2),
-      },
-      queueRefresh: true,
+      editor.updateSelectionDrag(dragSession, {
+        delta: {
+          x: round(nextCanvasPoint.x - previousCanvasPoint.x, 2),
+          y: round(nextCanvasPoint.y - previousCanvasPoint.y, 2),
+        },
+        queueRefresh: true,
+      });
+
+      previousCanvasPoint = nextCanvasPoint;
     });
 
-    previousCanvasPoint = nextCanvasPoint;
-  };
+  const handlePointerEnd = () =>
+    measurePerf(PERF_SPANS.pointerUpHandle, () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointercancel", handlePointerEnd);
+      window.removeEventListener("pointerup", handlePointerEnd);
+      window.cancelAnimationFrame(prewarmFrameId);
 
-  const handlePointerEnd = () => {
-    window.removeEventListener("pointermove", handlePointerMove);
-    window.removeEventListener("pointercancel", handlePointerEnd);
-    window.removeEventListener("pointerup", handlePointerEnd);
-    window.cancelAnimationFrame(prewarmFrameId);
-
-    if (dragSession) {
-      editor.endSelectionDrag(dragSession, { cancel: !didMove });
-    }
-  };
+      if (dragSession) {
+        editor.endSelectionDrag(dragSession, { cancel: !didMove });
+      }
+    });
 
   window.addEventListener("pointermove", handlePointerMove);
   window.addEventListener("pointercancel", handlePointerEnd);
@@ -678,7 +696,7 @@ const handleNodeToolIdlePointerDown = ({
 };
 
 const CanvasNodeShell = ({ children, isReady, nodeId }) => {
-  usePerformanceRenderCounter("render.canvas.node");
+  usePerformanceRenderCounter(PERF_COUNTERS.renderCanvasNode);
   const editor = useEditor();
   const activeTool = useEditorValue((_, state) => state.activeTool);
   const contextMenuNodeId = useEditorValue((editor) => {
@@ -742,147 +760,160 @@ const CanvasNodeShell = ({ children, isReady, nodeId }) => {
                   });
                 }}
                 onPointerDown={(event) => {
-                  const timingStartedAt = getInteractionTimingStart();
+                  const pointerHandleStartedAt = performance.now();
 
-                  if (
-                    shouldIgnoreCanvasNodePointerDown({
-                      activeTool,
-                      event,
-                      spacePressed,
-                    })
-                  ) {
-                    return;
-                  }
+                  try {
+                    const timingStartedAt = getInteractionTimingStart();
 
-                  if (event.detail >= 2) {
-                    event.preventDefault();
-                    event.stopPropagation();
+                    if (
+                      shouldIgnoreCanvasNodePointerDown({
+                        activeTool,
+                        event,
+                        spacePressed,
+                      })
+                    ) {
+                      return;
+                    }
+
+                    if (event.detail >= 2) {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      const interactionNodeId = getCanvasInteractionNodeId(
+                        editor,
+                        activeTool,
+                        nodeId,
+                        event
+                      );
+
+                      openCanvasNodeEditingMode(editor, interactionNodeId, {
+                        clientPoint: {
+                          x: event.clientX,
+                          y: event.clientY,
+                        },
+                      });
+                      return;
+                    }
+
+                    if (shouldDeferNodeToolIdleSelection(editor, activeTool)) {
+                      handleNodeToolIdlePointerDown({
+                        activeTool,
+                        editor,
+                        event,
+                        nodeId,
+                        spacePressed,
+                      });
+                      return;
+                    }
+
                     const interactionNodeId = getCanvasInteractionNodeId(
                       editor,
                       activeTool,
                       nodeId,
                       event
                     );
+                    const node = editor.getNode(interactionNodeId);
 
-                    openCanvasNodeEditingMode(editor, interactionNodeId, {
-                      clientPoint: {
-                        x: event.clientX,
-                        y: event.clientY,
-                      },
-                    });
-                    return;
-                  }
+                    if (!node) {
+                      clearSelectionFromUnpaintedNodeHit({
+                        activeTool,
+                        editor,
+                        event,
+                      });
+                      logInteractionCheckpoint(
+                        "canvas.nodePointerDown.unpaintedClear",
+                        timingStartedAt,
+                        {
+                          nodeId,
+                          selectedNodeCount: editor.selectedNodeIds.length,
+                        }
+                      );
+                      logInteractionNextPaint(
+                        "canvas.nodePointerDown.unpaintedClear",
+                        timingStartedAt,
+                        () => ({
+                          selectedNodeCount: editor.selectedNodeIds.length,
+                        })
+                      );
+                      return;
+                    }
 
-                  if (shouldDeferNodeToolIdleSelection(editor, activeTool)) {
-                    handleNodeToolIdlePointerDown({
-                      activeTool,
-                      editor,
-                      event,
-                      nodeId,
-                      spacePressed,
-                    });
-                    return;
-                  }
-
-                  const interactionNodeId = getCanvasInteractionNodeId(
-                    editor,
-                    activeTool,
-                    nodeId,
-                    event
-                  );
-                  const node = editor.getNode(interactionNodeId);
-
-                  if (!node) {
-                    clearSelectionFromUnpaintedNodeHit({
-                      activeTool,
-                      editor,
-                      event,
-                    });
-                    logInteractionCheckpoint(
-                      "canvas.nodePointerDown.unpaintedClear",
-                      timingStartedAt,
-                      {
-                        nodeId,
-                        selectedNodeCount: editor.selectedNodeIds.length,
-                      }
-                    );
-                    logInteractionNextPaint(
-                      "canvas.nodePointerDown.unpaintedClear",
-                      timingStartedAt,
-                      () => ({
-                        selectedNodeCount: editor.selectedNodeIds.length,
+                    if (
+                      shouldDirectEnterPathEditing({
+                        editor,
+                        event,
+                        nodeId: interactionNodeId,
                       })
-                    );
-                    return;
-                  }
+                    ) {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      editor.startPathEditing(interactionNodeId);
+                      return;
+                    }
 
-                  if (
-                    shouldDirectEnterPathEditing({
-                      editor,
-                      event,
-                      nodeId: interactionNodeId,
-                    })
-                  ) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    editor.startPathEditing(interactionNodeId);
-                    return;
-                  }
-
-                  const nodeEditCapabilities =
-                    editor.getNodeEditCapabilities(interactionNodeId);
-                  const canDragWithActiveTool =
-                    activeTool === "pointer" ||
-                    Boolean(
-                      activeTool === "node" &&
-                        editor.isPathEditing(interactionNodeId) &&
-                        nodeEditCapabilities?.pathEditingOverlayMode ===
-                          "keep-transform"
-                    );
-                  const interactionSelectionTargetNodeId =
-                    editor.getSelectionTargetNodeId(interactionNodeId) ||
-                    interactionNodeId;
-                  const isInteractionSelectionTargetSelected =
-                    editor.isSelected(interactionSelectionTargetNodeId);
-                  const shouldStartDragging = shouldStartNodeDrag({
-                    editor,
-                    event,
-                    isSelectionTargetSelected:
-                      isInteractionSelectionTargetSelected,
-                    node,
-                    nodeEditCapabilities,
-                  });
-
-                  const placementSession = editor.dispatchNodePointerDown({
-                    event,
-                    node,
-                    point: getCanvasPoint(editor, event.clientX, event.clientY),
-                  });
-
-                  if (
-                    startCanvasToolPlacementSession({
-                      editor,
-                      event,
-                      getCanvasPoint: (clientX, clientY) =>
-                        getCanvasPoint(editor, clientX, clientY),
-                      session: placementSession,
-                    })
-                  ) {
-                    return;
-                  }
-
-                  if (!canDragWithActiveTool) {
-                    return;
-                  }
-
-                  if (shouldStartDragging) {
-                    startCanvasNodeDragSession({
+                    const nodeEditCapabilities =
+                      editor.getNodeEditCapabilities(interactionNodeId);
+                    const canDragWithActiveTool =
+                      activeTool === "pointer" ||
+                      Boolean(
+                        activeTool === "node" &&
+                          editor.isPathEditing(interactionNodeId) &&
+                          nodeEditCapabilities?.pathEditingOverlayMode ===
+                            "keep-transform"
+                      );
+                    const interactionSelectionTargetNodeId =
+                      editor.getSelectionTargetNodeId(interactionNodeId) ||
+                      interactionNodeId;
+                    const isInteractionSelectionTargetSelected =
+                      editor.isSelected(interactionSelectionTargetNodeId);
+                    const shouldStartDragging = shouldStartNodeDrag({
                       editor,
                       event,
                       isSelectionTargetSelected:
                         isInteractionSelectionTargetSelected,
-                      nodeId: interactionNodeId,
+                      node,
+                      nodeEditCapabilities,
                     });
+
+                    const placementSession = editor.dispatchNodePointerDown({
+                      event,
+                      node,
+                      point: getCanvasPoint(
+                        editor,
+                        event.clientX,
+                        event.clientY
+                      ),
+                    });
+
+                    if (
+                      startCanvasToolPlacementSession({
+                        editor,
+                        event,
+                        getCanvasPoint: (clientX, clientY) =>
+                          getCanvasPoint(editor, clientX, clientY),
+                        session: placementSession,
+                      })
+                    ) {
+                      return;
+                    }
+
+                    if (!canDragWithActiveTool) {
+                      return;
+                    }
+
+                    if (shouldStartDragging) {
+                      startCanvasNodeDragSession({
+                        editor,
+                        event,
+                        isSelectionTargetSelected:
+                          isInteractionSelectionTargetSelected,
+                        nodeId: interactionNodeId,
+                      });
+                    }
+                  } finally {
+                    recordPointerHandlerSpan(
+                      PERF_SPANS.pointerDownHandle,
+                      pointerHandleStartedAt
+                    );
                   }
                 }}
                 onPointerEnter={(event) => {

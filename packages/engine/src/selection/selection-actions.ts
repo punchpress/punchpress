@@ -3,6 +3,7 @@ import {
   finishEditingIfNeeded,
 } from "../editing/editing-actions";
 import { measurePerf } from "../perf/perf-hooks";
+import { PERF_SPANS } from "../perf/perf-labels";
 
 const getResolvedNodeIds = (editor, nodeIds) => {
   let shouldExitFocusedGroup = false;
@@ -31,29 +32,29 @@ const getResolvedNodeIds = (editor, nodeIds) => {
 };
 
 export const clearSelection = (editor) => {
-  return measurePerf("selection.clearSelection", () => {
-    measurePerf("selection.clear.finishEditing", () =>
+  return measurePerf(PERF_SPANS.selectionClearApply, () => {
+    measurePerf(PERF_SPANS.selectionClearFinishEditing, () =>
       finishEditingIfNeeded(editor)
     );
 
     if (editor.focusedGroupId) {
-      measurePerf("selection.clear.focusedGroup", () =>
+      measurePerf(PERF_SPANS.selectionClearFocusedGroup, () =>
         editor.getState().setFocusedGroupId(null)
       );
     }
 
-    measurePerf("selection.clear.store", () =>
+    measurePerf(PERF_SPANS.selectionClearStore, () =>
       editor.getState().clearSelection()
     );
   });
 };
 
 export const clearSelectionPreservingFocus = (editor) => {
-  return measurePerf("selection.clearSelectionPreservingFocus", () => {
-    measurePerf("selection.clear.finishEditing", () =>
+  return measurePerf(PERF_SPANS.selectionClearApply, () => {
+    measurePerf(PERF_SPANS.selectionClearFinishEditing, () =>
       finishEditingIfNeeded(editor)
     );
-    measurePerf("selection.clear.store", () =>
+    measurePerf(PERF_SPANS.selectionClearStore, () =>
       editor.getState().clearSelection()
     );
   });
@@ -78,8 +79,8 @@ export const select = (editor, nodeId) => {
 };
 
 export const setSelectedNodes = (editor, nodeIds) => {
-  return measurePerf("selection.setSelectedNodes", () => {
-    const resolvedNodeIds = measurePerf("selection.resolveTargets", () =>
+  return measurePerf(PERF_SPANS.selectionSelectApply, () => {
+    const resolvedNodeIds = measurePerf(PERF_SPANS.selectionTargetsResolve, () =>
       getResolvedNodeIds(editor, nodeIds)
     );
 
@@ -88,10 +89,12 @@ export const setSelectedNodes = (editor, nodeIds) => {
       (resolvedNodeIds.length !== 1 ||
         resolvedNodeIds[0] !== editor.editingNodeId)
     ) {
-      measurePerf("selection.finalizeEditing", () => finalizeEditing(editor));
+      measurePerf(PERF_SPANS.selectionFinalizeEditing, () =>
+        finalizeEditing(editor)
+      );
     }
 
-    measurePerf("selection.store.selectNodes", () =>
+    measurePerf(PERF_SPANS.selectionStoreSelect, () =>
       editor.getState().selectNodes(resolvedNodeIds)
     );
   });

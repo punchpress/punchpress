@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { LiveFrameBuffer } from "./live-frame-buffer";
+import { LiveFrameBuffer } from "../../../src/performance/live-frame-buffer";
 
 describe("LiveFrameBuffer", () => {
   it("preserves insertion order until capacity is reached", () => {

@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { gotoEditor } from "../e2e/helpers/editor";
+import { startChromeTraceCapture } from "./helpers/chrome-trace";
 import {
   formatBenchmarkReadout,
   getCompletedBenchmarkResult,
@@ -26,62 +27,6 @@ const BROWSER_IDLE_SOAK_THRESHOLDS = {
   slowFrameCount: 0,
 };
 
-const TRACE_CATEGORIES = [
-  "blink",
-  "cc",
-  "devtools.timeline",
-  "disabled-by-default-devtools.timeline",
-  "scheduler",
-  "toplevel",
-].join(",");
-
-const readChromeTraceStream = async (cdpSession, stream) => {
-  let contents = "";
-
-  while (true) {
-    const chunk = await cdpSession.send("IO.read", { handle: stream });
-    contents += chunk.base64Encoded
-      ? Buffer.from(chunk.data, "base64").toString("utf8")
-      : chunk.data;
-
-    if (chunk.eof) {
-      break;
-    }
-  }
-
-  await cdpSession.send("IO.close", { handle: stream });
-
-  return contents;
-};
-
-const startChromeTraceCapture = async (page) => {
-  const cdpSession = await page.context().newCDPSession(page);
-
-  await cdpSession.send("Tracing.start", {
-    categories: TRACE_CATEGORIES,
-    streamFormat: "json",
-    transferMode: "ReturnAsStream",
-  });
-
-  return {
-    stop: async () => {
-      const traceCompletePromise = new Promise((resolve) => {
-        cdpSession.once("Tracing.tracingComplete", resolve);
-      });
-
-      await cdpSession.send("Tracing.end");
-      const tracingComplete = await traceCompletePromise;
-      const traceContents = await readChromeTraceStream(
-        cdpSession,
-        tracingComplete.stream
-      );
-      await cdpSession.detach();
-
-      return traceContents;
-    },
-  };
-};
-
 test.describe.configure({ mode: "serial" });
 
 test(idleSoakScenarioId, async ({ page }, testInfo) => {
@@ -104,6 +49,10 @@ test(idleSoakScenarioId, async ({ page }, testInfo) => {
     await page.waitForTimeout(idleWarmupMs);
   }
 
+  await page.evaluate((enabled) => {
+    window.__PUNCHPRESS_ENABLE_FLAME_SPANS__ = enabled;
+    window.__PUNCHPRESS_ENABLE_PERFORMANCE_API_MARKS__ = enabled;
+  }, shouldCaptureChromeTrace);
   const initialSnapshot = await getPerformanceSnapshot(page);
   const initialSlowFrameCount = initialSnapshot?.recentSlowFrames?.length || 0;
   const traceCapture = shouldCaptureChromeTrace

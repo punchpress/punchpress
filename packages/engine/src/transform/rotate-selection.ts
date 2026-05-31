@@ -5,6 +5,7 @@ import {
 } from "../primitives/rotation";
 import { isContainerNode } from "../nodes/node-tree";
 import { measurePerf } from "../perf/perf-hooks";
+import { PERF_SPANS } from "../perf/perf-labels";
 import { round } from "../primitives/math";
 import {
   applyMatrixToPoint,
@@ -118,7 +119,7 @@ const getRotateSelectionCenter = (
 };
 
 export const beginRotateSelection = (editor, { nodeId, nodeIds } = {}) => {
-  return measurePerf("selection.rotate.begin", () =>
+  return measurePerf(PERF_SPANS.transformRotateBegin, () =>
     beginRotateSelectionMeasured(editor, { nodeId, nodeIds })
   );
 };
@@ -204,7 +205,7 @@ export const updateRotateSelection = (
   session,
   { deltaRotation = 0 } = {}
 ) => {
-  return measurePerf("selection.rotate.update", () => {
+  return measurePerf(PERF_SPANS.transformRotateUpdate, () => {
     if (!(session && Number.isFinite(deltaRotation))) {
       return [];
     }
@@ -246,7 +247,7 @@ export const updateRotateSelection = (
 };
 
 export const commitRotateSelection = (editor, session) => {
-  return measurePerf("selection.rotate.commit", () => {
+  return measurePerf(PERF_SPANS.transformRotateCommit, () => {
     if (!session) {
       editor.setSelectionDragPreview(null);
       return [];

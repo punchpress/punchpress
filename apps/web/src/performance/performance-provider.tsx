@@ -1,9 +1,11 @@
 import {
+  PERF_SPANS,
   setPerfLogConfig,
   shouldIgnoreGlobalShortcutTarget,
 } from "@punchpress/engine";
 import { useEffect, useState } from "react";
 import { useEditor } from "../editor-react/use-editor";
+import type { PerformanceBenchmarkOptions } from "./performance-benchmark-types";
 import {
   findPerformanceBenchmark,
   performanceBenchmarks,
@@ -113,7 +115,8 @@ export const PerformanceProvider = ({ children }) => {
         setTimingLogEnabled: (enabled: boolean) => void;
         setHudOpen: (open: boolean) => void;
         runBenchmark: (
-          benchmarkId: string
+          benchmarkId: string,
+          options?: PerformanceBenchmarkOptions
         ) => ReturnType<PerformanceController["runBenchmark"]>;
         toggleHud: () => void;
       };
@@ -128,13 +131,13 @@ export const PerformanceProvider = ({ children }) => {
             ? {
                 enabled: true,
                 labels: [
-                  "canvas.pointerDown*",
+                  "pointer.down*",
                   "selection.*",
-                  "store.clearSelection*",
-                  "store.selectNodes*",
-                  "selector.layerRow*",
-                  "selector.layers*",
+                  "store.selection*",
+                  "transform.*",
+                  "layers.*",
                   "render.*",
+                  PERF_SPANS.hoverNodeSet,
                 ],
                 thresholdMs: 0,
               }
@@ -142,14 +145,17 @@ export const PerformanceProvider = ({ children }) => {
         );
       },
       setHudOpen: controller.setHudOpen,
-      runBenchmark: (benchmarkId: string) => {
+      runBenchmark: (
+        benchmarkId: string,
+        options?: PerformanceBenchmarkOptions
+      ) => {
         const benchmark = findPerformanceBenchmark(benchmarkId);
 
         if (!benchmark) {
           throw new Error(`Unknown benchmark: ${benchmarkId}`);
         }
 
-        return controller.runBenchmark(editor, benchmark);
+        return controller.runBenchmark(editor, benchmark, options);
       },
       toggleHud: controller.toggleHud,
     };

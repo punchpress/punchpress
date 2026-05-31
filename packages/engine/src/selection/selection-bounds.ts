@@ -1,4 +1,5 @@
 import { measurePerf } from "../perf/perf-hooks";
+import { PERF_SPANS } from "../perf/perf-labels";
 
 const getSelectionBoundsCache = (editor) => {
   if (
@@ -20,7 +21,7 @@ const getSelectionBoundsCache = (editor) => {
 };
 
 export const getSelectionBounds = (editor, nodeIds) => {
-  return measurePerf("selection.bounds", () => {
+  return measurePerf(PERF_SPANS.selectionBoundsCompute, () => {
     const previewDelta = editor.getSelectionPreviewDelta(nodeIds);
     const cacheKey = nodeIds.join("\0");
     const cache = cacheKey ? getSelectionBoundsCache(editor) : null;

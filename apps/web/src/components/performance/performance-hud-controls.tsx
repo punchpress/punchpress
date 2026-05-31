@@ -31,7 +31,7 @@ export const PerformanceHudControls = () => {
   }));
 
   return (
-    <div className="grid min-w-[18rem] shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-4 py-2.5">
+    <div className="ml-auto grid min-w-[18rem] shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 py-2.5 pr-12 pl-4">
       <PerformanceScenarioSelect
         className="h-7 min-w-0 text-xs"
         onValueChange={controller.setSelectedBenchmarkId}

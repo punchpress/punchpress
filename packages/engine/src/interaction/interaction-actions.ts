@@ -40,6 +40,7 @@ export const startPathEditing = (editor, nodeId = editor.selectedNodeId) => {
     selectDirectNode(editor, targetNodeId);
   }
 
+  editor.clearPathEditingPreview();
   applyInteractionState(editor, enterPathEditingInteractionState(targetNodeId));
   return true;
 };
@@ -60,6 +61,7 @@ export const stopPathEditing = (editor) => {
     selectionOwnerNodeId !== pathEditingNodeId;
 
   editor.currentTool.onPathEditingStopped?.();
+  editor.clearPathEditingPreview(pathEditingNodeId);
   applyInteractionState(editor, exitPathEditingInteractionState());
 
   if (shouldRestoreSelectionOwner) {

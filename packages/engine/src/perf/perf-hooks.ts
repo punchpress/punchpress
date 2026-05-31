@@ -1,6 +1,17 @@
+import type { PerfSpanLabel } from "./perf-labels";
+
+export interface PerfSpanSample {
+  depth: number;
+  durationMs: number;
+  endMs: number;
+  label: PerfSpanLabel | string;
+  startMs: number;
+}
+
 export interface PerfSink {
   incrementCounter: (name: string, amount?: number) => void;
   recordDuration: (label: string, durationMs: number) => void;
+  recordSpan?: (span: PerfSpanSample) => void;
 }
 
 export interface PerfLogConfig {
@@ -28,6 +39,8 @@ const getNow = () => {
 const getPerfSink = () => {
   return globalThis.__PUNCHPRESS_PERF_SINK__ || null;
 };
+
+const spanStack: string[] = [];
 
 export const setPerfSink = (sink: PerfSink | null) => {
   if (sink) {
@@ -78,21 +91,61 @@ const logMeasuredDuration = (label: string, durationMs: number) => {
 };
 
 export const measurePerf = <TValue>(
-  label: string,
+  label: PerfSpanLabel | string,
   callback: () => TValue
 ): TValue => {
   const sink = getPerfSink();
-
+  const depth = spanStack.length;
   const startedAt = getNow();
+  spanStack.push(label);
 
   try {
     return callback();
   } finally {
-    const durationMs = Math.max(0, getNow() - startedAt);
+    const endedAt = getNow();
+    const durationMs = Math.max(0, endedAt - startedAt);
 
-    sink?.recordDuration(label, durationMs);
+    if (sink?.recordSpan) {
+      sink.recordSpan({
+        depth,
+        durationMs,
+        endMs: endedAt,
+        label,
+        startMs: startedAt,
+      });
+    } else {
+      sink?.recordDuration(label, durationMs);
+    }
     logMeasuredDuration(label, durationMs);
+    spanStack.pop();
   }
+};
+
+export const recordPerfSpan = ({
+  depth = 0,
+  durationMs,
+  endMs,
+  label,
+  startMs,
+}: PerfSpanSample) => {
+  const sink = getPerfSink();
+
+  if (!(durationMs > 0)) {
+    return;
+  }
+
+  if (sink?.recordSpan) {
+    sink.recordSpan({
+      depth,
+      durationMs,
+      endMs,
+      label,
+      startMs,
+    });
+  } else {
+    sink?.recordDuration(label, durationMs);
+  }
+  logMeasuredDuration(label, durationMs);
 };
 
 export const incrementPerfCounter = (name: string, amount = 1) => {

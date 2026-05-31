@@ -1,34 +1,40 @@
 import { compoundVectorDragBenchmark } from "./benchmarks/compound-vector-drag-benchmark";
 import { idleSoakBenchmark } from "./benchmarks/idle-soak-benchmark";
 import {
-  largeSvgCorgiDeselectBenchmark,
-  largeSvgCorgiHoverBenchmark,
-  largeSvgCorgiPointerDeselectBenchmark,
-  largeSvgCorgiPointerDragBenchmark,
-  largeSvgCorgiResizeBenchmark,
-  largeSvgCorgiRotateBenchmark,
-  largeSvgCorgiSelectBenchmark,
-  largeSvgCorgiSelectionColorBenchmark,
-  largeSvgCorgiTextDeselectBenchmark,
-  largeSvgCorgiViewportBenchmark,
-} from "./benchmarks/large-svg-corgi-benchmark";
+  largeSvgDeselectBenchmark,
+  largeSvgHoverBenchmark,
+  largeSvgPointerDeselectBenchmark,
+  largeSvgPointerDragBenchmark,
+  largeSvgResizeBenchmark,
+  largeSvgRotateBenchmark,
+  largeSvgSelectBenchmark,
+  largeSvgSelectionColorBenchmark,
+  largeSvgTextDeselectBenchmark,
+  largeSvgViewportBenchmark,
+} from "./benchmarks/large-svg-benchmark";
 import { shapeDragBenchmarkLarge } from "./benchmarks/square-drag-benchmark";
 import {
   textDragBenchmark,
   textDragBenchmarkLarge,
 } from "./benchmarks/text-drag-benchmark";
+import {
+  largeSvgPathPointDragBenchmark,
+  simpleVectorPathPointDragBenchmark,
+} from "./benchmarks/vector-path-point-benchmark";
 
 export const performanceBenchmarks = [
-  largeSvgCorgiPointerDragBenchmark,
-  largeSvgCorgiViewportBenchmark,
-  largeSvgCorgiResizeBenchmark,
-  largeSvgCorgiRotateBenchmark,
-  largeSvgCorgiSelectBenchmark,
-  largeSvgCorgiSelectionColorBenchmark,
-  largeSvgCorgiHoverBenchmark,
-  largeSvgCorgiDeselectBenchmark,
-  largeSvgCorgiPointerDeselectBenchmark,
-  largeSvgCorgiTextDeselectBenchmark,
+  largeSvgPointerDragBenchmark,
+  largeSvgViewportBenchmark,
+  largeSvgResizeBenchmark,
+  largeSvgRotateBenchmark,
+  largeSvgSelectBenchmark,
+  largeSvgSelectionColorBenchmark,
+  largeSvgHoverBenchmark,
+  largeSvgDeselectBenchmark,
+  largeSvgPointerDeselectBenchmark,
+  largeSvgTextDeselectBenchmark,
+  largeSvgPathPointDragBenchmark,
+  simpleVectorPathPointDragBenchmark,
   compoundVectorDragBenchmark,
   idleSoakBenchmark,
   shapeDragBenchmarkLarge,

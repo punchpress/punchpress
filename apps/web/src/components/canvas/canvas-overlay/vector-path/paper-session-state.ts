@@ -67,6 +67,7 @@ export interface VectorCornerCurveSegment {
 export interface VectorPaperSessionSyncOptions {
   pinnedLocalPoint?: { x: number; y: number } | null;
   pinnedWorldPoint?: { x: number; y: number } | null;
+  transient?: boolean;
 }
 
 export interface VectorPaperSessionScene {
@@ -136,6 +137,7 @@ export const createVectorPaperSessionState = (scope: paper.PaperScope) => {
     nodeStrokeWidth: 0,
     paths: [] as paper.Path[],
     pendingPress: null as PendingPress | null,
+    pendingSyncOptions: null as VectorPaperSessionSyncOptions | null,
     pendingScene: null as VectorPaperSessionScene | null,
     penHover: null as PenHoverTarget,
     previewAnchor: null as paper.Path.Circle | null,

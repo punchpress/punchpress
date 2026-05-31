@@ -1,6 +1,11 @@
-import { type Editor, setPerfSink } from "@punchpress/engine";
+import {
+  type Editor,
+  type PerfSpanSample,
+  setPerfSink,
+} from "@punchpress/engine";
 import { LiveFrameBuffer } from "./live-frame-buffer";
 import { LiveFrameSummary } from "./live-frame-summary";
+import { PerformanceApiAdapter } from "./performance-api-adapter";
 import type {
   PerformanceBenchmarkContext,
   PerformanceBenchmarkDefinition,
@@ -28,15 +33,29 @@ const LIVE_STATE_PUBLISH_INTERVAL_MS = 1000;
 const SLOW_FRAME_TIMELINE_LOOKBACK_MS = 50;
 const SLOW_FRAME_TASK_LOOKBACK_MS = 2000;
 const MAX_SLOW_FRAME_TASKS = 6;
+const MIN_RETAINED_FLAME_SPAN_MS = 0.05;
+const MAX_COLLECTION_FLAME_SPANS = 20_000;
 
 type FrameBuckets = Record<string, number>;
 type FrameCounters = Record<string, number>;
+
+declare global {
+  interface Window {
+    __PUNCHPRESS_ENABLE_FLAME_SPANS__?: boolean;
+    __PUNCHPRESS_ENABLE_PERFORMANCE_API_MARKS__?: boolean;
+  }
+}
+
+export interface PerformanceFlameSpan extends PerfSpanSample {
+  frameId?: number;
+}
 
 export interface PerformanceFrameSample {
   buckets: FrameBuckets;
   counters: FrameCounters;
   durationMs: number;
   id: number;
+  spans?: PerformanceFlameSpan[];
   timestamp: number;
 }
 
@@ -47,6 +66,7 @@ export interface PerformanceSecondBucket {
   maxMs: number;
   mergedBuckets: Record<string, number>;
   slowCount: number;
+  spans?: PerformanceFlameSpan[];
 }
 
 export interface PerformanceSummary {
@@ -71,6 +91,7 @@ export interface PerformanceBenchmarkResult {
   durationMs: number;
   endedAt: string;
   error: string | null;
+  flameSpans: PerformanceFlameSpan[];
   frames: PerformanceFrameSample[];
   label: string;
   nodeStats: PerformanceNodeStats;
@@ -261,6 +282,62 @@ const toSpanSummary = (samples: Map<string, number[]>) => {
     .sort((left, right) => right.totalMs - left.totalMs);
 };
 
+const getFrameOverlappingSpans = (
+  frame: PerformanceFrameSample,
+  spans: PerformanceFlameSpan[]
+) => {
+  const frameStartMs = frame.timestamp - frame.durationMs;
+
+  return spans
+    .map((span) => {
+      const startMs = Math.max(span.startMs, frameStartMs);
+      const endMs = Math.min(span.endMs, frame.timestamp);
+      const durationMs = Math.max(0, endMs - startMs);
+
+      if (durationMs < MIN_RETAINED_FLAME_SPAN_MS) {
+        return null;
+      }
+
+      return {
+        ...span,
+        durationMs,
+        endMs,
+        frameId: frame.id,
+        startMs,
+      };
+    })
+    .filter((span): span is PerformanceFlameSpan => Boolean(span));
+};
+
+const attachFlameSpansToFrames = (
+  frames: PerformanceFrameSample[],
+  spans: PerformanceFlameSpan[]
+) => {
+  const toBaseFrame = (frame: PerformanceFrameSample) => ({
+    buckets: frame.buckets,
+    counters: frame.counters,
+    durationMs: frame.durationMs,
+    id: frame.id,
+    timestamp: frame.timestamp,
+  });
+
+  if (spans.length === 0) {
+    return frames.map(toBaseFrame);
+  }
+
+  return frames.map((frame) => {
+    const nextFrame = toBaseFrame(frame);
+    const frameSpans = getFrameOverlappingSpans(nextFrame, spans);
+
+    return frameSpans.length > 0
+      ? {
+          ...nextFrame,
+          spans: frameSpans,
+        }
+      : nextFrame;
+  });
+};
+
 const getErrorMessage = (error: unknown) => {
   return error instanceof Error ? error.message : "Unknown benchmark error.";
 };
@@ -269,6 +346,7 @@ export class PerformanceController {
   activeCollection: null | {
     benchmark: PerformanceBenchmarkDefinition;
     counters: FrameCounters;
+    flameSpans: PerformanceFlameSpan[];
     frames: PerformanceFrameSample[];
     options: ResolvedPerformanceBenchmarkOptions;
     spanSamples: Map<string, number[]>;
@@ -314,6 +392,7 @@ export class PerformanceController {
   listeners = new Set<() => void>();
   pendingBuckets = new Map<string, number>();
   pendingCounters = new Map<string, number>();
+  pendingSpans: PerfSpanSample[] = [];
   previousTimestamp = 0;
   statePublishTimeoutId = 0;
   timelineObserver: PerformanceObserver | null = null;
@@ -321,6 +400,10 @@ export class PerformanceController {
     typeof window !== "undefined" ? new RuntimeTaskRecorder(window) : null;
   rafId = 0;
   runtimeActive = false;
+  runtimeMirrorBrowserMarks = false;
+  runtimeRetainFlameSpans = false;
+  retainFlameSpans = false;
+  performanceApiAdapter: PerformanceApiAdapter | null = null;
   runningBenchmarkStartedAtMs = 0;
   runningBenchmarkTimerId = 0;
   state: PerformanceState = {
@@ -641,6 +724,7 @@ export class PerformanceController {
         maxMs: frame.durationMs,
         mergedBuckets: { ...frame.buckets },
         slowCount: frame.durationMs > SLOW_FRAME_THRESHOLD_MS ? 1 : 0,
+        spans: frame.spans ? [...frame.spans] : undefined,
       });
       this.liveSecondBucketsDirty = true;
       return;
@@ -656,6 +740,13 @@ export class PerformanceController {
     lastSecondBucket.slowCount +=
       frame.durationMs > SLOW_FRAME_THRESHOLD_MS ? 1 : 0;
     mergeFrameBuckets(lastSecondBucket.mergedBuckets, frame.buckets);
+
+    if (frame.spans?.length) {
+      lastSecondBucket.spans = [
+        ...(lastSecondBucket.spans || []),
+        ...frame.spans,
+      ];
+    }
   };
 
   buildHudSnapshot = (): PerformanceHudSnapshot => {
@@ -787,6 +878,34 @@ export class PerformanceController {
     this.activeCollection.spanSamples.set(label, durations);
   };
 
+  recordSpan = (span: PerfSpanSample) => {
+    if (!(span.durationMs > 0)) {
+      return;
+    }
+
+    this.recordDuration(span.label, span.durationMs);
+
+    if (
+      this.retainFlameSpans &&
+      span.durationMs >= MIN_RETAINED_FLAME_SPAN_MS
+    ) {
+      this.pendingSpans.push(span);
+    }
+    this.performanceApiAdapter?.recordSpan(span);
+
+    if (!this.activeCollection) {
+      return;
+    }
+
+    if (
+      this.retainFlameSpans &&
+      span.durationMs >= MIN_RETAINED_FLAME_SPAN_MS &&
+      this.activeCollection.flameSpans.length < MAX_COLLECTION_FLAME_SPANS
+    ) {
+      this.activeCollection.flameSpans.push(span);
+    }
+  };
+
   incrementCounter = (name: string, amount = 1) => {
     this.pendingCounters.set(
       name,
@@ -824,6 +943,7 @@ export class PerformanceController {
     this.activeCollection = {
       benchmark,
       counters: {},
+      flameSpans: [],
       frames: [],
       options,
       spanSamples: new Map(),
@@ -839,6 +959,10 @@ export class PerformanceController {
 
     const collection = this.activeCollection;
     this.activeCollection = null;
+    const frames = attachFlameSpansToFrames(
+      collection.frames,
+      collection.flameSpans
+    );
 
     return {
       benchmarkId: collection.benchmark.id,
@@ -847,13 +971,14 @@ export class PerformanceController {
       durationMs: Math.max(0, getNow() - collection.startedAtMs),
       endedAt: new Date().toISOString(),
       error: error ? getErrorMessage(error) : null,
-      frames: collection.frames,
+      frames,
+      flameSpans: collection.flameSpans,
       label: collection.benchmark.label,
       nodeStats: this.state.nodeStats,
       options: collection.options,
       spans: toSpanSummary(collection.spanSamples),
       startedAt: collection.startedAtIso,
-      summary: toSummary(collection.frames),
+      summary: toSummary(frames),
     } satisfies PerformanceBenchmarkResult;
   };
 
@@ -973,9 +1098,17 @@ export class PerformanceController {
         timestamp,
       };
 
+      if (this.pendingSpans.length > 0) {
+        frame.spans = this.pendingSpans.map((span) => ({
+          ...span,
+          frameId: this.frameId,
+        }));
+      }
+
       this.frameId += 1;
       this.pendingBuckets.clear();
       this.pendingCounters.clear();
+      this.pendingSpans = [];
 
       const evictedFrame = this.liveFrameBuffer.append(frame);
       this.liveFramesDirty = true;
@@ -1008,17 +1141,37 @@ export class PerformanceController {
     const shouldBeActive =
       this.liveCaptureRetainCount > 0 ||
       this.state.benchmarkStatus === "running";
+    const shouldMirrorBrowserMarks =
+      typeof window !== "undefined" &&
+      window.__PUNCHPRESS_ENABLE_PERFORMANCE_API_MARKS__ === true;
+    const shouldRetainFlameSpans =
+      this.state.benchmarkStatus === "running" ||
+      (typeof window !== "undefined" &&
+        window.__PUNCHPRESS_ENABLE_FLAME_SPANS__ === true);
 
-    if (shouldBeActive === this.runtimeActive) {
+    if (
+      shouldBeActive === this.runtimeActive &&
+      shouldMirrorBrowserMarks === this.runtimeMirrorBrowserMarks &&
+      shouldRetainFlameSpans === this.runtimeRetainFlameSpans
+    ) {
       return;
     }
 
     this.runtimeActive = shouldBeActive;
+    this.runtimeMirrorBrowserMarks = shouldMirrorBrowserMarks;
+    this.runtimeRetainFlameSpans = shouldRetainFlameSpans;
 
     if (shouldBeActive) {
+      this.retainFlameSpans = shouldRetainFlameSpans;
+      this.performanceApiAdapter = shouldMirrorBrowserMarks
+        ? new PerformanceApiAdapter()
+        : null;
       setPerfSink({
         incrementCounter: this.incrementCounter,
         recordDuration: this.recordDuration,
+        ...(shouldRetainFlameSpans || shouldMirrorBrowserMarks
+          ? { recordSpan: this.recordSpan }
+          : {}),
       });
       this.taskRecorder?.install();
       this.start();
@@ -1027,6 +1180,10 @@ export class PerformanceController {
     }
 
     setPerfSink(null);
+    this.runtimeMirrorBrowserMarks = false;
+    this.runtimeRetainFlameSpans = false;
+    this.retainFlameSpans = false;
+    this.performanceApiAdapter = null;
     this.taskRecorder?.uninstall();
     this.stop();
     this.notify();
@@ -1035,6 +1192,7 @@ export class PerformanceController {
   stop = () => {
     this.pendingBuckets.clear();
     this.pendingCounters.clear();
+    this.pendingSpans = [];
     this.previousTimestamp = 0;
 
     if (typeof window === "undefined") {

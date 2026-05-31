@@ -1,6 +1,6 @@
 import { hasPointerMovedAtLeast, round } from "@punchpress/engine";
 import { useEditor } from "../../editor-react/use-editor";
-import { useEditorSurfaceValue } from "../../editor-react/use-editor-surface-value";
+import { useEditorSelectionDragSurfaceValue } from "../../editor-react/use-editor-selection-drag-surface-value";
 
 const ARTBOARD_LABEL_GAP_PX = 28;
 const MIN_LABEL_ZOOM = 0.01;
@@ -165,7 +165,7 @@ const startArtboardLabelDrag = ({ editor, event, nodeId }) => {
 export const CanvasArtboards = () => {
   const editor = useEditor();
   const { artboards, labelScale, labelYOffset } =
-    useEditorSurfaceValue(selectArtboards);
+    useEditorSelectionDragSurfaceValue(selectArtboards);
 
   return (
     <>

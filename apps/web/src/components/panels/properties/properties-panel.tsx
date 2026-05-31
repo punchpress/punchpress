@@ -1,3 +1,4 @@
+import { PERF_COUNTERS } from "@punchpress/engine";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useEditor } from "../../../editor-react/use-editor";
@@ -14,7 +15,7 @@ import { TextWarpFields } from "./text-warp-fields";
 import { usePropertiesPanelState } from "./use-properties-panel-state";
 
 export const PropertiesPanel = () => {
-  usePerformanceRenderCounter("render.panel.properties");
+  usePerformanceRenderCounter(PERF_COUNTERS.renderPanelProperties);
   const editor = useEditor();
   const {
     bootstrapError,

@@ -1,4 +1,8 @@
-import { getPathNodeContours } from "@punchpress/engine";
+import {
+  getPathNodeContours,
+  PERF_COUNTERS,
+  PERF_SPANS,
+} from "@punchpress/engine";
 import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -229,7 +233,7 @@ const getLayerListHeight = (visibleLayerCount, hasLayers) => {
 };
 
 export const LayersPanel = ({ documentCommands }) => {
-  usePerformanceRenderCounter("render.panel.layers");
+  usePerformanceRenderCounter(PERF_COUNTERS.renderPanelLayers);
   const editor = useEditor();
   const scrollViewportRef = useRef(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -243,18 +247,18 @@ export const LayersPanel = ({ documentCommands }) => {
   );
   const layerNodeIds = useEditorValue(
     (editor) => editor.layerNodeIds,
-    "selector.layers.nodeIds"
+    PERF_SPANS.layersSelectorNodeIds
   );
   const isCanvasSelectionDragging = useEditorValue((_, state) => {
     return state.isSelectionDragging;
-  }, "selector.layers.dragging");
+  }, PERF_SPANS.layersSelectorDragging);
   const visibleLayerRowKeys = useEditorValue((editor) => {
     return getVisibleLayerRowKeys(
       editor,
       collapsedGroupIds,
       expandedDenseGroupIds
     );
-  }, "selector.layers.visibleNodeIds");
+  }, PERF_SPANS.layersSelectorVisibleNodeIds);
   const visibleLayerRows = useMemo(
     () => visibleLayerRowKeys,
     [visibleLayerRowKeys]

@@ -450,7 +450,7 @@ export const useCanvasNodePlacement = (nodeIds) => {
 
     const unsubscribeStore = editor.store.subscribe(scheduleDurableSync);
     const unsubscribePreview =
-      editor.subscribeInteractionPreview(syncPreviewPlacement);
+      editor.subscribeSelectionDragPreview(syncPreviewPlacement);
 
     return () => {
       isDisposed = true;

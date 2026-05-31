@@ -1,6 +1,7 @@
 import { supportsNodeProperty } from "../nodes/node-property-support";
 import { isContainerNode } from "../nodes/node-tree";
 import { measurePerf } from "../perf/perf-hooks";
+import { PERF_SPANS } from "../perf/perf-labels";
 import { getPropertyDescriptor } from "./property-descriptors";
 
 const SELECTION_COLOR_PROPERTY_IDS = ["background", "fill", "stroke"];
@@ -116,14 +117,14 @@ const resolveSelectionColorTargetProperties = (
 };
 
 export const getSelectionColors = (editor, nodeIds = editor.selectedNodeIds) => {
-  return measurePerf("selection.colors", () => {
+  return measurePerf(PERF_SPANS.selectionAppearanceAggregate, () => {
     if (!shouldExposeSelectionColors(editor, nodeIds)) {
       return [];
     }
 
     const colorsById = new Map();
 
-    for (const nodeId of measurePerf("selection.color.targets", () =>
+    for (const nodeId of measurePerf(PERF_SPANS.selectionAppearanceTargets, () =>
       getSelectionColorTargetNodeIds(editor, nodeIds)
     )) {
       const node = editor.getNode(nodeId);
@@ -174,8 +175,8 @@ export const beginSelectionColorChange = (
   selectionColorId,
   nodeIds = editor.selectedNodeIds
 ) => {
-  return measurePerf("selection.color.change.begin", () => {
-    const selectionColor = measurePerf("selection.color.change.resolve", () =>
+  return measurePerf(PERF_SPANS.selectionAppearanceChangeBegin, () => {
+    const selectionColor = measurePerf(PERF_SPANS.selectionAppearanceChangeResolve, () =>
       resolveSelectionColor(editor, selectionColorId, nodeIds)
     );
 
@@ -184,7 +185,7 @@ export const beginSelectionColorChange = (
     }
 
     const targetPropertyIdsByNodeId = measurePerf(
-      "selection.color.change.targets",
+      PERF_SPANS.selectionAppearanceChangeTargets,
       () => resolveSelectionColorTargetProperties(editor, selectionColor, nodeIds)
     );
 
@@ -212,7 +213,7 @@ export const commitSelectionColorChange = (editor, session, value) => {
     return false;
   }
 
-  measurePerf("selection.color.change.commit", () => {
+  measurePerf(PERF_SPANS.selectionAppearanceChangeCommit, () => {
     editor.updateNodes(targetNodeIds, (node) => {
       const propertyIds = session.targetPropertyIdsByNodeId.get(node.id) || [];
       const nextNode = {};
@@ -244,7 +245,7 @@ export const setSelectionColor = (
   value,
   nodeIds = editor.selectedNodeIds
 ) => {
-  return measurePerf("selection.color.set", () => {
+  return measurePerf(PERF_SPANS.selectionAppearanceSet, () => {
     const session = beginSelectionColorChange(
       editor,
       selectionColorId,

@@ -1,3 +1,4 @@
+import { PERF_SPANS } from "@punchpress/engine";
 import type {
   PerformanceHudSnapshot,
   PerformanceSecondBucket,
@@ -7,15 +8,16 @@ const MAX_VISIBLE_SECONDS = 120;
 const MIN_BAR_HEIGHT = 2;
 const MIN_AVG_HEIGHT = 1;
 const MIN_CHART_MAX_MS = 75;
+const CHART_HEADROOM = 1.25;
 const SLOW_FRAME_THRESHOLD_MS = 16.7;
 
 const BUCKET_COLORS: Record<string, string> = {
-  "selection.bounds": "#a3a3a3",
-  "selection.drag.begin": "#737373",
-  "selection.drag.end": "#d4d4d4",
-  "selection.drag.update": "#a3a3a3",
-  "selection.move.absolute": "#737373",
-  "selection.move.by": "#d4d4d4",
+  [PERF_SPANS.selectionBoundsCompute]: "#a3a3a3",
+  [PERF_SPANS.transformDragBegin]: "#737373",
+  [PERF_SPANS.transformDragEnd]: "#d4d4d4",
+  [PERF_SPANS.transformDragUpdate]: "#a3a3a3",
+  [PERF_SPANS.transformMoveAbsolute]: "#737373",
+  [PERF_SPANS.transformMoveBy]: "#d4d4d4",
 };
 
 export interface HudChartSlot {
@@ -57,10 +59,25 @@ const getVisibleSeconds = (seconds: PerformanceSecondBucket[]) => {
 };
 
 const getChartMaxMs = (seconds: PerformanceSecondBucket[]) => {
+  const maxValues = seconds
+    .map((second) => second.maxMs)
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .sort((left, right) => left - right);
+
+  if (maxValues.length === 0) {
+    return MIN_CHART_MAX_MS;
+  }
+
+  const p95Index = Math.min(
+    maxValues.length - 1,
+    Math.floor((maxValues.length - 1) * 0.95)
+  );
+  const p95MaxMs = maxValues[p95Index] || 0;
+
   return Math.max(
     MIN_CHART_MAX_MS,
     SLOW_FRAME_THRESHOLD_MS,
-    ...seconds.map((second) => second.maxMs)
+    p95MaxMs * CHART_HEADROOM
   );
 };
 

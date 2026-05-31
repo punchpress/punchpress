@@ -2,6 +2,7 @@ import { getTopmostArtboardAtPoint } from "../nodes/artboard/artboard-hit-test";
 import { getDescendantLeafNodeIds, isArtboardNode } from "../nodes/node-tree";
 import { getNodeX, getNodeY } from "../nodes/text/model";
 import { measurePerf } from "../perf/perf-hooks";
+import { PERF_SPANS } from "../perf/perf-labels";
 import { round } from "../primitives/math";
 
 export const beginMoveSelection = (editor, { nodeId, nodeIds } = {}) => {
@@ -68,13 +69,16 @@ const setMoveSelectionPreview = (editor, session, nextDelta) => {
     y: round(nextDelta.y, 2),
   };
 
-  session.previewDelta = resolvedDelta;
   const previewNodeIds = session.previewNodeIds || session.nodeIds;
-  editor.setSelectionDragPreview({
-    delta: resolvedDelta,
-    effectiveNodeIdSet: new Set(session.nodeIds),
-    nodeIdSet: new Set([...session.nodeIds, ...previewNodeIds]),
-    nodeIds: previewNodeIds,
+
+  measurePerf(PERF_SPANS.transformMovePreviewSet, () => {
+    session.previewDelta = resolvedDelta;
+    editor.setSelectionDragPreview({
+      delta: resolvedDelta,
+      effectiveNodeIdSet: new Set(session.nodeIds),
+      nodeIdSet: new Set([...session.nodeIds, ...previewNodeIds]),
+      nodeIds: previewNodeIds,
+    });
   });
 
   return previewNodeIds;
@@ -237,7 +241,7 @@ export const updateMoveSelection = (
   session,
   { delta, dragEvents, left, top } = {}
 ) => {
-  return measurePerf("selection.move.absolute", () => {
+  return measurePerf(PERF_SPANS.transformMoveAbsolute, () => {
     if (!session) {
       return [];
     }
@@ -264,7 +268,7 @@ export const updateMoveSelection = (
 };
 
 export const moveSelectionBy = (editor, { x = 0, y = 0 } = {}) => {
-  return measurePerf("selection.move.by", () => {
+  return measurePerf(PERF_SPANS.transformMoveBy, () => {
     const effectiveSelectedNodeIds = [
       ...new Set(
         editor.getEffectiveSelectionNodeIds().flatMap((id) => {

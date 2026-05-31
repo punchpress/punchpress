@@ -845,6 +845,7 @@ export const createPaperSessionToolController = ({
     }
 
     finalizeActivePointDrag();
+    chrome.commitNode();
 
     state.activeDrag = null;
     state.isGeometryDragging = false;

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { PERF_COUNTERS } from "@punchpress/engine";
 import { gotoEditor } from "../e2e/helpers/editor";
 import {
   getCompletedBenchmarkResult,
@@ -32,7 +33,7 @@ test("50-node drag does not rerender node wrappers during motion", async ({
   page,
 }) => {
   const result = await runBenchmark(page, "text-nodes-dragging-50");
-  const nodeRenderCount = result?.counters["render.canvas.node"] ?? 0;
+  const nodeRenderCount = result?.counters[PERF_COUNTERS.renderCanvasNode] ?? 0;
 
   expect(result?.nodeStats.selectedNodeCount).toBe(50);
   expect(nodeRenderCount).toBeLessThanOrEqual(5);
@@ -42,7 +43,7 @@ test("500-node drag does not rerender node wrappers during motion", async ({
   page,
 }) => {
   const result = await runBenchmark(page, "text-nodes-dragging-500");
-  const nodeRenderCount = result?.counters["render.canvas.node"] ?? 0;
+  const nodeRenderCount = result?.counters[PERF_COUNTERS.renderCanvasNode] ?? 0;
 
   expect(result?.nodeStats.selectedNodeCount).toBe(500);
   expect(nodeRenderCount).toBeLessThanOrEqual(20);

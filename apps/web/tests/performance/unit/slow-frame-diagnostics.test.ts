@@ -1,10 +1,11 @@
 import { describe, expect, it } from "bun:test";
+import { PERF_SPANS } from "@punchpress/engine";
 import {
   createSlowFrameDiagnostic,
   getSlowFrameCauseLabel,
   getSlowFrameSummary,
   getTimelineEntrySummary,
-} from "./slow-frame-diagnostics";
+} from "../../../src/performance/slow-frame-diagnostics";
 
 const createFrame = (
   overrides: Partial<
@@ -38,7 +39,7 @@ describe("slow-frame-diagnostics", () => {
   it("classifies hidden frames before anything else", () => {
     const diagnostic = createSlowFrameDiagnostic({
       frame: createFrame({
-        buckets: { "selection.move.by": 4 },
+        buckets: { [PERF_SPANS.transformMoveBy]: 4 },
       }),
       isFocused: true,
       overlappingTasks: [],
@@ -86,7 +87,7 @@ describe("slow-frame-diagnostics", () => {
     const diagnostic = createSlowFrameDiagnostic({
       frame: createFrame({
         buckets: {
-          "selection.move.by": 6,
+          [PERF_SPANS.transformMoveBy]: 6,
           "selection.bounds": 2,
         },
       }),
@@ -99,7 +100,7 @@ describe("slow-frame-diagnostics", () => {
     });
 
     expect(diagnostic.cause).toBe("instrumented-work");
-    expect(diagnostic.primaryBucket?.label).toBe("selection.move.by");
+    expect(diagnostic.primaryBucket?.label).toBe(PERF_SPANS.transformMoveBy);
   });
 
   it("falls back to scheduler/compositor jitter when nothing is attributed", () => {

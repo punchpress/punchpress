@@ -3,7 +3,7 @@ import { useMemo, useRef, useState } from "react";
 import { NodeContextMenuItems } from "@/components/context-menus/node-context-menu-items";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { useEditor } from "../../../../editor-react/use-editor";
-import { useEditorSurfaceValue } from "../../../../editor-react/use-editor-surface-value";
+import { useEditorSelectionDragPreviewValue } from "../../../../editor-react/use-editor-selection-drag-preview-value";
 import { useEditorValue } from "../../../../editor-react/use-editor-value";
 import {
   getCanvasRotateCursor,
@@ -230,7 +230,7 @@ export const CanvasMultiSelectionForeground = ({
       includePreview: false,
     });
   });
-  const selectionPreview = useEditorSurfaceValue((editor) => {
+  const selectionPreview = useEditorSelectionDragPreviewValue((editor) => {
     return {
       delta: editor.getSelectionPreviewDelta(nodeIds) || { x: 0, y: 0 },
       rotation: getRotatePreviewDelta(editor, nodeIds),

@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./apps/web/tests/performance",
+  testIgnore: "**/unit/**",
   fullyParallel: false,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
   retries: 0,

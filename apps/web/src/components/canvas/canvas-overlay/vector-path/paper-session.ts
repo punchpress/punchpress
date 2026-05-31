@@ -49,6 +49,7 @@ export const createVectorPaperSession = ({
 
   return {
     destroy: () => {
+      editor.clearPathEditingPreview(nodeId);
       scene.clearScene();
       tool.destroy();
     },

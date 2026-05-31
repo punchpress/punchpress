@@ -129,7 +129,7 @@ export const shapeNodeCapabilities = {
     return {
       backend: "vector-path",
       cornerCurveSegments: getShapeCornerCurveSegments(node),
-      contours,
+      contours: editor.getPathEditingPreviewContours(nodeId) || contours,
       interactionPolicy: {
         canInsertPoint: true,
       },

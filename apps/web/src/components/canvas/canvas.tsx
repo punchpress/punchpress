@@ -1,5 +1,13 @@
-import { MAX_ZOOM, MIN_ZOOM, measurePerf, round } from "@punchpress/engine";
 import {
+  MAX_ZOOM,
+  MIN_ZOOM,
+  measurePerf,
+  PERF_SPANS,
+  recordPerfSpan,
+  round,
+} from "@punchpress/engine";
+import {
+  Profiler,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -33,6 +41,24 @@ import { useCanvasDrop } from "./use-canvas-drop";
 
 const INITIAL_ZOOM = 1;
 const CANVAS_STAGE_MARGIN = 80_000;
+
+const recordCanvasReactRender = (...renderStats) => {
+  const startTime = renderStats[4];
+  const commitTime = renderStats[5];
+  const durationMs = Math.max(0, commitTime - startTime);
+
+  if (!(durationMs > 0)) {
+    return;
+  }
+
+  recordPerfSpan({
+    depth: 0,
+    durationMs,
+    endMs: commitTime,
+    label: PERF_SPANS.renderCanvasReact,
+    startMs: startTime,
+  });
+};
 
 const containsPoint = (bounds, point) => {
   return Boolean(
@@ -114,7 +140,7 @@ const logCanvasPointerDownAccepted = ({
   event,
   timingStartedAt,
 }) => {
-  logInteractionCheckpoint("canvas.pointerDown.accepted", timingStartedAt, {
+  logInteractionCheckpoint("pointer.down.accepted", timingStartedAt, {
     activeTool,
     selectedNodeCount: editor.selectedNodeIds.length,
     target: event.target instanceof Element ? event.target.tagName : null,
@@ -122,10 +148,10 @@ const logCanvasPointerDownAccepted = ({
 };
 
 const logCanvasPointerDownDispatched = (editor, timingStartedAt) => {
-  logInteractionCheckpoint("canvas.pointerDown.dispatched", timingStartedAt, {
+  logInteractionCheckpoint("pointer.down.dispatched", timingStartedAt, {
     selectedNodeCount: editor.selectedNodeIds.length,
   });
-  logInteractionNextPaint("canvas.pointerDown", timingStartedAt, () => ({
+  logInteractionNextPaint("pointer.down", timingStartedAt, () => ({
     selectedNodeCount: editor.selectedNodeIds.length,
   }));
 };
@@ -419,7 +445,7 @@ export const Canvas = () => {
 
       const hitNodeId =
         activeTool === "pointer"
-          ? measurePerf("canvas.pointerDown.deepHitTest", () =>
+          ? measurePerf(PERF_SPANS.pointerDownHitTestDeep, () =>
               getCanvasDeepLeafNodeIdAtPoint(
                 editor,
                 event.clientX,
@@ -429,7 +455,7 @@ export const Canvas = () => {
           : null;
       const artboardBodyNodeId =
         activeTool === "pointer" && !hitNodeId
-          ? measurePerf("canvas.pointerDown.artboardHitTest", () =>
+          ? measurePerf(PERF_SPANS.pointerDownHitTestArtboard, () =>
               getTopmostVisibleArtboardIdAtPoint(editor, point)
             )
           : null;
@@ -588,16 +614,18 @@ export const Canvas = () => {
             className="relative h-full w-full overflow-visible border-0 bg-transparent shadow-none"
             data-testid="canvas-stage"
           >
-            <CanvasDotGrid
-              originX={-CANVAS_STAGE_MARGIN}
-              originY={-CANVAS_STAGE_MARGIN}
-              stageMargin={CANVAS_STAGE_MARGIN}
-              zoom={zoom}
-            />
-            <CanvasArtboards />
-            <CanvasNodes />
-            <CanvasStageOverlays />
-            <CanvasTextEditor />
+            <Profiler id="canvas" onRender={recordCanvasReactRender}>
+              <CanvasDotGrid
+                originX={-CANVAS_STAGE_MARGIN}
+                originY={-CANVAS_STAGE_MARGIN}
+                stageMargin={CANVAS_STAGE_MARGIN}
+                zoom={zoom}
+              />
+              <CanvasArtboards />
+              <CanvasNodes />
+              <CanvasStageOverlays />
+              <CanvasTextEditor />
+            </Profiler>
           </div>
         </InfiniteViewer>
 

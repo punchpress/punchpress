@@ -79,7 +79,8 @@ export const pathNodeCapabilities = {
 
   getEditablePathSession: (editor, nodeId, node) => ({
     backend: "vector-path",
-    contours: getPathNodeContours(node),
+    contours:
+      editor.getPathEditingPreviewContours(nodeId) || getPathNodeContours(node),
     interactionPolicy: {
       canInsertPoint: true,
     },

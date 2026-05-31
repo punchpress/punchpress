@@ -1,10 +1,32 @@
 import { buildPathNodeGeometry } from "../../nodes/path/path-engine";
 import { getShapePathEditResult } from "../../nodes/shape/shape-engine";
 import { buildVectorNodeGeometry } from "../../nodes/vector/vector-engine";
+import { measurePerf } from "../../perf/perf-hooks";
+import { PERF_SPANS } from "../../perf/perf-labels";
 import { getNodeTransformForPinnedWorldPoint } from "../../primitives/rotation";
 import { toPathPointKey } from "../../state/store/path/path-point-selection";
 
 export const updateVectorContours = (
+  editor,
+  nodeId,
+  contours,
+  {
+    pinnedLocalPoint = null,
+    pinnedWorldPoint = null,
+  }: {
+    pinnedLocalPoint?: { x: number; y: number } | null;
+    pinnedWorldPoint?: { x: number; y: number } | null;
+  } = {}
+) => {
+  return measurePerf(PERF_SPANS.pathContoursUpdate, () =>
+    updateVectorContoursImpl(editor, nodeId, contours, {
+      pinnedLocalPoint,
+      pinnedWorldPoint,
+    })
+  );
+};
+
+const updateVectorContoursImpl = (
   editor,
   nodeId,
   contours,
@@ -173,22 +195,24 @@ export const offsetEditablePathPoints = (contours, points, delta) => {
 };
 
 export const moveSelectedPathPointsBy = (editor, nodeId, delta) => {
-  const session = editor.getEditablePathSession(nodeId);
-  const points = editor.pathEditingPoints;
+  return measurePerf(PERF_SPANS.pathPointMove, () => {
+    const session = editor.getEditablePathSession(nodeId);
+    const points = editor.pathEditingPoints;
 
-  if (!(session?.contours && points.length > 0)) {
-    return false;
-  }
+    if (!(session?.contours && points.length > 0)) {
+      return false;
+    }
 
-  const nextContours = offsetEditablePathPoints(
-    session.contours,
-    points,
-    delta
-  );
+    const nextContours = offsetEditablePathPoints(
+      session.contours,
+      points,
+      delta
+    );
 
-  if (!nextContours) {
-    return false;
-  }
+    if (!nextContours) {
+      return false;
+    }
 
-  return updateEditablePath(editor, nodeId, nextContours);
+    return updateEditablePath(editor, nodeId, nextContours);
+  });
 };

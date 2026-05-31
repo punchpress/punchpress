@@ -6,11 +6,11 @@ import { gotoEditor } from "../e2e/helpers/editor";
 const artifactDirectory = path.join(process.cwd(), ".context", "performance");
 const resultArtifactPath = path.join(
   artifactDirectory,
-  "large-svg-corgi-held-drag-result.json"
+  "large-svg-held-drag-result.json"
 );
 const snapshotArtifactPath = path.join(
   artifactDirectory,
-  "large-svg-corgi-held-drag-snapshot.json"
+  "large-svg-held-drag-snapshot.json"
 );
 
 const dragDurationMs = 2400;
@@ -91,7 +91,7 @@ const formatSummary = (summary: ReturnType<typeof summarizeFrames>) => {
   ].join(" ");
 };
 
-const loadLargeCorgi = (page) => {
+const loadLargeSvg = (page) => {
   return page.evaluate(async () => {
     const editor = window.__PUNCHPRESS_EDITOR__;
 
@@ -99,9 +99,7 @@ const loadLargeCorgi = (page) => {
       return null;
     }
 
-    const response = await fetch(
-      "/performance/large-corgi-11560740_20729591.svg"
-    );
+    const response = await fetch("/performance/large-svg.svg");
     const svg = await response.text();
     const module = await import("/src/platform/svg-import-document.ts");
     const nodes = await module.importSvgToNodes(svg, {
@@ -331,13 +329,13 @@ const stopFrameCapture = (page) => {
 
 test.describe.configure({ mode: "serial" });
 
-test("large corgi SVG held drag uses real mouse timing", async ({
+test("large SVG held drag uses real mouse timing", async ({
   page,
 }, testInfo) => {
   test.setTimeout(60_000);
   await gotoEditor(page);
 
-  const loaded = await loadLargeCorgi(page);
+  const loaded = await loadLargeSvg(page);
 
   expect(loaded?.rootId).toBeTruthy();
 
@@ -366,7 +364,7 @@ test("large corgi SVG held drag uses real mouse timing", async ({
   const summary = summarizeFrames(durations);
   const spans = summarizeSpanSamples(capture.spans);
   const result = {
-    benchmarkId: "large-svg-corgi-held-drag",
+    benchmarkId: "large-svg-held-drag",
     counters: capture.counters,
     dragDurationMs,
     dragSteps,
@@ -384,14 +382,14 @@ test("large corgi SVG held drag uses real mouse timing", async ({
     JSON.stringify({ durations, result }, null, 2)
   );
 
-  const summaryLine = `large-svg-corgi-held-drag: ${formatSummary(summary)} total=${loaded?.totalNodes || 0}`;
+  const summaryLine = `large-svg-held-drag: ${formatSummary(summary)} total=${loaded?.totalNodes || 0}`;
   console.log(summaryLine);
 
-  await testInfo.attach("large-svg-corgi-held-drag-result", {
+  await testInfo.attach("large-svg-held-drag-result", {
     body: JSON.stringify(result, null, 2),
     contentType: "application/json",
   });
-  await testInfo.attach("large-svg-corgi-held-drag-summary", {
+  await testInfo.attach("large-svg-held-drag-summary", {
     body: summaryLine,
     contentType: "text/plain",
   });

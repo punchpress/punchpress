@@ -126,7 +126,8 @@ export const vectorNodeCapabilities = {
 
     return {
       backend: "vector-path",
-      contours: node.contours || [],
+      contours:
+        editor.getPathEditingPreviewContours(nodeId) || node.contours || [],
       interactionPolicy: {
         canInsertPoint: true,
       },

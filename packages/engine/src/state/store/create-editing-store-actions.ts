@@ -1,4 +1,5 @@
 import { measurePerf } from "../../perf/perf-hooks";
+import { PERF_SPANS } from "../../perf/perf-labels";
 import { commitEditingState, finalizeEditingState } from "./editing-state";
 import {
   enterTextEditingInteractionState,
@@ -37,9 +38,9 @@ export const createEditingStoreActions = (set) => {
     },
 
     clearSelection: () => {
-      measurePerf("store.clearSelection.set", () => {
+      measurePerf(PERF_SPANS.storeSelectionClearSet, () => {
         set((state) => {
-          return measurePerf("store.clearSelection.reducer", () => {
+          return measurePerf(PERF_SPANS.storeSelectionClearReduce, () => {
             if (state.editingNodeId) {
               return withDocumentMutation(state, commitEditingState(state, []));
             }
@@ -131,11 +132,11 @@ export const createEditingStoreActions = (set) => {
     },
 
     selectNodes: (nodeIds) => {
-      measurePerf("store.selectNodes.set", () => {
+      measurePerf(PERF_SPANS.storeSelectionSelectSet, () => {
         set((state) => {
-          return measurePerf("store.selectNodes.reducer", () => {
+          return measurePerf(PERF_SPANS.storeSelectionSelectReduce, () => {
             const nextSelectedNodeIds = measurePerf(
-              "store.selectNodes.normalize",
+              PERF_SPANS.storeSelectionSelectResolveTargets,
               () => getSelectedNodeIds(state, nodeIds)
             );
             const preservesPathEditing = shouldPreservePathEditingSelection(

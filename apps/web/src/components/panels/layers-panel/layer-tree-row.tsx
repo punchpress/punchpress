@@ -1,5 +1,9 @@
 import { ViewIcon, ViewOffIcon } from "@hugeicons-pro/core-stroke-rounded";
-import { getPathNodeContours } from "@punchpress/engine";
+import {
+  getPathNodeContours,
+  PERF_COUNTERS,
+  PERF_SPANS,
+} from "@punchpress/engine";
 import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { memo, useLayoutEffect, useRef, useState } from "react";
@@ -325,14 +329,14 @@ export const LayerTreeRow = memo(function LayerTreeRow({
   renderChildren = true,
   sortable = true,
 }) {
-  usePerformanceRenderCounter("render.panel.layer-row");
+  usePerformanceRenderCounter(PERF_COUNTERS.renderPanelLayerRow);
   const editor = useEditor();
   const renameInputRef = useRef(null);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const layer = useEditorValue(
     (editor) => editor.getLayerRow(nodeId),
-    "selector.layerRow.layer"
+    PERF_SPANS.layerRowSelectorLayer
   );
   const layerState = useEditorValue((editor, state) => {
     const node = editor.getNode(nodeId);
@@ -365,7 +369,7 @@ export const LayerTreeRow = memo(function LayerTreeRow({
       pathEditingNodeId: state.pathEditingNodeId,
       pathEditingPoint: state.pathEditingPoint,
     };
-  }, "selector.layerRow.state");
+  }, PERF_SPANS.layerRowSelectorState);
   const compoundOperationTarget = layerState.compoundNodeId
     ? {
         nodeId: layerState.compoundNodeId,

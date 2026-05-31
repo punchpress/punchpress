@@ -12,6 +12,7 @@ import { resetPasteSequence as resetEditorPasteSequence } from "./clipboard/clip
 import { UI_ACCENT } from "./constants";
 import { getEditorDebugDump } from "./debug-dump";
 import { measurePerf } from "./perf/perf-hooks";
+import { PERF_SPANS } from "./perf/perf-labels";
 import {
   newDocument as createNewEditorDocument,
   exportDocument as exportEditorDocument,
@@ -305,6 +306,10 @@ export class Editor {
     this.localFontCatalogPromise = null;
     this.interactionPreviewListeners = new Set();
     this.interactionPreviewRevision = 0;
+    this.selectionDragPreviewListeners = new Set();
+    this.selectionDragPreviewRevision = 0;
+    this.pathEditingPreviewListeners = new Set();
+    this.pathEditingPreviewRevision = 0;
     this.selectionColorPreviewState = null;
     this.placementSurfaceListeners = new Set();
     this.viewportInteracting = false;
@@ -350,6 +355,7 @@ export class Editor {
     this.selectionBoundsCache = null;
     this.selectionPropertiesSnapshotCache = null;
     this.selectionDragPreviewState = null;
+    this.pathEditingPreviewState = null;
   }
 
   mount() {
@@ -987,6 +993,14 @@ export class Editor {
     return this.interactionPreviewRevision;
   }
 
+  getSelectionDragPreviewRevision() {
+    return this.selectionDragPreviewRevision;
+  }
+
+  getPathEditingPreviewRevision() {
+    return this.pathEditingPreviewRevision;
+  }
+
   getPenPreviewState() {
     return this.tools.get("pen")?.getPreviewState?.() || null;
   }
@@ -1219,7 +1233,7 @@ export class Editor {
   }
 
   setHoveredNode(nodeId) {
-    return measurePerf("hover.setHoveredNode", () => {
+    return measurePerf(PERF_SPANS.hoverNodeSet, () => {
       this.getState().setHoveredNodeId(nodeId);
     });
   }
@@ -1253,8 +1267,82 @@ export class Editor {
   }
 
   setSelectionDragPreview(selectionDragPreview) {
+    const previousPreview = this.selectionDragPreviewState;
     this.selectionDragPreviewState = selectionDragPreview || null;
-    this.notifyInteractionPreviewChanged();
+    this.notifySelectionDragPreviewChanged();
+
+    if (
+      shouldNotifyInteractionPreviewForSelectionDragPreview(
+        previousPreview,
+        selectionDragPreview
+      )
+    ) {
+      this.notifyInteractionPreviewChanged();
+    }
+  }
+
+  getPathEditingPreview(nodeId = this.pathEditingNodeId) {
+    if (
+      !(
+        nodeId &&
+        this.pathEditingPreviewState?.nodeId === nodeId &&
+        this.pathEditingNodeId === nodeId
+      )
+    ) {
+      return null;
+    }
+
+    return this.pathEditingPreviewState;
+  }
+
+  getPathEditingPreviewContours(nodeId = this.pathEditingNodeId) {
+    return this.getPathEditingPreview(nodeId)?.contours || null;
+  }
+
+  setPathEditingPreview(nodeId, contours, options) {
+    if (!(nodeId && contours && this.pathEditingNodeId === nodeId)) {
+      return false;
+    }
+
+    measurePerf(PERF_SPANS.pathEditPreviewSet, () => {
+      this.pathEditingPreviewState = {
+        contours,
+        nodeId,
+        options: options || null,
+      };
+      this.notifyPathEditingPreviewChanged();
+    });
+
+    return true;
+  }
+
+  clearPathEditingPreview(nodeId = this.pathEditingNodeId) {
+    if (
+      !this.pathEditingPreviewState ||
+      (nodeId && this.pathEditingPreviewState.nodeId !== nodeId)
+    ) {
+      return false;
+    }
+
+    this.pathEditingPreviewState = null;
+    this.notifyPathEditingPreviewChanged();
+    return true;
+  }
+
+  commitPathEditingPreview(nodeId = this.pathEditingNodeId) {
+    const preview = this.getPathEditingPreview(nodeId);
+
+    if (!preview) {
+      return false;
+    }
+
+    const didUpdate = this.updateEditablePath(
+      preview.nodeId,
+      preview.contours,
+      preview.options || undefined
+    );
+    this.clearPathEditingPreview(preview.nodeId);
+    return didUpdate;
   }
 
   setViewportInteracting(isViewportInteracting) {
@@ -1272,11 +1360,13 @@ export class Editor {
   }
 
   notifyInteractionPreviewChanged() {
-    this.interactionPreviewRevision += 1;
+    measurePerf(PERF_SPANS.interactionPreviewNotify, () => {
+      this.interactionPreviewRevision += 1;
 
-    for (const listener of this.interactionPreviewListeners) {
-      listener();
-    }
+      for (const listener of this.interactionPreviewListeners) {
+        listener();
+      }
+    });
   }
 
   setSelectionRotating(isSelectionRotating) {
@@ -1288,6 +1378,40 @@ export class Editor {
 
     return () => {
       this.interactionPreviewListeners.delete(listener);
+    };
+  }
+
+  notifySelectionDragPreviewChanged() {
+    measurePerf(PERF_SPANS.selectionDragPreviewNotify, () => {
+      this.selectionDragPreviewRevision += 1;
+
+      for (const listener of this.selectionDragPreviewListeners) {
+        listener();
+      }
+    });
+  }
+
+  subscribeSelectionDragPreview(listener) {
+    this.selectionDragPreviewListeners.add(listener);
+
+    return () => {
+      this.selectionDragPreviewListeners.delete(listener);
+    };
+  }
+
+  notifyPathEditingPreviewChanged() {
+    this.pathEditingPreviewRevision += 1;
+
+    for (const listener of this.pathEditingPreviewListeners) {
+      listener();
+    }
+  }
+
+  subscribePathEditingPreview(listener) {
+    this.pathEditingPreviewListeners.add(listener);
+
+    return () => {
+      this.pathEditingPreviewListeners.delete(listener);
     };
   }
 
@@ -1994,3 +2118,20 @@ export class Editor {
     return this.localFontCatalogPromise;
   }
 }
+
+const shouldNotifyInteractionPreviewForSelectionDragPreview = (
+  previousPreview,
+  nextPreview
+) => {
+  const previousDelta = previousPreview?.delta;
+  const nextDelta = nextPreview?.delta;
+
+  return Boolean(
+    previousPreview?.resize ||
+      previousPreview?.rotate ||
+      nextPreview?.resize ||
+      nextPreview?.rotate ||
+      previousDelta?.x !== nextDelta?.x ||
+      previousDelta?.y !== nextDelta?.y
+  );
+};

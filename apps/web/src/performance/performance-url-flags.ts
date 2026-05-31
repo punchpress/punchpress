@@ -1,3 +1,5 @@
+import { PERF_SPANS } from "@punchpress/engine";
+
 const hasUrlFlag = (name: string) => {
   if (typeof window === "undefined") {
     return false;
@@ -29,13 +31,13 @@ export const getPerfTimingLogConfig = () => {
     enabled: true,
     labels: hasUrlFlag("perf-log-selection")
       ? [
-          "canvas.pointerDown*",
+          "pointer.down*",
           "selection.*",
-          "store.clearSelection*",
-          "store.selectNodes*",
-          "selector.layerRow*",
-          "selector.layers*",
+          "store.selection*",
+          "transform.*",
+          "layers.*",
           "render.*",
+          PERF_SPANS.hoverNodeSet,
         ]
       : undefined,
     thresholdMs: Number.isFinite(thresholdMs) ? thresholdMs : 0,

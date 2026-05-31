@@ -77,6 +77,7 @@ export interface PaperSessionChromeController {
     segmentIndex: number,
     options?: { updateView?: boolean }
   ) => void;
+  commitNode: () => void;
   getLocalPoint: (point: paper.Point) => paper.Point | null;
   hideSelectionMarquee: () => void;
   refreshPathSegmentChrome: (
@@ -922,12 +923,28 @@ export const createPaperSessionChromeController = ({
     state.previewHandleOutLine.visible = shouldShowPreviewHandles;
   };
 
+  const commitNode = () => {
+    onChange(state.contours, state.pendingSyncOptions || undefined);
+    state.pendingSyncOptions = null;
+  };
+
   const syncNode = (options: VectorPaperSessionSyncOptions = {}) => {
+    if (state.isGeometryDragging) {
+      state.pendingSyncOptions =
+        Object.keys(options).length > 0 ? options : state.pendingSyncOptions;
+      onChange(state.contours, {
+        ...options,
+        transient: true,
+      });
+      return;
+    }
+
     onChange(state.contours, options);
   };
 
   return {
     applySourceSegmentToPaper,
+    commitNode,
     getLocalPoint,
     hideSelectionMarquee,
     refreshPathSegmentChrome,

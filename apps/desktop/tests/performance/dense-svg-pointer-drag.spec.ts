@@ -11,7 +11,7 @@ import {
 } from "../../../web/tests/performance/helpers/idle-slow-frame";
 import { launchDesktopPerformanceApp } from "./helpers/electron-performance-app";
 
-const benchmarkId = "large-svg-corgi-pointer-drag";
+const benchmarkId = "large-svg-pointer-drag";
 
 test.describe.configure({ mode: "serial" });
 

@@ -6,19 +6,30 @@ import {
   performanceBenchmarks,
 } from "../../apps/web/src/performance/performance-benchmarks";
 
-const listBenchmarks = () => {
+const listBenchmarks = (json = false) => {
+  const benchmarkList = performanceBenchmarks.map((benchmark) => ({
+    description: benchmark.description,
+    id: benchmark.id,
+    label: benchmark.label,
+  }));
+
+  if (json) {
+    console.log(JSON.stringify(benchmarkList, null, 2));
+    return;
+  }
+
   console.log("Available web performance benchmarks:");
-  for (const benchmark of performanceBenchmarks) {
-    console.log(`  ${benchmark.id}`);
+  for (const benchmark of benchmarkList) {
+    console.log(`  ${benchmark.id} - ${benchmark.label}`);
   }
 };
 
 const printUsage = () => {
   console.log(
-    "Usage: bun run test:performance:benchmark [--headed] [--json] [--timeout-ms <ms>] <benchmark-id>"
+    "Usage: bun run perf [--headed] [--json] [--flame] [--trace] [--frames <count>] [--node-count <count>] [--timeout-ms <ms>] <benchmark-id>"
   );
   console.log(
-    "Usage: bun run test:performance:benchmark:headed [--json] [--timeout-ms <ms>] <benchmark-id>"
+    "Usage: bun run perf:json <benchmark-id> | bun run perf:flame <benchmark-id> | bun run perf:trace <benchmark-id>"
   );
   console.log("Use --list to show available benchmarks.");
 };
@@ -42,7 +53,8 @@ const formatSummary = (summary: {
 const toCliResult = (
   result: Record<string, unknown>,
   resultArtifactPath: string,
-  snapshotArtifactPath: string
+  snapshotArtifactPath: string,
+  traceArtifactPath?: string
 ) => {
   return {
     benchmarkId: result.benchmarkId,
@@ -53,12 +65,14 @@ const toCliResult = (
     durationMs: result.durationMs,
     error: result.error,
     counters: result.counters,
+    flameSpans: result.flameSpans,
     nodeStats: result.nodeStats,
     options: result.options,
     spans: result.spans,
     summary: result.summary,
     resultArtifactPath,
     snapshotArtifactPath,
+    traceArtifactPath,
   };
 };
 
@@ -67,6 +81,10 @@ const parseArgs = (args: string[]) => {
   let headed = false;
   let json = false;
   let list = false;
+  let flame = false;
+  let trace = false;
+  let frames: number | null = null;
+  let nodeCount: number | null = null;
   let timeoutMs = 300_000;
 
   for (let index = 0; index < args.length; index += 1) {
@@ -79,6 +97,16 @@ const parseArgs = (args: string[]) => {
 
     if (arg === "--json") {
       json = true;
+      continue;
+    }
+
+    if (arg === "--flame") {
+      flame = true;
+      continue;
+    }
+
+    if (arg === "--trace") {
+      trace = true;
       continue;
     }
 
@@ -104,6 +132,29 @@ const parseArgs = (args: string[]) => {
       continue;
     }
 
+    if (arg === "--frames" || arg === "--node-count") {
+      const value = args[index + 1];
+
+      if (!value) {
+        throw new Error(`Missing value for ${arg}`);
+      }
+
+      const numberValue = Number(value);
+
+      if (!Number.isFinite(numberValue) || numberValue <= 0) {
+        throw new Error(`Invalid ${arg} value: ${value}`);
+      }
+
+      if (arg === "--frames") {
+        frames = numberValue;
+      } else {
+        nodeCount = numberValue;
+      }
+
+      index += 1;
+      continue;
+    }
+
     if (arg.startsWith("-")) {
       throw new Error(`Unknown option: ${arg}`);
     }
@@ -117,9 +168,13 @@ const parseArgs = (args: string[]) => {
 
   return {
     benchmarkId,
+    flame,
+    frames,
     headed,
     json,
     list,
+    nodeCount,
+    trace,
     timeoutMs,
   };
 };
@@ -128,7 +183,7 @@ const run = async () => {
   const options = parseArgs(process.argv.slice(2));
 
   if (options.list) {
-    listBenchmarks();
+    listBenchmarks(options.json);
     return;
   }
 
@@ -142,7 +197,7 @@ const run = async () => {
 
   if (!benchmark) {
     console.error(`Unknown benchmark: ${options.benchmarkId}`);
-    listBenchmarks();
+    listBenchmarks(options.json);
     process.exitCode = 1;
     return;
   }
@@ -155,6 +210,10 @@ const run = async () => {
   const resultArtifactPath = path.join(
     artifactDirectory,
     `${benchmark.id}-result.json`
+  );
+  const traceArtifactPath = path.join(
+    artifactDirectory,
+    `${benchmark.id}-trace.json`
   );
   const args = [
     "x",
@@ -177,7 +236,18 @@ const run = async () => {
         PUNCHPRESS_BENCHMARK_ID: benchmark.id,
         PUNCHPRESS_PERFORMANCE_RESULT_PATH: resultArtifactPath,
         PUNCHPRESS_PERFORMANCE_SNAPSHOT_PATH: snapshotArtifactPath,
+        PUNCHPRESS_PERFORMANCE_TRACE_PATH: traceArtifactPath,
         PUNCHPRESS_PERFORMANCE_TIMEOUT_MS: String(options.timeoutMs),
+        ...(options.frames
+          ? { PUNCHPRESS_BENCHMARK_FRAMES: String(options.frames) }
+          : {}),
+        ...(options.nodeCount
+          ? { PUNCHPRESS_BENCHMARK_NODE_COUNT: String(options.nodeCount) }
+          : {}),
+        ...(options.flame || options.trace
+          ? { PUNCHPRESS_CAPTURE_FLAME_SPANS: "1" }
+          : {}),
+        ...(options.trace ? { PUNCHPRESS_CAPTURE_CHROME_TRACE: "1" } : {}),
       },
       stdio: "inherit",
     });
@@ -202,7 +272,14 @@ const run = async () => {
   if (options.json) {
     console.log(
       JSON.stringify(
-        toCliResult(result, resultArtifactPath, snapshotArtifactPath),
+        options.trace
+          ? toCliResult(
+              result,
+              resultArtifactPath,
+              snapshotArtifactPath,
+              traceArtifactPath
+            )
+          : toCliResult(result, resultArtifactPath, snapshotArtifactPath),
         null,
         2
       )
@@ -215,6 +292,9 @@ const run = async () => {
   console.log(formatSummary(result.summary));
   console.log(`result: ${path.relative(process.cwd(), resultArtifactPath)}`);
   console.log(`snapshot: ${path.relative(process.cwd(), snapshotArtifactPath)}`);
+  if (options.trace) {
+    console.log(`trace: ${path.relative(process.cwd(), traceArtifactPath)}`);
+  }
 };
 
 run().catch((error) => {

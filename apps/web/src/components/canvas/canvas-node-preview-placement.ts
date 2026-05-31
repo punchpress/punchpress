@@ -11,6 +11,11 @@ export const resolvePreviewPlacementNodeIds = (
 
   const visibleNodeIdSet = new Set(visibleNodeIds);
   const previewNodeIdSet = new Set(previewNodeIds);
+
+  if (areAllPreviewNodesVisible(previewNodeIds, visibleNodeIdSet)) {
+    return previewNodeIds;
+  }
+
   const effectiveNodeIdSet = preview.effectiveNodeIdSet || previewNodeIdSet;
   const resolvedNodeIds: string[] = [];
 
@@ -31,17 +36,37 @@ export const resolvePreviewPlacementNodeIds = (
         : null;
     }
 
-    for (const visibleNodeId of visibleNodeIds) {
-      if (
-        effectiveNodeIdSet.has(visibleNodeId) &&
-        editor.isDescendantOf(visibleNodeId, previewNodeId)
-      ) {
-        resolvedNodeIds.push(visibleNodeId);
-      }
-    }
+    appendEffectiveDescendantPreviewNodeIds({
+      editor,
+      effectiveNodeIdSet,
+      previewNodeId,
+      resolvedNodeIds,
+      visibleNodeIds,
+    });
   }
 
   return [...new Set(resolvedNodeIds)];
+};
+
+const areAllPreviewNodesVisible = (previewNodeIds, visibleNodeIdSet) => {
+  return previewNodeIds.every((nodeId) => visibleNodeIdSet.has(nodeId));
+};
+
+const appendEffectiveDescendantPreviewNodeIds = ({
+  editor,
+  effectiveNodeIdSet,
+  previewNodeId,
+  resolvedNodeIds,
+  visibleNodeIds,
+}) => {
+  for (const visibleNodeId of visibleNodeIds) {
+    if (
+      effectiveNodeIdSet.has(visibleNodeId) &&
+      editor.isDescendantOf(visibleNodeId, previewNodeId)
+    ) {
+      resolvedNodeIds.push(visibleNodeId);
+    }
+  }
 };
 
 const canMapPreviewToVisibleNode = (

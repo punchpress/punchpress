@@ -4,7 +4,6 @@ import { Dialog, DialogPanel, DialogPopup } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { SettingsDialogAppearancePanel } from "./settings-dialog-appearance-panel";
 import { SettingsDialogDebugPanel } from "./settings-dialog-debug-panel";
-import { SettingsDialogPerformancePanel } from "./settings-dialog-performance-panel";
 
 const NAV_SECTIONS = [
   {
@@ -13,10 +12,7 @@ const NAV_SECTIONS = [
   },
   {
     label: "Developer",
-    items: [
-      { id: "performance", label: "Performance", icon: BugIcon },
-      { id: "debug", label: "Debug", icon: BugIcon },
-    ],
+    items: [{ id: "debug", label: "Debug", icon: BugIcon }],
   },
 ] as const;
 
@@ -26,9 +22,7 @@ export const SettingsDialog = ({ onOpenChange, open }) => {
   const [activeSectionId, setActiveSectionId] = useState(DEFAULT_SECTION_ID);
   let sectionContent = <SettingsDialogAppearancePanel />;
 
-  if (activeSectionId === "performance") {
-    sectionContent = <SettingsDialogPerformancePanel />;
-  } else if (activeSectionId === "debug") {
+  if (activeSectionId === "debug") {
     sectionContent = <SettingsDialogDebugPanel isActive />;
   }
 

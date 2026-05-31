@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { LiveFrameSummary } from "./live-frame-summary";
+import { LiveFrameSummary } from "../../../src/performance/live-frame-summary";
 
 const createFrame = (durationMs: number, id: number) => {
   return {

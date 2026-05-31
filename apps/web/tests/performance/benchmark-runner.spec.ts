@@ -3,6 +3,7 @@ import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { findPerformanceBenchmark } from "../../src/performance/performance-benchmarks";
 import { gotoEditor } from "../e2e/helpers/editor";
+import { startChromeTraceCapture } from "./helpers/chrome-trace";
 import {
   formatBenchmarkReadout,
   getCompletedBenchmarkResult,
@@ -24,10 +25,28 @@ const snapshotArtifactPath =
 const resultArtifactPath =
   process.env.PUNCHPRESS_PERFORMANCE_RESULT_PATH ||
   path.join(artifactDirectory, `${benchmarkId || "benchmark"}-result.json`);
+const traceArtifactPath =
+  process.env.PUNCHPRESS_PERFORMANCE_TRACE_PATH ||
+  path.join(artifactDirectory, `${benchmarkId || "benchmark"}-trace.json`);
+const shouldCaptureChromeTrace =
+  process.env.PUNCHPRESS_CAPTURE_CHROME_TRACE === "1";
+const shouldCaptureFlameSpans =
+  shouldCaptureChromeTrace ||
+  process.env.PUNCHPRESS_CAPTURE_FLAME_SPANS === "1";
+const benchmarkOptions = {
+  ...(process.env.PUNCHPRESS_BENCHMARK_FRAMES
+    ? { frames: Number(process.env.PUNCHPRESS_BENCHMARK_FRAMES) }
+    : {}),
+  ...(process.env.PUNCHPRESS_BENCHMARK_NODE_COUNT
+    ? { nodeCount: Number(process.env.PUNCHPRESS_BENCHMARK_NODE_COUNT) }
+    : {}),
+};
 
 test.describe.configure({ mode: "serial" });
 
 test(benchmarkId || "performance-benchmark", async ({ page }, testInfo) => {
+  test.skip(!benchmarkId, "Use bun run perf:* to run a specific benchmark.");
+
   if (!benchmarkId) {
     throw new Error("Missing PUNCHPRESS_BENCHMARK_ID.");
   }
@@ -39,14 +58,38 @@ test(benchmarkId || "performance-benchmark", async ({ page }, testInfo) => {
   test.setTimeout(benchmarkTimeoutMs + 30_000);
 
   await gotoEditor(page);
+  await page.evaluate(
+    ({ flameSpans, performanceApiMarks }) => {
+      window.__PUNCHPRESS_ENABLE_FLAME_SPANS__ = flameSpans;
+      window.__PUNCHPRESS_ENABLE_PERFORMANCE_API_MARKS__ = performanceApiMarks;
+    },
+    {
+      flameSpans: shouldCaptureFlameSpans,
+      performanceApiMarks: shouldCaptureChromeTrace,
+    }
+  );
   await openPerformanceHud(page);
   mkdirSync(path.dirname(snapshotArtifactPath), { recursive: true });
 
-  await triggerPerformanceBenchmark(page, benchmarkId);
+  const traceCapture = shouldCaptureChromeTrace
+    ? await startChromeTraceCapture(page)
+    : null;
+
+  await triggerPerformanceBenchmark(page, benchmarkId, benchmarkOptions);
   await waitForBenchmarkCompletion({
     page,
     timeoutMs: benchmarkTimeoutMs,
   });
+
+  if (traceCapture) {
+    const traceContents = await traceCapture.stop();
+
+    writeFileSync(traceArtifactPath, traceContents);
+    await testInfo.attach(`${benchmarkId}-trace`, {
+      body: traceContents,
+      contentType: "application/json",
+    });
+  }
 
   const snapshot = await getPerformanceSnapshot(page);
   expect(snapshot).not.toBeNull();
