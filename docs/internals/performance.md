@@ -14,6 +14,9 @@ Performance internals keep app and automation measurements on one path.
 - performance provider owns runtime capture context
 - live frame buffer and summary aggregate recent frames
 - performance controller manages recorder state
+- canonical span and counter labels live in the engine perf registry
+- timestamped flame spans are the source for in-app and artifact flame charts
+- performance API adapter mirrors active spans into browser marks and measures
 - benchmark registry defines scenarios
 - benchmark runner triggers registered scenarios
 - slow-frame diagnostics correlate frame spikes with renderer activity
@@ -23,3 +26,6 @@ Performance internals keep app and automation measurements on one path.
 
 The app produces the measurement. Automation triggers the app and collects its
 structured result.
+
+Benchmarks are scenarios, not span namespaces. Instrument editor operations at
+the product or architecture boundary, then let benchmarks collect those spans.

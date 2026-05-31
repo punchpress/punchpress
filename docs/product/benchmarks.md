@@ -16,3 +16,6 @@ Benchmarks make performance comparable across changes.
 - Benchmarks clean up after themselves.
 - The same definitions run from the app and automation.
 - Release checks should focus on a small number of meaningful thresholds.
+- Timing helper tests live with performance tests even when they run without a
+  browser.
+- Command-line runs may emit trace JSON for flame-chart analysis.

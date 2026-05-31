@@ -19,6 +19,8 @@ move through real design work.
 - Performance measurement should use real editor paths and deterministic
   scenarios.
 - The app and automation share benchmark definitions.
+- Flame charts should use product and architecture labels rather than benchmark
+  fixture labels.
 
 See [Performance HUD](performance-hud.md), [Benchmarks](benchmarks.md), and
 [Performance operations](../operations/performance.md).

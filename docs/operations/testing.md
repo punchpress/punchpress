@@ -20,7 +20,7 @@ render-path measurements. One test type should not carry all three jobs.
 | --- | --- | --- |
 | Editor contract | Durable editor behavior, document state, geometry invariants, selection, transforms, export, plain TypeScript modules. | `bun run test:editor` |
 | Playwright | Pointer wiring, keyboard focus, DOM geometry, overlays, browser APIs, GUI command routing. | `bun run test:e2e` |
-| Performance | Repeatable browser or desktop measurements of interaction cost. | `bun run test:performance` |
+| Performance | Timing helper coverage, repeatable browser or desktop measurements of interaction cost, benchmark artifacts, and traces. | `bun run test:performance:unit`, `bun run test:performance` |
 
 ## Default Rule
 
@@ -38,6 +38,11 @@ When changing editor behavior:
 Docs should not list individual test files. Test names and paths should be
 specific enough to find with `rg`.
 
+Keep timing tests in the performance layer even when they are fast Bun tests.
+The split is by ownership, not runtime: frame aggregation, slow-frame
+diagnostics, benchmark runners, and span-budget helpers belong with performance
+tests.
+
 ## Commands
 
 ```bash
@@ -47,6 +52,7 @@ bun run playwright:install
 bun run test:e2e
 bun run test:e2e:headed
 bun run test:e2e:ui
+bun run test:performance:unit
 ```
 
 For performance commands, see [Performance](performance.md).

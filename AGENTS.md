@@ -43,6 +43,10 @@ Use these standards for new code and touched code during refactors.
 
 ## Testing
 
+See `docs/operations/testing.md` for test-layer selection and
+`docs/reference/performance-tests.md` for performance benchmark commands,
+labels, artifacts, and CLI inspection.
+
 - Prefer a small number of high-signal tests over broad coverage.
 - Default to test-driven development for bug fixes and feature work: add or update the test first when feasible, observe it fail for the target behavior, then implement the fix and verify it passes.
 - If a test cannot realistically be written first, add it immediately after the implementation in the same task.

@@ -21,6 +21,7 @@ scan.
 | Canvas, viewport, screen, local, and SVG coordinates | [Coordinate spaces](coordinate-spaces.md) |
 | Cursor tokens and precedence | [Canvas cursors](canvas-cursors.md) |
 | Keyboard shortcuts | [Keyboard shortcuts](keyboard-shortcuts.md) |
+| Performance test labels, artifacts, and trace integration | [Performance tests](performance-tests.md) |
 | App and document command ids | [Document commands](document-commands.md) |
 | Electron menu command bridge | [Desktop menu commands](desktop-menu-commands.md) |
 | SVG import behavior and normalization | [SVG import](svg-import.md) |

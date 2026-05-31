@@ -47,3 +47,7 @@ Tool shortcuts do not fire with Meta, Ctrl, or Alt.
 
 Performance HUD shortcuts live with the performance provider and should avoid
 conflicting with editor text input.
+
+| Shortcut | Action |
+| --- | --- |
+| `Cmd/Ctrl+Shift+P` | Toggle Performance HUD |

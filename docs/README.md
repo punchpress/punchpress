@@ -66,6 +66,7 @@ infer safely from one file.
 | Editor API | [Editor API](reference/editor-api.md), [Node capabilities](reference/node-capabilities.md), [Tool events](reference/tool-events.md) |
 | Geometry | [Geometry frames](reference/geometry-frames.md), [Coordinate spaces](reference/coordinate-spaces.md), [Canvas cursors](reference/canvas-cursors.md) |
 | Keyboard and commands | [Keyboard shortcuts](reference/keyboard-shortcuts.md), [Document commands](reference/document-commands.md), [Desktop menu commands](reference/desktop-menu-commands.md) |
+| Performance tests | [Performance tests](reference/performance-tests.md) |
 | Export and import | [SVG import](reference/svg-import.md), [SVG export](reference/svg-export.md), [Clipboard formats](reference/clipboard-formats.md) |
 
 ## Operations

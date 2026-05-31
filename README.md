@@ -35,14 +35,14 @@ shared document schema package, and app shells:
 
 - `bun run test:editor` runs the editor contract tests.
 - `bun run test:e2e` runs the browser E2E suite.
-- `bun run test:performance` runs the default web performance Playwright spec.
-- `bun run test:performance:headed` runs the default web performance spec in a visible browser window.
-- `bun run test:performance:benchmark --list` lists the registered web benchmarks.
-- `bun run test:performance:benchmark text-nodes-dragging-500` runs one web benchmark and prints its summary.
-- `bun run test:performance:benchmark:headed text-nodes-dragging-500` runs one web benchmark in a visible browser window and prints its summary when complete.
-- `bun run test:performance:benchmark --json text-nodes-dragging-500` returns a structured benchmark summary on stdout for scripts or local comparison.
+- `bun run test:performance:unit` runs fast performance infrastructure tests.
+- `bun run test:performance` runs the browser-backed performance suite.
+- `bun run perf --list --json` lists registered web benchmark scenarios for agents.
+- `bun run perf:json text-nodes-dragging-500` runs one web benchmark and returns structured output.
+- `bun run perf:flame text-nodes-dragging-500` includes timestamped flame spans in the result artifact.
+- `bun run perf:trace text-nodes-dragging-500` includes flame spans and a browser trace artifact.
 - Web benchmark artifacts are written to `.context/performance/<benchmark-id>-result.json` and `.context/performance/<benchmark-id>-snapshot.json`.
-- See `docs/operations/performance.md` for the broader performance workflow and trace-based debugging commands.
+- See `docs/operations/testing.md` for test-layer selection and `docs/reference/performance-tests.md` for performance benchmark commands, labels, artifacts, and CLI inspection.
 
 ## Release
 

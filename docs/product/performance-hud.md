@@ -14,8 +14,7 @@ and running repeatable performance checks.
 ## Access
 
 - The performance panel is available inside the app.
-- It is reachable from Settings under a developer-facing section.
-- A keyboard shortcut may open or toggle it during editing.
+- `Cmd/Ctrl+Shift+P` toggles it during editing.
 - A compact floating HUD may show the same measurement surface.
 
 ## Live View
@@ -39,3 +38,7 @@ and running repeatable performance checks.
 - Users can run one benchmark or a suite.
 - Results are structured and remain inspectable after completion.
 - The app and automation share the same benchmark definitions.
+- Command-line benchmark traces are the artifact form of flame-chart
+  inspection.
+- The flame chart separates `Measured PunchPress Work` from `Unattributed Time`
+  so slow frames do not imply the remainder is OS or idle time.

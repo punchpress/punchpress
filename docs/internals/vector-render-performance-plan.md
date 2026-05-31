@@ -21,13 +21,13 @@ Use the shared performance panel and benchmark runner as the source of truth.
 - Automated run:
 
   ```sh
-  bun run test:performance:benchmark <benchmark-id>
+  bun run perf:json <benchmark-id>
   ```
 
-- Structured run:
+- Flame-span run:
 
   ```sh
-  bun run test:performance:benchmark <benchmark-id> --json
+  bun run perf:flame <benchmark-id>
   ```
 
 Dense SVG performance work tracks:
@@ -77,15 +77,14 @@ transform, and render derivations.
 
 ### 1. Large SVG Baseline
 
-Add benchmarks that load the large corgi SVG, wait for the canvas to settle,
+Add benchmarks that load the large SVG fixture, wait for the canvas to settle,
 and measure deterministic drag and viewport passes through the existing
 performance controller. Keep a real held-drag Playwright benchmark for the
 mouse path because synthetic pointer-event dispatch can miss product-level
 interaction issues.
 
-Status: implemented for `large-svg-corgi-pointer-drag`,
-`large-svg-corgi-viewport`, and the Playwright
-`large-svg-corgi-held-drag.spec.ts` check.
+Status: implemented for `large-svg-pointer-drag`, `large-svg-viewport`, and the
+Playwright `large-svg-held-drag.spec.ts` check.
 
 ### 2. Tree And Visibility Indexes
 
@@ -113,7 +112,7 @@ contents. Large render surfaces use one compiled inline SVG in normal mode so
 viewport pan and zoom do not fan out through per-path canvas wrappers.
 
 Status: implemented for dense imported groups and large multi-path groups in
-normal canvas mode. The large corgi fixture keeps editable child paths in the
+normal canvas mode. The large SVG fixture keeps editable child paths in the
 document while mounting one canvas wrapper in normal mode. Large
 moderate-complexity SVGs may also use this path when their painted bounds are
 large enough that per-path SVG rendering becomes the bottleneck.
@@ -155,13 +154,13 @@ instead of expanding every descendant into the per-frame preview set.
 ## Current Reference Results
 
 Measured on May 22, 2026 against
-`large-corgi-11560740_20729591.svg` on this workstation.
+`large-svg.svg` on this workstation.
 
 | Benchmark | Before | Current |
 | --- | --- | --- |
-| Large SVG corgi pointer drag | p50 8.3ms, p95 9.3ms, max 325.0ms, slow 5/160, 149 canvas nodes | p50 8.3ms, p95 9.3ms, max 225.5ms, slow 4/160, 1 inline SVG surface |
-| Large SVG corgi viewport | p50 100.0ms, p95 175.1ms, max 275.0ms, slow 159/160 | p50 8.3ms, p95 9.3ms, max 166.8ms, slow 5/160 |
-| Large SVG corgi held drag | invalid baseline: hit the layer panel, p95 66.7ms | corrected canvas target: p50 8.3ms, p95 9.3ms, slow 2/334 |
+| Large SVG pointer drag | p50 8.3ms, p95 9.3ms, max 325.0ms, slow 5/160, 149 canvas nodes | p50 8.3ms, p95 9.3ms, max 225.5ms, slow 4/160, 1 inline SVG surface |
+| Large SVG viewport | p50 100.0ms, p95 175.1ms, max 275.0ms, slow 159/160 | p50 8.3ms, p95 9.3ms, max 166.8ms, slow 5/160 |
+| Large SVG held drag | invalid baseline: hit the layer panel, p95 66.7ms | corrected canvas target: p50 8.3ms, p95 9.3ms, slow 2/334 |
 
 Remaining work: move dense group render assembly out of React recursion and into
 an engine-owned compiled surface, make aggregate resize use a root preview with

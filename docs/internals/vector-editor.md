@@ -17,7 +17,8 @@ Vector editing has three layers:
 
 - Engine owns selected path points and durable vector geometry.
 - Paper overlay owns browser interaction details during path edit mode.
-- Overlay changes write back through editor path actions.
+- Active Paper drags write transient path-edit preview contours.
+- Gesture end commits preview contours once through editor path actions.
 - Normal canvas rendering does not instantiate the path-edit backend.
 
 ## Rule
