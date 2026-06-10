@@ -270,7 +270,7 @@ describe("vector point editing", () => {
     expect(segment?.handleIn.x).toBeLessThan(0);
   });
 
-  test("loading a 1.4 vector document defaults point types to corner", () => {
+  test("loading a path without point types defaults them to corner", () => {
     const editor = new Editor();
 
     editor.loadDocument(
@@ -313,7 +313,7 @@ describe("vector point editing", () => {
             visible: true,
           },
         ],
-        version: "1.7",
+        version: PUNCH_DOCUMENT_VERSION,
       })
     );
 

@@ -71,6 +71,8 @@ export const pathNodeCapabilities = {
     requiresPathEditing: true,
   }),
 
+  getSourceKind: () => "vector",
+
   getResizeMode: () => "scale",
 
   getRotateMode: () => "self",

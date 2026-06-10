@@ -14,7 +14,7 @@ PunchPress is a Bun workspace with one product engine and multiple clients.
 
 | Layer | Owner |
 | --- | --- |
-| Schema | `packages/punch-schema` owns `.punch` constants, schema, migration, load, save, normalization, font descriptors, and clipboard types. |
+| Schema | `packages/punch-schema` owns `.punch` constants, schema, version checks, load, save, normalization, font descriptors, and clipboard types. |
 | Engine | `packages/engine` owns `Editor`, document state, commands, nodes, tools, geometry, selection, history, viewport, export, and inspection. |
 | React bindings | `apps/web/src/editor-react` provides editor context, subscriptions, configured editor creation, and clipboard events. |
 | Web app | `apps/web/src/components`, `workspace`, `platform`, and `performance` render the editor and adapt browser capabilities. |

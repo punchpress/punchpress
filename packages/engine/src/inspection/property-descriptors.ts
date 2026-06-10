@@ -1,9 +1,14 @@
 import { getNodeX, getNodeY } from "../nodes/text/model";
+import { getImageNodeBounds } from "../nodes/image/image-capabilities";
 import { getShapeCornerRadiusSummary } from "../nodes/shape/shape-engine";
 import {
   areCornerRadiiEquivalent,
   clampCornerRadius,
 } from "../primitives/corner-radius";
+import {
+  getNodeTransformForPinnedWorldPoint,
+  getNodeWorldPoint,
+} from "../primitives/rotation";
 import {
   fillRuleStyleDescriptor,
   fillStyleDescriptor,
@@ -50,10 +55,41 @@ const fontSizeDescriptor = createPropertyDescriptor({
   setValue: (_node, value) => ({ fontSize: value }),
 });
 
+const setImageDimensionFromCenter = (node, propertyId, value) => {
+  if (node?.type !== "image") {
+    return { [propertyId]: value };
+  }
+
+  const bounds = getImageNodeBounds(node);
+  const pinnedWorldPoint = getNodeWorldPoint(node, bounds, {
+    x: bounds.width / 2,
+    y: bounds.height / 2,
+  });
+  const nextNode = {
+    ...node,
+    [propertyId]: value,
+  };
+  const nextBounds = getImageNodeBounds(nextNode);
+  const transform = getNodeTransformForPinnedWorldPoint(
+    nextNode,
+    nextBounds,
+    {
+      x: nextBounds.width / 2,
+      y: nextBounds.height / 2,
+    },
+    pinnedWorldPoint
+  );
+
+  return {
+    [propertyId]: value,
+    transform,
+  };
+};
+
 const heightDescriptor = createPropertyDescriptor({
   getValue: (node) => node.height,
   id: "height",
-  setValue: (_node, value) => ({ height: value }),
+  setValue: (node, value) => setImageDimensionFromCenter(node, "height", value),
 });
 
 const cornerRadiusDescriptor = createPropertyDescriptor({
@@ -116,7 +152,7 @@ const warpDescriptor = createPropertyDescriptor({
 const widthDescriptor = createPropertyDescriptor({
   getValue: (node) => node.width,
   id: "width",
-  setValue: (_node, value) => ({ width: value }),
+  setValue: (node, value) => setImageDimensionFromCenter(node, "width", value),
 });
 
 const xDescriptor = createPropertyDescriptor({

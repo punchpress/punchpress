@@ -8,7 +8,7 @@ import {
   TextFontIcon,
 } from "@hugeicons-pro/core-stroke-rounded";
 import { ARTBOARD_HEIGHT, ARTBOARD_WIDTH } from "@punchpress/engine";
-import { HandIcon, PenToolIcon } from "lucide-react";
+import { BrushIcon, EraserIcon, HandIcon, PenToolIcon } from "lucide-react";
 import type { CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/ui/toggle";
@@ -63,7 +63,25 @@ const PEN_TOOL = {
   shortcut: "P",
 };
 
+const BRUSH_TOOL = {
+  icon: BrushIcon,
+  iconLibrary: "lucide",
+  id: "brush",
+  label: "Brush",
+  shortcut: "B",
+};
+
+const ERASER_TOOL = {
+  icon: EraserIcon,
+  iconLibrary: "lucide",
+  id: "eraser",
+  label: "Eraser",
+  shortcut: "E",
+};
+
 const TOOL_CURSOR_BY_ID = {
+  brush: "crosshair",
+  eraser: "crosshair",
   hand: "var(--canvas-cursor-grab)",
   node: "var(--canvas-cursor-node)",
   pen: "var(--canvas-cursor-pen-tool)",
@@ -73,6 +91,7 @@ const TOOL_CURSOR_BY_ID = {
 };
 
 const addArtboardToCurrentView = (editor) => {
+  const shouldFitArtboard = editor.nodes.every((node) => node.type === "empty");
   const viewportCenter = editor.getViewportCenter() || {
     x: ARTBOARD_WIDTH / 2,
     y: ARTBOARD_HEIGHT / 2,
@@ -85,6 +104,13 @@ const addArtboardToCurrentView = (editor) => {
 
   if (!nodeId) {
     return;
+  }
+
+  if (shouldFitArtboard) {
+    editor.scheduleViewportFocus([nodeId], {
+      paddingX: ARTBOARD_WIDTH * 0.1,
+      paddingY: ARTBOARD_HEIGHT * 0.1,
+    });
   }
 };
 
@@ -111,6 +137,8 @@ export const CanvasToolbar = () => {
         <ToolButton {...PEN_TOOL} />
         <ToolButton {...TEXT_TOOL} />
         <ShapeToolbarButton />
+        <ToolButton {...BRUSH_TOOL} />
+        <ToolButton {...ERASER_TOOL} />
         <ToolbarButton
           aria-label="Add artboard"
           onClick={() => addArtboardToCurrentView(editor)}

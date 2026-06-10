@@ -62,7 +62,7 @@ infer safely from one file.
 
 | Contract | Doc |
 | --- | --- |
-| File format | [Punch format](reference/punch-format.md), [Schema migration](reference/schema-migration.md) |
+| File format | [Punch format](reference/punch-format.md), [Schema versioning](reference/schema-migration.md) |
 | Editor API | [Editor API](reference/editor-api.md), [Node capabilities](reference/node-capabilities.md), [Tool events](reference/tool-events.md) |
 | Geometry | [Geometry frames](reference/geometry-frames.md), [Coordinate spaces](reference/coordinate-spaces.md), [Canvas cursors](reference/canvas-cursors.md) |
 | Keyboard and commands | [Keyboard shortcuts](reference/keyboard-shortcuts.md), [Document commands](reference/document-commands.md), [Desktop menu commands](reference/desktop-menu-commands.md) |

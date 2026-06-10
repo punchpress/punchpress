@@ -49,7 +49,7 @@ const ARTBOARD_DOCUMENT = JSON.stringify({
       width: 90,
     },
   ],
-  version: "1.7",
+  version: "1.8",
 });
 
 const getNode = async (page, nodeId) => {
@@ -266,7 +266,7 @@ test("shift-click on an artboard label or empty body adds it to the selection", 
           width: 80,
         },
       ],
-      version: "1.7",
+      version: "1.8",
     })
   );
   await resetViewport(page);
@@ -396,7 +396,7 @@ test("toolbar-created artboards do not auto-fit after content exists", async ({
           width: 300,
         },
       ],
-      version: "1.7",
+      version: "1.8",
     })
   );
   await resetViewport(page);
@@ -440,9 +440,10 @@ test("artboard children stay clipped while drag preview crosses the artboard edg
       .poll(() => {
         return shape.evaluate((element) => {
           const shell =
-            element.parentElement instanceof HTMLElement
+            element.closest("[data-node-shell='true']") ||
+            (element.parentElement instanceof HTMLElement
               ? element.parentElement
-              : element;
+              : element);
 
           return shell.style.clipPath;
         });
@@ -527,7 +528,7 @@ test("rotated artboard children are not selectable outside the artboard edge", a
           visible: true,
         },
       ],
-      version: "1.7",
+      version: "1.8",
     })
   );
   await resetViewport(page);

@@ -1,5 +1,8 @@
 import {
+  createPunchPackage,
   DEFAULT_DOCUMENT_BASE_NAME,
+  isPunchPackageBytes,
+  loadPunchPackageContents,
   PUNCH_DOCUMENT_EXTENSION,
   PUNCH_DOCUMENT_MIME_TYPE,
   PUNCH_PNG_EXTENSION,
@@ -44,6 +47,35 @@ const stripExtension = (value: string, extension: string) => {
     : value;
 };
 
+const readPunchDocumentContents = async (file: File) => {
+  const bytes = await file.arrayBuffer();
+
+  if (isPunchPackageBytes(bytes)) {
+    return loadPunchPackageContents(bytes);
+  }
+
+  return new TextDecoder().decode(bytes);
+};
+
+const normalizeDesktopPunchDocument = (openedDocument) => {
+  if (!openedDocument) {
+    return null;
+  }
+
+  const contents = openedDocument.contents;
+
+  if (typeof contents === "string") {
+    return openedDocument;
+  }
+
+  return {
+    ...openedDocument,
+    contents: isPunchPackageBytes(contents)
+      ? loadPunchPackageContents(contents)
+      : new TextDecoder().decode(contents),
+  };
+};
+
 export const getDocumentBaseName = (value?: string) => {
   const normalized = (value || DEFAULT_DOCUMENT_BASE_NAME).trim();
   const withoutPunchExtension = stripExtension(
@@ -84,7 +116,9 @@ export const openPunchDocumentFile = async () => {
   const desktopDocumentFiles = getDesktopDocumentFiles();
 
   if (desktopDocumentFiles) {
-    return desktopDocumentFiles.openDocument();
+    return normalizeDesktopPunchDocument(
+      await desktopDocumentFiles.openDocument()
+    );
   }
 
   try {
@@ -96,7 +130,7 @@ export const openPunchDocumentFile = async () => {
     });
 
     const openedDocument = {
-      contents: await file.text(),
+      contents: await readPunchDocumentContents(file),
       fileHandle: file.handle || null,
       fileName: file.name,
     };
@@ -151,7 +185,9 @@ export const openRecentPunchDocumentFile = (
 
   if (desktopDocumentFiles) {
     return recentDocument.filePath
-      ? desktopDocumentFiles.openRecentDocument(recentDocument.filePath)
+      ? desktopDocumentFiles
+          .openRecentDocument(recentDocument.filePath)
+          .then(normalizeDesktopPunchDocument)
       : Promise.resolve(null);
   }
 
@@ -159,7 +195,7 @@ export const openRecentPunchDocumentFile = (
     ? openBrowserRecentDocument(
         recentDocument.fileHandle,
         recentDocument.fileName
-      )
+      ).then(normalizeDesktopPunchDocument)
     : Promise.resolve(null);
 };
 
@@ -208,8 +244,12 @@ export const savePunchDocumentFile = async (
   const nextHandle = forceDialog ? null : existingHandle;
 
   if (desktopDocumentFiles) {
+    const packageContents = createPunchPackage(contents);
     const result = await desktopDocumentFiles.saveDocument({
-      contents,
+      contents: packageContents.buffer.slice(
+        packageContents.byteOffset,
+        packageContents.byteOffset + packageContents.byteLength
+      ),
       defaultFileName,
       directoryPath: typeof existingHandle === "string" ? existingHandle : null,
       fileHandle: typeof nextHandle === "string" ? nextHandle : null,
@@ -224,7 +264,9 @@ export const savePunchDocumentFile = async (
 
   try {
     const fileHandle = await fileSave(
-      new Blob([contents], { type: PUNCH_DOCUMENT_MIME_TYPE }),
+      new Blob([createPunchPackage(contents)], {
+        type: PUNCH_DOCUMENT_MIME_TYPE,
+      }),
       {
         description: "PunchPress document",
         excludeAcceptAllOption: true,

@@ -1,7 +1,7 @@
 ---
-summary: Defines the shared PunchPress tool model, cursor expectations, direct-edit entry, temporary hand mode, and tool-specific intent boundaries.
+summary: Defines the shared PunchPress tool model, cursor expectations, direct-edit entry, raster tools, temporary hand mode, and tool-specific intent boundaries.
 read_when:
-  - changing active tool behavior, tool shortcuts, canvas cursors, or tool handoff between pointer, node, pen, text, shape, and hand tools
+  - changing active tool behavior, tool shortcuts, canvas cursors, or tool handoff between pointer, node, pen, text, shape, brush, eraser, and hand tools
   - deciding whether a new interaction belongs in a tool, selection behavior, or node direct-edit mode
   - debugging a cursor, hover preview, or click result that disagrees with the active tool
 ---
@@ -26,6 +26,8 @@ Tools define the user's current canvas intent.
 - Pen authors and edits vector points.
 - Text places and edits text.
 - Shape creates polygon, ellipse, and star nodes.
+- Brush paints raster pixels into image layers.
+- Eraser removes raster pixels from image layers.
 - Hand pans the canvas.
 
 ## Direct Editing

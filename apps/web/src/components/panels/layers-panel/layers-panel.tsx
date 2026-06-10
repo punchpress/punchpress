@@ -4,7 +4,9 @@ import {
   PERF_SPANS,
 } from "@punchpress/engine";
 import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
+import { PlusIcon } from "lucide-react";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SortableList } from "@/components/ui/sortable-list";
 import { useEditor } from "../../../editor-react/use-editor";
@@ -438,10 +440,20 @@ export const LayersPanel = ({ documentCommands }) => {
 
         <div className="mx-2.5 h-px bg-foreground/4" />
 
-        <div className="px-3 pt-2.5 pb-1.5">
+        <div className="flex items-center justify-between px-3 pt-2.5 pb-1.5">
           <span className="font-semibold text-[12px] text-foreground/70 tracking-[-0.01em]">
             Layers
           </span>
+          <Button
+            aria-label="New layer"
+            onClick={() => editor.addEmptyLayer()}
+            size="icon-sm"
+            title="New layer"
+            type="button"
+            variant="ghost"
+          >
+            <PlusIcon size={15} strokeWidth={2} />
+          </Button>
         </div>
 
         <ScrollArea

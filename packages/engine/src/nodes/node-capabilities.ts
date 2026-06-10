@@ -1,4 +1,5 @@
 import { artboardNodeCapabilities } from "./artboard/artboard-capabilities";
+import { emptyNodeCapabilities } from "./empty/empty-capabilities";
 import { groupNodeCapabilities } from "./group/group-capabilities";
 import { imageNodeCapabilities } from "./image/image-capabilities";
 import { pathNodeCapabilities } from "./path/path-capabilities";
@@ -8,6 +9,7 @@ import { vectorNodeCapabilities } from "./vector/vector-capabilities";
 
 const nodeCapabilitiesByType = {
   artboard: artboardNodeCapabilities,
+  empty: emptyNodeCapabilities,
   group: groupNodeCapabilities,
   image: imageNodeCapabilities,
   path: pathNodeCapabilities,
@@ -119,6 +121,10 @@ export const getNodeEditCapabilities = (editor, nodeId) => {
   return (
     getNodeCapabilities(node)?.getEditCapabilities(editor, nodeId, node) || null
   );
+};
+
+export const getNodeSourceKind = (node) => {
+  return getNodeCapabilities(node)?.getSourceKind?.(node) || null;
 };
 
 export const getNodeResizeMode = (editor, nodeId) => {

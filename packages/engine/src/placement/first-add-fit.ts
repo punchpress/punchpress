@@ -1,5 +1,5 @@
 export const shouldFitFirstAddedNode = (editor) => {
-  return editor.nodes.length === 0;
+  return editor.nodes.every((node) => node.type === "empty");
 };
 
 export const fitFirstAddedNode = (editor, nodeId) => {

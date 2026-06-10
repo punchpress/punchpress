@@ -26,6 +26,8 @@ product meaning.
 
 - Panning moves the viewport without changing the document.
 - Viewport position and zoom are session state, not history steps.
+- Trackpad and wheel panning remain available over selected-object transform
+  chrome and preserve the same viewport speed at every zoom level.
 - Holding Space temporarily enters hand-pan behavior.
 
 ## Placement

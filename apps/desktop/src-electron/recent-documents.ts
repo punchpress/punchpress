@@ -12,7 +12,7 @@ export interface DesktopRecentDocument {
 }
 
 export interface DesktopOpenedDocument {
-  contents: string;
+  contents: ArrayBuffer;
   fileHandle: string;
   fileName: string;
 }
@@ -159,8 +159,13 @@ export const clearRecentDocuments = async () => {
 export const readDocumentAtPath = async (
   filePath: string
 ): Promise<DesktopOpenedDocument> => {
+  const contents = await readFile(filePath);
+
   return {
-    contents: await readFile(filePath, "utf8"),
+    contents: contents.buffer.slice(
+      contents.byteOffset,
+      contents.byteOffset + contents.byteLength
+    ),
     fileHandle: filePath,
     fileName: path.basename(filePath),
   };

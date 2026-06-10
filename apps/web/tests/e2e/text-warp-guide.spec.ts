@@ -34,7 +34,7 @@ const ARCH_TEXT_DOCUMENT = {
       },
     },
   ],
-  version: "1.7",
+  version: "1.8",
 } as const;
 
 test("arch text warp hides the guide until the warp handle is actively dragged", async ({

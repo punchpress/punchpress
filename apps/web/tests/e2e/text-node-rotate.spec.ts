@@ -197,7 +197,24 @@ const rotateSelectionSlowlyWithoutRelease = async (
     throw new Error(`Missing ${corner} selection handle for slow rotation`);
   }
 
-  const start = {
+  const zoneStart = await page.evaluate((corner) => {
+    const zone = document.querySelector(
+      `.canvas-moveable .canvas-rotation-zone[data-corner="${corner}"]`
+    );
+    const box = zone?.getBoundingClientRect();
+
+    if (!box) {
+      return null;
+    }
+
+    const point = {
+      x: box.x + box.width / 2,
+      y: box.y + box.height / 2,
+    };
+
+    return document.elementFromPoint(point.x, point.y) === zone ? point : null;
+  }, corner);
+  const start = zoneStart || {
     x: handle.x + handle.width / 2 + (corner.endsWith("e") ? offset : -offset),
     y:
       handle.y +
@@ -217,6 +234,8 @@ const rotateSelectionSlowlyWithoutRelease = async (
     );
     await page.waitForTimeout(16);
   }
+
+  await page.waitForTimeout(16);
 };
 
 test("rotates a selected text node from the moveable selection", async ({

@@ -189,8 +189,12 @@ export const openBrowserRecentDocument = async (
     }
   }
 
+  const file = await fileHandle.getFile();
   const openedDocument = {
-    contents: await (await fileHandle.getFile()).text(),
+    contents:
+      typeof file.arrayBuffer === "function"
+        ? await file.arrayBuffer()
+        : await file.text(),
     fileHandle,
     fileName: fileName || fileHandle.name || "document.punch",
   };

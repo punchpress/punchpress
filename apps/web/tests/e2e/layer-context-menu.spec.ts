@@ -69,7 +69,7 @@ const LAYER_CONTEXT_MENU_DOCUMENT = JSON.stringify({
       width: 120,
     },
   ],
-  version: "1.7",
+  version: "1.8",
 });
 
 const getLayerButton = (page, nodeId) => {

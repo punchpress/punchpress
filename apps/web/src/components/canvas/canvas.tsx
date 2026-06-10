@@ -26,6 +26,7 @@ import { shouldDisableCanvasOverlay } from "../../performance/performance-url-fl
 import { useTheme } from "../../theme/theme-provider";
 import { DesignerFloatingToolbar, DesignerFrame } from "../designer/designer";
 import { CanvasArtboards } from "./canvas-artboards";
+import { CanvasBrushCursor } from "./canvas-brush-cursor";
 import { getCanvasCursorStyle } from "./canvas-cursor-assets";
 import { CanvasCursorCompanion } from "./canvas-cursor-companion";
 import { CanvasDotGrid } from "./canvas-dot-grid";
@@ -154,6 +155,61 @@ const logCanvasPointerDownDispatched = (editor, timingStartedAt) => {
   logInteractionNextPaint("pointer.down", timingStartedAt, () => ({
     selectedNodeCount: editor.selectedNodeIds.length,
   }));
+};
+
+const shouldIgnoreCanvasPointerTarget = (event, activeTool) => {
+  if (!(event.target instanceof Element)) {
+    return true;
+  }
+
+  if (!event.target.closest(".canvas-surface")) {
+    return true;
+  }
+
+  if (
+    event.target.closest("[data-node-id], [data-testid='canvas-text-input']")
+  ) {
+    return true;
+  }
+
+  const isRasterTool = activeTool === "brush" || activeTool === "eraser";
+
+  return Boolean(
+    !isRasterTool &&
+      event.target.closest(
+        [".canvas-moveable", "[data-artboard-body]"].join(",")
+      )
+  );
+};
+
+const isTransformOverlayWheelTarget = (target) => {
+  return Boolean(
+    target instanceof Element && target.closest(".canvas-moveable")
+  );
+};
+
+const getWheelScrollDelta = (event, zoom) => {
+  const normalizedZoom = Math.max(zoom || INITIAL_ZOOM, MIN_ZOOM);
+  const deltaX = event.shiftKey && !event.deltaX ? event.deltaY : event.deltaX;
+  const deltaY = event.shiftKey && !event.deltaX ? 0 : event.deltaY;
+
+  return {
+    x: deltaX / normalizedZoom,
+    y: deltaY / normalizedZoom,
+  };
+};
+
+const markViewportInteraction = (editor, timeoutRef) => {
+  editor.setViewportInteracting(true);
+
+  if (timeoutRef.current !== null) {
+    window.clearTimeout(timeoutRef.current);
+  }
+
+  timeoutRef.current = window.setTimeout(() => {
+    timeoutRef.current = null;
+    editor.setViewportInteracting(false);
+  }, 120);
 };
 
 const getCanvasPoint = (viewer, host, clientX, clientY, zoom) => {
@@ -320,16 +376,7 @@ export const Canvas = () => {
   const handleScroll = useCallback(
     (event) => {
       const viewer = viewerRef.current;
-      editor.setViewportInteracting(true);
-
-      if (viewportInteractionTimeoutRef.current !== null) {
-        window.clearTimeout(viewportInteractionTimeoutRef.current);
-      }
-
-      viewportInteractionTimeoutRef.current = window.setTimeout(() => {
-        viewportInteractionTimeoutRef.current = null;
-        editor.setViewportInteracting(false);
-      }, 120);
+      markViewportInteraction(editor, viewportInteractionTimeoutRef);
 
       editor.setViewport({
         x: viewer?.getScrollLeft?.() ?? editor.viewport.x ?? 0,
@@ -357,7 +404,31 @@ export const Canvas = () => {
   });
   const handleCanvasWheel = useCallback(
     (event) => {
-      if (!(event.metaKey || event.ctrlKey)) {
+      const isZoomWheel = event.metaKey || event.ctrlKey;
+
+      if (!isZoomWheel) {
+        if (!isTransformOverlayWheelTarget(event.target)) {
+          return;
+        }
+
+        const viewer = viewerRef.current;
+
+        if (!viewer) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        markViewportInteraction(editor, viewportInteractionTimeoutRef);
+
+        const delta = getWheelScrollDelta(event, editor.viewport.zoom);
+        viewer.scrollBy?.(delta.x, delta.y);
+        editor.setViewport({
+          x: viewer.getScrollLeft?.() ?? editor.viewport.x ?? 0,
+          y: viewer.getScrollTop?.() ?? editor.viewport.y ?? 0,
+          zoom: editor.viewport.zoom ?? INITIAL_ZOOM,
+        });
+        editor.onViewportChange?.();
         return;
       }
 
@@ -369,16 +440,7 @@ export const Canvas = () => {
 
       event.preventDefault();
       event.stopPropagation();
-      editor.setViewportInteracting(true);
-
-      if (viewportInteractionTimeoutRef.current !== null) {
-        window.clearTimeout(viewportInteractionTimeoutRef.current);
-      }
-
-      viewportInteractionTimeoutRef.current = window.setTimeout(() => {
-        viewportInteractionTimeoutRef.current = null;
-        editor.setViewportInteracting(false);
-      }, 120);
+      markViewportInteraction(editor, viewportInteractionTimeoutRef);
 
       editor.zoomViewportFromWheel({
         clientX: event.clientX,
@@ -404,20 +466,7 @@ export const Canvas = () => {
         return;
       }
 
-      if (
-        !(
-          event.target instanceof Element &&
-          event.target.closest(".canvas-surface")
-        ) ||
-        event.target.closest(
-          [
-            "[data-node-id]",
-            "[data-artboard-body]",
-            ".canvas-moveable",
-            "[data-testid='canvas-text-input']",
-          ].join(",")
-        )
-      ) {
+      if (shouldIgnoreCanvasPointerTarget(event, activeTool)) {
         return;
       }
 
@@ -634,6 +683,7 @@ export const Canvas = () => {
         </DesignerFloatingToolbar>
 
         <CanvasCursorCompanion hostElement={hostElement} />
+        <CanvasBrushCursor hostElement={hostElement} />
 
         {shouldRenderOverlay ? <CanvasHostOverlays /> : null}
       </div>

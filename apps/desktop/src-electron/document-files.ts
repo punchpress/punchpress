@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import {
@@ -96,7 +96,13 @@ export const registerDocumentFileHandlers = ({
       return null;
     }
 
-    return readDocumentAtPath(result.filePaths[0]);
+    const filePath = result.filePaths[0];
+
+    return {
+      contents: await readFile(filePath, "utf8"),
+      fileHandle: filePath,
+      fileName: path.basename(filePath),
+    };
   });
 
   ipcMain.handle(OPEN_RECENT_DOCUMENT_CHANNEL, async (_event, filePath) => {
@@ -110,7 +116,7 @@ export const registerDocumentFileHandlers = ({
     async (
       _event,
       payload: {
-        contents: string;
+        contents: ArrayBuffer | string | Uint8Array;
         defaultFileName: string;
         directoryPath?: string | null;
         fileHandle?: string | null;
@@ -138,7 +144,12 @@ export const registerDocumentFileHandlers = ({
         };
       }
 
-      await writeFile(targetPath, payload.contents, "utf8");
+      await writeFile(
+        targetPath,
+        typeof payload.contents === "string"
+          ? payload.contents
+          : Buffer.from(payload.contents)
+      );
       await rememberRecentDocument(targetPath);
       onRecentDocumentsChanged?.();
 

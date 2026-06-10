@@ -1,13 +1,17 @@
 import { PUNCH_DOCUMENT_VERSION } from "./constants";
 import { normalizeNodesForSchema } from "./normalize";
+import { createDocumentAssetsFromNodes } from "./raster-assets";
 import { type DesignDocument, designDocumentSchema } from "./schema";
 
 export const createDesignDocument = (
   nodes: readonly DesignDocument["nodes"][number][]
 ): DesignDocument => {
+  const normalizedNodes = normalizeNodesForSchema(nodes);
+
   return designDocumentSchema.parse({
+    assets: createDocumentAssetsFromNodes(normalizedNodes),
     version: PUNCH_DOCUMENT_VERSION,
-    nodes: normalizeNodesForSchema(nodes),
+    nodes: normalizedNodes,
   });
 };
 

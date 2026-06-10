@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Editor } from "@punchpress/engine";
+import { PUNCH_DOCUMENT_VERSION } from "@punchpress/punch-schema";
 
 const createRectangleContour = () => {
   return {
@@ -73,7 +74,7 @@ const createPathDocument = () => {
         visible: true,
       },
     ],
-    version: "1.7",
+    version: PUNCH_DOCUMENT_VERSION,
   };
 };
 

@@ -1,4 +1,4 @@
-import { isArtboardNode, isGroupNode } from "@punchpress/engine";
+import { isArtboardNode, isEmptyNode, isGroupNode } from "@punchpress/engine";
 import { useEditorValue } from "../../editor-react/use-editor-value";
 import { CanvasNode } from "./canvas-node";
 import { useCanvasNodePlacement } from "./use-canvas-node-placement";
@@ -45,6 +45,10 @@ const shouldRenderGroupSurface = (editor, node) => {
 
 const shouldRenderNode = (editor, node) => {
   if (isArtboardNode(node)) {
+    return false;
+  }
+
+  if (isEmptyNode(node)) {
     return false;
   }
 

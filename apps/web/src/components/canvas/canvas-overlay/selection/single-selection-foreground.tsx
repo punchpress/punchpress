@@ -468,19 +468,21 @@ export const CanvasSingleSelectionForeground = ({
       return;
     }
 
+    if (isArtboardNode && editor.activeTool === "pointer") {
+      return;
+    }
+
     const startCanvasPoint = getCanvasPoint(
       editor,
       event.clientX,
       event.clientY
     );
-
-    if (
-      isPathEditing &&
-      !(
-        startCanvasPoint &&
+    const didPressSelectedNode = Boolean(
+      startCanvasPoint &&
         isNodeOrDescendantHit(editor, nodeId, startCanvasPoint)
-      )
-    ) {
+    );
+
+    if (isPathEditing && !didPressSelectedNode) {
       event.preventDefault();
       event.stopPropagation();
 
@@ -493,12 +495,7 @@ export const CanvasSingleSelectionForeground = ({
       return;
     }
 
-    if (
-      !(
-        startCanvasPoint &&
-        isNodeOrDescendantHit(editor, nodeId, startCanvasPoint)
-      )
-    ) {
+    if (!didPressSelectedNode) {
       if (editor.activeTool === "pointer") {
         event.preventDefault();
         event.stopPropagation();

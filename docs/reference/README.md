@@ -13,7 +13,8 @@ scan.
 | Contract | Doc |
 | --- | --- |
 | Saved document shape | [Punch format](punch-format.md) |
-| Schema versioning and migrations | [Schema migration](schema-migration.md) |
+| `.punch` package layout and asset records | [Punch package](punch-package.md) |
+| Schema versioning | [Schema versioning](schema-migration.md) |
 | Public editor methods and grouped responsibilities | [Editor API](editor-api.md) |
 | Node capability methods and extension points | [Node capabilities](node-capabilities.md) |
 | Tool event lifecycle | [Tool events](tool-events.md) |

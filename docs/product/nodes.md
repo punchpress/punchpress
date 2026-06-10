@@ -1,8 +1,8 @@
 ---
-summary: Defines the shared PunchPress node model for identity, layer order, visibility, transform, editability, containers, direct editing, and future node growth.
+summary: Defines the shared PunchPress node model for identity, source kind, empty layers, layer order, visibility, transform, editability, containers, direct editing, and future node growth.
 read_when:
   - adding a new node type or changing shared node behavior
-  - changing selection, transform, visibility, copy/paste, properties, or direct-edit entry for multiple node families
+  - changing selection, transform, visibility, copy/paste, properties, rasterization, or direct-edit entry for multiple node families
   - deciding whether a feature belongs on a node, a container, an editing mode, or export-only output
 ---
 
@@ -20,6 +20,25 @@ Nodes are the building blocks of PunchPress documents.
 - Multi-selection property controls show shared values and mixed states rather
   than guessing.
 - Container nodes own child layers while behaving as first-class canvas objects.
+
+## Source Kind
+
+Each node exposes a source kind through the engine capability layer. Source kind
+is the tool-routing contract for operations that only apply to certain content
+models.
+
+| Source kind | Node families |
+| --- | --- |
+| `empty` | New layers before their first content action. |
+| `raster` | Image nodes. |
+| `vector` | Shape, path, and vector nodes. |
+| `text` | Text nodes. |
+| `container` | Group nodes. |
+| `artboard` | Artboard nodes. |
+
+Brush operates directly on `raster` nodes. When Brush targets an `empty` layer,
+PunchPress materializes that layer as raster content. Rasterizing existing
+vector, text, group, or artboard content is a separate capability.
 
 ## Direct Editing
 

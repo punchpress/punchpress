@@ -5,6 +5,7 @@ import {
 } from "@punchpress/punch-schema";
 import { createHeadlessPaperCompiler } from "../../primitives/headless-paper-compiler";
 import { format } from "../../primitives/math";
+import { withNodeGeometryBehavior } from "../../primitives/node-geometry";
 import {
   getNodeRotation,
   getNodeScaleX,
@@ -30,6 +31,33 @@ const getWorldBounds = (node, bbox) => {
     minX: getNodeX(node) + bbox.minX,
     minY: getNodeY(node) + bbox.minY,
     width: bbox.width,
+  };
+};
+
+const getTransformedPathPoint = (node, bbox, point) => {
+  const center = {
+    x: (bbox.minX + bbox.maxX) / 2,
+    y: (bbox.minY + bbox.maxY) / 2,
+  };
+  const scaleX = getNodeScaleX(node) ?? 1;
+  const scaleY = getNodeScaleY(node) ?? 1;
+  const rotation = ((getNodeRotation(node) || 0) * Math.PI) / 180;
+  const scaledPoint = {
+    x: (point.x - center.x) * scaleX,
+    y: (point.y - center.y) * scaleY,
+  };
+
+  return {
+    x:
+      getNodeX(node) +
+      center.x +
+      scaledPoint.x * Math.cos(rotation) -
+      scaledPoint.y * Math.sin(rotation),
+    y:
+      getNodeY(node) +
+      center.y +
+      scaledPoint.x * Math.sin(rotation) +
+      scaledPoint.y * Math.cos(rotation),
   };
 };
 
@@ -127,6 +155,27 @@ const toRenderEntries = (pathNode, geometry) => {
     strokeMiterLimit: style.strokeMiterLimit,
     strokeWidth: style.strokeWidth,
     transform,
+  }));
+};
+
+const toRenderHitRegions = (pathNode, geometry) => {
+  if (!(geometry?.bbox && geometry.hitRegions?.length > 0)) {
+    return [];
+  }
+
+  const scaleX = getNodeScaleX(pathNode) ?? 1;
+  const scaleY = getNodeScaleY(pathNode) ?? 1;
+  const strokeScale = Math.max(Math.abs(scaleX), Math.abs(scaleY));
+
+  return geometry.hitRegions.map((region) => ({
+    ...region,
+    contours: (region.contours || []).map((contour) => ({
+      ...contour,
+      points: (contour.points || []).map((point) =>
+        getTransformedPathPoint(pathNode, geometry.bbox, point)
+      ),
+    })),
+    strokeWidth: (region.strokeWidth || 0) * strokeScale,
   }));
 };
 
@@ -386,6 +435,12 @@ const appendDefaultRenderEntries = (
   }
 };
 
+const getDefaultRenderHitRegions = (pathNodes, getPathGeometry) => {
+  return pathNodes.flatMap((pathNode) =>
+    toRenderHitRegions(pathNode, getPathGeometry(pathNode))
+  );
+};
+
 export const buildVectorRenderGeometry = (
   vectorNode,
   pathNodes,
@@ -410,14 +465,14 @@ export const buildVectorRenderGeometry = (
       return null;
     }
 
-    return {
+    return withNodeGeometryBehavior({
       bbox: compoundResult.bounds,
       guide: null,
       paths: compoundResult.entries,
       ready: true,
       selectionBounds: compoundResult.bounds,
       selectionPoints: compoundResult.selectionPoints,
-    };
+    });
   }
 
   if (BOOLEAN_PATH_COMPOSITIONS.has(pathComposition)) {
@@ -432,14 +487,14 @@ export const buildVectorRenderGeometry = (
       return null;
     }
 
-    return {
+    return withNodeGeometryBehavior({
       bbox: compoundResult.bounds,
       guide: null,
       paths: compoundResult.entries,
       ready: true,
       selectionBounds: compoundResult.bounds,
       selectionPoints: compoundResult.selectionPoints,
-    };
+    });
   }
 
   const bounds = [] as NonNullable<ReturnType<typeof getWorldBounds>>[];
@@ -458,11 +513,15 @@ export const buildVectorRenderGeometry = (
     return null;
   }
 
-  return {
+  return withNodeGeometryBehavior({
     bbox,
     guide: null,
+    hitRegions: getDefaultRenderHitRegions(
+      visiblePathNodes,
+      getPathGeometry
+    ),
     paths: readyEntries,
     ready: true,
     selectionBounds: bbox,
-  };
+  });
 };

@@ -1,4 +1,4 @@
-import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
+import { ROOT_PARENT_ID, createRasterAssetId } from "@punchpress/punch-schema";
 import { createId } from "../text/model";
 
 export const createDefaultImageNode = ({
@@ -8,9 +8,16 @@ export const createDefaultImageNode = ({
   src = "",
   width = 240,
 } = {}) => {
+  const id = createId();
+
   return {
+    assetId: createRasterAssetId(id),
+    baseHeight: height,
+    baseWidth: width,
+    baseX: 0,
+    baseY: 0,
     height,
-    id: createId(),
+    id,
     mimeType,
     name,
     opacity: 1,

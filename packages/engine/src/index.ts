@@ -16,6 +16,12 @@ export {
 export { offsetEditablePathPoints } from "./document/path/editable-path-actions";
 export { setVectorPathComposition } from "./document/path/path-composition-actions";
 export {
+  canMakeCompoundPath,
+  canReleaseCompoundPath,
+  makeCompoundPath,
+  releaseCompoundPath,
+} from "./document/path/path-compound-actions";
+export {
   canJoinCurves,
   canMergeCurves,
   canSeparateCurves,
@@ -23,12 +29,6 @@ export {
   mergeCurves,
   separateCurves,
 } from "./document/path/path-curve-actions";
-export {
-  canMakeCompoundPath,
-  canReleaseCompoundPath,
-  makeCompoundPath,
-  releaseCompoundPath,
-} from "./document/path/path-compound-actions";
 export { Editor } from "./editor";
 export {
   getNodePropertySupport,
@@ -39,8 +39,10 @@ export {
   setSelectionProperty,
 } from "./inspection/selection-properties";
 export { createDefaultArtboardNode } from "./nodes/artboard/model";
+export { createDefaultEmptyNode } from "./nodes/empty/model";
 export { createDefaultGroupNode } from "./nodes/group/model";
 export { createDefaultImageNode } from "./nodes/image/model";
+export { getNodeSourceKind } from "./nodes/node-capabilities";
 export {
   getAncestorNodeIds,
   getChildNodeIds,
@@ -53,6 +55,7 @@ export {
   isArtboardNode,
   isContainerNode,
   isDescendantOf,
+  isEmptyNode,
   isGroupNode,
   isImageNode,
   isPathNode,
@@ -133,27 +136,23 @@ export {
 } from "./primitives/dom";
 export { getResizeCorner } from "./primitives/group-resize";
 export { clamp, format, round, toNumber, toSafeHex } from "./primitives/math";
+export type { GestureTolerance } from "./primitives/pointer-distance";
 export {
   GESTURE_TOLERANCES_PX,
   getGestureTolerancePx,
   getGestureToleranceSquared,
-  getPointerDistanceSquared,
   getPointerDistancePx,
+  getPointerDistanceSquared,
   hasPointerMovedAtLeast,
   hasPointerMovedWithin,
   isPointerDistanceAtLeast,
   isPointerDistanceWithin,
 } from "./primitives/pointer-distance";
-export type { GestureTolerance } from "./primitives/pointer-distance";
 export {
   getNodeLocalPoint,
   getNodeRotationCenter,
   getNodeWorldPoint,
 } from "./primitives/rotation";
-export {
-  getNodeLocalMatrix,
-  getNodeLocalTransformBounds,
-} from "./transform/node-transform-matrix";
 export {
   includesPathPoint,
   isSamePathPoint,
@@ -162,3 +161,7 @@ export {
   toPathPointKey,
 } from "./state/store/path/path-point-selection";
 export type { PenHoverIntent, PenHoverState } from "./tools/pen-tool-types";
+export {
+  getNodeLocalMatrix,
+  getNodeLocalTransformBounds,
+} from "./transform/node-transform-matrix";

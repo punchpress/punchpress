@@ -88,7 +88,7 @@ const loadVectorDocument = async (page) => {
             visible: true,
           },
         ],
-        version: "1.7",
+        version: "1.8",
       })
     );
 
@@ -163,7 +163,7 @@ const loadOpenVectorDocument = async (page) => {
             visible: true,
           },
         ],
-        version: "1.7",
+        version: "1.8",
       })
     );
 
@@ -273,7 +273,7 @@ const _loadMultiContourOpenVectorDocument = async (page) => {
             visible: true,
           },
         ],
-        version: "1.7",
+        version: "1.8",
       })
     );
 
@@ -401,7 +401,7 @@ const _loadMultiContourVectorDocument = async (page) => {
             visible: true,
           },
         ],
-        version: "1.7",
+        version: "1.8",
       })
     );
 
@@ -530,7 +530,7 @@ const loadCompoundVectorDocument = async (page) => {
             visible: true,
           },
         ],
-        version: "1.7",
+        version: "1.8",
       })
     );
 
@@ -585,7 +585,7 @@ const loadPolygonShapeDocument = async (
               width: 240,
             },
           ],
-          version: "1.7",
+          version: "1.8",
         })
       );
 
@@ -635,7 +635,7 @@ const loadStarShapeDocument = async (
               width: 200,
             },
           ],
-          version: "1.7",
+          version: "1.8",
         })
       );
 
@@ -727,7 +727,7 @@ const loadIrregularVectorDocument = async (page) => {
             visible: true,
           },
         ],
-        version: "1.7",
+        version: "1.8",
       })
     );
 

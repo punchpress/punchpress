@@ -49,14 +49,14 @@ describe("savePunchDocumentFile", () => {
 
     const { savePunchDocumentFile } = await importWebDocumentFiles();
     const result = await savePunchDocumentFile(
-      '{"version":"1.7","nodes":[]}',
+      '{"version":"1.8","nodes":[]}',
       "renamed-design",
       "/tmp/original-folder/original-design.punch",
       true
     );
 
     expect(saveDocumentMock).toHaveBeenCalledWith({
-      contents: '{"version":"1.7","nodes":[]}',
+      contents: expect.any(ArrayBuffer),
       defaultFileName: "renamed-design.punch",
       directoryPath: "/tmp/original-folder/original-design.punch",
       fileHandle: null,
@@ -85,12 +85,13 @@ describe("openPunchDocumentFile", () => {
       value: {},
     });
     fileOpenMock.mockResolvedValueOnce({
+      arrayBuffer: async () =>
+        new TextEncoder().encode('{"version":"1.8","nodes":[]}').buffer,
       handle: {
         kind: "file",
         name: "design.punch",
       },
       name: "design.punch",
-      text: async () => '{"version":"1.7","nodes":[]}',
     });
 
     const { openPunchDocumentFile } = await importWebDocumentFiles();
@@ -100,10 +101,10 @@ describe("openPunchDocumentFile", () => {
       description: "PunchPress document",
       excludeAcceptAllOption: true,
       extensions: [".punch"],
-      mimeTypes: ["application/vnd.punchpress+json"],
+      mimeTypes: ["application/vnd.punchpress.document"],
     });
     expect(result).toEqual({
-      contents: '{"version":"1.7","nodes":[]}',
+      contents: '{"version":"1.8","nodes":[]}',
       fileHandle: {
         kind: "file",
         name: "design.punch",

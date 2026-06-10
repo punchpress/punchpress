@@ -29,6 +29,7 @@ export {
   replaceMissingDocumentFonts,
 } from "./document-fonts";
 export { normalizeNodeForSchema, normalizeNodesForSchema } from "./normalize";
+export { createRasterAssetId } from "./normalize";
 export {
   DocumentParseError,
   DocumentValidationError,
@@ -53,6 +54,11 @@ export {
 } from "./local-fonts";
 export { migrateDocument } from "./migrate";
 export {
+  createPunchPackage,
+  isPunchPackageBytes,
+  loadPunchPackageContents,
+} from "./package";
+export {
   createDesignDocument,
   saveDesignDocument,
   serializeDesignDocument,
@@ -61,11 +67,16 @@ export type {
   ArtboardNodeDocument,
   ClipboardContent,
   DesignDocument,
+  DocumentAsset,
+  EmptyNodeDocument,
   GroupNodeDocument,
   ImageNodeDocument,
+  ImageMimeTypeDocument,
   LocalFontDocument,
   NodeDocument,
   PathNodeDocument,
+  RasterAssetDocument,
+  RasterAssetTileDocument,
   ShapeKindDocument,
   ShapeNodeDocument,
   TextNodeDocument,
@@ -83,11 +94,16 @@ export type {
 export {
   artboardNodeSchema,
   designDocumentSchema,
+  documentAssetSchema,
+  emptyNodeSchema,
   groupNodeSchema,
   imageNodeSchema,
+  imageMimeTypeSchema,
   localFontSchema,
   nodeSchema,
   pathNodeSchema,
+  rasterAssetSchema,
+  rasterAssetTileSchema,
   shapeKindSchema,
   shapeNodeSchema,
   textNodeSchema,

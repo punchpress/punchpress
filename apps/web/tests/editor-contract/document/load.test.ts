@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
+  createPunchPackage,
   DocumentParseError,
   DocumentValidationError,
+  loadPunchPackageContents,
   PUNCH_DOCUMENT_VERSION,
   parseDesignDocument,
   UnsupportedDocumentVersionError,
@@ -68,25 +70,62 @@ describe("parseDesignDocument", () => {
     ).toThrow(DocumentValidationError);
   });
 
-  test("migrates 1.7 documents to the current version", () => {
-    expect(
+  test("rejects previous document versions", () => {
+    expect(() =>
       parseDesignDocument(
         JSON.stringify({
           ...VALID_DOCUMENT,
           version: "1.7",
         })
-      ).version
-    ).toBe(PUNCH_DOCUMENT_VERSION);
-  });
-
-  test("rejects older unsupported document versions", () => {
-    expect(() =>
-      parseDesignDocument(
-        JSON.stringify({
-          ...VALID_DOCUMENT,
-          version: "1.5",
-        })
       )
     ).toThrow(UnsupportedDocumentVersionError);
+  });
+});
+
+describe("Punch package", () => {
+  test("stores image payloads as package assets and hydrates them on load", () => {
+    const src =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR42mP8z8BQDwAFgwJ/lhL1WQAAAABJRU5ErkJggg==";
+    const contents = JSON.stringify({
+      assets: {},
+      version: PUNCH_DOCUMENT_VERSION,
+      nodes: [
+        {
+          assetId: "asset_image_node",
+          height: 1,
+          id: "image-node",
+          mimeType: "image/png",
+          name: "Pixel",
+          opacity: 1,
+          parentId: "root",
+          src,
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: 0,
+            y: 0,
+          },
+          type: "image",
+          visible: true,
+          width: 1,
+        },
+      ],
+    });
+
+    const packageBytes = createPunchPackage(contents);
+    const hydrated = parseDesignDocument(
+      loadPunchPackageContents(packageBytes)
+    );
+    const imageNode = hydrated.nodes[0];
+
+    expect(imageNode.type).toBe("image");
+    expect(imageNode.type === "image" ? imageNode.src : null).toBe(src);
+    expect(hydrated.assets.asset_image_node).toMatchObject({
+      currentMimeType: "image/png",
+      kind: "raster",
+      ref: "assets/raster/asset_image_node.png",
+      storage: "single",
+    });
   });
 });

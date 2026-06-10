@@ -113,7 +113,7 @@ const VECTOR_DOCUMENT = JSON.stringify({
       visible: true,
     },
   ],
-  version: "1.7",
+  version: "1.8",
 });
 
 const MULTI_COMPOUND_VECTOR_DOCUMENT = JSON.stringify({
@@ -337,7 +337,7 @@ const MULTI_COMPOUND_VECTOR_DOCUMENT = JSON.stringify({
       visible: true,
     },
   ],
-  version: "1.7",
+  version: "1.8",
 });
 
 const IRREGULAR_MULTI_COMPOUND_VECTOR_DOCUMENT = JSON.stringify({
@@ -561,7 +561,7 @@ const IRREGULAR_MULTI_COMPOUND_VECTOR_DOCUMENT = JSON.stringify({
       visible: true,
     },
   ],
-  version: "1.7",
+  version: "1.8",
 });
 
 const getElementRect = async (page, selector) => {

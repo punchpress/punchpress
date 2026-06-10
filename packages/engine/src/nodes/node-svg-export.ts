@@ -92,10 +92,27 @@ const buildSvgImageMarkup = (node, geometry, inheritedOpacity, offsetX, offsetY)
   const localTransform = getNodeLocalTransform(node, geometry.bbox);
   const openLocalTransform = localTransform ? `<g transform="${localTransform}">` : "";
   const closeLocalTransform = localTransform ? "</g>" : "";
+  const baseMarkup = node.src
+    ? `<image href="${node.src}" x="${format(node.baseX ?? 0)}" y="${format(
+        node.baseY ?? 0
+      )}" width="${format(node.baseWidth ?? node.width)}" height="${format(
+        node.baseHeight ?? node.height
+      )}" preserveAspectRatio="none"${opacity}/>`
+    : "";
+  const tileMarkup = (node.tileSources || [])
+    .map(
+      (tile) =>
+        `<image href="${tile.src}" x="${format(tile.x)}" y="${format(
+          tile.y
+        )}" width="${format(tile.width)}" height="${format(
+          tile.height
+        )}" preserveAspectRatio="none"${opacity}/>`
+    )
+    .join("");
 
   return `<g transform="translate(${format(getNodeX(node) - offsetX)} ${format(
     getNodeY(node) - offsetY
-  )})">${openLocalTransform}<image href="${node.src}" width="${format(node.width)}" height="${format(node.height)}" preserveAspectRatio="none"${opacity}/>${closeLocalTransform}</g>`;
+  )})">${openLocalTransform}${baseMarkup}${tileMarkup}${closeLocalTransform}</g>`;
 };
 
 export const buildSvgExport = (nodes, geometryById, options = {}) => {

@@ -3,6 +3,10 @@ import {
   DEFAULT_LOCAL_FONT,
 } from "@punchpress/punch-schema";
 import createStore from "zustand/vanilla";
+import {
+  DEFAULT_BRUSH_SETTINGS,
+  normalizeBrushSettings,
+} from "../../tools/brush-settings";
 import { createDocumentStoreActions } from "./create-document-store-actions";
 import { createEditingStoreActions } from "./create-editing-store-actions";
 import { createFontStoreActions } from "./create-font-store-actions";
@@ -20,6 +24,8 @@ export const createEditorStore = ({
 
   return createStore((set) => ({
     activeTool: "pointer",
+    brushSettings: DEFAULT_BRUSH_SETTINGS,
+    eraserSettings: DEFAULT_BRUSH_SETTINGS,
     editingNodeId: null,
     editingOriginalText: "",
     editingText: "",
@@ -45,6 +51,23 @@ export const createEditorStore = ({
       x: 0,
       y: 0,
       zoom: initialZoom,
+    },
+    setBrushSettings: (patch, toolId) => {
+      set((state) => ({
+        ...(toolId === "eraser" || (!toolId && state.activeTool === "eraser")
+          ? {
+              eraserSettings: normalizeBrushSettings(
+                patch || {},
+                state.eraserSettings
+              ),
+            }
+          : {
+              brushSettings: normalizeBrushSettings(
+                patch || {},
+                state.brushSettings
+              ),
+            }),
+      }));
     },
     ...createDocumentStoreActions(set, getDefaultFont),
     ...createEditingStoreActions(set),

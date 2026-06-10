@@ -150,7 +150,8 @@ const beginRotateSelectionMeasured = (editor, { nodeId, nodeIds } = {}) => {
   for (const currentNodeId of resolvedNodeIds) {
     const rotatedNode = editor.getNode(currentNodeId);
     const bbox = rotatedNode
-      ? editor.getNodeTransformBounds(currentNodeId)
+      ? editor.getNodeTransformBounds(currentNodeId) ||
+        editor.getNodeFrame(currentNodeId)?.bounds
       : null;
 
     if (!(rotatedNode && bbox)) {
@@ -214,15 +215,23 @@ export const updateRotateSelection = (
       session.previewDeltaRotation = deltaRotation;
       const previewNodeIds = session.previewNodeIds || session.nodeIds;
 
-      editor.setSelectionDragPreview({
-        effectiveNodeIdSet: new Set(session.nodeIds),
-        nodeIdSet: new Set([...session.nodeIds, ...previewNodeIds]),
-        nodeIds: previewNodeIds,
-        rotate: {
-          centerCanvas: { ...session.selectionCenter },
-          deltaRotation,
-        },
+      editor.updateNodes(session.nodeIds, (node) => {
+        const baseNode = session.baseNodes.get(node.id);
+
+        if (!baseNode) {
+          return node;
+        }
+
+        return getWorldRotateNodeUpdate(
+          editor,
+          baseNode,
+          baseNode.bbox,
+          session.baseNodes,
+          session.selectionCenter,
+          deltaRotation
+        );
       });
+      editor.setSelectionDragPreview(null);
 
       return previewNodeIds;
     }

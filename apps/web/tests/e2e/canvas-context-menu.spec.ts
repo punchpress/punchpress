@@ -70,7 +70,7 @@ const CANVAS_CONTEXT_MENU_DOCUMENT = JSON.stringify({
       width: 120,
     },
   ],
-  version: "1.7",
+  version: "1.8",
 });
 
 const CANVAS_CONTEXT_MENU_VECTOR_DOCUMENT = JSON.stringify({
@@ -170,7 +170,7 @@ const CANVAS_CONTEXT_MENU_VECTOR_DOCUMENT = JSON.stringify({
       visible: true,
     },
   ],
-  version: "1.7",
+  version: "1.8",
 });
 
 const getCanvasNode = (page, nodeId: string) => {

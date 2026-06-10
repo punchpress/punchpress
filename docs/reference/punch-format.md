@@ -1,5 +1,5 @@
 ---
-summary: Defines the `.punch` document constants, version, root shape, node families, transforms, warps, vector contours, and validation constraints.
+summary: Defines the packaged `.punch` document constants, version, root shape, node families, transforms, warps, vector contours, and validation constraints.
 read_when:
   - changing `packages/punch-schema/src/schema.ts`, document load/save, or persisted node fields
   - debugging a `.punch` file that fails validation or loses editable source data
@@ -8,12 +8,13 @@ read_when:
 
 # Punch Format
 
-`.punch` files are JSON design recipes.
+`.punch` files are packaged design documents. The package layout is defined in
+[Punch package](punch-package.md).
 
 | Constant | Value |
 | --- | --- |
 | Extension | `.punch` |
-| MIME type | `application/vnd.punchpress+json` |
+| MIME type | `application/vnd.punchpress.document` |
 | Current version | `1.8` |
 | Root parent id | `root` |
 | Default basename | `untitled-design` |
@@ -23,9 +24,14 @@ read_when:
 ```ts
 type DesignDocument = {
   version: "1.8";
+  assets: Record<string, DocumentAsset>;
   nodes: Node[];
 };
 ```
+
+`document.json` stores package-safe design data. Runtime editor snapshots may
+hydrate image nodes with transient `src` data URLs; saved package documents do
+not store image bytes inline.
 
 `nodes` is ordered tree order. Relationships use string ids and `parentId`.
 
@@ -34,11 +40,35 @@ type DesignDocument = {
 | Type | Saved responsibility |
 | --- | --- |
 | `artboard` | Rectangular production surface: name, size, background, lock, transform. |
+| `empty` | Named layer placeholder with no rendered content yet. |
 | `group` | Named container with transform. |
 | `text` | Editable text, local font descriptor, size, tracking, fill, stroke, warp, transform. |
 | `shape` | Live polygon, ellipse, or star with size, points, optional corner radius, appearance, transform. |
+| `image` | Raster artwork that references a document raster asset. |
 | `vector` | Vector object with optional child paths and path composition. |
 | `path` | Editable contours, fill rule, stroke style, appearance, transform. |
+
+Image nodes store logical raster bounds with optional base-plane placement for
+tiled edits:
+
+```ts
+type ImageNode = {
+  type: "image";
+  assetId: string;
+  width: number;
+  height: number;
+  baseX?: number;
+  baseY?: number;
+  baseWidth?: number;
+  baseHeight?: number;
+  transform: Transform;
+};
+```
+
+`width` and `height` define the node's logical render, hit, selection, and
+transform bounds. `baseX`, `baseY`, `baseWidth`, and `baseHeight` place the base
+raster payload inside those logical bounds when sparse tiled edits grow the node
+left or upward.
 
 ## Common Fields
 
@@ -113,3 +143,5 @@ type VectorSvgSource = {
 - Path nodes may live at root, under artboards, under groups, or under vectors.
 - Saved documents store durable design data only, not selection, hover, viewport,
   compiled render surfaces, Paper sessions, or overlay state.
+- Every image node `assetId` resolves to a raster asset.
+- Package `document.json` does not store image `src` fields.

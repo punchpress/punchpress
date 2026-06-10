@@ -1,5 +1,5 @@
 ---
-summary: Explains engine tool classes for pointer, node, pen, text, shape, and hand behavior, including hover state, preview state, sessions, and shortcut selection.
+summary: Explains engine tool classes for pointer, node, pen, text, shape, brush, eraser, and hand behavior, including hover state, preview state, sessions, and shortcut selection.
 read_when:
   - changing tool classes, adding a tool, or moving behavior between tools and interaction actions
   - debugging hover or preview state that persists after tool changes, history changes, or path editing exits
@@ -16,6 +16,7 @@ Tools are engine-owned state machines for canvas intent.
 - `PenTool`
 - `TextTool`
 - `ShapeTool`
+- `BrushTool`
 - `HandTool`
 
 Tools own hover state, preview state, active sessions, activation cleanup, and

@@ -2,9 +2,11 @@ import { PERF_COUNTERS } from "@punchpress/engine";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useEditor } from "../../../editor-react/use-editor";
+import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
 import { AppearanceFields } from "./appearance-fields";
 import { ArtboardFields } from "./artboard-fields";
+import { BrushFields } from "./brush-fields";
 import { ImageFields } from "./image-fields";
 import { PathCornerFields } from "./path-corner-fields";
 import { PathPointFields } from "./path-point-fields";
@@ -29,6 +31,14 @@ export const PropertiesPanel = () => {
     selectionProperties,
     showsPathPointCornerRadius,
   } = usePropertiesPanelState();
+  const rasterToolState = useEditorValue((editor, state) => {
+    const settings = editor.getBrushToolSettings(state.activeTool);
+
+    return {
+      settings,
+      tool: settings ? state.activeTool : null,
+    };
+  });
   const hasAppearanceFields = Boolean(
     selectionProperties.properties.fill ||
       selectionProperties.properties.stroke ||
@@ -38,6 +48,7 @@ export const PropertiesPanel = () => {
       selectionProperties.properties.strokeWidth
   );
   const hasSelectionColors = selectionProperties.selectionColors.length > 0;
+  const hasRasterToolFields = Boolean(rasterToolState.settings);
   const selectedNode = selectionProperties.selectedNode;
   const showsPathCornerRadiusSummary = Boolean(
     pointSelectedNode?.type === "path" &&
@@ -49,13 +60,15 @@ export const PropertiesPanel = () => {
       selectedNode?.type === "image" ||
       selectedNode?.type === "text" ||
       selectedNode?.type === "shape" ||
+      hasRasterToolFields ||
       showsPathPointCornerRadius ||
       showsPathCornerRadiusSummary
   );
 
   if (
     selectionProperties.selectionKind === "none" &&
-    bootstrapState !== "error"
+    bootstrapState !== "error" &&
+    !hasRasterToolFields
   ) {
     return null;
   }
@@ -70,6 +83,13 @@ export const PropertiesPanel = () => {
             </AlertDescription>
           </Alert>
         )}
+
+        {hasRasterToolFields ? (
+          <BrushFields
+            settings={rasterToolState.settings}
+            tool={rasterToolState.tool}
+          />
+        ) : null}
 
         {selectedNode?.type === "text" ? (
           <TextFields node={selectedNode} />

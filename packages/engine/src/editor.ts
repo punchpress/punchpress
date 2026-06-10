@@ -26,6 +26,7 @@ import {
   deleteNode as deleteEditorNode,
   deleteSelected as deleteEditorSelected,
   duplicate as duplicateEditorNodes,
+  addEmptyLayer as addEditorEmptyLayer,
   groupSelected as groupEditorSelected,
   insertNodes as insertEditorNodes,
   moveNodeToParent as moveEditorNodeToParent,
@@ -221,6 +222,7 @@ import {
 import { getSelectionBounds as getEditorSelectionBounds } from "./selection/selection-bounds";
 import { createEditorStore } from "./state/store/create-editor-store";
 import { HandTool } from "./tools/hand-tool";
+import { BrushTool } from "./tools/brush-tool";
 import { NodeTool } from "./tools/node-tool";
 import { PenTool } from "./tools/pen-tool";
 import { PointerTool } from "./tools/pointer-tool";
@@ -293,6 +295,8 @@ export class Editor {
     this.vectorRenderSurfaces = new VectorRenderSurfaceManager();
     this.tools = new Map([
       ["pointer", new PointerTool(this)],
+      ["brush", new BrushTool(this, "paint")],
+      ["eraser", new BrushTool(this, "erase")],
       ["node", new NodeTool(this)],
       ["hand", new HandTool(this)],
       ["pen", new PenTool(this)],
@@ -1009,6 +1013,33 @@ export class Editor {
     return this.tools.get("pen")?.getHoverState?.() || null;
   }
 
+  getBrushToolSettings(toolId = this.activeTool) {
+    if (!(toolId === "brush" || toolId === "eraser")) {
+      return null;
+    }
+
+    return this.tools.get(toolId)?.getSettings?.() || null;
+  }
+
+  setBrushSettings(patch, toolId) {
+    this.getState().setBrushSettings(patch, toolId);
+  }
+
+  getBrushWorkingSurfaceStates() {
+    return [
+      ...(this.tools.get("brush")?.getWorkingSurfaceStates?.() || []),
+      ...(this.tools.get("eraser")?.getWorkingSurfaceStates?.() || []),
+    ];
+  }
+
+  getBrushWorkingSurfaceStateForNode(nodeId) {
+    return (
+      this.tools.get("brush")?.getWorkingSurfaceStateForNode?.(nodeId) ||
+      this.tools.get("eraser")?.getWorkingSurfaceStateForNode?.(nodeId) ||
+      null
+    );
+  }
+
   getSelectionFrameKey(nodeIds = this.selectedNodeIds) {
     return getEditorSelectionFrameKey(this, nodeIds);
   }
@@ -1073,6 +1104,10 @@ export class Editor {
 
   addVectorNode(point) {
     addEditorVectorNode(this, point);
+  }
+
+  addEmptyLayer() {
+    return addEditorEmptyLayer(this);
   }
 
   insertNodes(nodes) {

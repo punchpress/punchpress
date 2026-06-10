@@ -113,6 +113,8 @@ export const imageNodeCapabilities = {
     requiresPathEditing: false,
   }),
 
+  getSourceKind: () => "raster",
+
   getResizeMode: () => "scale",
 
   getRotateMode: () => "self",

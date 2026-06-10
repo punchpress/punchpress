@@ -5,7 +5,7 @@ import type {
 } from "./desktop-menu/desktop-native-menu-types";
 
 export interface DesktopDocumentFileResult {
-  contents: string;
+  contents: ArrayBuffer | string;
   fileHandle: string | null;
   fileName: string;
 }
@@ -85,7 +85,7 @@ declare global {
           filePath: string
         ) => Promise<DesktopDocumentFileResult | null>;
         saveDocument: (payload: {
-          contents: string;
+          contents: ArrayBuffer | string;
           directoryPath?: string | null;
           defaultFileName: string;
           fileHandle?: string | null;

@@ -204,6 +204,14 @@ const isNodeElementBoundsHit = (editor, nodeId, point) => {
   );
 };
 
+const canDragFromNodeElementBounds = (editor, nodeId, nodeIds) => {
+  if (nodeIds.length > 1) {
+    return true;
+  }
+
+  return Boolean(editor.getNodeEditCapabilities(nodeId)?.hasExpandedHitBounds);
+};
+
 export const CanvasMultiSelectionForeground = ({
   isDraggable,
   isResizable,
@@ -306,7 +314,8 @@ export const CanvasMultiSelectionForeground = ({
       return (
         (startCanvasPoint &&
           isNodeOrDescendantHit(editor, nodeId, startCanvasPoint)) ||
-        isNodeElementBoundsHit(editor, nodeId, startClientPoint)
+        (canDragFromNodeElementBounds(editor, nodeId, nodeIds) &&
+          isNodeElementBoundsHit(editor, nodeId, startClientPoint))
       );
     });
 

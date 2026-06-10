@@ -15,7 +15,7 @@ module. They avoid the browser when the browser is not the thing being tested.
 
 ## Use For
 
-- document load, save, normalization, and migration behavior
+- document load, save, normalization, and schema-version behavior
 - selection, grouping, ordering, visibility, and history
 - node geometry, hit behavior, transform math, and export invariants
 - text, shape, vector, path, and artboard editor commands

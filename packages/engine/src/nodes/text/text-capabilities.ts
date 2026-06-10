@@ -204,6 +204,8 @@ export const textNodeCapabilities = {
     };
   },
 
+  getSourceKind: () => "text",
+
   getResizeMode: () => "scale",
 
   getRotateMode: () => "self",

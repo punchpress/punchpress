@@ -131,7 +131,7 @@ const ADD_COMPOUND_SOURCE_DOCUMENT = JSON.stringify({
       visible: true,
     },
   ],
-  version: "1.7",
+  version: "1.8",
 });
 
 const FILL_COMPOUND_DOCUMENT = JSON.stringify({
@@ -264,7 +264,7 @@ const FILL_COMPOUND_DOCUMENT = JSON.stringify({
       visible: true,
     },
   ],
-  version: "1.7",
+  version: "1.8",
 });
 
 test("making a compound path collapses the vector render to one boolean-add svg path", async ({

@@ -15,6 +15,7 @@ const opacityNumber = z.number().refine((value) => {
 });
 
 const parentIdSchema = z.string().min(1);
+export const imageMimeTypeSchema = z.enum(["image/jpeg", "image/png"]);
 
 const baseNodeSchema = z
   .object({
@@ -99,6 +100,13 @@ export const groupNodeSchema = baseNodeSchema
   })
   .strict();
 
+export const emptyNodeSchema = baseNodeSchema
+  .extend({
+    name: z.string().min(1),
+    type: z.literal("empty"),
+  })
+  .strict();
+
 export const artboardNodeSchema = baseNodeSchema
   .extend({
     background: z.string().min(1).nullable(),
@@ -138,15 +146,87 @@ export const shapeNodeSchema = baseNodeSchema
 
 export const imageNodeSchema = baseNodeSchema
   .extend({
+    assetId: z.string().min(1),
+    baseHeight: finiteNumber.optional(),
+    baseWidth: finiteNumber.optional(),
+    baseX: finiteNumber.optional(),
+    baseY: finiteNumber.optional(),
     height: finiteNumber,
-    mimeType: z.enum(["image/jpeg", "image/png"]),
+    mimeType: imageMimeTypeSchema.optional(),
     name: z.string().min(1),
-    src: z.string().min(1),
+    src: z.string().min(1).optional(),
+    tileSources: z
+      .array(
+        z
+          .object({
+            col: z.number().int(),
+            height: finiteNumber,
+            ref: z.string().min(1),
+            row: z.number().int(),
+            src: z.string().min(1),
+            width: finiteNumber,
+            x: finiteNumber,
+            y: finiteNumber,
+          })
+          .strict()
+      )
+      .optional(),
     transform: transformSchema,
     type: z.literal("image"),
     width: finiteNumber,
   })
   .strict();
+
+export const rasterAssetTileSchema = z
+  .object({
+    col: z.number().int(),
+    height: finiteNumber,
+    mimeType: imageMimeTypeSchema.optional(),
+    ref: z.string().min(1),
+    row: z.number().int(),
+    width: finiteNumber,
+    x: finiteNumber,
+    y: finiteNumber,
+  })
+  .strict();
+
+const baseRasterAssetSchema = z
+  .object({
+    colorSpace: z.literal("srgb"),
+    currentMimeType: imageMimeTypeSchema,
+    hasAlpha: z.boolean(),
+    height: finiteNumber,
+    id: z.string().min(1),
+    kind: z.literal("raster"),
+    name: z.string().min(1),
+    originalMimeType: imageMimeTypeSchema,
+    preferredExportMimeType: imageMimeTypeSchema,
+    width: finiteNumber,
+  })
+  .strict();
+
+export const singleRasterAssetSchema = baseRasterAssetSchema
+  .extend({
+    ref: z.string().min(1),
+    storage: z.literal("single"),
+  })
+  .strict();
+
+export const tiledRasterAssetSchema = baseRasterAssetSchema
+  .extend({
+    baseRef: z.string().min(1).optional(),
+    storage: z.literal("tiled"),
+    tileSize: finiteNumber,
+    tiles: z.array(rasterAssetTileSchema).min(1),
+  })
+  .strict();
+
+export const rasterAssetSchema = z.discriminatedUnion("storage", [
+  singleRasterAssetSchema,
+  tiledRasterAssetSchema,
+]);
+
+export const documentAssetSchema = rasterAssetSchema;
 
 export const vectorHandleSchema = z
   .object({
@@ -215,6 +295,7 @@ export const pathNodeSchema = baseNodeSchema
 export const nodeSchema = z.discriminatedUnion("type", [
   textNodeSchema,
   groupNodeSchema,
+  emptyNodeSchema,
   artboardNodeSchema,
   shapeNodeSchema,
   imageNodeSchema,
@@ -224,6 +305,7 @@ export const nodeSchema = z.discriminatedUnion("type", [
 
 export const designDocumentSchema = z
   .object({
+    assets: z.record(z.string(), documentAssetSchema).default({}),
     version: z.literal(PUNCH_DOCUMENT_VERSION),
     nodes: z.array(nodeSchema),
   })
@@ -257,6 +339,14 @@ export const designDocumentSchema = z
           code: z.ZodIssueCode.custom,
           message: `Unknown parent id: ${node.parentId}`,
           path: ["nodes", index, "parentId"],
+        });
+      }
+
+      if (node.type === "image" && !document.assets[node.assetId]) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Unknown raster asset id: ${node.assetId}`,
+          path: ["nodes", index, "assetId"],
         });
       }
 
@@ -321,9 +411,14 @@ export const designDocumentSchema = z
 
 export type DesignDocument = z.infer<typeof designDocumentSchema>;
 export type ArtboardNodeDocument = z.infer<typeof artboardNodeSchema>;
+export type DocumentAsset = z.infer<typeof documentAssetSchema>;
+export type EmptyNodeDocument = z.infer<typeof emptyNodeSchema>;
 export type GroupNodeDocument = z.infer<typeof groupNodeSchema>;
 export type ImageNodeDocument = z.infer<typeof imageNodeSchema>;
+export type ImageMimeTypeDocument = z.infer<typeof imageMimeTypeSchema>;
 export type NodeDocument = z.infer<typeof nodeSchema>;
+export type RasterAssetDocument = z.infer<typeof rasterAssetSchema>;
+export type RasterAssetTileDocument = z.infer<typeof rasterAssetTileSchema>;
 export type ShapeKindDocument = z.infer<typeof shapeKindSchema>;
 export type ShapePointDocument = z.infer<typeof shapePointSchema>;
 export type ShapeNodeDocument = z.infer<typeof shapeNodeSchema>;

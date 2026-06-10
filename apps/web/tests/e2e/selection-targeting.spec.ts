@@ -48,7 +48,7 @@ const OVERLAPPING_SHAPES_DOCUMENT = JSON.stringify({
       width: 180,
     },
   ],
-  version: "1.7",
+  version: "1.8",
 });
 
 const getCanvasPointClientPoint = async (page, point) => {

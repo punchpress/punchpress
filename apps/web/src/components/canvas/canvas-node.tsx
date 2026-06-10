@@ -33,6 +33,7 @@ import { usePerformanceRenderCounter } from "../../performance/use-performance-r
 import { openCanvasNodeEditingMode } from "./canvas-node-editing";
 import { getCanvasDeepLeafNodeIdAtPoint } from "./canvas-overlay/vector-path/canvas-node-hit-target";
 import { startCanvasToolPlacementSession } from "./canvas-tool-placement-session";
+import { CanvasRasterImage } from "./raster/canvas-raster-image";
 import { getVectorPathPaintOrder } from "./vector-paint-order";
 
 const getCanvasPoint = (editor, clientX, clientY) => {
@@ -325,10 +326,16 @@ const getGroupNodeRenderTree = (
     if (childNode.type === "image" && geometry?.bbox) {
       return [
         {
+          baseHeight: childNode.baseHeight,
+          baseWidth: childNode.baseWidth,
+          baseX: childNode.baseX,
+          baseY: childNode.baseY,
           height: childNode.height,
           key: childNode.id,
+          nodeId: childNode.id,
           opacity: getNodeOpacity(childNode),
           src: childNode.src,
+          tileSources: childNode.tileSources,
           transform: getSvgNodeTransform(childNode, geometry.bbox),
           type: "image",
           width: childNode.width,
@@ -720,7 +727,12 @@ const CanvasNodeShell = ({ children, isReady, nodeId }) => {
         }}
       >
         <div
-          className="absolute h-full w-full"
+          className={cn(
+            "canvas-node pointer-events-none absolute h-full w-full",
+            !isReady && "opacity-50"
+          )}
+          data-node-id={nodeId}
+          data-selected={isSelectionTargetSelected ? "true" : "false"}
           ref={(element) => {
             editor.registerNodeElement(nodeId, element);
           }}
@@ -730,8 +742,6 @@ const CanvasNodeShell = ({ children, isReady, nodeId }) => {
         >
           {children}
           <ContextMenuTrigger
-            data-node-id={nodeId}
-            data-selected={isSelectionTargetSelected ? "true" : "false"}
             onContextMenuCapture={() => {
               if (!editor.isSelected(contextMenuNodeId)) {
                 editor.select(contextMenuNodeId);
@@ -740,9 +750,8 @@ const CanvasNodeShell = ({ children, isReady, nodeId }) => {
             render={
               <button
                 className={cn(
-                  "canvas-node pointer-events-auto absolute block h-full w-full appearance-none border-0 bg-transparent p-0",
-                  cursorClassName,
-                  !isReady && "opacity-50"
+                  "pointer-events-auto absolute block h-full w-full appearance-none border-0 bg-transparent p-0",
+                  cursorClassName
                 )}
                 onDoubleClick={(event) => {
                   const interactionNodeId = getCanvasInteractionNodeId(
@@ -1138,17 +1147,19 @@ const CanvasNodeRenderTree = ({
 
     if (item.type === "image") {
       return (
-        <image
+        <CanvasRasterImage
+          baseHeight={item.baseHeight}
+          baseWidth={item.baseWidth}
+          baseX={item.baseX}
+          baseY={item.baseY}
           height={item.height}
-          href={item.src}
           key={item.key}
+          nodeId={item.nodeId}
           opacity={isEditing ? 0 : (item.opacity ?? 1)}
-          pointerEvents="none"
-          preserveAspectRatio="none"
+          src={item.src}
+          tileSources={item.tileSources}
           transform={item.transform || undefined}
           width={item.width}
-          x={0}
-          y={0}
         />
       );
     }
@@ -1217,14 +1228,16 @@ const CanvasNodeArt = memo(
     if (!(isInteractionProxy || renderMode === "image")) {
       if (image) {
         renderedContent = (
-          <image
+          <CanvasRasterImage
+            baseHeight={image.baseHeight}
+            baseWidth={image.baseWidth}
+            baseX={image.baseX}
+            baseY={image.baseY}
             height={image.height}
-            href={image.src}
-            pointerEvents="none"
-            preserveAspectRatio="none"
+            nodeId={image.id}
+            src={image.src}
+            tileSources={image.tileSources}
             width={image.width}
-            x={0}
-            y={0}
           />
         );
       } else if (renderTree) {

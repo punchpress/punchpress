@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Editor } from "@punchpress/engine";
+import { PUNCH_DOCUMENT_VERSION } from "@punchpress/punch-schema";
 
 const createPathNode = (id: string, parentId: string, x: number) => {
   return {
@@ -126,7 +127,7 @@ describe("vector path composition actions", () => {
               compoundPathId: "compound-1",
             },
           ],
-          version: "1.7",
+          version: PUNCH_DOCUMENT_VERSION,
         })
       )
     ).toThrow();

@@ -90,7 +90,7 @@ describe("Editor.rotateSelectionBy", () => {
     expect(afterSecondCenter.y).toBeCloseTo(expectedSecondCenter.y, 2);
   });
 
-  test("previews selected group rotation and commits descendants once", () => {
+  test("updates selected group rotation live and commits descendants once", () => {
     const editor = createEditor();
     const firstNodeId = createTextNode(editor, {
       text: "Rotate first",
@@ -120,8 +120,10 @@ describe("Editor.rotateSelectionBy", () => {
     const duringFirst = getDebugNode(editor.getDebugDump(), firstNodeId);
 
     expect(previewNodeIds).toEqual([groupNodeId]);
-    expect(editor.selectionDragPreview?.rotate?.deltaRotation).toBe(24);
-    expect(duringFirst.transform.rotation).toBe(beforeFirst.transform.rotation);
+    expect(editor.selectionDragPreview).toBeNull();
+    expect(
+      duringFirst.transform.rotation - beforeFirst.transform.rotation
+    ).toBeCloseTo(24, 6);
 
     const committedNodeIds = editor.commitRotateSelection(session);
     const afterFirst = getDebugNode(editor.getDebugDump(), firstNodeId);
@@ -129,8 +131,8 @@ describe("Editor.rotateSelectionBy", () => {
     expect(committedNodeIds).toEqual([firstNodeId, secondNodeId]);
     expect(editor.selectionDragPreview).toBeNull();
     expect(
-      afterFirst.transform.rotation - beforeFirst.transform.rotation
-    ).toBeCloseTo(24, 6);
+      afterFirst.transform.rotation - duringFirst.transform.rotation
+    ).toBeCloseTo(0, 6);
   });
 
   test("commits nested group rotation in parent-local coordinates", () => {

@@ -111,6 +111,10 @@ export class PenTool extends Tool {
       }
     }
 
+    if (this.hasActiveSession()) {
+      return false;
+    }
+
     return selectToolFromShortcut(this.editor, key, event);
   }
 

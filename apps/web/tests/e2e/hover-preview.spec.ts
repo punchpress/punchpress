@@ -213,7 +213,7 @@ test("hover preview uses the painted node under the pointer, not overlapping emp
           visible: true,
         },
       ],
-      version: "1.7",
+      version: "1.8",
     })
   );
   await resetViewport(page);

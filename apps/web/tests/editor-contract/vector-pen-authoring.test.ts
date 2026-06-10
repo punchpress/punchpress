@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Editor } from "@punchpress/engine";
+import { PUNCH_DOCUMENT_VERSION } from "@punchpress/punch-schema";
 import { getNodeWorldPoint } from "../../../../packages/engine/src/primitives/rotation";
 
 const createRectanglePathDocument = () => {
@@ -69,7 +70,7 @@ const createRectanglePathDocument = () => {
         visible: true,
       },
     ],
-    version: "1.7",
+    version: PUNCH_DOCUMENT_VERSION,
   };
 };
 
@@ -336,7 +337,7 @@ const createOpenPathDocument = () => {
         visible: true,
       },
     ],
-    version: "1.7",
+    version: PUNCH_DOCUMENT_VERSION,
   };
 };
 

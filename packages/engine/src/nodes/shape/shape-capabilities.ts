@@ -3,6 +3,7 @@ import {
   withNodeGeometryBehavior,
 } from "../../primitives/node-geometry";
 import { toTransformedWorldFrame, toWorldFrame } from "../node-frame-utils";
+import { createDefaultShapeNode } from "./model";
 import {
   buildShapeNodePath,
   getShapeCornerCurveSegments,
@@ -10,7 +11,6 @@ import {
   getShapeNodeBounds,
   supportsShapeEditablePath,
 } from "./shape-engine";
-import { createDefaultShapeNode } from "./model";
 
 export const shapeNodeCapabilities = {
   buildGeometry: (node) => {
@@ -112,6 +112,8 @@ export const shapeNodeCapabilities = {
       : "keep-transform",
     requiresPathEditing: supportsShapeEditablePath(node),
   }),
+
+  getSourceKind: () => "vector",
 
   getResizeMode: () => "bounds",
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -114,6 +114,7 @@ describe("registerDocumentFileHandlers", () => {
       "document:open-recent",
       "document:open-svg",
       "document:save",
+      "document:save-png",
       "document:save-svg",
     ]);
 
@@ -146,9 +147,12 @@ describe("registerDocumentFileHandlers", () => {
   });
 
   test("opens svg artwork for import without updating recents", async () => {
+    tempDir = await createTempDir();
+    const svgPath = path.join(tempDir, "from-dialog.svg");
+    await writeFile(svgPath, "<svg></svg>", "utf8");
     showOpenDialogMock.mockResolvedValueOnce({
       canceled: false,
-      filePaths: ["/tmp/from-dialog.svg"],
+      filePaths: [svgPath],
     });
 
     const { registerDocumentFileHandlers } = await importDocumentFiles();
@@ -170,12 +174,12 @@ describe("registerDocumentFileHandlers", () => {
         properties: ["openFile"],
       })
     );
-    expect(readDocumentAtPathMock).toHaveBeenCalledWith("/tmp/from-dialog.svg");
+    expect(readDocumentAtPathMock).not.toHaveBeenCalled();
     expect(rememberRecentDocumentMock).not.toHaveBeenCalled();
     expect(recentDocumentsChanged).not.toHaveBeenCalled();
     expect(openedDocument).toEqual({
-      contents: "loaded:/tmp/from-dialog.svg",
-      fileHandle: "/tmp/from-dialog.svg",
+      contents: "<svg></svg>",
+      fileHandle: svgPath,
       fileName: "from-dialog.svg",
     });
   });

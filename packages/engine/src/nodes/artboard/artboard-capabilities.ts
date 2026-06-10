@@ -54,7 +54,10 @@ export const artboardNodeCapabilities = {
   getFrameFromGeometry: (node, geometry, surface) => {
     switch (surface) {
       case "render":
-        return toWorldFrame(node, geometry?.bbox || getArtboardNodeBounds(node));
+        return toWorldFrame(
+          node,
+          geometry?.bbox || getArtboardNodeBounds(node)
+        );
       case "selection":
       case "transform":
         return toTransformedWorldFrame(
@@ -115,6 +118,8 @@ export const artboardNodeCapabilities = {
     pathEditingOverlayMode: "keep-transform",
     requiresPathEditing: false,
   }),
+
+  getSourceKind: () => "artboard",
 
   getResizeMode: () => "bounds",
 

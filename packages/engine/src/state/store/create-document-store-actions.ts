@@ -3,6 +3,10 @@ import {
   createDefaultArtboardNode,
   getNextArtboardName,
 } from "../../nodes/artboard/model";
+import {
+  createDefaultEmptyNode,
+  getNextLayerName,
+} from "../../nodes/empty/model";
 import { createDefaultPathNode } from "../../nodes/path/model";
 import { normalizePathNodeContours } from "../../nodes/path/path-contours";
 import { createDefaultShapeNode } from "../../nodes/shape/model";
@@ -83,6 +87,29 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
 
         return withDocumentMutation(state, {
           activeTool: activatePointer ? "pointer" : state.activeTool,
+          editingNodeId: null,
+          editingOriginalText: "",
+          editingText: "",
+          focusedGroupId: null,
+          nodes: [...state.nodes, node],
+          pathEditingNodeId: null,
+          pathEditingPoint: null,
+          pathEditingPoints: [],
+          selectedNodeIds: [node.id],
+        });
+      });
+
+      return insertedNodeId;
+    },
+
+    addEmptyNode: () => {
+      let insertedNodeId: string | null = null;
+
+      set((state) => {
+        const node = createDefaultEmptyNode(getNextLayerName(state.nodes));
+        insertedNodeId = node.id;
+
+        return withDocumentMutation(state, {
           editingNodeId: null,
           editingOriginalText: "",
           editingText: "",

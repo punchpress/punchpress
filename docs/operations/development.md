@@ -16,7 +16,7 @@ schema, Vite web app, and Electron desktop shell.
 | Package | Role |
 | --- | --- |
 | `packages/engine` | Headless `Editor`: state, commands, tools, geometry, history, export. |
-| `packages/punch-schema` | `.punch` schema, load/save, normalization, migration, font descriptors. |
+| `packages/punch-schema` | `.punch` schema, load/save, normalization, version checks, font descriptors. |
 | `apps/web` | React editor, canvas UI, panels, browser platform adapters. |
 | `apps/desktop` | Electron main/preload, native menus, file opening, updater, packaging. |
 

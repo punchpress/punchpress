@@ -125,12 +125,12 @@ const COMPOUND_VECTOR_DOCUMENT = JSON.stringify({
       visible: true,
     },
   ],
-  version: "1.7",
+  version: "1.8",
 });
 
 const EMPTY_DOCUMENT = JSON.stringify({
   nodes: [],
-  version: "1.7",
+  version: "1.8",
 });
 
 const SIMPLE_MULTISELECT_DOCUMENT = JSON.stringify({
@@ -176,7 +176,7 @@ const SIMPLE_MULTISELECT_DOCUMENT = JSON.stringify({
       width: 130,
     },
   ],
-  version: "1.7",
+  version: "1.8",
 });
 
 const NESTED_CURVE_DOCUMENT = JSON.stringify({
@@ -284,7 +284,7 @@ const NESTED_CURVE_DOCUMENT = JSON.stringify({
       visible: true,
     },
   ],
-  version: "1.7",
+  version: "1.8",
 });
 
 const TRANSFORMED_NESTED_CURVE_DOCUMENT = JSON.stringify({
@@ -362,7 +362,7 @@ const TRANSFORMED_NESTED_CURVE_DOCUMENT = JSON.stringify({
       visible: true,
     },
   ],
-  version: "1.7",
+  version: "1.8",
 });
 
 const resizeMultiSelectionFromCorner = async (page, { corner, drag }) => {

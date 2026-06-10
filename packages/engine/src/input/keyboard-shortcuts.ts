@@ -148,6 +148,12 @@ export const handleCanvasShortcutKeyDown = (editor, event, key) => {
     return true;
   }
 
+  if ((event.metaKey || event.ctrlKey) && event.shiftKey && key === "n") {
+    event.preventDefault();
+    editor.addEmptyLayer();
+    return true;
+  }
+
   if (event.metaKey || event.ctrlKey || event.altKey) {
     return false;
   }

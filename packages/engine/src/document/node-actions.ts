@@ -187,6 +187,17 @@ export const insertNodes = (editor, nodes) => {
   });
 };
 
+export const addEmptyLayer = (editor) => {
+  finishEditingIfNeeded(editor);
+  let nodeId = null;
+
+  editor.run(() => {
+    nodeId = editor.getState().addEmptyNode();
+  });
+
+  return nodeId;
+};
+
 export const bringToFront = (editor, nodeId) => {
   finishEditingIfNeeded(editor);
   if (

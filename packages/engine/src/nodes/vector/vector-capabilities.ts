@@ -114,6 +114,8 @@ export const vectorNodeCapabilities = {
   getResizeMode: (_editor, _nodeId, node) =>
     supportsEditableContours(node) ? "scale" : "children",
 
+  getSourceKind: () => "vector",
+
   getRotateMode: (_editor, _nodeId, node) =>
     supportsEditableContours(node) ? "self" : "children",
 

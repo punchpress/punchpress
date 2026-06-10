@@ -97,7 +97,7 @@ const createNestedPathDocument = () =>
         visible: true,
       },
     ],
-    version: "1.7",
+    version: "1.8",
   });
 
 const createOverlappingParallelGroupDocument = () =>
@@ -162,7 +162,7 @@ const createOverlappingParallelGroupDocument = () =>
         visible: true,
       },
     ],
-    version: "1.7",
+    version: "1.8",
   });
 
 test("double-clicking grouped content drills into the group and allows child selection", async ({

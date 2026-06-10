@@ -38,6 +38,7 @@ edge cases, and intentional omissions without becoming source tours.
 | Group containers, drill-in, ungroup, and child movement | [Groups](groups.md) |
 | Copy, paste, duplication, and external payload interpretation | [Clipboard](clipboard.md) |
 | Undo, redo, no-op changes, and gesture history boundaries | [History](history.md) |
+| Raster image crop, cutout tools, masks, and image edit mode | [Image editing](image-editing.md) |
 
 ## Tools
 

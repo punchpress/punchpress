@@ -119,7 +119,7 @@ const BOOLEAN_VECTOR_DOCUMENT = JSON.stringify({
       visible: true,
     },
   ],
-  version: "1.7",
+  version: "1.8",
 });
 
 const TOP_LEVEL_BOOLEAN_VECTOR_DOCUMENT = JSON.stringify({
@@ -247,7 +247,7 @@ const TOP_LEVEL_BOOLEAN_VECTOR_DOCUMENT = JSON.stringify({
       visible: true,
     },
   ],
-  version: "1.7",
+  version: "1.8",
 });
 
 const BOOLEAN_ACTIONS = [

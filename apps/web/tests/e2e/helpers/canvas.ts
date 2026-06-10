@@ -128,6 +128,33 @@ const getNodeCenter = async (page, nodeId) => {
 
       return null;
     };
+    const getPaintedDescendantFramePoint = (nodeId) => {
+      const node = editor.getNode?.(nodeId);
+
+      if (!(node?.type === "group" || node?.type === "vector")) {
+        return null;
+      }
+
+      const descendantNodeIds = [
+        ...(editor.getDescendantLeafNodeIds?.(nodeId) || []),
+      ].reverse();
+
+      for (const descendantNodeId of descendantNodeIds) {
+        const bounds = editor.getNodeRenderFrame?.(descendantNodeId)?.bounds;
+
+        if (!bounds) {
+          continue;
+        }
+
+        const point = getPaintedFramePoint(descendantNodeId, bounds);
+
+        if (point) {
+          return point;
+        }
+      }
+
+      return null;
+    };
     const getSelectionFallbackPoint = (nodeId) => {
       const selectionPoint =
         editor.getNodeRenderGeometry?.(nodeId)?.selectionPoints?.[0];
@@ -147,6 +174,7 @@ const getNodeCenter = async (page, nodeId) => {
       }
 
       const point =
+        getPaintedDescendantFramePoint(candidateNodeId) ||
         getPaintedFramePoint(candidateNodeId, bounds) ||
         getSelectionFallbackPoint(candidateNodeId);
 

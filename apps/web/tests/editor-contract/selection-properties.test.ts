@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import {
+  createDefaultImageNode,
+  Editor,
+  getNodeWorldPoint,
+} from "@punchpress/engine";
 
 const AVAILABLE_FONT = {
   family: "Arial",
@@ -130,6 +134,40 @@ const createTextNode = (id: string) => {
       kind: "none",
     },
   } as const;
+};
+
+const createImageNode = (id: string) => {
+  return {
+    ...createDefaultImageNode({
+      height: 120,
+      name: "Layer",
+      src: "data:image/png;base64,test",
+      width: 240,
+    }),
+    id,
+    transform: {
+      rotation: 32,
+      scaleX: 1,
+      scaleY: 1,
+      x: 420,
+      y: 280,
+    },
+  } as const;
+};
+
+const getImageWorldCenter = (node: ReturnType<typeof createImageNode>) => {
+  return getNodeWorldPoint(
+    node,
+    {
+      height: node.height,
+      maxX: node.width,
+      maxY: node.height,
+      minX: 0,
+      minY: 0,
+      width: node.width,
+    },
+    { x: node.width / 2, y: node.height / 2 }
+  );
 };
 
 const createArtboardNode = (id: string) => {
@@ -323,6 +361,45 @@ describe("Editor selection properties", () => {
       type: "artboard",
       width: 3200,
     });
+  });
+
+  test("resizes a rotated image around its center through selection properties", () => {
+    const editor = new Editor();
+
+    loadNodes(editor, [createImageNode("image-node")]);
+    editor.select("image-node");
+
+    const beforeNode = editor.getNode("image-node");
+    if (!beforeNode || beforeNode.type !== "image") {
+      throw new Error("Expected image node");
+    }
+    const beforeCenter = getImageWorldCenter(beforeNode);
+
+    expect(editor.setSelectionProperty("height", 240)).toBe(true);
+    const afterHeightNode = editor.getNode("image-node");
+    if (!afterHeightNode || afterHeightNode.type !== "image") {
+      throw new Error("Expected image node");
+    }
+    const afterHeightCenter = getImageWorldCenter(afterHeightNode);
+
+    expect(afterHeightNode.width).toBe(240);
+    expect(afterHeightNode.height).toBe(240);
+    expect(afterHeightNode.transform.rotation).toBe(32);
+    expect(afterHeightCenter.x).toBeCloseTo(beforeCenter.x, 2);
+    expect(afterHeightCenter.y).toBeCloseTo(beforeCenter.y, 2);
+
+    expect(editor.setSelectionProperty("width", 360)).toBe(true);
+    const afterWidthNode = editor.getNode("image-node");
+    if (!afterWidthNode || afterWidthNode.type !== "image") {
+      throw new Error("Expected image node");
+    }
+    const afterWidthCenter = getImageWorldCenter(afterWidthNode);
+
+    expect(afterWidthNode.width).toBe(360);
+    expect(afterWidthNode.height).toBe(240);
+    expect(afterWidthNode.transform.rotation).toBe(32);
+    expect(afterWidthCenter.x).toBeCloseTo(beforeCenter.x, 2);
+    expect(afterWidthCenter.y).toBeCloseTo(beforeCenter.y, 2);
   });
 
   test("does not expose corner radius for a non-polygon shape", () => {

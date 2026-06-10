@@ -16,6 +16,8 @@ read_when:
 | `p` | Pen tool |
 | `t` | Text tool |
 | `h` | Hand tool |
+| `b` | Brush tool |
+| `e` | Eraser tool |
 | `r` | Shape tool, polygon |
 | `o` | Shape tool, ellipse |
 | `s` | Shape tool, star |
@@ -39,6 +41,7 @@ Tool shortcuts do not fire with Meta, Ctrl, or Alt.
 | --- | --- |
 | `Cmd/Ctrl+Z` | Undo |
 | `Cmd/Ctrl+Y` or `Cmd/Ctrl+Shift+Z` | Redo |
+| `Cmd/Ctrl+Shift+N` | New layer |
 | `Cmd/Ctrl+G` | Group |
 | `Cmd/Ctrl+Shift+G` | Ungroup |
 | `Delete` / `Backspace` | Delete selection or selected path points, depending on active mode |

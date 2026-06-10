@@ -20,7 +20,7 @@ files:
 fileAssociations:
   - ext: punch
     icon: punch.icns
-    mimeType: application/vnd.punchpress+json
+    mimeType: application/vnd.punchpress.document
     name: PunchPress Document
     role: Editor
 

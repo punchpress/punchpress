@@ -34,7 +34,7 @@ const STROKED_TEXT_DOCUMENT = {
       },
     },
   ],
-  version: "1.7",
+  version: "1.8",
 } as const;
 
 test("uses a visible caret color in dark mode while editing text", async ({

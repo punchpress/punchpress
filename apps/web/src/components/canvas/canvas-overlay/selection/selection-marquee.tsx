@@ -291,6 +291,18 @@ const canStartObjectMarquee = (activeTool) => {
   return activeTool === "pointer" || activeTool === "node";
 };
 
+const isSelectedArtboardMoveableTarget = (editor, target) => {
+  if (!(target instanceof Element && target.closest(".canvas-moveable"))) {
+    return false;
+  }
+
+  if (editor.selectedNodeIds.length !== 1) {
+    return false;
+  }
+
+  return editor.getNode(editor.selectedNodeIds[0])?.type === "artboard";
+};
+
 export const CanvasSelectionMarquee = () => {
   const editor = useEditor();
   const selectoRef = useRef(null);
@@ -402,7 +414,11 @@ export const CanvasSelectionMarquee = () => {
             event.inputEvent.button !== 0 ||
             !canStartObjectMarquee(activeTool) ||
             shouldBlockSelectionStart(event.inputEvent.target) ||
-            event.inputEvent.target?.closest?.(".canvas-moveable")
+            (event.inputEvent.target?.closest?.(".canvas-moveable") &&
+              !isSelectedArtboardMoveableTarget(
+                editor,
+                event.inputEvent.target
+              ))
           ) {
             event.stop();
             restoreHover();

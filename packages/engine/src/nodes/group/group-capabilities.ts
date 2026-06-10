@@ -45,6 +45,8 @@ export const groupNodeCapabilities = {
     requiresPathEditing: false,
   }),
 
+  getSourceKind: () => "container",
+
   getResizeMode: () => "children",
 
   getRotateMode: () => "children",

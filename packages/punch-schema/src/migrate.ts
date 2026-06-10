@@ -1,6 +1,7 @@
 import { PUNCH_DOCUMENT_VERSION } from "./constants";
 import { UnsupportedDocumentVersionError } from "./errors";
 import { normalizeNodesForSchema } from "./normalize";
+import { createDocumentAssetsFromNodes } from "./raster-assets";
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -13,26 +14,25 @@ export const migrateDocument = (value: unknown) => {
     );
   }
 
-  if (value.version === PUNCH_DOCUMENT_VERSION) {
-    return Array.isArray(value.nodes)
-      ? {
-          ...value,
-          nodes: normalizeNodesForSchema(value.nodes),
-        }
-      : value;
-  }
+  const normalizeDocumentRecord = (document: Record<string, unknown>) => {
+    if (!Array.isArray(document.nodes)) {
+      return document;
+    }
 
-  if (value.version === "1.7") {
-    return Array.isArray(value.nodes)
-      ? {
-          ...value,
-          nodes: normalizeNodesForSchema(value.nodes),
-          version: PUNCH_DOCUMENT_VERSION,
-        }
-      : {
-          ...value,
-          version: PUNCH_DOCUMENT_VERSION,
-        };
+    const nodes = normalizeNodesForSchema(document.nodes);
+
+    return {
+      ...document,
+      assets: createDocumentAssetsFromNodes(
+        nodes,
+        isRecord(document.assets) ? document.assets : {}
+      ),
+      nodes,
+    };
+  };
+
+  if (value.version === PUNCH_DOCUMENT_VERSION) {
+    return normalizeDocumentRecord(value);
   }
 
   if (typeof value.version !== "string" || value.version.length === 0) {

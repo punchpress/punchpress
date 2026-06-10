@@ -52,7 +52,7 @@ const loadWaveDocument = async (page, rotation = 0) => {
               },
             },
           ],
-          version: "1.7",
+          version: "1.8",
         })
       );
 
@@ -100,7 +100,7 @@ test("applies wave from the panel with the restrained default preset", async ({
             },
           },
         ],
-        version: "1.7",
+        version: "1.8",
       })
     );
 

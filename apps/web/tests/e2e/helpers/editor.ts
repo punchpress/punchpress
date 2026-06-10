@@ -279,6 +279,19 @@ const getSelectionCornerDragPoints = (handle, corner, drag, offset) => {
   };
 };
 
+const getCornerOrder = (requestedCorner) => {
+  return [requestedCorner, "ne", "nw", "se", "sw"].filter(
+    (corner, index, corners) => corners.indexOf(corner) === index
+  );
+};
+
+const getCornerInwardDrag = (corner, drag) => {
+  return {
+    x: corner.endsWith("e") ? -Math.abs(drag.x) : Math.abs(drag.x),
+    y: corner.startsWith("s") ? -Math.abs(drag.y) : Math.abs(drag.y),
+  };
+};
+
 const isPointOnSelectionRotationZone = (page, point) => {
   return page.evaluate(({ x, y }) => {
     return Boolean(
@@ -296,9 +309,7 @@ const getVisibleSelectionCornerDragPoints = async (
   drag,
   offset
 ) => {
-  const cornerOrder = [requestedCorner, "ne", "nw", "se", "sw"].filter(
-    (corner, index, corners) => corners.indexOf(corner) === index
-  );
+  const cornerOrder = getCornerOrder(requestedCorner);
 
   for (const corner of cornerOrder) {
     const handle = selection.handles[corner];
@@ -334,14 +345,62 @@ const dragFromSelectionCorner = async (
   page,
   { corner = "nw", drag = { x: 120, y: 80 }, offset = 0, release = true } = {}
 ) => {
-  const selection = await waitForSelectionHandles(page);
-  const { end, start } = await getVisibleSelectionCornerDragPoints(
-    page,
-    selection,
-    corner,
-    drag,
-    offset
-  );
+  let start: { x: number; y: number } | null = null;
+  let end: { x: number; y: number } | null = null;
+  const hitRotationZone = await page.evaluate((cornerOrder) => {
+    for (const corner of cornerOrder) {
+      const zone = document.querySelector(
+        `.canvas-moveable .canvas-rotation-zone[data-corner="${corner}"]`
+      );
+      const box = zone?.getBoundingClientRect();
+
+      if (!box) {
+        continue;
+      }
+
+      const point = {
+        x: box.x + box.width / 2,
+        y: box.y + box.height / 2,
+      };
+      const topElement = document.elementFromPoint(point.x, point.y);
+      const isHit = topElement === zone;
+
+      if (isHit) {
+        return { corner, point };
+      }
+    }
+
+    return null;
+  }, getCornerOrder(corner));
+
+  if (hitRotationZone) {
+    const adjustedDrag =
+      hitRotationZone.corner === corner
+        ? drag
+        : getCornerInwardDrag(hitRotationZone.corner, drag);
+
+    start = hitRotationZone.point;
+    end = {
+      x: start.x + adjustedDrag.x,
+      y: start.y + adjustedDrag.y,
+    };
+  } else {
+    const selection = await waitForSelectionHandles(page);
+    const points = await getVisibleSelectionCornerDragPoints(
+      page,
+      selection,
+      corner,
+      drag,
+      offset
+    );
+
+    start = points.start;
+    end = points.end;
+  }
+
+  if (!(start && end)) {
+    throw new Error("Missing selection rotation start point");
+  }
 
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
@@ -619,16 +678,29 @@ export const waitForSelectionHandles = async (page) => {
   return getSelectionSnapshot(page);
 };
 
-export const zoomIn = async (page, times = 1) => {
+const getViewportZoom = async (page) => {
+  const dump = await getDebugDump(page);
+
+  return dump?.viewport?.zoom || 1;
+};
+
+const clickZoomControl = async (page, name, times) => {
   for (let index = 0; index < times; index += 1) {
-    await page.getByRole("button", { name: "Zoom in" }).click();
+    const before = await getViewportZoom(page);
+
+    await page.getByRole("button", { name }).click();
+    await expect
+      .poll(async () => Math.abs((await getViewportZoom(page)) - before))
+      .toBeGreaterThan(0.001);
   }
 };
 
+export const zoomIn = async (page, times = 1) => {
+  await clickZoomControl(page, "Zoom in", times);
+};
+
 export const zoomOut = async (page, times = 1) => {
-  for (let index = 0; index < times; index += 1) {
-    await page.getByRole("button", { name: "Zoom out" }).click();
-  }
+  await clickZoomControl(page, "Zoom out", times);
 };
 
 export const expectRectShift = (

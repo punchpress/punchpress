@@ -518,6 +518,15 @@ textarea,
   cursor: var(--canvas-cursor-pen-tool-add) !important;
 }
 
+.canvas-host[data-tool="brush"] .canvas-surface,
+.canvas-host[data-tool="brush"] .canvas-node,
+.canvas-host[data-tool="brush"] .canvas-node *,
+.canvas-host[data-tool="eraser"] .canvas-surface,
+.canvas-host[data-tool="eraser"] .canvas-node,
+.canvas-host[data-tool="eraser"] .canvas-node * {
+  cursor: none;
+}
+
 .canvas-host[data-panning="true"],
 .canvas-host[data-panning="true"] .canvas-surface,
 .canvas-host[data-panning="true"] .canvas-node,

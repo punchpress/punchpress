@@ -87,7 +87,7 @@ const createCircleDocument = (id: string, pathPosition?: number) => {
         },
       },
     ],
-    version: "1.7",
+    version: PUNCH_DOCUMENT_VERSION,
   });
 };
 
@@ -229,7 +229,7 @@ describe("Editor.loadDocument", () => {
     expect(editor.nodes[0]?.font).toEqual(AVAILABLE_FONT);
   });
 
-  test("fills in the default circle path position when older documents omit it", () => {
+  test("fills in the default circle path position when a document omits it", () => {
     const editor = new Editor();
 
     editor.loadDocument(createCircleDocument("circle-node"));

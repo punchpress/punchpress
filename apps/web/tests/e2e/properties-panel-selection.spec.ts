@@ -96,7 +96,7 @@ const loadVectorStrokeStyleDocument = (page) => {
           visible: true,
         },
       ],
-      version: "1.7",
+      version: "1.8",
     })
   );
 };
@@ -160,7 +160,7 @@ const loadIrregularVectorCornerDocument = (page) => {
           visible: true,
         },
       ],
-      version: "1.7",
+      version: "1.8",
     })
   );
 };
@@ -218,7 +218,7 @@ const loadClosedVectorCornerDocument = (page) => {
           visible: true,
         },
       ],
-      version: "1.7",
+      version: "1.8",
     })
   );
 };
@@ -247,7 +247,7 @@ const loadArtboardPropertiesDocument = (page) => {
           width: 340,
         },
       ],
-      version: "1.7",
+      version: "1.8",
     })
   );
 };
@@ -366,7 +366,7 @@ const loadVectorSelectionColorsDocument = (page) => {
           visible: true,
         },
       ],
-      version: "1.7",
+      version: "1.8",
     })
   );
 };
@@ -512,7 +512,7 @@ test("shows bulk path corner controls for a selected standalone path outside pat
           visible: true,
         },
       ],
-      version: "1.7",
+      version: "1.8",
     })
   );
   await selectNodes(page, ["vector-node"]);

@@ -78,7 +78,7 @@ const VECTOR_LAYER_MOVE_DOCUMENT = JSON.stringify({
       visible: true,
     },
   ],
-  version: "1.7",
+  version: "1.8",
 });
 
 test("dragging a path onto another vector reparents it and deletes the emptied source vector", async ({

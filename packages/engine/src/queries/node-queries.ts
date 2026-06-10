@@ -11,6 +11,7 @@ import {
 import {
   isContainerNode,
   isArtboardNode,
+  isEmptyNode,
   isGroupNode,
   isImageNode,
   isPathNode,
@@ -69,6 +70,8 @@ export const getLayerRow = (editor, nodeId) => {
 
   if (isArtboardNode(node)) {
     label = node.name || `Artboard ${layerMeta.containerLayerIndex + 1}`;
+  } else if (isEmptyNode(node)) {
+    label = node.name || `Layer ${layerMeta.layerIndex + 1}`;
   } else if (isTextNode(node)) {
     label =
       node.text.trim().length > 0 ? node.text : `Text ${layerMeta.layerIndex + 1}`;
@@ -87,6 +90,7 @@ export const getLayerRow = (editor, nodeId) => {
     isContainer: isContainerNode(node),
     isArtboard: isArtboardNode(node),
     isFrontmost: layerMeta.isFrontmost,
+    isEmpty: isEmptyNode(node),
     isGroup: isGroupNode(node),
     isSelected: editor.isSelected(node.id),
     isVector: isVectorNode(node),

@@ -1,4 +1,5 @@
 import { compoundVectorDragBenchmark } from "./benchmarks/compound-vector-drag-benchmark";
+import { hugeRasterViewportBenchmark } from "./benchmarks/huge-raster-viewport-benchmark";
 import { idleSoakBenchmark } from "./benchmarks/idle-soak-benchmark";
 import {
   largeSvgDeselectBenchmark,
@@ -35,6 +36,7 @@ export const performanceBenchmarks = [
   largeSvgTextDeselectBenchmark,
   largeSvgPathPointDragBenchmark,
   simpleVectorPathPointDragBenchmark,
+  hugeRasterViewportBenchmark,
   compoundVectorDragBenchmark,
   idleSoakBenchmark,
   shapeDragBenchmarkLarge,

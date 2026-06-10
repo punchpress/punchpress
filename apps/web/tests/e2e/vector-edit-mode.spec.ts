@@ -181,7 +181,7 @@ const loadVectorEditModeDocument = async (page) => {
           visible: true,
         },
       ],
-      version: "1.7",
+      version: "1.8",
     })
   );
 
@@ -365,7 +365,7 @@ const loadTransformedSubtractCompoundDocument = async (page) => {
           visible: true,
         },
       ],
-      version: "1.7",
+      version: "1.8",
     })
   );
 

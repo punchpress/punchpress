@@ -4,6 +4,10 @@ export const isGroupNode = (node) => {
   return node?.type === "group";
 };
 
+export const isEmptyNode = (node) => {
+  return node?.type === "empty";
+};
+
 export const isArtboardNode = (node) => {
   return node?.type === "artboard";
 };

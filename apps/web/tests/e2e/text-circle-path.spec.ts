@@ -55,7 +55,7 @@ const loadCircleDocument = async (page) => {
             },
           },
         ],
-        version: "1.7",
+        version: "1.8",
       })
     );
 
@@ -102,7 +102,7 @@ const loadPlainTextDocument = async (page) => {
             },
           },
         ],
-        version: "1.7",
+        version: "1.8",
       })
     );
 
