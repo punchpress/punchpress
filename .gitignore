@@ -9,3 +9,6 @@ npm-debug.log*
 .env.test.local
 .env.production.local
 .codex/environments/
+
+# Claude Code worktrees live here; keep their contents out of the main checkout.
+.claude/worktrees/

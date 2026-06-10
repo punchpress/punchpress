@@ -1,0 +1,7 @@
+# Gitignored files to copy from the main checkout into each new worktree.
+# Uses .gitignore syntax. Only files that match a pattern AND are gitignored
+# are copied, so tracked files are never duplicated.
+# Applies to `claude --worktree`, subagent worktrees, and desktop parallel sessions.
+
+.env
+.env.local

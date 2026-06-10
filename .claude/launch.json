@@ -1,0 +1,16 @@
+{
+  // Preview/dev server config for Claude Desktop's Code tab.
+  // Supports JSON with comments. Edit via the Preview dropdown → "Edit configuration".
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["run", "dev"],
+      // apps/web/vite.config.js pins port 5273 with strictPort:true and Vite
+      // ignores the PORT env var, so the port must match exactly.
+      "port": 5273,
+      "autoPort": false
+    }
+  ]
+}
