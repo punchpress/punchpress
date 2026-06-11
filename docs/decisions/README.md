@@ -19,4 +19,5 @@ plans, task lists, or implementation diaries.
 | Rendering | [Node render contract](node-render-contract.md) |
 | Rendering | [Interaction render hot path](interaction-render-hot-path.md) |
 | Vector rendering | [Vector render surface pipeline](vector-render-surface-pipeline.md) |
+| Raster rendering | [Raster tile store pipeline](raster-tile-store-pipeline.md) |
 | Groups and vectors | [Group rotation overlay](group-rotation-overlay.md) |

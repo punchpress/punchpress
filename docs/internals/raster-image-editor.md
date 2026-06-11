@@ -12,6 +12,11 @@ The raster image editor starts as the backend for Brush and Eraser. Durable
 source data and tool policy live in the engine and schema. Browser-specific
 canvas buffers render through the raster renderer.
 
+Pixel buffer and rendering sections below describe the current runtime. The
+accepted replacement is the
+[raster tile store pipeline](../decisions/raster-tile-store-pipeline.md),
+migrated in stages by the [raster engine plan](raster-engine-plan.md).
+
 ## Layers
 
 | Layer | Owns |
