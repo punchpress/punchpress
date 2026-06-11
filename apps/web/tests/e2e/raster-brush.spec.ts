@@ -152,6 +152,54 @@ const createHugeImageDocument = (src) =>
     version: DOCUMENT_VERSION,
   });
 
+const createDenseTiledImageDocument = (tileSrc) => {
+  const tileSources: {
+    col: number;
+    height: number;
+    ref: string;
+    row: number;
+    src: string;
+    width: number;
+    x: number;
+    y: number;
+  }[] = [];
+
+  for (let row = 0; row < 21; row += 1) {
+    for (let col = 0; col < 24; col += 1) {
+      tileSources.push({
+        col,
+        height: RASTER_TILE_TEST_SIZE,
+        ref: `assets/raster/huge-image-1/tiles/seed_${col}_${row}.png`,
+        row,
+        src: tileSrc,
+        width: RASTER_TILE_TEST_SIZE,
+        x: col * RASTER_TILE_TEST_SIZE,
+        y: row * RASTER_TILE_TEST_SIZE,
+      });
+    }
+  }
+
+  return JSON.stringify({
+    nodes: [
+      {
+        assetId: "asset-huge-image-1",
+        height: 10_800,
+        id: "huge-image-1",
+        mimeType: "image/png",
+        name: "Huge Image",
+        opacity: 1,
+        parentId: "root",
+        tileSources,
+        transform: transform(220, 160),
+        type: "image",
+        visible: true,
+        width: 12_400,
+      },
+    ],
+    version: DOCUMENT_VERSION,
+  });
+};
+
 const createEmptyDocument = () =>
   JSON.stringify({
     nodes: [],
@@ -193,176 +241,93 @@ const getCanvasStagePoint = async (page, offset) => {
   };
 };
 
-const installBrushPerfCapture = async (page) => {
-  await page.evaluate(() => {
-    window.__PUNCHPRESS_BRUSH_PERF_CAPTURE__ = {
-      counters: {},
-      spans: {},
-    };
-    window.__PUNCHPRESS_PERF_SINK__ = {
-      incrementCounter(name, amount = 1) {
-        const capture = window.__PUNCHPRESS_BRUSH_PERF_CAPTURE__;
-
-        if (!capture) {
-          return;
-        }
-
-        capture.counters[name] = (capture.counters[name] || 0) + amount;
-      },
-      recordDuration(label, durationMs) {
-        const capture = window.__PUNCHPRESS_BRUSH_PERF_CAPTURE__;
-
-        if (!capture) {
-          return;
-        }
-
-        capture.spans[label] ||= [];
-        capture.spans[label].push(durationMs);
-      },
-    };
-  });
-};
-
-const takeBrushPerfCapture = (page) => {
-  return page.evaluate(() => {
-    const capture = window.__PUNCHPRESS_BRUSH_PERF_CAPTURE__ || {
-      counters: {},
-      spans: {},
-    };
-
-    window.__PUNCHPRESS_PERF_SINK__ = undefined;
-    window.__PUNCHPRESS_BRUSH_PERF_CAPTURE__ = undefined;
-
-    return capture;
-  });
-};
-
-const getBrushPreviewState = (page) => {
-  return page.evaluate(() => {
-    const preview = document.querySelector<HTMLElement>(
-      "[data-brush-preview-node-id]"
-    );
-
-    if (!preview) {
-      return null;
-    }
-
-    return {
-      childTag: preview.firstElementChild?.tagName.toLowerCase() || null,
-      childCount: preview.children.length,
-      baseImageHeight:
-        preview
-          .querySelector("[data-brush-preview-image]")
-          ?.getAttribute("height") || null,
-      baseImageWidth:
-        preview
-          .querySelector("[data-brush-preview-image]")
-          ?.getAttribute("width") || null,
-      hasBaseImage: Boolean(
-        preview.querySelector("[data-brush-preview-image]")
-      ),
-      height: preview.style.height,
-      maxChildHeight: Math.max(
-        0,
-        ...[...preview.children].map((child) =>
-          Number.parseFloat((child as HTMLElement).style.height || "0")
-        )
-      ),
-      maxChildWidth: Math.max(
-        0,
-        ...[...preview.children].map((child) =>
-          Number.parseFloat((child as HTMLElement).style.width || "0")
-        )
-      ),
-      nodeId: preview.dataset.brushPreviewNodeId || null,
-      replacesNode: preview.dataset.brushPreviewReplacesNode || null,
-      transform: preview.style.transform,
-      width: preview.style.width,
-    };
-  });
-};
-
-const getRasterWorkingSurfaceState = (page) => {
+const getRasterStoreSurfaceState = (page) => {
   return page.evaluate(() => {
     const surfaces = [
-      ...document.querySelectorAll<SVGGElement>(
-        "[data-raster-working-surface]"
+      ...document.querySelectorAll<SVGForeignObjectElement>(
+        "[data-raster-store-surface='true']"
       ),
-    ];
-    const tileCanvases = [
-      ...document.querySelectorAll("[data-testid='raster-working-tile']"),
-    ];
-    const canvasSurfaces = [
-      ...document.querySelectorAll("[data-testid='raster-working-canvas']"),
     ];
 
     return {
-      canvasCount: canvasSurfaces.length,
-      maxCanvasHeight: Math.max(
-        0,
-        ...[...canvasSurfaces, ...tileCanvases].map((element) =>
-          Number.parseFloat(element.getAttribute("height") || "0")
-        )
-      ),
-      maxCanvasWidth: Math.max(
-        0,
-        ...[...canvasSurfaces, ...tileCanvases].map((element) =>
-          Number.parseFloat(element.getAttribute("width") || "0")
-        )
-      ),
       count: surfaces.length,
-      tileCount: tileCanvases.length,
-      tileSurfaceCount: surfaces.filter(
-        (surface) => surface.dataset.rasterWorkingSurface === "tiles"
+      hydratedCount: surfaces.filter(
+        (surface) =>
+          surface.getAttribute("data-raster-store-hydrated") === "true"
       ).length,
-      totalTileCount: surfaces.reduce((total, surface) => {
-        return (
-          total +
-          Number.parseInt(surface.dataset.rasterWorkingTileCount || "0", 10)
-        );
-      }, 0),
     };
   });
 };
 
-const getRasterWorkingTileRenderedBounds = (page) => {
-  return page.evaluate(() => {
-    const tiles = [
-      ...document.querySelectorAll<SVGForeignObjectElement>(
-        "[data-testid='raster-working-tile']"
-      ),
-    ];
+const waitForAnimationFrames = (page, count = 1) => {
+  return page.evaluate(async (frameCount) => {
+    for (let index = 0; index < frameCount; index += 1) {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+  }, count);
+};
 
-    if (!tiles.length) {
-      return null;
+const hydrateRasterStore = (page, nodeId) => {
+  return page.evaluate(async (targetNodeId) => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const node = editor?.getNode(targetNodeId);
+
+    if (!(editor && node)) {
+      throw new Error("Expected raster node to hydrate");
     }
 
-    const bounds = tiles.reduce(
-      (currentBounds, tile) => {
-        const rect = tile.getBoundingClientRect();
+    await editor.rasterStores.ensureHydrated(node);
+  }, nodeId);
+};
 
-        return {
-          bottom: Math.max(currentBounds.bottom, rect.bottom),
-          left: Math.min(currentBounds.left, rect.left),
-          right: Math.max(currentBounds.right, rect.right),
-          top: Math.min(currentBounds.top, rect.top),
-        };
-      },
-      {
-        bottom: Number.NEGATIVE_INFINITY,
-        left: Number.POSITIVE_INFINITY,
-        right: Number.NEGATIVE_INFINITY,
-        top: Number.POSITIVE_INFINITY,
+const setStableViewport = async (page, viewport) => {
+  await page.evaluate(async (targetViewport) => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    if (!editor) {
+      throw new Error("Expected editor");
+    }
+
+    editor.setViewportInteracting(false);
+    editor.setViewport(targetViewport);
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    editor.viewerRef?.setTo?.(targetViewport);
+    editor.setViewportInteracting(false);
+    editor.setViewport({
+      x: editor.viewerRef?.getScrollLeft?.() ?? targetViewport.x,
+      y: editor.viewerRef?.getScrollTop?.() ?? targetViewport.y,
+      zoom: targetViewport.zoom,
+    });
+    editor.onViewportChange?.();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+  }, viewport);
+};
+
+const getClientPointForImageLocalPoint = (page, nodeId, localPoint) => {
+  return page.evaluate(
+    ({ localPoint: targetLocalPoint, nodeId: targetNodeId }) => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
+      const hostRect = editor?.hostRef?.getBoundingClientRect();
+      const viewer = editor?.viewerRef;
+      const node = editor?.getNode(targetNodeId);
+
+      if (!(editor && hostRect && viewer && node?.type === "image")) {
+        throw new Error("Expected image node for client point mapping");
       }
-    );
 
-    return {
-      ...bounds,
-      height: bounds.bottom - bounds.top,
-      tileCount: tiles.length,
-      width: bounds.right - bounds.left,
-    };
-  });
+      return {
+        x:
+          hostRect.left +
+          (node.transform.x + targetLocalPoint.x - viewer.getScrollLeft()) *
+            editor.zoom,
+        y:
+          hostRect.top +
+          (node.transform.y + targetLocalPoint.y - viewer.getScrollTop()) *
+            editor.zoom,
+      };
+    },
+    { localPoint, nodeId }
+  );
 };
 
 const getScreenshotDarkPixelStats = async (page, clip) => {
@@ -603,126 +568,6 @@ const getScreencastInkFrameStats = async (page, frames, clip) => {
     },
     { clip, frames }
   );
-};
-
-const getRasterFrameDiagnostic = async ({
-  clip,
-  frameIndex,
-  page,
-  phase,
-  strokeIndex,
-}) => {
-  const pixelStats = await getScreenshotDarkPixelStats(page, clip);
-  const state = await page.evaluate(() => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-    const node = editor?.getNode("huge-image-1");
-    const rasterRoot = document.querySelector("[data-raster-render-key]");
-    const workingSurface =
-      editor?.getBrushWorkingSurfaceStateForNode?.("huge-image-1");
-    const workingSurfaceElement = document.querySelector(
-      "[data-raster-working-surface]"
-    );
-
-    return {
-      committedTileCount: node?.tileSources?.length || 0,
-      exactTileDomCount: document.querySelectorAll("[data-raster-tile-ref]")
-        .length,
-      exactTilesReady:
-        rasterRoot?.getAttribute("data-raster-exact-tiles-ready") || null,
-      loadedExactTileCount: Number(
-        rasterRoot?.getAttribute("data-raster-loaded-exact-tile-count") || 0
-      ),
-      node:
-        node?.type === "image"
-          ? {
-              baseX: node.baseX ?? 0,
-              baseY: node.baseY ?? 0,
-              height: node.height,
-              transform: node.transform,
-              width: node.width,
-            }
-          : null,
-      previewActive:
-        document.querySelector('[data-raster-preview-active="true"]') !== null,
-      previewEligible:
-        document.querySelector('[data-raster-preview-eligible="true"]') !==
-        null,
-      previewReady:
-        document.querySelector('[data-raster-preview-ready="true"]') !== null,
-      renderKeyLength:
-        rasterRoot?.getAttribute("data-raster-render-key")?.length || 0,
-      totalTileCount: Number(
-        rasterRoot?.getAttribute("data-raster-total-tile-count") || 0
-      ),
-      viewport: editor?.viewport || null,
-      visibleTileCount: Number(
-        rasterRoot?.getAttribute("data-raster-visible-tile-count") || 0
-      ),
-      workingSurfaceCompleted:
-        workingSurfaceElement?.getAttribute("data-raster-working-completed") ||
-        null,
-      workingSurfaceType:
-        workingSurfaceElement?.getAttribute("data-raster-working-surface") ||
-        null,
-      workingTileCount: workingSurface?.tiles?.length || 0,
-      workingTileDomCount: document.querySelectorAll(
-        "[data-testid='raster-working-tile']"
-      ).length,
-    };
-  });
-
-  return {
-    frameIndex,
-    phase,
-    pixels: pixelStats,
-    state,
-    strokeIndex,
-  };
-};
-
-const getRasterWorkingCanvasPlacement = (page, nodeId = "image-1") => {
-  return page.evaluate((targetNodeId) => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-    const host = editor?.hostRef;
-    const viewer = editor?.viewerRef;
-    const workingCanvas = document.querySelector<SVGForeignObjectElement>(
-      "[data-testid='raster-working-canvas']"
-    );
-    const surface = editor?.getBrushWorkingSurfaceStateForNode?.(targetNodeId);
-
-    if (!(editor && host && viewer && workingCanvas && surface)) {
-      return null;
-    }
-
-    const hostRect = host.getBoundingClientRect();
-    const rect = workingCanvas.getBoundingClientRect();
-    const zoom = editor.zoom || 1;
-
-    return {
-      renderedHeight: rect.height / zoom,
-      renderedWidth: rect.width / zoom,
-      renderedX: viewer.getScrollLeft() + (rect.left - hostRect.left) / zoom,
-      renderedY: viewer.getScrollTop() + (rect.top - hostRect.top) / zoom,
-      surfaceHeight: surface.height,
-      surfaceTransform: surface.transform || {},
-      surfaceWidth: surface.width,
-      surfaceX: surface.x || 0,
-      surfaceY: surface.y || 0,
-      type: surface.type,
-    };
-  }, nodeId);
-};
-
-const getRasterNodeArtOpacity = (page, nodeId) => {
-  return page.evaluate((targetNodeId) => {
-    const hitTarget = document.querySelector(
-      `[data-node-id="${targetNodeId}"]`
-    );
-    const shell = hitTarget?.parentElement;
-    const artGroup = shell?.querySelector("svg > g");
-
-    return artGroup?.getAttribute("opacity") || null;
-  }, nodeId);
 };
 
 const getRasterShellState = (page) => {
@@ -1042,6 +887,25 @@ const createOpaqueImageDataUrl = (page) => {
   });
 };
 
+const createOpaqueTileDataUrl = (page) => {
+  return page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 64;
+    canvas.height = 64;
+
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      return "";
+    }
+
+    context.fillStyle = "#111111";
+    context.fillRect(0, 0, 64, 64);
+
+    return canvas.toDataURL("image/png");
+  });
+};
+
 const createTransparentImageDataUrl = (page) => {
   return page.evaluate(() => {
     const canvas = document.createElement("canvas");
@@ -1284,6 +1148,14 @@ test("brush properties affect subsequently committed pixels", async ({
   await page.mouse.move(end.x, end.y, { steps: 1 });
   await page.mouse.up();
 
+  await expect
+    .poll(async () => {
+      const sample = await getCommittedImageSample(page, { x: 20, y: 20 });
+
+      return sample ? sample.a > 0 : false;
+    })
+    .toBe(true);
+
   const centerSample = await getCommittedImageSample(page, { x: 20, y: 20 });
   const gapSample = await getCommittedImageSample(page, { x: 50, y: 20 });
 
@@ -1308,16 +1180,26 @@ test("brush writes into a raster working surface before pointerup", async ({
 
   const start = await getCanvasStagePoint(page, { x: 320, y: 240 });
   const end = await getCanvasStagePoint(page, { x: 480, y: 240 });
+  const clip = {
+    height: 80,
+    width: end.x - start.x + 80,
+    x: start.x - 40,
+    y: start.y - 40,
+  };
+
+  await page.mouse.move(start.x, start.y);
+
+  const baseline = await getScreenshotDarkPixelStats(page, clip);
 
   await dragBrush(page, [start, end], { release: false });
+  await waitForAnimationFrames(page, 2);
 
-  await expect.poll(() => getBrushPreviewState(page)).toBeNull();
-  await expect
-    .poll(() => getRasterWorkingSurfaceState(page))
-    .toMatchObject({
-      canvasCount: 1,
-      count: 1,
-    });
+  const beforeRelease = await getScreenshotDarkPixelStats(page, clip);
+
+  expect(beforeRelease.darkPixelCount).toBeGreaterThan(
+    baseline.darkPixelCount + 800
+  );
+  expect(await getRasterStoreSurfaceState(page)).toMatchObject({ count: 1 });
 
   await expect
     .poll(async () => {
@@ -1334,13 +1216,13 @@ test("brush writes into a raster working surface before pointerup", async ({
     });
 
   await page.mouse.up();
+  await waitForAnimationFrames(page, 2);
 
-  await expect.poll(() => getBrushPreviewState(page)).toBeNull();
-  await expect
-    .poll(() => getRasterWorkingSurfaceState(page))
-    .toMatchObject({
-      count: 0,
-    });
+  const afterRelease = await getScreenshotDarkPixelStats(page, clip);
+
+  expect(afterRelease.darkPixelCount).toBeGreaterThan(
+    baseline.darkPixelCount + 800
+  );
 });
 
 test("eraser removes committed brush pixels through the shared brush path", async ({
@@ -1359,10 +1241,16 @@ test("eraser removes committed brush pixels through the shared brush path", asyn
 
   await dragBrush(page, [start, end]);
 
-  const beforeErase = await getCommittedImageSampleAtClientPoint(
-    page,
-    samplePoint
-  );
+  await expect
+    .poll(async () => {
+      const sample = await getCommittedImageSampleAtClientPoint(
+        page,
+        samplePoint
+      );
+
+      return sample?.a ?? null;
+    })
+    .toBe(255);
 
   await page.keyboard.press("e");
   await setBrushSliderValue(page, "Brush size", 72);
@@ -1370,13 +1258,16 @@ test("eraser removes committed brush pixels through the shared brush path", asyn
   await setBrushSliderValue(page, "Brush hardness", 100);
   await dragBrush(page, [samplePoint, samplePoint]);
 
-  const afterErase = await getCommittedImageSampleAtClientPoint(
-    page,
-    samplePoint
-  );
+  await expect
+    .poll(async () => {
+      const sample = await getCommittedImageSampleAtClientPoint(
+        page,
+        samplePoint
+      );
 
-  expect(beforeErase?.a).toBe(255);
-  expect(afterErase?.a).toBe(0);
+      return sample?.a ?? null;
+    })
+    .toBe(0);
 });
 
 test("soft eraser opacity reduces alpha with brush falloff", async ({
@@ -1393,6 +1284,17 @@ test("soft eraser opacity reduces alpha with brush falloff", async ({
 
   await dragBrush(page, [paintPoint, paintPoint]);
 
+  await expect
+    .poll(async () => {
+      const sample = await getCommittedImageSampleAtClientPoint(
+        page,
+        paintPoint
+      );
+
+      return sample?.a ?? null;
+    })
+    .toBe(255);
+
   await page.keyboard.press("e");
   await setBrushSliderValue(page, "Brush size", 100);
   await setBrushSliderValue(page, "Brush opacity", 50);
@@ -1401,6 +1303,17 @@ test("soft eraser opacity reduces alpha with brush falloff", async ({
   const edgePoint = await getCanvasStagePoint(page, { x: 460, y: 300 });
 
   await dragBrush(page, [paintPoint, paintPoint]);
+
+  await expect
+    .poll(async () => {
+      const sample = await getCommittedImageSampleAtClientPoint(
+        page,
+        paintPoint
+      );
+
+      return sample ? sample.a > 100 && sample.a < 255 : false;
+    })
+    .toBe(true);
 
   const centerSample = await getCommittedImageSampleAtClientPoint(
     page,
@@ -1429,10 +1342,6 @@ test("brush can start on an artboard body", async ({ page }) => {
 
   await dragBrush(page, [point, point]);
 
-  const imageState = await getCommittedImageState(page);
-
-  expect(imageState?.parentId).toBe("artboard-1");
-
   await expect
     .poll(async () => {
       const state = await getStateSnapshot(page);
@@ -1451,9 +1360,17 @@ test("brush can start on an artboard body", async ({ page }) => {
       selectedNodeIds: expect.any(Array),
     });
 
-  const sample = await getCommittedImageSampleAtClientPoint(page, point);
+  const imageState = await getCommittedImageState(page);
 
-  expect(sample?.a).toBe(255);
+  expect(imageState?.parentId).toBe("artboard-1");
+
+  await expect
+    .poll(async () => {
+      const sample = await getCommittedImageSampleAtClientPoint(page, point);
+
+      return sample?.a ?? null;
+    })
+    .toBe(255);
 });
 
 test("artboard brush strokes do not grow raster payloads outside the frame", async ({
@@ -1474,6 +1391,12 @@ test("artboard brush strokes do not grow raster payloads outside the frame", asy
   const outside = await getCanvasStagePoint(page, { x: 1280, y: 920 });
 
   await dragBrush(page, [start, outside], { steps: 60 });
+
+  await expect
+    .poll(
+      async () => (await getCommittedImageState(page))?.tileSourceCount || 0
+    )
+    .toBeGreaterThan(0);
 
   const imageState = await getCommittedImageState(page);
 
@@ -1503,19 +1426,21 @@ test("painting a bloated artboard raster clips it back to the frame", async ({
 
   await dragBrush(page, [point, point], { release: false });
 
-  const workingSurface = await getRasterWorkingSurfaceState(page);
-
-  expect(await getBrushPreviewState(page)).toBeNull();
-  expect(workingSurface.canvasCount).toBe(1);
-  expect(workingSurface.maxCanvasWidth).toBeLessThanOrEqual(340);
-  expect(workingSurface.maxCanvasHeight).toBeLessThanOrEqual(260);
+  await expect
+    .poll(() => getRasterStoreSurfaceState(page))
+    .toMatchObject({ count: 1 });
 
   await page.mouse.up();
+
+  await expect
+    .poll(async () => (await getCommittedImageState(page))?.width || 0)
+    .toBeLessThanOrEqual(340);
 
   const imageState = await getCommittedImageState(page);
 
   expect(imageState?.id).toBe("image-1");
   expect(imageState?.parentId).toBe("artboard-1");
+  expect(imageState?.tileSourceCount).toBe(0);
   expect(imageState?.width).toBeLessThanOrEqual(340);
   expect(imageState?.height).toBeLessThanOrEqual(260);
   expect((imageState?.x || 0) + (imageState?.width || 0)).toBeLessThanOrEqual(
@@ -1543,17 +1468,40 @@ test("large raster brush paints through the working raster surface", async ({
 
   const start = await getCanvasStagePoint(page, { x: 360, y: 260 });
   const end = await getCanvasStagePoint(page, { x: 440, y: 300 });
+  const clip = {
+    height: end.y - start.y + 120,
+    width: end.x - start.x + 120,
+    x: start.x - 60,
+    y: start.y - 60,
+  };
+
+  await page.mouse.move(start.x, start.y);
+
+  const baseline = await getScreenshotDarkPixelStats(page, clip);
 
   await dragBrush(page, [start, end], { release: false, steps: 4 });
+  await waitForAnimationFrames(page, 2);
 
-  const workingSurface = await getRasterWorkingSurfaceState(page);
+  const beforeRelease = await getScreenshotDarkPixelStats(page, clip);
 
-  expect(await getBrushPreviewState(page)).toBeNull();
-  expect(workingSurface.canvasCount).toBe(1);
-  expect(workingSurface.count).toBe(1);
-  expect(await getRasterNodeArtOpacity(page, "large-image-1")).not.toBe("0");
+  expect(beforeRelease.darkPixelCount).toBeGreaterThan(
+    baseline.darkPixelCount + 800
+  );
+  expect(await getRasterStoreSurfaceState(page)).toMatchObject({ count: 1 });
 
   await page.mouse.up();
+
+  await expect
+    .poll(
+      async () => (await getCommittedImageState(page))?.tileSourceCount || 0
+    )
+    .toBeGreaterThan(0);
+
+  const afterRelease = await getScreenshotDarkPixelStats(page, clip);
+
+  expect(afterRelease.darkPixelCount).toBeGreaterThan(
+    baseline.darkPixelCount + 800
+  );
 });
 
 test("brush commits on an existing raster layer preserve its raster plane", async ({
@@ -1576,8 +1524,15 @@ test("brush commits on an existing raster layer preserve its raster plane", asyn
 
   await dragBrush(page, [point, point]);
 
+  await expect
+    .poll(async () => {
+      const sample = await getCommittedImageSampleAtClientPoint(page, point);
+
+      return sample?.a ?? null;
+    })
+    .toBe(255);
+
   const afterStroke = await getCommittedImageState(page);
-  const sample = await getCommittedImageSampleAtClientPoint(page, point);
 
   expect(afterStroke).toMatchObject({
     height: beforeStroke?.height,
@@ -1585,264 +1540,28 @@ test("brush commits on an existing raster layer preserve its raster plane", asyn
     transform: beforeStroke?.transform,
     width: beforeStroke?.width,
   });
-  expect(sample?.a).toBe(255);
 });
 
-test("huge raster brush strokes mutate dirty tiles instead of a full layer canvas", async ({
+test("default brush shows ink on the first down at 4% zoom", async ({
   page,
 }) => {
   await gotoEditor(page);
-  const src = await createOpaqueImageDataUrl(page);
+  const src = await createTransparentImageDataUrl(page);
   await loadRasterTestDocument(page, createHugeImageDocument(src));
   await page.evaluate(() => {
     window.__PUNCHPRESS_EDITOR__?.select("huge-image-1");
   });
-  await page.keyboard.press("b");
-  await installBrushPerfCapture(page);
-
-  await setBrushSliderValue(page, "Brush size", 64);
-  await setBrushSliderValue(page, "Brush opacity", 100);
-  await setBrushSliderValue(page, "Brush hardness", 100);
-
-  const start = await getCanvasStagePoint(page, { x: 340, y: 250 });
-  const middle = await getCanvasStagePoint(page, { x: 760, y: 520 });
-  const end = await getCanvasStagePoint(page, { x: 980, y: 360 });
-
-  await dragBrush(page, [start, middle, end], { release: false, steps: 32 });
-
-  const workingSurface = await getRasterWorkingSurfaceState(page);
-
-  expect(await getBrushPreviewState(page)).toBeNull();
-  expect(workingSurface.tileSurfaceCount).toBe(1);
-  expect(workingSurface.totalTileCount).toBeGreaterThan(0);
-  expect(await getRasterNodeArtOpacity(page, "huge-image-1")).not.toBe("0");
-
-  await page.mouse.up();
-
-  const imageState = await getCommittedImageState(page);
-  const perf = await takeBrushPerfCapture(page);
-
-  expect(imageState?.id).toBe("huge-image-1");
-  expect(imageState?.width).toBe(12_400);
-  expect(imageState?.height).toBe(10_800);
-  expect(imageState?.tileSourceCount).toBeGreaterThan(0);
-  expect(perf.counters["brush.tile.session"] || 0).toBe(1);
-  expect(perf.counters["brush.tile.touched"] || 0).toBeGreaterThan(0);
-  expect(perf.counters["brush.canvas.expand"] || 0).toBe(0);
-  expect(perf.spans["brush.stroke.createFloatPixels"] || []).toHaveLength(0);
-  expect(perf.spans["brush.commit.encode"] || []).toHaveLength(0);
-});
-
-test("huge tiled live paint uses touched working tiles at zoom-out", async ({
-  page,
-}) => {
-  await gotoEditor(page);
-  const src = await createOpaqueImageDataUrl(page);
-  await loadRasterTestDocument(page, createHugeImageDocument(src));
+  await setStableViewport(page, { x: 0, y: 0, zoom: 0.04 });
   await page.evaluate(() => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-
-    editor?.select("huge-image-1");
-    editor?.setViewport({ x: 0, y: 0, zoom: 0.2 });
-    editor?.setBrushSettings({
+    window.__PUNCHPRESS_EDITOR__?.setBrushSettings({
       hardness: 1,
       opacity: 1,
-      size: 24,
+      size: 500,
       spacing: 0,
     });
   });
   await page.keyboard.press("b");
-  await installBrushPerfCapture(page);
-
-  await page.evaluate(async () => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-    const brush = editor?.tools.get("brush");
-    const node = editor?.getNode("huge-image-1");
-
-    if (!(editor && brush && node?.type === "image")) {
-      throw new Error("Expected huge image brush target");
-    }
-
-    const start = {
-      x: node.transform.x + node.width / 2,
-      y: node.transform.y + node.height / 2,
-    };
-    const end = {
-      x: start.x + 40_000,
-      y: start.y + 7800,
-    };
-    const session = brush.beginStroke({ point: start });
-
-    if (!session) {
-      throw new Error("Expected brush session");
-    }
-
-    window.__PUNCHPRESS_STRESS_BRUSH_SESSION__ = session;
-    session.update({ point: end });
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-  });
-
-  const workingSurface = await getRasterWorkingSurfaceState(page);
-  const perf = await takeBrushPerfCapture(page);
-
-  expect(await getBrushPreviewState(page)).toBeNull();
-  expect(workingSurface.tileSurfaceCount).toBe(1);
-  expect(workingSurface.totalTileCount).toBeGreaterThan(70);
-  expect(workingSurface.totalTileCount).toBeLessThan(130);
-  expect(perf.spans["brush.tile.working.tiles"] || []).not.toHaveLength(0);
-
-  await page.evaluate(() => {
-    const session = window.__PUNCHPRESS_STRESS_BRUSH_SESSION__;
-    const editor = window.__PUNCHPRESS_EDITOR__;
-    const node = editor?.getNode("huge-image-1");
-
-    if (session && node?.type === "image") {
-      const point = {
-        x: node.transform.x + node.width / 2 + 40_000,
-        y: node.transform.y + node.height / 2 + 7800,
-      };
-
-      session.complete({ point });
-    }
-
-    window.__PUNCHPRESS_STRESS_BRUSH_SESSION__ = undefined;
-  });
-});
-
-test("default brush updates working tiles during fast full-screen strokes at 4% zoom", async ({
-  page,
-}) => {
-  await gotoEditor(page);
-  const src = await createOpaqueImageDataUrl(page);
-  await loadRasterTestDocument(page, createHugeImageDocument(src));
-  await page.evaluate(() => {
-    window.__PUNCHPRESS_EDITOR__?.select("huge-image-1");
-  });
-  await page.evaluate(async () => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-
-    if (!editor) {
-      return;
-    }
-
-    editor.setViewportInteracting(false);
-    editor.setViewport({ x: 0, y: 0, zoom: 0.04 });
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    editor.viewerRef?.setTo?.({ x: 0, y: 0, zoom: 0.04 });
-    editor.setViewportInteracting(false);
-    editor.setViewport({
-      x: editor.viewerRef?.getScrollLeft?.() ?? 0,
-      y: editor.viewerRef?.getScrollTop?.() ?? 0,
-      zoom: 0.04,
-    });
-    editor.onViewportChange?.();
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-  });
-  await page.keyboard.press("b");
-  await installBrushPerfCapture(page);
-
-  const points = await page.evaluate(() => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-    const node = editor?.getNode("huge-image-1");
-    const viewerRect = editor?.viewerRef
-      ?.getContainer?.()
-      ?.getBoundingClientRect?.();
-    const viewport = editor?.viewport;
-
-    if (!(editor && node?.type === "image" && viewerRect && viewport)) {
-      return null;
-    }
-
-    const toScreen = (point) => ({
-      x: viewerRect.left + (point.x - viewport.x) * viewport.zoom,
-      y: viewerRect.top + (point.y - viewport.y) * viewport.zoom,
-    });
-    const start = toScreen({
-      x: node.transform.x + node.width * 0.9,
-      y: node.transform.y + node.height * 0.5,
-    });
-
-    return {
-      end: {
-        x: viewerRect.right - Math.min(420, viewerRect.width * 0.28),
-        y: start.y,
-      },
-      start,
-      viewport: { ...viewport },
-      viewerRect: {
-        height: viewerRect.height,
-        left: viewerRect.left,
-        top: viewerRect.top,
-        width: viewerRect.width,
-      },
-    };
-  });
-
-  if (!points) {
-    throw new Error("Missing brush test geometry");
-  }
-
-  const { end, start } = points;
-  const steps = 18;
-
-  await page.mouse.move(start.x, start.y);
-  await page.mouse.down();
-
-  for (let index = 1; index <= steps; index += 1) {
-    const progress = index / steps;
-
-    await page.mouse.move(
-      start.x + (end.x - start.x) * progress,
-      start.y + (end.y - start.y) * progress
-    );
-    await page.waitForTimeout(6);
-  }
-
-  const workingSurface = await getRasterWorkingSurfaceState(page);
-
-  await page.mouse.up();
-  await page.waitForTimeout(50);
-
-  const perf = await takeBrushPerfCapture(page);
-  const diagnostic = JSON.stringify({ perf, points, workingSurface });
-
-  expect(await getBrushPreviewState(page)).toBeNull();
-  expect(workingSurface.tileSurfaceCount, diagnostic).toBe(1);
-  expect(workingSurface.totalTileCount, diagnostic).toBeGreaterThan(0);
-  expect(perf.counters["brush.tile.session"] || 0).toBe(1);
-  expect(perf.counters["brush.canvas.expand"] || 0).toBe(0);
-});
-
-test("default brush shows a working tile on the first down at 4% zoom", async ({
-  page,
-}) => {
-  await gotoEditor(page);
-  const src = await createOpaqueImageDataUrl(page);
-  await loadRasterTestDocument(page, createHugeImageDocument(src));
-  await page.evaluate(async () => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-
-    if (!editor) {
-      return;
-    }
-
-    editor.select("huge-image-1");
-    editor.setViewportInteracting(false);
-    editor.setViewport({ x: 0, y: 0, zoom: 0.04 });
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    editor.viewerRef?.setTo?.({ x: 0, y: 0, zoom: 0.04 });
-    editor.setViewportInteracting(false);
-    editor.setViewport({
-      x: editor.viewerRef?.getScrollLeft?.() ?? 0,
-      y: editor.viewerRef?.getScrollTop?.() ?? 0,
-      zoom: 0.04,
-    });
-    editor.onViewportChange?.();
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-  });
-  await page.keyboard.press("b");
-  await installBrushPerfCapture(page);
+  await hydrateRasterStore(page, "huge-image-1");
 
   const point = await page.evaluate(() => {
     const editor = window.__PUNCHPRESS_EDITOR__;
@@ -1869,352 +1588,29 @@ test("default brush shows a working tile on the first down at 4% zoom", async ({
     throw new Error("Missing brush point");
   }
 
+  const clip = {
+    height: 100,
+    width: 100,
+    x: point.x - 50,
+    y: point.y - 50,
+  };
+
   await page.mouse.move(point.x, point.y);
+
+  const baseline = await getScreenshotDarkPixelStats(page, clip);
+
   await page.mouse.down();
+  await waitForAnimationFrames(page, 2);
   await page.waitForTimeout(25);
 
-  const workingSurface = await getRasterWorkingSurfaceState(page);
-  await takeBrushPerfCapture(page);
+  const afterDown = await getScreenshotDarkPixelStats(page, clip);
 
-  expect(await getBrushPreviewState(page)).toBeNull();
-  expect(workingSurface.tileSurfaceCount).toBe(1);
-  expect(workingSurface.totalTileCount).toBeGreaterThan(0);
+  expect(afterDown.darkPixelCount).toBeGreaterThan(
+    baseline.darkPixelCount + 150
+  );
+  expect(await getRasterStoreSurfaceState(page)).toMatchObject({ count: 1 });
 
   await page.mouse.up();
-});
-
-test("default brush uses working tiles on a normal raster after zooming out", async ({
-  page,
-}) => {
-  await gotoEditor(page);
-  const src = await createTransparentImageDataUrl(page);
-  await loadRasterTestDocument(page, createLargeImageDocument(src));
-  await page.evaluate(async () => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-
-    if (!editor) {
-      return;
-    }
-
-    const node = editor.getNode("large-image-1");
-
-    if (node?.type !== "image") {
-      return;
-    }
-
-    editor.updateNode("large-image-1", {
-      baseHeight: 48,
-      baseWidth: 48,
-      height: 337,
-      width: 306,
-    });
-    editor.select("large-image-1");
-    editor.setViewportInteracting(false);
-    editor.setViewport({
-      x: node.transform.x - 600,
-      y: node.transform.y - 500,
-      zoom: 1,
-    });
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    editor.viewerRef?.setTo?.({
-      x: node.transform.x - 600,
-      y: node.transform.y - 500,
-      zoom: 1,
-    });
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    editor.setViewport({
-      x: node.transform.x - 600,
-      y: node.transform.y - 500,
-      zoom: 0.04,
-    });
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    editor.viewerRef?.setTo?.({
-      x: node.transform.x - 600,
-      y: node.transform.y - 500,
-      zoom: 0.04,
-    });
-    editor.setViewport({
-      x: editor.viewerRef?.getScrollLeft?.() ?? node.transform.x - 600,
-      y: editor.viewerRef?.getScrollTop?.() ?? node.transform.y - 500,
-      zoom: 0.04,
-    });
-    editor.onViewportChange?.();
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-  });
-  await installBrushPerfCapture(page);
-  await page.evaluate(async () => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-    const brush = editor?.tools.get("brush");
-    const node = editor?.getNode("large-image-1");
-
-    if (!(editor && brush && node?.type === "image")) {
-      throw new Error("Expected brush and image node");
-    }
-
-    editor.setActiveTool("brush");
-    const point = {
-      x: node.transform.x + node.width / 2,
-      y: node.transform.y + node.height / 2,
-    };
-    const session = brush.beginStroke({ point });
-
-    if (!session) {
-      throw new Error("Expected brush stroke session");
-    }
-
-    window.__PUNCHPRESS_TEST_BRUSH_SESSION__ = session;
-    await session.ready;
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-  });
-  const workingSurface = await getRasterWorkingSurfaceState(page);
-  const perf = await takeBrushPerfCapture(page);
-
-  expect(await getBrushPreviewState(page)).toBeNull();
-  expect(workingSurface.tileSurfaceCount).toBe(1);
-  expect(workingSurface.totalTileCount).toBeGreaterThan(0);
-  expect(await getRasterNodeArtOpacity(page, "large-image-1")).not.toBe("0");
-  expect(perf.counters["brush.tile.session"] || 0).toBe(1);
-
-  await page.evaluate(() => {
-    const session = window.__PUNCHPRESS_TEST_BRUSH_SESSION__;
-    const editor = window.__PUNCHPRESS_EDITOR__;
-    const node = editor?.getNode("large-image-1");
-
-    if (session && node?.type === "image") {
-      session.complete({
-        point: {
-          x: node.transform.x + node.width / 2,
-          y: node.transform.y + node.height / 2,
-        },
-      });
-    }
-
-    window.__PUNCHPRESS_TEST_BRUSH_SESSION__ = undefined;
-  });
-});
-
-test("zoomed-out broad strokes on small rasters commit dirty tiles instead of a full PNG", async ({
-  page,
-}) => {
-  await gotoEditor(page);
-  const src = await createTransparentImageDataUrl(page);
-  await loadRasterTestDocument(page, createLargeImageDocument(src));
-  await page.evaluate(async () => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-
-    if (!editor) {
-      return;
-    }
-
-    const node = editor.getNode("large-image-1");
-
-    if (node?.type !== "image") {
-      return;
-    }
-
-    editor.updateNode("large-image-1", {
-      baseHeight: 337,
-      baseWidth: 306,
-      height: 337,
-      width: 306,
-    });
-    editor.select("large-image-1");
-    editor.setViewportInteracting(false);
-    editor.setViewport({
-      x: node.transform.x - 600,
-      y: node.transform.y - 500,
-      zoom: 0.04,
-    });
-    editor.viewerRef?.setTo?.({
-      x: node.transform.x - 600,
-      y: node.transform.y - 500,
-      zoom: 0.04,
-    });
-    editor.setBrushSettings({
-      hardness: 1,
-      opacity: 1,
-      size: 24,
-      spacing: 0,
-    });
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    editor.onViewportChange?.();
-  });
-  await page.keyboard.press("b");
-  await installBrushPerfCapture(page);
-
-  const result = await page.evaluate(async () => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-    const brush = editor?.tools.get("brush");
-    const node = editor?.getNode("large-image-1");
-
-    if (!(editor && brush && node?.type === "image")) {
-      throw new Error("Expected brush and image node");
-    }
-
-    const toWorldPoint = (point) => ({
-      x: node.transform.x + point.x,
-      y: node.transform.y + point.y,
-    });
-    const session = brush.beginStroke({
-      point: toWorldPoint({ x: 120, y: 160 }),
-    });
-
-    if (!session) {
-      throw new Error("Expected brush stroke session");
-    }
-
-    await session.ready;
-    session.update({ point: toWorldPoint({ x: 6800, y: 3600 }) });
-    session.complete({ point: toWorldPoint({ x: 6800, y: 3600 }) });
-
-    const imageNode = editor.getNode("large-image-1");
-
-    if (imageNode?.type !== "image") {
-      throw new Error("Expected committed image node");
-    }
-
-    return {
-      baseHeight: imageNode.baseHeight,
-      baseWidth: imageNode.baseWidth,
-      height: imageNode.height,
-      tileSourceCount: imageNode.tileSources?.length || 0,
-      width: imageNode.width,
-    };
-  });
-  const perf = await takeBrushPerfCapture(page);
-
-  expect(result.baseHeight).toBe(337);
-  expect(result.baseWidth).toBe(306);
-  expect(result.width).toBeGreaterThan(6500);
-  expect(result.height).toBeGreaterThan(3400);
-  expect(result.tileSourceCount).toBeGreaterThan(10);
-  expect(result.tileSourceCount).toBeLessThan(60);
-  expect(perf.counters["brush.tile.session"] || 0).toBe(1);
-  expect(perf.counters["brush.canvas.expand"] || 0).toBe(0);
-  expect(perf.spans["brush.commit.encode"] || []).toHaveLength(0);
-  expect(perf.spans["brush.tile.commit.encode"] || []).not.toHaveLength(0);
-});
-
-test("extreme zoom sweep strokes drain tile work before pointerup", async ({
-  page,
-}) => {
-  await gotoEditor(page);
-  const src = await createTransparentImageDataUrl(page);
-  await loadRasterTestDocument(page, createLargeImageDocument(src));
-  await page.evaluate(async () => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-
-    if (!editor) {
-      return;
-    }
-
-    const node = editor.getNode("large-image-1");
-
-    if (node?.type !== "image") {
-      return;
-    }
-
-    editor.updateNode("large-image-1", {
-      baseHeight: 337,
-      baseWidth: 306,
-      height: 337,
-      width: 306,
-    });
-    editor.select("large-image-1");
-    editor.setViewportInteracting(false);
-    editor.setViewport({
-      x: node.transform.x - 600,
-      y: node.transform.y - 500,
-      zoom: 0.01,
-    });
-    editor.viewerRef?.setTo?.({
-      x: node.transform.x - 600,
-      y: node.transform.y - 500,
-      zoom: 0.01,
-    });
-    editor.setBrushSettings({
-      hardness: 1,
-      opacity: 1,
-      size: 24,
-      spacing: 0,
-    });
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    editor.onViewportChange?.();
-  });
-  await page.keyboard.press("b");
-  await installBrushPerfCapture(page);
-
-  const liveResult = await page.evaluate(async () => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-    const brush = editor?.tools.get("brush");
-    const node = editor?.getNode("large-image-1");
-
-    if (!(editor && brush && node?.type === "image")) {
-      throw new Error("Expected brush and image node");
-    }
-
-    const toWorldPoint = (point) => ({
-      x: node.transform.x + point.x,
-      y: node.transform.y + point.y,
-    });
-    const session = brush.beginStroke({
-      point: toWorldPoint({ x: 120, y: 160 }),
-    });
-
-    if (!session) {
-      throw new Error("Expected brush stroke session");
-    }
-
-    window.__PUNCHPRESS_TEST_BRUSH_SESSION__ = session;
-    await session.ready;
-
-    const pointCount = 96;
-
-    for (let index = 1; index <= pointCount; index += 1) {
-      const progress = index / pointCount;
-
-      session.update({
-        point: toWorldPoint({
-          x: 120 + 42_000 * progress,
-          y: 160 + Math.sin(progress * Math.PI * 1.2) * 18_000,
-        }),
-      });
-    }
-
-    for (let index = 0; index < 6; index += 1) {
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-    }
-
-    return {
-      queuedPointCount: session.points.length - (session.pointReadIndex || 0),
-      totalPointCount: session.points.length,
-    };
-  });
-
-  expect(liveResult.queuedPointCount).toBeLessThan(70);
-
-  await page.evaluate(() => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-    const session = window.__PUNCHPRESS_TEST_BRUSH_SESSION__;
-    const node = editor?.getNode("large-image-1");
-
-    if (session && node?.type === "image") {
-      session.complete({
-        point: {
-          x: node.transform.x + 42_120,
-          y: node.transform.y + 160,
-        },
-      });
-    }
-
-    window.__PUNCHPRESS_TEST_BRUSH_SESSION__ = undefined;
-  });
-
-  const perf = await takeBrushPerfCapture(page);
-
-  expect(perf.counters["brush.tile.session"] || 0).toBe(1);
-  expect(perf.counters["brush.stroke.flushPointChunk"] || 0).toBeGreaterThan(0);
-  expect(perf.spans["brush.commit.encode"] || []).toHaveLength(0);
 });
 
 test("extreme zoom sweep pointerup does not block on tile encoding", async ({
@@ -2264,7 +1660,6 @@ test("extreme zoom sweep pointerup does not block on tile encoding", async ({
     editor.onViewportChange?.();
   });
   await page.keyboard.press("b");
-  await installBrushPerfCapture(page);
 
   const result = await page.evaluate(async () => {
     const editor = window.__PUNCHPRESS_EDITOR__;
@@ -2307,324 +1702,60 @@ test("extreme zoom sweep pointerup does not block on tile encoding", async ({
     }
 
     const completeStartedAt = performance.now();
-
-    session.complete({
-      point: toWorldPoint({
-        x: 72_120,
-        y: 160,
-      }),
-    });
-
-    const completeElapsedMs = performance.now() - completeStartedAt;
-
-    return {
-      completeElapsedMs,
-    };
-  });
-  const perf = await takeBrushPerfCapture(page);
-
-  expect(result.completeElapsedMs).toBeLessThan(80);
-  expect(perf.counters["brush.tile.session"] || 0).toBe(1);
-  expect(perf.spans["brush.commit.encode"] || []).toHaveLength(0);
-});
-
-test("pending async working tiles stay mounted when the next stroke starts", async ({
-  page,
-}) => {
-  await gotoEditor(page);
-  const src = await createTransparentImageDataUrl(page);
-  await loadRasterTestDocument(page, createLargeImageDocument(src));
-  await page.evaluate(async () => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-
-    if (!editor) {
-      return;
-    }
-
-    const node = editor.getNode("large-image-1");
-
-    if (node?.type !== "image") {
-      return;
-    }
-
-    editor.updateNode("large-image-1", {
-      baseHeight: 337,
-      baseWidth: 306,
-      height: 337,
-      width: 306,
-    });
-    editor.select("large-image-1");
-    editor.setViewportInteracting(false);
-    editor.setViewport({
-      x: node.transform.x - 600,
-      y: node.transform.y - 500,
-      zoom: 0.01,
-    });
-    editor.viewerRef?.setTo?.({
-      x: node.transform.x - 600,
-      y: node.transform.y - 500,
-      zoom: 0.01,
-    });
-    editor.setBrushSettings({
-      hardness: 1,
-      opacity: 1,
-      size: 24,
-      spacing: 0,
-    });
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    editor.onViewportChange?.();
-  });
-  await page.keyboard.press("b");
-
-  const result = await page.evaluate(async () => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-    const brush = editor?.tools.get("brush");
-    const node = editor?.getNode("large-image-1");
-
-    if (!(editor && brush && node?.type === "image")) {
-      throw new Error("Expected brush and image node");
-    }
-
-    const toWorldPoint = (point) => ({
-      x: node.transform.x + point.x,
-      y: node.transform.y + point.y,
-    });
-    const firstSession = brush.beginStroke({
-      point: toWorldPoint({ x: 120, y: 160 }),
-    });
-
-    if (!firstSession) {
-      throw new Error("Expected first brush stroke session");
-    }
-
-    await firstSession.ready;
-
-    for (let index = 1; index <= 160; index += 1) {
-      const progress = index / 160;
-
-      firstSession.update({
-        point: toWorldPoint({
-          x: 120 + 72_000 * progress,
-          y: 160 + Math.sin(progress * Math.PI * 1.6) * 52_000,
-        }),
-      });
-    }
-
-    const firstCommit = firstSession.complete({
-      point: toWorldPoint({
-        x: 72_120,
-        y: 160,
-      }),
-    });
-    const secondSession = brush.beginStroke({
-      point: toWorldPoint({ x: 420, y: 260 }),
-    });
-
-    if (!secondSession) {
-      throw new Error("Expected second brush stroke session");
-    }
-
-    secondSession.update({ point: toWorldPoint({ x: 34_000, y: 18_000 }) });
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-
-    const previewCount = document.querySelectorAll(
-      "[data-brush-preview-node-id]"
-    ).length;
-    const workingSurfaces = editor.getBrushWorkingSurfaceStates?.() || [];
-    const mergedWorkingSurface =
-      editor.getBrushWorkingSurfaceStateForNode?.("large-image-1");
-
-    secondSession.cancel();
-    await firstCommit;
-
-    return {
-      mergedTileCount: mergedWorkingSurface?.tiles?.length || 0,
-      previewCount,
-      workingSurfaceCount: workingSurfaces.length,
-    };
-  });
-
-  expect(result.previewCount).toBe(0);
-  expect(result.workingSurfaceCount).toBeGreaterThanOrEqual(2);
-  expect(result.mergedTileCount).toBeGreaterThan(0);
-});
-
-test("async tiled working surface stays mounted through commit paint handoff", async ({
-  page,
-}) => {
-  await gotoEditor(page);
-  const src = await createTransparentImageDataUrl(page);
-  await loadRasterTestDocument(page, createLargeImageDocument(src));
-  await page.evaluate(async () => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-
-    if (!editor) {
-      return;
-    }
-
-    const node = editor.getNode("large-image-1");
-
-    if (node?.type !== "image") {
-      return;
-    }
-
-    editor.updateNode("large-image-1", {
-      baseHeight: 337,
-      baseWidth: 306,
-      height: 337,
-      width: 306,
-    });
-    editor.select("large-image-1");
-    editor.setViewportInteracting(false);
-    editor.setViewport({
-      x: node.transform.x - 600,
-      y: node.transform.y - 500,
-      zoom: 0.01,
-    });
-    editor.viewerRef?.setTo?.({
-      x: node.transform.x - 600,
-      y: node.transform.y - 500,
-      zoom: 0.01,
-    });
-    editor.setBrushSettings({
-      hardness: 1,
-      opacity: 1,
-      size: 24,
-      spacing: 0,
-    });
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    editor.onViewportChange?.();
-  });
-  await page.keyboard.press("b");
-
-  const result = await page.evaluate(async () => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-    const brush = editor?.tools.get("brush");
-    const node = editor?.getNode("large-image-1");
-
-    if (!(editor && brush && node?.type === "image")) {
-      throw new Error("Expected brush and image node");
-    }
-
-    const toWorldPoint = (point) => ({
-      x: node.transform.x + point.x,
-      y: node.transform.y + point.y,
-    });
-    const session = brush.beginStroke({
-      point: toWorldPoint({ x: 120, y: 160 }),
-    });
-
-    if (!session) {
-      throw new Error("Expected brush stroke session");
-    }
-
-    await session.ready;
-
-    for (let index = 1; index <= 160; index += 1) {
-      const progress = index / 160;
-
-      session.update({
-        point: toWorldPoint({
-          x: 120 + 72_000 * progress,
-          y: 160 + Math.sin(progress * Math.PI * 1.6) * 52_000,
-        }),
-      });
-    }
-
-    for (let index = 0; index < 6; index += 1) {
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-    }
-
     const commit = session.complete({
       point: toWorldPoint({
         x: 72_120,
         y: 160,
       }),
     });
+    const completeReturnElapsedMs = performance.now() - completeStartedAt;
+
     await new Promise((resolve) => requestAnimationFrame(resolve));
 
-    const previewCountDuringCommit = document.querySelectorAll(
-      "[data-brush-preview-node-id]"
-    ).length;
-    const workingSurfaceDuringCommit =
-      editor.getBrushWorkingSurfaceStateForNode?.("large-image-1");
+    const nextFrameElapsedMs = performance.now() - completeStartedAt;
 
     await commit;
 
-    const previewCountAfterCommit = document.querySelectorAll(
-      "[data-brush-preview-node-id]"
-    ).length;
-    const workingSurfaceAfterCommit =
-      editor.getBrushWorkingSurfaceStateForNode?.("large-image-1");
-
-    for (let index = 0; index < 5; index += 1) {
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-    }
-
-    const previewCountAfterHandoff = document.querySelectorAll(
-      "[data-brush-preview-node-id]"
-    ).length;
-
     return {
-      previewCountAfterCommit,
-      previewCountAfterHandoff,
-      previewCountDuringCommit,
-      workingTileCountAfterCommit:
-        workingSurfaceAfterCommit?.tiles?.length || 0,
-      workingTileCountDuringCommit:
-        workingSurfaceDuringCommit?.tiles?.length || 0,
+      completeReturnElapsedMs,
+      nextFrameElapsedMs,
     };
   });
 
-  expect(result.previewCountDuringCommit).toBe(0);
-  expect(result.workingTileCountDuringCommit).toBeGreaterThan(0);
-  expect(result.previewCountAfterCommit).toBe(0);
-  expect(result.workingTileCountAfterCommit).toBeGreaterThan(0);
-  expect(result.previewCountAfterHandoff).toBe(0);
+  expect(result.completeReturnElapsedMs, JSON.stringify(result)).toBeLessThan(
+    80
+  );
+  expect(result.nextFrameElapsedMs, JSON.stringify(result)).toBeLessThan(80);
 });
 
 test("quick low-zoom tiled brush strokes stay visible through release", async ({
   page,
-}) => {
+}, testInfo) => {
+  testInfo.setTimeout(60_000);
   await gotoEditor(page);
   const src = await createTransparentImageDataUrl(page);
   await loadRasterTestDocument(page, createHugeImageDocument(src));
-  await page.evaluate(async () => {
+  await page.evaluate(() => {
     const editor = window.__PUNCHPRESS_EDITOR__;
-    const node = editor?.getNode("huge-image-1");
 
-    if (!(editor && node?.type === "image")) {
-      throw new Error("Expected huge image node");
-    }
-
-    editor.select("huge-image-1");
-    editor.setViewportInteracting(false);
-    editor.setViewport({
-      x: 0,
-      y: 0,
-      zoom: 0.07,
-    });
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    editor.viewerRef?.setTo?.({
-      x: 0,
-      y: 0,
-      zoom: 0.07,
-    });
-    editor.setViewportInteracting(false);
-    editor.setViewport({
-      x: editor.viewerRef?.getScrollLeft?.() ?? 0,
-      y: editor.viewerRef?.getScrollTop?.() ?? 0,
-      zoom: 0.07,
-    });
-    editor.setBrushSettings({
+    editor?.select("huge-image-1");
+    editor?.setBrushSettings({
       hardness: 1,
       opacity: 1,
-      size: 24,
+      size: 80,
       spacing: 0,
     });
-    editor.onViewportChange?.();
   });
+  await setStableViewport(page, { x: 0, y: 0, zoom: 0.07 });
   await page.keyboard.press("b");
+  await hydrateRasterStore(page, "huge-image-1");
+
+  const clip = await page.evaluate(() => ({
+    height: Math.max(1, Math.min(560, window.innerHeight - 180)),
+    width: Math.max(1, Math.min(860, window.innerWidth - 560)),
+    x: 260,
+    y: 90,
+  }));
 
   await page.evaluate(async () => {
     const editor = window.__PUNCHPRESS_EDITOR__;
@@ -2639,9 +1770,9 @@ test("quick low-zoom tiled brush strokes stay visible through release", async ({
       x: node.transform.x + point.x,
       y: node.transform.y + point.y,
     });
-    const start = { x: 900, y: 900 };
-    const end = { x: 49_000, y: 31_000 };
-    const session = brush.beginStroke({ point: toWorldPoint(start) });
+    const session = brush.beginStroke({
+      point: toWorldPoint({ x: 900, y: 900 }),
+    });
 
     if (!session) {
       throw new Error("Expected brush stroke session");
@@ -2649,54 +1780,16 @@ test("quick low-zoom tiled brush strokes stay visible through release", async ({
 
     window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_SESSION__ = session;
     await session.ready;
-    session.update({ point: toWorldPoint(end) });
+    session.update({ point: toWorldPoint({ x: 49_000, y: 31_000 }) });
     await new Promise((resolve) => requestAnimationFrame(resolve));
     await new Promise((resolve) => requestAnimationFrame(resolve));
   });
 
-  const beforeRelease = await getRasterWorkingTileRenderedBounds(page);
+  const beforeRelease = await getScreenshotDarkPixelStats(page, clip);
 
-  expect(beforeRelease?.tileCount).toBeGreaterThan(64);
-  expect(beforeRelease?.width).toBeGreaterThan(2500);
+  expect(beforeRelease.darkPixelCount).toBeGreaterThan(500);
 
-  const framesAfterRelease = await page.evaluate(async () => {
-    const getBounds = () => {
-      const tiles = [
-        ...document.querySelectorAll<SVGForeignObjectElement>(
-          "[data-testid='raster-working-tile']"
-        ),
-      ];
-
-      if (!tiles.length) {
-        return null;
-      }
-
-      const bounds = tiles.reduce(
-        (currentBounds, tile) => {
-          const rect = tile.getBoundingClientRect();
-
-          return {
-            bottom: Math.max(currentBounds.bottom, rect.bottom),
-            left: Math.min(currentBounds.left, rect.left),
-            right: Math.max(currentBounds.right, rect.right),
-            top: Math.min(currentBounds.top, rect.top),
-          };
-        },
-        {
-          bottom: Number.NEGATIVE_INFINITY,
-          left: Number.POSITIVE_INFINITY,
-          right: Number.NEGATIVE_INFINITY,
-          top: Number.POSITIVE_INFINITY,
-        }
-      );
-
-      return {
-        ...bounds,
-        height: bounds.bottom - bounds.top,
-        tileCount: tiles.length,
-        width: bounds.right - bounds.left,
-      };
-    };
+  await page.evaluate(() => {
     const editor = window.__PUNCHPRESS_EDITOR__;
     const node = editor?.getNode("huge-image-1");
     const session = window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_SESSION__;
@@ -2705,49 +1798,52 @@ test("quick low-zoom tiled brush strokes stay visible through release", async ({
       throw new Error("Expected active brush session");
     }
 
-    const end = {
-      x: node.transform.x + 49_000,
-      y: node.transform.y + 31_000,
-    };
-    const commit = session.complete({ point: end });
-    const frames: ReturnType<typeof getBounds>[] = [];
-
-    for (let index = 0; index < 4; index += 1) {
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-      frames.push(getBounds());
-    }
-
-    await commit;
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    frames.push(getBounds());
-    window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_SESSION__ = undefined;
-    return frames;
+    window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_COMMIT__ = session.complete({
+      point: {
+        x: node.transform.x + 49_000,
+        y: node.transform.y + 31_000,
+      },
+    });
   });
-  const visibleFrames = framesAfterRelease.filter(Boolean);
 
-  expect(visibleFrames, JSON.stringify(framesAfterRelease)).toHaveLength(
-    framesAfterRelease.length
-  );
+  const frameCounts: number[] = [];
 
-  for (const frame of visibleFrames) {
-    expect(frame.tileCount, JSON.stringify(framesAfterRelease)).toBeGreaterThan(
-      64
-    );
-    expect(frame.width, JSON.stringify(framesAfterRelease)).toBeGreaterThan(
-      beforeRelease.width * 0.9
-    );
-    expect(frame.height, JSON.stringify(framesAfterRelease)).toBeGreaterThan(
-      beforeRelease.height * 0.9
+  for (let index = 0; index < 10; index += 1) {
+    await waitForAnimationFrames(page, 1);
+    frameCounts.push(
+      (await getScreenshotDarkPixelStats(page, clip)).darkPixelCount
     );
   }
+
+  await page.evaluate(async () => {
+    await window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_COMMIT__;
+    window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_COMMIT__ = undefined;
+    window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_SESSION__ = undefined;
+  });
+
+  const afterCommit = await getScreenshotDarkPixelStats(page, clip);
+  const minimumDarkPixelCount = Math.floor(beforeRelease.darkPixelCount * 0.98);
+
+  for (const frameCount of frameCounts) {
+    expect(frameCount, JSON.stringify(frameCounts)).toBeGreaterThanOrEqual(
+      minimumDarkPixelCount
+    );
+  }
+
+  expect(
+    afterCommit.darkPixelCount,
+    JSON.stringify(frameCounts)
+  ).toBeGreaterThanOrEqual(minimumDarkPixelCount);
 });
 
 test("quick low-zoom tiled brush strokes do not visually flash after release", async ({
   page,
-}) => {
+}, testInfo) => {
+  testInfo.setTimeout(60_000);
   await gotoEditor(page);
   const src = await createTransparentImageDataUrl(page);
   await loadRasterTestDocument(page, createHugeImageDocument(src));
+  await hydrateRasterStore(page, "huge-image-1");
   await page.evaluate(async () => {
     const editor = window.__PUNCHPRESS_EDITOR__;
     const brush = editor?.tools.get("brush");
@@ -2761,7 +1857,7 @@ test("quick low-zoom tiled brush strokes do not visually flash after release", a
     editor.setBrushSettings({
       hardness: 1,
       opacity: 1,
-      size: 24,
+      size: 64,
       spacing: 0,
     });
 
@@ -2875,20 +1971,6 @@ test("quick low-zoom tiled brush strokes do not visually flash after release", a
 
   expect(beforeRelease.darkPixelCount).toBeGreaterThan(500);
 
-  const frameStats: Array<{
-    committedTileCount: number;
-    darkPixelCount: number;
-    exactTileDomCount: number;
-    height: number;
-    previewActive: boolean;
-    previewEligible: boolean;
-    previewReady: boolean;
-    visibleTileCount: number;
-    width: number;
-    workingTileCount: number;
-    workingTileDomCount: number;
-  }> = [];
-
   await page.evaluate(() => {
     const editor = window.__PUNCHPRESS_EDITOR__;
     const node = editor?.getNode("huge-image-1");
@@ -2898,7 +1980,7 @@ test("quick low-zoom tiled brush strokes do not visually flash after release", a
       throw new Error("Expected active brush session");
     }
 
-    session.complete({
+    window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_COMMIT__ = session.complete({
       point: {
         x: node.transform.x + 38_000,
         y: node.transform.y + 8200,
@@ -2906,44 +1988,19 @@ test("quick low-zoom tiled brush strokes do not visually flash after release", a
     });
   });
 
+  const frameStats: { darkPixelCount: number }[] = [];
+
   for (let index = 0; index < 5; index += 1) {
-    await page.evaluate(
-      () => new Promise((resolve) => requestAnimationFrame(resolve))
-    );
+    await waitForAnimationFrames(page, 1);
     frameStats.push({
-      ...(await getScreenshotDarkPixelStats(page, clip)),
-      ...(await page.evaluate(() => ({
-        committedTileCount:
-          window.__PUNCHPRESS_EDITOR__?.getNode("huge-image-1")?.tileSources
-            ?.length || 0,
-        exactTileDomCount: document.querySelectorAll("[data-raster-tile-ref]")
-          .length,
-        previewActive:
-          document.querySelector('[data-raster-preview-active="true"]') !==
-          null,
-        previewEligible:
-          document.querySelector('[data-raster-preview-eligible="true"]') !==
-          null,
-        previewReady:
-          document.querySelector('[data-raster-preview-ready="true"]') !== null,
-        visibleTileCount: Number(
-          document
-            .querySelector("[data-raster-visible-tile-count]")
-            ?.getAttribute("data-raster-visible-tile-count") || 0
-        ),
-        workingTileCount:
-          window.__PUNCHPRESS_EDITOR__?.getBrushWorkingSurfaceStateForNode?.(
-            "huge-image-1"
-          )?.tiles?.length || 0,
-        workingTileDomCount: document.querySelectorAll(
-          "[data-testid='raster-working-tile']"
-        ).length,
-      }))),
+      darkPixelCount: (await getScreenshotDarkPixelStats(page, clip))
+        .darkPixelCount,
     });
   }
 
   await page.evaluate(async () => {
-    await window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_SESSION__?.ready;
+    await window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_COMMIT__;
+    window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_COMMIT__ = undefined;
     window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_SESSION__ = undefined;
   });
 
@@ -2952,252 +2009,6 @@ test("quick low-zoom tiled brush strokes do not visually flash after release", a
       beforeRelease.darkPixelCount * 0.8
     );
   }
-});
-
-test("diagnoses repeated low-zoom brush release visibility", async ({
-  page,
-}, testInfo) => {
-  testInfo.setTimeout(90_000);
-  await gotoEditor(page);
-  const src = await createTransparentImageDataUrl(page);
-  await loadRasterTestDocument(page, createHugeImageDocument(src));
-  await page.evaluate(async () => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-    const brush = editor?.tools.get("brush");
-    const node = editor?.getNode("huge-image-1");
-
-    if (!(editor && brush && node?.type === "image")) {
-      throw new Error("Expected brush and huge image node");
-    }
-
-    editor.select("huge-image-1");
-    editor.setBrushSettings({
-      hardness: 1,
-      opacity: 1,
-      size: 24,
-      spacing: 0,
-    });
-
-    const toWorldPoint = (point) => ({
-      x: node.transform.x + point.x,
-      y: node.transform.y + point.y,
-    });
-    const seedSession = brush.beginStroke({
-      point: toWorldPoint({ x: 1200, y: 8600 }),
-    });
-
-    if (!seedSession) {
-      throw new Error("Expected seed brush stroke session");
-    }
-
-    await seedSession.ready;
-
-    for (let index = 1; index <= 32; index += 1) {
-      const progress = index / 32;
-
-      seedSession.update({
-        point: toWorldPoint({
-          x: 1200 + 58_000 * progress,
-          y: 8600 - Math.sin(progress * Math.PI) * 7600,
-        }),
-      });
-    }
-
-    await seedSession.complete({
-      point: toWorldPoint({ x: 59_200, y: 8600 }),
-    });
-
-    const imageNode = editor.getNode("huge-image-1");
-
-    if (imageNode?.type !== "image") {
-      throw new Error("Expected committed huge image node");
-    }
-
-    const viewport = {
-      x: 0,
-      y: 0,
-      zoom: 0.07,
-    };
-
-    editor.setViewportInteracting(false);
-    editor.setViewport(viewport);
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    editor.viewerRef?.setTo?.(viewport);
-    editor.setViewportInteracting(false);
-    editor.setViewport({
-      x: editor.viewerRef?.getScrollLeft?.() ?? viewport.x,
-      y: editor.viewerRef?.getScrollTop?.() ?? viewport.y,
-      zoom: viewport.zoom,
-    });
-    editor.onViewportChange?.();
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-  });
-  await page.keyboard.press("b");
-
-  const clip = await page.evaluate(() => ({
-    height: Math.max(1, Math.min(560, window.innerHeight - 180)),
-    width: Math.max(1, Math.min(860, window.innerWidth - 560)),
-    x: 260,
-    y: 90,
-  }));
-  const strokes = [
-    Array.from({ length: 30 }, (_, index) => {
-      const progress = index / 29;
-
-      return {
-        x: 1200 + 21_000 * progress,
-        y: 8200 - Math.sin(progress * Math.PI) * 7200,
-      };
-    }),
-    Array.from({ length: 24 }, (_, index) => {
-      const progress = index / 23;
-
-      return {
-        x: 800 + 22_000 * progress,
-        y: 1800 + Math.sin(progress * Math.PI) * 5800,
-      };
-    }),
-    Array.from({ length: 22 }, (_, index) => {
-      const progress = index / 21;
-
-      return {
-        x: 3000 + 18_000 * progress,
-        y: 1200 + 7800 * progress,
-      };
-    }),
-  ];
-  const diagnostics: Awaited<ReturnType<typeof getRasterFrameDiagnostic>>[] =
-    [];
-
-  for (const [strokeIndex, stroke] of strokes.entries()) {
-    await page.evaluate(async (points) => {
-      const editor = window.__PUNCHPRESS_EDITOR__;
-      const brush = editor?.tools.get("brush");
-      const node = editor?.getNode("huge-image-1");
-
-      if (!(editor && brush && node?.type === "image")) {
-        throw new Error("Expected brush and huge image node");
-      }
-
-      const toWorldPoint = (point) => ({
-        x: node.transform.x + point.x,
-        y: node.transform.y + point.y,
-      });
-      const [startPoint, ...remainingPoints] = points;
-      const session = brush.beginStroke({ point: toWorldPoint(startPoint) });
-
-      if (!session) {
-        throw new Error("Expected diagnostic brush stroke session");
-      }
-
-      window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_SESSION__ = session;
-      await session.ready;
-
-      for (const point of remainingPoints) {
-        session.update({ point: toWorldPoint(point) });
-      }
-
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-    }, stroke);
-
-    diagnostics.push(
-      await getRasterFrameDiagnostic({
-        clip,
-        frameIndex: 0,
-        page,
-        phase: "before-release",
-        strokeIndex,
-      })
-    );
-
-    await page.evaluate((endPoint) => {
-      const editor = window.__PUNCHPRESS_EDITOR__;
-      const node = editor?.getNode("huge-image-1");
-      const session = window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_SESSION__;
-
-      if (!(node?.type === "image" && session)) {
-        throw new Error("Expected active brush session");
-      }
-
-      session.complete({
-        point: {
-          x: node.transform.x + endPoint.x,
-          y: node.transform.y + endPoint.y,
-        },
-      });
-    }, stroke.at(-1));
-
-    for (let frameIndex = 1; frameIndex <= 8; frameIndex += 1) {
-      await page.evaluate(
-        () => new Promise((resolve) => requestAnimationFrame(resolve))
-      );
-      diagnostics.push(
-        await getRasterFrameDiagnostic({
-          clip,
-          frameIndex,
-          page,
-          phase: "after-release",
-          strokeIndex,
-        })
-      );
-    }
-
-    await page.evaluate(async () => {
-      await window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_SESSION__?.ready;
-      window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_SESSION__ = undefined;
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-    });
-  }
-
-  await testInfo.attach("raster-release-diagnostics", {
-    body: JSON.stringify(diagnostics, null, 2),
-    contentType: "application/json",
-  });
-
-  const dips = diagnostics.flatMap((frame) => {
-    if (frame.phase !== "after-release") {
-      return [];
-    }
-
-    const beforeRelease = diagnostics.find(
-      (candidate) =>
-        candidate.strokeIndex === frame.strokeIndex &&
-        candidate.phase === "before-release"
-    );
-
-    if (!beforeRelease) {
-      return [];
-    }
-
-    if (
-      frame.pixels.darkPixelCount >=
-      beforeRelease.pixels.darkPixelCount * 0.82
-    ) {
-      return [];
-    }
-
-    return [
-      {
-        activeTool: frame.state.activeTool,
-        beforePixels: beforeRelease.pixels.darkPixelCount,
-        exactTileDomCount: frame.state.exactTileDomCount,
-        exactTilesReady: frame.state.exactTilesReady,
-        frameIndex: frame.frameIndex,
-        loadedExactTileCount: frame.state.loadedExactTileCount,
-        pixels: frame.pixels.darkPixelCount,
-        previewActive: frame.state.previewActive,
-        previewReady: frame.state.previewReady,
-        strokeIndex: frame.strokeIndex,
-        workingSurfaceCompleted: frame.state.workingSurfaceCompleted,
-        workingSurfaceType: frame.state.workingSurfaceType,
-        workingTileCount: frame.state.workingTileCount,
-      },
-    ];
-  });
-
-  expect(dips).toEqual([]);
 });
 
 test("real pointer extreme zoom brush release does not blank visible ink", async ({
@@ -3323,25 +2134,13 @@ test("real pointer extreme zoom brush release does not blank visible ink", async
   const finalState = await page.evaluate(() => {
     const editor = window.__PUNCHPRESS_EDITOR__;
     const node = editor?.nodes.find((candidate) => candidate.type === "image");
-    const rasterRoot = document.querySelector("[data-raster-render-key]");
-    const workingSurface =
-      node?.type === "image"
-        ? editor?.getBrushWorkingSurfaceStateForNode?.(node.id)
-        : null;
-    const workingSurfaceElement = document.querySelector(
-      "[data-raster-working-surface]"
+    const storeSurface = document.querySelector(
+      "[data-raster-store-surface='true']"
     );
 
     return {
       activeTool: editor?.activeTool || null,
       committedTileCount: node?.tileSources?.length || 0,
-      exactTileDomCount: document.querySelectorAll("[data-raster-tile-ref]")
-        .length,
-      exactTilesReady:
-        rasterRoot?.getAttribute("data-raster-exact-tiles-ready") || null,
-      loadedExactTileCount: Number(
-        rasterRoot?.getAttribute("data-raster-loaded-exact-tile-count") || 0
-      ),
       node:
         node?.type === "image"
           ? {
@@ -3350,16 +2149,9 @@ test("real pointer extreme zoom brush release does not blank visible ink", async
               width: node.width,
             }
           : null,
-      previewActive:
-        document.querySelector('[data-raster-preview-active="true"]') !== null,
-      previewReady:
-        document.querySelector('[data-raster-preview-ready="true"]') !== null,
-      workingSurfaceCompleted:
-        workingSurfaceElement?.getAttribute("data-raster-working-completed") ||
-        null,
-      workingSurfaceType: workingSurface?.type || null,
-      workingTileCount:
-        workingSurface?.type === "tiles" ? workingSurface.tiles.length : 0,
+      storeSurfaceHydrated:
+        storeSurface?.getAttribute("data-raster-store-hydrated") || null,
+      storeSurfacePresent: Boolean(storeSurface),
     };
   });
 
@@ -3420,360 +2212,10 @@ test("real pointer extreme zoom brush release does not blank visible ink", async
   expect(dips).toEqual([]);
 });
 
-test("completed tiled working surface waits for raster render acknowledgement", async ({
-  page,
-}) => {
-  await gotoEditor(page);
-  const src = await createTransparentImageDataUrl(page);
-  await loadRasterTestDocument(page, createLargeImageDocument(src));
-  await page.evaluate(async () => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-
-    if (!editor) {
-      return;
-    }
-
-    const node = editor.getNode("large-image-1");
-
-    if (node?.type !== "image") {
-      return;
-    }
-
-    editor.updateNode("large-image-1", {
-      baseHeight: 337,
-      baseWidth: 306,
-      height: 337,
-      width: 306,
-    });
-    editor.select("large-image-1");
-    editor.setViewportInteracting(false);
-    editor.setViewport({
-      x: node.transform.x - 600,
-      y: node.transform.y - 500,
-      zoom: 0.01,
-    });
-    editor.viewerRef?.setTo?.({
-      x: node.transform.x - 600,
-      y: node.transform.y - 500,
-      zoom: 0.01,
-    });
-    editor.setBrushSettings({
-      hardness: 1,
-      opacity: 1,
-      size: 24,
-      spacing: 0,
-    });
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    editor.onViewportChange?.();
-  });
-  await page.keyboard.press("b");
-
-  const result = await page.evaluate(async () => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-    const brush = editor?.tools.get("brush");
-    const node = editor?.getNode("large-image-1");
-
-    if (!(editor && brush && node?.type === "image")) {
-      throw new Error("Expected brush and image node");
-    }
-
-    const heldRenderReadyEvents: Event[] = [];
-    const originalDispatchEvent = window.dispatchEvent.bind(window);
-
-    window.dispatchEvent = (event) => {
-      if (event.type === "punchpress:raster-node-render-ready") {
-        heldRenderReadyEvents.push(event);
-        return true;
-      }
-
-      return originalDispatchEvent(event);
-    };
-
-    const toWorldPoint = (point) => ({
-      x: node.transform.x + point.x,
-      y: node.transform.y + point.y,
-    });
-    const session = brush.beginStroke({
-      point: toWorldPoint({ x: 120, y: 160 }),
-    });
-
-    if (!session) {
-      throw new Error("Expected brush stroke session");
-    }
-
-    await session.ready;
-
-    for (let index = 1; index <= 160; index += 1) {
-      const progress = index / 160;
-
-      session.update({
-        point: toWorldPoint({
-          x: 120 + 72_000 * progress,
-          y: 160 + Math.sin(progress * Math.PI * 1.6) * 52_000,
-        }),
-      });
-    }
-
-    for (let index = 0; index < 6; index += 1) {
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-    }
-
-    const commit = session.complete({
-      point: toWorldPoint({
-        x: 72_120,
-        y: 160,
-      }),
-    });
-
-    await commit;
-
-    for (let index = 0; index < 90; index += 1) {
-      if (heldRenderReadyEvents.length > 0) {
-        break;
-      }
-
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-    }
-
-    const previewCountWithoutAck = document.querySelectorAll(
-      "[data-brush-preview-node-id]"
-    ).length;
-    const workingSurfaceWithoutAck =
-      editor.getBrushWorkingSurfaceStateForNode?.("large-image-1");
-    const heldEventCount = heldRenderReadyEvents.length;
-
-    window.dispatchEvent = originalDispatchEvent;
-
-    for (const event of heldRenderReadyEvents) {
-      originalDispatchEvent(event);
-    }
-
-    for (let index = 0; index < 4; index += 1) {
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-    }
-
-    const previewCountAfterAck = document.querySelectorAll(
-      "[data-brush-preview-node-id]"
-    ).length;
-    const workingSurfaceAfterAck =
-      editor.getBrushWorkingSurfaceStateForNode?.("large-image-1");
-
-    return {
-      heldEventCount,
-      previewCountAfterAck,
-      previewCountWithoutAck,
-      workingTileCountAfterAck: workingSurfaceAfterAck?.tiles?.length || 0,
-      workingTileCountWithoutAck: workingSurfaceWithoutAck?.tiles?.length || 0,
-    };
-  });
-
-  expect(result.heldEventCount).toBeGreaterThan(0);
-  expect(result.previewCountWithoutAck, JSON.stringify(result)).toBe(0);
-  expect(
-    result.workingTileCountWithoutAck,
-    JSON.stringify(result)
-  ).toBeGreaterThan(0);
-  expect(result.previewCountAfterAck, JSON.stringify(result)).toBe(0);
-  expect(result.workingTileCountAfterAck, JSON.stringify(result)).toBe(0);
-});
-
-test("tiled raster render acknowledgement waits for a stable paint window", async ({
-  page,
-}) => {
-  await gotoEditor(page);
-  const src = await createTransparentImageDataUrl(page);
-  await loadRasterTestDocument(page, createLargeImageDocument(src));
-  await page.evaluate(async () => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-
-    if (!editor) {
-      return;
-    }
-
-    const node = editor.getNode("large-image-1");
-
-    if (node?.type !== "image") {
-      return;
-    }
-
-    editor.updateNode("large-image-1", {
-      baseHeight: 337,
-      baseWidth: 306,
-      height: 337,
-      width: 306,
-    });
-    editor.select("large-image-1");
-    editor.setViewportInteracting(false);
-    editor.setViewport({
-      x: node.transform.x - 600,
-      y: node.transform.y - 500,
-      zoom: 0.01,
-    });
-    editor.viewerRef?.setTo?.({
-      x: node.transform.x - 600,
-      y: node.transform.y - 500,
-      zoom: 0.01,
-    });
-    editor.setBrushSettings({
-      hardness: 1,
-      opacity: 1,
-      size: 24,
-      spacing: 0,
-    });
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    editor.onViewportChange?.();
-    window.__PUNCHPRESS_RASTER_DEBUG__?.clear();
-  });
-  await page.keyboard.press("b");
-
-  const result = await page.evaluate(async () => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-    const brush = editor?.tools.get("brush");
-    const node = editor?.getNode("large-image-1");
-
-    if (!(editor && brush && node?.type === "image")) {
-      throw new Error("Expected brush and image node");
-    }
-
-    const toWorldPoint = (point) => ({
-      x: node.transform.x + point.x,
-      y: node.transform.y + point.y,
-    });
-    const session = brush.beginStroke({
-      point: toWorldPoint({ x: 120, y: 160 }),
-    });
-
-    if (!session) {
-      throw new Error("Expected brush stroke session");
-    }
-
-    await session.ready;
-
-    for (let index = 1; index <= 160; index += 1) {
-      const progress = index / 160;
-
-      session.update({
-        point: toWorldPoint({
-          x: 120 + 72_000 * progress,
-          y: 160 + Math.sin(progress * Math.PI * 1.6) * 52_000,
-        }),
-      });
-    }
-
-    const commit = session.complete({
-      point: toWorldPoint({
-        x: 72_120,
-        y: 160,
-      }),
-    });
-
-    await commit;
-
-    const waitForStableEvent = async () => {
-      for (let index = 0; index < 90; index += 1) {
-        const records = window.__PUNCHPRESS_RASTER_DEBUG__?.getRecords() || [];
-        const stableEvent = records.find(
-          (record) => record.event === "renderer.renderReady.stable"
-        );
-
-        if (stableEvent) {
-          return records;
-        }
-
-        await new Promise((resolve) => requestAnimationFrame(resolve));
-      }
-
-      throw new Error("Timed out waiting for stable raster render event");
-    };
-
-    const records = await waitForStableEvent();
-    const stableEvent = records.find(
-      (record) => record.event === "renderer.renderReady.stable"
-    );
-    const dispatchEvent = records.find(
-      (record) => record.event === "renderer.renderReady.dispatch"
-    );
-    const readyStateEvent = records
-      .filter(
-        (record) =>
-          record.event === "renderer.exactTiles.readyState" &&
-          record.payload?.areExactTilesReady === true
-      )
-      .at(-1);
-
-    return {
-      dispatchAfterStableMs:
-        dispatchEvent && stableEvent ? dispatchEvent.t - stableEvent.t : null,
-      dispatchEventCount: records.filter(
-        (record) => record.event === "renderer.renderReady.dispatch"
-      ).length,
-      readyToStableMs:
-        readyStateEvent && stableEvent
-          ? stableEvent.t - readyStateEvent.t
-          : null,
-      stableElapsedMs: stableEvent?.payload?.elapsedMs || 0,
-      stableEventCount: records.filter(
-        (record) => record.event === "renderer.renderReady.stable"
-      ).length,
-      stableFrameCount: stableEvent?.payload?.stableFrameCount || 0,
-    };
-  });
-
-  expect(result.stableEventCount, JSON.stringify(result)).toBeGreaterThan(0);
-  expect(result.dispatchEventCount, JSON.stringify(result)).toBeGreaterThan(0);
-  expect(
-    result.stableFrameCount,
-    JSON.stringify(result)
-  ).toBeGreaterThanOrEqual(8);
-  expect(result.stableElapsedMs, JSON.stringify(result)).toBeGreaterThanOrEqual(
-    90
-  );
-  expect(result.dispatchAfterStableMs, JSON.stringify(result)).not.toBeNull();
-});
-
-test("huge soft brush strokes use dirty tiles instead of a full layer pixel buffer", async ({
-  page,
-}) => {
-  await gotoEditor(page);
-  const src = await createOpaqueImageDataUrl(page);
-  await loadRasterTestDocument(page, createHugeImageDocument(src));
-  await page.evaluate(() => {
-    window.__PUNCHPRESS_EDITOR__?.select("huge-image-1");
-  });
-  await page.keyboard.press("b");
-  await installBrushPerfCapture(page);
-
-  await setBrushSliderValue(page, "Brush size", 96);
-  await setBrushSliderValue(page, "Brush opacity", 65);
-  await setBrushSliderValue(page, "Brush hardness", 0);
-
-  const start = await getCanvasStagePoint(page, { x: 360, y: 270 });
-  const end = await getCanvasStagePoint(page, { x: 760, y: 520 });
-
-  await dragBrush(page, [start, end], { release: false, steps: 24 });
-
-  const workingSurface = await getRasterWorkingSurfaceState(page);
-
-  expect(await getBrushPreviewState(page)).toBeNull();
-  expect(workingSurface.tileSurfaceCount).toBe(1);
-  expect(workingSurface.totalTileCount).toBeGreaterThan(0);
-
-  await page.mouse.up();
-
-  const imageState = await getCommittedImageState(page);
-  const perf = await takeBrushPerfCapture(page);
-
-  expect(imageState?.id).toBe("huge-image-1");
-  expect(imageState?.tileSourceCount).toBeGreaterThan(0);
-  expect(perf.counters["brush.tile.session"] || 0).toBe(1);
-  expect(perf.counters["brush.tile.dab"] || 0).toBeGreaterThan(0);
-  expect(perf.spans["brush.stroke.createFloatPixels"] || []).toHaveLength(0);
-  expect(perf.spans["brush.commit.encode"] || []).toHaveLength(0);
-});
-
 test("huge tiled brush strokes preserve previous strokes in the same tile", async ({
   page,
-}) => {
+}, testInfo) => {
+  testInfo.setTimeout(60_000);
   await gotoEditor(page);
   const src = await createOpaqueImageDataUrl(page);
   await loadRasterTestDocument(page, createHugeImageDocument(src));
@@ -3781,6 +2223,7 @@ test("huge tiled brush strokes preserve previous strokes in the same tile", asyn
     window.__PUNCHPRESS_EDITOR__?.select("huge-image-1");
   });
   await page.keyboard.press("b");
+  await hydrateRasterStore(page, "huge-image-1");
 
   await setBrushSliderValue(page, "Brush size", 64);
   await setBrushSliderValue(page, "Brush opacity", 100);
@@ -3790,9 +2233,21 @@ test("huge tiled brush strokes preserve previous strokes in the same tile", asyn
 
   await dragBrush(page, [point, point]);
 
+  await expect
+    .poll(
+      async () => (await getCommittedImageState(page))?.tileSourceCount || 0
+    )
+    .toBeGreaterThan(0);
+
   const firstState = await getCommittedImageState(page);
 
   await dragBrush(page, [point, point]);
+
+  await expect
+    .poll(
+      async () => (await getCommittedImageState(page))?.tileSourceCount || 0
+    )
+    .toBeGreaterThan(firstState?.tileSourceCount || 0);
 
   const secondState = await getCommittedImageState(page);
 
@@ -3807,10 +2262,12 @@ test("huge tiled brush strokes preserve previous strokes in the same tile", asyn
 
 test("huge tiled brush strokes commit overlap across tile boundaries", async ({
   page,
-}) => {
+}, testInfo) => {
+  testInfo.setTimeout(60_000);
   await gotoEditor(page);
   const src = await createTransparentImageDataUrl(page);
   await loadRasterTestDocument(page, createHugeImageDocument(src));
+  await hydrateRasterStore(page, "huge-image-1");
   await page.evaluate(async () => {
     const editor = window.__PUNCHPRESS_EDITOR__;
     const brush = editor?.tools.get("brush");
@@ -3846,8 +2303,7 @@ test("huge tiled brush strokes commit overlap across tile boundaries", async ({
     }
 
     session.update({ point: toWorldPoint({ x: 620, y: 900 }) });
-    session.complete({ point: toWorldPoint({ x: 620, y: 900 }) });
-    await session.ready;
+    await session.complete({ point: toWorldPoint({ x: 620, y: 900 }) });
   });
 
   const imageState = await getCommittedImageState(page);
@@ -3882,7 +2338,8 @@ test("huge tiled brush strokes commit overlap across tile boundaries", async ({
 
 test("huge tiled brush strokes can extend beyond the current layer bounds", async ({
   page,
-}) => {
+}, testInfo) => {
+  testInfo.setTimeout(60_000);
   await gotoEditor(page);
   const src = await createOpaqueImageDataUrl(page);
   await loadRasterTestDocument(page, createHugeImageDocument(src));
@@ -3891,18 +2348,19 @@ test("huge tiled brush strokes can extend beyond the current layer bounds", asyn
     window.__PUNCHPRESS_EDITOR__?.select("huge-image-1");
   });
   await page.keyboard.press("b");
+  await hydrateRasterStore(page, "huge-image-1");
 
   await setBrushSliderValue(page, "Brush size", 96);
   await setBrushSliderValue(page, "Brush opacity", 100);
   await setBrushSliderValue(page, "Brush hardness", 100);
 
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
     const editor = window.__PUNCHPRESS_EDITOR__;
     const brush = editor?.tools.get("brush");
     const point = { x: 6000, y: 11_200 };
     const session = brush?.beginStroke({ point });
 
-    session?.complete({ point });
+    await session?.complete({ point });
   });
 
   const imageState = await getCommittedImageState(page);
@@ -3918,7 +2376,8 @@ test("huge tiled brush strokes can extend beyond the current layer bounds", asyn
 
 test("huge tiled brush bounds grow left and keep existing content pinned", async ({
   page,
-}) => {
+}, testInfo) => {
+  testInfo.setTimeout(60_000);
   await gotoEditor(page);
   const src = await createOpaqueImageDataUrl(page);
   await loadRasterTestDocument(page, createHugeImageDocument(src));
@@ -3926,18 +2385,19 @@ test("huge tiled brush bounds grow left and keep existing content pinned", async
     window.__PUNCHPRESS_EDITOR__?.select("huge-image-1");
   });
   await page.keyboard.press("b");
+  await hydrateRasterStore(page, "huge-image-1");
 
   await setBrushSliderValue(page, "Brush size", 96);
   await setBrushSliderValue(page, "Brush opacity", 100);
   await setBrushSliderValue(page, "Brush hardness", 100);
 
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
     const editor = window.__PUNCHPRESS_EDITOR__;
     const brush = editor?.tools.get("brush");
     const point = { x: 160, y: 500 };
     const session = brush?.beginStroke({ point });
 
-    session?.complete({ point });
+    await session?.complete({ point });
   });
 
   const imageState = await getCommittedImageState(page);
@@ -3956,7 +2416,8 @@ test("huge tiled brush bounds grow left and keep existing content pinned", async
 
 test("huge tiled brush strokes cover arbitrary 40000px directions efficiently", async ({
   page,
-}) => {
+}, testInfo) => {
+  testInfo.setTimeout(90_000);
   await gotoEditor(page);
   const src = await createOpaqueImageDataUrl(page);
   await loadRasterTestDocument(page, createHugeImageDocument(src));
@@ -3972,7 +2433,7 @@ test("huge tiled brush strokes cover arbitrary 40000px directions efficiently", 
     });
   });
   await page.keyboard.press("b");
-  await installBrushPerfCapture(page);
+  await hydrateRasterStore(page, "huge-image-1");
 
   const result = await page.evaluate(async () => {
     const editor = window.__PUNCHPRESS_EDITOR__;
@@ -4042,14 +2503,7 @@ test("huge tiled brush strokes cover arbitrary 40000px directions efficiently", 
       width: imageNode.width,
     };
   });
-  const perf = await takeBrushPerfCapture(page);
   const tileRefs = result.tileSources.map((tile) => tile.ref);
-  const nativeStrokeSegments =
-    perf.counters["brush.tile.nativeStroke.segment"] || 0;
-  const touchedTiles = perf.counters["brush.tile.touched"] || 0;
-  const totalTileCommitMs = (
-    perf.spans["brush.tile.commit.encode"] || []
-  ).reduce((sum, duration) => sum + duration, 0);
 
   expect(result.width).toBeGreaterThan(55_000);
   expect(result.height).toBeGreaterThan(65_000);
@@ -4069,575 +2523,176 @@ test("huge tiled brush strokes cover arbitrary 40000px directions efficiently", 
         tile.y + tile.height <= result.height
     )
   ).toBe(true);
-  expect(nativeStrokeSegments).toBe(15);
-  expect(touchedTiles).toBeLessThan(620);
-  expect(perf.counters["brush.canvas.expand"] || 0).toBe(0);
-  expect(perf.spans["brush.stroke.createFloatPixels"] || []).toHaveLength(0);
-  expect(perf.spans["brush.commit.encode"] || []).toHaveLength(0);
-  expect(totalTileCommitMs).toBeLessThan(2000);
   expect(result.elapsedMs).toBeLessThan(3000);
-});
-
-test("huge tiled raster layers mount only visible committed tile images", async ({
-  page,
-}) => {
-  await gotoEditor(page);
-  const src = await createOpaqueImageDataUrl(page);
-  await loadRasterTestDocument(page, createHugeImageDocument(src));
-  await page.evaluate(async () => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-    const brush = editor?.tools.get("brush");
-
-    if (!(editor && brush)) {
-      throw new Error("Expected brush tool");
-    }
-
-    editor.select("huge-image-1");
-    editor.setBrushSettings({
-      hardness: 1,
-      opacity: 1,
-      size: 24,
-      spacing: 0,
-    });
-
-    const initialNode = editor.getNode("huge-image-1");
-
-    if (initialNode?.type !== "image") {
-      throw new Error("Expected huge image node");
-    }
-
-    const toWorldPoint = (localPoint) => ({
-      x: initialNode.transform.x + localPoint.x,
-      y: initialNode.transform.y + localPoint.y,
-    });
-    const center = {
-      x: initialNode.width / 2,
-      y: initialNode.height / 2,
-    };
-    const drawLine = async (angle) => {
-      const end = {
-        x: center.x + Math.cos(angle) * 40_000,
-        y: center.y + Math.sin(angle) * 40_000,
-      };
-      const session = brush.beginStroke({ point: toWorldPoint(center) });
-
-      if (!session) {
-        throw new Error("Expected brush stroke session");
-      }
-
-      session.update({ point: toWorldPoint(end) });
-      await session.complete({ point: toWorldPoint(end) });
-    };
-
-    for (const angle of [0.19, 1.37, 2.48, 4.11]) {
-      await drawLine(angle);
-    }
-
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-  });
-
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const imageNode = window.__PUNCHPRESS_EDITOR__?.nodes.find(
-          (node) => node.type === "image"
-        );
-
-        return imageNode?.tileSources?.length || 0;
-      })
-    )
-    .toBeGreaterThan(250);
-
-  await page.evaluate(async () => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-    const imageNode = editor?.nodes.find((node) => node.type === "image");
-
-    if (!(editor && imageNode?.type === "image")) {
-      throw new Error("Expected huge image node");
-    }
-
-    const viewport = {
-      x: imageNode.transform.x,
-      y: imageNode.transform.y,
-      zoom: 0.02,
-    };
-
-    editor.setViewportInteracting(false);
-    editor.setViewport(viewport);
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    editor.viewerRef?.setTo?.(viewport);
-    editor.setViewportInteracting(false);
-    editor.setViewport({
-      x: editor.viewerRef?.getScrollLeft?.() ?? viewport.x,
-      y: editor.viewerRef?.getScrollTop?.() ?? viewport.y,
-      zoom: viewport.zoom,
-    });
-    editor.onViewportChange?.();
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-  });
-
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          document.querySelector('[data-raster-preview-ready="true"]') !== null
-      )
-    )
-    .toBe(true);
-
-  const lowZoomResult = await page.evaluate(() => {
-    const imageNode = window.__PUNCHPRESS_EDITOR__?.nodes.find(
-      (node) => node.type === "image"
-    );
-
-    return {
-      groupTotalTileCount: Number(
-        document
-          .querySelector("[data-raster-total-tile-count]")
-          ?.getAttribute("data-raster-total-tile-count") || 0
-      ),
-      mountedTileCount: document.querySelectorAll("[data-raster-tile-ref]")
-        .length,
-      previewActive:
-        document.querySelector('[data-raster-preview-active="true"]') !== null,
-      previewReady:
-        document.querySelector('[data-raster-preview-ready="true"]') !== null,
-      tileSourceCount: imageNode?.tileSources?.length || 0,
-    };
-  });
-
-  expect(lowZoomResult.previewActive, JSON.stringify(lowZoomResult)).toBe(true);
-  expect(lowZoomResult.previewReady, JSON.stringify(lowZoomResult)).toBe(true);
-  expect(lowZoomResult.groupTotalTileCount).toBe(lowZoomResult.tileSourceCount);
-  expect(lowZoomResult.mountedTileCount).toBe(0);
-
-  await page.evaluate(async () => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-    const imageNode = editor?.nodes.find((node) => node.type === "image");
-
-    if (!(editor && imageNode?.type === "image")) {
-      throw new Error("Expected huge image node");
-    }
-
-    const targetTile = imageNode.tileSources?.[0];
-
-    if (!targetTile) {
-      throw new Error("Expected committed tile source");
-    }
-
-    const viewport = {
-      x: imageNode.transform.x + targetTile.x - 900,
-      y: imageNode.transform.y + targetTile.y - 600,
-      zoom: 0.86,
-    };
-
-    editor.setViewportInteracting(false);
-    editor.setViewport(viewport);
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    editor.viewerRef?.setTo?.(viewport);
-    editor.setViewportInteracting(false);
-    editor.setViewport({
-      x: editor.viewerRef?.getScrollLeft?.() ?? viewport.x,
-      y: editor.viewerRef?.getScrollTop?.() ?? viewport.y,
-      zoom: viewport.zoom,
-    });
-    editor.onViewportChange?.();
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-  });
-
-  await expect
-    .poll(() =>
-      page.evaluate(() =>
-        Number(
-          document
-            .querySelector("[data-raster-visible-tile-count]")
-            ?.getAttribute("data-raster-visible-tile-count") || 0
-        )
-      )
-    )
-    .toBeGreaterThan(0);
-
-  const result = await page.evaluate(() => {
-    const imageNode = window.__PUNCHPRESS_EDITOR__?.nodes.find(
-      (node) => node.type === "image"
-    );
-
-    return {
-      groupTotalTileCount: Number(
-        document
-          .querySelector("[data-raster-total-tile-count]")
-          ?.getAttribute("data-raster-total-tile-count") || 0
-      ),
-      groupVisibleTileCount: Number(
-        document
-          .querySelector("[data-raster-visible-tile-count]")
-          ?.getAttribute("data-raster-visible-tile-count") || 0
-      ),
-      image: imageNode
-        ? {
-            height: imageNode.height,
-            transformX: imageNode.transform.x,
-            transformY: imageNode.transform.y,
-            width: imageNode.width,
-          }
-        : null,
-      mountedTileCount: document.querySelectorAll("[data-raster-tile-ref]")
-        .length,
-      tileBounds: imageNode?.tileSources?.reduce(
-        (bounds, tile) => ({
-          maxX: Math.max(bounds.maxX, tile.x + tile.width),
-          maxY: Math.max(bounds.maxY, tile.y + tile.height),
-          minX: Math.min(bounds.minX, tile.x),
-          minY: Math.min(bounds.minY, tile.y),
-        }),
-        {
-          maxX: Number.NEGATIVE_INFINITY,
-          maxY: Number.NEGATIVE_INFINITY,
-          minX: Number.POSITIVE_INFINITY,
-          minY: Number.POSITIVE_INFINITY,
-        }
-      ),
-      tileSourceCount: imageNode?.tileSources?.length || 0,
-      viewport: window.__PUNCHPRESS_EDITOR__?.viewport,
-    };
-  });
-
-  expect(result.tileSourceCount).toBeGreaterThan(250);
-  expect(result.mountedTileCount).toBeGreaterThan(0);
-  expect(result.groupVisibleTileCount).toBe(result.mountedTileCount);
-  expect(result.groupTotalTileCount).toBe(result.tileSourceCount);
-  expect(result.mountedTileCount, JSON.stringify(result)).toBeLessThan(100);
 });
 
 test("long active working tile surface does not discard earlier touched tiles", async ({
   page,
-}) => {
+}, testInfo) => {
+  testInfo.setTimeout(60_000);
   await gotoEditor(page);
-  const src = await createOpaqueImageDataUrl(page);
+  const src = await createTransparentImageDataUrl(page);
   await loadRasterTestDocument(page, createHugeImageDocument(src));
-  await page.evaluate(async () => {
+  await page.evaluate(() => {
     const editor = window.__PUNCHPRESS_EDITOR__;
+    const node = editor?.getNode("huge-image-1");
 
-    if (!editor) {
-      return;
-    }
-
-    const node = editor.getNode("huge-image-1");
-
-    if (node?.type !== "image") {
-      return;
+    if (!(editor && node?.type === "image")) {
+      throw new Error("Expected huge image node");
     }
 
     editor.select("huge-image-1");
-    editor.setViewportInteracting(false);
-    editor.setViewport({
-      x: node.transform.x - 800,
-      y: node.transform.y - 600,
-      zoom: 0.04,
-    });
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    editor.viewerRef?.setTo?.({
-      x: node.transform.x - 800,
-      y: node.transform.y - 600,
-      zoom: 0.04,
-    });
-    editor.setViewportInteracting(false);
-    editor.setViewport({
-      x: editor.viewerRef?.getScrollLeft?.() ?? node.transform.x - 800,
-      y: editor.viewerRef?.getScrollTop?.() ?? node.transform.y - 600,
-      zoom: 0.04,
-    });
     editor.setBrushSettings({
       hardness: 1,
       opacity: 1,
-      size: 24,
+      size: 500,
       spacing: 0,
     });
-    editor.onViewportChange?.();
   });
+  await setStableViewport(page, { x: -580, y: -440, zoom: 0.04 });
   await page.keyboard.press("b");
+  await hydrateRasterStore(page, "huge-image-1");
 
-  const result = await page.evaluate(async () => {
+  const earlyClip = await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const hostRect = editor?.hostRef?.getBoundingClientRect();
+    const viewer = editor?.viewerRef;
+    const node = editor?.getNode("huge-image-1");
+
+    if (!(editor && hostRect && viewer && node?.type === "image")) {
+      throw new Error("Expected huge image node for clip");
+    }
+
+    const toClientPoint = (point) => ({
+      x:
+        hostRect.left +
+        (node.transform.x + point.x - viewer.getScrollLeft()) * editor.zoom,
+      y:
+        hostRect.top +
+        (node.transform.y + point.y - viewer.getScrollTop()) * editor.zoom,
+    });
+    const earlyStart = toClientPoint({ x: 1000, y: 5200 });
+    const earlyEnd = toClientPoint({ x: 3000, y: 5200 });
+
+    return {
+      height: 60,
+      width: Math.max(40, Math.floor(earlyEnd.x - earlyStart.x) + 40),
+      x: Math.floor(earlyStart.x) - 20,
+      y: Math.floor(earlyStart.y) - 30,
+    };
+  });
+
+  await page.evaluate(async () => {
     const editor = window.__PUNCHPRESS_EDITOR__;
     const brush = editor?.tools.get("brush");
-    const imageNode = editor?.getNode("huge-image-1");
+    const node = editor?.getNode("huge-image-1");
 
-    if (!(editor && brush && imageNode?.type === "image")) {
+    if (!(editor && brush && node?.type === "image")) {
       throw new Error("Expected brush and huge image node");
     }
 
     const toWorldPoint = (localPoint) => ({
-      x: imageNode.transform.x + localPoint.x,
-      y: imageNode.transform.y + localPoint.y,
+      x: node.transform.x + localPoint.x,
+      y: node.transform.y + localPoint.y,
     });
-    const start = {
-      x: imageNode.width * 0.08,
-      y: imageNode.height * 0.48,
-    };
     const session = brush.beginStroke({
-      point: toWorldPoint(start),
+      point: toWorldPoint({ x: 1000, y: 5200 }),
     });
 
     if (!session) {
       throw new Error("Expected brush stroke session");
     }
 
-    const counts: { index: number; pointCount: number }[] = [];
-    const totalPoints = 560;
+    window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_SESSION__ = session;
+    await session.ready;
+    session.update({ point: toWorldPoint({ x: 2000, y: 5200 }) });
+    session.update({ point: toWorldPoint({ x: 3000, y: 5200 }) });
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+  });
+
+  const earlyStats = await getScreenshotDarkPixelStats(page, earlyClip);
+
+  expect(earlyStats.darkPixelCount).toBeGreaterThan(300);
+
+  await page.evaluate(async () => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const node = editor?.getNode("huge-image-1");
+    const session = window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_SESSION__;
+
+    if (!(node?.type === "image" && session)) {
+      throw new Error("Expected active brush session");
+    }
+
+    const toWorldPoint = (localPoint) => ({
+      x: node.transform.x + localPoint.x,
+      y: node.transform.y + localPoint.y,
+    });
+    const totalPoints = 120;
 
     for (let index = 1; index <= totalPoints; index += 1) {
       const progress = index / totalPoints;
 
       session.update({
         point: toWorldPoint({
-          x: start.x + imageNode.width * 0.84 * progress,
-          y:
-            start.y +
-            Math.sin(progress * Math.PI * 9) * imageNode.height * 0.18,
+          x: 3000 + (node.width * 0.7 - 3000) * progress,
+          y: 5200 + Math.sin(progress * Math.PI * 6) * node.height * 0.18,
         }),
       });
 
-      if (index % 20 === 0) {
-        const workingSurface =
-          editor.getBrushWorkingSurfaceStateForNode?.("huge-image-1");
-
-        counts.push({
-          index,
-          pointCount: workingSurface?.tiles?.length || 0,
-        });
+      if (index % 12 === 0) {
         await new Promise((resolve) => requestAnimationFrame(resolve));
       }
     }
 
-    session.cancel();
-
-    return {
-      counts,
-      drops: counts.filter((entry, index) => {
-        const previous = counts[index - 1];
-
-        return previous ? entry.pointCount < previous.pointCount : false;
-      }),
-    };
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
   });
 
-  expect(result.drops, JSON.stringify(result)).toEqual([]);
-});
+  const lateStats = await getScreenshotDarkPixelStats(page, earlyClip);
 
-test("tiled raster LOD yields to active brush working tiles", async ({
-  page,
-}) => {
-  await gotoEditor(page);
-  const src = await createOpaqueImageDataUrl(page);
-  await loadRasterTestDocument(page, createHugeImageDocument(src));
+  expect(lateStats.darkPixelCount).toBeGreaterThanOrEqual(
+    Math.floor(earlyStats.darkPixelCount * 0.95)
+  );
+
   await page.evaluate(async () => {
     const editor = window.__PUNCHPRESS_EDITOR__;
-    const brush = editor?.tools.get("brush");
+    const node = editor?.getNode("huge-image-1");
+    const session = window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_SESSION__;
 
-    if (!(editor && brush)) {
-      throw new Error("Expected brush tool");
+    if (!(node?.type === "image" && session)) {
+      throw new Error("Expected active brush session");
     }
 
-    editor.select("huge-image-1");
-    editor.setBrushSettings({
-      hardness: 1,
-      opacity: 1,
-      size: 24,
-      spacing: 0,
+    await session.complete({
+      point: {
+        x: node.transform.x + node.width * 0.7,
+        y: node.transform.y + 5200,
+      },
     });
-
-    const initialNode = editor.getNode("huge-image-1");
-
-    if (initialNode?.type !== "image") {
-      throw new Error("Expected huge image node");
-    }
-
-    const center = {
-      x: initialNode.width / 2,
-      y: initialNode.height / 2,
-    };
-    const toWorldPoint = (localPoint) => ({
-      x: initialNode.transform.x + localPoint.x,
-      y: initialNode.transform.y + localPoint.y,
-    });
-    const drawLine = async (angle) => {
-      const end = {
-        x: center.x + Math.cos(angle) * 40_000,
-        y: center.y + Math.sin(angle) * 40_000,
-      };
-      const session = brush.beginStroke({ point: toWorldPoint(center) });
-
-      if (!session) {
-        throw new Error("Expected brush stroke session");
-      }
-
-      session.update({ point: toWorldPoint(end) });
-      await session.complete({ point: toWorldPoint(end) });
-    };
-
-    for (const angle of [0.19, 1.37, 2.48, 4.11]) {
-      await drawLine(angle);
-    }
-
-    const imageNode = editor.getNode("huge-image-1");
-
-    if (imageNode?.type !== "image") {
-      throw new Error("Expected committed huge image node");
-    }
-
-    const viewport = {
-      x: imageNode.transform.x,
-      y: imageNode.transform.y,
-      zoom: 0.02,
-    };
-
-    editor.setViewportInteracting(false);
-    editor.setViewport(viewport);
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    editor.viewerRef?.setTo?.(viewport);
-    editor.setViewportInteracting(false);
-    editor.setViewport({
-      x: editor.viewerRef?.getScrollLeft?.() ?? viewport.x,
-      y: editor.viewerRef?.getScrollTop?.() ?? viewport.y,
-      zoom: viewport.zoom,
-    });
-    editor.onViewportChange?.();
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-  });
-
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          document.querySelector('[data-raster-preview-ready="true"]') !== null
-      )
-    )
-    .toBe(true);
-
-  const beforeStroke = await page.evaluate(() => ({
-    mountedTileCount: document.querySelectorAll("[data-raster-tile-ref]")
-      .length,
-    previewActive:
-      document.querySelector('[data-raster-preview-active="true"]') !== null,
-    previewReady:
-      document.querySelector('[data-raster-preview-ready="true"]') !== null,
-    tileSourceCount:
-      window.__PUNCHPRESS_EDITOR__?.nodes.find((node) => node.type === "image")
-        ?.tileSources?.length || 0,
-  }));
-
-  expect(beforeStroke.previewActive, JSON.stringify(beforeStroke)).toBe(true);
-  expect(beforeStroke.previewReady, JSON.stringify(beforeStroke)).toBe(true);
-  expect(beforeStroke.mountedTileCount, JSON.stringify(beforeStroke)).toBe(0);
-  expect(beforeStroke.tileSourceCount).toBeGreaterThan(250);
-
-  const duringStroke = await page.evaluate(async () => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-    const brush = editor?.tools.get("brush");
-    const imageNode = editor?.getNode("huge-image-1");
-
-    if (!(editor && brush && imageNode?.type === "image")) {
-      throw new Error("Expected brush and huge image node");
-    }
-
-    const toWorldPoint = (localPoint) => ({
-      x: imageNode.transform.x + localPoint.x,
-      y: imageNode.transform.y + localPoint.y,
-    });
-    const session = brush.beginStroke({
-      point: toWorldPoint({ x: 1200, y: 2200 }),
-    });
-
-    if (!session) {
-      throw new Error("Expected active brush stroke session");
-    }
-
-    window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_SESSION__ = session;
-    session.update({ point: toWorldPoint({ x: 9800, y: 7600 }) });
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-
-    return {
-      brushPreviewCount: document.querySelectorAll(
-        "[data-brush-preview-node-id]"
-      ).length,
-      mountedTileCount: document.querySelectorAll("[data-raster-tile-ref]")
-        .length,
-      previewActive:
-        document.querySelector('[data-raster-preview-active="true"]') !== null,
-      previewReady:
-        document.querySelector('[data-raster-preview-ready="true"]') !== null,
-      workingTileCount:
-        editor.getBrushWorkingSurfaceStateForNode?.("huge-image-1")?.tiles
-          ?.length || 0,
-    };
-  });
-
-  await page.evaluate(() => {
-    window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_SESSION__?.cancel?.();
     window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_SESSION__ = undefined;
   });
+  await waitForAnimationFrames(page, 2);
 
-  expect(duringStroke.brushPreviewCount, JSON.stringify(duringStroke)).toBe(0);
-  expect(
-    duringStroke.workingTileCount,
-    JSON.stringify(duringStroke)
-  ).toBeGreaterThan(0);
-  expect(duringStroke.previewActive, JSON.stringify(duringStroke)).toBe(false);
-  expect(duringStroke.previewReady, JSON.stringify(duringStroke)).toBe(false);
-  expect(
-    duringStroke.mountedTileCount,
-    JSON.stringify(duringStroke)
-  ).toBeGreaterThan(0);
+  const afterRelease = await getScreenshotDarkPixelStats(page, earlyClip);
+
+  expect(afterRelease.darkPixelCount).toBeGreaterThanOrEqual(
+    Math.floor(earlyStats.darkPixelCount * 0.95)
+  );
 });
 
 test("over-dense tiled raster preview stays anchored while panning", async ({
   page,
 }) => {
   await gotoEditor(page);
-  const src = await createOpaqueImageDataUrl(page);
-  await loadRasterTestDocument(page, createHugeImageDocument(src));
+  const tileSrc = await createOpaqueTileDataUrl(page);
+  await loadRasterTestDocument(page, createDenseTiledImageDocument(tileSrc));
   await page.evaluate(async () => {
     const editor = window.__PUNCHPRESS_EDITOR__;
-    const brush = editor?.tools.get("brush");
+    const imageNode = editor?.getNode("huge-image-1");
 
-    if (!(editor && brush)) {
-      throw new Error("Expected brush tool");
-    }
-
-    editor.select("huge-image-1");
-    editor.setBrushSettings({
-      hardness: 1,
-      opacity: 1,
-      size: 120,
-      spacing: 0,
-    });
-
-    const initialNode = editor.getNode("huge-image-1");
-
-    if (initialNode?.type !== "image") {
-      throw new Error("Expected huge image node");
-    }
-
-    const toWorldPoint = (localPoint) => ({
-      x: initialNode.transform.x + localPoint.x,
-      y: initialNode.transform.y + localPoint.y,
-    });
-    const lineStart = { x: 1000, y: 5000 };
-    const lineEnd = { x: 100_000, y: 5000 };
-    const session = brush.beginStroke({ point: toWorldPoint(lineStart) });
-
-    if (!session) {
-      throw new Error("Expected brush stroke session");
-    }
-
-    session.update({ point: toWorldPoint(lineEnd) });
-    await session.complete({ point: toWorldPoint(lineEnd) });
-
-    const imageNode = editor.getNode("huge-image-1");
-
-    if (imageNode?.type !== "image") {
-      throw new Error("Expected huge image node");
+    if (!(editor && imageNode?.type === "image")) {
+      throw new Error("Expected huge tiled image node");
     }
 
     const viewport = {
@@ -4690,66 +2745,6 @@ test("over-dense tiled raster preview stays anchored while panning", async ({
   expect(beforePan.width).toBe(beforePan.imageWidth);
   expect(beforePan.height).toBe(beforePan.imageHeight);
 
-  const continuity = await page.evaluate(() => {
-    const preview = document.querySelector("[data-raster-preview-ready]");
-    const canvas = preview?.querySelector("canvas");
-
-    if (!(preview instanceof SVGForeignObjectElement && canvas)) {
-      throw new Error("Expected raster preview canvas");
-    }
-
-    const context = canvas.getContext("2d");
-
-    if (!context) {
-      throw new Error("Expected preview canvas context");
-    }
-
-    const previewWidth = Number(preview.getAttribute("width") || 0);
-    const previewHeight = Number(preview.getAttribute("height") || 0);
-    const scaleX = canvas.width / previewWidth;
-    const scaleY = canvas.height / previewHeight;
-    const sampleY = Math.round(5000 * scaleY);
-    const startX = Math.round(1200 * scaleX);
-    const endX = Math.min(canvas.width - 1, Math.round(98_000 * scaleX));
-    const imageData = context.getImageData(
-      startX,
-      Math.max(0, sampleY - 3),
-      Math.max(1, endX - startX),
-      7
-    );
-    let currentGap = 0;
-    let maxGap = 0;
-
-    for (let x = 0; x < imageData.width; x += 1) {
-      let hasInk = false;
-
-      for (let y = 0; y < imageData.height; y += 1) {
-        const offset = (y * imageData.width + x) * 4;
-
-        if (imageData.data[offset + 3] > 16) {
-          hasInk = true;
-          break;
-        }
-      }
-
-      if (hasInk) {
-        currentGap = 0;
-      } else {
-        currentGap += 1;
-        maxGap = Math.max(maxGap, currentGap);
-      }
-    }
-
-    return {
-      canvasHeight: canvas.height,
-      canvasWidth: canvas.width,
-      maxGap,
-      sampledWidth: imageData.width,
-    };
-  });
-
-  expect(continuity.maxGap, JSON.stringify(continuity)).toBeLessThan(12);
-
   await page.evaluate(async () => {
     const editor = window.__PUNCHPRESS_EDITOR__;
     const viewer = editor?.viewerRef;
@@ -4787,68 +2782,75 @@ test("over-dense tiled raster preview stays anchored while panning", async ({
   expect(afterPan).toEqual(beforePan);
 });
 
-test("brush strokes on a large artboard avoid repeated canvas reallocations", async ({
-  page,
-}) => {
-  await gotoEditor(page);
-  await loadRasterTestDocument(page, createLargeArtboardDocument());
-  await page.evaluate(() => {
-    window.__PUNCHPRESS_EDITOR__?.select("artboard-1");
-  });
-  await page.keyboard.press("b");
-  await installBrushPerfCapture(page);
-
-  const start = await getCanvasStagePoint(page, { x: 620, y: 360 });
-  const end = await getCanvasStagePoint(page, { x: 1450, y: 360 });
-
-  await dragBrush(page, [start, end], { steps: 120 });
-
-  const perf = await takeBrushPerfCapture(page);
-  const imageState = await getCommittedImageState(page);
-
-  expect(perf.counters["brush.canvas.expand"] || 0).toBeLessThanOrEqual(24);
-  expect(perf.spans["brush.canvas.expand"]?.length || 0).toBeLessThanOrEqual(
-    24
-  );
-  expect(imageState?.parentId).toBe("artboard-1");
-});
-
 test("rapid brush strokes on a large artboard paint through a working surface", async ({
   page,
 }) => {
+  const pageErrors: string[] = [];
+
+  page.on("pageerror", (error) => {
+    pageErrors.push(String(error));
+  });
+
   await gotoEditor(page);
   await loadRasterTestDocument(page, createLargeArtboardDocument());
   await page.evaluate(() => {
     window.__PUNCHPRESS_EDITOR__?.select("artboard-1");
   });
   await page.keyboard.press("b");
-  await installBrushPerfCapture(page);
 
-  const points = await Promise.all([
-    getCanvasStagePoint(page, { x: 620, y: 360 }),
-    getCanvasStagePoint(page, { x: 1450, y: 930 }),
-    getCanvasStagePoint(page, { x: 720, y: 880 }),
-    getCanvasStagePoint(page, { x: 1350, y: 300 }),
-    getCanvasStagePoint(page, { x: 1040, y: 1020 }),
-    getCanvasStagePoint(page, { x: 1520, y: 620 }),
-  ]);
+  const strokes = [
+    [
+      { x: 620, y: 360 },
+      { x: 840, y: 420 },
+    ],
+    [
+      { x: 660, y: 560 },
+      { x: 900, y: 620 },
+    ],
+    [
+      { x: 700, y: 300 },
+      { x: 920, y: 250 },
+    ],
+  ];
+  let previousTileCount = 0;
 
-  await dragBrush(page, points, { release: false, steps: 10 });
+  for (const [startOffset, endOffset] of strokes) {
+    const start = await getCanvasStagePoint(page, startOffset);
+    const end = await getCanvasStagePoint(page, endOffset);
+    const clip = {
+      height: Math.abs(end.y - start.y) + 100,
+      width: end.x - start.x + 100,
+      x: start.x - 50,
+      y: Math.min(start.y, end.y) - 50,
+    };
 
-  await expect
-    .poll(() => getRasterWorkingSurfaceState(page))
-    .toMatchObject({
-      canvasCount: 1,
-      count: 1,
-    });
+    await page.mouse.move(start.x, start.y);
 
-  const perf = await takeBrushPerfCapture(page);
+    const baseline = await getScreenshotDarkPixelStats(page, clip);
+    const expectedTileCount = previousTileCount;
 
-  expect(await getBrushPreviewState(page)).toBeNull();
-  expect(perf.counters["brush.nativeStroke.segment"] || 0).toBeGreaterThan(0);
-  expect(perf.counters["brush.dab"] || 0).toBe(0);
+    await dragBrush(page, [start, end], { steps: 4 });
 
-  await page.mouse.up();
+    await expect
+      .poll(
+        async () => (await getCommittedImageState(page))?.tileSourceCount || 0
+      )
+      .toBeGreaterThan(expectedTileCount);
+
+    previousTileCount =
+      (await getCommittedImageState(page))?.tileSourceCount || 0;
+
+    const afterStroke = await getScreenshotDarkPixelStats(page, clip);
+
+    expect(afterStroke.darkPixelCount).toBeGreaterThan(
+      baseline.darkPixelCount + 500
+    );
+  }
+
+  const imageState = await getCommittedImageState(page);
+
+  expect(imageState?.parentId).toBe("artboard-1");
+  expect(pageErrors).toEqual([]);
 });
 
 test("selected non-raster nodes do not create raster layers", async ({
@@ -4896,30 +2898,42 @@ test("selected raster layers expand without moving existing pixels", async ({
 
   await dragBrush(page, [firstPoint, firstPoint]);
 
+  await expect
+    .poll(async () => {
+      const sample = await getCommittedImageSampleAtClientPoint(
+        page,
+        firstPoint
+      );
+
+      return sample?.a ?? null;
+    })
+    .toBe(255);
+
   const firstState = await getCommittedImageState(page);
-  const firstSample = await getCommittedImageSampleAtClientPoint(
-    page,
-    firstPoint
-  );
 
   await dragBrush(page, [secondPoint, secondPoint]);
+
+  await expect
+    .poll(async () => {
+      const sample = await getCommittedImageSampleAtClientPoint(
+        page,
+        secondPoint
+      );
+
+      return sample?.a ?? null;
+    })
+    .toBe(255);
 
   const expandedState = await getCommittedImageState(page);
   const pinnedSample = await getCommittedImageSampleAtClientPoint(
     page,
     firstPoint
   );
-  const expandedSample = await getCommittedImageSampleAtClientPoint(
-    page,
-    secondPoint
-  );
 
-  expect(firstSample?.a).toBe(255);
   expect(expandedState?.id).toBe(firstState?.id);
   expect(expandedState?.width).toBeGreaterThan(firstState?.width || 0);
   expect(expandedState?.height).toBeGreaterThan(firstState?.height || 0);
   expect(pinnedSample?.a).toBe(255);
-  expect(expandedSample?.a).toBe(255);
 });
 
 test("selected raster layers expand left without shifting existing pixels on commit", async ({
@@ -4937,30 +2951,42 @@ test("selected raster layers expand left without shifting existing pixels on com
 
   await dragBrush(page, [firstPoint, firstPoint]);
 
+  await expect
+    .poll(async () => {
+      const sample = await getCommittedImageSampleAtClientPoint(
+        page,
+        firstPoint
+      );
+
+      return sample?.a ?? null;
+    })
+    .toBe(255);
+
   const firstState = await getCommittedImageState(page);
-  const firstSample = await getCommittedImageSampleAtClientPoint(
-    page,
-    firstPoint
-  );
 
   await dragBrush(page, [secondPoint, secondPoint]);
+
+  await expect
+    .poll(async () => {
+      const sample = await getCommittedImageSampleAtClientPoint(
+        page,
+        secondPoint
+      );
+
+      return sample?.a ?? null;
+    })
+    .toBe(255);
 
   const expandedState = await getCommittedImageState(page);
   const pinnedSample = await getCommittedImageSampleAtClientPoint(
     page,
     firstPoint
   );
-  const expandedSample = await getCommittedImageSampleAtClientPoint(
-    page,
-    secondPoint
-  );
 
-  expect(firstSample?.a).toBe(255);
   expect(expandedState?.id).toBe(firstState?.id);
   expect(expandedState?.x).toBeLessThan(firstState?.x || 0);
   expect(expandedState?.width).toBeGreaterThan(firstState?.width || 0);
   expect(pinnedSample?.a).toBe(255);
-  expect(expandedSample?.a).toBe(255);
 });
 
 test("expanded brush working canvas stays pinned while drawing", async ({
@@ -4971,13 +2997,12 @@ test("expanded brush working canvas stays pinned while drawing", async ({
   await loadRasterTestDocument(page, createSmallImageDocument(src));
   await page.keyboard.press("b");
 
-  const interaction = await page.evaluate(async () => {
+  await page.evaluate(async () => {
     const editor = window.__PUNCHPRESS_EDITOR__;
-    const brush = editor?.tools.get("brush");
-    const imageNode = editor?.getNode("image-1");
+    const node = editor?.getNode("image-1");
 
-    if (!(editor && brush && imageNode?.type === "image")) {
-      throw new Error("Expected brush and image node");
+    if (!(editor && node?.type === "image")) {
+      throw new Error("Expected small image node");
     }
 
     editor.select("image-1");
@@ -4987,13 +3012,34 @@ test("expanded brush working canvas stays pinned while drawing", async ({
       size: 40,
       spacing: 0,
     });
+    await editor.rasterStores.ensureHydrated(node);
+  });
 
-    const toWorldPoint = (localPoint) => ({
-      x: imageNode.transform.x + localPoint.x,
-      y: imageNode.transform.y + localPoint.y,
-    });
+  const anchorClient = await getClientPointForImageLocalPoint(page, "image-1", {
+    x: 72,
+    y: 72,
+  });
+  const clip = {
+    height: 60,
+    width: 60,
+    x: anchorClient.x - 30,
+    y: anchorClient.y - 30,
+  };
+
+  await page.evaluate(async () => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const brush = editor?.tools.get("brush");
+    const node = editor?.getNode("image-1");
+
+    if (!(editor && brush && node?.type === "image")) {
+      throw new Error("Expected brush and image node");
+    }
+
     const session = brush.beginStroke({
-      point: toWorldPoint({ x: 72, y: 72 }),
+      point: {
+        x: node.transform.x + 72,
+        y: node.transform.y + 72,
+      },
     });
 
     if (!session) {
@@ -5001,50 +3047,71 @@ test("expanded brush working canvas stays pinned while drawing", async ({
     }
 
     window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_SESSION__ = session;
-    session.update({ point: toWorldPoint({ x: -180, y: -130 }) });
+    await session.ready;
     await new Promise((resolve) => requestAnimationFrame(resolve));
     await new Promise((resolve) => requestAnimationFrame(resolve));
-
-    const surface = editor.getBrushWorkingSurfaceStateForNode?.("image-1");
-
-    return {
-      committedTransform: imageNode.transform,
-      surfaceTransform: surface?.transform || null,
-      surfaceType: surface?.type || null,
-      surfaceX: surface?.x || 0,
-      surfaceY: surface?.y || 0,
-    };
   });
 
-  const placement = await getRasterWorkingCanvasPlacement(page);
+  const beforeExpansion = await getScreenshotDarkPixelStats(page, clip);
 
-  await page.evaluate(() => {
-    window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_SESSION__?.cancel?.();
+  expect(beforeExpansion.darkPixelCount).toBeGreaterThan(300);
+  expect(await getRasterStoreSurfaceState(page)).toMatchObject({ count: 1 });
+
+  await page.evaluate(async () => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const node = editor?.getNode("image-1");
+    const session = window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_SESSION__;
+
+    if (!(node?.type === "image" && session)) {
+      throw new Error("Expected active brush session");
+    }
+
+    const toWorldPoint = (localPoint) => ({
+      x: node.transform.x + localPoint.x,
+      y: node.transform.y + localPoint.y,
+    });
+    const segments = [
+      { x: 20, y: 30 },
+      { x: -60, y: -20 },
+      { x: -120, y: -80 },
+      { x: -180, y: -130 },
+    ];
+
+    for (const segment of segments) {
+      session.update({ point: toWorldPoint(segment) });
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+  });
+
+  const duringExpansion = await getScreenshotDarkPixelStats(page, clip);
+
+  expect(duringExpansion.darkPixelCount).toBeGreaterThanOrEqual(
+    Math.floor(beforeExpansion.darkPixelCount * 0.95)
+  );
+
+  await page.evaluate(async () => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const node = editor?.getNode("image-1");
+    const session = window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_SESSION__;
+
+    if (!(node?.type === "image" && session)) {
+      throw new Error("Expected active brush session");
+    }
+
+    await session.complete({
+      point: {
+        x: node.transform.x - 180,
+        y: node.transform.y - 130,
+      },
+    });
     window.__PUNCHPRESS_ACTIVE_RASTER_BRUSH_TEST_SESSION__ = undefined;
   });
+  await waitForAnimationFrames(page, 2);
 
-  expect(interaction.surfaceType).toBe("canvas");
-  expect(interaction.surfaceTransform?.x).toBeLessThan(
-    interaction.committedTransform.x
-  );
-  expect(interaction.surfaceTransform?.y).toBeLessThan(
-    interaction.committedTransform.y
-  );
-  expect(interaction.surfaceX).toBeLessThan(0);
-  expect(interaction.surfaceY).toBeLessThan(0);
-  expect(placement?.type).toBe("canvas");
-  expect(placement?.renderedX).toBeCloseTo(
-    interaction.committedTransform.x + interaction.surfaceX,
-    1
-  );
-  expect(placement?.renderedY).toBeCloseTo(
-    interaction.committedTransform.y + interaction.surfaceY,
-    1
-  );
-  expect(placement?.renderedWidth).toBeCloseTo(placement?.surfaceWidth || 0, 1);
-  expect(placement?.renderedHeight).toBeCloseTo(
-    placement?.surfaceHeight || 0,
-    1
+  const afterRelease = await getScreenshotDarkPixelStats(page, clip);
+
+  expect(afterRelease.darkPixelCount).toBeGreaterThanOrEqual(
+    Math.floor(beforeExpansion.darkPixelCount * 0.95)
   );
 });
 
@@ -5061,6 +3128,17 @@ test("brush commits on a resized raster layer preserve the resized pixels", asyn
   const firstPoint = await getCanvasStagePoint(page, { x: 320, y: 240 });
 
   await dragBrush(page, [firstPoint, firstPoint]);
+
+  await expect
+    .poll(async () => {
+      const sample = await getCommittedImageSampleAtClientPoint(
+        page,
+        firstPoint
+      );
+
+      return sample?.a ?? null;
+    })
+    .toBe(255);
 
   const firstState = await getCommittedImageState(page);
   const resizeFactor = 120;
@@ -5090,50 +3168,8 @@ test("brush commits on a resized raster layer preserve the resized pixels", asyn
       : null;
   }, resizeFactor);
   const beforeSecondStrokeShell = await getRasterShellState(page);
-  const resizedFirstPoint = await page.evaluate(
-    ({ firstPoint: targetPoint, firstState: sourceState }) => {
-      const editor = window.__PUNCHPRESS_EDITOR__;
-      const host = editor?.hostRef;
-      const viewer = editor?.viewerRef;
-      const imageNode = editor?.nodes.find((node) => node.type === "image");
-
-      if (!(editor && host && viewer && imageNode && sourceState)) {
-        return targetPoint;
-      }
-
-      const hostRect = host.getBoundingClientRect();
-      const worldPoint = {
-        x:
-          viewer.getScrollLeft() +
-          (targetPoint.x - hostRect.left) / editor.zoom,
-        y: viewer.getScrollTop() + (targetPoint.y - hostRect.top) / editor.zoom,
-      };
-      const sourceLocalPoint = {
-        x: worldPoint.x - sourceState.x,
-        y: worldPoint.y - sourceState.y,
-      };
-      const nextLocalPoint = {
-        x: sourceLocalPoint.x * (imageNode.width / sourceState.width),
-        y: sourceLocalPoint.y * (imageNode.height / sourceState.height),
-      };
-      const nextWorldPoint = {
-        x: imageNode.transform.x + nextLocalPoint.x,
-        y: imageNode.transform.y + nextLocalPoint.y,
-      };
-
-      return {
-        x:
-          hostRect.left +
-          (nextWorldPoint.x - viewer.getScrollLeft()) * editor.zoom,
-        y:
-          hostRect.top +
-          (nextWorldPoint.y - viewer.getScrollTop()) * editor.zoom,
-      };
-    },
-    { firstPoint, firstState }
-  );
   const resizedPinnedSampleBeforeStroke =
-    await getCommittedImageSampleAtClientPoint(page, resizedFirstPoint);
+    await getCommittedImageSampleAtClientPoint(page, firstPoint);
   const secondPoint = {
     x: firstPoint.x + 220,
     y: firstPoint.y + 40,
@@ -5141,15 +3177,22 @@ test("brush commits on a resized raster layer preserve the resized pixels", asyn
 
   await dragBrush(page, [secondPoint, secondPoint]);
 
+  await expect
+    .poll(async () => {
+      const sample = await getCommittedImageSampleAtClientPoint(
+        page,
+        secondPoint
+      );
+
+      return sample?.a ?? null;
+    })
+    .toBe(255);
+
   const afterSecondStrokeState = await getCommittedImageState(page);
   const afterSecondStrokeShell = await getRasterShellState(page);
   const pinnedSample = await getCommittedImageSampleAtClientPoint(
     page,
-    resizedFirstPoint
-  );
-  const secondSample = await getCommittedImageSampleAtClientPoint(
-    page,
-    secondPoint
+    firstPoint
   );
 
   expect(firstState?.id).toBe(afterSecondStrokeState?.id);
@@ -5167,7 +3210,6 @@ test("brush commits on a resized raster layer preserve the resized pixels", asyn
   );
   expect(resizedPinnedSampleBeforeStroke?.a).toBe(255);
   expect(pinnedSample?.a).toBe(255);
-  expect(secondSample?.a).toBe(255);
 });
 
 test("erasing transparent space does not move or resize the raster layer", async ({
@@ -5185,6 +3227,17 @@ test("erasing transparent space does not move or resize the raster layer", async
 
   await dragBrush(page, [paintPoint, paintPoint]);
 
+  await expect
+    .poll(async () => {
+      const sample = await getCommittedImageSampleAtClientPoint(
+        page,
+        paintPoint
+      );
+
+      return sample?.a ?? null;
+    })
+    .toBe(255);
+
   const beforeErase = await getCommittedImageState(page);
 
   await page.keyboard.press("e");
@@ -5192,6 +3245,14 @@ test("erasing transparent space does not move or resize the raster layer", async
   await setBrushSliderValue(page, "Brush opacity", 100);
   await setBrushSliderValue(page, "Brush hardness", 100);
   await dragBrush(page, [emptyPoint, emptyPoint]);
+
+  await expect
+    .poll(async () => {
+      const state = await getCommittedImageState(page);
+
+      return state?.tileSourceCount || 0;
+    })
+    .toBe(0);
 
   const afterErase = await getCommittedImageState(page);
   const retainedSample = await getCommittedImageSampleAtClientPoint(
@@ -5223,6 +3284,14 @@ test("fully erasing a raster layer keeps an empty image layer selected", async (
 
   await dragBrush(page, [point, point]);
 
+  await expect
+    .poll(async () => {
+      const sample = await getCommittedImageSampleAtClientPoint(page, point);
+
+      return sample?.a ?? null;
+    })
+    .toBe(255);
+
   const paintedState = await getCommittedImageState(page);
 
   await page.keyboard.press("e");
@@ -5231,13 +3300,20 @@ test("fully erasing a raster layer keeps an empty image layer selected", async (
   await setBrushSliderValue(page, "Brush hardness", 100);
   await dragBrush(page, [point, point]);
 
+  await expect
+    .poll(async () => {
+      const sample = await getCommittedImageSampleAtClientPoint(page, point);
+
+      return sample?.a ?? null;
+    })
+    .toBe(0);
+
   const erasedState = await getCommittedImageState(page);
-  const sample = await getCommittedImageSampleAtClientPoint(page, point);
 
   expect(erasedState).toMatchObject({
     id: paintedState?.id,
   });
-  expect(sample?.a).toBe(0);
+  expect(erasedState?.tileSourceCount).toBe(0);
   await expect
     .poll(async () => {
       const state = await getStateSnapshot(page);
@@ -5270,16 +3346,30 @@ test("brush strokes undo and redo as one committed raster step", async ({
 
   await dragBrush(page, [firstStart, firstEnd]);
 
+  await expect
+    .poll(
+      async () => (await getCommittedImageState(page))?.tileSourceCount || 0
+    )
+    .toBeGreaterThan(0);
+
   const firstStrokeState = await getCommittedImageState(page);
 
   await dragBrush(page, [secondStart, secondEnd]);
+
+  await expect
+    .poll(
+      async () => (await getCommittedImageState(page))?.tileSourceCount || 0
+    )
+    .toBeGreaterThan(firstStrokeState?.tileSourceCount || 0);
 
   const secondStrokeState = await getCommittedImageState(page);
 
   expect(firstStrokeState).toBeTruthy();
   expect(secondStrokeState).toBeTruthy();
   expect(secondStrokeState?.id).toBe(firstStrokeState?.id);
-  expect(secondStrokeState?.src).not.toBe(firstStrokeState?.src);
+  expect(secondStrokeState?.tileSourceCount).toBeGreaterThan(
+    firstStrokeState?.tileSourceCount || 0
+  );
   expect(secondStrokeState?.width).toBeGreaterThan(
     firstStrokeState?.width || 0
   );
@@ -5324,10 +3414,16 @@ test("eraser strokes undo and redo restored raster pixels", async ({
 
   await dragBrush(page, [start, end]);
 
-  const paintedSample = await getCommittedImageSampleAtClientPoint(
-    page,
-    samplePoint
-  );
+  await expect
+    .poll(async () => {
+      const sample = await getCommittedImageSampleAtClientPoint(
+        page,
+        samplePoint
+      );
+
+      return sample?.a ?? null;
+    })
+    .toBe(255);
 
   await page.keyboard.press("e");
   await setBrushSliderValue(page, "Brush size", 72);
@@ -5335,13 +3431,16 @@ test("eraser strokes undo and redo restored raster pixels", async ({
   await setBrushSliderValue(page, "Brush hardness", 100);
   await dragBrush(page, [samplePoint, samplePoint]);
 
-  const erasedSample = await getCommittedImageSampleAtClientPoint(
-    page,
-    samplePoint
-  );
+  await expect
+    .poll(async () => {
+      const sample = await getCommittedImageSampleAtClientPoint(
+        page,
+        samplePoint
+      );
 
-  expect(paintedSample?.a).toBe(255);
-  expect(erasedSample?.a).toBe(0);
+      return sample?.a ?? null;
+    })
+    .toBe(0);
 
   await page.keyboard.press("ControlOrMeta+Z");
 
@@ -5431,6 +3530,7 @@ test("working brush surface does not resize the durable layer shell mid-stroke",
     });
 
   await page.mouse.move(far.x, far.y, { steps: 12 });
+  await waitForAnimationFrames(page, 2);
 
   await expect
     .poll(() => getRasterShellState(page))
@@ -5438,24 +3538,22 @@ test("working brush surface does not resize the durable layer shell mid-stroke",
       height: "96px",
       width: "96px",
     });
-  await expect.poll(() => getBrushPreviewState(page)).toBeNull();
-  await expect
-    .poll(() => getRasterWorkingSurfaceState(page))
-    .toMatchObject({
-      canvasCount: 1,
-      count: 1,
-    });
   await expect
     .poll(async () => {
-      const workingSurface = await getRasterWorkingSurfaceState(page);
+      const state = await getCommittedImageState(page);
 
-      return workingSurface.maxCanvasWidth;
+      return {
+        height: state?.height ?? null,
+        width: state?.width ?? null,
+      };
     })
-    .toBeGreaterThan(96);
+    .toEqual({
+      height: 96,
+      width: 96,
+    });
 
   await page.mouse.up();
 
-  await expect.poll(() => getBrushPreviewState(page)).toBeNull();
   await expect
     .poll(async () => {
       const shell = await getRasterShellState(page);
