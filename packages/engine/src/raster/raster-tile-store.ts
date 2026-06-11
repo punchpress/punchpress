@@ -296,6 +296,182 @@ export class RasterTileStore {
   }
 }
 
+export const mergeStrokeStore = ({
+  anchorX = 0,
+  anchorY = 0,
+  mode,
+  store,
+  strokeStore,
+}: {
+  anchorX?: number;
+  anchorY?: number;
+  mode: "erase" | "paint";
+  store: RasterTileStore;
+  strokeStore: RasterTileStore;
+}) => {
+  const strokeBounds = strokeStore.getPaintedBounds();
+
+  if (!strokeBounds) {
+    return null;
+  }
+
+  for (const strokeTile of strokeStore.getTilesForBounds(strokeBounds, {
+    create: false,
+  })) {
+    const nominalMinX = strokeTile.nominalX - strokeTile.x;
+    const nominalMinY = strokeTile.nominalY - strokeTile.y;
+    const nominalMaxX = nominalMinX + strokeTile.nominalWidth;
+    const nominalMaxY = nominalMinY + strokeTile.nominalHeight;
+
+    for (let y = nominalMinY; y < nominalMaxY; y += 1) {
+      for (let x = nominalMinX; x < nominalMaxX; x += 1) {
+        const strokeOffset = (y * strokeTile.width + x) * 4;
+        const strokeAlpha = strokeTile.pixels[strokeOffset + 3] / 255;
+
+        if (strokeAlpha === 0) {
+          continue;
+        }
+
+        const storeX = strokeTile.x + x - anchorX;
+        const storeY = strokeTile.y + y - anchorY;
+        const ownerCol = Math.floor(storeX / store.tileSize);
+        const ownerRow = Math.floor(storeY / store.tileSize);
+
+        for (const targetTile of getPhysicallyContainingTiles(
+          store,
+          storeX,
+          storeY,
+          ownerCol,
+          ownerRow,
+          mode === "paint"
+        )) {
+          writeMergedPixel({
+            mode,
+            storeX,
+            storeY,
+            strokeAlpha,
+            strokeOffset,
+            strokeTile,
+            targetTile,
+          });
+          targetTile.floatPixels = null;
+          targetTile.revision += 1;
+        }
+      }
+    }
+  }
+
+  const mergedBounds = {
+    maxX: strokeBounds.maxX - anchorX,
+    maxY: strokeBounds.maxY - anchorY,
+    minX: strokeBounds.minX - anchorX,
+    minY: strokeBounds.minY - anchorY,
+  };
+
+  store.revision += 1;
+  store.dirtyBounds = unionBounds(store.dirtyBounds, mergedBounds);
+  store.paintedBounds = unionBounds(store.paintedBounds, mergedBounds);
+  return mergedBounds;
+};
+
+const getPhysicallyContainingTiles = (
+  store: RasterTileStore,
+  storeX: number,
+  storeY: number,
+  ownerCol: number,
+  ownerRow: number,
+  createOwner: boolean
+) => {
+  const cols = [ownerCol];
+  const rows = [ownerRow];
+
+  if (storeX - ownerCol * store.tileSize < store.gutter) {
+    cols.push(ownerCol - 1);
+  }
+
+  if ((ownerCol + 1) * store.tileSize - storeX <= store.gutter) {
+    cols.push(ownerCol + 1);
+  }
+
+  if (storeY - ownerRow * store.tileSize < store.gutter) {
+    rows.push(ownerRow - 1);
+  }
+
+  if ((ownerRow + 1) * store.tileSize - storeY <= store.gutter) {
+    rows.push(ownerRow + 1);
+  }
+
+  const tiles: RasterStoreTile[] = [];
+
+  for (const col of cols) {
+    for (const row of rows) {
+      const isOwner = col === ownerCol && row === ownerRow;
+      const tile =
+        isOwner && createOwner
+          ? store.getOrCreateTile(col, row)
+          : store.getTile(col, row);
+
+      if (tile) {
+        tiles.push(tile);
+      }
+    }
+  }
+
+  return tiles;
+};
+
+const writeMergedPixel = ({
+  mode,
+  storeX,
+  storeY,
+  strokeAlpha,
+  strokeOffset,
+  strokeTile,
+  targetTile,
+}) => {
+  const localX = storeX - targetTile.x;
+  const localY = storeY - targetTile.y;
+
+  if (
+    localX < 0 ||
+    localY < 0 ||
+    localX >= targetTile.width ||
+    localY >= targetTile.height
+  ) {
+    return;
+  }
+
+  const targetOffset = (localY * targetTile.width + localX) * 4;
+  const targetAlpha = targetTile.pixels[targetOffset + 3] / 255;
+
+  if (mode === "erase") {
+    targetTile.pixels[targetOffset + 3] = Math.round(
+      targetAlpha * (1 - strokeAlpha) * 255
+    );
+    return;
+  }
+
+  const outputAlpha = strokeAlpha + targetAlpha * (1 - strokeAlpha);
+
+  if (outputAlpha <= 0) {
+    return;
+  }
+
+  for (let channel = 0; channel < 3; channel += 1) {
+    const strokeChannel = strokeTile.pixels[strokeOffset + channel] / 255;
+    const targetChannel = targetTile.pixels[targetOffset + channel] / 255;
+
+    targetTile.pixels[targetOffset + channel] = Math.round(
+      ((strokeChannel * strokeAlpha +
+        targetChannel * targetAlpha * (1 - strokeAlpha)) /
+        outputAlpha) *
+        255
+    );
+  }
+
+  targetTile.pixels[targetOffset + 3] = Math.round(outputAlpha * 255);
+};
+
 const createFloatPixels = (tile: RasterStoreTile) => {
   const floatPixels = new Float32Array(tile.width * tile.height * 4);
 
