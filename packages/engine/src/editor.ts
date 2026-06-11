@@ -168,6 +168,7 @@ import {
 import { GeometryManager } from "./managers/geometry-manager";
 import { HistoryManager } from "./managers/history-manager";
 import { NodeTreeManager } from "./managers/node-tree-manager";
+import { RasterStoreManager } from "./raster/raster-store-manager";
 import { VectorRenderSurfaceManager } from "./managers/vector-render-surface-manager";
 import {
   buildNodeCapabilityGeometry,
@@ -293,6 +294,7 @@ export class Editor {
     this.geometry = new GeometryManager(this.fonts);
     this.nodeTree = new NodeTreeManager();
     this.vectorRenderSurfaces = new VectorRenderSurfaceManager();
+    this.rasterStores = new RasterStoreManager();
     this.tools = new Map([
       ["pointer", new PointerTool(this)],
       ["brush", new BrushTool(this, "paint")],
@@ -1023,6 +1025,10 @@ export class Editor {
 
   setBrushSettings(patch, toolId) {
     this.getState().setBrushSettings(patch, toolId);
+  }
+
+  getRasterStoreEntry(nodeId) {
+    return this.rasterStores.getEntry(nodeId);
   }
 
   getBrushWorkingSurfaceStates() {
