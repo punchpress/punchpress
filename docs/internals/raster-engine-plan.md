@@ -9,6 +9,10 @@ read_when:
 # Raster Engine Plan
 
 Implements [Raster tile store pipeline](../decisions/raster-tile-store-pipeline.md).
+The durable architecture lives in [Raster engine](raster-engine.md); this page
+only sequences the migration and tracks stage status. Retire it when all
+stages complete.
+
 Raster layers must stay correct and responsive from small layers to 100k px
 square. The plan replaces the working-surface/handoff runtime in stages; each
 stage lands independently behind the existing brush and eraser behavior.
