@@ -563,13 +563,20 @@ export const mergeStrokeStore = ({
   return commitMergedStrokeBounds({ anchorX, anchorY, store, strokeBounds });
 };
 
+/**
+ * Tiles whose physical (gutter-extended) extent contains the store pixel. In
+ * create mode every container materializes, not just the nominal owner:
+ * merge order is row-major, so a seam pixel can need a neighbor tile that no
+ * earlier stroke tile has created yet, and skipping the write would leave
+ * that tile's gutter blank while its owner holds paint.
+ */
 const getPhysicallyContainingTiles = (
   store: RasterTileStore,
   storeX: number,
   storeY: number,
   ownerCol: number,
   ownerRow: number,
-  createOwner: boolean
+  create: boolean
 ) => {
   const cols = [ownerCol];
   const rows = [ownerRow];
@@ -594,11 +601,9 @@ const getPhysicallyContainingTiles = (
 
   for (const col of cols) {
     for (const row of rows) {
-      const isOwner = col === ownerCol && row === ownerRow;
-      const tile =
-        isOwner && createOwner
-          ? store.getOrCreateTile(col, row)
-          : store.getTile(col, row);
+      const tile = create
+        ? store.getOrCreateTile(col, row)
+        : store.getTile(col, row);
 
       if (tile) {
         tiles.push(tile);
