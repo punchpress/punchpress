@@ -39,6 +39,35 @@ post-mouseup flicker, prior-stroke flash, and shift. The
 `window.__PUNCHPRESS_RASTER_DEBUG__` capture remains the stroke-event timeline
 until the handoff events it records are deleted with stage 1.
 
+## Verification
+
+Before stage 1, triage the existing raster brush Playwright suite:
+
+- **Behavior tests stay and gate every stage.** Tests that describe product
+  contracts — strokes stay visible through release, no visual flash after
+  release, prior strokes preserved, grow-left without pixel shift, undo/redo
+  as one step, eraser and artboard clipping — must pass before stage 1 (they
+  define the contract) and after each stage.
+- **Mechanism tests are deleted with stage 1.** Tests that pin the
+  working-surface runtime — render acknowledgement, stable paint windows,
+  working-tile mounting, pending-surface promotion, LOD yielding — describe
+  the implementation being removed.
+
+New coverage follows the test-layer rule in
+[testing](../operations/testing.md): the tile store, persistence manifest,
+pyramid, and history are engine modules, so their behavior lands in
+editor-contract tests written test-first per stage. Pixel assertions run
+headless against the store's typed-array buffers; canvas stays behind the
+brush runtime seam. Key contract-level invariants: painting reports identical
+world-coordinate pixels after growth in any direction, pointerup leaves store
+pixels unchanged, manifests replace per tile coordinate, undo round-trips
+pixels, eviction plus rehydration preserves pixel identity.
+
+Playwright keeps only browser truth: the retained behavior tests above plus
+visual stability sampling around pointerup. Performance benchmarks are
+baselined on the current runtime before stage 1 and compared at every stage
+exit using the measurement contract above.
+
 ## Stages
 
 ### 1. Tile Store And Compositor
