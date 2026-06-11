@@ -5,6 +5,7 @@ import {
   DOCUMENT_OPENED_CHANNEL,
   DOCUMENT_RECENT_DOCUMENTS_CHANGED_CHANNEL,
 } from "./desktop-channels.js";
+import { isAllowedExternalUrl } from "./helpers/external-links.js";
 import type { DesktopOpenedDocument } from "./recent-documents.js";
 import { isDev } from "./utils/is-dev.js";
 
@@ -98,7 +99,7 @@ export const createMainWindowController = () => {
         backgroundThrottling: false,
         contextIsolation: true,
         nodeIntegration: false,
-        sandbox: false,
+        sandbox: true,
         session: sharedSession,
       },
     });
@@ -111,7 +112,9 @@ export const createMainWindowController = () => {
     mainWindow = nextWindow;
 
     nextWindow.webContents.setWindowOpenHandler(({ url }) => {
-      shell.openExternal(url);
+      if (isAllowedExternalUrl(url)) {
+        shell.openExternal(url);
+      }
       return { action: "deny" };
     });
 

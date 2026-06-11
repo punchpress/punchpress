@@ -48,7 +48,15 @@ export const serveStaticAt = async (appDir: string) => {
       resolvedPath = path.join(appDir, "index.html");
     }
 
-    return net.fetch(`file://${resolvedPath}`);
+    const containedPath = path.resolve(resolvedPath);
+    if (
+      containedPath !== path.resolve(appDir) &&
+      !containedPath.startsWith(path.resolve(appDir) + path.sep)
+    ) {
+      return new Response(null, { status: 404 });
+    }
+
+    return net.fetch(`file://${containedPath}`);
   });
 };
 
