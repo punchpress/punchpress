@@ -1,4 +1,5 @@
 import { createCanvas } from "../tools/brush-runtime";
+import { RasterTilePyramid } from "./raster-pyramid";
 import { RasterTileStore } from "./raster-tile-store";
 
 export type RasterStoreEntry = {
@@ -6,6 +7,7 @@ export type RasterStoreEntry = {
   anchorY: number;
   hydrated: boolean;
   hydrating: Promise<void> | null;
+  pyramid: RasterTilePyramid | null;
   store: RasterTileStore;
 };
 
@@ -37,10 +39,25 @@ export class RasterStoreManager {
       anchorY: 0,
       hydrated: false,
       hydrating: null,
+      pyramid: null,
       store: new RasterTileStore(),
     };
     this.entries.set(nodeId, entry);
     return entry;
+  }
+
+  getPyramid(nodeId: string) {
+    const entry = this.entries.get(nodeId);
+
+    if (!entry) {
+      return null;
+    }
+
+    if (!entry.pyramid) {
+      entry.pyramid = new RasterTilePyramid(entry.store);
+    }
+
+    return entry.pyramid;
   }
 
   ensureHydrated(node: { id: string }) {
@@ -198,6 +215,7 @@ const hydrateImageSource = async (store, source) => {
 
       blendImageDataOverTile(tile, imageData, minX - tile.x, minY - tile.y);
       tile.revision += 1;
+      store.markTileDirtyForPyramid(tile);
     }
   }
 

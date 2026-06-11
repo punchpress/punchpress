@@ -2,6 +2,7 @@ import { incrementPerfCounter, measurePerf } from "../perf/perf-hooks";
 
 export const RASTER_STORE_TILE_SIZE = 512;
 export const RASTER_STORE_TILE_GUTTER = 2;
+export const RASTER_PYRAMID_MAX_LEVEL = 8;
 
 export type RasterStoreTile = {
   col: number;
@@ -57,6 +58,7 @@ const unionBounds = (current: Bounds | null, next: Bounds): Bounds =>
 
 export class RasterTileStore {
   dirtyBounds: Bounds | null = null;
+  dirtyLevelCoords = new Map<number, Set<string>>();
   gutter: number;
   paintedBounds: Bounds | null = null;
   revision = 0;
@@ -178,6 +180,34 @@ export class RasterTileStore {
 
     this.dirtyBounds = null;
     return dirtyBounds;
+  }
+
+  markTileDirtyForPyramid(tile: { col: number; row: number }) {
+    for (let level = 1; level <= RASTER_PYRAMID_MAX_LEVEL; level += 1) {
+      const span = 2 ** level;
+      // Math.floor, not >>: cols/rows are signed and bit shifts misbehave at
+      // extreme magnitudes.
+      const key = `${Math.floor(tile.col / span)}:${Math.floor(tile.row / span)}`;
+      let coords = this.dirtyLevelCoords.get(level);
+
+      if (!coords) {
+        coords = new Set();
+        this.dirtyLevelCoords.set(level, coords);
+      }
+
+      coords.add(key);
+    }
+  }
+
+  takeDirtyLevelCoords(level: number) {
+    const coords = this.dirtyLevelCoords.get(level);
+
+    if (!coords || coords.size === 0) {
+      return null;
+    }
+
+    this.dirtyLevelCoords.delete(level);
+    return coords;
   }
 
   getPaintedBounds() {
@@ -305,6 +335,7 @@ export class RasterTileStore {
         }
 
         tile.revision += 1;
+        this.markTileDirtyForPyramid(tile);
       }
     });
 
@@ -424,6 +455,7 @@ export const mergeStrokeStoreTile = ({
   for (const targetTile of touchedTiles) {
     targetTile.floatPixels = null;
     targetTile.revision += 1;
+    store.markTileDirtyForPyramid(targetTile);
   }
 };
 

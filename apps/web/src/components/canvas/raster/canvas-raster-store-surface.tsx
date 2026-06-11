@@ -158,6 +158,58 @@ const drawStoreTiles = (context, surface, bounds, scale) => {
   }
 };
 
+const drawPyramidTiles = (context, pyramid, surface, bounds, scale, level) => {
+  const levelSpan = surface.store.tileSize * 2 ** level;
+  const storeBounds = {
+    maxX: bounds.maxX - surface.anchorX,
+    maxY: bounds.maxY - surface.anchorY,
+    minX: bounds.minX - surface.anchorX,
+    minY: bounds.minY - surface.anchorY,
+  };
+  const minCol = Math.floor(storeBounds.minX / levelSpan);
+  const maxCol = Math.floor((storeBounds.maxX - 1) / levelSpan);
+  const minRow = Math.floor(storeBounds.minY / levelSpan);
+  const maxRow = Math.floor((storeBounds.maxY - 1) / levelSpan);
+
+  for (let row = minRow; row <= maxRow; row += 1) {
+    for (let col = minCol; col <= maxCol; col += 1) {
+      const tile = pyramid.getTile(level, col, row);
+
+      if (!tile) {
+        continue;
+      }
+
+      context.drawImage(
+        tile.canvas,
+        (col * levelSpan + surface.anchorX - bounds.minX) * scale,
+        (row * levelSpan + surface.anchorY - bounds.minY) * scale,
+        levelSpan * scale,
+        levelSpan * scale
+      );
+    }
+  }
+};
+
+const drawCommittedStore = (
+  context,
+  editor,
+  nodeId,
+  surface,
+  bounds,
+  scale
+) => {
+  const pyramid = editor.rasterStores?.getPyramid?.(nodeId) || null;
+  const level = pyramid ? pyramid.getLevelForScale(scale) : 0;
+
+  if (pyramid && level > 0) {
+    pyramid.beginFrame();
+    drawPyramidTiles(context, pyramid, surface, bounds, scale, level);
+    return;
+  }
+
+  drawStoreTiles(context, surface, bounds, scale);
+};
+
 const drawStrokeOverlays = (context, overlays, bounds, scale) => {
   for (const overlay of overlays) {
     context.globalCompositeOperation =
@@ -243,7 +295,7 @@ export const CanvasRasterStoreSurface = ({ nodeId }) => {
     context.imageSmoothingQuality = scale < 0.25 ? "high" : "medium";
 
     if (surface.hydrated) {
-      drawStoreTiles(context, surface, bounds, scale);
+      drawCommittedStore(context, editor, nodeId, surface, bounds, scale);
     }
 
     drawStrokeOverlays(
