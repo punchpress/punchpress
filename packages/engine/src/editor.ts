@@ -294,7 +294,9 @@ export class Editor {
     this.geometry = new GeometryManager(this.fonts);
     this.nodeTree = new NodeTreeManager();
     this.vectorRenderSurfaces = new VectorRenderSurfaceManager();
-    this.rasterStores = new RasterStoreManager();
+    this.rasterStores = new RasterStoreManager({
+      onChange: () => this.notifyInteractionPreviewChanged(),
+    });
     this.tools = new Map([
       ["pointer", new PointerTool(this)],
       ["brush", new BrushTool(this, "paint")],

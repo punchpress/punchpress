@@ -2,6 +2,8 @@ import { createCanvas, loadImageToCanvas } from "../tools/brush-runtime";
 import { RasterTileStore } from "./raster-tile-store";
 
 export type RasterStoreEntry = {
+  anchorX: number;
+  anchorY: number;
   hydrated: boolean;
   hydrating: Promise<void> | null;
   store: RasterTileStore;
@@ -9,6 +11,11 @@ export type RasterStoreEntry = {
 
 export class RasterStoreManager {
   entries = new Map<string, RasterStoreEntry>();
+  onChange: (() => void) | null;
+
+  constructor({ onChange = null }: { onChange?: (() => void) | null } = {}) {
+    this.onChange = onChange;
+  }
 
   getEntry(nodeId: string) {
     return this.entries.get(nodeId) || null;
@@ -26,6 +33,8 @@ export class RasterStoreManager {
     }
 
     const entry: RasterStoreEntry = {
+      anchorX: 0,
+      anchorY: 0,
       hydrated: false,
       hydrating: null,
       store: new RasterTileStore(),
@@ -45,6 +54,7 @@ export class RasterStoreManager {
       entry.hydrating = hydrateStoreFromNode(entry.store, node).then(() => {
         entry.hydrated = true;
         entry.hydrating = null;
+        this.onChange?.();
       });
     }
 

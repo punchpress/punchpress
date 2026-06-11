@@ -1,6 +1,7 @@
 import { getNodeLocalPoint, getNodeScaleX } from "@punchpress/engine";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
+import { CanvasRasterStoreSurface } from "./canvas-raster-store-surface";
 
 interface RasterDebugRecord {
   event: string;
@@ -989,6 +990,17 @@ export const CanvasRasterImage = (props) => {
   const workingSurface = useEditorSurfaceValue((editor) =>
     editor.getBrushWorkingSurfaceStateForNode?.(props.nodeId)
   );
+  const isStoreHydrated = useEditorSurfaceValue((editor) =>
+    Boolean(editor.getRasterStoreEntry?.(props.nodeId)?.hydrated)
+  );
+
+  if (isStoreHydrated) {
+    return (
+      <g opacity={props.opacity ?? 1} transform={props.transform || undefined}>
+        <CanvasRasterStoreSurface nodeId={props.nodeId} />
+      </g>
+    );
+  }
 
   if (Array.isArray(props.tileSources) && props.tileSources.length > 0) {
     return <CanvasTiledRasterImage {...props} />;
