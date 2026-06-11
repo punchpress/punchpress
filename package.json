@@ -26,6 +26,7 @@
     "lint:fix": "bun run --cwd apps/web lint:fix",
     "check": "bun run --cwd apps/web check",
     "fix": "bun run --cwd apps/web fix",
+    "typecheck": "bun run --cwd packages/punch-schema typecheck && bun run --cwd packages/engine typecheck && bun run --cwd apps/web typecheck",
     "playwright:install": "playwright install chromium",
     "test:editor": "bun test apps/web/tests/editor-contract",
     "test:editor:watch": "bun test --watch apps/web/tests/editor-contract",
@@ -47,7 +48,8 @@
     "test:performance:desktop:trace": "PUNCHPRESS_CAPTURE_ELECTRON_TRACE=1 playwright test --config playwright.desktop-performance.config.ts"
   },
   "devDependencies": {
-    "@playwright/test": "1.58.2"
+    "@playwright/test": "1.58.2",
+    "typescript": "5.9.3"
   },
   "overrides": {
     "@hono/node-server": "1.19.13",
