@@ -227,12 +227,12 @@ describe("raster stroke store merge", () => {
     const store = new RasterTileStore();
     const strokeStore = new RasterTileStore();
 
-    paintAt(store, { x: 100, y: 100 }, 20 );
+    paintAt(store, { x: 100, y: 100 }, 20);
 
     const tileCountBefore = store.tileCount;
 
     paintAt(strokeStore, { x: 100, y: 100 }, 6, { opacity: 0.5 });
-    paintAt(strokeStore, { x: 900, y: 900 }, 6 );
+    paintAt(strokeStore, { x: 900, y: 900 }, 6);
 
     mergeStrokeStore({ mode: "erase", store, strokeStore });
 
@@ -248,9 +248,15 @@ describe("raster stroke store merge", () => {
     const store = new RasterTileStore();
     const strokeStore = new RasterTileStore();
 
-    paintAt(strokeStore, { x: 50, y: 50 }, 4 );
+    paintAt(strokeStore, { x: 50, y: 50 }, 4);
 
-    mergeStrokeStore({ anchorX: 600, anchorY: 0, mode: "paint", store, strokeStore });
+    mergeStrokeStore({
+      anchorX: 600,
+      anchorY: 0,
+      mode: "paint",
+      store,
+      strokeStore,
+    });
 
     expect(store.getPixelAt(-550, 50)[3]).toBe(255);
     expect(store.getPixelAt(50, 50)[3]).toBe(0);
@@ -261,7 +267,7 @@ describe("raster stroke store merge", () => {
     const strokeStore = new RasterTileStore();
     const edge = RASTER_STORE_TILE_SIZE;
 
-    paintAt(store, { x: edge, y: 40 }, 12 );
+    paintAt(store, { x: edge, y: 40 }, 12);
     paintAt(strokeStore, { x: edge, y: 40 }, 12, { opacity: 1 });
 
     mergeStrokeStore({ mode: "erase", store, strokeStore });

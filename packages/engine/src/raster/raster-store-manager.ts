@@ -64,6 +64,10 @@ export class RasterStoreManager {
   release(nodeId: string) {
     this.entries.delete(nodeId);
   }
+
+  releaseAll() {
+    this.entries.clear();
+  }
 }
 
 const hydrateStoreFromNode = async (store: RasterTileStore, node) => {

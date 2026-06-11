@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef } from "react";
+import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
 import { getNodeLocalViewportBounds } from "./raster-local-viewport";
 
@@ -88,6 +89,21 @@ const getStoreSurfaceState = (editor, state, nodeId) => {
         minY: Math.min(0, painted.minY + entry.anchorY),
       }
     : { maxX: node.width, maxY: node.height, minX: 0, minY: 0 };
+  const overlays = editor.getRasterStrokeOverlaysForNode?.(nodeId) || [];
+
+  for (const overlay of overlays) {
+    const overlayPainted = overlay.strokeStore.getPaintedBounds();
+
+    if (!overlayPainted) {
+      continue;
+    }
+
+    contentBounds.maxX = Math.max(contentBounds.maxX, overlayPainted.maxX);
+    contentBounds.maxY = Math.max(contentBounds.maxY, overlayPainted.maxY);
+    contentBounds.minX = Math.min(contentBounds.minX, overlayPainted.minX);
+    contentBounds.minY = Math.min(contentBounds.minY, overlayPainted.minY);
+  }
+
   const bounds = viewportBounds
     ? intersectBounds(contentBounds, viewportBounds)
     : contentBounds;
@@ -108,8 +124,65 @@ const getStoreSurfaceState = (editor, state, nodeId) => {
     minY: bounds.minY,
     revision: entry.store.revision,
     store: entry.store,
+    strokeKey: overlays
+      .map((overlay) => `${overlay.operation}:${overlay.revision}`)
+      .join("|"),
     zoom,
   };
+};
+
+const drawStoreTiles = (context, surface, bounds, scale) => {
+  const storeBounds = {
+    maxX: bounds.maxX - surface.anchorX,
+    maxY: bounds.maxY - surface.anchorY,
+    minX: bounds.minX - surface.anchorX,
+    minY: bounds.minY - surface.anchorY,
+  };
+
+  for (const tile of surface.store.getTilesForBounds(storeBounds, {
+    create: false,
+  })) {
+    const tileCanvas = getTileCanvas(tile);
+
+    if (!tileCanvas) {
+      continue;
+    }
+
+    context.drawImage(
+      tileCanvas,
+      (tile.x + surface.anchorX - bounds.minX) * scale,
+      (tile.y + surface.anchorY - bounds.minY) * scale,
+      tile.width * scale,
+      tile.height * scale
+    );
+  }
+};
+
+const drawStrokeOverlays = (context, overlays, bounds, scale) => {
+  for (const overlay of overlays) {
+    context.globalCompositeOperation =
+      overlay.operation === "erase" ? "destination-out" : "source-over";
+
+    for (const tile of overlay.strokeStore.getTilesForBounds(bounds, {
+      create: false,
+    })) {
+      const tileCanvas = getTileCanvas(tile);
+
+      if (!tileCanvas) {
+        continue;
+      }
+
+      context.drawImage(
+        tileCanvas,
+        (tile.x - bounds.minX) * scale,
+        (tile.y - bounds.minY) * scale,
+        tile.width * scale,
+        tile.height * scale
+      );
+    }
+  }
+
+  context.globalCompositeOperation = "source-over";
 };
 
 const getSurfaceScale = (bounds, zoom) => {
@@ -126,6 +199,7 @@ const getSurfaceScale = (bounds, zoom) => {
 };
 
 export const CanvasRasterStoreSurface = ({ nodeId }) => {
+  const editor = useEditor();
   const surface = useEditorSurfaceValue((surfaceEditor, state) =>
     getStoreSurfaceState(surfaceEditor, state, nodeId)
   );
@@ -138,7 +212,7 @@ export const CanvasRasterStoreSurface = ({ nodeId }) => {
       return;
     }
 
-    const { store, zoom } = surface;
+    const { zoom } = surface;
     const bounds = {
       maxX: surface.maxX,
       maxY: surface.maxY,
@@ -164,31 +238,17 @@ export const CanvasRasterStoreSurface = ({ nodeId }) => {
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = scale < 0.25 ? "high" : "medium";
 
-    const storeBounds = {
-      maxX: bounds.maxX - surface.anchorX,
-      maxY: bounds.maxY - surface.anchorY,
-      minX: bounds.minX - surface.anchorX,
-      minY: bounds.minY - surface.anchorY,
-    };
-
-    for (const tile of store.getTilesForBounds(storeBounds, {
-      create: false,
-    })) {
-      const tileCanvas = getTileCanvas(tile);
-
-      if (!tileCanvas) {
-        continue;
-      }
-
-      context.drawImage(
-        tileCanvas,
-        (tile.x + surface.anchorX - bounds.minX) * scale,
-        (tile.y + surface.anchorY - bounds.minY) * scale,
-        tile.width * scale,
-        tile.height * scale
-      );
+    if (surface.hydrated) {
+      drawStoreTiles(context, surface, bounds, scale);
     }
-  }, [surface]);
+
+    drawStrokeOverlays(
+      context,
+      editor.getRasterStrokeOverlaysForNode?.(nodeId) || [],
+      bounds,
+      scale
+    );
+  }, [editor, nodeId, surface]);
 
   if (!surface) {
     return null;

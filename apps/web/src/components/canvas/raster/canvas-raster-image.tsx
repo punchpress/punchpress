@@ -1,7 +1,8 @@
-import { getNodeLocalPoint, getNodeScaleX } from "@punchpress/engine";
+import { getNodeScaleX } from "@punchpress/engine";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
 import { CanvasRasterStoreSurface } from "./canvas-raster-store-surface";
+import { getNodeLocalViewportBounds } from "./raster-local-viewport";
 
 interface RasterDebugRecord {
   event: string;
@@ -36,9 +37,6 @@ const RASTER_TILE_PREVIEW_DENSITY_THRESHOLD = 8;
 const RASTER_TILE_PREVIEW_TILE_THRESHOLD = RASTER_TILE_CULL_THRESHOLD;
 const RASTER_TILE_PREVIEW_MAX_PIXELS = 4_000_000;
 const RASTER_TILE_PREVIEW_OVERSAMPLE = 2;
-const RASTER_NODE_RENDER_READY_EVENT = "punchpress:raster-node-render-ready";
-const RASTER_RENDER_READY_STABLE_FRAME_COUNT = 8;
-const RASTER_RENDER_READY_MIN_STABLE_MS = 96;
 const RASTER_DEBUG_MAX_RECORDS = 5000;
 const RASTER_DEBUG_SNAPSHOT_ELEMENT_ID = "punchpress-raster-debug-json";
 
@@ -50,37 +48,19 @@ const getRasterDomDebugSnapshot = () => {
   }
 
   return [...document.querySelectorAll("[data-raster-node-id]")].map((root) => {
-    const workingSurface = root.querySelector("[data-raster-working-surface]");
-
     return {
       exactTileDomCount: root.querySelectorAll("[data-raster-tile-ref]").length,
-      exactTilesReady:
-        root.getAttribute("data-raster-exact-tiles-ready") || null,
-      loadedExactTileCount: Number(
-        root.getAttribute("data-raster-loaded-exact-tile-count") || 0
-      ),
       nodeId: root.getAttribute("data-raster-node-id"),
       previewActive: root.getAttribute("data-raster-preview-active") === "true",
       previewEligible:
         root.getAttribute("data-raster-preview-eligible") === "true",
       previewReady:
         root.querySelector("[data-raster-preview-ready='true']") !== null,
-      renderKeyLength: root.getAttribute("data-raster-render-key")?.length || 0,
       totalTileCount: Number(
         root.getAttribute("data-raster-total-tile-count") || 0
       ),
       visibleTileCount: Number(
         root.getAttribute("data-raster-visible-tile-count") || 0
-      ),
-      workingSurfaceCompleted:
-        workingSurface?.getAttribute("data-raster-working-completed") || null,
-      workingSurfaceType:
-        workingSurface?.getAttribute("data-raster-working-surface") || null,
-      workingTileDomCount: root.querySelectorAll(
-        "[data-testid='raster-working-tile']"
-      ).length,
-      workingTileSurfaceCount: Number(
-        workingSurface?.getAttribute("data-raster-working-tile-count") || 0
       ),
     };
   });
@@ -111,13 +91,6 @@ const getRasterEditorDebugSnapshot = () => {
       })),
     selectedNodeIds: editor.selectedNodeIds,
     viewport: editor.viewport,
-    workingSurfaces: editor.getBrushWorkingSurfaceStates?.().map((surface) => ({
-      completed: surface.completed,
-      nodeId: surface.nodeId,
-      tileCount: surface.type === "tiles" ? surface.tiles.length : null,
-      type: surface.type,
-      workingSurfaceId: surface.workingSurfaceId,
-    })),
   };
 };
 
@@ -210,12 +183,7 @@ const installRasterDebugCapture = () => {
         );
       }
 
-      if (
-        event.startsWith("brush.") ||
-        event.startsWith("renderer.renderReady") ||
-        event.startsWith("renderer.preview") ||
-        event.startsWith("renderer.exactTiles")
-      ) {
+      if (event.startsWith("brush.") || event.startsWith("renderer.preview")) {
         capture.armFrameCapture(3500);
       }
 
@@ -258,122 +226,6 @@ installRasterDebugCapture();
 const getRasterTileSourcesKey = (tileSources) =>
   tileSources.map((tile) => tile.ref).join("|");
 
-const dispatchRasterNodeRenderReady = ({ mode, nodeId, renderKey }) => {
-  if (!(renderKey && typeof window !== "undefined")) {
-    return;
-  }
-
-  window.dispatchEvent(
-    new CustomEvent(RASTER_NODE_RENDER_READY_EVENT, {
-      detail: {
-        mode,
-        nodeId,
-        renderKey,
-      },
-    })
-  );
-  recordRasterDebugEvent("renderer.renderReady.dispatch", {
-    mode,
-    nodeId,
-    renderKeyLength: renderKey.length,
-  });
-};
-
-const hasBrushWorkingSurfaceForNode = (editor, nodeId) => {
-  const surfaces = editor.getBrushWorkingSurfaceStates?.() || [];
-
-  return surfaces.some((surface) => surface?.nodeId === nodeId);
-};
-
-const getImageLocalBounds = (node) => ({
-  height: node.height,
-  maxX: node.width,
-  maxY: node.height,
-  minX: 0,
-  minY: 0,
-  width: node.width,
-});
-
-const getViewportWorldCorners = (editor, state) => {
-  const host = editor.hostRef;
-
-  if (!host) {
-    return null;
-  }
-
-  const rect = host.getBoundingClientRect();
-  const viewport = state.viewport || editor.viewport;
-  const zoom = Math.max(0.0001, viewport?.zoom || editor.zoom || 1);
-  const minX = viewport.x;
-  const minY = viewport.y;
-  const maxX = viewport.x + rect.width / zoom;
-  const maxY = viewport.y + rect.height / zoom;
-
-  return [
-    { x: minX, y: minY },
-    { x: maxX, y: minY },
-    { x: maxX, y: maxY },
-    { x: minX, y: maxY },
-  ];
-};
-
-const getAncestorChain = (editor, node) => {
-  const ancestors: (typeof node)[] = [];
-  let currentNode = node;
-
-  while (currentNode?.parentId && currentNode.parentId !== "root") {
-    const parentNode = editor.getNode(currentNode.parentId);
-
-    if (!parentNode) {
-      break;
-    }
-
-    ancestors.unshift(parentNode);
-    currentNode = parentNode;
-  }
-
-  return ancestors;
-};
-
-const getNodeLocalViewportBounds = (editor, state, node) => {
-  const corners = getViewportWorldCorners(editor, state);
-
-  if (!corners) {
-    return null;
-  }
-
-  const ancestors = getAncestorChain(editor, node);
-  const localPoints = corners.map((corner) => {
-    let point = corner;
-
-    for (const ancestor of ancestors) {
-      const bounds = editor.getNodeTransformBounds(ancestor.id);
-
-      if (!bounds) {
-        return null;
-      }
-
-      point = getNodeLocalPoint(ancestor, bounds, point);
-    }
-
-    return getNodeLocalPoint(node, getImageLocalBounds(node), point);
-  });
-
-  if (localPoints.some((point) => !point)) {
-    return null;
-  }
-
-  const xs = localPoints.map((point) => point.x);
-  const ys = localPoints.map((point) => point.y);
-
-  return {
-    maxX: Math.max(...xs) + RASTER_TILE_CULL_PADDING,
-    maxY: Math.max(...ys) + RASTER_TILE_CULL_PADDING,
-    minX: Math.min(...xs) - RASTER_TILE_CULL_PADDING,
-    minY: Math.min(...ys) - RASTER_TILE_CULL_PADDING,
-  };
-};
-
 const getRasterTileCullState = (editor, state, nodeId, tileSources) => {
   const fallbackState = {
     bounds: null,
@@ -396,7 +248,12 @@ const getRasterTileCullState = (editor, state, nodeId, tileSources) => {
     return fallbackState;
   }
 
-  const bounds = getNodeLocalViewportBounds(editor, state, node);
+  const bounds = getNodeLocalViewportBounds(
+    editor,
+    state,
+    node,
+    RASTER_TILE_CULL_PADDING
+  );
 
   if (!bounds) {
     return fallbackState;
@@ -413,9 +270,7 @@ const getRasterTileCullState = (editor, state, nodeId, tileSources) => {
   const nodeScale = Math.max(0.0001, Math.abs(getNodeScaleX(node) || 1));
   const zoom = Math.max(0.0001, state.viewport?.zoom || editor.zoom || 1);
   const pixelDensity = 1 / (zoom * nodeScale);
-  const hasBrushWorkingSurface = hasBrushWorkingSurfaceForNode(editor, nodeId);
   const shouldBuildPreview =
-    !hasBrushWorkingSurface &&
     visibleTileSources.length > RASTER_TILE_PREVIEW_TILE_THRESHOLD &&
     pixelDensity >= RASTER_TILE_PREVIEW_DENSITY_THRESHOLD;
   const previewBounds = {
@@ -644,14 +499,13 @@ const RasterTilePreviewCanvas = ({
   );
 };
 
-const RasterTileImages = ({ onTileLoad, tileSources }) => {
+const RasterTileImages = ({ tileSources }) => {
   return tileSources.map((tile) => (
     <image
       data-raster-tile-ref={tile.ref}
       height={tile.height}
       href={tile.src}
       key={tile.ref}
-      onLoad={() => onTileLoad?.(tile.ref)}
       pointerEvents="none"
       preserveAspectRatio="none"
       width={tile.width}
@@ -659,100 +513,6 @@ const RasterTileImages = ({ onTileLoad, tileSources }) => {
       y={tile.y}
     />
   ));
-};
-
-const RasterWorkingCanvas = ({ canvas, height, testId, width, x, y }) => {
-  const hostRef = useRef<HTMLDivElement | null>(null);
-
-  useLayoutEffect(() => {
-    const host = hostRef.current;
-
-    if (!(host && canvas)) {
-      return;
-    }
-
-    canvas.style.display = "block";
-    canvas.style.height = "100%";
-    canvas.style.pointerEvents = "none";
-    canvas.style.width = "100%";
-    canvas.setAttribute("aria-hidden", "true");
-    host.replaceChildren(canvas);
-
-    return () => {
-      if (canvas.parentElement === host) {
-        host.removeChild(canvas);
-      }
-    };
-  }, [canvas]);
-
-  return (
-    <foreignObject
-      data-raster-working-canvas="true"
-      data-testid={testId}
-      height={height}
-      pointerEvents="none"
-      width={width}
-      x={x}
-      y={y}
-    >
-      <div
-        ref={hostRef}
-        style={{
-          height: "100%",
-          overflow: "visible",
-          width: "100%",
-        }}
-      />
-    </foreignObject>
-  );
-};
-
-const RasterWorkingSurface = ({ surface }) => {
-  if (!surface) {
-    return null;
-  }
-
-  if (surface.type === "tiles") {
-    return (
-      <g
-        data-raster-working-completed={surface.completed ? "true" : "false"}
-        data-raster-working-surface="tiles"
-        data-raster-working-tile-count={surface.tiles.length}
-      >
-        {surface.tiles.map((tile, index) => (
-          <RasterWorkingCanvas
-            canvas={tile.canvas}
-            height={tile.height}
-            key={`${surface.workingSurfaceId}:${tile.x}:${tile.y}:${index}`}
-            testId="raster-working-tile"
-            width={tile.width}
-            x={tile.x}
-            y={tile.y}
-          />
-        ))}
-      </g>
-    );
-  }
-
-  if (surface.type === "canvas") {
-    return (
-      <g
-        data-raster-working-completed={surface.completed ? "true" : "false"}
-        data-raster-working-surface="canvas"
-      >
-        <RasterWorkingCanvas
-          canvas={surface.canvas}
-          height={surface.height}
-          testId="raster-working-canvas"
-          width={surface.width}
-          x={surface.x ?? 0}
-          y={surface.y ?? 0}
-        />
-      </g>
-    );
-  }
-
-  return null;
 };
 
 const CanvasTiledRasterImage = ({
@@ -770,9 +530,6 @@ const CanvasTiledRasterImage = ({
 }) => {
   const cullState = useEditorSurfaceValue((editor, state) =>
     getRasterTileCullState(editor, state, nodeId, tileSources)
-  );
-  const workingSurface = useEditorSurfaceValue((editor) =>
-    editor.getBrushWorkingSurfaceStateForNode?.(nodeId)
   );
   const [readyRasterPreviewKey, setReadyRasterPreviewKey] = useState(null);
   const handleRasterPreviewReadyChange = useCallback(
@@ -793,162 +550,18 @@ const CanvasTiledRasterImage = ({
     [nodeId]
   );
   const visibleTileSources = cullState.tileSources;
-  const rasterRenderKey = getRasterTileSourcesKey(tileSources);
-  const visibleTileSourcesKey = getRasterTileSourcesKey(visibleTileSources);
   const isRasterPreviewReady =
     cullState.previewKey && readyRasterPreviewKey === cullState.previewKey;
-  const [loadedExactTiles, setLoadedExactTiles] = useState<{
-    key: string;
-    refs: Set<string>;
-  }>({
-    key: "",
-    refs: new Set(),
-  });
-  const areExactTilesReady =
-    visibleTileSources.length === 0 ||
-    (loadedExactTiles.key === visibleTileSourcesKey &&
-      visibleTileSources.every((tile) => loadedExactTiles.refs.has(tile.ref)));
   const shouldHideExactTiles =
     cullState.shouldUsePreview && isRasterPreviewReady;
 
-  useLayoutEffect(() => {
-    setLoadedExactTiles({
-      key: visibleTileSourcesKey,
-      refs: new Set(),
-    });
-    recordRasterDebugEvent("renderer.exactTiles.reset", {
-      nodeId,
-      visibleTileCount: visibleTileSources.length,
-      visibleTileSourcesKeyLength: visibleTileSourcesKey.length,
-    });
-  }, [nodeId, visibleTileSources.length, visibleTileSourcesKey]);
-  const handleExactTileLoad = useCallback(
-    (tileRef) => {
-      setLoadedExactTiles((current) => {
-        if (current.key !== visibleTileSourcesKey) {
-          return current;
-        }
-
-        if (current.refs.has(tileRef)) {
-          return current;
-        }
-
-        const refs = new Set(current.refs);
-
-        refs.add(tileRef);
-        recordRasterDebugEvent("renderer.exactTiles.load", {
-          loadedExactTileCount: refs.size,
-          nodeId,
-          tileRef,
-          visibleTileCount: visibleTileSources.length,
-        });
-        return {
-          key: current.key,
-          refs,
-        };
-      });
-    },
-    [nodeId, visibleTileSources.length, visibleTileSourcesKey]
-  );
-
-  useLayoutEffect(() => {
-    recordRasterDebugEvent("renderer.exactTiles.readyState", {
-      areExactTilesReady,
-      loadedExactTileCount: loadedExactTiles.refs.size,
-      nodeId,
-      visibleTileCount: visibleTileSources.length,
-    });
-  }, [
-    areExactTilesReady,
-    loadedExactTiles.refs.size,
-    nodeId,
-    visibleTileSources.length,
-  ]);
-
-  useLayoutEffect(() => {
-    if (!rasterRenderKey) {
-      return;
-    }
-
-    if (cullState.shouldBuildPreview && !isRasterPreviewReady) {
-      return;
-    }
-
-    if (!(cullState.shouldUsePreview || areExactTilesReady)) {
-      return;
-    }
-
-    const mode = cullState.shouldUsePreview ? "preview" : "tiles";
-    let frameId = 0;
-    let isCancelled = false;
-    let stableFrameCount = 0;
-    const stableStartTime = performance.now();
-
-    recordRasterDebugEvent("renderer.renderReady.schedule", {
-      areExactTilesReady,
-      isRasterPreviewReady,
-      mode,
-      nodeId,
-      renderKeyLength: rasterRenderKey.length,
-      shouldBuildPreview: cullState.shouldBuildPreview,
-      shouldUsePreview: cullState.shouldUsePreview,
-    });
-
-    const waitForStablePaint = (timestamp: number) => {
-      if (isCancelled) {
-        return;
-      }
-
-      stableFrameCount += 1;
-      const elapsedMs = timestamp - stableStartTime;
-
-      if (
-        stableFrameCount >= RASTER_RENDER_READY_STABLE_FRAME_COUNT &&
-        elapsedMs >= RASTER_RENDER_READY_MIN_STABLE_MS
-      ) {
-        recordRasterDebugEvent("renderer.renderReady.stable", {
-          elapsedMs,
-          mode,
-          nodeId,
-          renderKeyLength: rasterRenderKey.length,
-          stableFrameCount,
-        });
-        dispatchRasterNodeRenderReady({
-          mode,
-          nodeId,
-          renderKey: rasterRenderKey,
-        });
-        return;
-      }
-
-      frameId = requestAnimationFrame(waitForStablePaint);
-    };
-
-    frameId = requestAnimationFrame(waitForStablePaint);
-
-    return () => {
-      isCancelled = true;
-      cancelAnimationFrame(frameId);
-    };
-  }, [
-    cullState.shouldBuildPreview,
-    cullState.shouldUsePreview,
-    areExactTilesReady,
-    isRasterPreviewReady,
-    nodeId,
-    rasterRenderKey,
-  ]);
-
   return (
     <g
-      data-raster-exact-tiles-ready={areExactTilesReady ? "true" : "false"}
-      data-raster-loaded-exact-tile-count={loadedExactTiles.refs.size}
       data-raster-node-id={nodeId}
       data-raster-preview-active={cullState.shouldUsePreview ? "true" : "false"}
       data-raster-preview-eligible={
         cullState.shouldBuildPreview ? "true" : "false"
       }
-      data-raster-render-key={rasterRenderKey}
       data-raster-total-tile-count={tileSources.length}
       data-raster-visible-tile-count={visibleTileSources.length}
       opacity={opacity ?? 1}
@@ -976,25 +589,25 @@ const CanvasTiledRasterImage = ({
         />
       ) : null}
       {shouldHideExactTiles ? null : (
-        <RasterTileImages
-          onTileLoad={handleExactTileLoad}
-          tileSources={visibleTileSources}
-        />
+        <RasterTileImages tileSources={visibleTileSources} />
       )}
-      <RasterWorkingSurface surface={workingSurface} />
     </g>
   );
 };
 
 export const CanvasRasterImage = (props) => {
-  const workingSurface = useEditorSurfaceValue((editor) =>
-    editor.getBrushWorkingSurfaceStateForNode?.(props.nodeId)
-  );
-  const isStoreHydrated = useEditorSurfaceValue((editor) =>
-    Boolean(editor.getRasterStoreEntry?.(props.nodeId)?.hydrated)
-  );
+  const storeState = useEditorSurfaceValue((editor) => {
+    const entry = editor.getRasterStoreEntry?.(props.nodeId);
 
-  if (isStoreHydrated) {
+    return {
+      exists: Boolean(entry),
+      hydrated: Boolean(entry?.hydrated),
+    };
+  });
+  const hasTileSources =
+    Array.isArray(props.tileSources) && props.tileSources.length > 0;
+
+  if (storeState.hydrated) {
     return (
       <g opacity={props.opacity ?? 1} transform={props.transform || undefined}>
         <CanvasRasterStoreSurface nodeId={props.nodeId} />
@@ -1002,20 +615,33 @@ export const CanvasRasterImage = (props) => {
     );
   }
 
-  if (Array.isArray(props.tileSources) && props.tileSources.length > 0) {
-    return <CanvasTiledRasterImage {...props} />;
-  }
-
-  if (workingSurface?.type === "canvas") {
+  if (storeState.exists) {
     return (
-      <g
-        data-raster-working-replaces-node="true"
-        opacity={props.opacity ?? 1}
-        transform={props.transform || undefined}
-      >
-        <RasterWorkingSurface surface={workingSurface} />
+      <g opacity={props.opacity ?? 1} transform={props.transform || undefined}>
+        {hasTileSources ? (
+          <CanvasTiledRasterImage
+            {...props}
+            opacity={1}
+            transform={undefined}
+          />
+        ) : (
+          <image
+            height={props.height}
+            href={props.src}
+            pointerEvents="none"
+            preserveAspectRatio="none"
+            width={props.width}
+            x={0}
+            y={0}
+          />
+        )}
+        <CanvasRasterStoreSurface nodeId={props.nodeId} />
       </g>
     );
+  }
+
+  if (hasTileSources) {
+    return <CanvasTiledRasterImage {...props} />;
   }
 
   return (
@@ -1029,7 +655,6 @@ export const CanvasRasterImage = (props) => {
         x={0}
         y={0}
       />
-      <RasterWorkingSurface surface={workingSurface} />
     </g>
   );
 };

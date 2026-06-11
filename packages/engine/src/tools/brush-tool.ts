@@ -1,16 +1,18 @@
 import { getImageNodeBounds } from "../nodes/image/image-capabilities";
-import { getNodeScaleX } from "../nodes/text/model";
 import { incrementPerfCounter, measurePerf } from "../perf/perf-hooks";
 import {
   getNodeTransformForPinnedWorldPoint,
   getNodeWorldPoint,
 } from "../primitives/rotation";
 import {
+  mergeStrokeStore,
+  RASTER_STORE_TILE_SIZE,
+  RasterTileStore,
+} from "../raster/raster-tile-store";
+import {
   getBrushDabCoverage,
   getBrushDabRenderRadius,
   getBrushDabSpacing,
-  getErasedAlpha,
-  getPaintedAlpha,
 } from "./brush-mask";
 import {
   cancelRasterFrame,
@@ -18,29 +20,22 @@ import {
   createCanvas,
   getNow,
   hasRasterRuntime,
-  loadImageToCanvas,
   requestRasterFrame,
 } from "./brush-runtime";
 import { DEFAULT_BRUSH_SETTINGS, getBrushColorRgb } from "./brush-settings";
 import {
   getArtboardClipSourceRect,
-  getImageLocalClipBounds,
   getImageLocalPoint,
   getImageNodeCroppedToSourceRect,
   materializeBrushTarget,
   resolveBrushTarget,
 } from "./brush-target";
-import { RASTER_TILE_SIZE, RasterTileSurface } from "./raster-tile-surface";
 import { selectToolFromShortcut, Tool } from "./tool";
 
-const BRUSH_LAYER_EXPANSION_PADDING_MULTIPLIER = 8;
 const BRUSH_STROKE_POINT_FLUSH_BUDGET_MS = 5;
 const BRUSH_TILE_ASYNC_COMMIT_THRESHOLD = 64;
 const BRUSH_TILE_COMMIT_BUDGET_MS = 8;
-const RASTER_NODE_RENDER_READY_EVENT = "punchpress:raster-node-render-ready";
-const TILED_BRUSH_SURFACE_AREA_THRESHOLD = 4096 * 4096;
-const TILED_BRUSH_SURFACE_DENSITY_THRESHOLD = 8;
-let brushWorkingSurfaceRevision = 0;
+let brushStrokeSessionRevision = 0;
 let brushTileCommitRevision = 0;
 
 const recordRasterDebugEvent = (event, payload = {}) => {
@@ -78,40 +73,6 @@ const clamp = (value, min, max) => {
   return Math.min(max, Math.max(min, value));
 };
 
-const getBrushLayerExpansionPadding = (settings) => {
-  return Math.max(
-    2,
-    Math.ceil(settings.size * BRUSH_LAYER_EXPANSION_PADDING_MULTIPLIER)
-  );
-};
-
-const shouldUseNativeStroke = (settings) => {
-  return (
-    settings.hardness >= 1 && settings.opacity >= 1 && settings.spacing <= 0
-  );
-};
-
-const shouldUseTiledPaintSurface = ({
-  editor,
-  forceTiled = false,
-  node,
-  operation,
-  sourceRect,
-}) => {
-  const zoom = Math.max(0.0001, editor?.viewport?.zoom || editor?.zoom || 1);
-  const nodeScale = Math.max(0.0001, Math.abs(getNodeScaleX(node) || 1));
-  const pixelDensity = 1 / (zoom * nodeScale);
-
-  return (
-    operation === "paint" &&
-    !sourceRect &&
-    ((node.tileSources || []).length > 0 ||
-      forceTiled ||
-      node.width * node.height >= TILED_BRUSH_SURFACE_AREA_THRESHOLD ||
-      pixelDensity >= TILED_BRUSH_SURFACE_DENSITY_THRESHOLD)
-  );
-};
-
 const getAlphaBounds = (imageData) => {
   const { data, height, width } = imageData;
   let minX = width;
@@ -133,29 +94,6 @@ const getAlphaBounds = (imageData) => {
   }
 
   return maxX < 0 ? null : { maxX, maxY, minX, minY };
-};
-
-const createCanvasCopy = (sourceCanvas, sourceRect) => {
-  const canvas = createCanvas(sourceRect.width, sourceRect.height);
-  const context = canvas?.getContext("2d", { willReadFrequently: true });
-
-  if (!(canvas && context)) {
-    return null;
-  }
-
-  context.drawImage(
-    sourceCanvas,
-    sourceRect.x,
-    sourceRect.y,
-    sourceRect.width,
-    sourceRect.height,
-    0,
-    0,
-    sourceRect.width,
-    sourceRect.height
-  );
-
-  return canvas;
 };
 
 const getRasterPlaneBounds = (node, tileSources = []) => {
@@ -207,15 +145,12 @@ const getTileSourceWithOffset = (tileSource, offsetX, offsetY) => {
 
   return {
     ...tileSource,
-    col: Math.floor(x / RASTER_TILE_SIZE),
-    row: Math.floor(y / RASTER_TILE_SIZE),
+    col: Math.floor(x / RASTER_STORE_TILE_SIZE),
+    row: Math.floor(y / RASTER_STORE_TILE_SIZE),
     x,
     y,
   };
 };
-
-const getTileSourcesRenderKey = (tileSources = []) =>
-  tileSources.map((tileSource) => tileSource.ref).join("|");
 
 const getTiledBaseFrame = (node) => {
   if ((node.tileSources || []).length > 0) {
@@ -286,39 +221,122 @@ const getNextTiledImageNodeState = ({ node, tileSources }) => {
       : node.transform;
 
   return {
-    ...node,
-    baseHeight: offsetNode.baseHeight,
-    baseWidth: offsetNode.baseWidth,
-    baseX: offsetNode.baseX,
-    baseY: offsetNode.baseY,
-    height,
-    mimeType: "image/png",
-    tileSources: nextTileSources,
-    transform: {
-      ...node.transform,
-      ...transform,
+    node: {
+      ...node,
+      baseHeight: offsetNode.baseHeight,
+      baseWidth: offsetNode.baseWidth,
+      baseX: offsetNode.baseX,
+      baseY: offsetNode.baseY,
+      height,
+      mimeType: "image/png",
+      tileSources: nextTileSources,
+      transform: {
+        ...node.transform,
+        ...transform,
+      },
+      width,
     },
-    width,
+    offsetX,
+    offsetY,
   };
 };
 
-const createFloatPixelState = ({ canvas, context }) => {
-  const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-  const floatData = new Float32Array(canvas.width * canvas.height * 4);
+const createTileSourceFromDirtyTile = ({
+  commitRevision,
+  nodeId,
+  offsetX,
+  offsetY,
+  tile,
+}) => {
+  const alphaBounds = getAlphaBounds({
+    data: tile.pixels,
+    height: tile.height,
+    width: tile.width,
+  });
 
-  for (let index = 0; index < imageData.data.length; index += 1) {
-    floatData[index] = imageData.data[index] / 255;
+  if (!alphaBounds) {
+    return null;
   }
 
+  const width = alphaBounds.maxX - alphaBounds.minX + 1;
+  const height = alphaBounds.maxY - alphaBounds.minY + 1;
+  const x = tile.x + alphaBounds.minX + offsetX;
+  const y = tile.y + alphaBounds.minY + offsetY;
+  const canvas = createCanvas(width, height);
+  const context = canvas?.getContext("2d", { willReadFrequently: true });
+
+  if (!(canvas && context)) {
+    return null;
+  }
+
+  const pixels = new Uint8ClampedArray(width * height * 4);
+
+  for (let row = 0; row < height; row += 1) {
+    const sourceOffset =
+      ((alphaBounds.minY + row) * tile.width + alphaBounds.minX) * 4;
+
+    pixels.set(
+      tile.pixels.subarray(sourceOffset, sourceOffset + width * 4),
+      row * width * 4
+    );
+  }
+
+  context.putImageData(new ImageData(pixels, width, height), 0, 0);
+
+  const col = Math.floor(x / RASTER_STORE_TILE_SIZE);
+  const row = Math.floor(y / RASTER_STORE_TILE_SIZE);
+
   return {
-    data: floatData,
-    height: canvas.height,
-    width: canvas.width,
+    col,
+    height,
+    ref: `assets/raster/${nodeId}/tiles/${commitRevision}_${col}_${row}.png`,
+    row,
+    src: canvas.toDataURL("image/png"),
+    width,
+    x,
+    y,
   };
 };
 
-const createTileSourceFromDirtyTile = ({ commitRevision, nodeId, tile }) => {
-  const imageData = tile.context.getImageData(0, 0, tile.width, tile.height);
+const drawStoreTilesToCanvas = ({ anchorX, anchorY, context, rect, store }) => {
+  const storeBounds = {
+    maxX: rect.x + rect.width - anchorX,
+    maxY: rect.y + rect.height - anchorY,
+    minX: rect.x - anchorX,
+    minY: rect.y - anchorY,
+  };
+
+  for (const tile of store.getTilesForBounds(storeBounds, { create: false })) {
+    const scratch = createCanvas(tile.width, tile.height);
+    const scratchContext = scratch?.getContext("2d", {
+      willReadFrequently: true,
+    });
+
+    if (!(scratch && scratchContext)) {
+      continue;
+    }
+
+    scratchContext.putImageData(
+      new ImageData(tile.pixels, tile.width, tile.height),
+      0,
+      0
+    );
+    context.drawImage(
+      scratch,
+      tile.nominalX - tile.x,
+      tile.nominalY - tile.y,
+      tile.nominalWidth,
+      tile.nominalHeight,
+      tile.nominalX + anchorX - rect.x,
+      tile.nominalY + anchorY - rect.y,
+      tile.nominalWidth,
+      tile.nominalHeight
+    );
+  }
+};
+
+const getTrimmedFlattenState = ({ canvas, context, frameNode }) => {
+  const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
   const alphaBounds = getAlphaBounds(imageData);
 
   if (!alphaBounds) {
@@ -327,40 +345,69 @@ const createTileSourceFromDirtyTile = ({ commitRevision, nodeId, tile }) => {
 
   const width = alphaBounds.maxX - alphaBounds.minX + 1;
   const height = alphaBounds.maxY - alphaBounds.minY + 1;
-  const x = tile.x + alphaBounds.minX;
-  const y = tile.y + alphaBounds.minY;
-  const sourceCanvas =
-    width === tile.width && height === tile.height
-      ? tile.canvas
-      : createCanvasCopy(tile.canvas, {
-          height,
-          width,
-          x: alphaBounds.minX,
-          y: alphaBounds.minY,
-        });
 
-  if (!sourceCanvas) {
+  if (
+    alphaBounds.minX === 0 &&
+    alphaBounds.minY === 0 &&
+    width === canvas.width &&
+    height === canvas.height
+  ) {
     return null;
   }
 
-  return {
-    col: tile.col,
-    height,
-    ref: `assets/raster/${nodeId}/tiles/${commitRevision}_${tile.col}_${tile.row}.png`,
-    row: tile.row,
-    src: sourceCanvas.toDataURL("image/png"),
+  const nextCanvas = createCanvas(width, height);
+  const nextContext = nextCanvas?.getContext("2d", {
+    willReadFrequently: true,
+  });
+
+  if (!(nextCanvas && nextContext)) {
+    return null;
+  }
+
+  nextContext.drawImage(
+    canvas,
+    alphaBounds.minX,
+    alphaBounds.minY,
     width,
-    x,
-    y,
+    height,
+    0,
+    0,
+    width,
+    height
+  );
+
+  const pinnedWorldPoint = getNodeWorldPoint(
+    frameNode,
+    getImageNodeBounds(frameNode),
+    {
+      x: alphaBounds.minX,
+      y: alphaBounds.minY,
+    }
+  );
+  const nextNode = {
+    ...frameNode,
+    height,
+    width,
+  };
+
+  return {
+    canvas: nextCanvas,
+    height,
+    transform: getNodeTransformForPinnedWorldPoint(
+      nextNode,
+      getImageNodeBounds(nextNode),
+      { x: 0, y: 0 },
+      pinnedWorldPoint
+    ),
+    trimX: alphaBounds.minX,
+    trimY: alphaBounds.minY,
+    width,
   };
 };
 
 class BrushStrokeSession {
   constructor({ editor, node, operation, settings, startPoint, tool }) {
-    this.canvasState = null;
-    this.canvasOffset = { x: 0, y: 0 };
     this.completed = false;
-    this.commitHandoffCancel = null;
     this.dirtyBounds = null;
     this.editor = editor;
     this.historyMark = editor.markHistoryStep(
@@ -370,38 +417,28 @@ class BrushStrokeSession {
     this.preserveRasterPlane =
       editor.getNode(node.id)?.type === "image" && !this.initialSourceRect;
     this.commitReady = Promise.resolve();
-    this.commitRenderKey = null;
-    this.floatPixels = null;
     this.lastPoint = null;
+    this.merged = false;
     this.nodeId = node.id;
     this.operation = operation;
     this.pointFlushFrameId = 0;
     this.pointReadIndex = 0;
     this.points = [];
     this.previewFrameId = 0;
-    brushWorkingSurfaceRevision += 1;
-    this.workingSurfaceId = `brush-working-${brushWorkingSurfaceRevision}`;
+    brushStrokeSessionRevision += 1;
+    this.sessionId = `brush-session-${brushStrokeSessionRevision}`;
     this.previewNeedsNotify = false;
     this.previewNode = getImageNodeCroppedToSourceRect(
       node,
       this.initialSourceRect
     );
-    this.usesNativeStroke = shouldUseNativeStroke(settings);
     this.settings = settings;
-    this.tileSurface = shouldUseTiledPaintSurface({
-      editor,
-      node,
-      operation,
-      sourceRect: this.initialSourceRect,
-    })
-      ? new RasterTileSurface({
-          height: node.height,
-          width: node.width,
-        })
-      : null;
+    this.storeEntry = editor.rasterStores.getOrCreateEntry(node.id);
+    this.strokeStore = new RasterTileStore();
     recordRasterDebugEvent("session.create", {
       node: getRasterDebugNodePayload(node),
       operation,
+      sessionId: this.sessionId,
       settings: {
         hardness: settings.hardness,
         opacity: settings.opacity,
@@ -409,33 +446,9 @@ class BrushStrokeSession {
         spacing: settings.spacing,
       },
       sourceRect: this.initialSourceRect,
-      tileSurface: Boolean(this.tileSurface),
-      usesNativeStroke: this.usesNativeStroke,
-      workingSurfaceId: this.workingSurfaceId,
     });
-    this.ready = this.tileSurface
-      ? Promise.resolve().then(() => {
-          incrementPerfCounter("brush.tile.session");
-          this.flushPoints();
-
-          if (this.completed) {
-            this.commit();
-          }
-        })
-      : loadImageToCanvas(node, this.initialSourceRect).then((canvasState) => {
-          this.canvasState = canvasState;
-          this.floatPixels =
-            canvasState && !this.usesNativeStroke
-              ? measurePerf("brush.stroke.createFloatPixels", () =>
-                  createFloatPixelState(canvasState)
-                )
-              : null;
-          this.flushPoints();
-
-          if (this.completed) {
-            this.commit();
-          }
-        });
+    incrementPerfCounter("brush.tile.session");
+    this.ready = editor.rasterStores.ensureHydrated(node);
     this.tool = tool;
 
     measurePerf("brush.stroke.materializeTarget", () =>
@@ -445,7 +458,7 @@ class BrushStrokeSession {
     );
     recordRasterDebugEvent("target.materialized", {
       node: getRasterDebugNodePayload(editor.getNode(this.nodeId)),
-      workingSurfaceId: this.workingSurfaceId,
+      sessionId: this.sessionId,
     });
     this.addPoint(this.getInitialLocalPoint(startPoint));
   }
@@ -469,10 +482,6 @@ class BrushStrokeSession {
   flushPoints({
     budgetMs = Number.POSITIVE_INFINITY,
   } = {}) {
-    if (!(this.canvasState || this.tileSurface)) {
-      return;
-    }
-
     measurePerf("brush.stroke.flushPoints", () => {
       const startedAt = getNow();
       let processedCount = 0;
@@ -508,10 +517,6 @@ class BrushStrokeSession {
   }
 
   scheduleQueuedPointFlush() {
-    if (!this.tileSurface) {
-      return;
-    }
-
     if (this.completed || this.pointFlushFrameId) {
       return;
     }
@@ -544,69 +549,8 @@ class BrushStrokeSession {
   }
 
   applyPoint(point) {
-    if (this.tileSurface) {
-      this.applyTiledPoint(point);
-      return;
-    }
-
-    const adjustedPoint = this.ensureCanvasIncludesDab(point);
-
-    if (this.usesNativeStroke) {
-      if (!this.lastPoint) {
-        this.applyNativeStroke(adjustedPoint, adjustedPoint);
-        this.lastPoint = adjustedPoint;
-        return;
-      }
-
-      this.applyNativeStroke(this.lastPoint, adjustedPoint);
-      this.lastPoint = adjustedPoint;
-      return;
-    }
-
     if (!this.lastPoint) {
-      this.applyDab(adjustedPoint);
-      this.lastPoint = adjustedPoint;
-      return;
-    }
-
-    const distance = Math.hypot(
-      adjustedPoint.x - this.lastPoint.x,
-      adjustedPoint.y - this.lastPoint.y
-    );
-    const spacing = getBrushDabSpacing(
-      this.settings.size,
-      this.settings.spacing,
-      this.settings.hardness
-    );
-    const steps = Math.max(1, Math.ceil(distance / spacing));
-
-    for (let index = 1; index <= steps; index += 1) {
-      const progress = index / steps;
-      this.applyDab({
-        x: this.lastPoint.x + (adjustedPoint.x - this.lastPoint.x) * progress,
-        y: this.lastPoint.y + (adjustedPoint.y - this.lastPoint.y) * progress,
-      });
-    }
-
-    incrementPerfCounter("brush.dab", steps);
-    this.lastPoint = adjustedPoint;
-  }
-
-  applyTiledPoint(point) {
-    if (this.usesNativeStroke) {
-      if (!this.lastPoint) {
-        this.applyTiledNativeStroke(point, point);
-        this.lastPoint = point;
-        return;
-      }
-
-      this.applyTiledNativeStroke(this.lastPoint, point);
-      this.lastPoint = point;
-      return;
-    }
-
-    if (!this.lastPoint) {
-      this.applyTiledDab(point);
+      this.applyDab(point);
       this.lastPoint = point;
       return;
     }
@@ -624,7 +568,7 @@ class BrushStrokeSession {
 
     for (let index = 1; index <= steps; index += 1) {
       const progress = index / steps;
-      this.applyTiledDab({
+      this.applyDab({
         x: this.lastPoint.x + (point.x - this.lastPoint.x) * progress,
         y: this.lastPoint.y + (point.y - this.lastPoint.y) * progress,
       });
@@ -634,86 +578,7 @@ class BrushStrokeSession {
     this.lastPoint = point;
   }
 
-  applyNativeStroke(startPoint, endPoint) {
-    const { context } = this.canvasState;
-    const renderRadius = getBrushDabRenderRadius(
-      this.settings.size,
-      this.settings.hardness
-    );
-    const bounds = {
-      maxX: Math.ceil(Math.max(startPoint.x, endPoint.x) + renderRadius),
-      maxY: Math.ceil(Math.max(startPoint.y, endPoint.y) + renderRadius),
-      minX: Math.floor(Math.min(startPoint.x, endPoint.x) - renderRadius),
-      minY: Math.floor(Math.min(startPoint.y, endPoint.y) - renderRadius),
-    };
-
-    measurePerf("brush.nativeStroke.draw", () => {
-      const color = getBrushColorRgb(this.settings.color);
-
-      context.save();
-      context.globalAlpha = 1;
-      context.globalCompositeOperation =
-        this.operation === "erase" ? "destination-out" : "source-over";
-      context.fillStyle =
-        this.operation === "erase"
-          ? "rgba(0, 0, 0, 1)"
-          : `rgb(${color.r}, ${color.g}, ${color.b})`;
-      context.strokeStyle = context.fillStyle;
-      context.lineCap = "round";
-      context.lineJoin = "round";
-      context.lineWidth = this.settings.size;
-
-      if (startPoint.x === endPoint.x && startPoint.y === endPoint.y) {
-        context.beginPath();
-        context.arc(
-          endPoint.x,
-          endPoint.y,
-          this.settings.size / 2,
-          0,
-          Math.PI * 2
-        );
-        context.fill();
-      } else {
-        context.beginPath();
-        context.moveTo(startPoint.x, startPoint.y);
-        context.lineTo(endPoint.x, endPoint.y);
-        context.stroke();
-      }
-
-      context.restore();
-    });
-
-    incrementPerfCounter("brush.nativeStroke.segment");
-    this.recordDirtyBounds(bounds);
-    this.scheduleLivePreview();
-  }
-
-  applyTiledNativeStroke(startPoint, endPoint) {
-    const renderRadius = getBrushDabRenderRadius(
-      this.settings.size,
-      this.settings.hardness
-    );
-    const bounds = {
-      maxX: Math.ceil(Math.max(startPoint.x, endPoint.x) + renderRadius),
-      maxY: Math.ceil(Math.max(startPoint.y, endPoint.y) + renderRadius),
-      minX: Math.floor(Math.min(startPoint.x, endPoint.x) - renderRadius),
-      minY: Math.floor(Math.min(startPoint.y, endPoint.y) - renderRadius),
-    };
-
-    this.tileSurface.drawNativeStroke({
-      bounds,
-      color: getBrushColorRgb(this.settings.color),
-      endPoint,
-      lineWidth: this.settings.size,
-      startPoint,
-    });
-
-    incrementPerfCounter("brush.nativeStroke.segment");
-    this.recordDirtyBounds(bounds);
-    this.scheduleLivePreview();
-  }
-
-  applyTiledDab(point) {
+  applyDab(point) {
     const radius = this.settings.size / 2;
     const hardness = clamp(this.settings.hardness, 0, 1);
     const renderRadius = getBrushDabRenderRadius(this.settings.size, hardness);
@@ -724,7 +589,7 @@ class BrushStrokeSession {
       minY: Math.floor(point.y - renderRadius),
     };
 
-    this.tileSurface.drawPaintDab({
+    this.strokeStore.paintDab({
       bounds,
       color: getBrushColorRgb(this.settings.color),
       getCoverage: (x, y, centerPoint) => {
@@ -741,308 +606,6 @@ class BrushStrokeSession {
 
     this.recordDirtyBounds(bounds);
     this.scheduleLivePreview();
-  }
-
-  applyDab(point) {
-    const { canvas, context } = this.canvasState;
-
-    if (!this.floatPixels) {
-      this.floatPixels = createFloatPixelState(this.canvasState);
-    }
-
-    const radius = this.settings.size / 2;
-    const hardness = clamp(this.settings.hardness, 0, 1);
-    const renderRadius = getBrushDabRenderRadius(this.settings.size, hardness);
-    const minX = Math.max(0, Math.floor(point.x - renderRadius));
-    const minY = Math.max(0, Math.floor(point.y - renderRadius));
-    const maxX = Math.min(canvas.width - 1, Math.ceil(point.x + renderRadius));
-    const maxY = Math.min(canvas.height - 1, Math.ceil(point.y + renderRadius));
-
-    if (maxX < minX || maxY < minY) {
-      return;
-    }
-
-    const width = maxX - minX + 1;
-    const height = maxY - minY + 1;
-    const imageData = context.getImageData(minX, minY, width, height);
-    const data = imageData.data;
-    const color = getBrushColorRgb(this.settings.color);
-
-    for (let localY = 0; localY < height; localY += 1) {
-      for (let localX = 0; localX < width; localX += 1) {
-        const x = minX + localX;
-        const y = minY + localY;
-        const dx = x + 0.5 - point.x;
-        const dy = y + 0.5 - point.y;
-        const normalizedDistanceSquared =
-          (dx * dx + dy * dy) / (radius * radius);
-        const falloff = getBrushDabCoverage(
-          normalizedDistanceSquared,
-          hardness,
-          radius
-        );
-
-        if (falloff <= 0) {
-          continue;
-        }
-
-        const alpha = clamp(falloff * this.settings.opacity, 0, 1);
-        const offset = (localY * width + localX) * 4;
-        const floatOffset = (y * canvas.width + x) * 4;
-
-        if (this.operation === "erase") {
-          const outputAlpha = getErasedAlpha(
-            this.floatPixels.data[floatOffset + 3],
-            alpha
-          );
-
-          this.floatPixels.data[floatOffset + 3] = outputAlpha;
-          data[offset + 3] = Math.round(outputAlpha * 255);
-
-          if (data[offset + 3] === 0) {
-            this.floatPixels.data[floatOffset] = 0;
-            this.floatPixels.data[floatOffset + 1] = 0;
-            this.floatPixels.data[floatOffset + 2] = 0;
-            data[offset] = 0;
-            data[offset + 1] = 0;
-            data[offset + 2] = 0;
-          }
-
-          continue;
-        }
-
-        const sourceAlpha = alpha;
-        const targetAlpha = this.floatPixels.data[floatOffset + 3];
-        const outputAlpha = getPaintedAlpha(targetAlpha, sourceAlpha);
-
-        if (outputAlpha <= 0) {
-          this.floatPixels.data[floatOffset] = 0;
-          this.floatPixels.data[floatOffset + 1] = 0;
-          this.floatPixels.data[floatOffset + 2] = 0;
-          this.floatPixels.data[floatOffset + 3] = 0;
-          data[offset] = 0;
-          data[offset + 1] = 0;
-          data[offset + 2] = 0;
-          data[offset + 3] = 0;
-          continue;
-        }
-
-        const outputRed =
-          ((color.r / 255) * sourceAlpha +
-            this.floatPixels.data[floatOffset] *
-              targetAlpha *
-              (1 - sourceAlpha)) /
-          outputAlpha;
-        const outputGreen =
-          ((color.g / 255) * sourceAlpha +
-            this.floatPixels.data[floatOffset + 1] *
-              targetAlpha *
-              (1 - sourceAlpha)) /
-          outputAlpha;
-        const outputBlue =
-          ((color.b / 255) * sourceAlpha +
-            this.floatPixels.data[floatOffset + 2] *
-              targetAlpha *
-              (1 - sourceAlpha)) /
-          outputAlpha;
-
-        this.floatPixels.data[floatOffset] = outputRed;
-        this.floatPixels.data[floatOffset + 1] = outputGreen;
-        this.floatPixels.data[floatOffset + 2] = outputBlue;
-        this.floatPixels.data[floatOffset + 3] = outputAlpha;
-
-        data[offset] = Math.round(outputRed * 255);
-        data[offset + 1] = Math.round(outputGreen * 255);
-        data[offset + 2] = Math.round(outputBlue * 255);
-        data[offset + 3] = Math.round(outputAlpha * 255);
-      }
-    }
-
-    context.putImageData(imageData, minX, minY);
-    this.recordDirtyBounds({ maxX, maxY, minX, minY });
-    this.scheduleLivePreview();
-  }
-
-  expandFloatPixels({ bottom, left, right, top }) {
-    if (!this.floatPixels) {
-      return;
-    }
-
-    const nextWidth = this.floatPixels.width + left + right;
-    const nextHeight = this.floatPixels.height + top + bottom;
-    const nextData = new Float32Array(nextWidth * nextHeight * 4);
-
-    for (let y = 0; y < this.floatPixels.height; y += 1) {
-      for (let x = 0; x < this.floatPixels.width; x += 1) {
-        const sourceOffset = (y * this.floatPixels.width + x) * 4;
-        const targetOffset = ((y + top) * nextWidth + x + left) * 4;
-
-        nextData[targetOffset] = this.floatPixels.data[sourceOffset];
-        nextData[targetOffset + 1] = this.floatPixels.data[sourceOffset + 1];
-        nextData[targetOffset + 2] = this.floatPixels.data[sourceOffset + 2];
-        nextData[targetOffset + 3] = this.floatPixels.data[sourceOffset + 3];
-      }
-    }
-
-    this.floatPixels = {
-      data: nextData,
-      height: nextHeight,
-      width: nextWidth,
-    };
-  }
-
-  ensureCanvasIncludesDab(point) {
-    if (this.operation === "erase") {
-      return point;
-    }
-
-    const { canvas } = this.canvasState;
-    const clipBounds = getImageLocalClipBounds(
-      this.editor,
-      this.previewNode || this.editor.getNode(this.nodeId)
-    );
-    const radius = getBrushDabRenderRadius(
-      this.settings.size,
-      this.settings.hardness
-    );
-    const requiredLeft = Math.max(0, Math.ceil(radius - point.x));
-    const requiredTop = Math.max(0, Math.ceil(radius - point.y));
-    const requiredRight = Math.max(
-      0,
-      Math.ceil(point.x + radius - canvas.width + 1)
-    );
-    const requiredBottom = Math.max(
-      0,
-      Math.ceil(point.y + radius - canvas.height + 1)
-    );
-
-    if (!(requiredLeft || requiredTop || requiredRight || requiredBottom)) {
-      return point;
-    }
-
-    const expansionPadding = getBrushLayerExpansionPadding(this.settings);
-    const maxLeft = clipBounds
-      ? Math.max(0, Math.ceil(-clipBounds.minX))
-      : Number.POSITIVE_INFINITY;
-    const maxTop = clipBounds
-      ? Math.max(0, Math.ceil(-clipBounds.minY))
-      : Number.POSITIVE_INFINITY;
-    const maxRight = clipBounds
-      ? Math.max(0, Math.ceil(clipBounds.maxX - canvas.width))
-      : Number.POSITIVE_INFINITY;
-    const maxBottom = clipBounds
-      ? Math.max(0, Math.ceil(clipBounds.maxY - canvas.height))
-      : Number.POSITIVE_INFINITY;
-    const left = requiredLeft
-      ? Math.min(requiredLeft + expansionPadding, maxLeft)
-      : 0;
-    const top = requiredTop
-      ? Math.min(requiredTop + expansionPadding, maxTop)
-      : 0;
-    const right = requiredRight
-      ? Math.min(requiredRight + expansionPadding, maxRight)
-      : 0;
-    const bottom = requiredBottom
-      ? Math.min(requiredBottom + expansionPadding, maxBottom)
-      : 0;
-
-    if (!(left || top || right || bottom)) {
-      return point;
-    }
-
-    const didExpand = measurePerf("brush.canvas.expand", () => {
-      const nextCanvas = createCanvas(
-        canvas.width + left + right,
-        canvas.height + top + bottom
-      );
-      const nextContext = nextCanvas?.getContext("2d", {
-        willReadFrequently: true,
-      });
-
-      if (!(nextCanvas && nextContext)) {
-        return false;
-      }
-
-      incrementPerfCounter("brush.canvas.expand");
-      nextContext.drawImage(canvas, left, top);
-      this.canvasState = {
-        canvas: nextCanvas,
-        context: nextContext,
-      };
-      this.canvasOffset = {
-        x: this.canvasOffset.x - left,
-        y: this.canvasOffset.y - top,
-      };
-      this.expandFloatPixels({ bottom, left, right, top });
-
-      if (this.lastPoint) {
-        this.lastPoint = {
-          x: this.lastPoint.x + left,
-          y: this.lastPoint.y + top,
-        };
-      }
-
-      this.points = this.points.map((queuedPoint) => ({
-        x: queuedPoint.x + left,
-        y: queuedPoint.y + top,
-      }));
-
-      if (this.dirtyBounds) {
-        this.dirtyBounds = {
-          maxX: this.dirtyBounds.maxX + left,
-          maxY: this.dirtyBounds.maxY + top,
-          minX: this.dirtyBounds.minX + left,
-          minY: this.dirtyBounds.minY + top,
-        };
-      }
-
-      this.expandNodeBounds({ bottom, left, top, right });
-      return true;
-    });
-
-    if (!didExpand) {
-      return point;
-    }
-
-    return {
-      x: point.x + left,
-      y: point.y + top,
-    };
-  }
-
-  expandNodeBounds({ bottom, left, right, top }) {
-    const currentNode = this.previewNode || this.editor.getNode(this.nodeId);
-
-    if (currentNode?.type !== "image") {
-      return;
-    }
-
-    const currentBounds = getImageNodeBounds(currentNode);
-    const pinnedWorldPoint = getNodeWorldPoint(currentNode, currentBounds, {
-      x: 0,
-      y: 0,
-    });
-    const nextNode = {
-      ...currentNode,
-      height: currentNode.height + top + bottom,
-      width: currentNode.width + left + right,
-    };
-    const nextTransform = getNodeTransformForPinnedWorldPoint(
-      nextNode,
-      getImageNodeBounds(nextNode),
-      { x: left, y: top },
-      pinnedWorldPoint
-    );
-
-    this.previewNode = {
-      ...currentNode,
-      height: nextNode.height,
-      transform: {
-        ...currentNode.transform,
-        ...nextTransform,
-      },
-      width: nextNode.width,
-    };
   }
 
   recordDirtyBounds(bounds) {
@@ -1064,33 +627,26 @@ class BrushStrokeSession {
     recordRasterDebugEvent("session.complete.start", {
       nodeId: this.nodeId,
       pendingPointCount: this.points.length,
-      tileSurface: Boolean(this.tileSurface),
-      workingSurfaceId: this.workingSurfaceId,
+      sessionId: this.sessionId,
     });
     this.addPoint(this.getLocalPoint(point));
     this.completed = true;
     this.cancelQueuedPointFlush();
-
-    if (this.canvasState || this.tileSurface) {
-      this.flushPoints();
-      recordRasterDebugEvent("session.complete.flushed", {
-        dirtyBounds: this.dirtyBounds,
-        dirtyTileCount: this.tileSurface?.getDirtyTiles().length || 0,
-        nodeId: this.nodeId,
-        workingSurfaceId: this.workingSurfaceId,
-      });
-      this.commitReady = this.commit();
-    }
+    this.flushPoints();
+    recordRasterDebugEvent("session.complete.flushed", {
+      dirtyBounds: this.dirtyBounds,
+      nodeId: this.nodeId,
+      sessionId: this.sessionId,
+    });
+    this.commitReady = this.commit();
 
     return this.commitReady;
   }
 
   cancel() {
-    this.clearCommitHandoffWait();
     this.cancelQueuedPointFlush();
     this.cancelLivePreview();
     this.editor.revertToMark(this.historyMark);
-    this.tool.clearPendingPreview(this);
     this.tool.clearActiveSession(this);
   }
 
@@ -1103,84 +659,59 @@ class BrushStrokeSession {
     recordRasterDebugEvent("commit.start", {
       dirtyBounds: this.dirtyBounds,
       nodeId: this.nodeId,
-      tileSurface: Boolean(this.tileSurface),
-      workingSurfaceId: this.workingSurfaceId,
+      sessionId: this.sessionId,
     });
 
     if (!this.dirtyBounds) {
       recordRasterDebugEvent("commit.noDirtyBounds", {
         nodeId: this.nodeId,
-        workingSurfaceId: this.workingSurfaceId,
+        sessionId: this.sessionId,
       });
       this.editor.revertToMark(this.historyMark);
       this.tool.clearActiveSession(this);
       return Promise.resolve();
     }
 
-    if (this.tileSurface) {
-      return this.commitTileSurface();
-    }
-
-    const committedCanvas = measurePerf("brush.commit.prepareCanvas", () =>
-      this.preserveRasterPlane
-        ? this.getPreservedPlaneCanvas()
-        : this.getTrimmedCanvas()
-    );
-    const src = measurePerf("brush.commit.encode", () =>
-      committedCanvas.canvas.toDataURL("image/png")
-    );
-
-    measurePerf("brush.commit.updateNode", () =>
-      this.editor.run(() => {
-        this.editor.getState().updateNodeById(this.nodeId, (node) => {
-          if (node.type !== "image") {
-            return node;
-          }
-
-          return {
-            ...node,
-            baseHeight: committedCanvas.height,
-            baseWidth: committedCanvas.width,
-            baseX: 0,
-            baseY: 0,
-            height: committedCanvas.height,
-            mimeType: "image/png",
-            src,
-            transform: {
-              ...node.transform,
-              ...committedCanvas.transform,
-            },
-            width: committedCanvas.width,
-          };
-        });
-      })
-    );
-    this.editor.commitHistoryStep(this.historyMark);
-    this.completed = false;
-    recordRasterDebugEvent("commit.canvas.finish", {
-      node: getRasterDebugNodePayload(this.editor.getNode(this.nodeId)),
-      workingSurfaceId: this.workingSurfaceId,
-    });
-    this.tool.clearPendingPreview(this);
-    this.tool.clearActiveSession(this);
-    return Promise.resolve();
+    return this.ready.then(() => this.finishCommit());
   }
 
-  commitTileSurface() {
-    const dirtyTiles = this.tileSurface.getDirtyTiles();
+  finishCommit() {
+    const entry = this.storeEntry;
+
+    measurePerf("brush.commit.mergeStrokeStore", () =>
+      mergeStrokeStore({
+        anchorX: entry.anchorX - (this.initialSourceRect?.x || 0),
+        anchorY: entry.anchorY - (this.initialSourceRect?.y || 0),
+        mode: this.operation === "erase" ? "erase" : "paint",
+        store: entry.store,
+        strokeStore: this.strokeStore,
+      })
+    );
+    this.merged = true;
+    this.tool.sessions.delete(this);
+    this.editor.notifyInteractionPreviewChanged();
+
+    if (this.operation === "erase") {
+      return this.commitEraseFlatten();
+    }
+
+    return this.commitPaintTiles();
+  }
+
+  commitPaintTiles() {
+    const paintedBounds = this.strokeStore.getPaintedBounds();
+    const dirtyTiles = paintedBounds
+      ? this.strokeStore.getTilesForBounds(paintedBounds, { create: false })
+      : [];
+
     recordRasterDebugEvent("tileCommit.start", {
       dirtyTileCount: dirtyTiles.length,
       nodeId: this.nodeId,
-      workingSurfaceId: this.workingSurfaceId,
+      sessionId: this.sessionId,
     });
 
     if (dirtyTiles.length === 0) {
-      recordRasterDebugEvent("tileCommit.noDirtyTiles", {
-        nodeId: this.nodeId,
-        workingSurfaceId: this.workingSurfaceId,
-      });
       this.editor.revertToMark(this.historyMark);
-      this.tool.clearPendingPreview(this);
       this.tool.clearActiveSession(this);
       return Promise.resolve();
     }
@@ -1190,13 +721,6 @@ class BrushStrokeSession {
     const shouldCommitAsync =
       canScheduleRasterFrame() &&
       dirtyTiles.length > BRUSH_TILE_ASYNC_COMMIT_THRESHOLD;
-    recordRasterDebugEvent("tileCommit.mode", {
-      commitRevision,
-      dirtyTileCount: dirtyTiles.length,
-      nodeId: this.nodeId,
-      shouldCommitAsync,
-      workingSurfaceId: this.workingSurfaceId,
-    });
 
     if (shouldCommitAsync) {
       return this.commitTileSurfaceAsync({ commitRevision, dirtyTiles });
@@ -1207,7 +731,8 @@ class BrushStrokeSession {
         const tileSource = createTileSourceFromDirtyTile({
           commitRevision,
           nodeId: this.nodeId,
-          workingSurfaceId: this.workingSurfaceId,
+          offsetX: this.initialSourceRect?.x || 0,
+          offsetY: this.initialSourceRect?.y || 0,
           tile,
         });
 
@@ -1233,6 +758,8 @@ class BrushStrokeSession {
             const tileSource = createTileSourceFromDirtyTile({
               commitRevision,
               nodeId: this.nodeId,
+              offsetX: this.initialSourceRect?.x || 0,
+              offsetY: this.initialSourceRect?.y || 0,
               tile: dirtyTiles[tileIndex],
             });
 
@@ -1249,20 +776,20 @@ class BrushStrokeSession {
         });
         incrementPerfCounter("brush.tile.commit.encodeChunk");
 
-          if (tileIndex < dirtyTiles.length) {
-            requestRasterFrame(encodeChunk);
-            return;
-          }
+        if (tileIndex < dirtyTiles.length) {
+          requestRasterFrame(encodeChunk);
+          return;
+        }
 
-          recordRasterDebugEvent("tileCommit.asyncEncoded", {
-            commitRevision,
-            encodedTileCount: tileSources.length,
-            nodeId: this.nodeId,
-            workingSurfaceId: this.workingSurfaceId,
-          });
-          this.finishTileSurfaceCommit(tileSources);
-          resolve();
-        };
+        recordRasterDebugEvent("tileCommit.asyncEncoded", {
+          commitRevision,
+          encodedTileCount: tileSources.length,
+          nodeId: this.nodeId,
+          sessionId: this.sessionId,
+        });
+        this.finishTileSurfaceCommit(tileSources);
+        resolve();
+      };
 
       requestRasterFrame(encodeChunk);
     });
@@ -1272,15 +799,14 @@ class BrushStrokeSession {
     if (tileSources.length === 0) {
       recordRasterDebugEvent("tileCommit.emptyEncodedTiles", {
         nodeId: this.nodeId,
-        workingSurfaceId: this.workingSurfaceId,
+        sessionId: this.sessionId,
       });
       this.editor.revertToMark(this.historyMark);
-      this.tool.clearPendingPreview(this);
       this.tool.clearActiveSession(this);
       return;
     }
 
-    let committedNode = null;
+    let commitResult = null;
 
     measurePerf("brush.tile.commit.updateNode", () =>
       this.editor.run(() => {
@@ -1289,24 +815,133 @@ class BrushStrokeSession {
             return node;
           }
 
-          committedNode = getNextTiledImageNodeState({ node, tileSources });
-          return committedNode;
+          commitResult = getNextTiledImageNodeState({ node, tileSources });
+          return commitResult.node;
         });
       })
     );
-    this.commitRenderKey =
-      committedNode?.type === "image"
-        ? getTileSourcesRenderKey(committedNode.tileSources || [])
-        : null;
+
+    if (commitResult) {
+      this.storeEntry.anchorX += commitResult.offsetX;
+      this.storeEntry.anchorY += commitResult.offsetY;
+    }
+
     this.editor.commitHistoryStep(this.historyMark);
     recordRasterDebugEvent("tileCommit.finish", {
-      committedNode: getRasterDebugNodePayload(committedNode),
-      commitRenderKeyLength: this.commitRenderKey?.length || 0,
+      committedNode: getRasterDebugNodePayload(
+        commitResult?.node || this.editor.getNode(this.nodeId)
+      ),
       encodedTileCount: tileSources.length,
       nodeId: this.nodeId,
-      workingSurfaceId: this.workingSurfaceId,
+      sessionId: this.sessionId,
     });
-    this.scheduleCommitWorkingSurfaceClear();
+    this.completed = false;
+    this.tool.clearActiveSession(this);
+  }
+
+  commitEraseFlatten() {
+    const node = this.editor.getNode(this.nodeId);
+
+    if (node?.type !== "image") {
+      this.editor.revertToMark(this.historyMark);
+      this.tool.clearActiveSession(this);
+      return Promise.resolve();
+    }
+
+    const entry = this.storeEntry;
+    const frameNode =
+      !this.preserveRasterPlane && this.initialSourceRect
+        ? getImageNodeCroppedToSourceRect(node, this.initialSourceRect)
+        : node;
+    const rect =
+      !this.preserveRasterPlane && this.initialSourceRect
+        ? this.initialSourceRect
+        : { height: node.height, width: node.width, x: 0, y: 0 };
+    const width = Math.max(1, Math.round(rect.width));
+    const height = Math.max(1, Math.round(rect.height));
+    const canvas = createCanvas(width, height);
+    const context = canvas?.getContext("2d", { willReadFrequently: true });
+
+    if (!(canvas && context)) {
+      this.editor.revertToMark(this.historyMark);
+      this.tool.clearActiveSession(this);
+      return Promise.resolve();
+    }
+
+    measurePerf("brush.commit.flatten", () =>
+      drawStoreTilesToCanvas({
+        anchorX: entry.anchorX,
+        anchorY: entry.anchorY,
+        context,
+        rect,
+        store: entry.store,
+      })
+    );
+
+    let output = {
+      canvas,
+      height,
+      transform: frameNode.transform || {},
+      trimX: 0,
+      trimY: 0,
+      width,
+    };
+
+    if (!this.preserveRasterPlane) {
+      output =
+        getTrimmedFlattenState({ canvas, context, frameNode }) || output;
+    }
+
+    const flattenOriginX = rect.x + output.trimX;
+    const flattenOriginY = rect.y + output.trimY;
+
+    const src = measurePerf("brush.commit.encode", () =>
+      output.canvas.toDataURL("image/png")
+    );
+
+    measurePerf("brush.commit.updateNode", () =>
+      this.editor.run(() => {
+        this.editor.getState().updateNodeById(this.nodeId, (currentNode) => {
+          if (currentNode.type !== "image") {
+            return currentNode;
+          }
+
+          const { tileSources: _removedTileSources, ...nextNode } =
+            currentNode;
+
+          return {
+            ...nextNode,
+            baseHeight: output.height,
+            baseWidth: output.width,
+            baseX: 0,
+            baseY: 0,
+            height: output.height,
+            mimeType: "image/png",
+            src,
+            transform: this.preserveRasterPlane
+              ? currentNode.transform
+              : {
+                  ...currentNode.transform,
+                  ...output.transform,
+                },
+            width: output.width,
+          };
+        });
+      })
+    );
+    if (flattenOriginX || flattenOriginY) {
+      entry.anchorX -= flattenOriginX;
+      entry.anchorY -= flattenOriginY;
+    }
+
+    this.editor.commitHistoryStep(this.historyMark);
+    recordRasterDebugEvent("commit.eraseFlatten.finish", {
+      node: getRasterDebugNodePayload(this.editor.getNode(this.nodeId)),
+      sessionId: this.sessionId,
+    });
+    this.completed = false;
+    this.tool.clearActiveSession(this);
+    return Promise.resolve();
   }
 
   scheduleLivePreview({ notify = true } = {}) {
@@ -1344,313 +979,6 @@ class BrushStrokeSession {
     this.previewFrameId = 0;
   }
 
-  clearCommitHandoffWait() {
-    if (!this.commitHandoffCancel) {
-      return;
-    }
-
-    this.commitHandoffCancel();
-    this.commitHandoffCancel = null;
-  }
-
-  scheduleCommitWorkingSurfaceClear() {
-    const clear = () => {
-      recordRasterDebugEvent("handoff.clear", {
-        commitRenderKeyLength: this.commitRenderKey?.length || 0,
-        nodeId: this.nodeId,
-        workingSurfaceId: this.workingSurfaceId,
-      });
-      this.clearCommitHandoffWait();
-      this.completed = false;
-      this.tool.clearPendingPreview(this);
-      this.tool.clearActiveSession(this);
-    };
-
-    if (!canScheduleRasterFrame() || !this.commitRenderKey) {
-      recordRasterDebugEvent("handoff.clearImmediate", {
-        canScheduleRasterFrame: canScheduleRasterFrame(),
-        commitRenderKeyLength: this.commitRenderKey?.length || 0,
-        nodeId: this.nodeId,
-        workingSurfaceId: this.workingSurfaceId,
-      });
-      clear();
-      return;
-    }
-
-    const expectedRenderKey = this.commitRenderKey;
-    recordRasterDebugEvent("handoff.wait", {
-      expectedRenderKeyLength: expectedRenderKey.length,
-      nodeId: this.nodeId,
-      workingSurfaceId: this.workingSurfaceId,
-    });
-
-    const onRenderReady = (event) => {
-      const detail = event?.detail || {};
-
-      if (
-        detail.nodeId === this.nodeId &&
-        detail.renderKey === expectedRenderKey
-      ) {
-        recordRasterDebugEvent("handoff.renderReady", {
-          mode: detail.mode || null,
-          nodeId: this.nodeId,
-          renderKeyLength: detail.renderKey?.length || 0,
-          workingSurfaceId: this.workingSurfaceId,
-        });
-        clear();
-      }
-    };
-
-    window.addEventListener(RASTER_NODE_RENDER_READY_EVENT, onRenderReady);
-    this.commitHandoffCancel = () => {
-      window.removeEventListener(RASTER_NODE_RENDER_READY_EVENT, onRenderReady);
-    };
-  }
-
-  hasPendingWorkingSurface() {
-    return this.completed && Boolean(this.getWorkingSurfaceState());
-  }
-
-  getWorkingSurfaceState() {
-    const node = this.previewNode || this.editor.getNode(this.nodeId);
-
-    if (!node) {
-      return null;
-    }
-
-    if (this.tileSurface) {
-      const workingSurface = this.tileSurface.createDirtyWorkingTiles();
-
-      if (!workingSurface?.tiles.length) {
-        return null;
-      }
-
-      return {
-        completed: this.completed,
-        height: node.height,
-        nodeId: this.nodeId,
-        tiles: workingSurface.tiles,
-        transform: node.transform || {},
-        type: "tiles",
-        width: node.width,
-        workingSurfaceId: this.workingSurfaceId,
-      };
-    }
-
-    if (!this.canvasState) {
-      return null;
-    }
-
-    return {
-      canvas: this.canvasState.canvas,
-      completed: this.completed,
-      height: this.canvasState.canvas.height,
-      nodeId: this.nodeId,
-      replacesNode: true,
-      transform: this.previewNode?.transform || node.transform || {},
-      type: "canvas",
-      width: this.canvasState.canvas.width,
-      workingSurfaceId: this.workingSurfaceId,
-      x: this.canvasOffset.x,
-      y: this.canvasOffset.y,
-    };
-  }
-
-  getTrimmedCanvas() {
-    const { canvas, context } = this.canvasState;
-    const node = this.previewNode || this.editor.getNode(this.nodeId);
-    const clippedCanvas = this.getArtboardClippedCanvas({
-      canvas,
-      context,
-      node,
-    });
-    const imageData = clippedCanvas.context.getImageData(
-      0,
-      0,
-      clippedCanvas.canvas.width,
-      clippedCanvas.canvas.height
-    );
-    const alphaBounds = getAlphaBounds(imageData);
-
-    if (!(node?.type === "image" && alphaBounds)) {
-      return {
-        canvas: clippedCanvas.canvas,
-        height: clippedCanvas.canvas.height,
-        transform: clippedCanvas.transform,
-        width: clippedCanvas.canvas.width,
-      };
-    }
-
-    const width = alphaBounds.maxX - alphaBounds.minX + 1;
-    const height = alphaBounds.maxY - alphaBounds.minY + 1;
-
-    if (
-      alphaBounds.minX === 0 &&
-      alphaBounds.minY === 0 &&
-      width === clippedCanvas.canvas.width &&
-      height === clippedCanvas.canvas.height
-    ) {
-      return {
-        canvas: clippedCanvas.canvas,
-        height: clippedCanvas.canvas.height,
-        transform: clippedCanvas.transform,
-        width: clippedCanvas.canvas.width,
-      };
-    }
-
-    const nextCanvas = createCanvas(width, height);
-    const nextContext = nextCanvas?.getContext("2d", {
-      willReadFrequently: true,
-    });
-
-    if (!(nextCanvas && nextContext)) {
-      return {
-        canvas: clippedCanvas.canvas,
-        height: clippedCanvas.canvas.height,
-        transform: clippedCanvas.transform,
-        width: clippedCanvas.canvas.width,
-      };
-    }
-
-    nextContext.drawImage(
-      clippedCanvas.canvas,
-      alphaBounds.minX,
-      alphaBounds.minY,
-      width,
-      height,
-      0,
-      0,
-      width,
-      height
-    );
-
-    const pinnedWorldPoint = getNodeWorldPoint(
-      clippedCanvas.node,
-      getImageNodeBounds(clippedCanvas.node),
-      {
-        x: alphaBounds.minX,
-        y: alphaBounds.minY,
-      }
-    );
-    const nextNode = {
-      ...clippedCanvas.node,
-      height,
-      width,
-    };
-
-    return {
-      canvas: nextCanvas,
-      height,
-      transform: getNodeTransformForPinnedWorldPoint(
-        nextNode,
-        getImageNodeBounds(nextNode),
-        { x: 0, y: 0 },
-        pinnedWorldPoint
-      ),
-      width,
-    };
-  }
-
-  getPreservedPlaneCanvas() {
-    const node = this.editor.getNode(this.nodeId);
-
-    return {
-      canvas: this.canvasState.canvas,
-      height: this.canvasState.canvas.height,
-      transform: this.previewNode?.transform || node?.transform || {},
-      width: this.canvasState.canvas.width,
-    };
-  }
-
-  getArtboardClippedCanvas({ canvas, context, node }) {
-    const clipBounds = getImageLocalClipBounds(this.editor, node);
-
-    if (!(node?.type === "image" && clipBounds)) {
-      return {
-        canvas,
-        context,
-        node,
-        transform: node?.transform || {},
-      };
-    }
-
-    const minX = Math.max(0, Math.floor(clipBounds.minX));
-    const minY = Math.max(0, Math.floor(clipBounds.minY));
-    const maxX = Math.min(canvas.width, Math.ceil(clipBounds.maxX));
-    const maxY = Math.min(canvas.height, Math.ceil(clipBounds.maxY));
-    const width = Math.max(1, maxX - minX);
-    const height = Math.max(1, maxY - minY);
-
-    if (
-      minX === 0 &&
-      minY === 0 &&
-      width === canvas.width &&
-      height === canvas.height
-    ) {
-      return {
-        canvas,
-        context,
-        node,
-        transform: node.transform,
-      };
-    }
-
-    const nextCanvas = createCanvas(width, height);
-    const nextContext = nextCanvas?.getContext("2d", {
-      willReadFrequently: true,
-    });
-
-    if (!(nextCanvas && nextContext)) {
-      return {
-        canvas,
-        context,
-        node,
-        transform: node.transform,
-      };
-    }
-
-    nextContext.drawImage(
-      canvas,
-      minX,
-      minY,
-      width,
-      height,
-      0,
-      0,
-      width,
-      height
-    );
-
-    const pinnedWorldPoint = getNodeWorldPoint(node, getImageNodeBounds(node), {
-      x: minX,
-      y: minY,
-    });
-    const nextNode = {
-      ...node,
-      height,
-      width,
-    };
-    const transform = getNodeTransformForPinnedWorldPoint(
-      nextNode,
-      getImageNodeBounds(nextNode),
-      { x: 0, y: 0 },
-      pinnedWorldPoint
-    );
-
-    return {
-      canvas: nextCanvas,
-      context: nextContext,
-      node: {
-        ...nextNode,
-        transform: {
-          ...node.transform,
-          ...transform,
-        },
-      },
-      transform,
-    };
-  }
-
   getLocalPoint(point) {
     const node = this.previewNode || this.editor.getNode(this.nodeId);
 
@@ -1667,7 +995,7 @@ export class BrushTool extends Tool {
     super(editor);
     this.activeSession = null;
     this.operation = operation;
-    this.pendingWorkingSurfaces = [];
+    this.sessions = new Set();
   }
 
   getSettings() {
@@ -1680,39 +1008,22 @@ export class BrushTool extends Tool {
     );
   }
 
-  getWorkingSurfaceStates() {
-    const activeSurface = this.activeSession?.getWorkingSurfaceState();
+  getStrokeOverlaysForNode(nodeId) {
+    const overlays = [];
 
-    return [
-      ...this.pendingWorkingSurfaces
-        .map((entry) => entry.session.getWorkingSurfaceState())
-        .filter(Boolean),
-      ...(activeSurface ? [activeSurface] : []),
-    ];
-  }
+    for (const session of this.sessions) {
+      if (session.nodeId !== nodeId || session.merged) {
+        continue;
+      }
 
-  getWorkingSurfaceStateForNode(nodeId) {
-    const surfaces = this.getWorkingSurfaceStates().filter(
-      (surface) => surface?.nodeId === nodeId
-    );
-
-    if (surfaces.length <= 1) {
-      return surfaces[0] || null;
+      overlays.push({
+        operation: session.operation,
+        revision: session.strokeStore.revision,
+        strokeStore: session.strokeStore,
+      });
     }
 
-    if (surfaces.every((surface) => surface.type === "tiles")) {
-      const [firstSurface] = surfaces;
-
-      return {
-        ...firstSurface,
-        workingSurfaceId: surfaces
-          .map((surface) => surface.workingSurfaceId)
-          .join(":"),
-        tiles: surfaces.flatMap((surface) => surface.tiles),
-      };
-    }
-
-    return surfaces.at(-1) || null;
+    return overlays;
   }
 
   onCanvasPointerDown({ point }) {
@@ -1729,21 +1040,6 @@ export class BrushTool extends Tool {
     }
 
     return measurePerf("brush.stroke.begin", () => {
-      if (this.activeSession?.hasPendingWorkingSurface()) {
-        recordRasterDebugEvent("tool.promotePendingWorkingSurface", {
-          activeWorkingSurfaceId: this.activeSession.workingSurfaceId,
-          pendingSurfaceCount: this.pendingWorkingSurfaces.length,
-        });
-        this.pendingWorkingSurfaces = [
-          ...this.pendingWorkingSurfaces.filter(
-            (entry) => entry.session !== this.activeSession
-          ),
-          {
-            session: this.activeSession,
-          },
-        ];
-      }
-
       const settings = this.getSettings();
       const targetNode = measurePerf("brush.target.resolve", () =>
         resolveBrushTarget(this.editor, point, node, settings)
@@ -1768,34 +1064,20 @@ export class BrushTool extends Tool {
         tool: this,
       });
       this.activeSession = session;
+      this.sessions.add(session);
       this.editor.notifyInteractionPreviewChanged();
 
       return session;
     });
   }
 
-  clearPendingPreview(session) {
-    const nextWorkingSurfaces = this.pendingWorkingSurfaces.filter(
-      (entry) => entry.session !== session
-    );
-
-    if (nextWorkingSurfaces.length === this.pendingWorkingSurfaces.length) {
-      return;
-    }
-
-    this.pendingWorkingSurfaces = nextWorkingSurfaces;
-    recordRasterDebugEvent("tool.clearPendingPreview", {
-      pendingSurfaceCount: this.pendingWorkingSurfaces.length,
-      workingSurfaceId: session.workingSurfaceId,
-    });
-    this.editor.notifyInteractionPreviewChanged();
-  }
-
   clearActiveSession(session) {
+    this.sessions.delete(session);
+
     if (this.activeSession === session) {
       this.activeSession = null;
       recordRasterDebugEvent("tool.clearActiveSession", {
-        workingSurfaceId: session.workingSurfaceId,
+        sessionId: session.sessionId,
       });
       this.editor.notifyInteractionPreviewChanged();
     }

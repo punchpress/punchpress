@@ -1033,19 +1033,11 @@ export class Editor {
     return this.rasterStores.getEntry(nodeId);
   }
 
-  getBrushWorkingSurfaceStates() {
+  getRasterStrokeOverlaysForNode(nodeId) {
     return [
-      ...(this.tools.get("brush")?.getWorkingSurfaceStates?.() || []),
-      ...(this.tools.get("eraser")?.getWorkingSurfaceStates?.() || []),
+      ...(this.tools.get("brush")?.getStrokeOverlaysForNode?.(nodeId) || []),
+      ...(this.tools.get("eraser")?.getStrokeOverlaysForNode?.(nodeId) || []),
     ];
-  }
-
-  getBrushWorkingSurfaceStateForNode(nodeId) {
-    return (
-      this.tools.get("brush")?.getWorkingSurfaceStateForNode?.(nodeId) ||
-      this.tools.get("eraser")?.getWorkingSurfaceStateForNode?.(nodeId) ||
-      null
-    );
   }
 
   getSelectionFrameKey(nodeIds = this.selectedNodeIds) {
@@ -2001,7 +1993,12 @@ export class Editor {
   }
 
   loadDocument(contents) {
-    return loadEditorDocument(this, contents);
+    this.rasterStores.releaseAll();
+
+    const result = loadEditorDocument(this, contents);
+
+    this.notifyInteractionPreviewChanged();
+    return result;
   }
 
   newDocument() {
@@ -2058,6 +2055,8 @@ export class Editor {
 
     if (didRedo) {
       historyTool.onHistoryChanged?.("redo");
+      this.rasterStores.releaseAll();
+      this.notifyInteractionPreviewChanged();
     }
 
     return didRedo;
@@ -2069,6 +2068,8 @@ export class Editor {
 
     if (didUndo) {
       historyTool.onHistoryChanged?.("undo");
+      this.rasterStores.releaseAll();
+      this.notifyInteractionPreviewChanged();
     }
 
     return didUndo;
