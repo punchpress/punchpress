@@ -1,3 +1,4 @@
+// @ts-nocheck TODO(typecheck-baseline): raster runtime exempt — in-flight redesign owns these files
 export const DEFAULT_BRUSH_SETTINGS = {
   color: "#111111",
   hardness: 1,

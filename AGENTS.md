@@ -57,6 +57,7 @@ labels, artifacts, and CLI inspection.
 - Put durable editor behavior in `editor-contract` tests and reserve Playwright for end-to-end interaction wiring, browser behavior, and cases that cannot be covered honestly through the engine surface.
 - Minimize mocks; prefer exercising real editor flows and document state unless an external boundary leaves no reasonable alternative.
 - Use Playwright only for behavior we truly need and cannot cover honestly in `editor-contract`. Do not spend Playwright tests on primitives like file pickers, shell plumbing, or other setup paths when the real product value is elsewhere.
+- Run `bun run typecheck` (punch-schema + engine) along with `bun run check` before declaring work done. The apps/web surface is not yet in the gate.
 
 ## Architecture
 

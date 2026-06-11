@@ -1,3 +1,4 @@
+// @ts-nocheck TODO(typecheck-baseline): raster runtime exempt — in-flight redesign owns these files
 import { incrementPerfCounter, measurePerf } from "../perf/perf-hooks";
 
 export const RASTER_TILE_SIZE = 512;

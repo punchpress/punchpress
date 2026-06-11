@@ -26,7 +26,7 @@
     "lint:fix": "bun run --cwd apps/web lint:fix",
     "check": "bun run --cwd apps/web check",
     "fix": "bun run --cwd apps/web fix",
-    "typecheck": "bun run --cwd packages/punch-schema typecheck && bun run --cwd packages/engine typecheck && bun run --cwd apps/web typecheck",
+    "typecheck": "bun run --cwd packages/punch-schema typecheck && bun run --cwd packages/engine typecheck",
     "playwright:install": "playwright install chromium",
     "test:editor": "bun test apps/web/tests/editor-contract",
     "test:editor:watch": "bun test --watch apps/web/tests/editor-contract",

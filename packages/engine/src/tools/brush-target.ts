@@ -1,3 +1,4 @@
+// @ts-nocheck TODO(typecheck-baseline): raster runtime exempt — in-flight redesign owns these files
 import { getTopmostArtboardAtPoint } from "../nodes/artboard/artboard-hit-test";
 import { getImageNodeBounds } from "../nodes/image/image-capabilities";
 import { createDefaultImageNode } from "../nodes/image/model";

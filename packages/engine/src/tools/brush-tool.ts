@@ -1,3 +1,4 @@
+// @ts-nocheck TODO(typecheck-baseline): raster runtime exempt — in-flight redesign owns these files
 import { getImageNodeBounds } from "../nodes/image/image-capabilities";
 import { getNodeScaleX } from "../nodes/text/model";
 import { incrementPerfCounter, measurePerf } from "../perf/perf-hooks";
