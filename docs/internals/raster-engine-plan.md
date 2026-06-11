@@ -120,7 +120,16 @@ when zoomed out and refines in place. Strokes always paint at full resolution.
 Exit criteria: zoomed-out pan and zoom on the 100k fixture stay near frame
 budget; no blank regions while levels refine.
 
-Status: pending.
+Status: implemented (pulled ahead of stage 2 because the zoomed-out lag was
+the user-visible pain). Tile writes mark per-level dirty coords in the store;
+pyramid tiles (512 px per level, max level 8) build lazily on draw and rebuild
+when their dirty coords are taken. The compositor picks
+`floor(log2(1/scale))`. Stroke benchmark at 0.055 zoom: p95 42 → ~17-25 ms;
+steady-state repaints draw ~9 level-4 tiles instead of ~1600 level-0 tiles.
+Known follow-up (stage 5 family, alongside lazy hydration): the first paint
+at a deep level builds the visible pyramid chain in one frame (~1-2 s on a
+1600-tile layer); budget first builds or build deep levels directly from
+level 0.
 
 ### 4. Tile-Delta Undo
 
