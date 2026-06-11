@@ -3,6 +3,7 @@ import type { LocalFontDescriptor } from "@punchpress/punch-schema";
 import { MissingDocumentFontsError } from "@punchpress/punch-schema";
 import { useEffectEvent, useState } from "react";
 import { showToast } from "@/components/ui/toast";
+import { tryParseEmbeddedDocument } from "@/platform/svg-embedded-import";
 import { importSvgToNodes } from "@/platform/svg-import-document";
 import {
   clearRecentPunchDocumentFiles,
@@ -215,6 +216,25 @@ export const useDocumentCommands = () => {
 
     if (!openedSvg) {
       return;
+    }
+
+    const embedded = tryParseEmbeddedDocument(openedSvg.contents);
+
+    if (embedded.kind === "document") {
+      await workspace.openDocumentTab({
+        contents: embedded.documentJson,
+        fileHandle: null,
+        fileName: openedSvg.fileName,
+      });
+      showToast({
+        message: `Restored design from ${openedSvg.fileName}`,
+        type: "success",
+      });
+      return;
+    }
+
+    if (embedded.kind === "error") {
+      throw embedded.error;
     }
 
     const importedNodes = await importSvgToNodes(openedSvg.contents, {

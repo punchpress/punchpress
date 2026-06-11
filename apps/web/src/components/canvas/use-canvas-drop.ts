@@ -1,16 +1,28 @@
 import { round } from "@punchpress/engine";
+import {
+  PUNCH_SVG_EXTENSION,
+  PUNCH_SVG_MIME_TYPE,
+} from "@punchpress/punch-schema";
 import { useCallback } from "react";
 import { showToast } from "@/components/ui/toast";
+import { tryParseEmbeddedDocument } from "@/platform/svg-embedded-import";
+import { importSvgToNodes } from "@/platform/svg-import-document";
+import { useWorkspace } from "@/workspace/use-workspace";
 import {
   CANVAS_DROP_SUPPORTED_FILE_LABEL,
   getCanvasFileDropImport,
 } from "./canvas-file-drop-importers";
+
+const isSvgFile = (file: File) =>
+  file.type === PUNCH_SVG_MIME_TYPE ||
+  file.name.toLowerCase().endsWith(PUNCH_SVG_EXTENSION);
 
 const hasDraggedFiles = (dataTransfer: DataTransfer | null) => {
   return Boolean(dataTransfer?.types?.includes("Files"));
 };
 
 export const useCanvasDrop = ({ editor, getCanvasPoint }) => {
+  const workspace = useWorkspace();
   const handleCanvasDragOver = useCallback((event) => {
     if (!hasDraggedFiles(event.dataTransfer)) {
       return;
@@ -50,27 +62,58 @@ export const useCanvasDrop = ({ editor, getCanvasPoint }) => {
       };
       const { file, importer } = droppedImport;
 
-      importer
-        .importFile({ file, targetCenter })
-        .then((nodes) => {
+      const handleDrop = async () => {
+        if (isSvgFile(file)) {
+          const svgText = await file.text();
+          const embedded = tryParseEmbeddedDocument(svgText);
+
+          if (embedded.kind === "document") {
+            await workspace.openDocumentTab({
+              contents: embedded.documentJson,
+              fileHandle: null,
+              fileName: file.name,
+            });
+            showToast({
+              message: `Restored design from ${file.name}`,
+              type: "success",
+            });
+            return;
+          }
+
+          if (embedded.kind === "error") {
+            throw embedded.error;
+          }
+
+          // kind === "none": no embedded recipe — fall back to geometry import
+          const nodes = await importSvgToNodes(svgText, { targetCenter });
           editor.insertNodes(nodes);
           showToast({
             message: `Imported ${file.name}`,
             type: "success",
           });
-        })
-        .catch((error) => {
-          console.error(error);
-          showToast({
-            message: `Import ${importer.label} failed: ${
-              error instanceof Error ? error.message : "Unknown file error."
-            }`,
-            priority: "high",
-            type: "error",
-          });
+          return;
+        }
+
+        const nodes = await importer.importFile({ file, targetCenter });
+        editor.insertNodes(nodes);
+        showToast({
+          message: `Imported ${file.name}`,
+          type: "success",
         });
+      };
+
+      handleDrop().catch((error) => {
+        console.error(error);
+        showToast({
+          message: `Import ${importer.label} failed: ${
+            error instanceof Error ? error.message : "Unknown file error."
+          }`,
+          priority: "high",
+          type: "error",
+        });
+      });
     },
-    [editor, getCanvasPoint]
+    [editor, getCanvasPoint, workspace]
   );
 
   return {

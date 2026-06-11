@@ -37,6 +37,10 @@ export {
   UnsupportedDocumentVersionError,
 } from "./errors";
 export { loadDesignDocument, parseDesignDocument } from "./load";
+export {
+  extractEmbeddedDocumentJson,
+  parseEmbeddedDesignDocument,
+} from "./svg-embedded-document";
 export type {
   LocalFontCatalogResult,
   LocalFontCatalogState,
