@@ -75,18 +75,28 @@ exit using the measurement contract above.
 Move canonical stroke pixels into an engine-owned sparse tile store with signed
 tile coordinates. Render each raster node through one compositing canvas that
 draws visible store tiles per dirty-rect or viewport change. Brush and eraser
-dab math, float accumulation, gutters, and the native-stroke fast path carry
-over from the current tile surface.
+dab math, float accumulation, and gutters carry over from the current tile
+surface.
 
 Deletes: render-ready handshake, working-surface mount/retire, loaded-tile
-tracking, per-tile DOM culling, pending-surface promotion, and the LOD preview
-component. Committed PNG encoding remains temporarily as a persistence step
-behind the store.
+tracking, pending-surface promotion, and the native-stroke fast path (all
+strokes are dabs for now). Committed PNG encoding remains temporarily as a
+persistence step behind the store. Per-tile DOM rendering, culling, and the
+LOD preview remain only for never-brushed nodes.
 
 Exit criteria: pointerup causes no visible change; repeated large strokes show
 no flicker, shift, or cumulative degradation.
 
-Status: pending.
+Status: implemented. Strokes paint a per-session buffer composited live over
+the hydrated store; commit merges synchronously, then paint commits append
+stroke-only tiles while erase and artboard-clipped commits flatten to a single
+payload (fixing the old eraser's silent tile-overlay loss). Benchmarks vs the
+pre-migration baseline: zero working-tile accumulation (was 68→360 over six
+strokes), zero mounted tile-image DOM (was ~2000), viewport pass clean
+(p95 8.8 ms, 0 slow frames). Known follow-ups: first-contact hydration spike
+(lazy hydration arrives with stage 5) and dab-path cost for large hard
+brushes during fast sweeps (p95 67 ms in the stroke benchmark; a
+store-backed native-stroke fast path can return behind the same dab API).
 
 ### 2. Pixels Out Of Document State
 
