@@ -1,4 +1,4 @@
-import { createCanvas, loadImageToCanvas } from "../tools/brush-runtime";
+import { createCanvas } from "../tools/brush-runtime";
 import { RasterTileStore } from "./raster-tile-store";
 
 export type RasterStoreEntry = {
@@ -100,60 +100,105 @@ const hydrateStoreFromNode = async (store: RasterTileStore, node) => {
   store.consumeDirtyBounds();
 };
 
-const hydrateImageSource = async (store, source) => {
-  const loaded = await loadImageToCanvas(
-    { height: source.height, src: source.src, width: source.width },
-    null
-  );
+const loadImageElement = (src) => {
+  if (typeof Image === "undefined" || !src) {
+    return Promise.resolve(null);
+  }
 
-  if (!loaded?.context) {
+  return new Promise((resolve) => {
+    const image = new Image();
+
+    image.addEventListener("error", () => resolve(null));
+    image.addEventListener("load", () => resolve(image));
+    image.src = src;
+  });
+};
+
+const hasVisibleAlpha = (imageData) => {
+  for (let offset = 3; offset < imageData.data.length; offset += 4) {
+    if (imageData.data[offset] !== 0) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+const hydrateImageSource = async (store, source) => {
+  const image = await loadImageElement(source.src);
+
+  if (!image) {
     return;
   }
 
+  const naturalWidth = image.naturalWidth || image.width || 1;
+  const naturalHeight = image.naturalHeight || image.height || 1;
+  const scaleX = source.width / naturalWidth;
+  const scaleY = source.height / naturalHeight;
   const bounds = {
     maxX: source.x + source.width,
     maxY: source.y + source.height,
     minX: source.x,
     minY: source.y,
   };
+  const minCol = Math.floor((bounds.minX - store.gutter) / store.tileSize);
+  const maxCol = Math.floor(
+    (Math.ceil(bounds.maxX) - 1 + store.gutter) / store.tileSize
+  );
+  const minRow = Math.floor((bounds.minY - store.gutter) / store.tileSize);
+  const maxRow = Math.floor(
+    (Math.ceil(bounds.maxY) - 1 + store.gutter) / store.tileSize
+  );
 
-  for (const tile of store.getTilesForBounds(bounds)) {
-    const minX = Math.max(tile.x, Math.floor(bounds.minX));
-    const minY = Math.max(tile.y, Math.floor(bounds.minY));
-    const maxX = Math.min(tile.x + tile.width, Math.ceil(bounds.maxX));
-    const maxY = Math.min(tile.y + tile.height, Math.ceil(bounds.maxY));
-    const width = maxX - minX;
-    const height = maxY - minY;
+  for (let row = minRow; row <= maxRow; row += 1) {
+    for (let col = minCol; col <= maxCol; col += 1) {
+      const tileX = col * store.tileSize - store.gutter;
+      const tileY = row * store.tileSize - store.gutter;
+      const tileWidth = store.tileSize + store.gutter * 2;
+      const tileHeight = store.tileSize + store.gutter * 2;
+      const minX = Math.max(tileX, Math.floor(bounds.minX));
+      const minY = Math.max(tileY, Math.floor(bounds.minY));
+      const maxX = Math.min(tileX + tileWidth, Math.ceil(bounds.maxX));
+      const maxY = Math.min(tileY + tileHeight, Math.ceil(bounds.maxY));
+      const width = maxX - minX;
+      const height = maxY - minY;
 
-    if (width <= 0 || height <= 0) {
-      continue;
+      if (width <= 0 || height <= 0) {
+        continue;
+      }
+
+      const scratch = createCanvas(width, height);
+      const scratchContext = scratch?.getContext("2d", {
+        willReadFrequently: true,
+      });
+
+      if (!scratchContext) {
+        continue;
+      }
+
+      scratchContext.drawImage(
+        image,
+        (minX - source.x) / scaleX,
+        (minY - source.y) / scaleY,
+        width / scaleX,
+        height / scaleY,
+        0,
+        0,
+        width,
+        height
+      );
+
+      const imageData = scratchContext.getImageData(0, 0, width, height);
+
+      if (!hasVisibleAlpha(imageData)) {
+        continue;
+      }
+
+      const tile = store.getOrCreateTile(col, row);
+
+      blendImageDataOverTile(tile, imageData, minX - tile.x, minY - tile.y);
+      tile.revision += 1;
     }
-
-    const scratch = createCanvas(width, height);
-    const scratchContext = scratch?.getContext("2d", {
-      willReadFrequently: true,
-    });
-
-    if (!scratchContext) {
-      continue;
-    }
-
-    scratchContext.drawImage(
-      loaded.canvas,
-      minX - source.x,
-      minY - source.y,
-      width,
-      height,
-      0,
-      0,
-      width,
-      height
-    );
-
-    const imageData = scratchContext.getImageData(0, 0, width, height);
-
-    blendImageDataOverTile(tile, imageData, minX - tile.x, minY - tile.y);
-    tile.revision += 1;
   }
 
   store.revision += 1;

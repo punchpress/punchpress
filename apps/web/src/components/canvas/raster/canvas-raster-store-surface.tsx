@@ -166,6 +166,10 @@ const drawStrokeOverlays = (context, overlays, bounds, scale) => {
     for (const tile of overlay.strokeStore.getTilesForBounds(bounds, {
       create: false,
     })) {
+      if (tile.merged) {
+        continue;
+      }
+
       const tileCanvas = getTileCanvas(tile);
 
       if (!tileCanvas) {

@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
+  commitMergedStrokeBounds,
   mergeStrokeStore,
+  mergeStrokeStoreTile,
   RASTER_STORE_TILE_SIZE,
   RasterTileStore,
 } from "../../../../packages/engine/src/raster/raster-tile-store";
@@ -185,6 +187,31 @@ describe("raster tile store paint", () => {
     expect(store.getPixelAt(40, 40)).toEqual([200, 40, 30, 255]);
     expect(store.getTile(0, 0).floatPixels).toBeNull();
   });
+
+  test("repainting the same color over saturated pixels is a no-op", () => {
+    const store = new RasterTileStore();
+
+    paintHardDab(store, { x: 60, y: 60 }, 10);
+
+    const pixelBefore = store.getPixelAt(60, 60);
+    const revisionBefore = store.getTile(0, 0).revision;
+
+    paintHardDab(store, { x: 60, y: 60 }, 10);
+
+    expect(store.getPixelAt(60, 60)).toEqual(pixelBefore);
+    expect(store.getTile(0, 0).revision).toBeGreaterThan(revisionBefore);
+  });
+
+  test("painting a different color over saturated pixels still blends", () => {
+    const store = new RasterTileStore();
+
+    paintHardDab(store, { x: 60, y: 60 }, 10);
+    paintHardDab(store, { x: 60, y: 60 }, 10, {
+      color: { b: 220, g: 10, r: 10 },
+    });
+
+    expect(store.getPixelAt(60, 60)).toEqual([10, 10, 220, 255]);
+  });
 });
 
 describe("raster stroke store merge", () => {
@@ -260,6 +287,57 @@ describe("raster stroke store merge", () => {
 
     expect(store.getPixelAt(-550, 50)[3]).toBe(255);
     expect(store.getPixelAt(50, 50)[3]).toBe(0);
+  });
+
+  test("incremental per-tile merge matches a full merge and flags tiles", () => {
+    const fullStore = new RasterTileStore();
+    const fullStrokeStore = new RasterTileStore();
+    const chunkedStore = new RasterTileStore();
+    const chunkedStrokeStore = new RasterTileStore();
+    const edge = RASTER_STORE_TILE_SIZE;
+
+    for (const strokeStore of [fullStrokeStore, chunkedStrokeStore]) {
+      paintAt(strokeStore, { x: edge, y: 40 }, 12, { opacity: 0.5 });
+      paintAt(strokeStore, { x: 80, y: 80 }, 10);
+    }
+
+    mergeStrokeStore({
+      mode: "paint",
+      store: fullStore,
+      strokeStore: fullStrokeStore,
+    });
+
+    const strokeBounds = chunkedStrokeStore.getPaintedBounds();
+    const strokeTiles = chunkedStrokeStore.getTilesForBounds(strokeBounds, {
+      create: false,
+    });
+
+    for (const strokeTile of strokeTiles) {
+      expect(strokeTile.merged).toBe(false);
+      mergeStrokeStoreTile({
+        mode: "paint",
+        store: chunkedStore,
+        strokeTile,
+      });
+      strokeTile.merged = true;
+    }
+
+    commitMergedStrokeBounds({ store: chunkedStore, strokeBounds });
+
+    for (const point of [
+      { x: edge - 1, y: 40 },
+      { x: edge, y: 40 },
+      { x: 80, y: 80 },
+    ]) {
+      expect(chunkedStore.getPixelAt(point.x, point.y)).toEqual(
+        fullStore.getPixelAt(point.x, point.y)
+      );
+    }
+
+    expect(chunkedStore.getPaintedBounds()).toEqual(
+      fullStore.getPaintedBounds()
+    );
+    expect(strokeTiles.every((strokeTile) => strokeTile.merged)).toBe(true);
   });
 
   test("merge across a tile seam keeps both sides and gutters consistent", () => {

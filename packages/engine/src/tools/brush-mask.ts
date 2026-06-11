@@ -55,7 +55,7 @@ export const getBrushDabSpacing = (size, spacing, hardness) => {
     MIN_SOFT_SPACING_MULTIPLIER +
     (1 - MIN_SOFT_SPACING_MULTIPLIER) * normalizedHardness;
 
-  return Math.max(1, size * spacing * spacingMultiplier);
+  return Math.max(1, size * 0.02, size * spacing * spacingMultiplier);
 };
 
 export const getBrushDabRenderRadius = (size, hardness) => {

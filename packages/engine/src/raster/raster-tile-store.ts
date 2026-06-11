@@ -16,6 +16,7 @@ export type RasterStoreTile = {
   nominalHeight: number;
   pixels: Uint8ClampedArray;
   floatPixels: Float32Array | null;
+  merged: boolean;
   revision: number;
 };
 
@@ -94,6 +95,7 @@ export class RasterTileStore {
       col,
       floatPixels: null,
       height,
+      merged: false,
       nominalHeight: this.tileSize,
       nominalWidth: this.tileSize,
       nominalX,
@@ -199,6 +201,12 @@ export class RasterTileStore {
     const red = (color?.r || 0) / 255;
     const green = (color?.g || 0) / 255;
     const blue = (color?.b || 0) / 255;
+    const saturatedWord =
+      (((255 << 24) |
+        ((color?.b || 0) << 16) |
+        ((color?.g || 0) << 8) |
+        (color?.r || 0)) >>>
+        0);
 
     measurePerf("brush.tile.dab.draw", () => {
       for (const tile of tiles) {
@@ -223,9 +231,27 @@ export class RasterTileStore {
 
         const floatPixels = tile.floatPixels;
         const pixels = tile.pixels;
+        const words = new Uint32Array(
+          pixels.buffer,
+          pixels.byteOffset,
+          pixels.length / 4
+        );
 
         for (let y = localMinY; y <= localMaxY; y += 1) {
+          const rowOffset = y * tile.width;
+
           for (let x = localMinX; x <= localMaxX; x += 1) {
+            const word = words[rowOffset + x];
+
+            if (mode === "paint" && word === saturatedWord) {
+              continue;
+            }
+
+            if (mode === "erase" && word >>> 24 === 0) {
+              continue;
+            }
+
+            const offset = (rowOffset + x) * 4;
             const coverage = getCoverage(
               tile.x + x + 0.5,
               tile.y + y + 0.5,
@@ -237,7 +263,6 @@ export class RasterTileStore {
             }
 
             const sourceAlpha = Math.min(1, Math.max(0, coverage * opacity));
-            const offset = (y * tile.width + x) * 4;
             const targetAlpha = floatPixels[offset + 3];
             const outputAlpha =
               mode === "erase"
@@ -296,6 +321,136 @@ export class RasterTileStore {
   }
 }
 
+export const mergeStrokeStoreTile = ({
+  anchorX = 0,
+  anchorY = 0,
+  mode,
+  store,
+  strokeTile,
+}: {
+  anchorX?: number;
+  anchorY?: number;
+  mode: "erase" | "paint";
+  store: RasterTileStore;
+  strokeTile: RasterStoreTile;
+}) => {
+  const strokeWords = new Uint32Array(
+    strokeTile.pixels.buffer,
+    strokeTile.pixels.byteOffset,
+    strokeTile.pixels.length / 4
+  );
+  const tileSize = store.tileSize;
+  const gutter = store.gutter;
+  const nominalMinX = strokeTile.nominalX - strokeTile.x;
+  const nominalMinY = strokeTile.nominalY - strokeTile.y;
+  const nominalMaxX = nominalMinX + strokeTile.nominalWidth;
+  const nominalMaxY = nominalMinY + strokeTile.nominalHeight;
+  const touchedTiles = new Set<RasterStoreTile>();
+  let cachedCol = Number.NaN;
+  let cachedRow = Number.NaN;
+  let cachedTile: RasterStoreTile | null = null;
+
+  for (let y = nominalMinY; y < nominalMaxY; y += 1) {
+    const rowOffset = y * strokeTile.width;
+
+    for (let x = nominalMinX; x < nominalMaxX; x += 1) {
+      const strokeAlphaByte = strokeWords[rowOffset + x] >>> 24;
+
+      if (strokeAlphaByte === 0) {
+        continue;
+      }
+
+      const strokeAlpha = strokeAlphaByte / 255;
+      const strokeOffset = (rowOffset + x) * 4;
+      const storeX = strokeTile.x + x - anchorX;
+      const storeY = strokeTile.y + y - anchorY;
+      const ownerCol = Math.floor(storeX / tileSize);
+      const ownerRow = Math.floor(storeY / tileSize);
+      const nearSeam =
+        storeX - ownerCol * tileSize < gutter ||
+        (ownerCol + 1) * tileSize - storeX <= gutter ||
+        storeY - ownerRow * tileSize < gutter ||
+        (ownerRow + 1) * tileSize - storeY <= gutter;
+
+      if (nearSeam) {
+        for (const targetTile of getPhysicallyContainingTiles(
+          store,
+          storeX,
+          storeY,
+          ownerCol,
+          ownerRow,
+          mode === "paint"
+        )) {
+          writeMergedPixel({
+            mode,
+            storeX,
+            storeY,
+            strokeAlpha,
+            strokeOffset,
+            strokeTile,
+            targetTile,
+          });
+          touchedTiles.add(targetTile);
+        }
+        continue;
+      }
+
+      if (ownerCol !== cachedCol || ownerRow !== cachedRow) {
+        cachedCol = ownerCol;
+        cachedRow = ownerRow;
+        cachedTile =
+          mode === "paint"
+            ? store.getOrCreateTile(ownerCol, ownerRow)
+            : store.getTile(ownerCol, ownerRow);
+      }
+
+      if (!cachedTile) {
+        continue;
+      }
+
+      writeMergedPixel({
+        mode,
+        storeX,
+        storeY,
+        strokeAlpha,
+        strokeOffset,
+        strokeTile,
+        targetTile: cachedTile,
+      });
+      touchedTiles.add(cachedTile);
+    }
+  }
+
+  for (const targetTile of touchedTiles) {
+    targetTile.floatPixels = null;
+    targetTile.revision += 1;
+  }
+};
+
+export const commitMergedStrokeBounds = ({
+  anchorX = 0,
+  anchorY = 0,
+  store,
+  strokeBounds,
+}: {
+  anchorX?: number;
+  anchorY?: number;
+  store: RasterTileStore;
+  strokeBounds: Bounds;
+}) => {
+  const mergedBounds = {
+    maxX: strokeBounds.maxX - anchorX,
+    maxY: strokeBounds.maxY - anchorY,
+    minX: strokeBounds.minX - anchorX,
+    minY: strokeBounds.minY - anchorY,
+  };
+
+  store.revision += 1;
+  store.dirtyBounds = unionBounds(store.dirtyBounds, mergedBounds);
+  store.paintedBounds = unionBounds(store.paintedBounds, mergedBounds);
+  return mergedBounds;
+};
+
 export const mergeStrokeStore = ({
   anchorX = 0,
   anchorY = 0,
@@ -318,60 +473,11 @@ export const mergeStrokeStore = ({
   for (const strokeTile of strokeStore.getTilesForBounds(strokeBounds, {
     create: false,
   })) {
-    const nominalMinX = strokeTile.nominalX - strokeTile.x;
-    const nominalMinY = strokeTile.nominalY - strokeTile.y;
-    const nominalMaxX = nominalMinX + strokeTile.nominalWidth;
-    const nominalMaxY = nominalMinY + strokeTile.nominalHeight;
-
-    for (let y = nominalMinY; y < nominalMaxY; y += 1) {
-      for (let x = nominalMinX; x < nominalMaxX; x += 1) {
-        const strokeOffset = (y * strokeTile.width + x) * 4;
-        const strokeAlpha = strokeTile.pixels[strokeOffset + 3] / 255;
-
-        if (strokeAlpha === 0) {
-          continue;
-        }
-
-        const storeX = strokeTile.x + x - anchorX;
-        const storeY = strokeTile.y + y - anchorY;
-        const ownerCol = Math.floor(storeX / store.tileSize);
-        const ownerRow = Math.floor(storeY / store.tileSize);
-
-        for (const targetTile of getPhysicallyContainingTiles(
-          store,
-          storeX,
-          storeY,
-          ownerCol,
-          ownerRow,
-          mode === "paint"
-        )) {
-          writeMergedPixel({
-            mode,
-            storeX,
-            storeY,
-            strokeAlpha,
-            strokeOffset,
-            strokeTile,
-            targetTile,
-          });
-          targetTile.floatPixels = null;
-          targetTile.revision += 1;
-        }
-      }
-    }
+    mergeStrokeStoreTile({ anchorX, anchorY, mode, store, strokeTile });
+    strokeTile.merged = true;
   }
 
-  const mergedBounds = {
-    maxX: strokeBounds.maxX - anchorX,
-    maxY: strokeBounds.maxY - anchorY,
-    minX: strokeBounds.minX - anchorX,
-    minY: strokeBounds.minY - anchorY,
-  };
-
-  store.revision += 1;
-  store.dirtyBounds = unionBounds(store.dirtyBounds, mergedBounds);
-  store.paintedBounds = unionBounds(store.paintedBounds, mergedBounds);
-  return mergedBounds;
+  return commitMergedStrokeBounds({ anchorX, anchorY, store, strokeBounds });
 };
 
 const getPhysicallyContainingTiles = (
@@ -448,6 +554,14 @@ const writeMergedPixel = ({
     targetTile.pixels[targetOffset + 3] = Math.round(
       targetAlpha * (1 - strokeAlpha) * 255
     );
+    return;
+  }
+
+  if (strokeAlpha >= 1) {
+    targetTile.pixels[targetOffset] = strokeTile.pixels[strokeOffset];
+    targetTile.pixels[targetOffset + 1] = strokeTile.pixels[strokeOffset + 1];
+    targetTile.pixels[targetOffset + 2] = strokeTile.pixels[strokeOffset + 2];
+    targetTile.pixels[targetOffset + 3] = 255;
     return;
   }
 

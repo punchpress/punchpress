@@ -5,7 +5,8 @@ import {
   getNodeWorldPoint,
 } from "../primitives/rotation";
 import {
-  mergeStrokeStore,
+  commitMergedStrokeBounds,
+  mergeStrokeStoreTile,
   RASTER_STORE_TILE_SIZE,
   RasterTileStore,
 } from "../raster/raster-tile-store";
@@ -25,6 +26,7 @@ import {
 import { DEFAULT_BRUSH_SETTINGS, getBrushColorRgb } from "./brush-settings";
 import {
   getArtboardClipSourceRect,
+  getImageLocalClipBounds,
   getImageLocalPoint,
   getImageNodeCroppedToSourceRect,
   materializeBrushTarget,
@@ -32,9 +34,9 @@ import {
 } from "./brush-target";
 import { selectToolFromShortcut, Tool } from "./tool";
 
-const BRUSH_STROKE_POINT_FLUSH_BUDGET_MS = 5;
+const BRUSH_STROKE_POINT_FLUSH_BUDGET_MS = 15;
 const BRUSH_TILE_ASYNC_COMMIT_THRESHOLD = 64;
-const BRUSH_TILE_COMMIT_BUDGET_MS = 8;
+const BRUSH_TILE_COMMIT_BUDGET_MS = 15;
 let brushStrokeSessionRevision = 0;
 let brushTileCommitRevision = 0;
 
@@ -73,23 +75,45 @@ const clamp = (value, min, max) => {
   return Math.min(max, Math.max(min, value));
 };
 
+const yieldRasterTask = () =>
+  new Promise((resolve) => {
+    if (typeof setTimeout === "undefined") {
+      resolve(undefined);
+      return;
+    }
+
+    setTimeout(resolve, 0);
+  });
+
 const getAlphaBounds = (imageData) => {
   const { data, height, width } = imageData;
+  const words = new Uint32Array(data.buffer, data.byteOffset, width * height);
   let minX = width;
   let minY = height;
   let maxX = -1;
   let maxY = -1;
 
   for (let y = 0; y < height; y += 1) {
+    const rowOffset = y * width;
+
     for (let x = 0; x < width; x += 1) {
-      if (data[(y * width + x) * 4 + 3] === 0) {
+      if (words[rowOffset + x] >>> 24 === 0) {
         continue;
       }
 
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x);
-      maxY = Math.max(maxY, y);
+      if (x < minX) {
+        minX = x;
+      }
+
+      if (x > maxX) {
+        maxX = x;
+      }
+
+      if (y < minY) {
+        minY = y;
+      }
+
+      maxY = y;
     }
   }
 
@@ -241,6 +265,65 @@ const getNextTiledImageNodeState = ({ node, tileSources }) => {
   };
 };
 
+const getCreatedTiledImageNodeState = ({ node, tileSources }) => {
+  const minX = Math.floor(
+    Math.min(...tileSources.map((tileSource) => tileSource.x))
+  );
+  const minY = Math.floor(
+    Math.min(...tileSources.map((tileSource) => tileSource.y))
+  );
+  const maxX = Math.ceil(
+    Math.max(...tileSources.map((tileSource) => tileSource.x + tileSource.width))
+  );
+  const maxY = Math.ceil(
+    Math.max(
+      ...tileSources.map((tileSource) => tileSource.y + tileSource.height)
+    )
+  );
+  const width = Math.max(1, maxX - minX);
+  const height = Math.max(1, maxY - minY);
+  const nextTileSources = tileSources.map((tileSource) =>
+    getTileSourceWithOffset(tileSource, -minX, -minY)
+  );
+  const nextNode = {
+    ...node,
+    height,
+    width,
+  };
+  const transform =
+    minX || minY
+      ? getNodeTransformForPinnedWorldPoint(
+          nextNode,
+          getImageNodeBounds(nextNode),
+          { x: 0, y: 0 },
+          getNodeWorldPoint(node, getImageNodeBounds(node), {
+            x: minX,
+            y: minY,
+          })
+        )
+      : node.transform;
+
+  return {
+    node: {
+      ...node,
+      baseHeight: height,
+      baseWidth: width,
+      baseX: 0,
+      baseY: 0,
+      height,
+      mimeType: "image/png",
+      tileSources: nextTileSources,
+      transform: {
+        ...node.transform,
+        ...transform,
+      },
+      width,
+    },
+    offsetX: -minX,
+    offsetY: -minY,
+  };
+};
+
 const createTileSourceFromDirtyTile = ({
   commitRevision,
   nodeId,
@@ -283,14 +366,11 @@ const createTileSourceFromDirtyTile = ({
 
   context.putImageData(new ImageData(pixels, width, height), 0, 0);
 
-  const col = Math.floor(x / RASTER_STORE_TILE_SIZE);
-  const row = Math.floor(y / RASTER_STORE_TILE_SIZE);
-
   return {
-    col,
+    col: Math.floor(x / RASTER_STORE_TILE_SIZE),
     height,
-    ref: `assets/raster/${nodeId}/tiles/${commitRevision}_${col}_${row}.png`,
-    row,
+    ref: `assets/raster/${nodeId}/tiles/${commitRevision}_${tile.col}_${tile.row}.png`,
+    row: Math.floor(y / RASTER_STORE_TILE_SIZE),
     src: canvas.toDataURL("image/png"),
     width,
     x,
@@ -414,8 +494,21 @@ class BrushStrokeSession {
       operation === "erase" ? "erase brush stroke" : "paint brush stroke"
     );
     this.initialSourceRect = getArtboardClipSourceRect(editor, node);
+
+    const localClipBounds = getImageLocalClipBounds(editor, node);
+
+    this.strokeClipBounds = localClipBounds
+      ? {
+          maxX: localClipBounds.maxX - (this.initialSourceRect?.x || 0),
+          maxY: localClipBounds.maxY - (this.initialSourceRect?.y || 0),
+          minX: localClipBounds.minX - (this.initialSourceRect?.x || 0),
+          minY: localClipBounds.minY - (this.initialSourceRect?.y || 0),
+        }
+      : null;
+    this.createdTarget = editor.getNode(node.id)?.type !== "image";
     this.preserveRasterPlane =
       editor.getNode(node.id)?.type === "image" && !this.initialSourceRect;
+    this.activeSegment = null;
     this.commitReady = Promise.resolve();
     this.lastPoint = null;
     this.merged = false;
@@ -483,23 +576,27 @@ class BrushStrokeSession {
     budgetMs = Number.POSITIVE_INFINITY,
   } = {}) {
     measurePerf("brush.stroke.flushPoints", () => {
-      const startedAt = getNow();
+      const deadline = Number.isFinite(budgetMs)
+        ? getNow() + budgetMs
+        : Number.POSITIVE_INFINITY;
       let processedCount = 0;
 
-      while (this.pointReadIndex < this.points.length) {
+      while (true) {
+        if (this.activeSegment && !this.advanceSegment(deadline)) {
+          break;
+        }
+
+        this.activeSegment = null;
+
+        if (this.pointReadIndex >= this.points.length) {
+          break;
+        }
+
         const point = this.points[this.pointReadIndex];
 
         this.pointReadIndex += 1;
-        this.applyPoint(point);
+        this.beginSegment(point);
         processedCount += 1;
-
-        if (
-          Number.isFinite(budgetMs) &&
-          processedCount > 0 &&
-          getNow() - startedAt >= budgetMs
-        ) {
-          break;
-        }
       }
 
       if (processedCount > 0) {
@@ -514,6 +611,10 @@ class BrushStrokeSession {
         this.pointReadIndex = 0;
       }
     });
+  }
+
+  get hasPendingStrokeInput() {
+    return Boolean(this.activeSegment) || this.pointReadIndex < this.points.length;
   }
 
   scheduleQueuedPointFlush() {
@@ -532,7 +633,7 @@ class BrushStrokeSession {
         budgetMs: BRUSH_STROKE_POINT_FLUSH_BUDGET_MS,
       });
 
-      if (!this.completed && this.pointReadIndex < this.points.length) {
+      if (!this.completed && this.hasPendingStrokeInput) {
         this.scheduleQueuedPointFlush();
       }
     });
@@ -548,10 +649,12 @@ class BrushStrokeSession {
     this.pointFlushFrameId = 0;
   }
 
-  applyPoint(point) {
+  beginSegment(point) {
     if (!this.lastPoint) {
       this.applyDab(point);
+      incrementPerfCounter("brush.dab");
       this.lastPoint = point;
+      this.activeSegment = null;
       return;
     }
 
@@ -564,18 +667,39 @@ class BrushStrokeSession {
       this.settings.spacing,
       this.settings.hardness
     );
-    const steps = Math.max(1, Math.ceil(distance / spacing));
 
-    for (let index = 1; index <= steps; index += 1) {
-      const progress = index / steps;
+    this.activeSegment = {
+      from: this.lastPoint,
+      index: 0,
+      steps: Math.max(1, Math.ceil(distance / spacing)),
+      to: point,
+    };
+    this.lastPoint = point;
+  }
+
+  advanceSegment(deadline) {
+    const segment = this.activeSegment;
+    let appliedCount = 0;
+
+    while (segment.index < segment.steps) {
+      if (getNow() >= deadline) {
+        incrementPerfCounter("brush.dab", appliedCount);
+        return false;
+      }
+
+      segment.index += 1;
+
+      const progress = segment.index / segment.steps;
+
       this.applyDab({
-        x: this.lastPoint.x + (point.x - this.lastPoint.x) * progress,
-        y: this.lastPoint.y + (point.y - this.lastPoint.y) * progress,
+        x: segment.from.x + (segment.to.x - segment.from.x) * progress,
+        y: segment.from.y + (segment.to.y - segment.from.y) * progress,
       });
+      appliedCount += 1;
     }
 
-    incrementPerfCounter("brush.dab", steps);
-    this.lastPoint = point;
+    incrementPerfCounter("brush.dab", appliedCount);
+    return true;
   }
 
   applyDab(point) {
@@ -588,6 +712,29 @@ class BrushStrokeSession {
       minX: Math.floor(point.x - renderRadius),
       minY: Math.floor(point.y - renderRadius),
     };
+
+    if (this.strokeClipBounds) {
+      bounds.maxX = Math.min(
+        bounds.maxX,
+        Math.ceil(this.strokeClipBounds.maxX) - 1
+      );
+      bounds.maxY = Math.min(
+        bounds.maxY,
+        Math.ceil(this.strokeClipBounds.maxY) - 1
+      );
+      bounds.minX = Math.max(
+        bounds.minX,
+        Math.floor(this.strokeClipBounds.minX)
+      );
+      bounds.minY = Math.max(
+        bounds.minY,
+        Math.floor(this.strokeClipBounds.minY)
+      );
+
+      if (bounds.maxX <= bounds.minX || bounds.maxY <= bounds.minY) {
+        return;
+      }
+    }
 
     this.strokeStore.paintDab({
       bounds,
@@ -629,18 +776,33 @@ class BrushStrokeSession {
       pendingPointCount: this.points.length,
       sessionId: this.sessionId,
     });
-    this.addPoint(this.getLocalPoint(point));
+    this.points.push(this.getLocalPoint(point));
     this.completed = true;
     this.cancelQueuedPointFlush();
-    this.flushPoints();
+    this.commitReady = this.commit();
+
+    return this.commitReady;
+  }
+
+  async flushRemainingPoints() {
+    while (this.hasPendingStrokeInput) {
+      this.flushPoints({
+        budgetMs: canScheduleRasterFrame()
+          ? BRUSH_STROKE_POINT_FLUSH_BUDGET_MS
+          : Number.POSITIVE_INFINITY,
+      });
+      this.editor.notifyInteractionPreviewChanged();
+
+      if (this.hasPendingStrokeInput) {
+        await yieldRasterTask();
+      }
+    }
+
     recordRasterDebugEvent("session.complete.flushed", {
       dirtyBounds: this.dirtyBounds,
       nodeId: this.nodeId,
       sessionId: this.sessionId,
     });
-    this.commitReady = this.commit();
-
-    return this.commitReady;
   }
 
   cancel() {
@@ -662,6 +824,12 @@ class BrushStrokeSession {
       sessionId: this.sessionId,
     });
 
+    return this.runCommit();
+  }
+
+  async runCommit() {
+    await this.flushRemainingPoints();
+
     if (!this.dirtyBounds) {
       recordRasterDebugEvent("commit.noDirtyBounds", {
         nodeId: this.nodeId,
@@ -669,33 +837,76 @@ class BrushStrokeSession {
       });
       this.editor.revertToMark(this.historyMark);
       this.tool.clearActiveSession(this);
-      return Promise.resolve();
+      return;
     }
 
-    return this.ready.then(() => this.finishCommit());
+    await this.ready;
+    await this.finishCommit();
   }
 
-  finishCommit() {
-    const entry = this.storeEntry;
-
-    measurePerf("brush.commit.mergeStrokeStore", () =>
-      mergeStrokeStore({
-        anchorX: entry.anchorX - (this.initialSourceRect?.x || 0),
-        anchorY: entry.anchorY - (this.initialSourceRect?.y || 0),
-        mode: this.operation === "erase" ? "erase" : "paint",
-        store: entry.store,
-        strokeStore: this.strokeStore,
-      })
-    );
+  async finishCommit() {
+    await this.mergeStrokeStoreBudgeted();
     this.merged = true;
     this.tool.sessions.delete(this);
     this.editor.notifyInteractionPreviewChanged();
 
-    if (this.operation === "erase") {
-      return this.commitEraseFlatten();
+    if (this.operation === "erase" || this.initialSourceRect) {
+      return this.commitFlatten();
     }
 
     return this.commitPaintTiles();
+  }
+
+  async mergeStrokeStoreBudgeted() {
+    const entry = this.storeEntry;
+    const strokeBounds = this.strokeStore.getPaintedBounds();
+
+    if (!strokeBounds) {
+      return;
+    }
+
+    const anchorX = entry.anchorX - (this.initialSourceRect?.x || 0);
+    const anchorY = entry.anchorY - (this.initialSourceRect?.y || 0);
+    const mode = this.operation === "erase" ? "erase" : "paint";
+    const strokeTiles = this.strokeStore.getTilesForBounds(strokeBounds, {
+      create: false,
+    });
+    let tileIndex = 0;
+
+    while (tileIndex < strokeTiles.length) {
+      measurePerf("brush.commit.mergeStrokeStore.chunk", () => {
+        const startedAt = getNow();
+
+        do {
+          const strokeTile = strokeTiles[tileIndex];
+
+          mergeStrokeStoreTile({
+            anchorX,
+            anchorY,
+            mode,
+            store: entry.store,
+            strokeTile,
+          });
+          strokeTile.merged = true;
+          tileIndex += 1;
+        } while (
+          tileIndex < strokeTiles.length &&
+          getNow() - startedAt < BRUSH_TILE_COMMIT_BUDGET_MS
+        );
+      });
+
+      if (tileIndex < strokeTiles.length && canScheduleRasterFrame()) {
+        await yieldRasterTask();
+      }
+    }
+
+    this.strokeStore.revision += 1;
+    commitMergedStrokeBounds({
+      anchorX,
+      anchorY,
+      store: entry.store,
+      strokeBounds,
+    });
   }
 
   commitPaintTiles() {
@@ -777,7 +988,7 @@ class BrushStrokeSession {
         incrementPerfCounter("brush.tile.commit.encodeChunk");
 
         if (tileIndex < dirtyTiles.length) {
-          requestRasterFrame(encodeChunk);
+          yieldRasterTask().then(encodeChunk);
           return;
         }
 
@@ -791,7 +1002,7 @@ class BrushStrokeSession {
         resolve();
       };
 
-      requestRasterFrame(encodeChunk);
+      encodeChunk();
     });
   }
 
@@ -815,7 +1026,9 @@ class BrushStrokeSession {
             return node;
           }
 
-          commitResult = getNextTiledImageNodeState({ node, tileSources });
+          commitResult = this.createdTarget
+            ? getCreatedTiledImageNodeState({ node, tileSources })
+            : getNextTiledImageNodeState({ node, tileSources });
           return commitResult.node;
         });
       })
@@ -839,7 +1052,7 @@ class BrushStrokeSession {
     this.tool.clearActiveSession(this);
   }
 
-  commitEraseFlatten() {
+  commitFlatten() {
     const node = this.editor.getNode(this.nodeId);
 
     if (node?.type !== "image") {
@@ -906,11 +1119,8 @@ class BrushStrokeSession {
             return currentNode;
           }
 
-          const { tileSources: _removedTileSources, ...nextNode } =
-            currentNode;
-
           return {
-            ...nextNode,
+            ...currentNode,
             baseHeight: output.height,
             baseWidth: output.width,
             baseX: 0,
@@ -918,6 +1128,7 @@ class BrushStrokeSession {
             height: output.height,
             mimeType: "image/png",
             src,
+            tileSources: undefined,
             transform: this.preserveRasterPlane
               ? currentNode.transform
               : {
@@ -935,7 +1146,7 @@ class BrushStrokeSession {
     }
 
     this.editor.commitHistoryStep(this.historyMark);
-    recordRasterDebugEvent("commit.eraseFlatten.finish", {
+    recordRasterDebugEvent("commit.flatten.finish", {
       node: getRasterDebugNodePayload(this.editor.getNode(this.nodeId)),
       sessionId: this.sessionId,
     });

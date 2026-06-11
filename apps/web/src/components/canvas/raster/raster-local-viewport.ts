@@ -32,24 +32,6 @@ const getViewportWorldCorners = (editor, state) => {
   ];
 };
 
-const getAncestorChain = (editor, node) => {
-  const ancestors: (typeof node)[] = [];
-  let currentNode = node;
-
-  while (currentNode?.parentId && currentNode.parentId !== "root") {
-    const parentNode = editor.getNode(currentNode.parentId);
-
-    if (!parentNode) {
-      break;
-    }
-
-    ancestors.unshift(parentNode);
-    currentNode = parentNode;
-  }
-
-  return ancestors;
-};
-
 export const getNodeLocalViewportBounds = (editor, state, node, padding) => {
   const corners = getViewportWorldCorners(editor, state);
 
@@ -57,22 +39,9 @@ export const getNodeLocalViewportBounds = (editor, state, node, padding) => {
     return null;
   }
 
-  const ancestors = getAncestorChain(editor, node);
-  const localPoints = corners.map((corner) => {
-    let point = corner;
-
-    for (const ancestor of ancestors) {
-      const bounds = editor.getNodeTransformBounds(ancestor.id);
-
-      if (!bounds) {
-        return null;
-      }
-
-      point = getNodeLocalPoint(ancestor, bounds, point);
-    }
-
-    return getNodeLocalPoint(node, getImageLocalBounds(node), point);
-  });
+  const localPoints = corners.map((corner) =>
+    getNodeLocalPoint(node, getImageLocalBounds(node), corner)
+  );
 
   if (localPoints.some((point) => !point)) {
     return null;
