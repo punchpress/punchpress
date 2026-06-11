@@ -61,5 +61,5 @@ export const normalizeNodeForSchema = (node: Record<string, unknown>) => {
 export const normalizeNodesForSchema = <TNode extends Record<string, unknown>>(
   nodes: readonly TNode[]
 ) => {
-  return nodes.map((node) => normalizeNodeForSchema(node)) as TNode[];
+  return nodes.map((node) => normalizeNodeForSchema(node)) as unknown as TNode[];
 };

@@ -29,6 +29,7 @@ export const parseDesignDocument = (contents: string): DesignDocument => {
   const result = designDocumentSchema.safeParse(migrated);
 
   if (!result.success) {
+    // @ts-expect-error TODO(typecheck-baseline): Zod v4 ZodError.issues.path is PropertyKey[] (includes symbol) but formatValidationError expects (string|number)[]
     throw new DocumentValidationError(formatValidationError(result.error), {
       cause: result.error,
     });

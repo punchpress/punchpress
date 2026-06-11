@@ -6,6 +6,7 @@ export {
   parseClipboardContent,
   serializeClipboardContent,
 } from "./clipboard";
+export type { ClipboardContent } from "./clipboard";
 export {
   DEFAULT_DOCUMENT_BASE_NAME,
   PUNCH_DOCUMENT_EXTENSION,
@@ -69,7 +70,6 @@ export {
 } from "./save";
 export type {
   ArtboardNodeDocument,
-  ClipboardContent,
   DesignDocument,
   DocumentAsset,
   EmptyNodeDocument,

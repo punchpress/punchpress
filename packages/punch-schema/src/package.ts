@@ -105,6 +105,7 @@ const createSingleRasterPackageEntry = (
     entries: [
       {
         data: bytes,
+        // @ts-expect-error TODO(typecheck-baseline): createRasterAssetRecord always returns single storage (with ref), but return type is the full union
         path: asset.ref,
       },
     ],
@@ -236,6 +237,7 @@ export const createPunchPackage = (contents: string) => {
           ? createSparseTiledRasterPackageEntry(node)
         : createSingleRasterPackageEntry(node);
 
+    // @ts-expect-error TODO(typecheck-baseline): inferred asset type from createSparseTiledRasterPackageEntry has colorSpace: string instead of "srgb"
     packageAssets[packageEntry.asset.id] = packageEntry.asset;
     assetEntries.push(...packageEntry.entries);
 
