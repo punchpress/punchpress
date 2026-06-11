@@ -118,13 +118,13 @@ const getRotateSelectionCenter = (
   return getBoundsCenter(editor.getSelectionBounds(resolvedNodeIds));
 };
 
-export const beginRotateSelection = (editor, { nodeId, nodeIds } = {}) => {
+export const beginRotateSelection = (editor, { nodeId = undefined, nodeIds = undefined } = {}) => {
   return measurePerf(PERF_SPANS.transformRotateBegin, () =>
     beginRotateSelectionMeasured(editor, { nodeId, nodeIds })
   );
 };
 
-const beginRotateSelectionMeasured = (editor, { nodeId, nodeIds } = {}) => {
+const beginRotateSelectionMeasured = (editor, { nodeId = undefined, nodeIds = undefined } = {}) => {
   const requestedNodeIds =
     nodeIds?.filter((currentNodeId) => editor.getNode(currentNodeId)) ||
     (nodeId
@@ -204,7 +204,7 @@ const beginRotateSelectionMeasured = (editor, { nodeId, nodeIds } = {}) => {
 export const updateRotateSelection = (
   editor,
   session,
-  { deltaRotation = 0 } = {}
+  { deltaRotation = 0, queueRefresh = undefined } = {}
 ) => {
   return measurePerf(PERF_SPANS.transformRotateUpdate, () => {
     if (!(session && Number.isFinite(deltaRotation))) {

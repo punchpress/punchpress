@@ -87,7 +87,7 @@ export const scheduleViewportFocus = (editor, nodeIds, options = {}) => {
   });
 };
 
-export const focusCanvasBoundsInViewport = (editor, bounds, options = {}) => {
+export const focusCanvasBoundsInViewport = (editor, bounds, options: { paddingX?: number; paddingY?: number; padding?: number; maxZoom?: number } = {}) => {
   const viewer = editor.viewerRef;
   const host = editor.hostRef;
 

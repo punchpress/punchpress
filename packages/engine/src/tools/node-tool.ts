@@ -40,7 +40,7 @@ export class NodeTool extends Tool {
     return this.editor.startPathEditing(targetNodeId);
   }
 
-  onDeactivate({ nextToolId } = {}) {
+  onDeactivate({ nextToolId = undefined } = {}) {
     if (nextToolId === "pen" || !this.editor.pathEditingNodeId) {
       return false;
     }

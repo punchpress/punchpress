@@ -144,9 +144,9 @@ export const handlePenCanvasPointerDown = (tool: PenTool, { event, point }) => {
 
   return createPlacementSession(
     () => tool.cancelDraftPlacement(),
-    ({ point: nextPoint, ...options } = {}) =>
+    ({ point: nextPoint = undefined, ...options } = {}) =>
       tool.completeDraftPlacement(nextPoint || point, options),
-    ({ point: nextPoint, ...options } = {}) =>
+    ({ point: nextPoint = undefined, ...options } = {}) =>
       updateDraftPlacement(tool, nextPoint || point, options)
   );
 };

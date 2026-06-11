@@ -62,9 +62,9 @@ const roundHandle = (point: { x: number; y: number }) => {
 };
 
 const transformHandle = (
-  matrix: paper.Matrix,
-  point: paper.Point,
-  handle: paper.Point
+  matrix,
+  point,
+  handle
 ) => {
   const transformedPoint = matrix.transform(point);
   const transformedHandlePoint = matrix.transform(point.add(handle));
@@ -72,7 +72,7 @@ const transformHandle = (
   return transformedHandlePoint.subtract(transformedPoint);
 };
 
-const createContourFromPaperPath = (path: paper.Path, center: paper.Point) => {
+const createContourFromPaperPath = (path, center) => {
   const matrix = path.globalMatrix;
 
   return {
@@ -96,15 +96,15 @@ const createContourFromPaperPath = (path: paper.Path, center: paper.Point) => {
   };
 };
 
-const getPaperResultPaths = (item: paper.Item) => {
+const getPaperResultPaths = (item) => {
   if (item.className === "CompoundPath") {
-    return item.children.filter((child): child is paper.Path => {
+    return item.children.filter((child) => {
       return child.className === "Path" && child.segments.length > 0;
     });
   }
 
   if (item.className === "Path") {
-    const path = item as paper.Path;
+    const path = item as any;
     return path.segments.length > 0 ? [path] : [];
   }
 
@@ -221,8 +221,8 @@ const getBooleanSourceSelection = (
 };
 
 const applyLeafNodeTransform = (
-  scope: paper.PaperScope,
-  item: paper.Item,
+  scope,
+  item,
   node,
   bbox
 ) => {
@@ -245,7 +245,7 @@ const applyLeafNodeTransform = (
   item.translate(new scope.Point(getNodeX(node), getNodeY(node)));
 };
 
-const createPaperItemFromLeafNode = (scope: paper.PaperScope, node) => {
+const createPaperItemFromLeafNode = (scope, node) => {
   const geometry = buildNodeCapabilityGeometry(node, null);
 
   if (!(geometry?.bbox && geometry.paths.length > 0)) {
@@ -274,7 +274,7 @@ const createPaperItemFromLeafNode = (scope: paper.PaperScope, node) => {
   return item;
 };
 
-const createPaperItemFromSource = (scope: paper.PaperScope, source) => {
+const createPaperItemFromSource = (scope, source) => {
   if (source.node.type === "path" || source.node.type === "shape") {
     return createPaperItemFromLeafNode(scope, source.node);
   }
@@ -308,7 +308,7 @@ const createPaperItemFromSource = (scope: paper.PaperScope, source) => {
 
 const performBooleanOperation = (
   operation: BooleanOperation,
-  sourceItems: paper.PathItem[]
+  sourceItems
 ) => {
   const [firstItem, ...restItems] = sourceItems;
 
@@ -337,7 +337,7 @@ const performBooleanOperation = (
 
 const createResultNodes = (
   editor,
-  resultItem: paper.Item,
+  resultItem,
   parentId: string,
   styleTemplate
 ) => {

@@ -131,7 +131,7 @@ const setDetectedVectorRoundCornerRadius = (
   contours,
   descriptor,
   cornerRadius,
-  options = {}
+  options: { clampToDescriptorMax?: boolean } = {}
 ) => {
   const nextCornerRadius = clampCornerRadius(cornerRadius);
   const contour = contours?.[descriptor?.contourIndex];

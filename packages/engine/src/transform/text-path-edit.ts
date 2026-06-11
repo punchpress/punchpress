@@ -237,7 +237,7 @@ const beginSlantEdit = (guideState, nodeId, pointerCanvas) => {
 
 export const beginTextPathEdit = (
   editor,
-  { mode, nodeId, pointerCanvas } = {}
+  { mode = undefined, nodeId = undefined, pointerCanvas = undefined } = {}
 ) => {
   const guideState = getEditableGuideState(editor, nodeId);
 
@@ -271,7 +271,7 @@ export const beginTextPathEdit = (
 export const updateTextPathEdit = (
   editor,
   session,
-  { pointerCanvas, shiftKey = false } = {}
+  { pointerCanvas = undefined, shiftKey = false } = {}
 ) => {
   if (!(session && pointerCanvas)) {
     return null;

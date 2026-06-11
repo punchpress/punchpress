@@ -14,7 +14,7 @@ import { createSelectionStoreActions } from "./create-selection-store-actions";
 
 export const createEditorStore = ({
   initialZoom = 1,
-  resolveDefaultFont,
+  resolveDefaultFont = undefined,
 } = {}) => {
   const getDefaultFont = () => {
     return createLocalFontDescriptor(

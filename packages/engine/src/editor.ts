@@ -268,6 +268,47 @@ import { zoomViewportFromWheel as zoomEditorViewportFromWheel } from "./viewport
 // Intentional facade: keep the public editor API and durable subsystem wiring
 // here, and move behavior-heavy implementation into capability modules.
 export class Editor {
+  declare accent;
+  declare availableFonts;
+  declare defaultFont;
+  declare editingHistoryMark;
+  declare fonts;
+  declare geometry;
+  declare getInitialLocalFontCatalog;
+  declare history;
+  declare hostRef;
+  declare interactionPreviewListeners;
+  declare interactionPreviewRevision;
+  declare lastPasteCount;
+  declare lastPasteKey;
+  declare lastUsedFont;
+  declare localFontCatalogPromise;
+  declare nodeElements;
+  declare nodeTransformElements;
+  declare nodeTree;
+  declare onViewportChange;
+  declare pathEditingPreviewListeners;
+  declare pathEditingPreviewRevision;
+  declare pathEditingPreviewState;
+  declare pendingViewportFocusFrame;
+  declare persistLastUsedFont;
+  declare placementSurfaceListeners;
+  declare requestLocalFontCatalog;
+  declare selectionBoundsCache;
+  declare selectionColorPreviewState;
+  declare selectionDragPreviewListeners;
+  declare selectionDragPreviewRevision;
+  declare selectionDragPreviewState;
+  declare selectionPropertiesSnapshotCache;
+  declare store;
+  declare tools;
+  declare unsubscribe;
+  declare vectorRenderSurfaces;
+  declare viewerRef;
+  declare viewportFocusRequest;
+  declare viewportInteracting;
+  declare viewportState;
+
   constructor({ accent = UI_ACCENT, initialZoom = 1 } = {}) {
     this.accent = accent;
     this.availableFonts = [];
@@ -293,6 +334,7 @@ export class Editor {
     this.geometry = new GeometryManager(this.fonts);
     this.nodeTree = new NodeTreeManager();
     this.vectorRenderSurfaces = new VectorRenderSurfaceManager();
+    // @ts-expect-error TODO(typecheck-baseline): Map infers narrowest tool overload; union is correct at runtime
     this.tools = new Map([
       ["pointer", new PointerTool(this)],
       ["brush", new BrushTool(this, "paint")],

@@ -158,7 +158,7 @@ export const makeCompoundPath = (editor, nodeIds = editor.selectedNodeIds) => {
         return;
       }
 
-      const vectorNode = {
+      const vectorNode: any = {
         ...createDefaultVectorContainerNode(),
         compoundWrapper: true,
         name: "Compound",

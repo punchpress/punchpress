@@ -5,7 +5,7 @@ import { measurePerf } from "../perf/perf-hooks";
 import { PERF_SPANS } from "../perf/perf-labels";
 import { round } from "../primitives/math";
 
-export const beginMoveSelection = (editor, { nodeId, nodeIds } = {}) => {
+export const beginMoveSelection = (editor, { nodeId = undefined, nodeIds = undefined } = {}) => {
   const requestedNodeIds =
     nodeIds?.filter((currentNodeId) => editor.getNode(currentNodeId)) ||
     (nodeId
@@ -84,7 +84,7 @@ const setMoveSelectionPreview = (editor, session, nextDelta) => {
   return previewNodeIds;
 };
 
-const getAbsoluteMoveDelta = (session, { dragEvents, left, top } = {}) => {
+const getAbsoluteMoveDelta = (session, { dragEvents = undefined, left = undefined, top = undefined } = {}) => {
   if (!session) {
     return null;
   }
@@ -239,7 +239,7 @@ export const commitMoveSelection = (editor, session) => {
 export const updateMoveSelection = (
   editor,
   session,
-  { delta, dragEvents, left, top } = {}
+  { delta = undefined, dragEvents = undefined, left = undefined, top = undefined } = {}
 ) => {
   return measurePerf(PERF_SPANS.transformMoveAbsolute, () => {
     if (!session) {

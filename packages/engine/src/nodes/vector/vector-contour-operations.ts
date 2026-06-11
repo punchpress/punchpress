@@ -65,7 +65,7 @@ export const appendVectorContourSegment = (
 
 export const replaceVectorContourSegment = (
   contours,
-  { contourIndex, handleIn, handleOut, point, pointType, segmentIndex }
+  { contourIndex = undefined, handleIn = undefined, handleOut = undefined, point = undefined, pointType = undefined, segmentIndex = undefined } = {}
 ) => {
   return contours.map((contour, index) => {
     if (index !== contourIndex) {

@@ -125,7 +125,7 @@ const updateVectorContoursImpl = (
   return true;
 };
 
-export const updateEditablePath = (editor, nodeId, contours, options) => {
+export const updateEditablePath = (editor, nodeId, contours, options?) => {
   const session = editor.getEditablePathSession(nodeId);
 
   if (!(session && contours)) {

@@ -183,7 +183,7 @@ const beginShapePlacement = (editor, { point, shape }) => {
     },
     complete: ({
       dragDistancePx = 0,
-      point: nextPoint,
+      point: nextPoint = undefined,
       preserveAspectRatio = false,
     } = {}) => {
       const placementApplied = applyPlacementPoint(nextPoint, {
@@ -207,7 +207,7 @@ const beginShapePlacement = (editor, { point, shape }) => {
     },
     update: ({
       dragDistancePx = 0,
-      point: nextPoint,
+      point: nextPoint = undefined,
       preserveAspectRatio = false,
     } = {}) => {
       return applyPlacementPoint(nextPoint, {
@@ -295,7 +295,7 @@ const beginArtboardPlacement = (editor, { point }) => {
   };
 };
 
-export const beginNodePlacement = (editor, { point, shape, type } = {}) => {
+export const beginNodePlacement = (editor, { point = undefined, shape = undefined, type = undefined } = {}) => {
   const placementCapabilities = getNodePlacementCapabilities(type);
 
   if (!(placementCapabilities && point)) {

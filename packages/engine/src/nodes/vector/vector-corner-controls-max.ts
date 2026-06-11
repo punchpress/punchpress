@@ -35,12 +35,12 @@ const getContourLogicalCornerVertices = (
       segmentIndex,
     });
 
-    if (control?.kind !== "detected" || control.startIndex !== segmentIndex) {
+    if ((control as any)?.kind !== "detected" || (control as any).startIndex !== segmentIndex) {
       return;
     }
 
-    detectedByStartIndex.set(segmentIndex, control);
-    detectedEndIndices.add(control.endIndex);
+    detectedByStartIndex.set(segmentIndex, control as any);
+    detectedEndIndices.add((control as any).endIndex);
   });
 
   return contour.segments.flatMap((segment, segmentIndex) => {

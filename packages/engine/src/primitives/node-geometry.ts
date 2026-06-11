@@ -166,7 +166,7 @@ const hitTestRegion = (region, point, options) => {
   });
 };
 
-const hitTestGeometryPoint = (geometry, point, options = {}) => {
+const hitTestGeometryPoint = (geometry, point, options: { margin?: number; hitInside?: boolean } = {}) => {
   const margin = options.margin || 0;
 
   if (!isPointInBounds(point, geometry?.bbox, margin)) {

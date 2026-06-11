@@ -87,7 +87,7 @@ const getPointTypeTogglePlacementContours = (
     return placement.baseContours;
   }
 
-  return setVectorPointHandlesFromAnchorDrag(placement.baseContours, {
+  return setVectorPointHandlesFromAnchorDrag(placement.baseContours as any, {
     contourIndex: placement.point.contourIndex,
     segmentIndex: placement.point.segmentIndex,
     value: dragHandle,

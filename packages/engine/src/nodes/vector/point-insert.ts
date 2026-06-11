@@ -1,9 +1,10 @@
 import type {
   VectorContourDocument,
   VectorHandleDocument,
-  VectorPointDocument,
   VectorSegmentDocument,
 } from "@punchpress/punch-schema";
+
+type VectorPointDocument = { x: number; y: number };
 
 const CURVE_ENDPOINT_EPSILON = 0.001;
 const CURVE_REFINE_STEPS = 6;

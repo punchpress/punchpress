@@ -1,4 +1,6 @@
 import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
+
+type AddNodeOptions = { activatePointer?: boolean; patch?: any; selectionNodeId?: string };
 import {
   createDefaultArtboardNode,
   getNextArtboardName,
@@ -52,7 +54,7 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
   };
 
   return {
-    addArtboardNode: (point, options = {}) => {
+    addArtboardNode: (point, options: AddNodeOptions = {}) => {
       const activatePointer = options.activatePointer !== false;
       const nodePatch = options.patch ? { ...options.patch } : {};
       let insertedNodeId: string | null = null;
@@ -125,7 +127,7 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
       return insertedNodeId;
     },
 
-    addShapeNode: (point, shape, options = {}) => {
+    addShapeNode: (point, shape, options: AddNodeOptions = {}) => {
       const node = createDefaultShapeNode(shape);
       const activatePointer = options.activatePointer !== false;
       const nodePatch = options.patch || null;
@@ -167,7 +169,7 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
       return node.id;
     },
 
-    addTextNode: (point, font, options = {}) => {
+    addTextNode: (point, font, options: AddNodeOptions = {}) => {
       const node = createDefaultNode(font || resolveDefaultFont());
       const nodePatch = options.patch || null;
 
@@ -208,7 +210,7 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
       return node.id;
     },
 
-    addVectorNode: (point, options = {}) => {
+    addVectorNode: (point, options: AddNodeOptions = {}) => {
       const node = createDefaultPathNode(ROOT_PARENT_ID);
       const activatePointer = options.activatePointer !== false;
       const nodePatch = options.patch || null;
@@ -245,7 +247,7 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
       return normalizedNode.id;
     },
 
-    addPathNode: (parentId, point, options = {}) => {
+    addPathNode: (parentId, point, options: AddNodeOptions = {}) => {
       const resolvedParentId = parentId || ROOT_PARENT_ID;
       const node = createDefaultPathNode(resolvedParentId);
       const activatePointer = options.activatePointer !== false;

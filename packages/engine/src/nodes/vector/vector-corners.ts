@@ -59,7 +59,7 @@ export const getVectorContourCommands = (contour) => {
   }
 
   if (contour.closed) {
-    commands.push({ type: "Z" });
+    commands.push({ type: "Z" } as any);
   }
 
   return commands;

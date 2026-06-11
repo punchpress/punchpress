@@ -115,7 +115,7 @@ const buildSvgImageMarkup = (node, geometry, inheritedOpacity, offsetX, offsetY)
   )})">${openLocalTransform}${baseMarkup}${tileMarkup}${closeLocalTransform}</g>`;
 };
 
-export const buildSvgExport = (nodes, geometryById, options = {}) => {
+export const buildSvgExport = (nodes, geometryById, options: { width?: any; height?: any; offsetX?: any; offsetY?: any; inheritedOpacityById?: any; background?: any } = {}) => {
   const width = options.width ?? ARTBOARD_WIDTH;
   const height = options.height ?? ARTBOARD_HEIGHT;
   const offsetX = options.offsetX ?? 0;

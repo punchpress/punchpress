@@ -49,7 +49,7 @@ const getNodeOpacity = (node) => {
 };
 
 const buildInheritedOpacityById = (document) => {
-  const nodeById = new Map(document.nodes.map((node) => [node.id, node]));
+  const nodeById = new Map<string, any>(document.nodes.map((node) => [node.id, node]));
   const inheritedOpacityById = new Map<string, number>();
 
   for (const node of document.nodes) {

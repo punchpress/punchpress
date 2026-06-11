@@ -1,8 +1,9 @@
 import type {
   VectorContourDocument,
   VectorHandleDocument,
-  VectorPointDocument,
 } from "@punchpress/punch-schema";
+
+type VectorPointDocument = { x: number; y: number };
 
 const CURVE_SAMPLE_STEPS = 24;
 const DIRECTION_EPSILON = 0.0001;

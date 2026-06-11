@@ -6,6 +6,7 @@ import {
 } from "../nodes/vector/vector-contour-operations";
 import { getSelectedEndpointContinuationTarget } from "./pen-existing-point-actions";
 import type { PenTool } from "./pen-tool";
+import type { PenAuthoringSession } from "./pen-tool-types";
 import {
   getContourSegmentCount,
   getNodeContour,

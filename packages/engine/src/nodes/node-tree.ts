@@ -52,7 +52,7 @@ export const getNodeParentId = (node) => {
   return node?.parentId || ROOT_PARENT_ID;
 };
 
-export const createNodeMap = (nodes) => {
+export const createNodeMap = (nodes): Map<string, any> => {
   return new Map(nodes.map((node) => [node.id, node]));
 };
 

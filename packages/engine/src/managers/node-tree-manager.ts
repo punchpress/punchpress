@@ -5,6 +5,11 @@ import {
 } from "../nodes/node-tree";
 
 export class NodeTreeManager {
+  declare childIdsByParent;
+  declare layerMetaById;
+  declare nodes;
+  declare nodesById;
+
   constructor() {
     this.childIdsByParent = new Map();
     this.layerMetaById = new Map();

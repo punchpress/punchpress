@@ -62,11 +62,16 @@ const ensureEditableFontFamilyLoaded = async (font, bytes) => {
 
   const fontFace = new FontFace(family, bytes);
   await fontFace.load();
+  // @ts-expect-error TODO(typecheck-baseline): FontFaceSet.add not in TS5.9 DOM lib
   document.fonts.add(fontFace);
   loadedEditableFamilies.add(family);
 };
 
 export class FontManager {
+  declare cache;
+  declare loadFontBytes;
+  declare onChange;
+
   constructor({ onChange }) {
     this.cache = new Map();
     this.loadFontBytes = null;

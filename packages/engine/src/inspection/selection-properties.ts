@@ -202,7 +202,7 @@ const buildSelectionProperties = (editor, nodeIds) => {
 const getSelectionPropertiesKeyFromState = (selectionProperties) => {
   const keyedProperties = Object.fromEntries(
     Object.entries(selectionProperties.properties).map(
-      ([propertyId, property]) => {
+      ([propertyId, property]: [string, any]) => {
         return [propertyId, property.isMixed ? "mixed" : property.value];
       }
     )

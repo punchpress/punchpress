@@ -4,6 +4,12 @@ import {
 } from "../nodes/node-capabilities";
 
 export class GeometryManager {
+  declare cache;
+  declare fontManager;
+  declare lastGeometryById;
+  declare lastNodes;
+  declare lastRevision;
+
   constructor(fontManager) {
     this.fontManager = fontManager;
     this.cache = new Map();

@@ -90,6 +90,11 @@ const pruneCache = (cache, liveVectorNodeIds) => {
 };
 
 export class VectorRenderSurfaceManager {
+  declare buildSurface;
+  declare durableCache;
+  declare lastNodes;
+  declare previewCache;
+
   constructor(buildSurface = buildVectorRenderGeometry) {
     this.buildSurface = buildSurface;
     this.durableCache = new Map();

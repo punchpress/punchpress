@@ -16,7 +16,7 @@ import {
   isVectorNode,
 } from "../../nodes/node-tree";
 
-const dedupeIds = (nodeIds) => {
+const dedupeIds = (nodeIds: string[]): string[] => {
   return [...new Set(nodeIds.filter(Boolean))];
 };
 

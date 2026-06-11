@@ -46,7 +46,7 @@ export const getNodeFrameFromGeometry = (
   );
 };
 
-export const buildNodeCapabilityGeometry = (node, font) => {
+export const buildNodeCapabilityGeometry = (node, font?) => {
   return getNodeCapabilities(node)?.buildGeometry(node, font) || null;
 };
 

@@ -8,13 +8,13 @@ import {
   updateMoveSelection,
 } from "./move-selection";
 
-const hasAbsoluteMoveInput = ({ dragEvents, left, top } = {}) => {
+const hasAbsoluteMoveInput = ({ dragEvents = undefined, left = undefined, top = undefined } = {}) => {
   return Boolean(
     dragEvents?.length > 0 || (Number.isFinite(left) && Number.isFinite(top))
   );
 };
 
-const hasVisibleMoveInput = ({ delta, dragEvents, left, top } = {}) => {
+const hasVisibleMoveInput = ({ delta = undefined, dragEvents = undefined, left = undefined, top = undefined } = {}) => {
   if (delta) {
     return Boolean(delta.x || delta.y);
   }
@@ -24,7 +24,7 @@ const hasVisibleMoveInput = ({ delta, dragEvents, left, top } = {}) => {
 
 export const beginSelectionDrag = (
   editor,
-  { duplicate = false, nodeId, nodeIds } = {}
+  { duplicate = false, nodeId = undefined, nodeIds = undefined } = {}
 ) => {
   return measurePerf(PERF_SPANS.transformDragBegin, () => {
     finishEditingIfNeeded(editor);
@@ -61,7 +61,7 @@ export const beginSelectionDrag = (
   });
 };
 
-export const updateSelectionDrag = (editor, session, options = {}) => {
+export const updateSelectionDrag = (editor, session, options: { delta?: any; dragEvents?: any; left?: any; top?: any; cancel?: any } = {}) => {
   return measurePerf(PERF_SPANS.transformDragUpdate, () => {
     if (!session) {
       return [];
@@ -86,7 +86,7 @@ export const updateSelectionDrag = (editor, session, options = {}) => {
   });
 };
 
-export const endSelectionDrag = (editor, session, options = {}) => {
+export const endSelectionDrag = (editor, session, options: { delta?: any; dragEvents?: any; left?: any; top?: any; cancel?: any } = {}) => {
   return measurePerf(PERF_SPANS.transformDragEnd, () => {
     if (!session) {
       return false;

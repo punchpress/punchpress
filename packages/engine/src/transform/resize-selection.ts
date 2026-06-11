@@ -215,7 +215,7 @@ const setResizeSelectionPreview = (editor, session, scale) => {
 
 export const beginResizeSelection = (
   editor,
-  { anchorCanvas, direction, handle, nodeId, nodeIds } = {}
+  { anchorCanvas = undefined, direction = undefined, handle = undefined, nodeId = undefined, nodeIds = undefined } = {}
 ) => {
   return measurePerf(PERF_SPANS.transformResizeBegin, () =>
     beginResizeSelectionMeasured(editor, {
@@ -230,7 +230,7 @@ export const beginResizeSelection = (
 
 const beginResizeSelectionMeasured = (
   editor,
-  { anchorCanvas, direction, handle, nodeId, nodeIds } = {}
+  { anchorCanvas = undefined, direction = undefined, handle = undefined, nodeId = undefined, nodeIds = undefined } = {}
 ) => {
   const requestedNodeIds =
     nodeIds?.filter((currentNodeId) => editor.getNode(currentNodeId)) ||
@@ -296,7 +296,7 @@ const beginResizeSelectionMeasured = (
 export const updateResizeSelection = (
   editor,
   session,
-  { pointCanvas, preserveAspectRatio = false, preview = false, scale = 1 } = {}
+  { pointCanvas = undefined, preserveAspectRatio = false, preview = false, queueRefresh = undefined, scale = 1 } = {}
 ) => {
   return measurePerf(PERF_SPANS.transformResizeUpdate, () =>
     updateResizeSelectionMeasured(editor, session, {
@@ -311,7 +311,7 @@ export const updateResizeSelection = (
 const updateResizeSelectionMeasured = (
   editor,
   session,
-  { pointCanvas, preserveAspectRatio = false, preview = false, scale = 1 } = {}
+  { pointCanvas = undefined, preserveAspectRatio = false, preview = false, scale = 1 } = {}
 ) => {
   if (!session) {
     return [];

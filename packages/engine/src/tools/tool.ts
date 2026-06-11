@@ -36,6 +36,8 @@ export const selectToolFromShortcut = (editor, key, event) => {
 };
 
 export class Tool {
+  declare editor;
+
   constructor(editor) {
     this.editor = editor;
   }
@@ -52,7 +54,7 @@ export class Tool {
     return false;
   }
 
-  onCanvasPointerDown() {
+  onCanvasPointerDown(_event?) {
     return null;
   }
 
@@ -60,7 +62,7 @@ export class Tool {
     return false;
   }
 
-  onCanvasPointerMove() {
+  onCanvasPointerMove(_event?) {
     return false;
   }
 
@@ -80,7 +82,7 @@ export class Tool {
     return false;
   }
 
-  onNodePointerDown({ node, ...info }) {
+  onNodePointerDown({ node, ...info }: any) {
     return this.onCanvasPointerDown({
       ...info,
       node,
@@ -92,7 +94,7 @@ export class Tool {
     });
   }
 
-  onKeyDown() {
+  onKeyDown(_event?) {
     return false;
   }
 }

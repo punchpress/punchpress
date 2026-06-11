@@ -335,7 +335,7 @@ export const getPathContourJoinResult = (
     );
   });
 
-  nextContours.splice(insertIndex, 0, joinedContour);
+  nextContours.splice(insertIndex, 0, joinedContour as any);
 
   return {
     contours: nextContours,
