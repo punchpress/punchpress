@@ -93,10 +93,14 @@ stroke-only tiles while erase and artboard-clipped commits flatten to a single
 payload (fixing the old eraser's silent tile-overlay loss). Benchmarks vs the
 pre-migration baseline: zero working-tile accumulation (was 68→360 over six
 strokes), zero mounted tile-image DOM (was ~2000), viewport pass clean
-(p95 8.8 ms, 0 slow frames). Known follow-ups: first-contact hydration spike
-(lazy hydration arrives with stage 5) and dab-path cost for large hard
-brushes during fast sweeps (p95 67 ms in the stroke benchmark; a
-store-backed native-stroke fast path can return behind the same dab API).
+(p95 8.8 ms, 0 slow frames). Known follow-up: first-contact hydration spike
+(lazy hydration arrives with stage 5). The dab-path cost for large hard
+brushes is resolved: fully-hard fully-opaque dabs take a solid fast path in
+the store (analytic row spans, skip circle for the previous dab, coverage
+math only on the antialias band), and the compositor resyncs tile canvases
+through per-tile sync rects instead of full-tile `putImageData`. The
+38400x25088 fixture (`raster-brush-stroke-huge`, 1500 px brush) dropped from
+15 s to 0.7 s of dab time across four sweep strokes.
 
 ### 2. Pixels Out Of Document State
 

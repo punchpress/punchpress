@@ -2,11 +2,19 @@ import { incrementPerfCounter } from "@punchpress/engine";
 import type { PerformanceBenchmarkDefinition } from "../performance-benchmark-types";
 
 const TILE_SIZE = 512;
-const TILE_COLUMNS = 40;
-const TILE_ROWS = 40;
-const RASTER_WIDTH = TILE_COLUMNS * TILE_SIZE;
-const RASTER_HEIGHT = TILE_ROWS * TILE_SIZE;
 const SETTLE_FRAMES = 24;
+
+interface RasterBrushStrokeConfig {
+  brushSize: number;
+  description: string;
+  frames: number;
+  id: string;
+  label: string;
+  strokeCount: number;
+  tileColumns: number;
+  tileRows: number;
+  viewport: { x: number; y: number; zoom: number };
+}
 
 let tileSourceDataUrl: string | null = null;
 
@@ -31,16 +39,18 @@ const getTileSourceDataUrl = () => {
   return tileSourceDataUrl;
 };
 
-const createLargeRasterDocument = () => {
+const createLargeRasterDocument = (config: RasterBrushStrokeConfig) => {
   const src = getTileSourceDataUrl();
+  const rasterWidth = config.tileColumns * TILE_SIZE;
+  const rasterHeight = config.tileRows * TILE_SIZE;
   const tileSources: Record<string, number | string>[] = [];
 
-  for (let row = 0; row < TILE_ROWS; row += 1) {
-    for (let col = 0; col < TILE_COLUMNS; col += 1) {
+  for (let row = 0; row < config.tileRows; row += 1) {
+    for (let col = 0; col < config.tileColumns; col += 1) {
       tileSources.push({
         col,
         height: TILE_SIZE,
-        ref: `assets/raster/raster-brush-stroke/tile-${col}-${row}.png`,
+        ref: `assets/raster/${config.id}/tile-${col}-${row}.png`,
         row,
         src,
         width: TILE_SIZE,
@@ -53,12 +63,12 @@ const createLargeRasterDocument = () => {
   return JSON.stringify({
     nodes: [
       {
-        assetId: "asset-raster-brush-stroke",
-        baseHeight: RASTER_HEIGHT,
-        baseWidth: RASTER_WIDTH,
+        assetId: `asset-${config.id}`,
+        baseHeight: rasterHeight,
+        baseWidth: rasterWidth,
         baseX: 0,
         baseY: 0,
-        height: RASTER_HEIGHT,
+        height: rasterHeight,
         id: "raster-brush-stroke",
         mimeType: "image/png",
         name: "Large Raster",
@@ -74,7 +84,7 @@ const createLargeRasterDocument = () => {
         },
         type: "image",
         visible: true,
-        width: RASTER_WIDTH,
+        width: rasterWidth,
       },
     ],
     version: "1.8",
@@ -100,29 +110,30 @@ const recordStrokeStats = (editor, phase) => {
   );
 };
 
-export const rasterBrushStrokeBenchmark: PerformanceBenchmarkDefinition = {
+const createRasterBrushStrokeBenchmark = (
+  config: RasterBrushStrokeConfig
+): PerformanceBenchmarkDefinition => ({
   defaultOptions: {
-    frames: 192,
-    nodeCount: 6,
+    frames: config.frames,
+    nodeCount: config.strokeCount,
     warmupFrames: 12,
   },
-  description:
-    "Paints repeated zoomed-out sweep strokes across a 20480x20480 tiled raster layer and measures stroke, commit, and settle frames. nodeCount is the stroke count.",
-  id: "raster-brush-stroke",
-  label: "Raster Brush Stroke",
+  description: config.description,
+  id: config.id,
+  label: config.label,
   setup: async ({ editor, waitForFrames }) => {
-    editor.loadDocument(createLargeRasterDocument());
+    editor.loadDocument(createLargeRasterDocument(config));
     editor.select("raster-brush-stroke");
     editor.setActiveTool("brush");
     editor.setBrushSettings({
       color: "#bb2233",
       hardness: 1,
       opacity: 1,
-      size: 96,
+      size: config.brushSize,
       spacing: 0,
     });
-    editor.viewerRef?.setTo?.({ x: 1200, y: 1400, zoom: 0.055 });
-    editor.setViewport({ x: 1200, y: 1400, zoom: 0.055 });
+    editor.viewerRef?.setTo?.(config.viewport);
+    editor.setViewport(config.viewport);
     editor.onViewportChange?.();
     await waitForFrames(12);
   },
@@ -134,7 +145,9 @@ export const rasterBrushStrokeBenchmark: PerformanceBenchmarkDefinition = {
       throw new Error("Expected brush tool and raster node");
     }
 
-    const strokeCount = Math.max(1, options.nodeCount || 6);
+    const rasterWidth = config.tileColumns * TILE_SIZE;
+    const rasterHeight = config.tileRows * TILE_SIZE;
+    const strokeCount = Math.max(1, options.nodeCount || config.strokeCount);
     const pointsPerStroke = Math.max(
       8,
       Math.floor(options.frames / strokeCount) - SETTLE_FRAMES
@@ -144,10 +157,10 @@ export const rasterBrushStrokeBenchmark: PerformanceBenchmarkDefinition = {
 
     for (let strokeIndex = 0; strokeIndex < strokeCount; strokeIndex += 1) {
       const angle = (strokeIndex / strokeCount) * Math.PI;
-      const centerX = RASTER_WIDTH / 2;
-      const centerY = RASTER_HEIGHT / 2;
-      const reachX = RASTER_WIDTH * 0.42;
-      const reachY = RASTER_HEIGHT * 0.42;
+      const centerX = rasterWidth / 2;
+      const centerY = rasterHeight / 2;
+      const reachX = rasterWidth * 0.42;
+      const reachY = rasterHeight * 0.42;
       const pointAt = (progress: number) => ({
         x: centerX + Math.cos(angle) * reachX * (progress * 2 - 1),
         y: centerY + Math.sin(angle) * reachY * (progress * 2 - 1),
@@ -176,4 +189,30 @@ export const rasterBrushStrokeBenchmark: PerformanceBenchmarkDefinition = {
     recordStrokeStats(editor, "after");
   },
   usesScratchDocument: true,
-};
+});
+
+export const rasterBrushStrokeBenchmark = createRasterBrushStrokeBenchmark({
+  brushSize: 96,
+  description:
+    "Paints repeated zoomed-out sweep strokes across a 20480x20480 tiled raster layer and measures stroke, commit, and settle frames. nodeCount is the stroke count.",
+  frames: 192,
+  id: "raster-brush-stroke",
+  label: "Raster Brush Stroke",
+  strokeCount: 6,
+  tileColumns: 40,
+  tileRows: 40,
+  viewport: { x: 1200, y: 1400, zoom: 0.055 },
+});
+
+export const rasterBrushStrokeHugeBenchmark = createRasterBrushStrokeBenchmark({
+  brushSize: 1500,
+  description:
+    "Paints sweep strokes with a 1500px brush across a 38400x25088 tiled raster layer while zoomed far out. nodeCount is the stroke count.",
+  frames: 192,
+  id: "raster-brush-stroke-huge",
+  label: "Raster Brush Stroke (Huge Layer)",
+  strokeCount: 4,
+  tileColumns: 75,
+  tileRows: 49,
+  viewport: { x: 2500, y: 3000, zoom: 0.04 },
+});

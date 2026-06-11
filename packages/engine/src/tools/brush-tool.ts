@@ -511,6 +511,7 @@ class BrushStrokeSession {
     this.activeSegment = null;
     this.commitReady = Promise.resolve();
     this.lastPoint = null;
+    this.lastSolidDabPoint = null;
     this.merged = false;
     this.nodeId = node.id;
     this.operation = operation;
@@ -736,6 +737,19 @@ class BrushStrokeSession {
       }
     }
 
+    // For a fully-hard, fully-opaque paint dab the previous dab in this
+    // session painted an identical saturated circle, so the store can skip
+    // rewriting the overlap and fill only the new crescent.
+    const solid =
+      this.operation === "paint" && hardness >= 1 && this.settings.opacity >= 1
+        ? {
+            radius,
+            skip: this.lastSolidDabPoint
+              ? { radius, x: this.lastSolidDabPoint.x, y: this.lastSolidDabPoint.y }
+              : undefined,
+          }
+        : undefined;
+
     this.strokeStore.paintDab({
       bounds,
       color: getBrushColorRgb(this.settings.color),
@@ -749,7 +763,12 @@ class BrushStrokeSession {
       },
       opacity: this.settings.opacity,
       point,
+      solid,
     });
+
+    if (solid) {
+      this.lastSolidDabPoint = point;
+    }
 
     this.recordDirtyBounds(bounds);
     this.scheduleLivePreview();

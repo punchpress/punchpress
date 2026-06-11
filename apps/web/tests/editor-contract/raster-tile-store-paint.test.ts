@@ -202,6 +202,63 @@ describe("raster tile store paint", () => {
     expect(store.getTile(0, 0).revision).toBeGreaterThan(revisionBefore);
   });
 
+  test("dab writes union a tile-local sync rect alongside revision bumps", () => {
+    const store = new RasterTileStore();
+
+    paintHardDab(store, { x: 100, y: 100 }, 16);
+
+    const tile = store.getTile(0, 0);
+    const firstRect = tile.syncRect;
+
+    expect(firstRect).not.toBeNull();
+    expect(firstRect.minX).toBeGreaterThanOrEqual(0);
+    expect(firstRect.minY).toBeGreaterThanOrEqual(0);
+    expect(firstRect.maxX).toBeLessThanOrEqual(tile.width);
+    expect(firstRect.maxY).toBeLessThanOrEqual(tile.height);
+    // Covers the painted center pixel in tile-local coordinates.
+    expect(firstRect.minX).toBeLessThanOrEqual(100 - tile.x);
+    expect(firstRect.maxX).toBeGreaterThan(100 - tile.x);
+
+    paintHardDab(store, { x: 40, y: 200 }, 8);
+
+    const unionedRect = tile.syncRect;
+
+    expect(unionedRect.minX).toBeLessThanOrEqual(40 - 8 - tile.x);
+    expect(unionedRect.maxY).toBeGreaterThan(200 - tile.y);
+    // Still contains the first dab's rect after the union.
+    expect(unionedRect.minX).toBeLessThanOrEqual(firstRect.minX);
+    expect(unionedRect.maxX).toBeGreaterThanOrEqual(firstRect.maxX);
+  });
+
+  test("consumed sync rect restarts from only the next write's region", () => {
+    const store = new RasterTileStore();
+
+    paintHardDab(store, { x: 100, y: 100 }, 16);
+
+    const tile = store.getTile(0, 0);
+
+    // The render cache consumes the rect: snapshot then clear.
+    tile.syncRect = null;
+
+    paintHardDab(store, { x: 300, y: 300 }, 8);
+
+    const rect = tile.syncRect;
+
+    expect(rect).not.toBeNull();
+    expect(rect.minX).toBeGreaterThan(200 - tile.x);
+    expect(rect.maxX).toBeLessThan(400 - tile.x);
+
+    store.eraseDab({
+      bounds: { maxX: 108, maxY: 108, minX: 92, minY: 92 },
+      getCoverage: hardCircleCoverage(8),
+      opacity: 1,
+      point: { x: 100, y: 100 },
+    });
+
+    // Erase writes union into the same rect.
+    expect(tile.syncRect.minX).toBeLessThanOrEqual(92 - tile.x);
+  });
+
   test("painting a different color over saturated pixels still blends", () => {
     const store = new RasterTileStore();
 
@@ -338,6 +395,30 @@ describe("raster stroke store merge", () => {
       fullStore.getPaintedBounds()
     );
     expect(strokeTiles.every((strokeTile) => strokeTile.merged)).toBe(true);
+  });
+
+  test("merge unions target tile sync rects covering the merged region", () => {
+    const store = new RasterTileStore();
+    const strokeStore = new RasterTileStore();
+
+    paintAt(store, { x: 100, y: 100 }, 20);
+
+    const tile = store.getTile(0, 0);
+
+    tile.syncRect = null;
+
+    paintAt(strokeStore, { x: 100, y: 100 }, 8);
+    mergeStrokeStore({ mode: "paint", store, strokeStore });
+
+    const rect = tile.syncRect;
+
+    expect(rect).not.toBeNull();
+    expect(rect.minX).toBeGreaterThanOrEqual(0);
+    expect(rect.minY).toBeGreaterThanOrEqual(0);
+    expect(rect.maxX).toBeLessThanOrEqual(tile.width);
+    expect(rect.maxY).toBeLessThanOrEqual(tile.height);
+    expect(rect.minX).toBeLessThanOrEqual(92 - tile.x);
+    expect(rect.maxX).toBeGreaterThan(108 - tile.x);
   });
 
   test("merge across a tile seam keeps both sides and gutters consistent", () => {
