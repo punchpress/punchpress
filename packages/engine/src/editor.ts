@@ -141,10 +141,10 @@ import {
 import { getPathEditingInspectorState as getEditorPathEditingInspectorState } from "./inspection/path/path-edit-inspector";
 import { getSelectionBooleanOperations as getEditorSelectionBooleanOperations } from "./inspection/selection-boolean-operations";
 import {
+  getCachedSelectionPropertiesSnapshot as getEditorCachedSelectionPropertiesSnapshot,
   getNodePropertySupport as getEditorNodePropertySupport,
   getSelectionProperties as getEditorSelectionProperties,
   getSelectionPropertiesKey as getEditorSelectionPropertiesKey,
-  getSelectionPropertiesSnapshot as getEditorSelectionPropertiesSnapshot,
   setSelectionColor as setEditorSelectionColor,
   setSelectionProperty as setEditorSelectionProperty,
 } from "./inspection/selection-properties";
@@ -1068,29 +1068,7 @@ export class Editor {
   }
 
   getSelectionPropertiesSnapshot(nodeIds = this.selectedNodeIds) {
-    const state = this.getState();
-    const nodeIdsKey = nodeIds.join("\0");
-    const cachedSnapshot = this.selectionPropertiesSnapshotCache;
-
-    if (
-      cachedSnapshot &&
-      cachedSnapshot.fontRevision === state.fontRevision &&
-      cachedSnapshot.nodeIdsKey === nodeIdsKey &&
-      cachedSnapshot.nodes === state.nodes
-    ) {
-      return cachedSnapshot.snapshot;
-    }
-
-    const snapshot = getEditorSelectionPropertiesSnapshot(this, nodeIds);
-
-    this.selectionPropertiesSnapshotCache = {
-      fontRevision: state.fontRevision,
-      nodeIdsKey,
-      nodes: state.nodes,
-      snapshot,
-    };
-
-    return snapshot;
+    return getEditorCachedSelectionPropertiesSnapshot(this, nodeIds);
   }
 
   getDebugDump() {

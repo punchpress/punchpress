@@ -317,3 +317,32 @@ export const getSelectionPropertiesSnapshot = (
     selectionProperties,
   };
 };
+
+export const getCachedSelectionPropertiesSnapshot = (
+  editor,
+  nodeIds = editor.selectedNodeIds
+) => {
+  const state = editor.getState();
+  const nodeIdsKey = nodeIds.join("\0");
+  const cachedSnapshot = editor.selectionPropertiesSnapshotCache;
+
+  if (
+    cachedSnapshot &&
+    cachedSnapshot.fontRevision === state.fontRevision &&
+    cachedSnapshot.nodeIdsKey === nodeIdsKey &&
+    cachedSnapshot.nodes === state.nodes
+  ) {
+    return cachedSnapshot.snapshot;
+  }
+
+  const snapshot = getSelectionPropertiesSnapshot(editor, nodeIds);
+
+  editor.selectionPropertiesSnapshotCache = {
+    fontRevision: state.fontRevision,
+    nodeIdsKey,
+    nodes: state.nodes,
+    snapshot,
+  };
+
+  return snapshot;
+};
