@@ -279,6 +279,7 @@ export class Editor {
     this.nodeTransformElements = new Map();
     this.viewerRef = null;
     this.hostRef = null;
+    this.rasterSurfaceLayer = null;
     this.persistLastUsedFont = null;
     this.pendingViewportFocusFrame = null;
     this.requestLocalFontCatalog = null;

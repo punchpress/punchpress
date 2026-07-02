@@ -980,6 +980,274 @@ const getCommittedTileSamples = (page, points) => {
   }, points);
 };
 
+const getScreenshotColumnInkProfile = async (page, clip) => {
+  // Warm-up frame: a screenshot forces a compositor BeginFrame so lazily
+  // rasterized tiles finish before the frame asserted on. The truncation
+  // bug this guards against persists across any number of screenshots.
+  await page.screenshot({ clip });
+  await waitForAnimationFrames(page, 2);
+
+  const screenshot = await page.screenshot({ clip });
+  const src = `data:image/png;base64,${screenshot.toString("base64")}`;
+
+  return page.evaluate(async (imageSrc) => {
+    const image = new Image();
+
+    image.src = imageSrc;
+    await image.decode();
+
+    const canvas = document.createElement("canvas");
+
+    canvas.width = image.width;
+    canvas.height = image.height;
+
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+
+    if (!context) {
+      throw new Error("Expected screenshot canvas context");
+    }
+
+    context.drawImage(image, 0, 0);
+
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+    const columns: number[] = [];
+
+    for (let x = 0; x < canvas.width; x += 1) {
+      let inkPixelCount = 0;
+
+      for (let y = 0; y < canvas.height; y += 1) {
+        const offset = (y * canvas.width + x) * 4;
+        const red = imageData.data[offset];
+        const green = imageData.data[offset + 1];
+        const blue = imageData.data[offset + 2];
+        const alpha = imageData.data[offset + 3];
+        const luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+
+        if (alpha > 200 && luminance < 140) {
+          inkPixelCount += 1;
+        }
+      }
+
+      columns.push(inkPixelCount);
+    }
+
+    return { columns, height: canvas.height, width: canvas.width };
+  }, src);
+};
+
+const getSeamGapColumns = (columns: number[]) => {
+  const sorted = [...columns].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const gapColumns = columns.flatMap((inkPixelCount, column) =>
+    inkPixelCount < median * 0.4 ? [{ column, inkPixelCount }] : []
+  );
+
+  return { gapColumns, median };
+};
+
+const drawCommittedBrushLine = async (page, nodeId, from, to) => {
+  await page.evaluate(
+    async ({ from: fromPoint, nodeId: targetNodeId, to: toPoint }) => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
+      const brush = editor?.tools.get("brush");
+      const node = editor?.getNode(targetNodeId);
+
+      if (!(editor && brush && node?.type === "image")) {
+        throw new Error("Expected brush and image node");
+      }
+
+      const toWorldPoint = (point) => ({
+        x: node.transform.x + point.x,
+        y: node.transform.y + point.y,
+      });
+      const session = brush.beginStroke({ point: toWorldPoint(fromPoint) });
+
+      if (!session) {
+        throw new Error("Expected brush stroke session");
+      }
+
+      await session.ready;
+      session.update({ point: toWorldPoint(toPoint) });
+      await session.complete({ point: toWorldPoint(toPoint) });
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    },
+    { from, nodeId, to }
+  );
+};
+
+const getStrokeClipAtZoom = (page, nodeId, localRect) => {
+  return page.evaluate(
+    ({ localRect: rect, nodeId: targetNodeId }) => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
+      const hostRect = editor?.hostRef?.getBoundingClientRect();
+      const viewer = editor?.viewerRef;
+      const node = editor?.getNode(targetNodeId);
+
+      if (!(editor && hostRect && viewer && node?.type === "image")) {
+        throw new Error("Expected image node for stroke clip");
+      }
+
+      const toClientPoint = (point) => ({
+        x:
+          hostRect.left +
+          (node.transform.x + point.x - viewer.getScrollLeft()) * editor.zoom,
+        y:
+          hostRect.top +
+          (node.transform.y + point.y - viewer.getScrollTop()) * editor.zoom,
+      });
+      const topLeft = toClientPoint({ x: rect.x, y: rect.y });
+      const bottomRight = toClientPoint({
+        x: rect.x + rect.width,
+        y: rect.y + rect.height,
+      });
+
+      return {
+        height: Math.floor(bottomRight.y - topLeft.y),
+        width: Math.floor(
+          Math.min(
+            window.innerWidth - 20 - topLeft.x,
+            bottomRight.x - topLeft.x
+          )
+        ),
+        x: Math.ceil(Math.max(0, topLeft.x)),
+        y: Math.ceil(topLeft.y),
+        zoom: editor.zoom,
+      };
+    },
+    { localRect, nodeId }
+  );
+};
+
+// Blink paints world-space content through a cull rect that stops around
+// 16384 CSS px. An in-world raster surface spanning more local pixels than
+// that truncates at raster-tile boundaries (512 * 2^k local px at
+// power-of-two zoom buckets -- lines that look exactly like pyramid tile
+// seams) or drops content entirely, so such surfaces must render through the
+// screen-space raster surface layer. These two tests pin the symptom at the
+// reported zooms by scanning stroke screenshots for background-colored gaps.
+
+test("zoomed-out strokes show no background seams across a wide viewport", async ({
+  page,
+}, testInfo) => {
+  testInfo.setTimeout(60_000);
+  await page.setViewportSize({ height: 900, width: 3600 });
+  await gotoEditor(page);
+  const src = await createTransparentImageDataUrl(page);
+  await loadRasterTestDocument(page, createHugeImageDocument(src));
+  await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    editor?.select("huge-image-1");
+    editor?.setBrushSettings({
+      hardness: 1,
+      opacity: 1,
+      size: 400,
+      spacing: 0,
+    });
+  });
+  await hydrateRasterStore(page, "huge-image-1");
+
+  // 21% zoom renders through pyramid level 2 and, on a wide viewport, sizes
+  // the raster surface past 16384 CSS px, matching the reported repro.
+  await setStableViewport(page, { x: 3000, y: 3900, zoom: 0.21 });
+  await waitForAnimationFrames(page, 4);
+
+  // Thick hard stroke crossing many 2048px raster/pyramid spans, extending
+  // the layer to the right past its initial width.
+  await drawCommittedBrushLine(
+    page,
+    "huge-image-1",
+    { x: 1000, y: 5200 },
+    { x: 20_000, y: 5200 }
+  );
+
+  await expect
+    .poll(
+      async () => (await getCommittedImageState(page))?.tileSourceCount || 0
+    )
+    .toBeGreaterThan(0);
+  await waitForAnimationFrames(page, 6);
+
+  const clip = await getStrokeClipAtZoom(page, "huge-image-1", {
+    height: 300,
+    width: 16_300,
+    x: 3200,
+    y: 5050,
+  });
+
+  expect(clip.zoom).toBeCloseTo(0.21, 3);
+
+  const profile = await getScreenshotColumnInkProfile(page, clip);
+  const { gapColumns, median } = getSeamGapColumns(profile.columns);
+
+  expect(median).toBeGreaterThan(40);
+  expect(
+    gapColumns.length,
+    `background seam columns (median ink ${median}): ${JSON.stringify(gapColumns.slice(0, 24))}`
+  ).toBe(0);
+});
+
+test("thin strokes stay continuous through deep zoom-out pyramid levels", async ({
+  page,
+}, testInfo) => {
+  testInfo.setTimeout(60_000);
+  await gotoEditor(page);
+  const src = await createTransparentImageDataUrl(page);
+  await loadRasterTestDocument(page, createHugeImageDocument(src));
+  await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    editor?.select("huge-image-1");
+    editor?.setBrushSettings({
+      hardness: 1,
+      opacity: 1,
+      size: 200,
+      spacing: 0,
+    });
+  });
+  await hydrateRasterStore(page, "huge-image-1");
+
+  // Long thin stroke extending the layer to ~20100px so the raster surface
+  // spans more CSS pixels than Chromium's max texture size.
+  await drawCommittedBrushLine(
+    page,
+    "huge-image-1",
+    { x: 1000, y: 5200 },
+    { x: 20_000, y: 5200 }
+  );
+
+  await expect
+    .poll(
+      async () => (await getCommittedImageState(page))?.tileSourceCount || 0
+    )
+    .toBeGreaterThan(0);
+
+  // 4.5% zoom renders through pyramid level 4 with the whole stroke on
+  // screen; the dashed-stroke symptom appears as columns with no ink.
+  await setStableViewport(page, { x: 0, y: 0, zoom: 0.045 });
+  await waitForAnimationFrames(page, 6);
+
+  const clip = await getStrokeClipAtZoom(page, "huge-image-1", {
+    height: 500,
+    width: 18_000,
+    x: 1400,
+    y: 4950,
+  });
+
+  expect(clip.zoom).toBeCloseTo(0.045, 3);
+
+  const profile = await getScreenshotColumnInkProfile(page, clip);
+  const { gapColumns, median } = getSeamGapColumns(profile.columns);
+
+  expect(median).toBeGreaterThan(4);
+
+  expect(
+    gapColumns.length,
+    `dashed stroke gap columns (median ink ${median}): ${JSON.stringify(gapColumns.slice(0, 24))}`
+  ).toBe(0);
+});
+
 const setBrushSliderValue = async (page, name, value) => {
   const slider = page.getByRole("slider", { name });
 

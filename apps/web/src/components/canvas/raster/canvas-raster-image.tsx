@@ -609,9 +609,10 @@ export const CanvasRasterImage = (props) => {
 
   if (storeState.hydrated) {
     return (
-      <g opacity={props.opacity ?? 1} transform={props.transform || undefined}>
-        <CanvasRasterStoreSurface nodeId={props.nodeId} />
-      </g>
+      <CanvasRasterStoreSurface
+        nodeId={props.nodeId}
+        opacity={props.opacity ?? 1}
+      />
     );
   }
 
@@ -635,7 +636,10 @@ export const CanvasRasterImage = (props) => {
             y={0}
           />
         )}
-        <CanvasRasterStoreSurface nodeId={props.nodeId} />
+        <CanvasRasterStoreSurface
+          nodeId={props.nodeId}
+          opacity={props.opacity ?? 1}
+        />
       </g>
     );
   }

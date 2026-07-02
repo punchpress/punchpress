@@ -1,10 +1,21 @@
-import { useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
 import { getNodeLocalViewportBounds } from "./raster-local-viewport";
 
 const RASTER_SURFACE_PADDING = 256;
 const RASTER_SURFACE_MAX_PIXELS = 8_000_000;
+/**
+ * Blink paints world-space content through a cull rect that stops around
+ * 16384 CSS px, so any in-world element spanning more local pixels than that
+ * truncates at a raster-tile boundary (512 * 2^k local px at power-of-two
+ * zoom buckets -- lines that look exactly like pyramid tile seams) or is
+ * culled entirely. Surfaces wider or taller than this span render through
+ * the screen-space raster surface layer instead of the node shell. The
+ * margin below 16384 covers the cull rect's viewport-relative anchor.
+ */
+const RASTER_SURFACE_MAX_LOCAL_SPAN = 12_000;
 
 interface TileCanvasEntry {
   canvas: HTMLCanvasElement;
@@ -155,11 +166,20 @@ const getStoreSurfaceState = (editor, state, nodeId) => {
     maxY: bounds.maxY,
     minX: bounds.minX,
     minY: bounds.minY,
+    nodeHeight: node.height,
+    nodeWidth: node.width,
     revision: entry.store.revision,
+    rotation: node.transform.rotation || 0,
+    scaleX: node.transform.scaleX || 1,
+    scaleY: node.transform.scaleY || 1,
     store: entry.store,
     strokeKey: overlays
       .map((overlay) => `${overlay.operation}:${overlay.revision}`)
       .join("|"),
+    viewportX: state.viewport?.x ?? editor.viewport?.x ?? 0,
+    viewportY: state.viewport?.y ?? editor.viewport?.y ?? 0,
+    x: node.transform.x,
+    y: node.transform.y,
     zoom,
   };
 };
@@ -287,12 +307,23 @@ const getSurfaceScale = (bounds, zoom) => {
   return baseScale * Math.sqrt(RASTER_SURFACE_MAX_PIXELS / projectedPixels);
 };
 
-export const CanvasRasterStoreSurface = ({ nodeId }) => {
+export const CanvasRasterStoreSurface = ({ nodeId, opacity = 1 }) => {
   const editor = useEditor();
   const surface = useEditorSurfaceValue((surfaceEditor, state) =>
     getStoreSurfaceState(surfaceEditor, state, nodeId)
   );
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [hosts, setHosts] = useState<{
+    layer: HTMLElement | null;
+    node: HTMLElement | null;
+  }>({ layer: null, node: null });
+
+  useEffect(() => {
+    setHosts({
+      layer: editor.rasterSurfaceLayer || null,
+      node: editor.getNodeElement?.(nodeId) || null,
+    });
+  }, [editor, nodeId]);
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
@@ -343,16 +374,80 @@ export const CanvasRasterStoreSurface = ({ nodeId }) => {
     return null;
   }
 
-  return (
-    <foreignObject
-      data-raster-store-hydrated={surface.hydrated ? "true" : "false"}
-      data-raster-store-revision={surface.revision}
-      data-raster-store-surface="true"
-      height={surface.maxY - surface.minY}
-      pointerEvents="none"
-      width={surface.maxX - surface.minX}
-      x={surface.minX}
-      y={surface.minY}
+  const width = surface.maxX - surface.minX;
+  const height = surface.maxY - surface.minY;
+  const screenSpace =
+    width > RASTER_SURFACE_MAX_LOCAL_SPAN ||
+    height > RASTER_SURFACE_MAX_LOCAL_SPAN;
+  const host = screenSpace ? hosts.layer : hosts.node;
+
+  if (!host) {
+    return null;
+  }
+
+  const dataAttributes = {
+    "data-raster-store-hydrated": surface.hydrated ? "true" : "false",
+    "data-raster-store-revision": surface.revision,
+    "data-raster-store-surface": "true",
+  };
+
+  if (screenSpace) {
+    // Zoomed out past the Blink paint cull span: render at screen resolution
+    // in the host-anchored raster surface layer. The outer div reproduces the
+    // node shell's box and transform in screen pixels.
+    const { zoom } = surface;
+    const transform =
+      surface.rotation || surface.scaleX !== 1 || surface.scaleY !== 1
+        ? `rotate(${surface.rotation}deg) scale(${surface.scaleX}, ${surface.scaleY})`
+        : undefined;
+
+    return createPortal(
+      <div
+        {...dataAttributes}
+        style={{
+          height: surface.nodeHeight * zoom,
+          left: (surface.x - surface.viewportX) * zoom,
+          opacity,
+          pointerEvents: "none",
+          position: "absolute",
+          top: (surface.y - surface.viewportY) * zoom,
+          transform,
+          transformOrigin: "center center",
+          width: surface.nodeWidth * zoom,
+        }}
+      >
+        <canvas
+          ref={canvasRef}
+          style={{
+            display: "block",
+            height: height * zoom,
+            left: surface.minX * zoom,
+            pointerEvents: "none",
+            position: "absolute",
+            top: surface.minY * zoom,
+            width: width * zoom,
+          }}
+        />
+      </div>,
+      host
+    );
+  }
+
+  // Portaled into the node shell so the canvas lives in HTML rather than SVG
+  // foreignObject (foreignObject content cannot direct-composite). The shell
+  // carries the node transform, so local coordinates and clipping apply.
+  return createPortal(
+    <div
+      {...dataAttributes}
+      style={{
+        height,
+        left: surface.minX,
+        opacity,
+        pointerEvents: "none",
+        position: "absolute",
+        top: surface.minY,
+        width,
+      }}
     >
       <canvas
         ref={canvasRef}
@@ -363,7 +458,8 @@ export const CanvasRasterStoreSurface = ({ nodeId }) => {
           width: "100%",
         }}
       />
-    </foreignObject>
+    </div>,
+    host
   );
 };
 

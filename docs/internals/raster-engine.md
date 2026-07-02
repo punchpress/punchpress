@@ -86,6 +86,14 @@ Rules:
   level and refines in place. Blank flashes are a bug, not a loading state.
 - Per-tile DOM elements, image `load` tracking, and render acknowledgement
   events are forbidden; the compositor is synchronous with the store.
+- The surface canvas is plain HTML portaled into the node shell, never SVG
+  foreignObject: foreignObject content cannot direct-composite and Blink's
+  paint cull truncates in-world content past ~16384 CSS px.
+- When the viewport-clamped surface spans more local pixels than that cull
+  horizon (deep zoom-out), the surface renders at screen resolution in the
+  host-anchored raster surface layer instead of the node shell. Otherwise
+  Chromium drops or cracks raster tiles at 512 * 2^k local-px boundaries --
+  artifacts that masquerade as pyramid tile seams.
 
 ## Mipmap Pyramid
 

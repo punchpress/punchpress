@@ -678,6 +678,20 @@ export const Canvas = () => {
           </div>
         </InfiniteViewer>
 
+        {/*
+          Screen-space host for zoomed-out raster store surfaces. Blink's
+          paint cull stops rendering world-space content past ~16k CSS px, so
+          surfaces spanning more local pixels than that render here at screen
+          resolution instead of inside their node shells.
+        */}
+        <div
+          className="pointer-events-none absolute inset-0 z-[1] overflow-hidden"
+          data-raster-surface-layer="true"
+          ref={(element) => {
+            editor.rasterSurfaceLayer = element;
+          }}
+        />
+
         <DesignerFloatingToolbar>
           <CanvasToolbar />
         </DesignerFloatingToolbar>
