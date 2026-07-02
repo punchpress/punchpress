@@ -65,6 +65,24 @@ export const setLastUsedFont = (editor, font) => {
   editor.persistLastUsedFont?.(descriptor);
 };
 
+export const loadLocalFontCatalog = (editor, loadCatalog, { force = false } = {}) => {
+  if (!force && editor.localFontCatalogPromise) {
+    return editor.localFontCatalogPromise;
+  }
+
+  editor.localFontCatalogPromise = loadCatalog()
+    .then((catalog) => {
+      editor.applyLocalFontCatalog(catalog);
+      return catalog;
+    })
+    .catch((error) => {
+      editor.localFontCatalogPromise = null;
+      throw error;
+    });
+
+  return editor.localFontCatalogPromise;
+};
+
 export const applyLocalFontCatalog = (
   editor,
   catalog: LocalFontCatalogResult

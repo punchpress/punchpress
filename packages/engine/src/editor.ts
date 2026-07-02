@@ -115,6 +115,7 @@ import {
   getFontPreviewFamily as getEditorFontPreviewFamily,
   getFontPreviewState as getEditorFontPreviewState,
   initializeLocalFonts as initializeEditorLocalFonts,
+  loadLocalFontCatalog as loadEditorLocalFontCatalog,
   preloadFontOptions as preloadEditorFontOptions,
   preloadFonts as preloadEditorFonts,
   requestLocalFonts as requestEditorLocalFonts,
@@ -2177,22 +2178,8 @@ export class Editor {
     focusEditorCanvasBoundsInViewport(this, bounds, options);
   }
 
-  loadLocalFontCatalog(loadCatalog, { force = false } = {}) {
-    if (!force && this.localFontCatalogPromise) {
-      return this.localFontCatalogPromise;
-    }
-
-    this.localFontCatalogPromise = loadCatalog()
-      .then((catalog) => {
-        this.applyLocalFontCatalog(catalog);
-        return catalog;
-      })
-      .catch((error) => {
-        this.localFontCatalogPromise = null;
-        throw error;
-      });
-
-    return this.localFontCatalogPromise;
+  loadLocalFontCatalog(loadCatalog, options) {
+    return loadEditorLocalFontCatalog(this, loadCatalog, options);
   }
 }
 
