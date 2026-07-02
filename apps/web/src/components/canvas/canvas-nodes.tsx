@@ -1,6 +1,6 @@
 import { isArtboardNode, isEmptyNode, isGroupNode } from "@punchpress/engine";
 import { useEditorValue } from "../../editor-react/use-editor-value";
-import { CanvasNode } from "./canvas-node";
+import { CanvasNode } from "./canvas-node/canvas-node";
 import { useCanvasNodePlacement } from "./use-canvas-node-placement";
 
 const DENSE_GROUP_RENDER_THRESHOLD = 300;
