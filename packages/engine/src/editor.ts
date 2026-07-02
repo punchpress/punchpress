@@ -81,6 +81,7 @@ import {
   deletePathPoints as deleteEditorPathPoints,
   deleteVectorPoint as deleteEditorVectorPoint,
   getPathPointType as getEditorPathPointType,
+  getVectorPointType as getEditorVectorPointType,
   insertPathPoint as insertEditorPathPoint,
   insertVectorPoint as insertEditorVectorPoint,
   setPathPointType as setEditorPathPointType,
@@ -195,7 +196,6 @@ import {
   isArtboardNode,
   isGroupNode,
 } from "./nodes/node-tree";
-import { getPathNodeContours } from "./nodes/path/path-contours";
 import { getVectorPathEditingChildId } from "./nodes/vector/vector-path-composition";
 import { beginNodePlacement as beginEditorNodePlacement } from "./placement/node-placement";
 import {
@@ -1503,28 +1503,7 @@ export class Editor {
   }
 
   getVectorPointType(nodeId, point = this.pathEditingPoint) {
-    const node = this.getNode(nodeId);
-
-    if (!(node && point)) {
-      return null;
-    }
-
-    if (node.type === "path") {
-      return (
-        getPathNodeContours(node)[point.contourIndex]?.segments[
-          point.segmentIndex
-        ]?.pointType || null
-      );
-    }
-
-    if (node.type !== "vector") {
-      return null;
-    }
-
-    return (
-      node.contours[point.contourIndex]?.segments[point.segmentIndex]
-        ?.pointType || null
-    );
+    return getEditorVectorPointType(this, nodeId, point);
   }
 
   getPathPointType(

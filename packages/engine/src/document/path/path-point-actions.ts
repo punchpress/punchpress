@@ -494,6 +494,31 @@ export const deletePathPoints = (editor, nodeId, points) => {
   return true;
 };
 
+export const getVectorPointType = (editor, nodeId, point) => {
+  const node = editor.getNode(nodeId);
+
+  if (!(node && point)) {
+    return null;
+  }
+
+  if (node.type === "path") {
+    return (
+      getPathNodeContours(node)[point.contourIndex]?.segments[
+        point.segmentIndex
+      ]?.pointType || null
+    );
+  }
+
+  if (node.type !== "vector") {
+    return null;
+  }
+
+  return (
+    node.contours[point.contourIndex]?.segments[point.segmentIndex]
+      ?.pointType || null
+  );
+};
+
 export const getPathPointType = (editor, nodeId, point) => {
   const session = editor.getEditablePathSession(nodeId);
 
