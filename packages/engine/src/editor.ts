@@ -161,6 +161,15 @@ import {
   startPathEditing as startEditorPathEditing,
   stopPathEditing as stopEditorPathEditing,
 } from "./interaction/interaction-actions";
+import {
+  clearPathEditingPreview as clearEditorPathEditingPreview,
+  commitPathEditingPreview as commitEditorPathEditingPreview,
+  getPathEditingPreview as getEditorPathEditingPreview,
+  getPathEditingPreviewContours as getEditorPathEditingPreviewContours,
+  notifyPathEditingPreviewChanged as notifyEditorPathEditingPreviewChanged,
+  setPathEditingPreview as setEditorPathEditingPreview,
+  subscribePathEditingPreview as subscribeEditorPathEditingPreview,
+} from "./interaction/path-editing-preview";
 import { disposeEditor, mountEditor } from "./lifecycle/editor-lifecycle";
 import {
   DEFAULT_EDITABLE_FONT_FAMILY,
@@ -1360,67 +1369,23 @@ export class Editor {
   }
 
   getPathEditingPreview(nodeId = this.pathEditingNodeId) {
-    if (
-      !(
-        nodeId &&
-        this.pathEditingPreviewState?.nodeId === nodeId &&
-        this.pathEditingNodeId === nodeId
-      )
-    ) {
-      return null;
-    }
-
-    return this.pathEditingPreviewState;
+    return getEditorPathEditingPreview(this, nodeId);
   }
 
   getPathEditingPreviewContours(nodeId = this.pathEditingNodeId) {
-    return this.getPathEditingPreview(nodeId)?.contours || null;
+    return getEditorPathEditingPreviewContours(this, nodeId);
   }
 
   setPathEditingPreview(nodeId, contours, options) {
-    if (!(nodeId && contours && this.pathEditingNodeId === nodeId)) {
-      return false;
-    }
-
-    measurePerf(PERF_SPANS.pathEditPreviewSet, () => {
-      this.pathEditingPreviewState = {
-        contours,
-        nodeId,
-        options: options || null,
-      };
-      this.notifyPathEditingPreviewChanged();
-    });
-
-    return true;
+    return setEditorPathEditingPreview(this, nodeId, contours, options);
   }
 
   clearPathEditingPreview(nodeId = this.pathEditingNodeId) {
-    if (
-      !this.pathEditingPreviewState ||
-      (nodeId && this.pathEditingPreviewState.nodeId !== nodeId)
-    ) {
-      return false;
-    }
-
-    this.pathEditingPreviewState = null;
-    this.notifyPathEditingPreviewChanged();
-    return true;
+    return clearEditorPathEditingPreview(this, nodeId);
   }
 
   commitPathEditingPreview(nodeId = this.pathEditingNodeId) {
-    const preview = this.getPathEditingPreview(nodeId);
-
-    if (!preview) {
-      return false;
-    }
-
-    const didUpdate = this.updateEditablePath(
-      preview.nodeId,
-      preview.contours,
-      preview.options || undefined
-    );
-    this.clearPathEditingPreview(preview.nodeId);
-    return didUpdate;
+    return commitEditorPathEditingPreview(this, nodeId);
   }
 
   setViewportInteracting(isViewportInteracting) {
@@ -1478,19 +1443,11 @@ export class Editor {
   }
 
   notifyPathEditingPreviewChanged() {
-    this.pathEditingPreviewRevision += 1;
-
-    for (const listener of this.pathEditingPreviewListeners) {
-      listener();
-    }
+    notifyEditorPathEditingPreviewChanged(this);
   }
 
   subscribePathEditingPreview(listener) {
-    this.pathEditingPreviewListeners.add(listener);
-
-    return () => {
-      this.pathEditingPreviewListeners.delete(listener);
-    };
+    return subscribeEditorPathEditingPreview(this, listener);
   }
 
   notifyPlacementSurfaceApplied() {
