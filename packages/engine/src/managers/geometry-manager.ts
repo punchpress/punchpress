@@ -3,13 +3,15 @@ import {
   getNodeGeometrySignature,
 } from "../nodes/node-capabilities";
 
-export class GeometryManager {
-  declare cache;
-  declare fontManager;
-  declare lastGeometryById;
-  declare lastNodes;
-  declare lastRevision;
+export interface GeometryManager {
+  cache: any;
+  fontManager: any;
+  lastGeometryById: any;
+  lastNodes: any;
+  lastRevision: any;
+}
 
+export class GeometryManager {
   constructor(fontManager) {
     this.fontManager = fontManager;
     this.cache = new Map();

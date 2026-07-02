@@ -4,12 +4,14 @@ import {
   isContainerNode,
 } from "../nodes/node-tree";
 
-export class NodeTreeManager {
-  declare childIdsByParent;
-  declare layerMetaById;
-  declare nodes;
-  declare nodesById;
+export interface NodeTreeManager {
+  childIdsByParent: any;
+  layerMetaById: any;
+  nodes: any;
+  nodesById: any;
+}
 
+export class NodeTreeManager {
   constructor() {
     this.childIdsByParent = new Map();
     this.layerMetaById = new Map();

@@ -1,20 +1,22 @@
 const DEFAULT_HISTORY_LIMIT = 100;
 
-export class HistoryManager {
-  declare activeMarks;
-  declare applyChange;
-  declare applyState;
-  declare captureSnapshot;
-  declare captureState;
-  declare createChange;
-  declare currentRevision;
-  declare isApplying;
-  declare limit;
-  declare nextMarkId;
-  declare redoStack;
-  declare savedSnapshot;
-  declare undoStack;
+export interface HistoryManager {
+  activeMarks: any;
+  applyChange: any;
+  applyState: any;
+  captureSnapshot: any;
+  captureState: any;
+  createChange: any;
+  currentRevision: any;
+  isApplying: any;
+  limit: any;
+  nextMarkId: any;
+  redoStack: any;
+  savedSnapshot: any;
+  undoStack: any;
+}
 
+export class HistoryManager {
   constructor({
     applyChange,
     applyState,

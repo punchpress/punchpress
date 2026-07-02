@@ -67,11 +67,13 @@ const ensureEditableFontFamilyLoaded = async (font, bytes) => {
   loadedEditableFamilies.add(family);
 };
 
-export class FontManager {
-  declare cache;
-  declare loadFontBytes;
-  declare onChange;
+export interface FontManager {
+  cache: any;
+  loadFontBytes: any;
+  onChange: any;
+}
 
+export class FontManager {
   constructor({ onChange }) {
     this.cache = new Map();
     this.loadFontBytes = null;

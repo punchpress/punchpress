@@ -35,9 +35,11 @@ export const selectToolFromShortcut = (editor, key, event) => {
   return true;
 };
 
-export class Tool {
-  declare editor;
+export interface Tool {
+  editor: any;
+}
 
+export class Tool {
   constructor(editor) {
     this.editor = editor;
   }

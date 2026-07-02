@@ -89,12 +89,14 @@ const pruneCache = (cache, liveVectorNodeIds) => {
   }
 };
 
-export class VectorRenderSurfaceManager {
-  declare buildSurface;
-  declare durableCache;
-  declare lastNodes;
-  declare previewCache;
+export interface VectorRenderSurfaceManager {
+  buildSurface: any;
+  durableCache: any;
+  lastNodes: any;
+  previewCache: any;
+}
 
+export class VectorRenderSurfaceManager {
   constructor(buildSurface = buildVectorRenderGeometry) {
     this.buildSurface = buildSurface;
     this.durableCache = new Map();

@@ -285,48 +285,50 @@ import { zoomViewportFromWheel as zoomEditorViewportFromWheel } from "./viewport
 
 // Intentional facade: keep the public editor API and durable subsystem wiring
 // here, and move behavior-heavy implementation into capability modules.
-export class Editor {
-  declare accent;
-  declare availableFonts;
-  declare defaultFont;
-  declare editingHistoryMark;
-  declare fonts;
-  declare geometry;
-  declare getInitialLocalFontCatalog;
-  declare history;
-  declare hostRef;
-  declare interactionPreviewListeners;
-  declare interactionPreviewRevision;
-  declare lastPasteCount;
-  declare lastPasteKey;
-  declare lastUsedFont;
-  declare localFontCatalogPromise;
-  declare nodeElements;
-  declare nodeTransformElements;
-  declare nodeTree;
-  declare onViewportChange;
-  declare pathEditingPreviewListeners;
-  declare pathEditingPreviewRevision;
-  declare pathEditingPreviewState;
-  declare pendingViewportFocusFrame;
-  declare persistLastUsedFont;
-  declare placementSurfaceListeners;
-  declare requestLocalFontCatalog;
-  declare selectionBoundsCache;
-  declare selectionColorPreviewState;
-  declare selectionDragPreviewListeners;
-  declare selectionDragPreviewRevision;
-  declare selectionDragPreviewState;
-  declare selectionPropertiesSnapshotCache;
-  declare store;
-  declare tools;
-  declare unsubscribe;
-  declare vectorRenderSurfaces;
-  declare viewerRef;
-  declare viewportFocusRequest;
-  declare viewportInteracting;
-  declare viewportState;
+export interface Editor {
+  accent: any;
+  availableFonts: any;
+  defaultFont: any;
+  editingHistoryMark: any;
+  fonts: any;
+  geometry: any;
+  getInitialLocalFontCatalog: any;
+  history: any;
+  hostRef: any;
+  interactionPreviewListeners: any;
+  interactionPreviewRevision: any;
+  lastPasteCount: any;
+  lastPasteKey: any;
+  lastUsedFont: any;
+  localFontCatalogPromise: any;
+  nodeElements: any;
+  nodeTransformElements: any;
+  nodeTree: any;
+  onViewportChange: any;
+  pathEditingPreviewListeners: any;
+  pathEditingPreviewRevision: any;
+  pathEditingPreviewState: any;
+  pendingViewportFocusFrame: any;
+  persistLastUsedFont: any;
+  placementSurfaceListeners: any;
+  requestLocalFontCatalog: any;
+  selectionBoundsCache: any;
+  selectionColorPreviewState: any;
+  selectionDragPreviewListeners: any;
+  selectionDragPreviewRevision: any;
+  selectionDragPreviewState: any;
+  selectionPropertiesSnapshotCache: any;
+  store: any;
+  tools: any;
+  unsubscribe: any;
+  vectorRenderSurfaces: any;
+  viewerRef: any;
+  viewportFocusRequest: any;
+  viewportInteracting: any;
+  viewportState: any;
+}
 
+export class Editor {
   constructor({ accent = UI_ACCENT, initialZoom = 1 } = {}) {
     this.accent = accent;
     this.availableFonts = [];
