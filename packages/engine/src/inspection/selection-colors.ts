@@ -259,3 +259,79 @@ export const setSelectionColor = (
     return commitSelectionColorChange(editor, session, value);
   });
 };
+
+export const updateSelectionColorChange = (editor, session, value) => {
+  if (!session) {
+    return false;
+  }
+
+  editor.selectionColorPreviewState = {
+    baseValue: session.baseValue,
+    targetPropertyIdsByNodeId: session.targetPropertyIdsByNodeId,
+    value,
+  };
+  editor.notifyInteractionPreviewChanged();
+
+  return true;
+};
+
+export const cancelSelectionColorChange = (editor) => {
+  if (!editor.selectionColorPreviewState) {
+    return;
+  }
+
+  editor.selectionColorPreviewState = null;
+  editor.notifyInteractionPreviewChanged();
+};
+
+export const getSelectionColorPreviewValue = (
+  editor,
+  nodeId,
+  propertyId,
+  currentValue
+) => {
+  const preview = editor.selectionColorPreviewState;
+
+  if (!preview || currentValue !== preview.baseValue) {
+    return currentValue;
+  }
+
+  if (!preview.targetPropertyIdsByNodeId.get(nodeId)?.includes(propertyId)) {
+    return currentValue;
+  }
+
+  return preview.value;
+};
+
+export const isSelectionColorPreviewAffectingNode = (editor, nodeId) => {
+  const preview = editor.selectionColorPreviewState;
+
+  if (!preview) {
+    return false;
+  }
+
+  if (preview.targetPropertyIdsByNodeId.has(nodeId)) {
+    return true;
+  }
+
+  for (const targetNodeId of preview.targetPropertyIdsByNodeId.keys()) {
+    if (editor.isDescendantOf(targetNodeId, nodeId)) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+export const getSelectionColorPreviewForNode = (editor, nodeId) => {
+  const preview = editor.selectionColorPreviewState;
+
+  if (!preview || !isSelectionColorPreviewAffectingNode(editor, nodeId)) {
+    return null;
+  }
+
+  return {
+    baseValue: preview.baseValue,
+    value: preview.value,
+  };
+};

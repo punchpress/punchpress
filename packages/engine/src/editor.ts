@@ -149,7 +149,12 @@ import {
 } from "./inspection/selection-properties";
 import {
   beginSelectionColorChange as beginEditorSelectionColorChange,
+  cancelSelectionColorChange as cancelEditorSelectionColorChange,
   commitSelectionColorChange as commitEditorSelectionColorChange,
+  getSelectionColorPreviewForNode as getEditorSelectionColorPreviewForNode,
+  getSelectionColorPreviewValue as getEditorSelectionColorPreviewValue,
+  isSelectionColorPreviewAffectingNode as isEditorSelectionColorPreviewAffectingNode,
+  updateSelectionColorChange as updateEditorSelectionColorChange,
 } from "./inspection/selection-colors";
 import {
   beginSelectionDragInteraction as beginEditorSelectionDragInteraction,
@@ -864,18 +869,7 @@ export class Editor {
   }
 
   updateSelectionColorChange(session, value) {
-    if (!session) {
-      return false;
-    }
-
-    this.selectionColorPreviewState = {
-      baseValue: session.baseValue,
-      targetPropertyIdsByNodeId: session.targetPropertyIdsByNodeId,
-      value,
-    };
-    this.notifyInteractionPreviewChanged();
-
-    return true;
+    return updateEditorSelectionColorChange(this, session, value);
   }
 
   commitSelectionColorChange(session, value) {
@@ -886,12 +880,7 @@ export class Editor {
   }
 
   cancelSelectionColorChange() {
-    if (!this.selectionColorPreviewState) {
-      return;
-    }
-
-    this.selectionColorPreviewState = null;
-    this.notifyInteractionPreviewChanged();
+    cancelEditorSelectionColorChange(this);
   }
 
   get selectionColorPreview() {
@@ -899,50 +888,20 @@ export class Editor {
   }
 
   getSelectionColorPreviewValue(nodeId, propertyId, currentValue) {
-    const preview = this.selectionColorPreviewState;
-
-    if (!preview || currentValue !== preview.baseValue) {
-      return currentValue;
-    }
-
-    if (!preview.targetPropertyIdsByNodeId.get(nodeId)?.includes(propertyId)) {
-      return currentValue;
-    }
-
-    return preview.value;
+    return getEditorSelectionColorPreviewValue(
+      this,
+      nodeId,
+      propertyId,
+      currentValue
+    );
   }
 
   isSelectionColorPreviewAffectingNode(nodeId) {
-    const preview = this.selectionColorPreviewState;
-
-    if (!preview) {
-      return false;
-    }
-
-    if (preview.targetPropertyIdsByNodeId.has(nodeId)) {
-      return true;
-    }
-
-    for (const targetNodeId of preview.targetPropertyIdsByNodeId.keys()) {
-      if (this.isDescendantOf(targetNodeId, nodeId)) {
-        return true;
-      }
-    }
-
-    return false;
+    return isEditorSelectionColorPreviewAffectingNode(this, nodeId);
   }
 
   getSelectionColorPreviewForNode(nodeId) {
-    const preview = this.selectionColorPreviewState;
-
-    if (!preview || !this.isSelectionColorPreviewAffectingNode(nodeId)) {
-      return null;
-    }
-
-    return {
-      baseValue: preview.baseValue,
-      value: preview.value,
-    };
+    return getEditorSelectionColorPreviewForNode(this, nodeId);
   }
 
   getSelectionBooleanOperations(nodeIds = this.selectedNodeIds) {
