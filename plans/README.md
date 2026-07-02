@@ -27,7 +27,7 @@ never commit it).
 | 003 | Tests for .punch migration and normalization | P1 | S | — | DONE (merged as `dd380606`) |
 | 004 | Electron hardening (sandbox, openExternal, app:// containment) | P2 | M | — | DONE (merged as `99be27ac`; desktop hand-test checklist pending — see below) |
 | 005 | SVG recipe round-trip re-import | P2 | M | 003 | DONE (merged as `fc33070e`; in-app round-trip hand-test pending — see below) |
-| 006 | Split canvas-node.tsx into a feature folder | P3 | M | 002 | IN PROGRESS |
+| 006 | Split canvas-node.tsx into a feature folder | P3 | M | 002 | DONE (merged as `94055c85`; move-only confirmed — bundle byte-identical; e2e has ~11 PRE-EXISTING flaky failures unrelated to this change) |
 | 007 | Slim editor.ts toward its documented facade role | P3 | L | 002 | DONE (merged as `74ff9a3e`..`570c7bbb`; editor.ts 2,214→2,059 LoC — all 12 method bodies >10 lines extracted to capability modules; the ~1,200 target was based on an overstated premise: remaining bulk is imports + thin delegates, i.e. correct facade shape. Plan file target stands corrected by measurement.) |
 | 008 | Layers-panel selector cost: measure, then fix | P3 | S→M | — | DONE (measured, not worth fixing: selector 0.3–0.7ms/benchmark, panel renders 3–4× per 180-frame drag — drag previews bypass the Zustand store by design, so the selector barely runs; no code change) |
 
@@ -43,6 +43,15 @@ REJECTED (with one-line rationale)
   imports/signatures during moves.
 - 007 after 006: both churn hot files; serialize to keep diffs reviewable.
 - 004 and 008 are independent; run anytime.
+
+## Follow-ups in flight
+
+- **Perf-runner break (from plan 002)**: FIXED (`9183c9d4`) — `declare`
+  class fields converted to interface declaration-merging in the 7 engine
+  classes; `bun run perf:json` verified working again (52.5 fps on
+  text-nodes-dragging-500). Also noted: e2e suite has ~11 pre-existing flaky failures
+  (group-drill-in, text-circle-path ×4, text-node-move ×2, text-tool-trace-replay,
+  vector-path-edit, raster-brush) — candidate for a future stabilization pass.
 
 ## Pending operator hand-tests
 
