@@ -277,7 +277,10 @@ import {
   zoomIn as zoomEditorIn,
   zoomOut as zoomEditorOut,
 } from "./viewport/viewport-focus";
-import { getViewportCenter as getEditorViewportCenter } from "./viewport/viewport-queries";
+import {
+  getViewportCenter as getEditorViewportCenter,
+  setViewport as setEditorViewport,
+} from "./viewport/viewport-queries";
 import { zoomViewportFromWheel as zoomEditorViewportFromWheel } from "./viewport/viewport-wheel-zoom";
 
 // Intentional facade: keep the public editor API and durable subsystem wiring
@@ -1757,25 +1760,7 @@ export class Editor {
   }
 
   setViewport(viewport) {
-    const previousViewport = this.viewportState;
-    const nextViewport = {
-      x: viewport.x ?? previousViewport.x,
-      y: viewport.y ?? previousViewport.y,
-      zoom: viewport.zoom ?? previousViewport.zoom,
-    };
-
-    this.viewportState = nextViewport;
-
-    const storeViewport = this.getState().viewport;
-
-    if (
-      !this.viewportInteracting &&
-      (nextViewport.x !== storeViewport.x ||
-        nextViewport.y !== storeViewport.y ||
-        nextViewport.zoom !== storeViewport.zoom)
-    ) {
-      this.getState().setViewport(nextViewport);
-    }
+    setEditorViewport(this, viewport);
   }
 
   startPathEditing(nodeId = this.selectedNodeId) {

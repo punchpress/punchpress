@@ -34,3 +34,25 @@ export const getViewportCenter = (editor) => {
 };
 
 export const getViewportWorldBounds = getViewportBounds;
+
+export const setViewport = (editor, viewport) => {
+  const previousViewport = editor.viewportState;
+  const nextViewport = {
+    x: viewport.x ?? previousViewport.x,
+    y: viewport.y ?? previousViewport.y,
+    zoom: viewport.zoom ?? previousViewport.zoom,
+  };
+
+  editor.viewportState = nextViewport;
+
+  const storeViewport = editor.getState().viewport;
+
+  if (
+    !editor.viewportInteracting &&
+    (nextViewport.x !== storeViewport.x ||
+      nextViewport.y !== storeViewport.y ||
+      nextViewport.zoom !== storeViewport.zoom)
+  ) {
+    editor.getState().setViewport(nextViewport);
+  }
+};
