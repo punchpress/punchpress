@@ -28,7 +28,7 @@ never commit it).
 | 004 | Electron hardening (sandbox, openExternal, app:// containment) | P2 | M | — | DONE (merged as `99be27ac`; desktop hand-test checklist pending — see below) |
 | 005 | SVG recipe round-trip re-import | P2 | M | 003 | DONE (merged as `fc33070e`; in-app round-trip hand-test pending — see below) |
 | 006 | Split canvas-node.tsx into a feature folder | P3 | M | 002 | IN PROGRESS |
-| 007 | Slim editor.ts toward its documented facade role | P3 | L | 002 | IN PROGRESS (running in parallel with 006 — disjoint files: engine vs web) |
+| 007 | Slim editor.ts toward its documented facade role | P3 | L | 002 | DONE (merged as `74ff9a3e`..`570c7bbb`; editor.ts 2,214→2,059 LoC — all 12 method bodies >10 lines extracted to capability modules; the ~1,200 target was based on an overstated premise: remaining bulk is imports + thin delegates, i.e. correct facade shape. Plan file target stands corrected by measurement.) |
 | 008 | Layers-panel selector cost: measure, then fix | P3 | S→M | — | DONE (measured, not worth fixing: selector 0.3–0.7ms/benchmark, panel renders 3–4× per 180-frame drag — drag previews bypass the Zustand store by design, so the selector barely runs; no code change) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
