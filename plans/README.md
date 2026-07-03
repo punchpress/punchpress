@@ -29,6 +29,7 @@ never commit it).
 | 005 | SVG recipe round-trip re-import | P2 | M | 003 | DONE (merged as `fc33070e`; in-app round-trip hand-test pending — see below) |
 | 006 | Split canvas-node.tsx into a feature folder | P3 | M | 002 | DONE (merged as `94055c85`; move-only confirmed — bundle byte-identical; e2e has ~11 PRE-EXISTING flaky failures unrelated to this change) |
 | 007 | Slim editor.ts toward its documented facade role | P3 | L | 002 | DONE (merged as `74ff9a3e`..`570c7bbb`; editor.ts 2,214→2,059 LoC — all 12 method bodies >10 lines extracted to capability modules; the ~1,200 target was based on an overstated premise: remaining bulk is imports + thin delegates, i.e. correct facade shape. Plan file target stands corrected by measurement.) |
+| 009 | Drop-import punch SVGs as frameless group (open keeps frame) | P2 | M | 005 | IN PROGRESS |
 | 008 | Layers-panel selector cost: measure, then fix | P3 | S→M | — | DONE (measured, not worth fixing: selector 0.3–0.7ms/benchmark, panel renders 3–4× per 180-frame drag — drag previews bypass the Zustand store by design, so the selector barely runs; no code change) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
