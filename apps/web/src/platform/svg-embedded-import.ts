@@ -1,10 +1,11 @@
+import type { DesignDocument } from "@punchpress/punch-schema";
 import {
   parseEmbeddedDesignDocument,
   serializeDesignDocument,
 } from "@punchpress/punch-schema";
 
 export type SvgEmbeddedImportResult =
-  | { kind: "document"; documentJson: string }
+  | { kind: "document"; document: DesignDocument; documentJson: string }
   | { kind: "error"; error: unknown }
   | { kind: "none" };
 
@@ -27,8 +28,9 @@ export const tryParseEmbeddedDocument = (
     }
 
     return {
-      kind: "document",
+      document,
       documentJson: serializeDesignDocument(document),
+      kind: "document",
     };
   } catch (error) {
     return { kind: "error", error };

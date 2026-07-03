@@ -1,13 +1,15 @@
-import { round } from "@punchpress/engine";
+import { recipeToComponentNodes, round } from "@punchpress/engine";
 import {
   PUNCH_SVG_EXTENSION,
   PUNCH_SVG_MIME_TYPE,
 } from "@punchpress/punch-schema";
 import { useCallback } from "react";
 import { showToast } from "@/components/ui/toast";
-import { tryParseEmbeddedDocument } from "@/platform/svg-embedded-import";
+import {
+  type SvgEmbeddedImportResult,
+  tryParseEmbeddedDocument,
+} from "@/platform/svg-embedded-import";
 import { importSvgToNodes } from "@/platform/svg-import-document";
-import { useWorkspace } from "@/workspace/use-workspace";
 import {
   CANVAS_DROP_SUPPORTED_FILE_LABEL,
   getCanvasFileDropImport,
@@ -21,8 +23,36 @@ const hasDraggedFiles = (dataTransfer: DataTransfer | null) => {
   return Boolean(dataTransfer?.types?.includes("Files"));
 };
 
+// Drop path for a recipe SVG: insert its content as a frameless group at the
+// drop point rather than opening it as a new tab (see svg-embedded-import.ts).
+const insertRecipeAsGroup = (
+  editor,
+  embedded: Extract<SvgEmbeddedImportResult, { kind: "document" }>,
+  fileName: string,
+  targetCenter: { x: number; y: number }
+) => {
+  const { nodes, skippedImageCount } = recipeToComponentNodes(
+    embedded.document,
+    { targetCenter }
+  );
+
+  if (nodes.length === 0) {
+    throw new Error(`No importable content found in ${fileName}.`);
+  }
+
+  editor.insertNodes(nodes);
+  showToast({
+    message:
+      skippedImageCount > 0
+        ? `Added ${fileName} to canvas (skipped ${skippedImageCount} image${
+            skippedImageCount === 1 ? "" : "s"
+          } without image data)`
+        : `Added ${fileName} to canvas`,
+    type: "success",
+  });
+};
+
 export const useCanvasDrop = ({ editor, getCanvasPoint }) => {
-  const workspace = useWorkspace();
   const handleCanvasDragOver = useCallback((event) => {
     if (!hasDraggedFiles(event.dataTransfer)) {
       return;
@@ -68,15 +98,7 @@ export const useCanvasDrop = ({ editor, getCanvasPoint }) => {
           const embedded = tryParseEmbeddedDocument(svgText);
 
           if (embedded.kind === "document") {
-            await workspace.openDocumentTab({
-              contents: embedded.documentJson,
-              fileHandle: null,
-              fileName: file.name,
-            });
-            showToast({
-              message: `Restored design from ${file.name}`,
-              type: "success",
-            });
+            insertRecipeAsGroup(editor, embedded, file.name, targetCenter);
             return;
           }
 
@@ -113,7 +135,7 @@ export const useCanvasDrop = ({ editor, getCanvasPoint }) => {
         });
       });
     },
-    [editor, getCanvasPoint, workspace]
+    [editor, getCanvasPoint]
   );
 
   return {
