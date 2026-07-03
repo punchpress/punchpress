@@ -173,13 +173,20 @@ const shouldIgnoreCanvasPointerTarget = (event, activeTool) => {
   }
 
   const isRasterTool = activeTool === "brush" || activeTool === "eraser";
+  const isPlacementTool =
+    isRasterTool ||
+    activeTool === "pen" ||
+    activeTool === "shape" ||
+    activeTool === "text";
 
-  return Boolean(
-    !isRasterTool &&
-      event.target.closest(
-        [".canvas-moveable", "[data-artboard-body]"].join(",")
-      )
-  );
+  // Placement tools create content inside artboards, so the artboard body
+  // must not swallow their presses; selection-style tools defer to the
+  // artboard press handling instead.
+  if (!isPlacementTool && event.target.closest("[data-artboard-body]")) {
+    return true;
+  }
+
+  return Boolean(!isRasterTool && event.target.closest(".canvas-moveable"));
 };
 
 const isTransformOverlayWheelTarget = (target) => {
