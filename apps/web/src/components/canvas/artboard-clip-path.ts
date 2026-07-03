@@ -44,10 +44,15 @@ export const getArtboardClipPath = (editor, nodeId, bounds, preview = null) => {
     return "";
   }
 
-  const top = Math.max(0, artboardBounds.minY - bounds.minY);
-  const right = Math.max(0, bounds.maxX - artboardBounds.maxX);
-  const bottom = Math.max(0, bounds.maxY - artboardBounds.maxY);
-  const left = Math.max(0, artboardBounds.minX - bounds.minX);
+  // Insets may go negative: `bounds` is the node's unrotated shell box, and
+  // rotated content legitimately paints outside it (rotation is applied by an
+  // inner element). Clamping at 0 shrank the clip region to the unrotated box
+  // and sheared rotated children along their own frame edges. A negative
+  // inset extends the region so the clip stays exactly the artboard rect.
+  const top = artboardBounds.minY - bounds.minY;
+  const right = bounds.maxX - artboardBounds.maxX;
+  const bottom = bounds.maxY - artboardBounds.maxY;
+  const left = artboardBounds.minX - bounds.minX;
 
   return `inset(${top}px ${right}px ${bottom}px ${left}px)`;
 };
