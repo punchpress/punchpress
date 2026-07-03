@@ -419,6 +419,14 @@ const RasterTilePreviewCanvas = ({
 
         context.clearRect(0, 0, width, height);
 
+        // Snap tile EDGES (not origins) to integer canvas pixels: abutting
+        // tiles share the exact same snapped edge, so fractional per-tile
+        // destination rects cannot under-cover shared-edge pixels and open
+        // bright seam lines under GPU raster.
+        const snapX = (localX) =>
+          Math.round((localX - nextBounds.minX) * nextPreviewScale);
+        const snapY = (localY) =>
+          Math.round((localY - nextBounds.minY) * nextPreviewScale);
         const drawNextChunk = () => {
           if (isCanceled) {
             return;
@@ -432,15 +440,13 @@ const RasterTilePreviewCanvas = ({
           ) {
             const tile = nextTileSources[tileIndex];
             const image = imagesBySource.get(tile.src);
+            const x0 = snapX(tile.x);
+            const x1 = snapX(tile.x + tile.width);
+            const y0 = snapY(tile.y);
+            const y1 = snapY(tile.y + tile.height);
 
-            if (image) {
-              context.drawImage(
-                image,
-                (tile.x - nextBounds.minX) * nextPreviewScale,
-                (tile.y - nextBounds.minY) * nextPreviewScale,
-                tile.width * nextPreviewScale,
-                tile.height * nextPreviewScale
-              );
+            if (image && x1 > x0 && y1 > y0) {
+              context.drawImage(image, x0, y0, x1 - x0, y1 - y0);
             }
 
             tileIndex += 1;

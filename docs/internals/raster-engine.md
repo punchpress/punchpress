@@ -69,31 +69,41 @@ rebased document state disagree mid-commit.
 
 ## Compositor
 
-One compositing canvas per raster surface, mounted once in the node's render
-tree. It repaints from the tile store when tiles dirty or the viewport changes:
+One always-screen-space compositing canvas per raster surface. The canvas
+backing store is device resolution — viewport CSS px × `devicePixelRatio` —
+and never represents world or local extents. It repaints from the tile store
+when tiles dirty or the viewport changes:
 
-1. Resolve the visible tile range for the current viewport and zoom.
-2. Pick the pyramid level closest to screen resolution.
-3. `drawImage` each visible tile at that level, clipped to the dirty rect
-   during strokes.
+1. Set one shared store→device-pixel transform on the context
+   (zoom × DPR × node transform × anchor offset).
+2. Pick the pyramid level closest to device resolution:
+   effective scale = device px per store px, level =
+   `clamp(floor(log2(1 / scale)), 0, max)`.
+3. `drawImage` each viewport-intersecting tile at that level at its integer
+   store coordinates through the shared transform.
 
 Rules:
 
 - The compositor reads tiles; it never owns or mutates pixels.
-- Invalidation is coalesced: many dab writes produce one dirty-rect repaint per
-  frame, and one settle event per completed action.
+- Invalidation is coalesced: many dab writes produce one repaint per frame,
+  and one settle event per completed action. Repaints redraw the full
+  viewport; the device-resolution backing caps the cost regardless of zoom.
 - A region with no decoded tile at the ideal level renders the nearest existing
   level and refines in place. Blank flashes are a bug, not a loading state.
 - Per-tile DOM elements, image `load` tracking, and render acknowledgement
   events are forbidden; the compositor is synchronous with the store.
-- The surface canvas is plain HTML portaled into the node shell, never SVG
-  foreignObject: foreignObject content cannot direct-composite and Blink's
-  paint cull truncates in-world content past ~16384 CSS px.
-- When the viewport-clamped surface spans more local pixels than that cull
-  horizon (deep zoom-out), the surface renders at screen resolution in the
-  host-anchored raster surface layer instead of the node shell. Otherwise
-  Chromium drops or cracks raster tiles at 512 * 2^k local-px boundaries --
-  artifacts that masquerade as pyramid tile seams.
+- The surface canvas is plain HTML (never SVG foreignObject — it cannot
+  direct-composite) portaled into the host-anchored raster surface layer:
+  axis-aligned, exactly viewport-sized, one canvas per brushed node in
+  document order. Mounting it inside the node shell with an inverse transform
+  does not survive Blink: the paint cull is applied in shell-local space and
+  truncates the surface at ~16384 px even when the element is composited.
+- Tiles are never drawn at per-tile fractional destination rects. One shared
+  context transform with integer store-space coordinates makes neighboring
+  tile edges land on identical device pixels; per-tile rounding under GPU
+  rasterization opens bright seam lines at tile boundaries.
+- Level selection is device-pixel aware. Ignoring DPR undersamples on hi-DPI
+  displays (one level too coarse) and widens seam artifacts.
 
 ## Mipmap Pyramid
 
@@ -139,7 +149,12 @@ raster asset; the asset owns a tile manifest.
 - Save writes manifest payloads into the package's tiled raster layout (see
   [Punch package](../reference/punch-package.md)).
 - Load hydrates the store lazily: decode the tiles the viewport needs first,
-  the rest on demand.
+  the rest on demand. Hydration runs in frame-budgeted chunks (~8 ms of sync
+  work per rAF); painting proceeds against the stroke buffer meanwhile, and
+  only the commit merge awaits full hydration.
+- Commit-time merge and encode chunks run on rAF cadence and pause entirely
+  while any brush session has an active pointer stroke or un-flushed points,
+  so a previous stroke's commit never hitches the next stroke's drag.
 - Encode and decode timing have zero rendering consequences; the store is
   always ahead of the assets, never behind.
 

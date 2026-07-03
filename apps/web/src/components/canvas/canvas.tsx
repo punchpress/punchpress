@@ -679,10 +679,12 @@ export const Canvas = () => {
         </InfiniteViewer>
 
         {/*
-          Screen-space host for zoomed-out raster store surfaces. Blink's
-          paint cull stops rendering world-space content past ~16k CSS px, so
-          surfaces spanning more local pixels than that render here at screen
-          resolution instead of inside their node shells.
+          Host-anchored screen-space layer for raster store surfaces (one
+          viewport-sized canvas per brushed node, in document order). Mounting
+          the device-resolution canvas inside a node shell with an inverse
+          transform re-enters Blink's ~16384 px paint cull in the shell's
+          local space, truncating the surface mid-viewport at deep zoom-out;
+          this axis-aligned layer never does.
         */}
         <div
           className="pointer-events-none absolute inset-0 z-[1] overflow-hidden"
