@@ -95,7 +95,7 @@ export const createMainWindowController = () => {
         y: 16,
       },
       webPreferences: {
-        preload: path.join(import.meta.dirname, "../preload/preload.mjs"),
+        preload: path.join(import.meta.dirname, "../preload/preload.cjs"),
         backgroundThrottling: false,
         contextIsolation: true,
         nodeIntegration: false,

@@ -21,6 +21,11 @@ export default defineConfig({
         input: {
           preload: resolve(__dirname, "src-electron/preload.ts"),
         },
+        output: {
+          // Sandboxed renderers cannot load ESM preload scripts; emit CJS.
+          entryFileNames: "[name].cjs",
+          format: "cjs",
+        },
       },
     },
     plugins: [externalizeDepsPlugin()],
