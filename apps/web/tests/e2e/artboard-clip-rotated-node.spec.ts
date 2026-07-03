@@ -69,13 +69,16 @@ const getClipInsets = (page, nodeId) => {
     const shell =
       el?.parentElement?.dataset?.nodeShell === "true" ? el.parentElement : el;
     const clip = shell ? getComputedStyle(shell).clipPath : "";
-    const match = clip.match(/inset\(([^)]+)\)/);
-    if (!match) {
+    const start = clip.indexOf("inset(");
+    const end = clip.indexOf(")", start);
+    if (start < 0 || end < 0) {
       return { clip, insets: null };
     }
-    const parts = match[1]
+    // Computed clip-path normalizes whitespace to single spaces.
+    const parts = clip
+      .slice(start + "inset(".length, end)
       .trim()
-      .split(/\s+/)
+      .split(" ")
       .map((value) => Number.parseFloat(value));
     if (parts.some((value) => Number.isNaN(value))) {
       return { clip, insets: null };
@@ -86,7 +89,9 @@ const getClipInsets = (page, nodeId) => {
   }, nodeId);
 };
 
-test("artboard clip region extends past a rotated child's unrotated frame", async ({ page }) => {
+test("artboard clip region extends past a rotated child's unrotated frame", async ({
+  page,
+}) => {
   await gotoEditor(page);
   await loadClipDocument(page);
   await resetViewport(page);
