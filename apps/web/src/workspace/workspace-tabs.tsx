@@ -11,31 +11,30 @@ export const WorkspaceTabs = ({ onCloseTab, onNewFile }) => {
   const fileTabs = workspace.tabs.filter((tab) => tab.id !== scratchpadTab?.id);
 
   return (
-    <div
-      className="pointer-events-auto flex h-full min-w-0 flex-1 translate-y-[3px] items-center gap-2 px-2"
-      style={{ WebkitAppRegion: "no-drag" }}
-    >
+    <div className="pointer-events-auto flex h-full min-w-0 flex-1 translate-y-[3px] items-center gap-2 px-2">
       {scratchpadTab ? (
-        <WorkspaceTab onCloseTab={onCloseTab} tab={scratchpadTab} />
+        <div className="no-drag flex shrink-0 items-center">
+          <WorkspaceTab onCloseTab={onCloseTab} tab={scratchpadTab} />
+        </div>
       ) : null}
+
+      <div className="flex min-w-0 items-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="no-drag flex min-w-max items-center gap-2">
+          {fileTabs.map((tab) => (
+            <WorkspaceTab key={tab.id} onCloseTab={onCloseTab} tab={tab} />
+          ))}
+        </div>
+      </div>
 
       <Button
         aria-label="New file"
-        className="shrink-0"
+        className="no-drag shrink-0"
         onClick={onNewFile}
         size="icon-sm"
         variant="ghost"
       >
         <PlusIcon className="size-4" />
       </Button>
-
-      <div className="flex min-w-0 flex-1 items-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="flex min-w-max items-center gap-2">
-          {fileTabs.map((tab) => (
-            <WorkspaceTab key={tab.id} onCloseTab={onCloseTab} tab={tab} />
-          ))}
-        </div>
-      </div>
     </div>
   );
 };
