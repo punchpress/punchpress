@@ -1,6 +1,8 @@
 import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
 import { createDefaultGroupNode } from "../nodes/group/model";
 import { createId } from "../nodes/text/model";
+import { getArtboardParentPatch } from "../placement/artboard-parent";
+import { getSelectionBounds } from "../selection/selection-bounds";
 
 /**
  * Converts a parsed recipe (DesignDocument) into a flat node array suitable
@@ -143,4 +145,75 @@ export const recipeToComponentNodes = (
     nodes: [groupNode, ...remappedNodes],
     skippedImageCount,
   };
+};
+
+// Recentering waits for measurable bounds because text bounds depend on font
+// loading; shapes/vectors measure synchronously on the first attempt.
+const RECENTER_FRAME_BUDGET = 60;
+
+const recenterInsertedGroup = (editor, groupId, targetCenter, attempt = 0) => {
+  if (!editor.getNode(groupId)) {
+    return;
+  }
+
+  const bounds = getSelectionBounds(editor, [groupId]);
+  const measurable = Boolean(
+    bounds && (bounds.maxX - bounds.minX > 1 || bounds.maxY - bounds.minY > 1)
+  );
+
+  if (measurable) {
+    const delta = {
+      x: targetCenter.x - (bounds.minX + (bounds.maxX - bounds.minX) / 2),
+      y: targetCenter.y - (bounds.minY + (bounds.maxY - bounds.minY) / 2),
+    };
+
+    if (Math.abs(delta.x) > 0.5 || Math.abs(delta.y) > 0.5) {
+      const isGroupStillSelected =
+        editor.selectedNodeIds.length === 1 &&
+        editor.selectedNodeIds[0] === groupId;
+
+      // moveSelectionBy is the sanctioned group-move (shifts descendants);
+      // if the user already changed selection, leave the content where it is
+      // rather than yanking their new selection around.
+      if (isGroupStillSelected) {
+        editor.moveSelectionBy(delta);
+      }
+    }
+
+    return;
+  }
+
+  editor.selectionBoundsCache = null;
+
+  if (attempt < RECENTER_FRAME_BUDGET && typeof window !== "undefined") {
+    window.requestAnimationFrame(() => {
+      recenterInsertedGroup(editor, groupId, targetCenter, attempt + 1);
+    });
+  }
+};
+
+/**
+ * Inserts component nodes produced by `recipeToComponentNodes` at a drop
+ * point: the group is parented into the topmost artboard under the point
+ * (matching how placement tools parent new nodes), and the content is
+ * recentered on the point using measured bounds once they are available.
+ */
+export const insertComponentNodes = (editor, nodes, { targetCenter }) => {
+  if (nodes.length === 0) {
+    return;
+  }
+
+  const [groupNode, ...rest] = nodes;
+  const parentPatch = targetCenter
+    ? getArtboardParentPatch(editor, targetCenter)
+    : null;
+  const insertedGroup = parentPatch
+    ? { ...groupNode, ...parentPatch }
+    : groupNode;
+
+  editor.insertNodes([insertedGroup, ...rest]);
+
+  if (targetCenter) {
+    recenterInsertedGroup(editor, insertedGroup.id, targetCenter);
+  }
 };

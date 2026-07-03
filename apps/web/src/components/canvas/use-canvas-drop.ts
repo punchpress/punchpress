@@ -1,4 +1,8 @@
-import { recipeToComponentNodes, round } from "@punchpress/engine";
+import {
+  insertComponentNodes,
+  recipeToComponentNodes,
+  round,
+} from "@punchpress/engine";
 import {
   PUNCH_SVG_EXTENSION,
   PUNCH_SVG_MIME_TYPE,
@@ -40,7 +44,7 @@ const insertRecipeAsGroup = (
     throw new Error(`No importable content found in ${fileName}.`);
   }
 
-  editor.insertNodes(nodes);
+  insertComponentNodes(editor, nodes, { targetCenter });
   showToast({
     message:
       skippedImageCount > 0

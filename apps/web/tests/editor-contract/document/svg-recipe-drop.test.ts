@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { Editor, recipeToComponentNodes } from "@punchpress/engine";
+import {
+  Editor,
+  insertComponentNodes,
+  recipeToComponentNodes,
+} from "@punchpress/engine";
 import {
   PUNCH_DOCUMENT_VERSION,
   parseEmbeddedDesignDocument,
@@ -91,6 +95,26 @@ const buildImage = (
   visible: true,
   width: 1,
 });
+
+const buildShapeRecipeNode = (
+  x: number,
+  y: number,
+  width = 200,
+  height = 200
+) => {
+  const scratch = new Editor();
+  scratch.addShapeNode({ x, y });
+  const shape = scratch.nodes.find((node) => node.type === "shape");
+
+  return {
+    ...(shape as Record<string, unknown>),
+    height,
+    id: "recipe-shape",
+    parentId: ROOT_PARENT_ID,
+    transform: transform(x, y),
+    width,
+  };
+};
 
 const buildDocument = (nodes: Record<string, unknown>[]) => ({
   assets: {},
@@ -241,5 +265,70 @@ describe("recipeToComponentNodes", () => {
     expect(insertedShape?.type === "shape" ? insertedShape.shape : null).toBe(
       "star"
     );
+  });
+
+  test("insertComponentNodes parents the group into the artboard under the drop point", () => {
+    const editor = new Editor();
+    editor.run(() => {
+      editor
+        .getState()
+        .addArtboardNode(
+          { x: 0, y: 0 },
+          { patch: { height: 1000, name: "Target", width: 1000 } }
+        );
+    });
+    const artboard = editor.nodes.find((node) => node.type === "artboard");
+    expect(artboard).toBeDefined();
+
+    const recipe = {
+      version: PUNCH_DOCUMENT_VERSION,
+      nodes: [buildShapeRecipeNode(400, 400)],
+    };
+    const { nodes } = recipeToComponentNodes(recipe, {
+      targetCenter: { x: 500, y: 500 },
+    });
+
+    insertComponentNodes(editor, nodes, { targetCenter: { x: 500, y: 500 } });
+
+    const insertedGroup = editor.getNode(nodes[0].id);
+    expect(insertedGroup).toBeDefined();
+    // Drop point is inside the artboard, so the group nests into it.
+    expect(insertedGroup?.parentId).toBe(artboard?.id);
+
+    // A drop outside any artboard parents to the root.
+    const { nodes: outsideNodes } = recipeToComponentNodes(recipe, {
+      targetCenter: { x: 5000, y: 5000 },
+    });
+    insertComponentNodes(editor, outsideNodes, {
+      targetCenter: { x: 5000, y: 5000 },
+    });
+    expect(editor.getNode(outsideNodes[0].id)?.parentId).toBe("root");
+  });
+
+  test("insertComponentNodes recenters content on measured bounds", () => {
+    const editor = new Editor();
+    const recipe = {
+      version: PUNCH_DOCUMENT_VERSION,
+      // Real size matters here: naive pre-insert centering (transform x/y
+      // only) cannot know it; the measured recenter must correct for it.
+      nodes: [buildShapeRecipeNode(400, 400, 200, 400)],
+    };
+    const target = { x: 3000, y: 3000 };
+    const { nodes } = recipeToComponentNodes(recipe, { targetCenter: target });
+
+    insertComponentNodes(editor, nodes, { targetCenter: target });
+
+    const bounds = editor.getNodeSelectionFrame(nodes[0].id)?.bounds ?? null;
+    expect(bounds).not.toBeNull();
+    if (!bounds) {
+      return;
+    }
+    const center = {
+      x: bounds.minX + (bounds.maxX - bounds.minX) / 2,
+      y: bounds.minY + (bounds.maxY - bounds.minY) / 2,
+    };
+    // Measured content center lands on the drop point (sync-measurable shape).
+    expect(Math.abs(center.x - target.x)).toBeLessThan(1);
+    expect(Math.abs(center.y - target.y)).toBeLessThan(1);
   });
 });

@@ -14,7 +14,10 @@ export {
   WARP_TEXT_NODE_KIND,
 } from "./constants";
 export { offsetEditablePathPoints } from "./document/path/editable-path-actions";
-export { recipeToComponentNodes } from "./document/recipe-component-nodes";
+export {
+  insertComponentNodes,
+  recipeToComponentNodes,
+} from "./document/recipe-component-nodes";
 export { setVectorPathComposition } from "./document/path/path-composition-actions";
 export {
   canMakeCompoundPath,
