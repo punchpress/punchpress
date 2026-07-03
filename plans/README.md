@@ -55,11 +55,16 @@ REJECTED (with one-line rationale)
 
 ## Pending operator hand-tests
 
-- **Plan 004 (`99be27ac`)** — verify in the desktop app with `sandbox: true`:
-  app renders; `.punch` open + save dialogs; recent-documents menu; local
-  fonts in the font picker; native menu commands; updater check on launch.
-  Also launch a packaged build once (`bun run build:desktop:unsigned`) to
-  confirm the hardened `app://` handler serves it.
+- **Plan 004 (`99be27ac` + preload fix `8dd10b76`)** — `sandbox: true`
+  initially broke the desktop shell: Electron silently refuses ESM preloads in
+  sandboxed renderers, so `window.electron` vanished (tabs behind traffic
+  lights, no window drag, browser-mode font prompt). Fixed by emitting the
+  preload as CJS. CONFIRMED by operator: window chrome, drag, and local fonts
+  all working sandboxed. Still pending: `.punch` open/save dialogs,
+  recent-documents menu, native menu commands, updater; one packaged-build
+  launch (`bun run build:desktop:unsigned`) for the `app://` containment path.
+  Note: Magnific asset search returns 401 — stale MAGNIFIC_API_KEY in `.env`
+  (verified via direct curl; unrelated to these changes; owner to rotate key).
 - **Plan 005 (`fc33070e`)** — in the running app: export a design to SVG,
   re-import it via File > Import SVG and via canvas drag-drop — original
   document opens as a NEW TAB fully editable (text/warp/colors live). A plain
