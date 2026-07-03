@@ -7,6 +7,7 @@ import {
   getErasedAlphaByte,
   getPaintedAlpha,
   getPaintedAlphaByte,
+  getSolidBrushDabSpacing,
 } from "../../../../packages/engine/src/tools/brush-mask";
 
 describe("brush settings", () => {
@@ -129,6 +130,19 @@ describe("brush settings", () => {
     expect(getBrushDabSpacing(100, 0.18, 1)).toBe(18);
     expect(getBrushDabSpacing(100, 0.18, 0)).toBeLessThan(5);
     expect(getBrushDabSpacing(100, 0.18, 0)).toBeGreaterThanOrEqual(1);
+  });
+
+  test("solid strokes stretch dab steps with the scallop-bounded bound", () => {
+    // s = clamp(sqrt(3.2 * radius), regular floor, radius / 2): the step that
+    // keeps stamped-circle scallop depth s^2 / (8r) at or under 0.4 px.
+    expect(getSolidBrushDabSpacing(500, 0)).toBeCloseTo(Math.sqrt(3.2 * 250));
+    expect(getSolidBrushDabSpacing(100, 0)).toBeCloseTo(Math.sqrt(3.2 * 50));
+    // Small brushes cap at half the radius.
+    expect(getSolidBrushDabSpacing(20, 0)).toBe(5);
+    // An explicit spacing above the adaptive bound keeps the regular value.
+    expect(getSolidBrushDabSpacing(500, 0.2)).toBe(100);
+    // Never below one store pixel.
+    expect(getSolidBrushDabSpacing(2, 0)).toBeGreaterThanOrEqual(1);
   });
 
   test("byte alpha compositing keeps source-over semantics", () => {

@@ -58,6 +58,40 @@ export const getBrushDabSpacing = (size, spacing, hardness) => {
   return Math.max(1, size * 0.02, size * spacing * spacingMultiplier);
 };
 
+/**
+ * Adaptive dab-step length for solid (hardness 1, opacity 1) stroke
+ * segments. Solid segments paint exact capsules, so the step length only
+ * bounds incremental work per dab, never envelope accuracy; the
+ * scallop-depth bound s^2 / (8r) <= 0.4 px picks a step that would stay
+ * sub-half-pixel even for stamped circles. Clamped between the regular
+ * spacing floor and half the radius.
+ */
+export const getSolidBrushDabSpacing = (size, spacing) => {
+  const radius = size / 2;
+  const floor = getBrushDabSpacing(size, spacing, 1);
+  const adaptive = Math.sqrt(3.2 * radius);
+
+  return Math.max(1, Math.min(Math.max(adaptive, floor), radius / 2));
+};
+
+/**
+ * Coverage of a solid brush swept along the segment `from -> to`: the
+ * one-pixel antialias ramp around the capsule envelope, matching
+ * getBrushDabCoverage at hardness 1 for a degenerate segment.
+ */
+export const getSolidBrushSegmentCoverage = (x, y, from, to, radius) => {
+  const abX = to.x - from.x;
+  const abY = to.y - from.y;
+  const lengthSquared = abX * abX + abY * abY;
+  const t =
+    lengthSquared > 0
+      ? clamp(((x - from.x) * abX + (y - from.y) * abY) / lengthSquared, 0, 1)
+      : 0;
+  const distance = Math.hypot(x - (from.x + abX * t), y - (from.y + abY * t));
+
+  return clamp(radius + HARD_BRUSH_ANTIALIAS_WIDTH / 2 - distance, 0, 1);
+};
+
 export const getBrushDabRenderRadius = (size, hardness) => {
   const radius = size / 2;
 

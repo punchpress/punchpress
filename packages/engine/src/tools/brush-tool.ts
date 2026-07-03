@@ -14,6 +14,8 @@ import {
   getBrushDabCoverage,
   getBrushDabRenderRadius,
   getBrushDabSpacing,
+  getSolidBrushDabSpacing,
+  getSolidBrushSegmentCoverage,
 } from "./brush-mask";
 import {
   cancelRasterFrame,
@@ -35,7 +37,11 @@ import {
 } from "./brush-target";
 import { selectToolFromShortcut, Tool } from "./tool";
 
-const BRUSH_STROKE_POINT_FLUSH_BUDGET_MS = 15;
+// Per-rAF dab budget for the queued-point drain. The drain shares its frame
+// with the compositor repaint (~10ms on a dense huge layer), so the budget
+// must leave a 30fps frame with headroom; queued points absorb the slack and
+// complete() drains whatever remains at pointerup.
+const BRUSH_STROKE_POINT_FLUSH_BUDGET_MS = 11;
 const BRUSH_TILE_ASYNC_COMMIT_THRESHOLD = 64;
 const BRUSH_TILE_COMMIT_BUDGET_MS = 8;
 let brushStrokeSessionRevision = 0;
@@ -522,7 +528,7 @@ class BrushStrokeSession {
     this.activeSegment = null;
     this.commitReady = Promise.resolve();
     this.lastPoint = null;
-    this.lastSolidDabPoint = null;
+    this.lastSolidDab = null;
     this.merged = false;
     this.nodeId = node.id;
     this.operation = operation;
@@ -538,6 +544,18 @@ class BrushStrokeSession {
       this.initialSourceRect
     );
     this.settings = settings;
+    // Solid strokes (fully-hard, fully-opaque paint) take the capsule fast
+    // path: each dab paints the exact envelope segment from the previous dab
+    // point, so the dab step can stretch (getSolidBrushDabSpacing) without
+    // scalloping edges. Explicit wide spacing keeps stamped circles.
+    this.solidStroke =
+      operation === "paint" &&
+      clamp(settings.hardness, 0, 1) >= 1 &&
+      settings.opacity >= 1;
+    this.capsuleStroke =
+      this.solidStroke &&
+      getBrushDabSpacing(settings.size, settings.spacing, 1) <=
+        settings.size / 4;
     this.storeEntry = editor.rasterStores.getOrCreateEntry(node.id);
     this.strokeStore = new RasterTileStore();
     recordRasterDebugEvent("session.create", {
@@ -581,9 +599,16 @@ class BrushStrokeSession {
     };
   }
 
+  /**
+   * Input path does no dab work during an active stroke: points enqueue and
+   * the rAF-cadenced flush owns ALL dab application under its frame budget
+   * (complete() drains the remainder). Budgeting the input flush itself and
+   * stacking an rAF drain on top regressed frame pacing badly — per-frame
+   * budget+drain churn compounds — so pointer events must stay write-only.
+   */
   addPoint(point) {
     this.points.push(point);
-    this.flushPoints();
+    this.scheduleQueuedPointFlush();
   }
 
   flushPoints({
@@ -676,11 +701,13 @@ class BrushStrokeSession {
       point.x - this.lastPoint.x,
       point.y - this.lastPoint.y
     );
-    const spacing = getBrushDabSpacing(
-      this.settings.size,
-      this.settings.spacing,
-      this.settings.hardness
-    );
+    const spacing = this.capsuleStroke
+      ? getSolidBrushDabSpacing(this.settings.size, this.settings.spacing)
+      : getBrushDabSpacing(
+          this.settings.size,
+          this.settings.spacing,
+          this.settings.hardness
+        );
 
     this.activeSegment = {
       from: this.lastPoint,
@@ -693,6 +720,10 @@ class BrushStrokeSession {
 
   advanceSegment(deadline) {
     const segment = this.activeSegment;
+    const pointAt = (progress) => ({
+      x: segment.from.x + (segment.to.x - segment.from.x) * progress,
+      y: segment.from.y + (segment.to.y - segment.from.y) * progress,
+    });
     let appliedCount = 0;
 
     while (segment.index < segment.steps) {
@@ -702,13 +733,10 @@ class BrushStrokeSession {
       }
 
       segment.index += 1;
-
-      const progress = segment.index / segment.steps;
-
-      this.applyDab({
-        x: segment.from.x + (segment.to.x - segment.from.x) * progress,
-        y: segment.from.y + (segment.to.y - segment.from.y) * progress,
-      });
+      this.applyDab(
+        pointAt(segment.index / segment.steps),
+        pointAt((segment.index - 1) / segment.steps)
+      );
       appliedCount += 1;
     }
 
@@ -716,15 +744,16 @@ class BrushStrokeSession {
     return true;
   }
 
-  applyDab(point) {
+  applyDab(point, segmentFrom = null) {
     const radius = this.settings.size / 2;
     const hardness = clamp(this.settings.hardness, 0, 1);
     const renderRadius = getBrushDabRenderRadius(this.settings.size, hardness);
+    const capsuleFrom = this.capsuleStroke && segmentFrom ? segmentFrom : null;
     const bounds = {
-      maxX: Math.ceil(point.x + renderRadius),
-      maxY: Math.ceil(point.y + renderRadius),
-      minX: Math.floor(point.x - renderRadius),
-      minY: Math.floor(point.y - renderRadius),
+      maxX: Math.ceil(Math.max(point.x, capsuleFrom?.x ?? point.x) + renderRadius),
+      maxY: Math.ceil(Math.max(point.y, capsuleFrom?.y ?? point.y) + renderRadius),
+      minX: Math.floor(Math.min(point.x, capsuleFrom?.x ?? point.x) - renderRadius),
+      minY: Math.floor(Math.min(point.y, capsuleFrom?.y ?? point.y) - renderRadius),
     };
 
     if (this.strokeClipBounds) {
@@ -750,37 +779,44 @@ class BrushStrokeSession {
       }
     }
 
-    // For a fully-hard, fully-opaque paint dab the previous dab in this
-    // session painted an identical saturated circle, so the store can skip
-    // rewriting the overlap and fill only the new crescent.
-    const solid =
-      this.operation === "paint" && hardness >= 1 && this.settings.opacity >= 1
-        ? {
-            radius,
-            skip: this.lastSolidDabPoint
-              ? { radius, x: this.lastSolidDabPoint.x, y: this.lastSolidDabPoint.y }
-              : undefined,
-          }
-        : undefined;
+    // For a solid stroke the previous dab painted an identical saturated
+    // capsule/circle, so the store can skip rewriting the overlap and fill
+    // only the new crescent.
+    const solid = this.solidStroke
+      ? {
+          from: capsuleFrom || undefined,
+          radius,
+          skip: this.lastSolidDab ? { radius, ...this.lastSolidDab } : undefined,
+        }
+      : undefined;
 
     this.strokeStore.paintDab({
       bounds,
       color: getBrushColorRgb(this.settings.color),
-      getCoverage: (x, y, centerPoint) => {
-        const dx = x - centerPoint.x;
-        const dy = y - centerPoint.y;
-        const normalizedDistanceSquared =
-          (dx * dx + dy * dy) / (radius * radius);
+      getCoverage: capsuleFrom
+        ? (x, y) =>
+            getSolidBrushSegmentCoverage(x, y, capsuleFrom, point, radius)
+        : (x, y, centerPoint) => {
+            const dx = x - centerPoint.x;
+            const dy = y - centerPoint.y;
+            const normalizedDistanceSquared =
+              (dx * dx + dy * dy) / (radius * radius);
 
-        return getBrushDabCoverage(normalizedDistanceSquared, hardness, radius);
-      },
+            return getBrushDabCoverage(
+              normalizedDistanceSquared,
+              hardness,
+              radius
+            );
+          },
       opacity: this.settings.opacity,
       point,
       solid,
     });
 
     if (solid) {
-      this.lastSolidDabPoint = point;
+      this.lastSolidDab = capsuleFrom
+        ? { from: capsuleFrom, x: point.x, y: point.y }
+        : { x: point.x, y: point.y };
     }
 
     this.recordDirtyBounds(bounds);

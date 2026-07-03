@@ -9,6 +9,8 @@ import {
   getBrushDabCoverage,
   getBrushDabRenderRadius,
   getBrushDabSpacing,
+  getSolidBrushDabSpacing,
+  getSolidBrushSegmentCoverage,
 } from "../../../../packages/engine/src/tools/brush-mask";
 
 const TILE = RASTER_STORE_TILE_SIZE;
@@ -21,44 +23,58 @@ interface Point {
 
 /**
  * Mirrors BrushStrokeSession's dab pipeline for a fully-hard, fully-opaque
- * paint brush: render-radius bounds, hard-brush coverage, solid fast path
- * with the previous dab as the skip circle, and segment interpolation at the
- * default spacing.
+ * paint brush: render-radius bounds, capsule segments between dab points at
+ * the adaptive solid spacing, the previous dab as the skip capsule, and
+ * union (max) edge composition through the store's solid fast path.
  */
 class SolidStrokeSimulator {
   lastPoint: Point | null = null;
-  lastSolidDabPoint: Point | null = null;
+  lastSolidDab: { from?: Point; x: number; y: number } | null = null;
   radius: number;
   renderRadius: number;
   solidEnabled: boolean;
   spacing: number;
   store: RasterTileStore;
 
-  constructor(store: RasterTileStore, size: number, { solid = true } = {}) {
+  constructor(
+    store: RasterTileStore,
+    size: number,
+    { solid = true, spacing = null as number | null } = {}
+  ) {
     this.store = store;
     this.radius = size / 2;
     this.renderRadius = getBrushDabRenderRadius(size, 1);
     this.solidEnabled = solid;
-    this.spacing = getBrushDabSpacing(size, 0, 1);
+    this.spacing =
+      spacing ??
+      (solid
+        ? getSolidBrushDabSpacing(size, 0)
+        : getBrushDabSpacing(size, 0, 1));
   }
 
-  applyDab(point: Point) {
+  applyDab(point: Point, segmentFrom: Point | null = null) {
     const radius = this.radius;
+    const capsuleFrom = this.solidEnabled && segmentFrom ? segmentFrom : null;
     const bounds = {
-      maxX: Math.ceil(point.x + this.renderRadius),
-      maxY: Math.ceil(point.y + this.renderRadius),
-      minX: Math.floor(point.x - this.renderRadius),
-      minY: Math.floor(point.y - this.renderRadius),
+      maxX: Math.ceil(
+        Math.max(point.x, capsuleFrom?.x ?? point.x) + this.renderRadius
+      ),
+      maxY: Math.ceil(
+        Math.max(point.y, capsuleFrom?.y ?? point.y) + this.renderRadius
+      ),
+      minX: Math.floor(
+        Math.min(point.x, capsuleFrom?.x ?? point.x) - this.renderRadius
+      ),
+      minY: Math.floor(
+        Math.min(point.y, capsuleFrom?.y ?? point.y) - this.renderRadius
+      ),
     };
     const solid = this.solidEnabled
       ? {
+          from: capsuleFrom || undefined,
           radius,
-          skip: this.lastSolidDabPoint
-            ? {
-                radius,
-                x: this.lastSolidDabPoint.x,
-                y: this.lastSolidDabPoint.y,
-              }
+          skip: this.lastSolidDab
+            ? { radius, ...this.lastSolidDab }
             : undefined,
         }
       : undefined;
@@ -66,23 +82,28 @@ class SolidStrokeSimulator {
     this.store.paintDab({
       bounds,
       color: COLOR,
-      getCoverage: (x, y, centerPoint) => {
-        const dx = x - centerPoint.x;
-        const dy = y - centerPoint.y;
+      getCoverage: capsuleFrom
+        ? (x, y) =>
+            getSolidBrushSegmentCoverage(x, y, capsuleFrom, point, radius)
+        : (x, y, centerPoint) => {
+            const dx = x - centerPoint.x;
+            const dy = y - centerPoint.y;
 
-        return getBrushDabCoverage(
-          (dx * dx + dy * dy) / (radius * radius),
-          1,
-          radius
-        );
-      },
+            return getBrushDabCoverage(
+              (dx * dx + dy * dy) / (radius * radius),
+              1,
+              radius
+            );
+          },
       opacity: 1,
       point,
       solid,
     });
 
     if (this.solidEnabled) {
-      this.lastSolidDabPoint = point;
+      this.lastSolidDab = capsuleFrom
+        ? { from: capsuleFrom, x: point.x, y: point.y }
+        : { x: point.x, y: point.y };
     }
   }
 
@@ -94,19 +115,16 @@ class SolidStrokeSimulator {
       return;
     }
 
-    const distance = Math.hypot(
-      point.x - this.lastPoint.x,
-      point.y - this.lastPoint.y
-    );
+    const from = this.lastPoint;
+    const distance = Math.hypot(point.x - from.x, point.y - from.y);
     const steps = Math.max(1, Math.ceil(distance / this.spacing));
+    const pointAt = (progress: number) => ({
+      x: from.x + (point.x - from.x) * progress,
+      y: from.y + (point.y - from.y) * progress,
+    });
 
     for (let index = 1; index <= steps; index += 1) {
-      const progress = index / steps;
-
-      this.applyDab({
-        x: this.lastPoint.x + (point.x - this.lastPoint.x) * progress,
-        y: this.lastPoint.y + (point.y - this.lastPoint.y) * progress,
-      });
+      this.applyDab(pointAt(index / steps), pointAt((index - 1) / steps));
       onDab?.();
     }
 
@@ -267,6 +285,60 @@ const findGutterMismatch = (store: RasterTileStore, { tolerance = 1 } = {}) => {
   return null;
 };
 
+/**
+ * A solid stroke's stroke-store bytes must equal the analytic envelope of
+ * the brush swept along the polyline: alpha = clamp(radius + 0.5 -
+ * distance-to-polyline, 0, 1) within one byte step. Checked on every
+ * physical pixel of every materialized tile, gutters included.
+ */
+const findEnvelopeMismatch = (
+  store: RasterTileStore,
+  polyline: Point[],
+  radius: number,
+  { tolerance = 1 } = {}
+) => {
+  const distanceToPolyline = (x: number, y: number) => {
+    let distance = Number.POSITIVE_INFINITY;
+
+    for (let index = 0; index < polyline.length - 1; index += 1) {
+      distance = Math.min(
+        distance,
+        distanceToSegment(x, y, polyline[index], polyline[index + 1])
+      );
+    }
+
+    return distance;
+  };
+
+  for (const tile of store.tiles.values()) {
+    for (let localY = 0; localY < tile.height; localY += 1) {
+      for (let localX = 0; localX < tile.width; localX += 1) {
+        const offset = (localY * tile.width + localX) * 4;
+        const distance = distanceToPolyline(
+          tile.x + localX + 0.5,
+          tile.y + localY + 0.5
+        );
+        const expected = Math.round(
+          Math.min(1, Math.max(0, radius + 0.5 - distance)) * 255
+        );
+        const actual = tile.pixels[offset + 3];
+
+        if (Math.abs(actual - expected) > tolerance) {
+          return {
+            actual,
+            expected,
+            tile: `${tile.col}:${tile.row}`,
+            worldX: tile.x + localX,
+            worldY: tile.y + localY,
+          };
+        }
+      }
+    }
+  }
+
+  return null;
+};
+
 const getMaxStoreChannelDiff = (a: RasterTileStore, b: RasterTileStore) => {
   const keys = new Set([...a.tiles.keys(), ...b.tiles.keys()]);
   let maxDiff = 0;
@@ -416,20 +488,39 @@ describe("H3: solid+skip polyline stroke-store bytes", () => {
   ];
 
   for (const [name, polyline, size] of cases) {
-    test(`${name}: full interior coverage and coverage-path parity`, () => {
+    test(`${name}: full interior coverage and analytic envelope parity`, () => {
       const solidStore = new RasterTileStore();
-      const referenceStore = new RasterTileStore();
 
       paintPolyline(solidStore, polyline, size, { solid: true });
-      paintPolyline(referenceStore, polyline, size, { solid: false });
 
       expect(findInteriorHole(solidStore, polyline, size / 2)).toBeNull();
       expect(findGutterMismatch(solidStore)).toBeNull();
-      expect(
-        getMaxStoreChannelDiff(solidStore, referenceStore)
-      ).toBeLessThanOrEqual(1);
+      expect(findEnvelopeMismatch(solidStore, polyline, size / 2)).toBeNull();
     });
   }
+
+  test("adaptive and dense dab spacing paint the same envelope", () => {
+    // Capsule segments make the stroke envelope spacing-invariant: the
+    // adaptive step (scallop-bounded for stamped circles) must stay within
+    // one alpha step of a densely stepped stroke on interior and edge alike.
+    const adaptiveStore = new RasterTileStore();
+    const denseStore = new RasterTileStore();
+
+    paintPolyline(adaptiveStore, WOBBLE_ACROSS_COLUMNS, 200, { solid: true });
+
+    const denseSimulator = new SolidStrokeSimulator(denseStore, 200, {
+      solid: true,
+      spacing: 2,
+    });
+
+    for (const point of WOBBLE_ACROSS_COLUMNS) {
+      denseSimulator.addPoint(point);
+    }
+
+    expect(
+      getMaxStoreChannelDiff(adaptiveStore, denseStore)
+    ).toBeLessThanOrEqual(1);
+  });
 });
 
 describe("H2: chunked stroke-store merge into the main store", () => {

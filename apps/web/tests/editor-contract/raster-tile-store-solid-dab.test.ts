@@ -108,18 +108,56 @@ describe("raster tile store solid dab fast path", () => {
     expect(Math.abs(partialCount - referenceCount)).toBeLessThanOrEqual(8);
   });
 
-  test("overlapping solid dabs along a stroke match the coverage path", () => {
-    const reference = new RasterTileStore();
+  test("overlapping solid dabs along a stroke paint the union envelope", () => {
+    // Solid dabs compose by coverage MAX: the stroke is the union of its
+    // dabs, so every pixel holds the envelope coverage of its nearest dab
+    // center -- not a source-over accumulation of overlapping edge bands.
     const fast = new RasterTileStore();
+    const radius = 24;
+    const points: { x: number; y: number }[] = [];
 
     for (let step = 0; step <= 10; step += 1) {
       const point = { x: 60 + step * 12, y: 80 + step * 3 };
 
-      paintDabAt(reference, point, 24);
-      paintDabAt(fast, point, 24, { solid: true });
+      points.push(point);
+      paintDabAt(fast, point, radius, { solid: true });
     }
 
-    expect(getMaxStoreChannelDiff(reference, fast)).toBeLessThanOrEqual(2);
+    let mismatch: Record<string, number> | null = null;
+
+    for (const tile of fast.tiles.values()) {
+      for (let localY = 0; !mismatch && localY < tile.height; localY += 1) {
+        for (let localX = 0; localX < tile.width; localX += 1) {
+          const sampleX = tile.x + localX + 0.5;
+          const sampleY = tile.y + localY + 0.5;
+          let distance = Number.POSITIVE_INFINITY;
+
+          for (const point of points) {
+            distance = Math.min(
+              distance,
+              Math.hypot(sampleX - point.x, sampleY - point.y)
+            );
+          }
+
+          const expected = Math.round(
+            Math.min(1, Math.max(0, radius + 0.5 - distance)) * 255
+          );
+          const actual = tile.pixels[(localY * tile.width + localX) * 4 + 3];
+
+          if (Math.abs(actual - expected) > 1) {
+            mismatch = {
+              actual,
+              expected,
+              worldX: tile.x + localX,
+              worldY: tile.y + localY,
+            };
+            break;
+          }
+        }
+      }
+    }
+
+    expect(mismatch).toBeNull();
   });
 
   test("skip-circle dabs leave no gaps and match unskipped solid dabs", () => {
