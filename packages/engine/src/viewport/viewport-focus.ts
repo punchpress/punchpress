@@ -58,23 +58,37 @@ export const scheduleViewportFocus = (editor, nodeIds, options = {}) => {
 
     const bounds = getSelectionBounds(editor, visibleNodeIds);
     const hasViewport = Boolean(editor.viewerRef && editor.hostRef);
-    const isReady = visibleNodeIds.every((nodeId) => {
-      const node = editor.getNode(nodeId);
-      if (node?.type === "artboard") {
-        return Boolean(editor.getNodeGeometry(nodeId)?.ready);
-      }
+    // During tab/canvas mount, node frames can momentarily measure as a
+    // zero-size rect even though geometry reports ready; fitting that rect
+    // pins the viewport to the node center at max zoom.
+    const hasMeasurableBounds = Boolean(
+      bounds && (bounds.maxX - bounds.minX > 1 || bounds.maxY - bounds.minY > 1)
+    );
+    const isReady =
+      hasMeasurableBounds &&
+      visibleNodeIds.every((nodeId) => {
+        const node = editor.getNode(nodeId);
+        if (node?.type === "artboard") {
+          return Boolean(editor.getNodeGeometry(nodeId)?.ready);
+        }
 
-      return Boolean(
-        (editor.getNodeTransformElement(nodeId) ||
-          editor.getNodeElement(nodeId)) &&
-          editor.getNodeGeometry(nodeId)?.ready
-      );
-    });
+        return Boolean(
+          (editor.getNodeTransformElement(nodeId) ||
+            editor.getNodeElement(nodeId)) &&
+            editor.getNodeGeometry(nodeId)?.ready
+        );
+      });
 
     if (bounds && hasViewport && (isReady || attempt >= 120)) {
       focusCanvasBoundsInViewport(editor, bounds, options);
-      editor.pendingViewportFocusFrame = null;
+      holdViewportFocusTarget(editor, bounds, options, requestId);
       return;
+    }
+
+    if (!hasMeasurableBounds) {
+      // Degenerate bounds get cached by nodes identity; drop the cache so the
+      // next attempt re-measures instead of replaying the stale rect.
+      editor.selectionBoundsCache = null;
     }
 
     editor.pendingViewportFocusFrame = window.requestAnimationFrame(() => {
@@ -84,6 +98,67 @@ export const scheduleViewportFocus = (editor, nodeIds, options = {}) => {
 
   editor.pendingViewportFocusFrame = window.requestAnimationFrame(() => {
     attemptFocus();
+  });
+};
+
+// React commits queued before a programmatic focus can re-assert a stale
+// viewer zoom/scroll through the controlled viewer props right after the
+// focus applies. Hold the focus target for a few frames and re-apply until
+// the viewport settles; yield immediately to user interaction.
+const FOCUS_HOLD_FRAME_BUDGET = 10;
+const FOCUS_HOLD_STABLE_FRAMES = 2;
+
+const holdViewportFocusTarget = (editor, bounds, options, requestId) => {
+  let target = { ...editor.viewportState };
+  let stableFrames = 0;
+
+  const attemptHold = (frame = 0) => {
+    if (editor.viewportFocusRequest !== requestId) {
+      return;
+    }
+
+    // Note: viewportInteracting is NOT a bail signal here — the stale viewer
+    // echo itself arrives through the scroll handler and marks the viewport
+    // as interacting. The hold budget is a handful of frames, so a real user
+    // gesture can win at most ~160ms later.
+    const viewport = editor.viewportState;
+    const drifted =
+      Math.abs(viewport.zoom - target.zoom) > 0.0001 ||
+      Math.abs(viewport.x - target.x) > 0.5 ||
+      Math.abs(viewport.y - target.y) > 0.5;
+
+    if (drifted) {
+      focusCanvasBoundsInViewport(editor, bounds, options);
+      target = { ...editor.viewportState };
+      stableFrames = 0;
+
+      // setViewport suppresses store writes while the echo has the viewport
+      // marked as interacting; sync the store directly so the controlled
+      // viewer props converge on the focus target instead of replaying it.
+      const storeViewport = editor.getState().viewport;
+      if (
+        storeViewport.x !== target.x ||
+        storeViewport.y !== target.y ||
+        storeViewport.zoom !== target.zoom
+      ) {
+        editor.getState().setViewport(target);
+      }
+    } else {
+      stableFrames += 1;
+    }
+
+    if (stableFrames >= FOCUS_HOLD_STABLE_FRAMES || frame >= FOCUS_HOLD_FRAME_BUDGET) {
+      editor.pendingViewportFocusFrame = null;
+      return;
+    }
+
+    editor.pendingViewportFocusFrame = window.requestAnimationFrame(() => {
+      attemptHold(frame + 1);
+    });
+  };
+
+  editor.pendingViewportFocusFrame = window.requestAnimationFrame(() => {
+    attemptHold();
   });
 };
 
