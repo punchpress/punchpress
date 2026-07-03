@@ -7,7 +7,7 @@
 - **Risk**: MED (id/asset remapping; insert semantics)
 - **Depends on**: 005 (merged as `fc33070e`)
 - **Category**: direction / feature
-- **Planned at**: commit `836e8a0b`, 2026-06-10
+- **Planned at**: commit `836e8a0b`, 2026-06-10 (REVISED after executor investigation: no asset merging exists or is needed — `document.assets` is a save/export-time artifact; live image nodes carry their own raster data)
 
 ## Why this matters (owner-specified semantics)
 
@@ -48,16 +48,12 @@ makes component reuse awkward. New contract:
   into the doc it was exported from). Find the repo's id helper (grep how
   `createDefault*Node` ids are made; engine likely exposes a `createNodeId`
   or the model factories self-assign — reuse that, do not invent uuid code).
-- Assets: image nodes reference `document.assets[assetId]`. Dropped content
-  must copy the asset entries it references into the target document's asset
-  map. If an assetId already exists in the target with DIFFERENT content,
-  remap the incoming assetId (fresh id) and update the node reference; if it
-  matches or is absent, insert/keep as-is. Investigate how the editor mutates
-  the asset map (grep `assets` in `packages/engine/src/state/store/` and
-  clipboard paste flow `packages/engine/src/clipboard/`) — clipboard paste of
-  image nodes already solves this problem; REUSE its mechanism if it exists.
-  If clipboard paste does NOT handle cross-document asset merging, STOP and
-  report what exists.
+- Assets (RESOLVED by prior executor's investigation): there is NO live
+  asset map — `document.assets` is derived at save/export time by
+  `createDocumentAssetsFromNodes`; live image nodes are self-contained
+  (`src`, `tileSources`, ...). Conversion therefore needs NO asset merging.
+  Guard only: if a recipe image node lacks usable inline data (empty `src`),
+  SKIP that node and surface one toast noting skipped images.
 
 ## Commands you will need
 
@@ -96,7 +92,7 @@ makes component reuse awkward. New contract:
 
 ### Step 1: Conversion helper in the engine
 
-`recipeToComponentNodes(document, { targetCenter })` → `{ nodes, assets }`:
+`recipeToComponentNodes(document, { targetCenter })` → `{ nodes, skippedImageCount }`:
 
 1. Partition recipe nodes: artboards vs everything else.
 2. Drop artboard nodes; children of artboards keep their coordinates
@@ -112,8 +108,8 @@ makes component reuse awkward. New contract:
    box (exact); otherwise use the min/max of node transform x/y as an
    approximation (document this limitation in a comment). Offset all
    top-level children so the box center lands on targetCenter.
-6. Collect referenced asset entries (image nodes' assetIds) into `assets`,
-   remapping ids as needed per "Current state".
+6. Image nodes: keep as-is (self-contained). Skip any with empty `src`
+   (count them; the caller toasts if count > 0). Return `{ nodes, skippedImageCount }`.
 
 **Verify**: unit-testable pure function; tests in Step 3 cover it.
 
@@ -121,9 +117,8 @@ makes component reuse awkward. New contract:
 
 In `use-canvas-drop.ts`, the `embedded.kind === "document"` branch becomes:
 convert via `recipeToComponentNodes(embedded.document, { targetCenter })`,
-merge assets into the current document (via whatever mechanism Step 1's
-investigation found — ideally the same call clipboard paste uses), then
-`editor.insertNodes(nodes)` and toast `Added <fileName> to canvas`.
+then `editor.insertNodes(nodes)` and toast `Added <fileName> to canvas`
+(append a note when `skippedImageCount > 0`).
 `svg-embedded-import.ts` result gains the parsed `document` for this.
 Menu-import path (`use-document-commands.ts`) stays on `documentJson` +
 `openDocumentTab`.
@@ -140,8 +135,9 @@ Menu-import path (`use-document-commands.ts`) stays on `documentJson` +
    recipe's), content box centered on targetCenter (artboard-exact case).
 2. Recipe with two sibling artboards → both stripped, all children under one
    group.
-3. Recipe with an image node → returned `assets` contains its entry; node's
-   assetId consistent with the returned map.
+3. Recipe with an image node carrying a data-url `src` → node inserted
+   intact under the group; an image node with empty `src` → skipped and
+   counted.
 4. Id collision: convert the same recipe twice → zero id overlap between the
    two results.
 5. End-to-end: build editor with an existing document, run the real exporter
@@ -183,8 +179,6 @@ force.
 ## STOP conditions
 
 - Artboard children turn out to use artboard-relative coordinates.
-- No existing mechanism to merge asset entries into the open document's asset
-  map (clipboard paste doesn't do it and no store action exists).
 - The id-helper investigation finds nodes get ids only via store actions (no
   reusable factory) — report rather than hand-rolling id generation.
 
