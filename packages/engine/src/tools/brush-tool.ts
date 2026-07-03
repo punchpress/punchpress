@@ -28,6 +28,7 @@ import {
   getArtboardClipSourceRect,
   getImageLocalClipBounds,
   getImageLocalPoint,
+  getImageLocalViewportBounds,
   getImageNodeCroppedToSourceRect,
   materializeBrushTarget,
   resolveBrushTarget,
@@ -36,7 +37,7 @@ import { selectToolFromShortcut, Tool } from "./tool";
 
 const BRUSH_STROKE_POINT_FLUSH_BUDGET_MS = 15;
 const BRUSH_TILE_ASYNC_COMMIT_THRESHOLD = 64;
-const BRUSH_TILE_COMMIT_BUDGET_MS = 15;
+const BRUSH_TILE_COMMIT_BUDGET_MS = 8;
 let brushStrokeSessionRevision = 0;
 let brushTileCommitRevision = 0;
 
@@ -83,6 +84,16 @@ const yieldRasterTask = () =>
     }
 
     setTimeout(resolve, 0);
+  });
+
+/**
+ * Frame-cadenced yield for background commit work (merge + encode chunks).
+ * rAF, never a microtask/timeout loop, so each chunk shares its frame with
+ * input handling and the compositor instead of starving them.
+ */
+const nextRasterFrame = () =>
+  new Promise((resolve) => {
+    requestRasterFrame(() => resolve(undefined));
   });
 
 const getAlphaBounds = (imageData) => {
@@ -542,7 +553,9 @@ class BrushStrokeSession {
       sourceRect: this.initialSourceRect,
     });
     incrementPerfCounter("brush.tile.session");
-    this.ready = editor.rasterStores.ensureHydrated(node);
+    this.ready = editor.rasterStores.ensureHydrated(node, {
+      priorityBounds: getImageLocalViewportBounds(editor, node),
+    });
     this.tool = tool;
 
     measurePerf("brush.stroke.materializeTarget", () =>
@@ -893,6 +906,13 @@ class BrushStrokeSession {
     let tileIndex = 0;
 
     while (tileIndex < strokeTiles.length) {
+      // A previous stroke's merge must never land under the next stroke's
+      // drag: pause whole chunks while any session is interactively painting.
+      if (canScheduleRasterFrame() && this.tool.hasInteractiveStrokeWork()) {
+        await nextRasterFrame();
+        continue;
+      }
+
       measurePerf("brush.commit.mergeStrokeStore.chunk", () => {
         const startedAt = getNow();
 
@@ -915,7 +935,7 @@ class BrushStrokeSession {
       });
 
       if (tileIndex < strokeTiles.length && canScheduleRasterFrame()) {
-        await yieldRasterTask();
+        await nextRasterFrame();
       }
     }
 
@@ -974,55 +994,57 @@ class BrushStrokeSession {
     return Promise.resolve();
   }
 
-  commitTileSurfaceAsync({ commitRevision, dirtyTiles }) {
-    return new Promise((resolve) => {
-      const tileSources: NonNullable<
-        ReturnType<typeof createTileSourceFromDirtyTile>
-      >[] = [];
-      let tileIndex = 0;
-      const encodeChunk = () => {
-        measurePerf("brush.tile.commit.encode.chunk", () => {
-          const startedAt = getNow();
+  async commitTileSurfaceAsync({ commitRevision, dirtyTiles }) {
+    const tileSources: NonNullable<
+      ReturnType<typeof createTileSourceFromDirtyTile>
+    >[] = [];
+    let tileIndex = 0;
 
-          while (tileIndex < dirtyTiles.length) {
-            const tileSource = createTileSourceFromDirtyTile({
-              commitRevision,
-              nodeId: this.nodeId,
-              offsetX: this.initialSourceRect?.x || 0,
-              offsetY: this.initialSourceRect?.y || 0,
-              tile: dirtyTiles[tileIndex],
-            });
+    while (tileIndex < dirtyTiles.length) {
+      // Encode follows the merge rule: pause whole chunks while any session
+      // is interactively painting, resume on rAF cadence when idle.
+      if (canScheduleRasterFrame() && this.tool.hasInteractiveStrokeWork()) {
+        await nextRasterFrame();
+        continue;
+      }
 
-            tileIndex += 1;
+      measurePerf("brush.tile.commit.encode.chunk", () => {
+        const startedAt = getNow();
 
-            if (tileSource) {
-              tileSources.push(tileSource);
-            }
+        while (tileIndex < dirtyTiles.length) {
+          const tileSource = createTileSourceFromDirtyTile({
+            commitRevision,
+            nodeId: this.nodeId,
+            offsetX: this.initialSourceRect?.x || 0,
+            offsetY: this.initialSourceRect?.y || 0,
+            tile: dirtyTiles[tileIndex],
+          });
 
-            if (getNow() - startedAt >= BRUSH_TILE_COMMIT_BUDGET_MS) {
-              break;
-            }
+          tileIndex += 1;
+
+          if (tileSource) {
+            tileSources.push(tileSource);
           }
-        });
-        incrementPerfCounter("brush.tile.commit.encodeChunk");
 
-        if (tileIndex < dirtyTiles.length) {
-          yieldRasterTask().then(encodeChunk);
-          return;
+          if (getNow() - startedAt >= BRUSH_TILE_COMMIT_BUDGET_MS) {
+            break;
+          }
         }
+      });
+      incrementPerfCounter("brush.tile.commit.encodeChunk");
 
-        recordRasterDebugEvent("tileCommit.asyncEncoded", {
-          commitRevision,
-          encodedTileCount: tileSources.length,
-          nodeId: this.nodeId,
-          sessionId: this.sessionId,
-        });
-        this.finishTileSurfaceCommit(tileSources);
-        resolve();
-      };
+      if (tileIndex < dirtyTiles.length && canScheduleRasterFrame()) {
+        await nextRasterFrame();
+      }
+    }
 
-      encodeChunk();
+    recordRasterDebugEvent("tileCommit.asyncEncoded", {
+      commitRevision,
+      encodedTileCount: tileSources.length,
+      nodeId: this.nodeId,
+      sessionId: this.sessionId,
     });
+    this.finishTileSurfaceCommit(tileSources);
   }
 
   finishTileSurfaceCommit(tileSources) {
@@ -1236,6 +1258,21 @@ export class BrushTool extends Tool {
         ? state.eraserSettings
         : state.brushSettings) || DEFAULT_BRUSH_SETTINGS
     );
+  }
+
+  /**
+   * True while any of this tool's sessions has an active pointer stroke or
+   * un-flushed stroke points. Background commit work (merge + encode chunks)
+   * pauses while this holds so it never runs under a live drag.
+   */
+  hasInteractiveStrokeWork() {
+    for (const session of this.sessions) {
+      if (!session.completed || session.hasPendingStrokeInput) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   getStrokeOverlaysForNode(nodeId) {

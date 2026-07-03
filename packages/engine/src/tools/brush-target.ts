@@ -20,6 +20,41 @@ export const getImageLocalPoint = (node, point) => {
   return getNodeLocalPoint(node, getImageNodeBounds(node), point);
 };
 
+/**
+ * Current viewport in the image node's local space, used as the hydration
+ * priority hint: on-screen tiles decode before offscreen ones.
+ */
+export const getImageLocalViewportBounds = (editor, node) => {
+  const hostRect = editor.hostRef?.getBoundingClientRect?.();
+
+  if (!(hostRect && node?.type === "image")) {
+    return null;
+  }
+
+  const zoom = Math.max(0.0001, editor.zoom || 1);
+  const viewport = editor.viewport || { x: 0, y: 0 };
+  const corners = [
+    { x: viewport.x, y: viewport.y },
+    { x: viewport.x + hostRect.width / zoom, y: viewport.y },
+    {
+      x: viewport.x + hostRect.width / zoom,
+      y: viewport.y + hostRect.height / zoom,
+    },
+    { x: viewport.x, y: viewport.y + hostRect.height / zoom },
+  ].map((corner) => getImageLocalPoint(node, corner));
+
+  if (corners.some((corner) => !corner)) {
+    return null;
+  }
+
+  return {
+    maxX: Math.max(...corners.map((corner) => corner.x)),
+    maxY: Math.max(...corners.map((corner) => corner.y)),
+    minX: Math.min(...corners.map((corner) => corner.x)),
+    minY: Math.min(...corners.map((corner) => corner.y)),
+  };
+};
+
 export const getNodeArtboardClipBounds = (editor, node) => {
   const parent = node?.parentId ? editor.getNode(node.parentId) : null;
 

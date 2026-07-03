@@ -1,6 +1,26 @@
-import { createCanvas } from "../tools/brush-runtime";
+import {
+  canScheduleRasterFrame,
+  createCanvas,
+  getNow,
+  requestRasterFrame,
+} from "../tools/brush-runtime";
 import { RasterTilePyramid } from "./raster-pyramid";
 import { RasterTileStore } from "./raster-tile-store";
+
+/**
+ * Hydration decodes committed tiles on the main thread, so it runs in
+ * rAF-cadenced chunks with a small sync budget: painting proceeds against the
+ * stroke buffer while tiles stream in, and only the commit merge awaits the
+ * full hydration promise.
+ */
+const HYDRATION_CHUNK_BUDGET_MS = 8;
+
+type HydrationBounds = {
+  maxX: number;
+  maxY: number;
+  minX: number;
+  minY: number;
+};
 
 export type RasterStoreEntry = {
   anchorX: number;
@@ -60,7 +80,10 @@ export class RasterStoreManager {
     return entry.pyramid;
   }
 
-  ensureHydrated(node: { id: string }) {
+  ensureHydrated(
+    node: { id: string },
+    { priorityBounds = null }: { priorityBounds?: HydrationBounds | null } = {}
+  ) {
     const entry = this.getOrCreateEntry(node.id);
 
     if (entry.hydrated) {
@@ -68,7 +91,11 @@ export class RasterStoreManager {
     }
 
     if (!entry.hydrating) {
-      entry.hydrating = hydrateStoreFromNode(entry.store, node).then(() => {
+      entry.hydrating = hydrateStoreFromNode(
+        entry.store,
+        node,
+        priorityBounds
+      ).then(() => {
         entry.hydrated = true;
         entry.hydrating = null;
         this.onChange?.();
@@ -87,7 +114,35 @@ export class RasterStoreManager {
   }
 }
 
-const hydrateStoreFromNode = async (store: RasterTileStore, node) => {
+const createHydrationBudget = () => {
+  const budget = { startedAt: getNow() };
+
+  return async () => {
+    if (
+      !canScheduleRasterFrame() ||
+      getNow() - budget.startedAt < HYDRATION_CHUNK_BUDGET_MS
+    ) {
+      return;
+    }
+
+    await new Promise((resolve) => {
+      requestRasterFrame(() => resolve(undefined));
+    });
+    budget.startedAt = getNow();
+  };
+};
+
+const intersectsBounds = (source, bounds: HydrationBounds) =>
+  source.x < bounds.maxX &&
+  source.x + source.width > bounds.minX &&
+  source.y < bounds.maxY &&
+  source.y + source.height > bounds.minY;
+
+const hydrateStoreFromNode = async (
+  store: RasterTileStore,
+  node,
+  priorityBounds: HydrationBounds | null
+) => {
   const sources = [];
 
   if (node.src) {
@@ -110,8 +165,20 @@ const hydrateStoreFromNode = async (store: RasterTileStore, node) => {
     });
   }
 
-  for (const source of sources) {
-    await hydrateImageSource(store, source);
+  // Viewport-intersecting tiles hydrate first so what the user is painting
+  // over becomes correct soonest.
+  const orderedSources = priorityBounds
+    ? [
+        ...sources.filter((source) => intersectsBounds(source, priorityBounds)),
+        ...sources.filter(
+          (source) => !intersectsBounds(source, priorityBounds)
+        ),
+      ]
+    : sources;
+  const yieldIfOverBudget = createHydrationBudget();
+
+  for (const source of orderedSources) {
+    await hydrateImageSource(store, source, yieldIfOverBudget);
   }
 
   store.consumeDirtyBounds();
@@ -141,7 +208,7 @@ const hasVisibleAlpha = (imageData) => {
   return false;
 };
 
-const hydrateImageSource = async (store, source) => {
+const hydrateImageSource = async (store, source, yieldIfOverBudget) => {
   const image = await loadImageElement(source.src);
 
   if (!image) {
@@ -169,6 +236,8 @@ const hydrateImageSource = async (store, source) => {
 
   for (let row = minRow; row <= maxRow; row += 1) {
     for (let col = minCol; col <= maxCol; col += 1) {
+      await yieldIfOverBudget();
+
       const tileX = col * store.tileSize - store.gutter;
       const tileY = row * store.tileSize - store.gutter;
       const tileWidth = store.tileSize + store.gutter * 2;
