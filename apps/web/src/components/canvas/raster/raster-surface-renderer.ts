@@ -309,8 +309,18 @@ export const drawRasterSurface = (canvas, editor, nodeId, surface) => {
     context.setTransform(localToDevice);
   }
 
-  context.imageSmoothingEnabled = true;
-  context.imageSmoothingQuality = "high";
+  // Deep-zoom regime: once a store pixel spans more than 2 CSS px (zoom > 2
+  // on an unscaled node), sample nearest-neighbor so pixels render as crisp
+  // squares, Photoshop-style. Below that, smoothing stays on for downscale
+  // and mild upscale.
+  const cssScale = scale / dpr;
+  const smoothing = cssScale <= 2;
+
+  context.imageSmoothingEnabled = smoothing;
+
+  if (smoothing) {
+    context.imageSmoothingQuality = "high";
+  }
 
   if (surface.hydrated) {
     drawCommittedStore(context, snap, editor, nodeId, surface, bounds, scale);

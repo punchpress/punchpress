@@ -104,6 +104,12 @@ Rules:
   rasterization opens bright seam lines at tile boundaries.
 - Level selection is device-pixel aware. Ignoring DPR undersamples on hi-DPI
   displays (one level too coarse) and widens seam artifacts.
+- Sampling flips to nearest-neighbor at deep zoom-in: once a store pixel
+  spans more than 2 CSS px (zoom > 2 on an unscaled node), smoothing turns
+  off so pixels render as crisp squares, Photoshop-style. Smoothing stays on
+  for downscale and mild upscale. The zoom range is `MIN_ZOOM`–`MAX_ZOOM`
+  (0.01–64); the editor state and the viewer share the same ceiling constant
+  so they can never diverge.
 
 ## Mipmap Pyramid
 
