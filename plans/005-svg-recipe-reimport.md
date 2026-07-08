@@ -86,7 +86,7 @@ no barrels except package roots, files <300 LoC (AGENTS.md).
 
 | Purpose | Command | Expected on success |
 |---------|---------|---------------------|
-| Env setup (FIRST — install/app-run fail without it) | `cp ~/Programming/punchpress/.env .` | `.env` exists at repo root (gitignored; never commit it) |
+| Env setup (FIRST — install/app-run fail without it) | Codex-managed worktrees copy `.env` through `.worktreeinclude`. | `.env` exists at repo root (gitignored; never commit it) |
 | Install | `bun install --frozen-lockfile` | exit 0 |
 | New tests | `bun test apps/web/tests/editor-contract/document/svg-recipe-roundtrip.test.ts` | all pass |
 | Editor suite | `bun run test:editor` | all pass |

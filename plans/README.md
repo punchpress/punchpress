@@ -6,8 +6,8 @@ plan fully before starting, honor its STOP conditions, and update your row
 when done.
 
 **Global prerequisite**: this checkout cannot `bun install` or run the app
-without the env file — `cp ~/Programming/punchpress/.env .` first (gitignored;
-never commit it).
+without the repo `.env`. Codex-managed worktrees copy it through
+`.worktreeinclude`; keep `.env` gitignored and never commit it.
 
 **Owner constraints baked into these plans** (do not "improve" around them):
 - **No CI.** Verification is local-only (`bun run check`, `bun run typecheck`

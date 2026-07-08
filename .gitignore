@@ -8,7 +8,8 @@ npm-debug.log*
 .env.development.local
 .env.test.local
 .env.production.local
-.codex/environments/
+.codex/environments/*
+!.codex/environments/environment.toml
 
 # Claude Code worktrees live here; keep their contents out of the main checkout.
 .claude/worktrees/

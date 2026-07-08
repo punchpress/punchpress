@@ -59,7 +59,7 @@ makes component reuse awkward. New contract:
 
 | Purpose | Command | Expected on success |
 |---------|---------|---------------------|
-| Env setup (FIRST — install fails without it) | `cp ~/Programming/punchpress/.env .` | `.env` exists (never commit) |
+| Env setup (FIRST — install fails without it) | Codex-managed worktrees copy `.env` through `.worktreeinclude`. | `.env` exists (never commit) |
 | Install | `bun install --frozen-lockfile` | exit 0 |
 | New tests | `bun test apps/web/tests/editor-contract/document/svg-recipe-drop.test.ts` | all pass |
 | Editor suite | `bun run test:editor` | 403+ pass |

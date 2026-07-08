@@ -66,7 +66,7 @@ This is incremental: extract the worst offenders, not a big-bang rewrite.
 
 | Purpose | Command | Expected on success |
 |---------|---------|---------------------|
-| Env setup (FIRST — install fails without it) | `cp ~/Programming/punchpress/.env .` | `.env` exists at repo root (gitignored; never commit it) |
+| Env setup (FIRST — install fails without it) | Codex-managed worktrees copy `.env` through `.worktreeinclude`. | `.env` exists at repo root (gitignored; never commit it) |
 | Install | `bun install --frozen-lockfile` | exit 0 |
 | Typecheck | `bun run typecheck` | exit 0 |
 | Editor tests | `bun run test:editor` | all pass |

@@ -62,7 +62,7 @@ strictness. Ratcheting `strict: true` is a deliberate follow-up.
 
 | Purpose | Command | Expected on success |
 |---------|---------|---------------------|
-| Env setup (FIRST — install fails without it) | `cp ~/Programming/punchpress/.env .` | `.env` exists at repo root (gitignored; never commit it) |
+| Env setup (FIRST — install fails without it) | Codex-managed worktrees copy `.env` through `.worktreeinclude`. | `.env` exists at repo root (gitignored; never commit it) |
 | Install | `bun install` | exit 0 |
 | Lint | `bun run check` | exit 0 |
 | Editor tests | `bun run test:editor` | all pass |

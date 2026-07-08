@@ -73,7 +73,7 @@ Current external consumers: `grep -rn "from \"./canvas-node\"\|from \"@/componen
 
 | Purpose | Command | Expected on success |
 |---------|---------|---------------------|
-| Env setup (FIRST — install fails without it) | `cp ~/Programming/punchpress/.env .` | `.env` exists at repo root (gitignored; never commit it) |
+| Env setup (FIRST — install fails without it) | Codex-managed worktrees copy `.env` through `.worktreeinclude`. | `.env` exists at repo root (gitignored; never commit it) |
 | Install | `bun install --frozen-lockfile` | exit 0 |
 | Typecheck | `bun run typecheck` (exists if plan 002 landed; else skip) | exit 0 |
 | Editor tests | `bun run test:editor` | all pass |
