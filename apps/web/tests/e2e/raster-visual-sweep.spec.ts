@@ -1,10 +1,5 @@
 import { expect, test } from "@playwright/test";
-import {
-  gotoEditor,
-  loadDocument,
-  serializeDocument,
-  setViewport,
-} from "./helpers/editor";
+import { gotoEditor, loadDocument, setViewport } from "./helpers/editor";
 
 /**
  * Visual validation sweep for the raster compositor
@@ -308,6 +303,40 @@ const getCommittedTileSourceCount = (page, nodeId) => {
 
     return node?.type === "image" ? node.tileSources?.length || 0 : 0;
   }, nodeId);
+};
+
+/**
+ * Serialize the document in transport form: tile manifests get inline data
+ * URLs from the raster asset store, matching what a .punch package load
+ * produces. serializeDocument alone is manifest-only (refs without bytes),
+ * which cannot cross into a fresh page.
+ */
+const serializeTransportDocument = (page) => {
+  return page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    if (!editor) {
+      return null;
+    }
+
+    const document = JSON.parse(editor.serializeDocument());
+
+    document.nodes = document.nodes.map((node) => {
+      if (!(node.type === "image" && node.tileSources?.length)) {
+        return node;
+      }
+
+      return {
+        ...node,
+        tileSources: node.tileSources.map((tile) => ({
+          ...tile,
+          src: editor.rasterAssets.getDataUrl(tile.ref) || undefined,
+        })),
+      };
+    });
+
+    return JSON.stringify(document);
+  });
 };
 
 const setUpSweepDocument = async (page) => {
@@ -760,7 +789,7 @@ const runSeamZoomLadder = async (page, testInfo) => {
   // pixels from tileSources (SVG image tiles / preview canvas), the user's
   // regime when viewing a previously painted document. The existing seam
   // tests only ever exercise state 1.
-  const serialized = await serializeDocument(page);
+  const serialized = await serializeTransportDocument(page);
 
   if (!serialized) {
     throw new Error("Expected serialized sweep document");
@@ -1738,155 +1767,161 @@ test.describe("raster visual sweep @ DPR 2", () => {
     }
   });
 
-  test("scribbling at 1% zoom on a hydrated 78x67-tile layer stays within frame budget", async ({
-    page,
-  }, testInfo) => {
-    testInfo.setTimeout(300_000);
-    await gotoEditor(page);
-    await installPerfSpanAggregator(page);
+  // Wall-clock frame budget with zero headroom by design: a real regression
+  // fails both attempts; one retry absorbs external machine-load blips.
+  test.describe(() => {
+    test.describe.configure({ retries: 1 });
 
-    const tileSrc = await createOpaqueTileDataUrl(page);
-
-    await loadDocument(
+    test("scribbling at 1% zoom on a hydrated 78x67-tile layer stays within frame budget", async ({
       page,
-      createDenseSweepDocument(tileSrc, LAG_NODE_WIDTH, LAG_NODE_HEIGHT)
-    );
-    await setViewport(page, { x: 0, y: 0, zoom: 1 });
-    await page.evaluate((targetNodeId) => {
-      window.__PUNCHPRESS_EDITOR__?.select(targetNodeId);
-    }, NODE_ID);
+    }, testInfo) => {
+      testInfo.setTimeout(300_000);
+      await gotoEditor(page);
+      await installPerfSpanAggregator(page);
 
-    // STEADY STATE on purpose (unlike the 3% first-contact test): pre-touch
-    // the layer so hydration/decodes are fully prepaid, then wait for frame
-    // pacing to go quiet. This test measures per-stroke dab cost only.
-    await hydrateRasterStore(page, NODE_ID);
-    await centerViewportOn(
-      page,
-      { x: LAG_NODE_WIDTH / 2, y: LAG_NODE_HEIGHT / 2 },
-      LAG_ZOOM
-    );
-    await waitForAnimationFrames(page, 8);
-    await page.screenshot();
-    await installFrameLog(page);
+      const tileSrc = await createOpaqueTileDataUrl(page);
 
-    const quiet = await waitForQuietFrames(page);
-
-    console.log(
-      `[sweep] 1% lag: hydration settled=${quiet.settled} after ${quiet.attempt} probe windows`
-    );
-
-    await page.evaluate(() => {
-      window.__PUNCHPRESS_EDITOR__?.setBrushSettings({
-        color: "#000000",
-        hardness: 1,
-        opacity: 1,
-        size: 500,
-        spacing: 0,
-      });
-    });
-    await page.keyboard.press("b");
-
-    const projection = await getViewportProjection(page, NODE_ID);
-
-    expect(
-      projection.zoom,
-      `viewer must settle at zoom ${LAG_ZOOM} (got ${projection.zoom})`
-    ).toBeCloseTo(LAG_ZOOM, 3);
-
-    // The layer covers ~399x343 CSS px on screen at 1%; scribble inside it.
-    // One continuous multi-segment drag crossing the on-screen layer 10
-    // times at a vigorous-but-realistic swipe speed: browsers coalesce
-    // pointermove to frame cadence, so a fast back-and-forth scribble lands
-    // ~70 CSS px per event. Every screen px is 100 layer px, so each event
-    // extends the stroke path by ~7000 layer px (~700 dabs at the spacing
-    // floor of size * 0.02 = 10) and the whole gesture is ~600k layer px
-    // (~60k dabs).
-    const centerX = projection.hostLeft + projection.hostWidth / 2;
-    const centerY = projection.hostTop + projection.hostHeight / 2;
-    const sweepCount = 10;
-    const waypoints = Array.from({ length: sweepCount }, (_, sweep) => {
-      const direction = sweep % 2 === 0 ? 1 : -1;
-
-      return {
-        x: centerX + direction * 170,
-        y: centerY + (sweep / (sweepCount - 1) - 0.5) * 240,
-      };
-    });
-    const inkBeforeDrag = await getSurfaceCenterInkCount(page);
-
-    await page.mouse.move(centerX - 170, centerY - 120);
-    await resetPerfSpanAggregate(page);
-    await resetFrameLog(page);
-    await page.mouse.down();
-
-    for (const waypoint of waypoints) {
-      // steps 5 across a 340 px sweep = ~68 CSS px per pointermove event.
-      await page.mouse.move(waypoint.x, waypoint.y, { steps: 5 });
-    }
-
-    const frameDeltas = await readFrameLog(page, true);
-    const inkDuringDrag = await getSurfaceCenterInkCount(page);
-
-    await page.mouse.up();
-
-    const perf = await readPerfSpanAggregate(page);
-
-    // Guard: the measured frames must belong to a live painting drag.
-    expect(
-      inkDuringDrag,
-      `drag did not paint (ink before=${inkBeforeDrag}, during=${inkDuringDrag})`
-    ).toBeGreaterThan(Math.max(0, inkBeforeDrag) + 2000);
-
-    if (frameDeltas.length < 45) {
-      throw new Error(
-        `Drag finished in only ${frameDeltas.length} frames; not enough to measure pacing`
+      await loadDocument(
+        page,
+        createDenseSweepDocument(tileSrc, LAG_NODE_WIDTH, LAG_NODE_HEIGHT)
       );
-    }
+      await setViewport(page, { x: 0, y: 0, zoom: 1 });
+      await page.evaluate((targetNodeId) => {
+        window.__PUNCHPRESS_EDITOR__?.select(targetNodeId);
+      }, NODE_ID);
 
-    const stats = getFrameStats(frameDeltas);
-    const summary =
-      `frames=${frameDeltas.length} mean=${stats.mean.toFixed(1)}ms ` +
-      `p50=${stats.p50.toFixed(1)}ms p95=${stats.p95.toFixed(1)}ms ` +
-      `max=${stats.max.toFixed(1)}ms ` +
-      `slowest=[${stats.slowest.map((delta) => delta.toFixed(1)).join(", ")}]`;
+      // STEADY STATE on purpose (unlike the 3% first-contact test): pre-touch
+      // the layer so hydration/decodes are fully prepaid, then wait for frame
+      // pacing to go quiet. This test measures per-stroke dab cost only.
+      await hydrateRasterStore(page, NODE_ID);
+      await centerViewportOn(
+        page,
+        { x: LAG_NODE_WIDTH / 2, y: LAG_NODE_HEIGHT / 2 },
+        LAG_ZOOM
+      );
+      await waitForAnimationFrames(page, 8);
+      await page.screenshot();
+      await installFrameLog(page);
 
-    console.log(
-      `[sweep] steady-state scribble @ zoom ${LAG_ZOOM} dpr 2 (78x67 tiles): ${summary}`
-    );
+      const quiet = await waitForQuietFrames(page);
 
-    if (perf.spans.length) {
-      for (const span of perf.spans.slice(0, 10)) {
-        console.log(
-          `[sweep] 1% lag perf span ${span.label}: total=${span.totalMs}ms count=${span.count} max=${span.maxMs}ms`
+      console.log(
+        `[sweep] 1% lag: hydration settled=${quiet.settled} after ${quiet.attempt} probe windows`
+      );
+
+      await page.evaluate(() => {
+        window.__PUNCHPRESS_EDITOR__?.setBrushSettings({
+          color: "#000000",
+          hardness: 1,
+          opacity: 1,
+          size: 500,
+          spacing: 0,
+        });
+      });
+      await page.keyboard.press("b");
+
+      const projection = await getViewportProjection(page, NODE_ID);
+
+      expect(
+        projection.zoom,
+        `viewer must settle at zoom ${LAG_ZOOM} (got ${projection.zoom})`
+      ).toBeCloseTo(LAG_ZOOM, 3);
+
+      // The layer covers ~399x343 CSS px on screen at 1%; scribble inside it.
+      // One continuous multi-segment drag crossing the on-screen layer 10
+      // times at a vigorous-but-realistic swipe speed: browsers coalesce
+      // pointermove to frame cadence, so a fast back-and-forth scribble lands
+      // ~70 CSS px per event. Every screen px is 100 layer px, so each event
+      // extends the stroke path by ~7000 layer px (~700 dabs at the spacing
+      // floor of size * 0.02 = 10) and the whole gesture is ~600k layer px
+      // (~60k dabs).
+      const centerX = projection.hostLeft + projection.hostWidth / 2;
+      const centerY = projection.hostTop + projection.hostHeight / 2;
+      const sweepCount = 10;
+      const waypoints = Array.from({ length: sweepCount }, (_, sweep) => {
+        const direction = sweep % 2 === 0 ? 1 : -1;
+
+        return {
+          x: centerX + direction * 170,
+          y: centerY + (sweep / (sweepCount - 1) - 0.5) * 240,
+        };
+      });
+      const inkBeforeDrag = await getSurfaceCenterInkCount(page);
+
+      await page.mouse.move(centerX - 170, centerY - 120);
+      await resetPerfSpanAggregate(page);
+      await resetFrameLog(page);
+      await page.mouse.down();
+
+      for (const waypoint of waypoints) {
+        // steps 5 across a 340 px sweep = ~68 CSS px per pointermove event.
+        await page.mouse.move(waypoint.x, waypoint.y, { steps: 5 });
+      }
+
+      const frameDeltas = await readFrameLog(page, true);
+      const inkDuringDrag = await getSurfaceCenterInkCount(page);
+
+      await page.mouse.up();
+
+      const perf = await readPerfSpanAggregate(page);
+
+      // Guard: the measured frames must belong to a live painting drag.
+      expect(
+        inkDuringDrag,
+        `drag did not paint (ink before=${inkBeforeDrag}, during=${inkDuringDrag})`
+      ).toBeGreaterThan(Math.max(0, inkBeforeDrag) + 2000);
+
+      if (frameDeltas.length < 45) {
+        throw new Error(
+          `Drag finished in only ${frameDeltas.length} frames; not enough to measure pacing`
         );
       }
-    } else {
-      console.log(
-        "[sweep] 1% lag perf spans: none recorded (perf sink saw no measurePerf traffic)"
-      );
-    }
 
-    if (perf.counters.length) {
-      console.log(
-        `[sweep] 1% lag perf counters: ${perf.counters
-          .map((counter) => `${counter.name}=${counter.count}`)
-          .join(" ")}`
-      );
-    }
+      const stats = getFrameStats(frameDeltas);
+      const summary =
+        `frames=${frameDeltas.length} mean=${stats.mean.toFixed(1)}ms ` +
+        `p50=${stats.p50.toFixed(1)}ms p95=${stats.p95.toFixed(1)}ms ` +
+        `max=${stats.max.toFixed(1)}ms ` +
+        `slowest=[${stats.slowest.map((delta) => delta.toFixed(1)).join(", ")}]`;
 
-    // 30fps p95 floor + a hard hitch ceiling for steady-state stroking.
-    expect
-      .soft(
-        stats.p95,
-        `p95 frame time during steady-state 1% scribble too slow: ${summary}`
-      )
-      .toBeLessThanOrEqual(33);
-    expect
-      .soft(
-        stats.max,
-        `worst frame hitch during steady-state 1% scribble: ${summary}`
-      )
-      .toBeLessThanOrEqual(120);
+      console.log(
+        `[sweep] steady-state scribble @ zoom ${LAG_ZOOM} dpr 2 (78x67 tiles): ${summary}`
+      );
+
+      if (perf.spans.length) {
+        for (const span of perf.spans.slice(0, 10)) {
+          console.log(
+            `[sweep] 1% lag perf span ${span.label}: total=${span.totalMs}ms count=${span.count} max=${span.maxMs}ms`
+          );
+        }
+      } else {
+        console.log(
+          "[sweep] 1% lag perf spans: none recorded (perf sink saw no measurePerf traffic)"
+        );
+      }
+
+      if (perf.counters.length) {
+        console.log(
+          `[sweep] 1% lag perf counters: ${perf.counters
+            .map((counter) => `${counter.name}=${counter.count}`)
+            .join(" ")}`
+        );
+      }
+
+      // 30fps p95 floor + a hard hitch ceiling for steady-state stroking.
+      expect
+        .soft(
+          stats.p95,
+          `p95 frame time during steady-state 1% scribble too slow: ${summary}`
+        )
+        .toBeLessThanOrEqual(33);
+      expect
+        .soft(
+          stats.max,
+          `worst frame hitch during steady-state 1% scribble: ${summary}`
+        )
+        .toBeLessThanOrEqual(120);
+    });
   });
 
   test("max zoom probe: log the app's effective zoom ceiling", async ({

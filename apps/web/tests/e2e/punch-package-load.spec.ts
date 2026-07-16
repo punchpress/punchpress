@@ -25,6 +25,7 @@ const ARIAL_FONT = {
   style: "Regular",
 };
 
+const BLOB_URL_PATTERN = /^blob:/;
 const PNG_SRC =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR42mP8z8BQDwAFgwJ/lhL1WQAAAABJRU5ErkJggg==";
 const textEncoder = new TextEncoder();
@@ -428,12 +429,14 @@ test("packaged tiled raster assets hydrate and render as image tiles", async ({
   await expect(
     page.locator('.canvas-node[data-node-id="tiled-image-layer"]')
   ).toBeVisible();
+  // Tile pixel bytes live in the editor's raster asset store; the DOM
+  // fallback renders them through cached object URLs, never inline data URLs.
   await expect
     .poll(async () => await getCanvasNodeTileSummary(page, "tiled-image-layer"))
     .toEqual([
       {
         height: "64",
-        href: PNG_SRC,
+        href: expect.stringMatching(BLOB_URL_PATTERN),
         ref: "assets/raster/asset_tiled_image/tiles/0_0.png",
         width: "32",
         x: "0",
@@ -441,13 +444,33 @@ test("packaged tiled raster assets hydrate and render as image tiles", async ({
       },
       {
         height: "64",
-        href: PNG_SRC,
+        href: expect.stringMatching(BLOB_URL_PATTERN),
         ref: "assets/raster/asset_tiled_image/tiles/1_0.png",
         width: "32",
         x: "32",
         y: "0",
       },
     ]);
+
+  const tileAssetBytesMatchPackage = await page.evaluate(async (pngSrc) => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const node = editor?.getNode("tiled-image-layer");
+    const refs = (node?.tileSources || []).map((tile) => tile.ref);
+    const expected = await (await fetch(pngSrc)).arrayBuffer();
+    const expectedBytes = new Uint8Array(expected);
+
+    return refs.every((ref) => {
+      const entry = editor?.rasterAssets?.get(ref);
+
+      return (
+        entry &&
+        entry.bytes.length === expectedBytes.length &&
+        entry.bytes.every((byte, index) => byte === expectedBytes[index])
+      );
+    });
+  }, PNG_SRC);
+
+  expect(tileAssetBytesMatchPackage).toBe(true);
 
   const serializedDocument = parseDesignDocument(await serializeDocument(page));
   const tiledNode = serializedDocument.nodes[0];

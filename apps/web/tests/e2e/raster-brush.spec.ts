@@ -621,7 +621,9 @@ const getCommittedImageSample = (page, samplePoint) => {
     const image = await loadImage(imageNode.src);
     const tileImages = await Promise.all(
       (imageNode.tileSources || []).map(async (tile) => ({
-        image: await loadImage(tile.src),
+        image: await loadImage(
+          window.__PUNCHPRESS_EDITOR__?.rasterAssets?.getObjectUrl(tile.ref)
+        ),
         tile,
       }))
     );
@@ -753,7 +755,9 @@ const getCommittedImageSampleAtClientPoint = (page, clientPoint) => {
     const image = await loadImage(imageNode.src);
     const tileImages = await Promise.all(
       (imageNode.tileSources || []).map(async (tile) => ({
-        image: await loadImage(tile.src),
+        image: await loadImage(
+          window.__PUNCHPRESS_EDITOR__?.rasterAssets?.getObjectUrl(tile.ref)
+        ),
         tile,
       }))
     );
@@ -938,7 +942,9 @@ const getCommittedTileSamples = (page, points) => {
     };
     const tileImages = await Promise.all(
       (imageNode.tileSources || []).map(async (tile) => ({
-        image: await loadImage(tile.src),
+        image: await loadImage(
+          window.__PUNCHPRESS_EDITOR__?.rasterAssets?.getObjectUrl(tile.ref)
+        ),
         tile,
       }))
     );
