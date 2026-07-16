@@ -132,11 +132,12 @@ Each store maintains downscaled levels for zoomed-out display.
 
 ```text
  pointerdown ─ open session, resolve target, mark history
- pointermove ─ sample → dab into store tiles
-             │   first touch of a tile copies its before-pixels (history)
+ pointermove ─ sample → dab into the session stroke buffer
              │   dirty rects accumulate → compositor repaints next frame
- pointerup   ─ finalize history delta (one entry per stroke)
-             └ queue dirty tiles for worker encode (no visual effect)
+ pointerup   ─ merge stroke buffer into the store (budgeted chunks)
+             │   first write of a store tile copies its before-rect (history)
+             ├ record history delta (one entry per stroke)
+             └ queue dirty tiles for encode (no visual effect)
 ```
 
 Brush and Eraser are the same writer with different compositing (paint adds
@@ -187,14 +188,34 @@ only when a new document loads.
 
 ## History
 
-Undo state is tile-granular, modeled on Krita's memento system:
+Undo state is tile-granular, modeled on Krita's memento system. Document
+history restores node state (src-less manifests); the editor-owned
+`RasterHistoryManager` sidecar restores the matching store pixels and anchor.
 
-- A stroke session snapshots each touched tile once, before its first dab.
-- The history entry is the set of (tile key, before-pixels, after-pixels)
-  pairs plus node metadata changes.
-- Undo/redo swaps tile contents, invalidates affected pyramid levels, and
-  repaints. Strokes are never replayed.
-- History size scales with touched tiles, not layer size.
+- Strokes paint a session stroke buffer, so committed store pixels change
+  only at the commit merge. That merge is the capture point: before it first
+  writes a target tile, the about-to-be-written sub-rect is copied
+  (copy-on-first-write). Tiles the merge creates record a zero-fill marker
+  instead of a buffer of zeros.
+- One history entry per commit: the before sub-rects, the retained stroke
+  buffer, the merge anchors/mode, and the entry anchor before/after (rebasing
+  commits shift it).
+- Undo writes the before sub-rects back and restores the prior anchor. Redo
+  re-merges the retained stroke buffer with the original anchors — the merge
+  is deterministic over restored inputs, so redo is byte-identical and the
+  captured sub-rects stay valid for the next undo. Interactive strokes are
+  never replayed.
+- Both directions invalidate exactly like a merge: tile syncRects and
+  revisions, pyramid dirty coords, store revision and dirty bounds. The store
+  surface stays mounted through undo/redo.
+- Entries are keyed by a unique id stamped on each pushed document change
+  (monotonic, never reused, immune to undo/redo branch divergence).
+- History size scales with touched tiles, not layer size, and is capped at
+  the most recent 20 raster commits (`raster.history.bytes` tracks retained
+  bytes). Undoing a step whose delta was evicted — or any non-brush step that
+  changed an image node's pixel-relevant state — releases only that node's
+  store entry and falls back to committed rendering until the next brush
+  contact rehydrates.
 
 ## Memory Model
 

@@ -170,7 +170,36 @@ Stroke sessions capture copy-on-first-touch snapshots of dirtied tiles. Undo
 swaps tile contents back, invalidates affected pyramid levels, and repaints.
 One history entry per stroke, sized by touched tiles.
 
-Status: pending.
+Status: implemented. The editor-owned `RasterHistoryManager`
+(`raster/raster-history.ts`) keeps a sidecar of per-commit deltas keyed by a
+unique id the `HistoryManager` stamps on each pushed change (monotonic, never
+reused — revision/index would collide across branch divergence). Capture runs
+inside the commit merge's existing budgeted chunks: before
+`mergeStrokeStoreTile` first writes a target tile, the about-to-be-written
+sub-rect (intersection of the tile's physical extent with the stroke tile's
+merged nominal rect — the syncRect math) is copied; tiles the merge creates
+record a zero-fill marker instead of a buffer of zeros. The session's stroke
+buffer moves to the manager instead of being dropped, so redo re-merges it
+with the original anchors/mode — deterministic, byte-identical, and it keeps
+the captured before-rects valid for the next undo. Undo writes before-rects
+back, restores the pre-commit anchor (rebasing commits), and invalidates like
+a merge (syncRects, tile/store revisions, pyramid dirt). `releaseAll()` is
+gone from undo/redo: steps with a delta apply it surgically (the store
+surface stays mounted — e2e-asserted); any other step that changed an image
+node's pixel-relevant state releases only that node's entry
+(rehydrate-on-contact), which is also the fallback past the depth cap of 20
+retained raster steps (`RASTER_HISTORY_DEPTH`). Memory is accounted via the
+`raster.history.bytes` perf counter: a step retains before-rect copies plus
+the stroke buffer — measured ~2.0 MB for a 40 px/150 px e2e-scale stroke
+(9 tile deltas), ~16 MB for a 200 px brush sweeping 1600 px, and ~218 MB per
+1500 px sweep on the `raster-brush-stroke-huge` fixture (873 MB retained
+across its four strokes; eviction returns the bytes). The cap is
+count-based, so a bytes-based budget is a candidate follow-up for the
+100k tier. Capture cost rides inside the budgeted merge chunks — ~13 ms
+across a huge stroke's ~545 ms chunked merge (~2%) — and the benchmark is
+unchanged vs stage 2: fps 91→90.8, frame p50 8.3→8.3 ms, p95 9.3→9.3 ms,
+encode chunk p95 9.8→9.4 ms (total 394→401 ms), merge chunk p95 10.3 ms
+still hugging the 8 ms budget with the same single-tile overshoot profile.
 
 ### 5. Eviction And Hydration
 
