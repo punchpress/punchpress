@@ -17,7 +17,10 @@ export class HistoryManager {
     this.createChange = createChange;
     this.currentRevision = 0;
     this.isApplying = false;
+    this.lastPushedChangeId = null;
+    this.lastRestoredChange = null;
     this.limit = limit;
+    this.nextChangeId = 1;
     this.nextMarkId = 0;
     this.redoStack = [];
     this.savedSnapshot = captureSnapshot();
@@ -85,6 +88,12 @@ export class HistoryManager {
       return false;
     }
 
+    // Unique, never-reused step identity. Sidecar histories (raster tile
+    // deltas) key on it; revision/index would collide across branch
+    // divergence (undo, then a new change clears the redo stack).
+    change.historyStepId = this.nextChangeId;
+    this.nextChangeId += 1;
+    this.lastPushedChangeId = change.historyStepId;
     this.currentRevision += 1;
     this.undoStack.push(change);
     this.trimStack(this.undoStack);
@@ -109,6 +118,8 @@ export class HistoryManager {
   reset() {
     this.activeMarks.clear();
     this.currentRevision = 0;
+    this.lastPushedChangeId = null;
+    this.lastRestoredChange = null;
     this.redoStack = [];
     this.savedSnapshot = this.captureSnapshot();
     this.undoStack = [];
@@ -158,6 +169,7 @@ export class HistoryManager {
 
       targetStack.push(change);
       this.trimStack(targetStack);
+      this.lastRestoredChange = change;
       return true;
     } finally {
       this.isApplying = false;

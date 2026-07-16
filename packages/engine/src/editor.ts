@@ -169,6 +169,10 @@ import { GeometryManager } from "./managers/geometry-manager";
 import { HistoryManager } from "./managers/history-manager";
 import { NodeTreeManager } from "./managers/node-tree-manager";
 import { RasterAssetStore } from "./raster/raster-asset-store";
+import {
+  getRasterAffectedNodeIds,
+  RasterHistoryManager,
+} from "./raster/raster-history";
 import { RasterStoreManager } from "./raster/raster-store-manager";
 import { VectorRenderSurfaceManager } from "./managers/vector-render-surface-manager";
 import {
@@ -297,6 +301,7 @@ export class Editor {
     this.nodeTree = new NodeTreeManager();
     this.vectorRenderSurfaces = new VectorRenderSurfaceManager();
     this.rasterAssets = new RasterAssetStore();
+    this.rasterHistory = new RasterHistoryManager();
     this.rasterStores = new RasterStoreManager({
       assets: this.rasterAssets,
       onChange: () => this.notifyInteractionPreviewChanged(),
@@ -1997,6 +2002,7 @@ export class Editor {
   }
 
   loadDocument(contents) {
+    this.rasterHistory.clear();
     this.rasterStores.releaseAll();
     this.rasterAssets.releaseAll();
 
@@ -2060,7 +2066,7 @@ export class Editor {
 
     if (didRedo) {
       historyTool.onHistoryChanged?.("redo");
-      this.rasterStores.releaseAll();
+      this.applyRasterHistory("redo", this.history.lastRestoredChange);
       this.notifyInteractionPreviewChanged();
     }
 
@@ -2073,15 +2079,52 @@ export class Editor {
 
     if (didUndo) {
       historyTool.onHistoryChanged?.("undo");
-      this.rasterStores.releaseAll();
+      this.applyRasterHistory("undo", this.history.lastRestoredChange);
       this.notifyInteractionPreviewChanged();
     }
 
     return didUndo;
   }
 
+  /**
+   * Per-node raster reconciliation after a history step restores node state.
+   * A step with a retained tile delta applies it surgically (store pixels and
+   * anchors move with the manifest, the compositor keeps rendering from the
+   * store); any other step that changed an image node's pixel-relevant state
+   * releases just that node's store entry, which falls back to committed-DOM
+   * rendering until the next brush contact rehydrates.
+   */
+  applyRasterHistory(direction, change) {
+    if (!change) {
+      this.rasterStores.releaseAll();
+      return;
+    }
+
+    const step = this.rasterHistory.get(change.historyStepId);
+
+    for (const nodeId of getRasterAffectedNodeIds(change)) {
+      const entry = this.rasterStores.getEntry(nodeId);
+
+      if (!entry) {
+        continue;
+      }
+
+      if (step && step.nodeId === nodeId && entry.hydrated) {
+        if (direction === "undo") {
+          this.rasterHistory.applyUndo(step, entry);
+        } else {
+          this.rasterHistory.applyRedo(step, entry);
+        }
+        continue;
+      }
+
+      this.rasterStores.release(nodeId);
+    }
+  }
+
   resetHistory() {
     this.history.reset();
+    this.rasterHistory.clear();
     this.editingHistoryMark = null;
   }
 

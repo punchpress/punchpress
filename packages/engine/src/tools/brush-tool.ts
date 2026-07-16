@@ -5,6 +5,10 @@ import {
   getNodeWorldPoint,
 } from "../primitives/rotation";
 import {
+  captureTileDeltasBeforeMerge,
+  createStrokeCapture,
+} from "../raster/raster-history";
+import {
   commitMergedStrokeBounds,
   mergeStrokeStoreTile,
   RASTER_STORE_TILE_SIZE,
@@ -551,6 +555,7 @@ class BrushStrokeSession {
       editor.getNode(node.id)?.type === "image" && !this.initialSourceRect;
     this.activeSegment = null;
     this.commitReady = Promise.resolve();
+    this.historyCapture = null;
     this.lastPoint = null;
     this.lastSolidDab = null;
     this.merged = false;
@@ -965,6 +970,16 @@ class BrushStrokeSession {
     });
     let tileIndex = 0;
 
+    // Tile-delta history: the merge below is the only writer of committed
+    // store pixels, so each target tile's about-to-be-written sub-rect is
+    // copied here, before its first write in this commit.
+    this.historyCapture = createStrokeCapture({
+      anchorBefore: { x: entry.anchorX, y: entry.anchorY },
+      mergeAnchorX: anchorX,
+      mergeAnchorY: anchorY,
+      operation: this.operation === "erase" ? "erase" : "paint",
+    });
+
     while (tileIndex < strokeTiles.length) {
       // A previous stroke's merge must never land under the next stroke's
       // drag: pause whole chunks while any session is interactively painting.
@@ -979,6 +994,13 @@ class BrushStrokeSession {
         do {
           const strokeTile = strokeTiles[tileIndex];
 
+          captureTileDeltasBeforeMerge({
+            anchorX,
+            anchorY,
+            capture: this.historyCapture,
+            store: entry.store,
+            strokeTile,
+          });
           mergeStrokeStoreTile({
             anchorX,
             anchorY,
@@ -1140,7 +1162,9 @@ class BrushStrokeSession {
       this.storeEntry.anchorY += commitResult.offsetY;
     }
 
-    this.editor.commitHistoryStep(this.historyMark);
+    this.recordRasterHistoryStep(
+      this.editor.commitHistoryStep(this.historyMark)
+    );
     recordRasterDebugEvent("tileCommit.finish", {
       committedNode: getRasterDebugNodePayload(
         commitResult?.node || this.editor.getNode(this.nodeId)
@@ -1246,7 +1270,9 @@ class BrushStrokeSession {
       entry.anchorY -= flattenOriginY;
     }
 
-    this.editor.commitHistoryStep(this.historyMark);
+    this.recordRasterHistoryStep(
+      this.editor.commitHistoryStep(this.historyMark)
+    );
     recordRasterDebugEvent("commit.flatten.finish", {
       node: getRasterDebugNodePayload(this.editor.getNode(this.nodeId)),
       sessionId: this.sessionId,
@@ -1254,6 +1280,28 @@ class BrushStrokeSession {
     this.completed = false;
     this.tool.clearActiveSession(this);
     return Promise.resolve();
+  }
+
+  /**
+   * Hand the stroke's tile deltas and stroke buffer to the editor's raster
+   * history once the document history step committed. Keyed by the unique id
+   * the HistoryManager stamped on the pushed change; skipped when the commit
+   * did not push (mark released by an interleaved undo, or a no-op diff).
+   */
+  recordRasterHistoryStep(committed) {
+    if (!(committed && this.historyCapture)) {
+      this.historyCapture = null;
+      return;
+    }
+
+    this.editor.rasterHistory.record({
+      anchorAfter: { x: this.storeEntry.anchorX, y: this.storeEntry.anchorY },
+      capture: this.historyCapture,
+      historyStepId: this.editor.history.lastPushedChangeId,
+      nodeId: this.nodeId,
+      strokeStore: this.strokeStore,
+    });
+    this.historyCapture = null;
   }
 
   scheduleLivePreview({ notify = true } = {}) {
