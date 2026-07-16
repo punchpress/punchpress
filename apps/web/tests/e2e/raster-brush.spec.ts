@@ -837,6 +837,43 @@ const getCommittedImageSampleAtClientPoint = (page, clientPoint) => {
   }, clientPoint);
 };
 
+/**
+ * Sample canonical store pixels (not committed manifests) at a client point.
+ * Returns null when the node has no live store entry — i.e. the store was
+ * released and rendering fell back to the committed-DOM path.
+ */
+const getRasterStoreSampleAtClientPoint = (page, clientPoint) => {
+  return page.evaluate((point) => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const imageNode = editor?.nodes.find((node) => node.type === "image");
+    const entry = imageNode
+      ? editor?.rasterStores?.getEntry(imageNode.id)
+      : null;
+    const host = editor?.hostRef;
+    const viewer = editor?.viewerRef;
+
+    if (!(imageNode && entry && host && viewer)) {
+      return null;
+    }
+
+    const hostRect = host.getBoundingClientRect();
+    const canvasPoint = {
+      x: viewer.getScrollLeft() + (point.x - hostRect.left) / editor.zoom,
+      y: viewer.getScrollTop() + (point.y - hostRect.top) / editor.zoom,
+    };
+    const localPoint = {
+      x: Math.round(canvasPoint.x - imageNode.transform.x),
+      y: Math.round(canvasPoint.y - imageNode.transform.y),
+    };
+    const [r, g, b, a] = entry.store.getPixelAt(
+      localPoint.x - entry.anchorX,
+      localPoint.y - entry.anchorY
+    );
+
+    return { a, b, g, r };
+  }, clientPoint);
+};
+
 const getCommittedImageState = (page) => {
   return page.evaluate(() => {
     const imageNode = window.__PUNCHPRESS_EDITOR__?.nodes.find(
@@ -3741,6 +3778,105 @@ test("eraser strokes undo and redo restored raster pixels", async ({
       return sample?.a;
     })
     .toBe(0);
+});
+
+test("undo of a stroke keeps the store surface mounted and restores store pixels", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await page.keyboard.press("b");
+
+  await setBrushSliderValue(page, "Brush size", 40);
+  await setBrushSliderValue(page, "Brush opacity", 100);
+  await setBrushSliderValue(page, "Brush hardness", 100);
+
+  const firstStart = await getCanvasStagePoint(page, { x: 320, y: 240 });
+  const firstEnd = await getCanvasStagePoint(page, { x: 420, y: 240 });
+  const secondStart = await getCanvasStagePoint(page, { x: 560, y: 320 });
+  const secondEnd = await getCanvasStagePoint(page, { x: 660, y: 320 });
+  const firstStrokePoint = await getCanvasStagePoint(page, { x: 370, y: 240 });
+  const secondStrokePoint = await getCanvasStagePoint(page, { x: 610, y: 320 });
+
+  await dragBrush(page, [firstStart, firstEnd]);
+
+  await expect
+    .poll(
+      async () => (await getCommittedImageState(page))?.tileSourceCount || 0
+    )
+    .toBeGreaterThan(0);
+
+  const firstStrokeState = await getCommittedImageState(page);
+
+  await dragBrush(page, [secondStart, secondEnd]);
+
+  await expect
+    .poll(
+      async () => (await getCommittedImageState(page))?.tileSourceCount || 0
+    )
+    .toBeGreaterThan(firstStrokeState?.tileSourceCount || 0);
+
+  const secondStrokeState = await getCommittedImageState(page);
+
+  await expect
+    .poll(() => getRasterStoreSurfaceState(page))
+    .toEqual({ count: 1, hydratedCount: 1 });
+  await expect
+    .poll(async () => {
+      const sample = await getRasterStoreSampleAtClientPoint(
+        page,
+        secondStrokePoint
+      );
+
+      return sample?.a ?? null;
+    })
+    .toBe(255);
+
+  await page.keyboard.press("ControlOrMeta+Z");
+
+  await expect
+    .poll(() => getCommittedImageState(page))
+    .toEqual(firstStrokeState);
+
+  // The tile delta applied surgically: the store surface never unmounted
+  // (a release would fall back to committed-DOM rendering until the next
+  // brush contact) and the store pixels reverted in place.
+  expect(await getRasterStoreSurfaceState(page)).toEqual({
+    count: 1,
+    hydratedCount: 1,
+  });
+  await expect
+    .poll(async () => {
+      const sample = await getRasterStoreSampleAtClientPoint(
+        page,
+        secondStrokePoint
+      );
+
+      return sample?.a ?? null;
+    })
+    .toBe(0);
+  expect(
+    (await getRasterStoreSampleAtClientPoint(page, firstStrokePoint))?.a
+  ).toBe(255);
+
+  await page.keyboard.press("ControlOrMeta+Shift+Z");
+
+  await expect
+    .poll(() => getCommittedImageState(page))
+    .toEqual(secondStrokeState);
+  expect(await getRasterStoreSurfaceState(page)).toEqual({
+    count: 1,
+    hydratedCount: 1,
+  });
+  await expect
+    .poll(async () => {
+      const sample = await getRasterStoreSampleAtClientPoint(
+        page,
+        secondStrokePoint
+      );
+
+      return sample?.a ?? null;
+    })
+    .toBe(255);
 });
 
 test("undoing the first brush stroke on an empty layer restores the empty layer", async ({
