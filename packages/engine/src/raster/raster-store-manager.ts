@@ -4,6 +4,7 @@ import {
   getNow,
   requestRasterFrame,
 } from "../tools/brush-runtime";
+import type { RasterAssetStore } from "./raster-asset-store";
 import { RasterTilePyramid } from "./raster-pyramid";
 import { RasterTileStore } from "./raster-tile-store";
 
@@ -33,9 +34,17 @@ export type RasterStoreEntry = {
 
 export class RasterStoreManager {
   entries = new Map<string, RasterStoreEntry>();
+  assets: RasterAssetStore | null;
   onChange: (() => void) | null;
 
-  constructor({ onChange = null }: { onChange?: (() => void) | null } = {}) {
+  constructor({
+    assets = null,
+    onChange = null,
+  }: {
+    assets?: RasterAssetStore | null;
+    onChange?: (() => void) | null;
+  } = {}) {
+    this.assets = assets;
     this.onChange = onChange;
   }
 
@@ -94,6 +103,7 @@ export class RasterStoreManager {
       entry.hydrating = hydrateStoreFromNode(
         entry.store,
         node,
+        this.assets,
         priorityBounds
       ).then(() => {
         entry.hydrated = true;
@@ -141,6 +151,7 @@ const intersectsBounds = (source, bounds: HydrationBounds) =>
 const hydrateStoreFromNode = async (
   store: RasterTileStore,
   node,
+  assets: RasterAssetStore | null,
   priorityBounds: HydrationBounds | null
 ) => {
   const sources = [];
@@ -156,9 +167,13 @@ const hydrateStoreFromNode = async (
   }
 
   for (const tileSource of node.tileSources || []) {
+    if (!assets?.has(tileSource.ref)) {
+      continue;
+    }
+
     sources.push({
       height: tileSource.height,
-      src: tileSource.src,
+      ref: tileSource.ref,
       width: tileSource.width,
       x: tileSource.x,
       y: tileSource.y,
@@ -178,7 +193,7 @@ const hydrateStoreFromNode = async (
   const yieldIfOverBudget = createHydrationBudget();
 
   for (const source of orderedSources) {
-    await hydrateImageSource(store, source, yieldIfOverBudget);
+    await hydrateImageSource(store, source, assets, yieldIfOverBudget);
   }
 
   store.consumeDirtyBounds();
@@ -208,8 +223,37 @@ const hasVisibleAlpha = (imageData) => {
   return false;
 };
 
-const hydrateImageSource = async (store, source, yieldIfOverBudget) => {
-  const image = await loadImageElement(source.src);
+/**
+ * Resolve a hydration source to a decodable image. Manifest tiles (ref) whose
+ * asset-store entry is still an undecoded data URL load straight off that
+ * string (Image.src accepts a data URL directly — zero base64→byte decode).
+ * Once an entry has been decoded to bytes, tiles load through the asset
+ * store's content-deduped object URLs instead, so tiles with identical
+ * payloads share one browser-cached decode. Inline base payloads (src) load
+ * directly.
+ */
+const loadImageForSource = (source, assets: RasterAssetStore | null) => {
+  if (source.src) {
+    return loadImageElement(source.src);
+  }
+
+  if (!source.ref) {
+    return Promise.resolve(null);
+  }
+
+  const entry = assets?.get(source.ref);
+
+  if (entry?.dataUrl) {
+    return loadImageElement(entry.dataUrl);
+  }
+
+  const objectUrl = assets?.getObjectUrl(source.ref);
+
+  return objectUrl ? loadImageElement(objectUrl) : Promise.resolve(null);
+};
+
+const hydrateImageSource = async (store, source, assets, yieldIfOverBudget) => {
+  const image = await loadImageForSource(source, assets);
 
   if (!image) {
     return;

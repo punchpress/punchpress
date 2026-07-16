@@ -163,7 +163,11 @@ export const imageNodeSchema = baseNodeSchema
             height: finiteNumber,
             ref: z.string().min(1),
             row: z.number().int(),
-            src: z.string().min(1),
+            // Transport-only inline payload: present in interchange forms
+            // (clipboard payloads, hydrated package contents); absorbed into
+            // the editor's raster asset store on load and never held in
+            // editor state or written back out by serialization.
+            src: z.string().min(1).optional(),
             width: finiteNumber,
             x: finiteNumber,
             y: finiteNumber,

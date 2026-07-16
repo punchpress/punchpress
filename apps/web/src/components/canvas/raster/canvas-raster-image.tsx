@@ -1,5 +1,6 @@
 import { getNodeScaleX } from "@punchpress/engine";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
 import { CanvasRasterStoreSurface } from "./canvas-raster-store-surface";
 import { getNodeLocalViewportBounds } from "./raster-local-viewport";
@@ -534,8 +535,9 @@ const CanvasTiledRasterImage = ({
   transform,
   width,
 }) => {
-  const cullState = useEditorSurfaceValue((editor, state) =>
-    getRasterTileCullState(editor, state, nodeId, tileSources)
+  const editor = useEditor();
+  const cullState = useEditorSurfaceValue((currentEditor, state) =>
+    getRasterTileCullState(currentEditor, state, nodeId, tileSources)
   );
   const [readyRasterPreviewKey, setReadyRasterPreviewKey] = useState(null);
   const handleRasterPreviewReadyChange = useCallback(
@@ -555,7 +557,13 @@ const CanvasTiledRasterImage = ({
     },
     [nodeId]
   );
-  const visibleTileSources = cullState.tileSources;
+  // Tile manifests carry refs only; pixel bytes live in the editor's raster
+  // asset store. Resolve cached object URLs for the DOM fallback renderer.
+  const visibleTileSources = cullState.tileSources.flatMap((tile) => {
+    const resolvedSrc = editor.rasterAssets?.getObjectUrl(tile.ref);
+
+    return resolvedSrc ? [{ ...tile, src: resolvedSrc }] : [];
+  });
   const isRasterPreviewReady =
     cullState.previewKey && readyRasterPreviewKey === cullState.previewKey;
   const shouldHideExactTiles =

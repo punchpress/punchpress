@@ -1,4 +1,9 @@
-import { DEFAULT_DOCUMENT_BASE_NAME } from "@punchpress/punch-schema";
+import {
+  createPunchPackage,
+  DEFAULT_DOCUMENT_BASE_NAME,
+  isPunchPackageBytes,
+  loadPunchPackageContents,
+} from "@punchpress/punch-schema";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createConfiguredEditor } from "@/editor-react/create-configured-editor";
 import { EditorContext } from "@/editor-react/editor-context";
@@ -78,9 +83,25 @@ export const WorkspaceProvider = ({ children }) => {
   useEffect(() => {
     let canceled = false;
 
+    const getScratchpadContents = (stored) => {
+      if (typeof stored === "string") {
+        return stored;
+      }
+
+      return isPunchPackageBytes(stored)
+        ? loadPunchPackageContents(stored)
+        : null;
+    };
+
     loadScratchpadDocument()
-      .then((contents) => {
-        if (canceled || !contents) {
+      .then((stored) => {
+        if (canceled || !stored) {
+          return;
+        }
+
+        const contents = getScratchpadContents(stored);
+
+        if (!contents) {
           return;
         }
 
@@ -140,23 +161,38 @@ export const WorkspaceProvider = ({ children }) => {
       return;
     }
 
-    let timeoutId = window.setTimeout(() => {
-      saveScratchpadDocument(activeEditor.serializeDocument()).catch(
-        (error) => {
+    const persistScratchpad = () => {
+      try {
+        const packageBytes = createPunchPackage(
+          activeEditor.serializeDocument(),
+          {
+            // getBytes() is where the deferred base64→byte decode actually
+            // lands: commits store raw data URLs, so save time is the first
+            // point anything needs decoded bytes.
+            getAssetBytes: (ref) => {
+              const entry = activeEditor.rasterAssets.get(ref);
+              const bytes = activeEditor.rasterAssets.getBytes(ref);
+
+              return entry && bytes
+                ? { bytes, mimeType: entry.mimeType }
+                : null;
+            },
+          }
+        );
+
+        saveScratchpadDocument(packageBytes).catch((error) => {
           console.error(error);
-        }
-      );
-    }, 400);
+        });
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    let timeoutId = window.setTimeout(persistScratchpad, 400);
 
     const unsubscribe = activeEditor.store.subscribe(() => {
       window.clearTimeout(timeoutId);
-      timeoutId = window.setTimeout(() => {
-        saveScratchpadDocument(activeEditor.serializeDocument()).catch(
-          (error) => {
-            console.error(error);
-          }
-        );
-      }, 400);
+      timeoutId = window.setTimeout(persistScratchpad, 400);
     });
 
     return () => {

@@ -1,4 +1,5 @@
 import {
+  type CreatePunchPackageOptions,
   createPunchPackage,
   DEFAULT_DOCUMENT_BASE_NAME,
   isPunchPackageBytes,
@@ -237,14 +238,15 @@ export const savePunchDocumentFile = async (
   contents: string,
   baseName = DEFAULT_DOCUMENT_BASE_NAME,
   existingHandle: PunchDocumentHandle = null,
-  forceDialog = false
+  forceDialog = false,
+  packageOptions: CreatePunchPackageOptions = {}
 ): Promise<PunchFileSaveResult> => {
   const desktopDocumentFiles = getDesktopDocumentFiles();
   const defaultFileName = `${getDocumentBaseName(baseName)}${PUNCH_DOCUMENT_EXTENSION}`;
   const nextHandle = forceDialog ? null : existingHandle;
 
   if (desktopDocumentFiles) {
-    const packageContents = createPunchPackage(contents);
+    const packageContents = createPunchPackage(contents, packageOptions);
     const result = await desktopDocumentFiles.saveDocument({
       contents: packageContents.buffer.slice(
         packageContents.byteOffset,
@@ -264,7 +266,7 @@ export const savePunchDocumentFile = async (
 
   try {
     const fileHandle = await fileSave(
-      new Blob([createPunchPackage(contents)], {
+      new Blob([createPunchPackage(contents, packageOptions)], {
         type: PUNCH_DOCUMENT_MIME_TYPE,
       }),
       {

@@ -1,4 +1,5 @@
 import { PUNCH_DOCUMENT_MIME_TYPE } from "./constants";
+import { decodeDataUrl, encodeDataUrl } from "./data-url";
 import { parseDesignDocument } from "./load";
 import { createRasterAssetRecord } from "./raster-assets";
 import { serializeDesignDocument } from "./save";
@@ -14,50 +15,37 @@ const DOCUMENT_PATH = "document.json";
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
-const DATA_URL_PATTERN = /^data:([^;,]+)(;base64)?,(.*)$/;
-
-const encodeBase64 = (bytes: Uint8Array) => {
-  let binary = "";
-
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-
-  return btoa(binary);
+export type PunchPackageAssetBytes = {
+  bytes: Uint8Array;
+  mimeType: string;
 };
 
-const decodeBase64 = (value: string) => {
-  const binary = atob(value);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-
-  return bytes;
+export type CreatePunchPackageOptions = {
+  getAssetBytes?: (ref: string) => PunchPackageAssetBytes | null | undefined;
 };
 
-const decodeDataUrl = (src: string) => {
-  const match = DATA_URL_PATTERN.exec(src);
+type TileSourceDocument = NonNullable<
+  Extract<DesignDocument["nodes"][number], { type: "image" }>["tileSources"]
+>[number];
 
-  if (!match) {
-    throw new Error("Raster asset source is not a data URL.");
+const getTileSourceBytes = (
+  nodeId: string,
+  tileSource: TileSourceDocument,
+  getAssetBytes: CreatePunchPackageOptions["getAssetBytes"]
+) => {
+  const asset = getAssetBytes?.(tileSource.ref);
+
+  if (asset) {
+    return asset.bytes;
   }
 
-  const mimeType = match[1] as ImageMimeTypeDocument;
-  const isBase64 = Boolean(match[2]);
-  const payload = match[3] || "";
+  if (tileSource.src) {
+    return decodeDataUrl(tileSource.src).bytes;
+  }
 
-  return {
-    bytes: isBase64
-      ? decodeBase64(payload)
-      : textEncoder.encode(decodeURIComponent(payload)),
-    mimeType,
-  };
-};
-
-const encodeDataUrl = (bytes: Uint8Array, mimeType: string) => {
-  return `data:${mimeType};base64,${encodeBase64(bytes)}`;
+  throw new Error(
+    `Image node ${nodeId} is missing bytes for raster tile ${tileSource.ref}.`
+  );
 };
 
 const stripRuntimeImageFields = (node: DesignDocument["nodes"][number]) => {
@@ -113,7 +101,8 @@ const createSingleRasterPackageEntry = (
 
 const createTiledRasterPackageEntry = (
   node: Extract<DesignDocument["nodes"][number], { type: "image" }>,
-  asset: RasterAssetDocument
+  asset: RasterAssetDocument,
+  getAssetBytes: CreatePunchPackageOptions["getAssetBytes"]
 ) => {
   if (asset.storage !== "tiled") {
     throw new Error("Expected a tiled raster asset.");
@@ -142,9 +131,8 @@ const createTiledRasterPackageEntry = (
       throw new Error(`Image node ${node.id} is missing raster tile ${tile.ref}.`);
     }
 
-    const { bytes } = decodeDataUrl(tileSource.src);
     entries.push({
-      data: bytes,
+      data: getTileSourceBytes(node.id, tileSource, getAssetBytes),
       path: tile.ref,
     });
   }
@@ -156,7 +144,8 @@ const createTiledRasterPackageEntry = (
 };
 
 const createSparseTiledRasterPackageEntry = (
-  node: Extract<DesignDocument["nodes"][number], { type: "image" }>
+  node: Extract<DesignDocument["nodes"][number], { type: "image" }>,
+  getAssetBytes: CreatePunchPackageOptions["getAssetBytes"]
 ) => {
   if (!node.src) {
     throw new Error(`Image node ${node.id} is missing raster base data.`);
@@ -200,7 +189,7 @@ const createSparseTiledRasterPackageEntry = (
         path: baseRef,
       },
       ...tileSources.map((tileSource) => ({
-        data: decodeDataUrl(tileSource.src).bytes,
+        data: getTileSourceBytes(node.id, tileSource, getAssetBytes),
         path: tileSource.ref,
       })),
     ],
@@ -219,7 +208,10 @@ export const isPunchPackageBytes = (contents: ArrayBuffer | Uint8Array) => {
   );
 };
 
-export const createPunchPackage = (contents: string) => {
+export const createPunchPackage = (
+  contents: string,
+  { getAssetBytes }: CreatePunchPackageOptions = {}
+) => {
   const document = parseDesignDocument(contents);
   const packageAssets: DesignDocument["assets"] = {};
   const assetEntries: Array<{ data: Uint8Array; path: string }> = [];
@@ -231,9 +223,9 @@ export const createPunchPackage = (contents: string) => {
     const existingAsset = document.assets[node.assetId];
     const packageEntry =
       existingAsset?.kind === "raster" && existingAsset.storage === "tiled"
-        ? createTiledRasterPackageEntry(node, existingAsset)
+        ? createTiledRasterPackageEntry(node, existingAsset, getAssetBytes)
         : node.tileSources?.length
-          ? createSparseTiledRasterPackageEntry(node)
+          ? createSparseTiledRasterPackageEntry(node, getAssetBytes)
         : createSingleRasterPackageEntry(node);
 
     packageAssets[packageEntry.asset.id] = packageEntry.asset;

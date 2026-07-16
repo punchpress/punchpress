@@ -168,6 +168,7 @@ import {
 import { GeometryManager } from "./managers/geometry-manager";
 import { HistoryManager } from "./managers/history-manager";
 import { NodeTreeManager } from "./managers/node-tree-manager";
+import { RasterAssetStore } from "./raster/raster-asset-store";
 import { RasterStoreManager } from "./raster/raster-store-manager";
 import { VectorRenderSurfaceManager } from "./managers/vector-render-surface-manager";
 import {
@@ -295,7 +296,9 @@ export class Editor {
     this.geometry = new GeometryManager(this.fonts);
     this.nodeTree = new NodeTreeManager();
     this.vectorRenderSurfaces = new VectorRenderSurfaceManager();
+    this.rasterAssets = new RasterAssetStore();
     this.rasterStores = new RasterStoreManager({
+      assets: this.rasterAssets,
       onChange: () => this.notifyInteractionPreviewChanged(),
     });
     this.tools = new Map([
@@ -1995,6 +1998,7 @@ export class Editor {
 
   loadDocument(contents) {
     this.rasterStores.releaseAll();
+    this.rasterAssets.releaseAll();
 
     const result = loadEditorDocument(this, contents);
 

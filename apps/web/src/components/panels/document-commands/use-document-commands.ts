@@ -163,7 +163,18 @@ export const useDocumentCommands = () => {
         tab.editor.serializeDocument(),
         tab.baseName,
         tab.fileHandle,
-        forceDialog
+        forceDialog,
+        {
+          // getBytes() is where the deferred base64→byte decode actually
+          // lands: commits store raw data URLs, so save time is the first
+          // point anything needs decoded bytes.
+          getAssetBytes: (ref) => {
+            const entry = tab.editor.rasterAssets.get(ref);
+            const bytes = tab.editor.rasterAssets.getBytes(ref);
+
+            return entry && bytes ? { bytes, mimeType: entry.mimeType } : null;
+          },
+        }
       );
 
       if (result.canceled) {

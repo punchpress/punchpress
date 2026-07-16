@@ -10,6 +10,10 @@ import {
   toInternalEditorNodes,
   toSerializableDocumentNodes,
 } from "../nodes/vector/vector-document-conversion";
+import {
+  absorbInlineTileSources,
+  inlineTileSources,
+} from "../raster/raster-tile-transport";
 import { exportArtboardSvg, exportDesignDocument } from "./export";
 
 export const getDocument = (editor) => {
@@ -18,6 +22,20 @@ export const getDocument = (editor) => {
   }
 
   return saveDesignDocument(toSerializableDocumentNodes(editor.nodes)).document;
+};
+
+/**
+ * Export reads a self-contained document: tile manifests get their inline
+ * data URLs back from the asset store so exported markup (and its embedded
+ * document metadata) renders outside this session.
+ */
+const getExportDocument = (editor) => {
+  const document = getDocument(editor);
+
+  return {
+    ...document,
+    nodes: inlineTileSources(editor.rasterAssets, document.nodes),
+  };
 };
 
 export const exportDocument = (editor) => {
@@ -30,7 +48,7 @@ export const exportDocument = (editor) => {
     throw new MissingDocumentFontsError(missingFonts);
   }
 
-  return exportDesignDocument(getDocument(editor), (font) =>
+  return exportDesignDocument(getExportDocument(editor), (font) =>
     editor.fonts.loadFontForExport(font)
   );
 };
@@ -51,7 +69,7 @@ export const exportSelectedArtboardSvg = (editor, artboardId = editor.selectedNo
     throw new MissingDocumentFontsError(missingFonts);
   }
 
-  return exportArtboardSvg(getDocument(editor), node.id, (font) =>
+  return exportArtboardSvg(getExportDocument(editor), node.id, (font) =>
     editor.fonts.loadFontForExport(font)
   );
 };
@@ -59,7 +77,7 @@ export const exportSelectedArtboardSvg = (editor, artboardId = editor.selectedNo
 export const loadDocument = (editor, contents) => {
   const { nodes } = loadDesignDocument(contents);
   const resolution = replaceMissingDocumentFonts(
-    toInternalEditorNodes(nodes),
+    absorbInlineTileSources(editor.rasterAssets, toInternalEditorNodes(nodes)),
     editor.availableFonts,
     editor.getDefaultFont()
   );

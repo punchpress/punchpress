@@ -341,7 +341,24 @@ const getCreatedTiledImageNodeState = ({ node, tileSources }) => {
   };
 };
 
+/**
+ * Trim a dirty tile to its painted alpha bounds, PNG-encode it into the
+ * editor's raster asset store, and return the src-less manifest entry.
+ *
+ * The encode is synchronous toDataURL by design: async toBlob/convertToBlob
+ * (in every variant tried — DOM canvas, OffscreenCanvas, serialized, bounded
+ * in-flight, with the canvas pinned through the callback) intermittently
+ * kills the Chromium renderer when several same-origin pages encode large
+ * commits concurrently, which the raster e2e suite exercises directly.
+ * Off-main-thread encoding arrives with the stage 5 encode worker instead.
+ *
+ * The store keeps the data URL as-is via putDataUrl(): nothing needs decoded
+ * bytes at commit time (they're only consumed at save/export), so the
+ * base64→byte decode is deferred to first access instead of paid here on the
+ * frame-budgeted commit chunk.
+ */
 const createTileSourceFromDirtyTile = ({
+  assets,
   commitRevision,
   nodeId,
   offsetX,
@@ -383,16 +400,23 @@ const createTileSourceFromDirtyTile = ({
 
   context.putImageData(new ImageData(pixels, width, height), 0, 0);
 
-  return {
+  const tileSource = {
     col: Math.floor(x / RASTER_STORE_TILE_SIZE),
     height,
     ref: `assets/raster/${nodeId}/tiles/${commitRevision}_${tile.col}_${tile.row}.png`,
     row: Math.floor(y / RASTER_STORE_TILE_SIZE),
-    src: canvas.toDataURL("image/png"),
     width,
     x,
     y,
   };
+
+  assets.putDataUrl(
+    tileSource.ref,
+    canvas.toDataURL("image/png"),
+    "image/png"
+  );
+
+  return tileSource;
 };
 
 const drawStoreTilesToCanvas = ({ anchorX, anchorY, context, rect, store }) => {
@@ -1015,6 +1039,7 @@ class BrushStrokeSession {
     const tileSources = measurePerf("brush.tile.commit.encode", () =>
       dirtyTiles.flatMap((tile) => {
         const tileSource = createTileSourceFromDirtyTile({
+          assets: this.editor.rasterAssets,
           commitRevision,
           nodeId: this.nodeId,
           offsetX: this.initialSourceRect?.x || 0,
@@ -1031,9 +1056,7 @@ class BrushStrokeSession {
   }
 
   async commitTileSurfaceAsync({ commitRevision, dirtyTiles }) {
-    const tileSources: NonNullable<
-      ReturnType<typeof createTileSourceFromDirtyTile>
-    >[] = [];
+    const tileSources = [];
     let tileIndex = 0;
 
     while (tileIndex < dirtyTiles.length) {
@@ -1049,6 +1072,7 @@ class BrushStrokeSession {
 
         while (tileIndex < dirtyTiles.length) {
           const tileSource = createTileSourceFromDirtyTile({
+            assets: this.editor.rasterAssets,
             commitRevision,
             nodeId: this.nodeId,
             offsetX: this.initialSourceRect?.x || 0,

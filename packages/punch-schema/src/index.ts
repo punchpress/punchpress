@@ -53,6 +53,11 @@ export {
   getLocalFontSearchText,
 } from "./local-fonts";
 export { migrateDocument } from "./migrate";
+export { decodeDataUrl, encodeDataUrl } from "./data-url";
+export type {
+  CreatePunchPackageOptions,
+  PunchPackageAssetBytes,
+} from "./package";
 export {
   createPunchPackage,
   isPunchPackageBytes,
