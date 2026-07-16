@@ -113,7 +113,36 @@ Document load hydrates store tiles lazily.
 Exit criteria: history snapshots and editor state contain no pixel data;
 per-tile payloads stay single; package save/load round-trips.
 
-Status: pending.
+Status: implemented, with three scope cuts. Tile manifests in node state are
+src-less `{ref, x, y, width, height, col, row}` entries; encoded bytes live in
+the editor-owned `RasterAssetStore` (`editor.rasterAssets`, append-only per
+session so history entries always resolve, emptied only on document load).
+Object URLs are lazily created and deduped by byte content, and hydration
+decodes tiles through those shared URLs, so identical payloads cost one
+browser decode however many tiles reference them. Save passes bytes through
+`createPunchPackage(contents, { getAssetBytes })`; interchange forms
+(hydrated package contents, clipboard payloads, legacy documents) carry tiles
+as transport-only inline data URLs that `editor.loadDocument` absorbs into
+the asset store, so the base `node.src` payload also stays inline unchanged
+this stage. Scope cuts: per-tile payload replacement (commits keep
+stroke-only append manifests) and lazy load-time hydration (absorption is
+eager) both defer to stage 5, and — unplanned — commit encoding stays
+synchronous `toDataURL` inside the existing budgeted chunks: every async
+`toBlob`/`convertToBlob` variant tried (DOM canvas, OffscreenCanvas,
+serialized, bounded in-flight, canvas pinned through the callback)
+intermittently killed the Chromium renderer when several same-origin pages
+encode large commits concurrently, which the raster e2e suite exercises
+directly. Off-main-thread encoding lands with the stage 5 encode worker.
+The asset store also defers the base64→byte decode side of that same
+tradeoff: commits store the raw `toDataURL` string via `putDataUrl()` and
+only decode to bytes lazily, on first `getBytes()`/`getObjectUrl()` access —
+nothing needs decoded bytes at commit time (save/export are the first
+consumers), so commit chunks pay encode cost only, not decode too.
+Measured: a stroke commit's history-visible node snapshot serializes to
+under 4 KB regardless of tile payload size (contract-tested);
+`raster-brush-stroke-huge` is unchanged (fps 91→91, frame p50 8.3→8.3 ms,
+p95 9.3→9.2 ms, encode chunk p95 9.6→9.8 ms with total encode-chunk time
+411→394 ms, helped by native `Uint8Array.fromBase64/toBase64` fast paths).
 
 ### 3. Pyramid LOD
 

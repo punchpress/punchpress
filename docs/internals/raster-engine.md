@@ -147,13 +147,34 @@ contract.
 
 ## Persistence Projection
 
-The document never holds pixel bytes in node state. An image node references a
-raster asset; the asset owns a tile manifest.
+The document never holds pixel bytes in node state. An image node carries a
+tile manifest — src-less `{ref, x, y, width, height, col, row}` entries — and
+the encoded bytes behind each ref live in the editor-owned raster asset store
+(`editor.rasterAssets`). Asset-store entries are append-only for the session
+(history entries reference refs, so undo always re-resolves) and are released
+only when a new document loads.
 
-- After a stroke, dirty tiles encode in a worker and **replace** that tile
-  coordinate's payload in the manifest. Payloads do not stack per stroke.
-- Save writes manifest payloads into the package's tiled raster layout (see
-  [Punch package](../reference/punch-package.md)).
+- After a stroke, dirty tiles PNG-encode into the asset store in the
+  frame-budgeted commit chunks; the commit appends src-less manifest entries
+  to the node. Encoding is synchronous `toDataURL` for now — async
+  `toBlob`/`convertToBlob` intermittently kills the Chromium renderer under
+  concurrent large-commit load — and moves off-thread with stage 5's encode
+  worker. Per-tile payload **replace** (no overlay stacking) also arrives
+  with stage 5's flatten work.
+- Commits store that `toDataURL` string as-is (`putDataUrl()`); the store
+  only decodes it to bytes lazily, on first `getBytes()`/`getObjectUrl()`
+  access. Nothing needs decoded bytes at commit time — save and export are
+  the first consumers — so the base64→byte decode never lands on the
+  frame-budgeted commit path.
+- Save writes manifest payloads into the package's tiled raster layout via
+  `createPunchPackage(contents, { getAssetBytes })` (see
+  [Punch package](../reference/punch-package.md)); the schema package never
+  reads editor internals.
+- Interchange forms are self-contained: hydrated package contents and
+  clipboard payloads carry tile pixels as transport-only inline `src` data
+  URLs, which `editor.loadDocument` / paste absorb into the asset store and
+  strip before nodes reach editor state. Export inlines data URLs back out of
+  the store so exported markup renders outside the session.
 - Load hydrates the store lazily: decode the tiles the viewport needs first,
   the rest on demand. Hydration runs in frame-budgeted chunks (~8 ms of sync
   work per rAF); painting proceeds against the stroke buffer meanwhile, and
