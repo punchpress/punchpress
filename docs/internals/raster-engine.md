@@ -155,13 +155,34 @@ the encoded bytes behind each ref live in the editor-owned raster asset store
 (history entries reference refs, so undo always re-resolves) and are released
 only when a new document loads.
 
-- After a stroke, dirty tiles PNG-encode into the asset store in the
-  frame-budgeted commit chunks; the commit appends src-less manifest entries
-  to the node. Encoding is synchronous `toDataURL` for now — async
+- Every store-backed commit leaves the node **pure-tiled**: no inline base
+  `src`, no base frame fields, and exactly one manifest entry per painted
+  store tile — each entry the complete non-transparent content of its tile's
+  physical (gutter-extended) rect. Adjacent payloads overlap by the gutter
+  band on purpose: the committed-DOM fallback draws each payload as its own
+  image, and abutting rects open bright GPU-rounding seams at fractional
+  zooms (sweep-asserted). Manifest size is bounded by painted area, never
+  stroke count, and every payload is self-complete — the precondition for
+  tile eviction.
+- A node not yet in that shape — an imported base image, a legacy
+  append/overlay manifest, or a reloaded manifest whose grid no longer aligns
+  with this session's store tiling — **migrates on its next commit**: every
+  non-blank store tile encodes once inside the same frame-budgeted commit
+  chunks, the manifest rebuilds wholesale, and `src`/base fields drop. Pure
+  nodes re-encode only the tiles the commit's merge touched and swap the
+  matching entries under fresh refs.
+- Erase commits ride the same path: a tile erased to zero alpha drops its
+  manifest entry, and a fully-erased layer keeps a valid zero-tile manifest.
+  Artboard-clipped commits crop the node to the artboard source rect and
+  migrate within it; encoding always clamps to the node's legitimate plane
+  region, so pixels a crop dropped never resurface in later manifests.
+- Commits serialize per node: encode reads merged store tiles, so a later
+  session's merge never interleaves with an earlier session's encode chunks
+  on the same store.
+- Encoding is synchronous `toDataURL` for now — async
   `toBlob`/`convertToBlob` intermittently kills the Chromium renderer under
-  concurrent large-commit load — and moves off-thread with stage 5's encode
-  worker. Per-tile payload **replace** (no overlay stacking) also arrives
-  with stage 5's flatten work.
+  concurrent large-commit load — and moves off-thread with stage 5b's encode
+  worker.
 - Commits store that `toDataURL` string as-is (`putDataUrl()`); the store
   only decodes it to bytes lazily, on first `getBytes()`/`getObjectUrl()`
   access. Nothing needs decoded bytes at commit time — save and export are
@@ -239,6 +260,8 @@ Decoded tiles are the dominant cost (a 512 px RGBA tile ≈ 1 MB).
 - One canonical pixel representation per raster node: the tile store.
 - The screen always renders from the store; encoded assets are never a render
   source.
+- A committed node is pure-tiled: one self-complete payload per painted store
+  tile, replaced per tile on commit — manifests never stack overlays.
 - Pointerup changes nothing visually.
 - Tile keys and pixel data never rebase; growth is metadata-only.
 - Painting is always full resolution; LOD is display-side decimation.

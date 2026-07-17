@@ -124,9 +124,10 @@ browser decode however many tiles reference them. Save passes bytes through
 (hydrated package contents, clipboard payloads, legacy documents) carry tiles
 as transport-only inline data URLs that `editor.loadDocument` absorbs into
 the asset store, so the base `node.src` payload also stays inline unchanged
-this stage. Scope cuts: per-tile payload replacement (commits keep
-stroke-only append manifests) and lazy load-time hydration (absorption is
-eager) both defer to stage 5, and — unplanned — commit encoding stays
+this stage. Scope cuts: per-tile payload replacement (commits kept
+stroke-only append manifests — landed with stage 5a) and lazy load-time
+hydration (absorption is eager, still stage 5b) deferred, and — unplanned —
+commit encoding stays
 synchronous `toDataURL` inside the existing budgeted chunks: every async
 `toBlob`/`convertToBlob` variant tried (DOM canvas, OffscreenCanvas,
 serialized, bounded in-flight, canvas pinned through the callback)
@@ -207,7 +208,38 @@ Budget hot decoded tiles. Cold tiles drop decoded bitmaps and keep encoded
 payloads; scrolling or zooming rehydrates through the decode worker. Required
 for the 100k px tier.
 
-Status: pending.
+Status: partial — 5a (per-tile payload flattening) implemented; the encode
+worker, lazy load-time hydration, and hot-tile eviction (5b) remain. Every
+store-backed commit now leaves the node pure-tiled: a node whose manifest is
+not in that shape (imported base `src`, legacy append overlays, or a reloaded
+manifest whose grid drifted off the session's store tiling) migrates on its
+next commit — every non-blank store tile encodes once inside the existing
+budgeted commit chunks, the manifest rebuilds keyed by store tile, and
+`src`/base fields drop. Pure nodes re-encode only the tiles the merge touched
+and swap the matching entries, so manifest size is bounded by painted area
+(contract-tested: constant across repeated same-region strokes,
+erase-to-empty drops entries, zero-tile manifests save/load). Erase and
+artboard-clipped commits share the path (clip commits crop-migrate within the
+artboard rect); `commitFlatten`'s single-src shape is gone, and commits
+serialize per node so encode chunks never interleave with the next stroke's
+merge. Payloads cover the tile's physical (gutter-extended) extent — abutting
+nominal-only payloads opened bright GPU seams in the committed-DOM fallback at
+fractional zooms (sweep-caught) — but a tile whose nominal region is blank
+gets no entry, so boundary-crossing strokes don't shed 2px sliver entries.
+Scratchpad autosave now defers while raster work is pending
+(`editor.hasPendingRasterWork()`): packaging is synchronous zip work and was
+landing ~200 ms hitches mid-drag once src-less tiled documents became
+saveable at all. Measured: `raster-brush-stroke-huge` fps 91→91.2, frame p50
+8.3→8.3 ms, p95 9.3→10.1 ms, merge chunk p95 10.3→11.9 ms, encode chunk p95
+9.4→9.8 ms with total encode-chunk time 401→685 ms (full-tile replace
+payloads vs stroke-trimmed appends); manifest holds at 3675 entries across
+all four strokes (was append-growth). Migration commit on a 12400×10800
+opaque base: 550 tiles encode in ~950 ms of budgeted chunks (~1.7 ms/tile
+uniform content) and the node emerges src-less. Known cost for 5b: the
+benchmark's 3.9 s max frame is the now-functional scratchpad autosave
+packaging a 3675-tile document at post-stroke idle — sync packaging (and the
+first-contact hydration spike, ~2.1 s on the 550-tile base) moves off-thread
+with the 5b worker family.
 
 ## Non-Goals
 

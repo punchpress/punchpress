@@ -88,9 +88,13 @@ Rules:
 - Large or actively edited raster assets may use tiled storage. Tile refs point
   to normal package files under `assets/raster/`; there is no monolithic current
   payload for tiled assets.
-- A tiled asset may include `baseRef` while an imported or previously single
-  raster is being edited sparsely. The base payload renders first; tile payloads
-  overlay changed regions.
+- Brush-authored raster layers save as pure-tiled assets: no `baseRef`, one
+  self-complete tile payload per painted store tile, and `tiles` may be empty
+  for a fully-erased layer.
+- `baseRef` appears only on legacy mixed assets (saved before the node's first
+  store-backed brush commit). The base payload renders first; tile payloads
+  overlay changed regions. The node's next brush commit migrates it to the
+  pure-tiled shape.
 - Export defaults to `preferredExportMimeType` only when it can represent the
   current raster state.
 
@@ -113,8 +117,10 @@ type ImageNode = {
 
 `width` and `height` are canvas dimensions. For brush-authored raster layers,
 they match the current bounded pixel payload. `baseX`, `baseY`, `baseWidth`,
-and `baseHeight` place the package base payload inside a tiled image node's
-logical bounds; tile `x` and `y` values use the same local coordinate space.
+and `baseHeight` are legacy fields: they place a legacy mixed asset's base
+payload inside a tiled image node's logical bounds and disappear when the node
+migrates to the pure-tiled shape. Tile `x` and `y` values use the node's local
+coordinate space.
 
 ## Runtime Hydration
 
