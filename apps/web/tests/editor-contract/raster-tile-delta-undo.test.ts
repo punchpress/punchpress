@@ -155,8 +155,10 @@ const mergeWithCapture = (
 const createEntry = (store = new RasterTileStore()): RasterStoreEntry => ({
   anchorX: 0,
   anchorY: 0,
+  commitQueue: Promise.resolve(),
   hydrated: true,
   hydrating: null,
+  pendingCommits: 0,
   pyramid: null,
   store,
 });

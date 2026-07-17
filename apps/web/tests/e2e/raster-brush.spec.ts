@@ -604,7 +604,9 @@ const getCommittedImageSample = (page, samplePoint) => {
       (node) => node.type === "image"
     );
 
-    if (!imageNode?.src) {
+    // Pure-tiled nodes carry no base src; the manifest tiles are the
+    // complete committed content.
+    if (!imageNode) {
       return null;
     }
 
@@ -618,7 +620,7 @@ const getCommittedImageSample = (page, samplePoint) => {
       await loaded;
       return image;
     };
-    const image = await loadImage(imageNode.src);
+    const image = imageNode.src ? await loadImage(imageNode.src) : null;
     const tileImages = await Promise.all(
       (imageNode.tileSources || []).map(async (tile) => ({
         image: await loadImage(
@@ -668,14 +670,14 @@ const getCommittedImageSample = (page, samplePoint) => {
       context.drawImage(sourceImage, sourceX, sourceY, 1, 1, 0, 0, 1, 1);
     };
 
-    if (tileImages.length) {
+    if (image && tileImages.length) {
       drawSample(image, {
         height: imageNode.baseHeight ?? imageNode.height,
         width: imageNode.baseWidth ?? imageNode.width,
         x: imageNode.baseX ?? 0,
         y: imageNode.baseY ?? 0,
       });
-    } else {
+    } else if (image) {
       drawSample(image, {
         height: imageNode.height,
         width: imageNode.width,
@@ -708,7 +710,8 @@ const getCommittedImageSampleAtClientPoint = (page, clientPoint) => {
     const host = editor?.hostRef;
     const viewer = editor?.viewerRef;
 
-    if (!(imageNode?.src && host && viewer)) {
+    // Pure-tiled nodes carry no base src; sample the manifest tiles alone.
+    if (!(imageNode && host && viewer)) {
       return null;
     }
 
@@ -752,7 +755,7 @@ const getCommittedImageSampleAtClientPoint = (page, clientPoint) => {
       await loaded;
       return image;
     };
-    const image = await loadImage(imageNode.src);
+    const image = imageNode.src ? await loadImage(imageNode.src) : null;
     const tileImages = await Promise.all(
       (imageNode.tileSources || []).map(async (tile) => ({
         image: await loadImage(
@@ -802,14 +805,14 @@ const getCommittedImageSampleAtClientPoint = (page, clientPoint) => {
       context.drawImage(sourceImage, sourceX, sourceY, 1, 1, 0, 0, 1, 1);
     };
 
-    if (tileImages.length) {
+    if (image && tileImages.length) {
       drawSample(image, {
         height: imageNode.baseHeight ?? imageNode.height,
         width: imageNode.baseWidth ?? imageNode.width,
         x: imageNode.baseX ?? 0,
         y: imageNode.baseY ?? 0,
       });
-    } else {
+    } else if (image) {
       drawSample(image, {
         height: imageNode.height,
         width: imageNode.width,
@@ -901,6 +904,28 @@ const getCommittedImageState = (page) => {
       y: imageNode.transform.y,
     };
   });
+};
+
+/**
+ * Wait for the next commit to land. Per-tile replace commits swap payload
+ * refs — the manifest only grows when the stroke paints previously-blank
+ * tiles — so a fresh ref, not a larger count, is the commit signal.
+ */
+const waitForNewCommittedTileRefs = async (page, previousState) => {
+  const previousRefs = new Set(
+    (previousState?.tileSources || []).map((tile) => tile.ref)
+  );
+
+  await expect
+    .poll(async () => {
+      const state = await getCommittedImageState(page);
+
+      return (
+        state?.tileSources.filter((tile) => !previousRefs.has(tile.ref))
+          .length || 0
+      );
+    })
+    .toBeGreaterThan(0);
 };
 
 const loadRasterTestDocument = async (page, contents) => {
@@ -1751,7 +1776,19 @@ test("painting a bloated artboard raster clips it back to the frame", async ({
 
   expect(imageState?.id).toBe("image-1");
   expect(imageState?.parentId).toBe("artboard-1");
-  expect(imageState?.tileSourceCount).toBe(0);
+  // The crop commit migrates to pure-tiled within the artboard frame: no
+  // base src, and every payload stays inside the clipped plane.
+  expect(imageState?.src).toBe("");
+  expect(imageState?.tileSourceCount).toBeGreaterThan(0);
+  expect(
+    imageState?.tileSources.every(
+      (tile) =>
+        tile.x >= 0 &&
+        tile.y >= 0 &&
+        tile.x + tile.width <= (imageState?.width || 0) &&
+        tile.y + tile.height <= (imageState?.height || 0)
+    )
+  ).toBe(true);
   expect(imageState?.width).toBeLessThanOrEqual(340);
   expect(imageState?.height).toBeLessThanOrEqual(260);
   expect((imageState?.x || 0) + (imageState?.width || 0)).toBeLessThanOrEqual(
@@ -2551,21 +2588,28 @@ test("huge tiled brush strokes preserve previous strokes in the same tile", asyn
     .toBeGreaterThan(0);
 
   const firstState = await getCommittedImageState(page);
+  const firstRefs = new Set(firstState?.tileSources.map((tile) => tile.ref));
 
   await dragBrush(page, [point, point]);
 
+  // A second stroke over the same region REPLACES the touched tiles'
+  // payloads (fresh refs) instead of appending overlay entries.
   await expect
-    .poll(
-      async () => (await getCommittedImageState(page))?.tileSourceCount || 0
-    )
-    .toBeGreaterThan(firstState?.tileSourceCount || 0);
+    .poll(async () => {
+      const state = await getCommittedImageState(page);
+
+      return (
+        state?.tileSources.filter((tile) => !firstRefs.has(tile.ref)).length ||
+        0
+      );
+    })
+    .toBeGreaterThan(0);
 
   const secondState = await getCommittedImageState(page);
 
   expect(firstState?.tileSourceCount).toBeGreaterThan(0);
-  expect(secondState?.tileSourceCount).toBeGreaterThan(
-    firstState?.tileSourceCount || 0
-  );
+  // Manifest size is bounded by painted area, never stroke count.
+  expect(secondState?.tileSourceCount).toBe(firstState?.tileSourceCount || 0);
   expect(new Set(secondState?.tileSources.map((tile) => tile.ref)).size).toBe(
     secondState?.tileSourceCount
   );
@@ -2624,18 +2668,20 @@ test("huge tiled brush strokes commit overlap across tile boundaries", async ({
     { x: 512, y: 900 },
     { x: 513, y: 900 },
   ]);
-  const tileRanges = imageState?.tileSources.map((tile) => ({
-    maxX: tile.x + tile.width,
-    minX: tile.x,
-  }));
-  const overlapsTileBoundary = tileRanges?.some((tile) => {
-    return (
-      tile.minX < RASTER_TILE_TEST_SIZE && tile.maxX > RASTER_TILE_TEST_SIZE
-    );
-  });
+  // One manifest entry per store tile (payloads overlap the boundary only by
+  // the tile gutter), so a stroke crossing a tile boundary lands as entries
+  // centered on both sides of it; the committed samples below prove the
+  // boundary pixels compose seamlessly.
+  const hasLeftOfBoundary = imageState?.tileSources.some(
+    (tile) => tile.x + tile.width / 2 < RASTER_TILE_TEST_SIZE
+  );
+  const hasRightOfBoundary = imageState?.tileSources.some(
+    (tile) => tile.x + tile.width / 2 > RASTER_TILE_TEST_SIZE
+  );
 
   expect(imageState?.tileSourceCount).toBeGreaterThan(1);
-  expect(overlapsTileBoundary).toBe(true);
+  expect(hasLeftOfBoundary).toBe(true);
+  expect(hasRightOfBoundary).toBe(true);
   expect(samples).not.toBeNull();
 
   for (const sample of samples || []) {
@@ -2716,8 +2762,11 @@ test("huge tiled brush bounds grow left and keep existing content pinned", async
   expect(imageState?.id).toBe("huge-image-1");
   expect(imageState?.width).toBeGreaterThan(12_400);
   expect(imageState?.x).toBeLessThan(220);
-  expect(imageState?.baseX).toBeGreaterThan(0);
-  expect(imageState?.baseWidth).toBe(12_400);
+  // The first store-backed commit migrated the node to pure-tiled: the base
+  // src and base frame are gone, and growth is manifest-offset only.
+  expect(imageState?.src).toBe("");
+  expect(imageState?.baseX).toBeUndefined();
+  expect(imageState?.baseWidth).toBeUndefined();
   expect(
     imageState?.tileSources.every(
       (tile) => tile.x >= 0 && tile.x + tile.width <= imageState.width
@@ -2788,9 +2837,13 @@ test("huge tiled brush strokes cover arbitrary 40000px directions efficiently", 
       x: center.x + Math.cos(angle) * hugeLength,
       y: center.y + Math.sin(angle) * hugeLength,
     }));
-    const startedAt = performance.now();
 
+    // First contact pays the node's one-time migration to pure-tiled (the
+    // whole opaque base image encodes once); the timed budget below pins
+    // steady-state per-tile replace commits.
     await drawLine(toWorldPoint(center), toWorldPoint(tinyEnd));
+
+    const startedAt = performance.now();
 
     for (const endpoint of endpoints) {
       await drawLine(toWorldPoint(center), toWorldPoint(endpoint));
@@ -2804,10 +2857,9 @@ test("huge tiled brush strokes cover arbitrary 40000px directions efficiently", 
     }
 
     return {
-      baseX: imageNode.baseX,
-      baseY: imageNode.baseY,
       elapsedMs,
       height: imageNode.height,
+      src: imageNode.src || "",
       tileSources: imageNode.tileSources || [],
       transformX: imageNode.transform.x,
       transformY: imageNode.transform.y,
@@ -2820,10 +2872,11 @@ test("huge tiled brush strokes cover arbitrary 40000px directions efficiently", 
   expect(result.height).toBeGreaterThan(65_000);
   expect(result.transformX).toBeLessThan(220);
   expect(result.transformY).toBeLessThan(160);
-  expect(result.baseX).toBeGreaterThan(0);
-  expect(result.baseY).toBeGreaterThan(0);
-  expect(result.tileSources.length).toBeGreaterThan(250);
-  expect(result.tileSources.length).toBeLessThan(1000);
+  expect(result.src).toBe("");
+  // Migration covers the opaque 12400x10800 base (~550 tiles); the four
+  // 40000px strokes add only the sparse tiles they actually cross.
+  expect(result.tileSources.length).toBeGreaterThan(550);
+  expect(result.tileSources.length).toBeLessThan(1400);
   expect(new Set(tileRefs).size).toBe(tileRefs.length);
   expect(
     result.tileSources.every(
@@ -3123,7 +3176,8 @@ test("rapid brush strokes on a large artboard paint through a working surface", 
       { x: 920, y: 250 },
     ],
   ];
-  let previousTileCount = 0;
+  let previousState: Awaited<ReturnType<typeof getCommittedImageState>> | null =
+    null;
 
   for (const [startOffset, endOffset] of strokes) {
     const start = await getCanvasStagePoint(page, startOffset);
@@ -3138,18 +3192,13 @@ test("rapid brush strokes on a large artboard paint through a working surface", 
     await page.mouse.move(start.x, start.y);
 
     const baseline = await getScreenshotDarkPixelStats(page, clip);
-    const expectedTileCount = previousTileCount;
 
     await dragBrush(page, [start, end], { steps: 4 });
 
-    await expect
-      .poll(
-        async () => (await getCommittedImageState(page))?.tileSourceCount || 0
-      )
-      .toBeGreaterThan(expectedTileCount);
+    await waitForNewCommittedTileRefs(page, previousState);
 
-    previousTileCount =
-      (await getCommittedImageState(page))?.tileSourceCount || 0;
+    previousState = await getCommittedImageState(page);
+    expect(previousState?.tileSourceCount).toBeGreaterThan(0);
 
     const afterStroke = await getScreenshotDarkPixelStats(page, clip);
 
@@ -3557,13 +3606,9 @@ test("erasing transparent space does not move or resize the raster layer", async
   await setBrushSliderValue(page, "Brush hardness", 100);
   await dragBrush(page, [emptyPoint, emptyPoint]);
 
-  await expect
-    .poll(async () => {
-      const state = await getCommittedImageState(page);
-
-      return state?.tileSourceCount || 0;
-    })
-    .toBe(0);
+  // Erasing only transparent pixels commits nothing: the manifest, layer
+  // geometry, and painted pixels all stay put.
+  await waitForAnimationFrames(page, 24);
 
   const afterErase = await getCommittedImageState(page);
   const retainedSample = await getCommittedImageSampleAtClientPoint(
@@ -3574,6 +3619,7 @@ test("erasing transparent space does not move or resize the raster layer", async
   expect(afterErase).toMatchObject({
     height: beforeErase?.height,
     id: beforeErase?.id,
+    tileSourceCount: beforeErase?.tileSourceCount,
     width: beforeErase?.width,
     x: beforeErase?.x,
     y: beforeErase?.y,
@@ -3667,18 +3713,14 @@ test("brush strokes undo and redo as one committed raster step", async ({
 
   await dragBrush(page, [secondStart, secondEnd]);
 
-  await expect
-    .poll(
-      async () => (await getCommittedImageState(page))?.tileSourceCount || 0
-    )
-    .toBeGreaterThan(firstStrokeState?.tileSourceCount || 0);
+  await waitForNewCommittedTileRefs(page, firstStrokeState);
 
   const secondStrokeState = await getCommittedImageState(page);
 
   expect(firstStrokeState).toBeTruthy();
   expect(secondStrokeState).toBeTruthy();
   expect(secondStrokeState?.id).toBe(firstStrokeState?.id);
-  expect(secondStrokeState?.tileSourceCount).toBeGreaterThan(
+  expect(secondStrokeState?.tileSourceCount).toBeGreaterThanOrEqual(
     firstStrokeState?.tileSourceCount || 0
   );
   expect(secondStrokeState?.width).toBeGreaterThan(
@@ -3809,11 +3851,7 @@ test("undo of a stroke keeps the store surface mounted and restores store pixels
 
   await dragBrush(page, [secondStart, secondEnd]);
 
-  await expect
-    .poll(
-      async () => (await getCommittedImageState(page))?.tileSourceCount || 0
-    )
-    .toBeGreaterThan(firstStrokeState?.tileSourceCount || 0);
+  await waitForNewCommittedTileRefs(page, firstStrokeState);
 
   const secondStrokeState = await getCommittedImageState(page);
 
