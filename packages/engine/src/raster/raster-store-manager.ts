@@ -26,6 +26,15 @@ type HydrationBounds = {
 export type RasterStoreEntry = {
   anchorX: number;
   anchorY: number;
+  /**
+   * Per-node commit serialization. Commits re-encode merged store tiles, so
+   * one session's encode chunks must never interleave with the next
+   * session's merge on the same store; each commit chains onto the previous
+   * one's completion.
+   */
+  commitQueue: Promise<void>;
+  /** Commits queued or running on this store (see hasPendingCommits). */
+  pendingCommits: number;
   hydrated: boolean;
   hydrating: Promise<void> | null;
   pyramid: RasterTilePyramid | null;
@@ -66,7 +75,9 @@ export class RasterStoreManager {
     const entry: RasterStoreEntry = {
       anchorX: 0,
       anchorY: 0,
+      commitQueue: Promise.resolve(),
       hydrated: false,
+      pendingCommits: 0,
       hydrating: null,
       pyramid: null,
       store: new RasterTileStore(),
@@ -113,6 +124,21 @@ export class RasterStoreManager {
     }
 
     return entry.hydrating;
+  }
+
+  /**
+   * True while any store has commits queued or running (merge + encode
+   * chunks). Heavy main-thread work outside the engine (autosave packaging)
+   * defers on this.
+   */
+  hasPendingCommits() {
+    for (const entry of this.entries.values()) {
+      if (entry.pendingCommits > 0) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   release(nodeId: string) {

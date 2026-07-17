@@ -143,18 +143,26 @@ const createTiledRasterPackageEntry = (
   };
 };
 
+/**
+ * Tiled layout for manifest-carrying nodes. Pure-tiled nodes (the normal
+ * store-backed commit shape) have no base payload — the manifest tiles are
+ * the complete pixel content, and zero tiles is a valid fully-erased layer.
+ * A legacy mixed node (inline base src plus overlay tiles) still writes its
+ * base entry so it round-trips unchanged until its next brush commit
+ * migrates it.
+ */
 const createSparseTiledRasterPackageEntry = (
   node: Extract<DesignDocument["nodes"][number], { type: "image" }>,
   getAssetBytes: CreatePunchPackageOptions["getAssetBytes"]
 ) => {
-  if (!node.src) {
-    throw new Error(`Image node ${node.id} is missing raster base data.`);
-  }
-
   const baseAsset = createRasterAssetRecord(node);
-  const { bytes, mimeType } = decodeDataUrl(node.src);
-  const currentMimeType = getCurrentMimeType(mimeType, baseAsset.currentMimeType);
-  const baseRef = `assets/raster/${baseAsset.id}/base.${currentMimeType === "image/jpeg" ? "jpg" : "png"}`;
+  const base = node.src ? decodeDataUrl(node.src) : null;
+  const currentMimeType = base
+    ? getCurrentMimeType(base.mimeType, baseAsset.currentMimeType)
+    : ("image/png" as const);
+  const baseRef = base
+    ? `assets/raster/${baseAsset.id}/base.${currentMimeType === "image/jpeg" ? "jpg" : "png"}`
+    : undefined;
   const tileSources = node.tileSources || [];
 
   return {
@@ -168,7 +176,7 @@ const createSparseTiledRasterPackageEntry = (
       name: baseAsset.name,
       originalMimeType: currentMimeType,
       preferredExportMimeType: currentMimeType,
-      baseRef,
+      ...(baseRef ? { baseRef } : {}),
       storage: "tiled" as const,
       tileSize: 512,
       tiles: tileSources.map((tileSource) => ({
@@ -184,10 +192,7 @@ const createSparseTiledRasterPackageEntry = (
       width: baseAsset.width,
     },
     entries: [
-      {
-        data: bytes,
-        path: baseRef,
-      },
+      ...(base && baseRef ? [{ data: base.bytes, path: baseRef }] : []),
       ...tileSources.map((tileSource) => ({
         data: getTileSourceBytes(node.id, tileSource, getAssetBytes),
         path: tileSource.ref,
@@ -224,9 +229,9 @@ export const createPunchPackage = (
     const packageEntry =
       existingAsset?.kind === "raster" && existingAsset.storage === "tiled"
         ? createTiledRasterPackageEntry(node, existingAsset, getAssetBytes)
-        : node.tileSources?.length
+        : node.tileSources || !node.src
           ? createSparseTiledRasterPackageEntry(node, getAssetBytes)
-        : createSingleRasterPackageEntry(node);
+          : createSingleRasterPackageEntry(node);
 
     packageAssets[packageEntry.asset.id] = packageEntry.asset;
     assetEntries.push(...packageEntry.entries);

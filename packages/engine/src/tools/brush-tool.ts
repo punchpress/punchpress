@@ -1,9 +1,12 @@
-import { getImageNodeBounds } from "../nodes/image/image-capabilities";
 import { incrementPerfCounter, measurePerf } from "../perf/perf-hooks";
 import {
-  getNodeTransformForPinnedWorldPoint,
-  getNodeWorldPoint,
-} from "../primitives/rotation";
+  createStoreTileSource,
+  getManifestEntryStoreKey,
+  getReplacedTileSources,
+  getStoreTileKey,
+  getTiledImageCommitState,
+  isPureTiledImageNode,
+} from "../raster/raster-commit";
 import {
   captureTileDeltasBeforeMerge,
   createStrokeCapture,
@@ -11,7 +14,6 @@ import {
 import {
   commitMergedStrokeBounds,
   mergeStrokeStoreTile,
-  RASTER_STORE_TILE_SIZE,
   RasterTileStore,
 } from "../raster/raster-tile-store";
 import {
@@ -24,7 +26,6 @@ import {
 import {
   cancelRasterFrame,
   canScheduleRasterFrame,
-  createCanvas,
   getNow,
   hasRasterRuntime,
   requestRasterFrame,
@@ -106,430 +107,6 @@ const nextRasterFrame = () =>
     requestRasterFrame(() => resolve(undefined));
   });
 
-const getAlphaBounds = (imageData) => {
-  const { data, height, width } = imageData;
-  const words = new Uint32Array(data.buffer, data.byteOffset, width * height);
-  let minX = width;
-  let minY = height;
-  let maxX = -1;
-  let maxY = -1;
-
-  for (let y = 0; y < height; y += 1) {
-    const rowOffset = y * width;
-
-    for (let x = 0; x < width; x += 1) {
-      if (words[rowOffset + x] >>> 24 === 0) {
-        continue;
-      }
-
-      if (x < minX) {
-        minX = x;
-      }
-
-      if (x > maxX) {
-        maxX = x;
-      }
-
-      if (y < minY) {
-        minY = y;
-      }
-
-      maxY = y;
-    }
-  }
-
-  return maxX < 0 ? null : { maxX, maxY, minX, minY };
-};
-
-const getRasterPlaneBounds = (node, tileSources = []) => {
-  const bounds = [
-    {
-      maxX: node.width,
-      maxY: node.height,
-      minX: 0,
-      minY: 0,
-    },
-  ];
-
-  if (node.src) {
-    const baseX = node.baseX ?? 0;
-    const baseY = node.baseY ?? 0;
-
-    bounds.push({
-      maxX: baseX + (node.baseWidth ?? node.width),
-      maxY: baseY + (node.baseHeight ?? node.height),
-      minX: baseX,
-      minY: baseY,
-    });
-  }
-
-  for (const tileSource of tileSources) {
-    bounds.push({
-      maxX: tileSource.x + tileSource.width,
-      maxY: tileSource.y + tileSource.height,
-      minX: tileSource.x,
-      minY: tileSource.y,
-    });
-  }
-
-  return {
-    maxX: Math.max(...bounds.map((bounds) => bounds.maxX)),
-    maxY: Math.max(...bounds.map((bounds) => bounds.maxY)),
-    minX: Math.min(...bounds.map((bounds) => bounds.minX)),
-    minY: Math.min(...bounds.map((bounds) => bounds.minY)),
-  };
-};
-
-const getTileSourceWithOffset = (tileSource, offsetX, offsetY) => {
-  if (!(offsetX || offsetY)) {
-    return tileSource;
-  }
-
-  const x = tileSource.x + offsetX;
-  const y = tileSource.y + offsetY;
-
-  return {
-    ...tileSource,
-    col: Math.floor(x / RASTER_STORE_TILE_SIZE),
-    row: Math.floor(y / RASTER_STORE_TILE_SIZE),
-    x,
-    y,
-  };
-};
-
-const getTiledBaseFrame = (node) => {
-  if ((node.tileSources || []).length > 0) {
-    return {
-      baseHeight: node.baseHeight ?? node.height,
-      baseWidth: node.baseWidth ?? node.width,
-      baseX: node.baseX ?? 0,
-      baseY: node.baseY ?? 0,
-    };
-  }
-
-  return {
-    baseHeight: node.height,
-    baseWidth: node.width,
-    baseX: 0,
-    baseY: 0,
-  };
-};
-
-const getNextTiledImageNodeState = ({ node, tileSources }) => {
-  const nextTileSourcesByRef = new Map(
-    (node.tileSources || []).map((tileSource) => [tileSource.ref, tileSource])
-  );
-
-  for (const tileSource of tileSources) {
-    nextTileSourcesByRef.set(tileSource.ref, tileSource);
-  }
-
-  const existingTileSources = [...nextTileSourcesByRef.values()];
-  const baseFrame = getTiledBaseFrame(node);
-  const currentNode = {
-    ...node,
-    ...baseFrame,
-  };
-  const currentBounds = getRasterPlaneBounds(currentNode, existingTileSources);
-  const offsetX = Math.max(0, -Math.floor(currentBounds.minX));
-  const offsetY = Math.max(0, -Math.floor(currentBounds.minY));
-  const nextTileSources = existingTileSources.map((tileSource) =>
-    getTileSourceWithOffset(tileSource, offsetX, offsetY)
-  );
-  const offsetNode = {
-    ...currentNode,
-    baseX: baseFrame.baseX + offsetX,
-    baseY: baseFrame.baseY + offsetY,
-  };
-  const nextBounds = getRasterPlaneBounds(offsetNode, nextTileSources);
-  const width = Math.max(1, Math.ceil(nextBounds.maxX));
-  const height = Math.max(1, Math.ceil(nextBounds.maxY));
-  const transform =
-    offsetX || offsetY
-      ? getNodeTransformForPinnedWorldPoint(
-          {
-            ...node,
-            height,
-            width,
-          },
-          getImageNodeBounds({
-            ...node,
-            height,
-            width,
-          }),
-          { x: offsetX, y: offsetY },
-          getNodeWorldPoint(node, getImageNodeBounds(node), {
-            x: 0,
-            y: 0,
-          })
-        )
-      : node.transform;
-
-  return {
-    node: {
-      ...node,
-      baseHeight: offsetNode.baseHeight,
-      baseWidth: offsetNode.baseWidth,
-      baseX: offsetNode.baseX,
-      baseY: offsetNode.baseY,
-      height,
-      mimeType: "image/png",
-      tileSources: nextTileSources,
-      transform: {
-        ...node.transform,
-        ...transform,
-      },
-      width,
-    },
-    offsetX,
-    offsetY,
-  };
-};
-
-const getCreatedTiledImageNodeState = ({ node, tileSources }) => {
-  const minX = Math.floor(
-    Math.min(...tileSources.map((tileSource) => tileSource.x))
-  );
-  const minY = Math.floor(
-    Math.min(...tileSources.map((tileSource) => tileSource.y))
-  );
-  const maxX = Math.ceil(
-    Math.max(...tileSources.map((tileSource) => tileSource.x + tileSource.width))
-  );
-  const maxY = Math.ceil(
-    Math.max(
-      ...tileSources.map((tileSource) => tileSource.y + tileSource.height)
-    )
-  );
-  const width = Math.max(1, maxX - minX);
-  const height = Math.max(1, maxY - minY);
-  const nextTileSources = tileSources.map((tileSource) =>
-    getTileSourceWithOffset(tileSource, -minX, -minY)
-  );
-  const nextNode = {
-    ...node,
-    height,
-    width,
-  };
-  const transform =
-    minX || minY
-      ? getNodeTransformForPinnedWorldPoint(
-          nextNode,
-          getImageNodeBounds(nextNode),
-          { x: 0, y: 0 },
-          getNodeWorldPoint(node, getImageNodeBounds(node), {
-            x: minX,
-            y: minY,
-          })
-        )
-      : node.transform;
-
-  return {
-    node: {
-      ...node,
-      baseHeight: height,
-      baseWidth: width,
-      baseX: 0,
-      baseY: 0,
-      height,
-      mimeType: "image/png",
-      tileSources: nextTileSources,
-      transform: {
-        ...node.transform,
-        ...transform,
-      },
-      width,
-    },
-    offsetX: -minX,
-    offsetY: -minY,
-  };
-};
-
-/**
- * Trim a dirty tile to its painted alpha bounds, PNG-encode it into the
- * editor's raster asset store, and return the src-less manifest entry.
- *
- * The encode is synchronous toDataURL by design: async toBlob/convertToBlob
- * (in every variant tried — DOM canvas, OffscreenCanvas, serialized, bounded
- * in-flight, with the canvas pinned through the callback) intermittently
- * kills the Chromium renderer when several same-origin pages encode large
- * commits concurrently, which the raster e2e suite exercises directly.
- * Off-main-thread encoding arrives with the stage 5 encode worker instead.
- *
- * The store keeps the data URL as-is via putDataUrl(): nothing needs decoded
- * bytes at commit time (they're only consumed at save/export), so the
- * base64→byte decode is deferred to first access instead of paid here on the
- * frame-budgeted commit chunk.
- */
-const createTileSourceFromDirtyTile = ({
-  assets,
-  commitRevision,
-  nodeId,
-  offsetX,
-  offsetY,
-  tile,
-}) => {
-  const alphaBounds = getAlphaBounds({
-    data: tile.pixels,
-    height: tile.height,
-    width: tile.width,
-  });
-
-  if (!alphaBounds) {
-    return null;
-  }
-
-  const width = alphaBounds.maxX - alphaBounds.minX + 1;
-  const height = alphaBounds.maxY - alphaBounds.minY + 1;
-  const x = tile.x + alphaBounds.minX + offsetX;
-  const y = tile.y + alphaBounds.minY + offsetY;
-  const canvas = createCanvas(width, height);
-  const context = canvas?.getContext("2d", { willReadFrequently: true });
-
-  if (!(canvas && context)) {
-    return null;
-  }
-
-  const pixels = new Uint8ClampedArray(width * height * 4);
-
-  for (let row = 0; row < height; row += 1) {
-    const sourceOffset =
-      ((alphaBounds.minY + row) * tile.width + alphaBounds.minX) * 4;
-
-    pixels.set(
-      tile.pixels.subarray(sourceOffset, sourceOffset + width * 4),
-      row * width * 4
-    );
-  }
-
-  context.putImageData(new ImageData(pixels, width, height), 0, 0);
-
-  const tileSource = {
-    col: Math.floor(x / RASTER_STORE_TILE_SIZE),
-    height,
-    ref: `assets/raster/${nodeId}/tiles/${commitRevision}_${tile.col}_${tile.row}.png`,
-    row: Math.floor(y / RASTER_STORE_TILE_SIZE),
-    width,
-    x,
-    y,
-  };
-
-  assets.putDataUrl(
-    tileSource.ref,
-    canvas.toDataURL("image/png"),
-    "image/png"
-  );
-
-  return tileSource;
-};
-
-const drawStoreTilesToCanvas = ({ anchorX, anchorY, context, rect, store }) => {
-  const storeBounds = {
-    maxX: rect.x + rect.width - anchorX,
-    maxY: rect.y + rect.height - anchorY,
-    minX: rect.x - anchorX,
-    minY: rect.y - anchorY,
-  };
-
-  for (const tile of store.getTilesForBounds(storeBounds, { create: false })) {
-    const scratch = createCanvas(tile.width, tile.height);
-    const scratchContext = scratch?.getContext("2d", {
-      willReadFrequently: true,
-    });
-
-    if (!(scratch && scratchContext)) {
-      continue;
-    }
-
-    scratchContext.putImageData(
-      new ImageData(tile.pixels, tile.width, tile.height),
-      0,
-      0
-    );
-    context.drawImage(
-      scratch,
-      tile.nominalX - tile.x,
-      tile.nominalY - tile.y,
-      tile.nominalWidth,
-      tile.nominalHeight,
-      tile.nominalX + anchorX - rect.x,
-      tile.nominalY + anchorY - rect.y,
-      tile.nominalWidth,
-      tile.nominalHeight
-    );
-  }
-};
-
-const getTrimmedFlattenState = ({ canvas, context, frameNode }) => {
-  const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-  const alphaBounds = getAlphaBounds(imageData);
-
-  if (!alphaBounds) {
-    return null;
-  }
-
-  const width = alphaBounds.maxX - alphaBounds.minX + 1;
-  const height = alphaBounds.maxY - alphaBounds.minY + 1;
-
-  if (
-    alphaBounds.minX === 0 &&
-    alphaBounds.minY === 0 &&
-    width === canvas.width &&
-    height === canvas.height
-  ) {
-    return null;
-  }
-
-  const nextCanvas = createCanvas(width, height);
-  const nextContext = nextCanvas?.getContext("2d", {
-    willReadFrequently: true,
-  });
-
-  if (!(nextCanvas && nextContext)) {
-    return null;
-  }
-
-  nextContext.drawImage(
-    canvas,
-    alphaBounds.minX,
-    alphaBounds.minY,
-    width,
-    height,
-    0,
-    0,
-    width,
-    height
-  );
-
-  const pinnedWorldPoint = getNodeWorldPoint(
-    frameNode,
-    getImageNodeBounds(frameNode),
-    {
-      x: alphaBounds.minX,
-      y: alphaBounds.minY,
-    }
-  );
-  const nextNode = {
-    ...frameNode,
-    height,
-    width,
-  };
-
-  return {
-    canvas: nextCanvas,
-    height,
-    transform: getNodeTransformForPinnedWorldPoint(
-      nextNode,
-      getImageNodeBounds(nextNode),
-      { x: 0, y: 0 },
-      pinnedWorldPoint
-    ),
-    trimX: alphaBounds.minX,
-    trimY: alphaBounds.minY,
-    width,
-  };
-};
-
 class BrushStrokeSession {
   constructor({ editor, node, operation, settings, startPoint, tool }) {
     this.completed = false;
@@ -559,6 +136,8 @@ class BrushStrokeSession {
     this.lastPoint = null;
     this.lastSolidDab = null;
     this.merged = false;
+    this.mergedStoreBounds = null;
+    this.mergedStoreTiles = new Set();
     this.nodeId = node.id;
     this.operation = operation;
     this.pointFlushFrameId = 0;
@@ -938,7 +517,26 @@ class BrushStrokeSession {
     }
 
     await this.ready;
-    await this.finishCommit();
+
+    // Commits serialize per node: encode reads merged store tiles, so a
+    // later session's merge must never interleave with an earlier session's
+    // encode chunks on the same store.
+    const entry = this.storeEntry;
+
+    entry.pendingCommits += 1;
+
+    const commitRun = entry.commitQueue.then(() => this.finishCommit());
+    const settled = commitRun.then(
+      () => {
+        entry.pendingCommits -= 1;
+      },
+      () => {
+        entry.pendingCommits -= 1;
+      }
+    );
+
+    entry.commitQueue = settled;
+    await commitRun;
   }
 
   async finishCommit() {
@@ -947,11 +545,7 @@ class BrushStrokeSession {
     this.tool.sessions.delete(this);
     this.editor.notifyInteractionPreviewChanged();
 
-    if (this.operation === "erase" || this.initialSourceRect) {
-      return this.commitFlatten();
-    }
-
-    return this.commitPaintTiles();
+    return this.commitStoreTiles();
   }
 
   async mergeStrokeStoreBudgeted() {
@@ -1001,13 +595,17 @@ class BrushStrokeSession {
             store: entry.store,
             strokeTile,
           });
-          mergeStrokeStoreTile({
+
+          for (const touchedTile of mergeStrokeStoreTile({
             anchorX,
             anchorY,
             mode,
             store: entry.store,
             strokeTile,
-          });
+          })) {
+            this.mergedStoreTiles.add(touchedTile);
+          }
+
           strokeTile.merged = true;
           tileIndex += 1;
         } while (
@@ -1022,7 +620,7 @@ class BrushStrokeSession {
     }
 
     this.strokeStore.revision += 1;
-    commitMergedStrokeBounds({
+    this.mergedStoreBounds = commitMergedStrokeBounds({
       anchorX,
       anchorY,
       store: entry.store,
@@ -1030,54 +628,153 @@ class BrushStrokeSession {
     });
   }
 
-  commitPaintTiles() {
-    const paintedBounds = this.strokeStore.getPaintedBounds();
-    const dirtyTiles = paintedBounds
-      ? this.strokeStore.getTilesForBounds(paintedBounds, { create: false })
-      : [];
+  /**
+   * Store-backed commit projection. The store (fully hydrated and merged) is
+   * complete truth here, so every commit leaves the node pure-tiled: on the
+   * node's first store commit — or whenever its manifest is not in the
+   * pure-tiled shape (imported src, legacy append overlays, a reloaded
+   * manifest whose grid drifted off this session's store tiling) — every
+   * non-blank store tile re-encodes once, the manifest is rebuilt keyed by
+   * store tile, and `src`/base fields drop. Pure nodes re-encode only the
+   * tiles this commit's merge touched and swap the matching entries, so
+   * manifest size is bounded by painted area, never stroke count. Erase and
+   * artboard-clipped commits ride the same path (a clip commit crops the
+   * node to the source rect and migrates within it); the old single-payload
+   * flatten shape is gone.
+   */
+  commitStoreTiles() {
+    const node = this.editor.getNode(this.nodeId);
 
-    recordRasterDebugEvent("tileCommit.start", {
-      dirtyTileCount: dirtyTiles.length,
-      nodeId: this.nodeId,
-      sessionId: this.sessionId,
-    });
-
-    if (dirtyTiles.length === 0) {
+    if (node?.type !== "image") {
       this.editor.revertToMark(this.historyMark);
       this.tool.clearActiveSession(this);
       return Promise.resolve();
     }
 
+    const entry = this.storeEntry;
+    const sourceRect =
+      !this.preserveRasterPlane && this.initialSourceRect
+        ? this.initialSourceRect
+        : null;
+    // Manifest coords land in the committed node's plane; a crop commit
+    // rebases the node to the source rect, shifting the effective anchor.
+    const anchorX = entry.anchorX - (sourceRect?.x || 0);
+    const anchorY = entry.anchorY - (sourceRect?.y || 0);
+    const pure =
+      !sourceRect &&
+      isPureTiledImageNode(node, {
+        anchorX: entry.anchorX,
+        anchorY: entry.anchorY,
+      });
+    const clampBounds = this.getCommitClampBounds(node, sourceRect);
+    const dirtyTiles = pure
+      ? [...this.mergedStoreTiles]
+      : clampBounds
+        ? entry.store.getTilesForBounds(clampBounds, { create: false })
+        : [];
+    const replacedKeys = new Set(
+      pure
+        ? dirtyTiles.map((tile) => getStoreTileKey(tile.col, tile.row))
+        : []
+    );
+
+    recordRasterDebugEvent("tileCommit.start", {
+      dirtyTileCount: dirtyTiles.length,
+      migration: !pure,
+      nodeId: this.nodeId,
+      sessionId: this.sessionId,
+    });
+
     brushTileCommitRevision += 1;
     const commitRevision = brushTileCommitRevision;
+    const encodeContext = {
+      anchorX,
+      anchorY,
+      clampBounds,
+      commitRevision,
+      dirtyTiles,
+    };
+    const finish = (tileSources) =>
+      this.finishStoreTileCommit({
+        anchorX,
+        anchorY,
+        pure,
+        replacedKeys,
+        sourceRect,
+        tileSources,
+      });
     const shouldCommitAsync =
       canScheduleRasterFrame() &&
       dirtyTiles.length > BRUSH_TILE_ASYNC_COMMIT_THRESHOLD;
 
     if (shouldCommitAsync) {
-      return this.commitTileSurfaceAsync({ commitRevision, dirtyTiles });
+      return this.encodeStoreTilesAsync(encodeContext).then(finish);
     }
 
     const tileSources = measurePerf("brush.tile.commit.encode", () =>
       dirtyTiles.flatMap((tile) => {
-        const tileSource = createTileSourceFromDirtyTile({
-          assets: this.editor.rasterAssets,
-          commitRevision,
-          nodeId: this.nodeId,
-          offsetX: this.initialSourceRect?.x || 0,
-          offsetY: this.initialSourceRect?.y || 0,
-          tile,
-        });
+        const tileSource = this.encodeStoreTile(encodeContext, tile);
 
         return tileSource ? [tileSource] : [];
       })
     );
 
-    this.finishTileSurfaceCommit(tileSources);
+    finish(tileSources);
     return Promise.resolve();
   }
 
-  async commitTileSurfaceAsync({ commitRevision, dirtyTiles }) {
+  /**
+   * The node's legitimate plane region in store coordinates: the node rect
+   * plus this commit's merged stroke bounds — or the artboard source rect
+   * for crop commits. Encoding clamps to it so store pixels that committed
+   * state has dropped (an earlier artboard crop) never resurface in a
+   * manifest.
+   */
+  getCommitClampBounds(node, sourceRect) {
+    const entry = this.storeEntry;
+
+    if (sourceRect) {
+      return {
+        maxX: sourceRect.x + sourceRect.width - entry.anchorX,
+        maxY: sourceRect.y + sourceRect.height - entry.anchorY,
+        minX: sourceRect.x - entry.anchorX,
+        minY: sourceRect.y - entry.anchorY,
+      };
+    }
+
+    const planeBounds = {
+      maxX: node.width - entry.anchorX,
+      maxY: node.height - entry.anchorY,
+      minX: -entry.anchorX,
+      minY: -entry.anchorY,
+    };
+
+    if (!this.mergedStoreBounds) {
+      return planeBounds;
+    }
+
+    return {
+      maxX: Math.max(planeBounds.maxX, this.mergedStoreBounds.maxX),
+      maxY: Math.max(planeBounds.maxY, this.mergedStoreBounds.maxY),
+      minX: Math.min(planeBounds.minX, this.mergedStoreBounds.minX),
+      minY: Math.min(planeBounds.minY, this.mergedStoreBounds.minY),
+    };
+  }
+
+  encodeStoreTile({ anchorX, anchorY, clampBounds, commitRevision }, tile) {
+    return createStoreTileSource({
+      anchorX,
+      anchorY,
+      assets: this.editor.rasterAssets,
+      clampBounds,
+      commitRevision,
+      nodeId: this.nodeId,
+      tile,
+    });
+  }
+
+  async encodeStoreTilesAsync(encodeContext) {
+    const { dirtyTiles } = encodeContext;
     const tileSources = [];
     let tileIndex = 0;
 
@@ -1093,14 +790,10 @@ class BrushStrokeSession {
         const startedAt = getNow();
 
         while (tileIndex < dirtyTiles.length) {
-          const tileSource = createTileSourceFromDirtyTile({
-            assets: this.editor.rasterAssets,
-            commitRevision,
-            nodeId: this.nodeId,
-            offsetX: this.initialSourceRect?.x || 0,
-            offsetY: this.initialSourceRect?.y || 0,
-            tile: dirtyTiles[tileIndex],
-          });
+          const tileSource = this.encodeStoreTile(
+            encodeContext,
+            dirtyTiles[tileIndex]
+          );
 
           tileIndex += 1;
 
@@ -1121,16 +814,25 @@ class BrushStrokeSession {
     }
 
     recordRasterDebugEvent("tileCommit.asyncEncoded", {
-      commitRevision,
+      commitRevision: encodeContext.commitRevision,
       encodedTileCount: tileSources.length,
       nodeId: this.nodeId,
       sessionId: this.sessionId,
     });
-    this.finishTileSurfaceCommit(tileSources);
+    return tileSources;
   }
 
-  finishTileSurfaceCommit(tileSources) {
-    if (tileSources.length === 0) {
+  finishStoreTileCommit({
+    anchorX,
+    anchorY,
+    pure,
+    replacedKeys,
+    sourceRect,
+    tileSources,
+  }) {
+    const entry = this.storeEntry;
+
+    if (tileSources.length === 0 && this.isNoOpCommit({ pure, replacedKeys })) {
       recordRasterDebugEvent("tileCommit.emptyEncodedTiles", {
         nodeId: this.nodeId,
         sessionId: this.sessionId,
@@ -1149,17 +851,31 @@ class BrushStrokeSession {
             return node;
           }
 
-          commitResult = this.createdTarget
-            ? getCreatedTiledImageNodeState({ node, tileSources })
-            : getNextTiledImageNodeState({ node, tileSources });
+          const nextTileSources = pure
+            ? getReplacedTileSources({
+                anchorX: entry.anchorX,
+                anchorY: entry.anchorY,
+                existingTileSources: node.tileSources || [],
+                replacedKeys,
+                tileSources,
+              })
+            : tileSources;
+
+          commitResult = getTiledImageCommitState({
+            node: sourceRect
+              ? getImageNodeCroppedToSourceRect(node, sourceRect)
+              : node,
+            tileSources: nextTileSources,
+            trimToTiles: this.createdTarget,
+          });
           return commitResult.node;
         });
       })
     );
 
     if (commitResult) {
-      this.storeEntry.anchorX += commitResult.offsetX;
-      this.storeEntry.anchorY += commitResult.offsetY;
+      entry.anchorX = anchorX + commitResult.offsetX;
+      entry.anchorY = anchorY + commitResult.offsetY;
     }
 
     this.recordRasterHistoryStep(
@@ -1177,109 +893,30 @@ class BrushStrokeSession {
     this.tool.clearActiveSession(this);
   }
 
-  commitFlatten() {
-    const node = this.editor.getNode(this.nodeId);
+  /**
+   * A commit that encoded nothing is a no-op only when it also removes
+   * nothing: a pure commit whose replaced keys match no existing entry
+   * (painting produced no visible pixels), or a brand-new layer that never
+   * got visible paint. Erase-to-empty and migrations of blank nodes still
+   * commit — they change the manifest.
+   */
+  isNoOpCommit({ pure, replacedKeys }) {
+    if (this.createdTarget) {
+      return true;
+    }
 
-    if (node?.type !== "image") {
-      this.editor.revertToMark(this.historyMark);
-      this.tool.clearActiveSession(this);
-      return Promise.resolve();
+    if (!pure) {
+      return false;
     }
 
     const entry = this.storeEntry;
-    const frameNode =
-      !this.preserveRasterPlane && this.initialSourceRect
-        ? getImageNodeCroppedToSourceRect(node, this.initialSourceRect)
-        : node;
-    const rect =
-      !this.preserveRasterPlane && this.initialSourceRect
-        ? this.initialSourceRect
-        : { height: node.height, width: node.width, x: 0, y: 0 };
-    const width = Math.max(1, Math.round(rect.width));
-    const height = Math.max(1, Math.round(rect.height));
-    const canvas = createCanvas(width, height);
-    const context = canvas?.getContext("2d", { willReadFrequently: true });
+    const node = this.editor.getNode(this.nodeId);
 
-    if (!(canvas && context)) {
-      this.editor.revertToMark(this.historyMark);
-      this.tool.clearActiveSession(this);
-      return Promise.resolve();
-    }
-
-    measurePerf("brush.commit.flatten", () =>
-      drawStoreTilesToCanvas({
-        anchorX: entry.anchorX,
-        anchorY: entry.anchorY,
-        context,
-        rect,
-        store: entry.store,
-      })
+    return !(node?.tileSources || []).some((tileSource) =>
+      replacedKeys.has(
+        getManifestEntryStoreKey(tileSource, entry.anchorX, entry.anchorY)
+      )
     );
-
-    let output = {
-      canvas,
-      height,
-      transform: frameNode.transform || {},
-      trimX: 0,
-      trimY: 0,
-      width,
-    };
-
-    if (!this.preserveRasterPlane) {
-      output =
-        getTrimmedFlattenState({ canvas, context, frameNode }) || output;
-    }
-
-    const flattenOriginX = rect.x + output.trimX;
-    const flattenOriginY = rect.y + output.trimY;
-
-    const src = measurePerf("brush.commit.encode", () =>
-      output.canvas.toDataURL("image/png")
-    );
-
-    measurePerf("brush.commit.updateNode", () =>
-      this.editor.run(() => {
-        this.editor.getState().updateNodeById(this.nodeId, (currentNode) => {
-          if (currentNode.type !== "image") {
-            return currentNode;
-          }
-
-          return {
-            ...currentNode,
-            baseHeight: output.height,
-            baseWidth: output.width,
-            baseX: 0,
-            baseY: 0,
-            height: output.height,
-            mimeType: "image/png",
-            src,
-            tileSources: undefined,
-            transform: this.preserveRasterPlane
-              ? currentNode.transform
-              : {
-                  ...currentNode.transform,
-                  ...output.transform,
-                },
-            width: output.width,
-          };
-        });
-      })
-    );
-    if (flattenOriginX || flattenOriginY) {
-      entry.anchorX -= flattenOriginX;
-      entry.anchorY -= flattenOriginY;
-    }
-
-    this.recordRasterHistoryStep(
-      this.editor.commitHistoryStep(this.historyMark)
-    );
-    recordRasterDebugEvent("commit.flatten.finish", {
-      node: getRasterDebugNodePayload(this.editor.getNode(this.nodeId)),
-      sessionId: this.sessionId,
-    });
-    this.completed = false;
-    this.tool.clearActiveSession(this);
-    return Promise.resolve();
   }
 
   /**

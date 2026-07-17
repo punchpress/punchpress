@@ -1049,6 +1049,21 @@ export class Editor {
     ];
   }
 
+  /**
+   * True while a brush or eraser session has an active pointer stroke,
+   * un-flushed stroke points, or a commit still merging/encoding. Heavy
+   * main-thread work outside the engine (scratchpad autosave packaging)
+   * defers on this so it never lands a hitch under a live drag or between a
+   * stroke and its settled commit.
+   */
+  hasPendingRasterWork() {
+    return Boolean(
+      this.tools.get("brush")?.hasInteractiveStrokeWork?.() ||
+        this.tools.get("eraser")?.hasInteractiveStrokeWork?.() ||
+        this.rasterStores.hasPendingCommits()
+    );
+  }
+
   getSelectionFrameKey(nodeIds = this.selectedNodeIds) {
     return getEditorSelectionFrameKey(this, nodeIds);
   }

@@ -396,6 +396,10 @@ export class RasterTileStore {
   }
 }
 
+/**
+ * Merge one stroke tile into the store. Returns the store tiles the merge
+ * wrote, so commits can re-encode exactly the touched tiles.
+ */
 export const mergeStrokeStoreTile = ({
   anchorX = 0,
   anchorY = 0,
@@ -520,6 +524,8 @@ export const mergeStrokeStoreTile = ({
     targetTile.revision += 1;
     store.markTileDirtyForPyramid(targetTile);
   }
+
+  return touchedTiles;
 };
 
 export const commitMergedStrokeBounds = ({

@@ -162,6 +162,15 @@ export const WorkspaceProvider = ({ children }) => {
     }
 
     const persistScratchpad = () => {
+      // Packaging is synchronous main-thread work (zip + base64 decode of
+      // tile payloads); landing it under a live brush drag or between a
+      // stroke and its settled commit drops frames. Defer until raster work
+      // goes quiet — the post-commit store change re-arms the debounce.
+      if (activeEditor.hasPendingRasterWork?.()) {
+        timeoutId = window.setTimeout(persistScratchpad, 400);
+        return;
+      }
+
       try {
         const packageBytes = createPunchPackage(
           activeEditor.serializeDocument(),

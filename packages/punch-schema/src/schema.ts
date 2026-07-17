@@ -221,7 +221,9 @@ export const tiledRasterAssetSchema = baseRasterAssetSchema
     baseRef: z.string().min(1).optional(),
     storage: z.literal("tiled"),
     tileSize: finiteNumber,
-    tiles: z.array(rasterAssetTileSchema).min(1),
+    // Empty is valid: a fully-erased raster layer keeps its (src-less) node
+    // with zero tile payloads.
+    tiles: z.array(rasterAssetTileSchema),
   })
   .strict();
 
