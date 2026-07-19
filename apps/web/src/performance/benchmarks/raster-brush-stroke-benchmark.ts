@@ -204,6 +204,124 @@ export const rasterBrushStrokeBenchmark = createRasterBrushStrokeBenchmark({
   viewport: { x: 1200, y: 1400, zoom: 0.055 },
 });
 
+const FIRST_CONTACT_WIDTH = 12_400;
+const FIRST_CONTACT_HEIGHT = 10_800;
+
+const createOpaqueBaseDocument = () => {
+  const canvas = document.createElement("canvas");
+
+  canvas.width = FIRST_CONTACT_WIDTH;
+  canvas.height = FIRST_CONTACT_HEIGHT;
+
+  const context = canvas.getContext("2d");
+
+  if (context) {
+    const gradient = context.createLinearGradient(
+      0,
+      0,
+      FIRST_CONTACT_WIDTH,
+      FIRST_CONTACT_HEIGHT
+    );
+
+    gradient.addColorStop(0, "#3355aa");
+    gradient.addColorStop(0.5, "#dd8844");
+    gradient.addColorStop(1, "#227755");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, FIRST_CONTACT_WIDTH, FIRST_CONTACT_HEIGHT);
+  }
+
+  return JSON.stringify({
+    nodes: [
+      {
+        height: FIRST_CONTACT_HEIGHT,
+        id: "raster-first-contact",
+        mimeType: "image/png",
+        name: "Opaque Base",
+        opacity: 1,
+        parentId: "root",
+        src: canvas.toDataURL("image/png"),
+        transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+        type: "image",
+        visible: true,
+        width: FIRST_CONTACT_WIDTH,
+      },
+    ],
+    version: "1.8",
+  });
+};
+
+/**
+ * First-contact cost on a large imported photo: the very first stroke on a
+ * cold (never-hydrated) opaque base. Lazy hydration must keep the stroke and
+ * its commit responsive — the merge hydrates only the tiles it touches while
+ * the rest of the base streams in the background, and the migration commit's
+ * full hydration plus encode run in budgeted chunks. Watch max frame.
+ */
+export const rasterBrushFirstContactBenchmark: PerformanceBenchmarkDefinition =
+  {
+    defaultOptions: {
+      frames: 120,
+      nodeCount: 1,
+      warmupFrames: 12,
+    },
+    description:
+      "Paints the first stroke on a cold 12400x10800 opaque base image and measures first-contact hydration, merge, and migration-commit frames.",
+    id: "raster-brush-first-contact",
+    label: "Raster Brush First Contact",
+    setup: async ({ editor, waitForFrames }) => {
+      editor.loadDocument(createOpaqueBaseDocument());
+      editor.select("raster-first-contact");
+      editor.setActiveTool("brush");
+      editor.setBrushSettings({
+        color: "#bb2233",
+        hardness: 1,
+        opacity: 1,
+        size: 300,
+        spacing: 0,
+      });
+
+      const viewport = { x: 1000, y: 1200, zoom: 0.08 };
+
+      editor.viewerRef?.setTo?.(viewport);
+      editor.setViewport(viewport);
+      editor.onViewportChange?.();
+      await waitForFrames(12);
+    },
+    run: async ({ editor, options, waitForFrame, waitForFrames }) => {
+      const brush = editor.tools.get("brush");
+      const node = editor.getNode("raster-first-contact");
+
+      if (!(brush && node)) {
+        throw new Error("Expected brush tool and raster node");
+      }
+
+      const pointsPerStroke = Math.max(
+        8,
+        (options.frames || 120) - SETTLE_FRAMES
+      );
+      const pointAt = (progress: number) => ({
+        x: FIRST_CONTACT_WIDTH * (0.1 + progress * 0.8),
+        y: FIRST_CONTACT_HEIGHT * (0.3 + progress * 0.4),
+      });
+      const session = brush.beginStroke({ node, point: pointAt(0) });
+
+      if (!session) {
+        throw new Error("Expected brush stroke session");
+      }
+
+      for (let step = 1; step < pointsPerStroke; step += 1) {
+        await waitForFrame();
+        session.update({ point: pointAt(step / (pointsPerStroke - 1)) });
+      }
+
+      const commitReady = session.complete({ point: pointAt(1) });
+
+      await waitForFrames(SETTLE_FRAMES);
+      await commitReady;
+    },
+    usesScratchDocument: true,
+  };
+
 export const rasterBrushStrokeHugeBenchmark = createRasterBrushStrokeBenchmark({
   brushSize: 1500,
   description:

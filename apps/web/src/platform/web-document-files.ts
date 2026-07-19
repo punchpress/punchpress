@@ -239,14 +239,19 @@ export const savePunchDocumentFile = async (
   baseName = DEFAULT_DOCUMENT_BASE_NAME,
   existingHandle: PunchDocumentHandle = null,
   forceDialog = false,
-  packageOptions: CreatePunchPackageOptions = {}
+  packageOptions: CreatePunchPackageOptions & {
+    /** Prepackaged bytes (from the package worker); skips sync packaging. */
+    packageBytes?: Uint8Array | null;
+  } = {}
 ): Promise<PunchFileSaveResult> => {
   const desktopDocumentFiles = getDesktopDocumentFiles();
   const defaultFileName = `${getDocumentBaseName(baseName)}${PUNCH_DOCUMENT_EXTENSION}`;
   const nextHandle = forceDialog ? null : existingHandle;
 
   if (desktopDocumentFiles) {
-    const packageContents = createPunchPackage(contents, packageOptions);
+    const packageContents =
+      packageOptions.packageBytes ??
+      createPunchPackage(contents, packageOptions);
     const result = await desktopDocumentFiles.saveDocument({
       contents: packageContents.buffer.slice(
         packageContents.byteOffset,
@@ -266,9 +271,13 @@ export const savePunchDocumentFile = async (
 
   try {
     const fileHandle = await fileSave(
-      new Blob([createPunchPackage(contents, packageOptions)], {
-        type: PUNCH_DOCUMENT_MIME_TYPE,
-      }),
+      new Blob(
+        [
+          packageOptions.packageBytes ??
+            createPunchPackage(contents, packageOptions),
+        ],
+        { type: PUNCH_DOCUMENT_MIME_TYPE }
+      ),
       {
         description: "PunchPress document",
         excludeAcceptAllOption: true,

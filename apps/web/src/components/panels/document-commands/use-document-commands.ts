@@ -3,6 +3,10 @@ import type { LocalFontDescriptor } from "@punchpress/punch-schema";
 import { MissingDocumentFontsError } from "@punchpress/punch-schema";
 import { useEffectEvent, useState } from "react";
 import { showToast } from "@/components/ui/toast";
+import {
+  collectRasterAssetPayloads,
+  createPunchPackageBytes,
+} from "@/platform/punch-package-client";
 import { importSvgToNodes } from "@/platform/svg-import-document";
 import {
   clearRecentPunchDocumentFiles,
@@ -159,22 +163,21 @@ export const useDocumentCommands = () => {
         return false;
       }
 
+      // Worker tile encodes must land before the manifest payloads are
+      // captured; packaging itself (zip + payload decode) runs in the
+      // package worker.
+      await tab.editor.rasterAssets.flush();
+
+      const packageBytes = await createPunchPackageBytes(
+        tab.editor.serializeDocument(),
+        collectRasterAssetPayloads(tab.editor)
+      );
       const result = await savePunchDocumentFile(
         tab.editor.serializeDocument(),
         tab.baseName,
         tab.fileHandle,
         forceDialog,
-        {
-          // getBytes() is where the deferred base64→byte decode actually
-          // lands: commits store raw data URLs, so save time is the first
-          // point anything needs decoded bytes.
-          getAssetBytes: (ref) => {
-            const entry = tab.editor.rasterAssets.get(ref);
-            const bytes = tab.editor.rasterAssets.getBytes(ref);
-
-            return entry && bytes ? { bytes, mimeType: entry.mimeType } : null;
-          },
-        }
+        { packageBytes }
       );
 
       if (result.canceled) {

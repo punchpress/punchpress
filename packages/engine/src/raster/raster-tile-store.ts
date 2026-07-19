@@ -12,6 +12,13 @@ export type RasterStoreTile = {
   y: number;
   width: number;
   height: number;
+  /**
+   * LRU recency stamp from a monotonic use counter shared across all stores.
+   * Bumped on every tile lookup — writes, merges, hydration, compositor
+   * reads all pass through getTile/getOrCreateTile — and read by the hot-tile
+   * budget's eviction scan.
+   */
+  lastUse: number;
   nominalX: number;
   nominalY: number;
   nominalWidth: number;
@@ -60,6 +67,53 @@ type DabWrite = {
 
 const getTileKey = (col: number, row: number) => `${col}:${row}`;
 
+/**
+ * Recycled pixel buffers from evicted standard-size tiles. Budgeted
+ * evict/rehydrate cycles on large layers otherwise allocate and free ~1 MB
+ * per tile in waves, and the resulting heap churn lands multi-second major
+ * GC pauses mid-commit. Bounded so the pool itself cannot hoard memory.
+ */
+const TILE_BUFFER_POOL_LIMIT = 64;
+const tileBufferPool: ArrayBuffer[] = [];
+
+const takePooledTileBuffer = (byteLength: number) => {
+  const buffer = tileBufferPool.pop();
+
+  if (!buffer || buffer.byteLength !== byteLength) {
+    if (buffer) {
+      tileBufferPool.push(buffer);
+    }
+
+    return new Uint8ClampedArray(byteLength);
+  }
+
+  const pixels = new Uint8ClampedArray(buffer);
+
+  pixels.fill(0);
+  return pixels;
+};
+
+const releaseTileBufferToPool = (pixels: Uint8ClampedArray) => {
+  if (
+    tileBufferPool.length < TILE_BUFFER_POOL_LIMIT &&
+    pixels.byteOffset === 0 &&
+    pixels.byteLength === pixels.buffer.byteLength &&
+    (tileBufferPool.length === 0 ||
+      tileBufferPool[0].byteLength === pixels.byteLength)
+  ) {
+    tileBufferPool.push(pixels.buffer as ArrayBuffer);
+  }
+};
+
+/** Shared monotonic use counter for LRU recency across all stores. */
+let rasterTileUseTick = 0;
+
+const touchTile = (tile: RasterStoreTile) => {
+  rasterTileUseTick += 1;
+  tile.lastUse = rasterTileUseTick;
+  return tile;
+};
+
 const getClampedBounds = (bounds: Bounds) => {
   const minX = Math.floor(bounds.minX);
   const minY = Math.floor(bounds.minY);
@@ -84,9 +138,27 @@ const unionBounds = (current: Bounds | null, next: Bounds): Bounds =>
     : next;
 
 export class RasterTileStore {
+  decodedBytes = 0;
   dirtyBounds: Bounds | null = null;
   dirtyLevelCoords = new Map<number, Set<string>>();
   gutter: number;
+  /**
+   * Tiles with committed content whose decoded pixels are not resident:
+   * either never decoded (lazy hydration index) or evicted under budget
+   * pressure (`evicted: true` — the pyramid still holds their content, so
+   * byte-exact rehydration need not re-dirty it). The manifest payload is
+   * the recovery source; per-tile hydration moves a key back into `tiles`.
+   */
+  hollowTiles = new Map<
+    string,
+    { col: number; evicted: boolean; row: number }
+  >();
+  /**
+   * Rehydration hook set by the owning store manager: a consumer that needs
+   * a hollow tile's pixels (compositor, pyramid rebuild) calls this to kick
+   * an async per-tile decode. Single-flighted by the manager.
+   */
+  onHollowTileNeeded: ((col: number, row: number) => void) | null = null;
   paintedBounds: Bounds | null = null;
   revision = 0;
   tiles = new Map<string, RasterStoreTile>();
@@ -105,7 +177,9 @@ export class RasterTileStore {
   }
 
   getTile(col: number, row: number) {
-    return this.tiles.get(getTileKey(col, row)) || null;
+    const tile = this.tiles.get(getTileKey(col, row));
+
+    return tile ? touchTile(tile) : null;
   }
 
   getOrCreateTile(col: number, row: number) {
@@ -113,7 +187,7 @@ export class RasterTileStore {
     const existingTile = this.tiles.get(key);
 
     if (existingTile) {
-      return existingTile;
+      return touchTile(existingTile);
     }
 
     const nominalX = col * this.tileSize;
@@ -124,12 +198,13 @@ export class RasterTileStore {
       col,
       floatPixels: null,
       height,
+      lastUse: 0,
       merged: false,
       nominalHeight: this.tileSize,
       nominalWidth: this.tileSize,
       nominalX,
       nominalY,
-      pixels: new Uint8ClampedArray(width * height * 4),
+      pixels: takePooledTileBuffer(width * height * 4),
       revision: 0,
       row,
       syncRect: null,
@@ -138,8 +213,98 @@ export class RasterTileStore {
       y: nominalY - this.gutter,
     };
     this.tiles.set(key, tile);
+    this.hollowTiles.delete(key);
+    this.decodedBytes += tile.pixels.byteLength;
     incrementPerfCounter("brush.tile.create");
-    return tile;
+    incrementPerfCounter("raster.hotTiles.bytes", tile.pixels.byteLength);
+    return touchTile(tile);
+  }
+
+  /**
+   * Index a tile as hollow: committed content exists behind it but no
+   * decoded pixels do. No-op when the tile is resident.
+   */
+  markHollowTile(col: number, row: number) {
+    const key = getTileKey(col, row);
+
+    if (!(this.tiles.has(key) || this.hollowTiles.has(key))) {
+      this.hollowTiles.set(key, { col, evicted: false, row });
+    }
+  }
+
+  getHollowTile(col: number, row: number) {
+    return this.hollowTiles.get(getTileKey(col, row)) || null;
+  }
+
+  isHollow(col: number, row: number) {
+    return this.hollowTiles.has(getTileKey(col, row));
+  }
+
+  /** Drop a hollow marker whose region turned out to own no content. */
+  clearHollowTile(col: number, row: number) {
+    this.hollowTiles.delete(getTileKey(col, row));
+  }
+
+  get hollowTileCount() {
+    return this.hollowTiles.size;
+  }
+
+  /**
+   * Drop a resident tile's decoded pixels; the tile becomes hollow and its
+   * manifest payload is the recovery source. Callers enforce the never-evict
+   * rules (unmerged stroke buffers, pending commit encodes) and pyramid
+   * ancestor coverage before calling.
+   */
+  evictTile(col: number, row: number) {
+    const key = getTileKey(col, row);
+    const tile = this.tiles.get(key);
+
+    if (!tile) {
+      return false;
+    }
+
+    this.tiles.delete(key);
+    this.hollowTiles.set(key, { col, evicted: true, row });
+    this.decodedBytes -= tile.pixels.byteLength;
+    releaseTileBufferToPool(tile.pixels);
+    incrementPerfCounter("raster.hotTiles.bytes", -tile.pixels.byteLength);
+    incrementPerfCounter("raster.tile.evict");
+    return true;
+  }
+
+  getHollowTilesForBounds(bounds: Bounds) {
+    const clampedBounds = getClampedBounds(bounds);
+
+    if (!clampedBounds || this.hollowTiles.size === 0) {
+      return [];
+    }
+
+    const minCol = Math.floor(
+      (clampedBounds.minX - this.gutter) / this.tileSize
+    );
+    const maxCol = Math.floor(
+      (clampedBounds.maxX - 1 + this.gutter) / this.tileSize
+    );
+    const minRow = Math.floor(
+      (clampedBounds.minY - this.gutter) / this.tileSize
+    );
+    const maxRow = Math.floor(
+      (clampedBounds.maxY - 1 + this.gutter) / this.tileSize
+    );
+    const hollow: Array<{ col: number; row: number }> = [];
+
+    for (const coords of this.hollowTiles.values()) {
+      if (
+        coords.col >= minCol &&
+        coords.col <= maxCol &&
+        coords.row >= minRow &&
+        coords.row <= maxRow
+      ) {
+        hollow.push(coords);
+      }
+    }
+
+    return hollow;
   }
 
   getTilesForBounds(bounds: Bounds, { create = true } = {}) {
@@ -508,6 +673,10 @@ export const mergeStrokeStoreTile = ({
   };
 
   for (const targetTile of touchedTiles) {
+    // Committed-merge marker: pre-full-hydration the compositor draws only
+    // tiles that hold merged commit content (hydration-only tiles would
+    // double-composite over the committed-DOM fallback beneath).
+    targetTile.merged = true;
     targetTile.floatPixels = null;
     targetTile.syncRect = unionBounds(targetTile.syncRect, {
       maxX: Math.min(

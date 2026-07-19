@@ -2,6 +2,7 @@ interface TileCanvasEntry {
   canvas: HTMLCanvasElement;
   context: CanvasRenderingContext2D;
   imageData: ImageData;
+  pixels: Uint8ClampedArray;
   revision: number;
 }
 
@@ -11,10 +12,17 @@ const tileCanvasCache = new WeakMap<object, TileCanvasEntry>();
  * Canvas snapshot of a store tile's pixels, cached per tile by revision.
  * This cache is the sole consumer of the store's per-tile sync rect:
  * snapshot it, clear it, and resync only the changed pixels. A missing rect
- * on a changed revision falls back to a full-tile resync.
+ * on a changed revision falls back to a full-tile resync. Eviction and
+ * rehydration replace the tile's pixel buffer wholesale, so a pixels
+ * identity change rebuilds the entry (its ImageData wraps the old buffer).
  */
 export const getTileCanvas = (tile) => {
   let entry = tileCanvasCache.get(tile);
+
+  if (entry && entry.pixels !== tile.pixels) {
+    tileCanvasCache.delete(tile);
+    entry = undefined;
+  }
 
   if (entry && entry.revision === tile.revision) {
     return entry.canvas;
@@ -40,6 +48,7 @@ export const getTileCanvas = (tile) => {
       canvas,
       context,
       imageData: new ImageData(tile.pixels, tile.width, tile.height),
+      pixels: tile.pixels,
       revision: -1,
     };
     tileCanvasCache.set(tile, entry);

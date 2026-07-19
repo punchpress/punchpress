@@ -5,6 +5,7 @@ import {
 } from "../primitives/rotation";
 import { createCanvas } from "../tools/brush-runtime";
 import type { RasterAssetStore } from "./raster-asset-store";
+import { encodeTilePixelsInWorker } from "./raster-encoder";
 import {
   RASTER_STORE_TILE_GUTTER,
   RASTER_STORE_TILE_SIZE,
@@ -53,6 +54,10 @@ export type EncodeTilePixels = (
 ) => string | null;
 
 const getStoreTileKey = (col: number, row: number) => `${col}:${row}`;
+
+/** Bytes of raw pixels retained for pending-encode sync materialization. */
+const PENDING_MATERIALIZE_BYTES_CAP = 64 * 1024 * 1024;
+let pendingMaterializeBytes = 0;
 
 /**
  * Store tile key for a manifest entry. Payloads cover their tile's physical
@@ -215,9 +220,11 @@ const getAlphaBoundsInRegion = (
 };
 
 /**
- * Default tile payload encoder: synchronous canvas toDataURL by design (the
- * async toBlob family intermittently kills the Chromium renderer under
- * concurrent large-commit load; off-thread encoding is the stage 5b worker).
+ * Fallback tile payload encoder: synchronous canvas toDataURL, used when the
+ * encode worker is unavailable (headless runtimes) or a pending ref must
+ * materialize synchronously. The async canvas toBlob family stays banned —
+ * it intermittently kills the Chromium renderer under concurrent
+ * large-commit load; the off-thread path is the pure-TS PNG worker.
  */
 export const encodeTilePixelsToPngDataUrl: EncodeTilePixels = (
   pixels,
@@ -314,17 +321,50 @@ export const createStoreTileSource = ({
     );
   }
 
-  const dataUrl = encodeTilePixels(pixels, width, height);
-
-  if (!dataUrl) {
-    return null;
-  }
-
   const x = tile.x + alphaBounds.minX + anchorX;
   const y = tile.y + alphaBounds.minY + anchorY;
   const ref = `assets/raster/${nodeId}/tiles/${commitRevision}_${tile.col}_${tile.row}.png`;
 
-  assets.putDataUrl(ref, dataUrl, "image/png");
+  // Off-thread PNG encode: the budgeted commit chunk only pays for the
+  // sub-rect copy above; the worker owns filter + deflate. The ref exists
+  // immediately as a pending asset entry — save/export flush the queue, and
+  // a sync consumer that cannot wait materializes through the fallback
+  // encoder over these retained pixels. Retention is capped: a huge commit
+  // queues gigabytes of sub-rect copies, and holding them all for the
+  // fallback would stall major GC — beyond the cap the pixels are released
+  // and a mid-flight sync consumer simply misses the ref until the worker
+  // lands it.
+  const workerEncode =
+    encodeTilePixels === encodeTilePixelsToPngDataUrl
+      ? encodeTilePixelsInWorker(pixels, width, height)
+      : null;
+
+  if (workerEncode) {
+    let materialize: () => string | null = () => null;
+
+    if (
+      pendingMaterializeBytes + pixels.byteLength <=
+      PENDING_MATERIALIZE_BYTES_CAP
+    ) {
+      const retainedBytes = pixels.byteLength;
+
+      pendingMaterializeBytes += retainedBytes;
+      workerEncode.finally(() => {
+        pendingMaterializeBytes -= retainedBytes;
+      });
+      materialize = () => encodeTilePixelsToPngDataUrl(pixels, width, height);
+    }
+
+    assets.putPending(ref, "image/png", workerEncode, materialize);
+  } else {
+    const dataUrl = encodeTilePixels(pixels, width, height);
+
+    if (!dataUrl) {
+      return null;
+    }
+
+    assets.putDataUrl(ref, dataUrl, "image/png");
+  }
 
   return {
     col: Math.floor(x / tileSize),

@@ -12,6 +12,14 @@ import {
  */
 export const RASTER_HISTORY_DEPTH = 20;
 
+/**
+ * Retained-bytes budget across all kept steps (before-rect copies plus
+ * retained stroke buffers). A huge stroke retains ~218 MB, so the count cap
+ * alone could hold multiple gigabytes; over budget the oldest steps evict
+ * first, through the same release fallback as depth eviction.
+ */
+export const RASTER_HISTORY_BYTES_BUDGET = 256 * 1024 * 1024;
+
 type Bounds = { maxX: number; maxY: number; minX: number; minY: number };
 
 type AnchorPoint = { x: number; y: number };
@@ -280,11 +288,17 @@ export const getRasterAffectedNodeIds = (change) => {
  * never collide with a live step; they age out through the depth cap.
  */
 export class RasterHistoryManager {
+  bytesBudget: number;
   depth: number;
   order: number[] = [];
   steps = new Map<number, RasterHistoryStep>();
+  totalBytes = 0;
 
-  constructor({ depth = RASTER_HISTORY_DEPTH }: { depth?: number } = {}) {
+  constructor({
+    bytesBudget = RASTER_HISTORY_BYTES_BUDGET,
+    depth = RASTER_HISTORY_DEPTH,
+  }: { bytesBudget?: number; depth?: number } = {}) {
+    this.bytesBudget = bytesBudget;
     this.depth = depth;
   }
 
@@ -328,10 +342,16 @@ export class RasterHistoryManager {
     this.evict(historyStepId);
     this.steps.set(historyStepId, step);
     this.order.push(historyStepId);
+    this.totalBytes += bytes;
     incrementPerfCounter("raster.history.bytes", bytes);
     incrementPerfCounter("raster.history.step");
 
-    while (this.order.length > this.depth) {
+    // Depth cap and bytes budget, oldest first. A single over-budget step
+    // evicts itself too — its undo takes the release fallback.
+    while (
+      this.order.length > 0 &&
+      (this.order.length > this.depth || this.totalBytes > this.bytesBudget)
+    ) {
       this.evict(this.order[0]);
     }
   }
@@ -350,6 +370,7 @@ export class RasterHistoryManager {
     }
 
     this.steps.delete(historyStepId);
+    this.totalBytes -= step.bytes;
     incrementPerfCounter("raster.history.bytes", -step.bytes);
     incrementPerfCounter("raster.history.evict");
   }
@@ -358,6 +379,30 @@ export class RasterHistoryManager {
     for (const historyStepId of [...this.order]) {
       this.evict(historyStepId);
     }
+  }
+
+  /**
+   * True when every tile this step's delta targets can take its write. A
+   * hollow target cannot (partial-rect writes need the rest of the tile's
+   * decoded content), and a captured before-rect needs its tile resident —
+   * an absent tile there means the store was rebuilt since the commit. Both
+   * fall back to releasing the node's store entry and rehydrating from the
+   * restored manifest. Zero-fill markers (`beforePixels: null`) allow absent
+   * tiles: a paint capture records them for store tiles the merge might not
+   * actually create.
+   */
+  canApplyToStore(step: RasterHistoryStep, store: RasterTileStore) {
+    for (const delta of step.tiles) {
+      if (store.isHollow(delta.col, delta.row)) {
+        return false;
+      }
+
+      if (delta.beforePixels && !store.getTile(delta.col, delta.row)) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   /**

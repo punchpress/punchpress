@@ -1,5 +1,5 @@
+import { measurePerf } from "@punchpress/engine";
 import {
-  createPunchPackage,
   DEFAULT_DOCUMENT_BASE_NAME,
   isPunchPackageBytes,
   loadPunchPackageContents,
@@ -8,6 +8,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createConfiguredEditor } from "@/editor-react/create-configured-editor";
 import { EditorContext } from "@/editor-react/editor-context";
 import { useEditorClipboardEvents } from "@/editor-react/use-editor-clipboard-events";
+import {
+  collectRasterAssetPayloads,
+  createPunchPackageBytes,
+} from "@/platform/punch-package-client";
 import { getDocumentBaseName } from "@/platform/web-document-files";
 import {
   loadScratchpadDocument,
@@ -161,38 +165,39 @@ export const WorkspaceProvider = ({ children }) => {
       return;
     }
 
+    let packageInFlight = false;
+
     const persistScratchpad = () => {
-      // Packaging is synchronous main-thread work (zip + base64 decode of
-      // tile payloads); landing it under a live brush drag or between a
-      // stroke and its settled commit drops frames. Defer until raster work
-      // goes quiet — the post-commit store change re-arms the debounce.
-      if (activeEditor.hasPendingRasterWork?.()) {
+      // Zip packaging runs in the package worker, but the manifest must be
+      // quiescent when it is captured: defer while a brush drag, commit
+      // merge/encode chunk, or worker tile encode is pending — the
+      // post-commit store change re-arms the debounce. One package at a
+      // time; a re-arm during an in-flight package retries after it lands.
+      if (activeEditor.hasPendingRasterWork?.() || packageInFlight) {
         timeoutId = window.setTimeout(persistScratchpad, 400);
         return;
       }
 
       try {
-        const packageBytes = createPunchPackage(
-          activeEditor.serializeDocument(),
-          {
-            // getBytes() is where the deferred base64→byte decode actually
-            // lands: commits store raw data URLs, so save time is the first
-            // point anything needs decoded bytes.
-            getAssetBytes: (ref) => {
-              const entry = activeEditor.rasterAssets.get(ref);
-              const bytes = activeEditor.rasterAssets.getBytes(ref);
+        packageInFlight = true;
 
-              return entry && bytes
-                ? { bytes, mimeType: entry.mimeType }
-                : null;
-            },
-          }
+        const packagePromise = measurePerf("workspace.autosave.capture", () =>
+          createPunchPackageBytes(
+            activeEditor.serializeDocument(),
+            collectRasterAssetPayloads(activeEditor)
+          )
         );
 
-        saveScratchpadDocument(packageBytes).catch((error) => {
-          console.error(error);
-        });
+        packagePromise
+          .then((packageBytes) => saveScratchpadDocument(packageBytes))
+          .catch((error) => {
+            console.error(error);
+          })
+          .finally(() => {
+            packageInFlight = false;
+          });
       } catch (error) {
+        packageInFlight = false;
         console.error(error);
       }
     };

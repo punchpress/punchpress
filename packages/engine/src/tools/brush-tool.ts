@@ -11,6 +11,7 @@ import {
   captureTileDeltasBeforeMerge,
   createStrokeCapture,
 } from "../raster/raster-history";
+import { scheduleRasterMemoryEnforcement } from "../raster/raster-memory";
 import {
   commitMergedStrokeBounds,
   mergeStrokeStoreTile,
@@ -516,7 +517,9 @@ class BrushStrokeSession {
       return;
     }
 
-    await this.ready;
+    // Merge does NOT await full hydration: it hydrates exactly the store
+    // tiles the stroke touches (inside mergeStrokeStoreBudgeted) while the
+    // background hydration kicked at session start keeps streaming the rest.
 
     // Commits serialize per node: encode reads merged store tiles, so a
     // later session's merge must never interleave with an earlier session's
@@ -563,6 +566,22 @@ class BrushStrokeSession {
       create: false,
     });
     let tileIndex = 0;
+
+    // Hydrate exactly the store tiles this merge will write (cold tiles
+    // decode from their manifest payloads; blank regions cost nothing).
+    // This must complete before the capture below copies before-rects —
+    // undo restores HYDRATED content, never a cold tile's zeros — and
+    // before erase merges reduce alpha against real pixels.
+    const node = this.editor.getNode(this.nodeId);
+
+    if (node?.type === "image") {
+      await this.editor.rasterStores.ensureTilesHydrated(node, {
+        maxX: strokeBounds.maxX - anchorX,
+        maxY: strokeBounds.maxY - anchorY,
+        minX: strokeBounds.minX - anchorX,
+        minY: strokeBounds.minY - anchorY,
+      });
+    }
 
     // Tile-delta history: the merge below is the only writer of committed
     // store pixels, so each target tile's about-to-be-written sub-rect is
@@ -642,13 +661,13 @@ class BrushStrokeSession {
    * node to the source rect and migrates within it); the old single-payload
    * flatten shape is gone.
    */
-  commitStoreTiles() {
+  async commitStoreTiles() {
     const node = this.editor.getNode(this.nodeId);
 
     if (node?.type !== "image") {
       this.editor.revertToMark(this.historyMark);
       this.tool.clearActiveSession(this);
-      return Promise.resolve();
+      return;
     }
 
     const entry = this.storeEntry;
@@ -666,6 +685,14 @@ class BrushStrokeSession {
         anchorX: entry.anchorX,
         anchorY: entry.anchorY,
       });
+
+    // A migration commit re-encodes every non-blank store tile, so the
+    // store must be complete truth first. Pure commits skip this: they only
+    // read tiles the merge just touched (and hydrated).
+    if (!pure) {
+      await this.editor.rasterStores.ensureHydrated(node);
+    }
+
     const clampBounds = this.getCommitClampBounds(node, sourceRect);
     const dirtyTiles = pure
       ? [...this.mergedStoreTiles]
@@ -708,7 +735,8 @@ class BrushStrokeSession {
       dirtyTiles.length > BRUSH_TILE_ASYNC_COMMIT_THRESHOLD;
 
     if (shouldCommitAsync) {
-      return this.encodeStoreTilesAsync(encodeContext).then(finish);
+      finish(await this.encodeStoreTilesAsync(encodeContext));
+      return;
     }
 
     const tileSources = measurePerf("brush.tile.commit.encode", () =>
@@ -720,7 +748,6 @@ class BrushStrokeSession {
     );
 
     finish(tileSources);
-    return Promise.resolve();
   }
 
   /**
@@ -881,6 +908,10 @@ class BrushStrokeSession {
     this.recordRasterHistoryStep(
       this.editor.commitHistoryStep(this.historyMark)
     );
+    // The merge (and any migration hydration) may have carried decoded
+    // bytes past the hot-tile budget while this store was pinned; trim now
+    // that the commit has settled.
+    scheduleRasterMemoryEnforcement();
     recordRasterDebugEvent("tileCommit.finish", {
       committedNode: getRasterDebugNodePayload(
         commitResult?.node || this.editor.getNode(this.nodeId)
@@ -1013,6 +1044,21 @@ export class BrushTool extends Tool {
   hasInteractiveStrokeWork() {
     for (const session of this.sessions) {
       if (!session.completed || session.hasPendingStrokeInput) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * True while a session targeting the node has an unmerged stroke buffer.
+   * The hot-tile budget never evicts such a node's store tiles: the pending
+   * merge composites against them.
+   */
+  hasUnmergedSessionForNode(nodeId) {
+    for (const session of this.sessions) {
+      if (session.nodeId === nodeId && !session.merged) {
         return true;
       }
     }

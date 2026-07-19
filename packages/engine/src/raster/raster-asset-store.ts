@@ -4,6 +4,17 @@ export type RasterAssetEntry = {
   bytes?: Uint8Array;
   dataUrl?: string;
   mimeType: string;
+  /**
+   * In-flight worker encode. The manifest ref exists as soon as the commit
+   * chunk posts the pixels; bytes land when the worker responds. A sync
+   * consumer that cannot wait (clipboard/export mid-encode) calls
+   * `materialize` — the synchronous fallback encoder over the retained
+   * pixels — and the first materialization wins so a ref always resolves to
+   * one stable payload.
+   */
+  pending?: {
+    materialize: () => string | null;
+  };
 };
 
 const canCreateObjectUrls = () =>
@@ -45,6 +56,8 @@ export class RasterAssetStore {
   >();
   private refUrls = new Map<string, string>();
   private contentUrls = new Map<string, string>();
+  private pendingCount = 0;
+  private pendingWaiters: Array<() => void> = [];
 
   put(ref: string, bytes: Uint8Array, mimeType: string) {
     // Object URLs may be shared across refs with identical payloads, so an
@@ -64,6 +77,100 @@ export class RasterAssetStore {
   putDataUrl(ref: string, dataUrl: string, mimeType: string) {
     this.refUrls.delete(ref);
     this.entries.set(ref, { dataUrl, mimeType });
+  }
+
+  /**
+   * Register a ref whose PNG bytes are being encoded off-thread. The entry
+   * resolves like any other once `encodePromise` lands; until then a sync
+   * accessor materializes through the fallback encoder. Save/export flows
+   * call `flush()` first so the worker bytes (not the fallback) are what
+   * persists.
+   */
+  putPending(
+    ref: string,
+    mimeType: string,
+    encodePromise: Promise<Uint8Array>,
+    materialize: () => string | null
+  ) {
+    this.refUrls.delete(ref);
+
+    const entry: RasterAssetEntry & { contentKey?: string } = {
+      mimeType,
+      pending: { materialize },
+    };
+
+    this.entries.set(ref, entry);
+    this.pendingCount += 1;
+
+    const settle = () => {
+      this.pendingCount -= 1;
+
+      if (this.pendingCount === 0) {
+        const waiters = this.pendingWaiters;
+
+        this.pendingWaiters = [];
+
+        for (const waiter of waiters) {
+          waiter();
+        }
+      }
+    };
+
+    encodePromise.then(
+      (bytes) => {
+        // A sync consumer may have materialized meanwhile; first successful
+        // materialization wins so the ref's payload never changes identity.
+        // A failed materialization (retention cap) leaves the entry empty,
+        // and the worker bytes still land.
+        if (
+          this.entries.get(ref) === entry &&
+          !(entry.bytes || entry.dataUrl)
+        ) {
+          entry.bytes = bytes;
+          entry.pending = undefined;
+        }
+
+        settle();
+      },
+      () => {
+        // Worker failure: fall back to the synchronous encoder so the ref
+        // still resolves.
+        if (this.entries.get(ref) === entry && entry.pending) {
+          this.materializePendingEntry(entry);
+        }
+
+        settle();
+      }
+    );
+  }
+
+  private materializePendingEntry(entry: RasterAssetEntry) {
+    if (!entry.pending) {
+      return;
+    }
+
+    const dataUrl = entry.pending.materialize();
+
+    entry.pending = undefined;
+
+    if (dataUrl) {
+      entry.dataUrl = dataUrl;
+    }
+  }
+
+  get hasPendingEncodes() {
+    return this.pendingCount > 0;
+  }
+
+  /** Resolves once every in-flight encode has landed. Save must await this. */
+  flush(): Promise<void> {
+    if (this.pendingCount === 0) {
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+      this.pendingWaiters.push(resolve);
+    });
   }
 
   get(ref: string): RasterAssetEntry | null {
@@ -88,6 +195,10 @@ export class RasterAssetStore {
 
     if (!entry) {
       return null;
+    }
+
+    if (entry.pending) {
+      this.materializePendingEntry(entry);
     }
 
     if (!entry.bytes) {
@@ -121,6 +232,12 @@ export class RasterAssetStore {
       return null;
     }
 
+    // Render paths must not force a main-thread encode: a pending ref simply
+    // has no URL yet (the store surface renders the merged tile meanwhile).
+    if (entry.pending) {
+      return null;
+    }
+
     const bytes = this.getBytes(ref);
 
     if (!bytes) {
@@ -151,6 +268,10 @@ export class RasterAssetStore {
 
     if (!entry) {
       return null;
+    }
+
+    if (entry.pending) {
+      this.materializePendingEntry(entry);
     }
 
     if (entry.dataUrl) {

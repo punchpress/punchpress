@@ -1,5 +1,5 @@
 import { getNodeScaleX } from "@punchpress/engine";
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { memo, useCallback, useLayoutEffect, useRef, useState } from "react";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
 import { CanvasRasterStoreSurface } from "./canvas-raster-store-surface";
@@ -522,7 +522,7 @@ const RasterTileImages = ({ tileSources }) => {
   ));
 };
 
-const CanvasTiledRasterImage = ({
+const CanvasTiledRasterImage = memo(function CanvasTiledRasterImageInner({
   baseHeight,
   baseWidth,
   baseX,
@@ -534,7 +534,7 @@ const CanvasTiledRasterImage = ({
   tileSources,
   transform,
   width,
-}) => {
+}) {
   const editor = useEditor();
   const cullState = useEditorSurfaceValue((currentEditor, state) =>
     getRasterTileCullState(currentEditor, state, nodeId, tileSources)
@@ -607,19 +607,50 @@ const CanvasTiledRasterImage = ({
       )}
     </g>
   );
-};
+});
 
 export const CanvasRasterImage = (props) => {
-  const storeState = useEditorSurfaceValue((editor) => {
-    const entry = editor.getRasterStoreEntry?.(props.nodeId);
+  const editor = useEditor();
+  const storeState = useEditorSurfaceValue((surfaceEditor) => {
+    const entry = surfaceEditor.getRasterStoreEntry?.(props.nodeId);
 
     return {
       exists: Boolean(entry),
       hydrated: Boolean(entry?.hydrated),
     };
   });
+  // While the store streams hydration, the committed-DOM fallback renders a
+  // manifest FROZEN at store-entry creation: the store surface above it
+  // draws every merged commit, and re-rendering the live manifest here
+  // would re-resolve thousands of just-replaced payload refs into object
+  // URLs (content hashing) on every commit — a multi-second frame on
+  // fully-brushed layers. Transform and opacity stay live via the wrapper.
+  const frozenFallbackRef = useRef(null);
+  const entry = editor.getRasterStoreEntry?.(props.nodeId) || null;
+
+  if (!entry) {
+    frozenFallbackRef.current = null;
+  } else if (frozenFallbackRef.current?.entry !== entry) {
+    frozenFallbackRef.current = {
+      entry,
+      props: {
+        baseHeight: props.baseHeight,
+        baseWidth: props.baseWidth,
+        baseX: props.baseX,
+        baseY: props.baseY,
+        height: props.height,
+        nodeId: props.nodeId,
+        src: props.src,
+        tileSources: props.tileSources,
+        width: props.width,
+      },
+    };
+  }
+
+  const fallbackProps = frozenFallbackRef.current?.props || props;
   const hasTileSources =
-    Array.isArray(props.tileSources) && props.tileSources.length > 0;
+    Array.isArray(fallbackProps.tileSources) &&
+    fallbackProps.tileSources.length > 0;
 
   if (storeState.hydrated) {
     return (
@@ -635,17 +666,17 @@ export const CanvasRasterImage = (props) => {
       <g opacity={props.opacity ?? 1} transform={props.transform || undefined}>
         {hasTileSources ? (
           <CanvasTiledRasterImage
-            {...props}
+            {...fallbackProps}
             opacity={1}
             transform={undefined}
           />
         ) : (
           <image
-            height={props.height}
-            href={props.src}
+            height={fallbackProps.height}
+            href={fallbackProps.src}
             pointerEvents="none"
             preserveAspectRatio="none"
-            width={props.width}
+            width={fallbackProps.width}
             x={0}
             y={0}
           />

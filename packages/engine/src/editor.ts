@@ -169,6 +169,7 @@ import { GeometryManager } from "./managers/geometry-manager";
 import { HistoryManager } from "./managers/history-manager";
 import { NodeTreeManager } from "./managers/node-tree-manager";
 import { RasterAssetStore } from "./raster/raster-asset-store";
+import { scheduleRasterMemoryEnforcement } from "./raster/raster-memory";
 import {
   getRasterAffectedNodeIds,
   RasterHistoryManager,
@@ -304,6 +305,12 @@ export class Editor {
     this.rasterHistory = new RasterHistoryManager();
     this.rasterStores = new RasterStoreManager({
       assets: this.rasterAssets,
+      getNode: (nodeId) => this.getNode(nodeId),
+      isNodePinned: (nodeId) =>
+        Boolean(
+          this.tools.get("brush")?.hasUnmergedSessionForNode?.(nodeId) ||
+            this.tools.get("eraser")?.hasUnmergedSessionForNode?.(nodeId)
+        ),
       onChange: () => this.notifyInteractionPreviewChanged(),
     });
     this.tools = new Map([
@@ -1051,16 +1058,17 @@ export class Editor {
 
   /**
    * True while a brush or eraser session has an active pointer stroke,
-   * un-flushed stroke points, or a commit still merging/encoding. Heavy
-   * main-thread work outside the engine (scratchpad autosave packaging)
-   * defers on this so it never lands a hitch under a live drag or between a
-   * stroke and its settled commit.
+   * un-flushed stroke points, a commit still merging/encoding, or worker
+   * tile encodes still in flight. Heavy work outside the engine (scratchpad
+   * autosave packaging) defers on this so it never lands a hitch under a
+   * live drag and never packages a manifest whose payloads are pending.
    */
   hasPendingRasterWork() {
     return Boolean(
       this.tools.get("brush")?.hasInteractiveStrokeWork?.() ||
         this.tools.get("eraser")?.hasInteractiveStrokeWork?.() ||
-        this.rasterStores.hasPendingCommits()
+        this.rasterStores.hasPendingCommits() ||
+        this.rasterAssets.hasPendingEncodes
     );
   }
 
@@ -2124,12 +2132,22 @@ export class Editor {
         continue;
       }
 
-      if (step && step.nodeId === nodeId && entry.hydrated) {
+      // A delta applies when every tile it targets has resident pixels —
+      // full hydration is not required (lazy hydration keeps streaming
+      // around the restored tiles), but a hollow target forces the release
+      // fallback since partial-rect writes need the rest of the tile.
+      if (
+        step &&
+        step.nodeId === nodeId &&
+        this.rasterHistory.canApplyToStore(step, entry.store)
+      ) {
         if (direction === "undo") {
           this.rasterHistory.applyUndo(step, entry);
         } else {
           this.rasterHistory.applyRedo(step, entry);
         }
+
+        scheduleRasterMemoryEnforcement();
         continue;
       }
 

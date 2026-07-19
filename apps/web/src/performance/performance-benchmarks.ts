@@ -14,6 +14,7 @@ import {
   largeSvgViewportBenchmark,
 } from "./benchmarks/large-svg-benchmark";
 import {
+  rasterBrushFirstContactBenchmark,
   rasterBrushStrokeBenchmark,
   rasterBrushStrokeHugeBenchmark,
 } from "./benchmarks/raster-brush-stroke-benchmark";
@@ -43,6 +44,7 @@ export const performanceBenchmarks = [
   hugeRasterViewportBenchmark,
   rasterBrushStrokeBenchmark,
   rasterBrushStrokeHugeBenchmark,
+  rasterBrushFirstContactBenchmark,
   compoundVectorDragBenchmark,
   idleSoakBenchmark,
   shapeDragBenchmarkLarge,

@@ -1,3 +1,4 @@
+import { RASTER_PYRAMID_MAX_LEVEL } from "@punchpress/engine";
 import { getTileCanvas } from "./raster-tile-canvas-cache";
 
 /** Local-px padding on the inverse-projected viewport when culling tiles. */
@@ -159,7 +160,9 @@ const drawPyramidLevel = (context, snap, pyramid, surface, entry, options) => {
   const minRow = Math.floor(bounds.minY / levelSpan);
   const maxRow = Math.floor((bounds.maxY - 1) / levelSpan);
 
-  pyramid.beginFrame();
+  // Pre-full-hydration the committed-DOM fallback renders beneath this
+  // surface, so even first builds may defer past the rebuild budget.
+  pyramid.beginFrame({ allowBlankDeferral: !surface.hydrated });
 
   for (let row = minRow; row <= maxRow; row += 1) {
     for (let col = minCol; col <= maxCol; col += 1) {
@@ -201,6 +204,78 @@ const drawPyramidLevel = (context, snap, pyramid, surface, entry, options) => {
   }
 };
 
+/**
+ * Nearest resident pyramid ancestor coverage for a hollow level-0 tile:
+ * draw the ancestor's sub-rect over the tile's nominal region (stale
+ * zoomed-out pixels beat a blank flash) while the per-tile rehydration
+ * decodes.
+ */
+const drawHollowTileFallback = (
+  context,
+  snap,
+  pyramid,
+  surface,
+  entry,
+  coords
+) => {
+  const tileSize = entry.store.tileSize;
+
+  for (let level = 1; level <= RASTER_PYRAMID_MAX_LEVEL; level += 1) {
+    const ancestorCol = Math.floor(coords.col / 2 ** level);
+    const ancestorRow = Math.floor(coords.row / 2 ** level);
+    const ancestor = pyramid.peekTile(level, ancestorCol, ancestorRow);
+
+    if (!ancestor) {
+      continue;
+    }
+
+    const levelSpan = tileSize * 2 ** level;
+    const sourceScale = ancestor.canvas.width / levelSpan;
+    const sourceX =
+      (coords.col * tileSize - ancestorCol * levelSpan) * sourceScale;
+    const sourceY =
+      (coords.row * tileSize - ancestorRow * levelSpan) * sourceScale;
+    const sourceSize = tileSize * sourceScale;
+    const minX = coords.col * tileSize + surface.anchorX;
+    const minY = coords.row * tileSize + surface.anchorY;
+
+    if (snap) {
+      const x0 = snap.x(minX);
+      const x1 = snap.x(minX + tileSize);
+      const y0 = snap.y(minY);
+      const y1 = snap.y(minY + tileSize);
+
+      if (x1 > x0 && y1 > y0) {
+        context.drawImage(
+          ancestor.canvas,
+          sourceX,
+          sourceY,
+          sourceSize,
+          sourceSize,
+          x0,
+          y0,
+          x1 - x0,
+          y1 - y0
+        );
+      }
+    } else {
+      context.drawImage(
+        ancestor.canvas,
+        sourceX,
+        sourceY,
+        sourceSize,
+        sourceSize,
+        minX,
+        minY,
+        tileSize,
+        tileSize
+      );
+    }
+
+    return;
+  }
+};
+
 const drawCommittedStore = (
   context,
   snap,
@@ -223,6 +298,11 @@ const drawCommittedStore = (
     minY: bounds.minY - surface.anchorY,
   };
   const pyramid = editor.rasterStores?.getPyramid?.(nodeId) || null;
+  // Level selection ignores hydration state on purpose: a zoomed-out merge
+  // on a still-streaming store can put thousands of merged tiles in view,
+  // and forcing them through level-0 canvas syncs costs seconds per
+  // repaint. The pyramid holds hydrated-plus-merged content, which is the
+  // right zoomed-out picture in both states.
   const level = pyramid ? pyramid.getLevelForScale(scale) : 0;
 
   if (pyramid && level > 0) {
@@ -236,6 +316,14 @@ const drawCommittedStore = (
   for (const tile of entry.store.getTilesForBounds(storeBounds, {
     create: false,
   })) {
+    // Pre-full-hydration only merged commit content draws at level 0: the
+    // committed-DOM fallback still renders beneath this surface, and
+    // re-drawing hydration-only tiles over it would double-composite
+    // semi-transparent regions.
+    if (!(surface.hydrated || tile.merged)) {
+      continue;
+    }
+
     drawTileNominalRegion(
       context,
       snap,
@@ -243,6 +331,23 @@ const drawCommittedStore = (
       surface.anchorX,
       surface.anchorY
     );
+  }
+
+  // Hollow tiles (evicted under the hot-tile budget): kick their async
+  // rehydration and cover with the nearest resident pyramid ancestor
+  // meanwhile. Blank flashes are a bug, not a loading state.
+  if (surface.hydrated) {
+    for (const coords of entry.store.getHollowTilesForBounds(storeBounds)) {
+      editor.rasterStores?.requestTileHydration?.(
+        nodeId,
+        coords.col,
+        coords.row
+      );
+
+      if (pyramid) {
+        drawHollowTileFallback(context, snap, pyramid, surface, entry, coords);
+      }
+    }
   }
 };
 
@@ -322,9 +427,10 @@ export const drawRasterSurface = (canvas, editor, nodeId, surface) => {
     context.imageSmoothingQuality = "high";
   }
 
-  if (surface.hydrated) {
-    drawCommittedStore(context, snap, editor, nodeId, surface, bounds, scale);
-  }
+  // Draw committed store content even before full hydration: lazy merges
+  // land tiles ahead of the background hydration stream, and their pending
+  // encodes mean the committed-DOM fallback below cannot render them yet.
+  drawCommittedStore(context, snap, editor, nodeId, surface, bounds, scale);
 
   drawStrokeOverlays(
     context,
@@ -333,4 +439,14 @@ export const drawRasterSurface = (canvas, editor, nodeId, surface) => {
     bounds
   );
   context.setTransform(1, 0, 0, 1, 0, 0);
+
+  // The pyramid rebuilds within a per-draw budget; when it served stale
+  // canvases, schedule another repaint so the remaining tiles refine.
+  const pyramid = editor.rasterStores?.getPyramid?.(nodeId);
+
+  if (pyramid?.hasDeferredRebuilds?.()) {
+    requestAnimationFrame(() => {
+      editor.notifyInteractionPreviewChanged?.();
+    });
+  }
 };

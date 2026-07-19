@@ -1,4 +1,3 @@
-import { decodeDataUrl } from "@punchpress/punch-schema";
 import type { RasterAssetStore } from "./raster-asset-store";
 
 /**
@@ -43,9 +42,13 @@ export const absorbInlineTileSources = <Node extends TransportNode>(
         }
 
         if (!assets.has(tileSource.ref)) {
-          const { bytes, mimeType } = decodeDataUrl(tileSource.src);
+          // Store the payload as-is: document load absorbs thousands of
+          // tiles, and the base64→byte decode defers to first access
+          // (save/export on the worker side, or tile hydration).
+          const mimeType =
+            /^data:([^;,]+)/.exec(tileSource.src)?.[1] || "image/png";
 
-          assets.put(tileSource.ref, bytes, mimeType);
+          assets.putDataUrl(tileSource.ref, tileSource.src, mimeType);
         }
 
         const { src: _src, ...manifestTileSource } = tileSource;

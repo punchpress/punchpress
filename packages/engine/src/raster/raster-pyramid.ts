@@ -1,9 +1,18 @@
-import { createCanvas } from "../tools/brush-runtime";
+import { createCanvas, getNow } from "../tools/brush-runtime";
 import {
   RASTER_PYRAMID_MAX_LEVEL,
   type RasterStoreTile,
   type RasterTileStore,
 } from "./raster-tile-store";
+
+/**
+ * Sync rebuild budget per draw pass. A whole-layer merge dirties every
+ * visible level tile at once, and rebuilding them all in one compositor
+ * draw was a multi-second frame; past the budget, stale tiles draw their
+ * previous canvas (stale zoomed-out content beats a hitch) and refine over
+ * the following frames.
+ */
+const PYRAMID_REBUILD_BUDGET_MS = 6;
 
 export { RASTER_PYRAMID_MAX_LEVEL };
 
@@ -70,9 +79,22 @@ const getStoreTileScratch = (tile: RasterStoreTile) => {
 export class RasterTilePyramid {
   private levels = new Map<number, Map<string, PyramidTile>>();
   private store: RasterTileStore;
+  private rebuildDeadline = Number.POSITIVE_INFINITY;
+  private allowBlankDeferral = false;
+  private deferredCount = 0;
+  private deferredRebuilds = false;
 
   constructor(store: RasterTileStore) {
     this.store = store;
+  }
+
+  /**
+   * True when the last draw pass ran out of rebuild budget and served stale
+   * canvases. The caller schedules another repaint so the remaining tiles
+   * refine.
+   */
+  hasDeferredRebuilds() {
+    return this.deferredRebuilds;
   }
 
   /** Instance seam so compositors reach level selection without an import. */
@@ -83,8 +105,15 @@ export class RasterTilePyramid {
   /**
    * Drain the store's per-level dirty coords and mark matching cached tiles
    * stale. Call once per repaint before any getTile calls.
+   * `allowBlankDeferral` lets even first builds (no previous canvas) defer
+   * past the budget — safe only while another layer covers the blanks (the
+   * committed-DOM fallback during initial hydration).
    */
-  beginFrame() {
+  beginFrame({ allowBlankDeferral = false } = {}) {
+    this.rebuildDeadline = getNow() + PYRAMID_REBUILD_BUDGET_MS;
+    this.allowBlankDeferral = allowBlankDeferral;
+    this.deferredRebuilds = false;
+
     for (let level = 1; level <= RASTER_PYRAMID_MAX_LEVEL; level += 1) {
       const dirtyCoords = this.store.takeDirtyLevelCoords(level);
 
@@ -124,57 +153,122 @@ export class RasterTilePyramid {
     let tile = cache.get(key);
 
     if (!tile || tile.stale) {
-      tile = this.buildTile(level, col, row, tile?.canvas || null);
+      // Over the per-draw rebuild budget, a stale tile keeps serving its
+      // previous canvas; a missing tile must build regardless (blank
+      // flashes are a bug) unless the caller declared blanks covered.
+      if (
+        getNow() >= this.rebuildDeadline &&
+        (tile?.canvas || this.allowBlankDeferral)
+      ) {
+        this.deferredRebuilds = true;
+        this.deferredCount += 1;
+        return tile?.canvas ? { canvas: tile.canvas } : null;
+      }
+
+      tile = this.buildTile(level, col, row, tile || null);
       cache.set(key, tile);
     }
 
     return tile.canvas ? { canvas: tile.canvas } : null;
   }
 
+  /**
+   * Cached tile canvas without building or rebuilding. The compositor's
+   * hollow-tile fallback reads through this: stale zoomed-out content beats
+   * a blank flash while a rehydration is in flight.
+   */
+  peekTile(level: number, col: number, row: number) {
+    const tile = this.levels.get(level)?.get(`${col}:${row}`);
+
+    return tile?.canvas ? { canvas: tile.canvas } : null;
+  }
+
+  /**
+   * Build a store tile's level-1 ancestor while the tile's pixels are still
+   * resident — called immediately before eviction so zoomed-out rendering
+   * keeps coverage once the tile goes hollow. Drains pending dirty coords
+   * first so the ancestor reflects the latest writes.
+   */
+  ensureBaseAncestor(col: number, row: number) {
+    this.beginFrame();
+    this.getTile(1, Math.floor(col / 2), Math.floor(row / 2));
+  }
+
   private buildTile(
     level: number,
     col: number,
     row: number,
-    reusableCanvas: HTMLCanvasElement | null
+    previousTile: PyramidTile | null
   ): PyramidTile {
     const tileSize = this.store.tileSize;
     const half = tileSize / 2;
-    let canvas = reusableCanvas;
-    let context: CanvasRenderingContext2D | null = null;
-
-    if (canvas) {
-      context = canvas.getContext("2d");
-      context?.clearRect(0, 0, tileSize, tileSize);
-    }
-
+    const deferredCountBefore = this.deferredCount;
+    let canvas = previousTile?.canvas || null;
+    let context: CanvasRenderingContext2D | null =
+      canvas?.getContext("2d") || null;
     let hasContent = false;
+    let lostHollowContent = false;
+    const ensureContext = () => {
+      if (!context) {
+        canvas = canvas || createCanvas(tileSize, tileSize);
+        context = canvas?.getContext("2d") || null;
+
+        if (context) {
+          context.imageSmoothingEnabled = true;
+          context.imageSmoothingQuality = "high";
+        }
+      }
+
+      return context;
+    };
 
     for (let quadrantRow = 0; quadrantRow < 2; quadrantRow += 1) {
       for (let quadrantCol = 0; quadrantCol < 2; quadrantCol += 1) {
         const childCol = col * 2 + quadrantCol;
         const childRow = row * 2 + quadrantRow;
+
+        // A hollow child's pixels are not resident: keep the previous
+        // canvas's quadrant (its content is still valid — eviction does not
+        // change committed content, and eviction pre-builds this ancestor).
+        // A hollow-from-birth child (initial hydration worklist) simply has
+        // no content yet; its hydration marks pyramid dirt, which re-marks
+        // this tile stale then. Only an EVICTED child with no previous
+        // canvas needs an on-demand rehydration and a stale retry — its
+        // byte-exact restore intentionally skips pyramid dirt.
+        if (level === 1 && this.store.isHollow(childCol, childRow)) {
+          if (previousTile?.canvas) {
+            hasContent = true;
+          } else if (this.store.getHollowTile(childCol, childRow)?.evicted) {
+            lostHollowContent = true;
+            this.store.onHollowTileNeeded?.(childCol, childRow);
+          }
+
+          continue;
+        }
+
         const source =
           level === 1
             ? this.getStoreTileSource(childCol, childRow)
             : this.getChildTileSource(level - 1, childCol, childRow);
 
         if (!source) {
+          context?.clearRect(quadrantCol * half, quadrantRow * half, half, half);
           continue;
         }
 
-        if (!context) {
-          canvas = canvas || createCanvas(tileSize, tileSize);
-          context = canvas?.getContext("2d") || null;
+        const targetContext = ensureContext();
 
-          if (!context) {
-            return { canvas: null, stale: false };
-          }
-
-          context.imageSmoothingEnabled = true;
-          context.imageSmoothingQuality = "high";
+        if (!targetContext) {
+          return { canvas: null, stale: false };
         }
 
-        context.drawImage(
+        targetContext.clearRect(
+          quadrantCol * half,
+          quadrantRow * half,
+          half,
+          half
+        );
+        targetContext.drawImage(
           source.canvas,
           source.sourceX,
           source.sourceY,
@@ -189,7 +283,12 @@ export class RasterTilePyramid {
       }
     }
 
-    return { canvas: hasContent ? canvas : null, stale: false };
+    return {
+      canvas: hasContent ? canvas : null,
+      // A build fed by a deferred (stale) child must itself stay stale so
+      // it rebuilds once the child refines.
+      stale: lostHollowContent || this.deferredCount > deferredCountBefore,
+    };
   }
 
   private getChildTileSource(level: number, col: number, row: number) {

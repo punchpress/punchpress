@@ -128,6 +128,11 @@ export {
   setPerfSink,
 } from "./perf/perf-hooks";
 export { PERF_COUNTERS, PERF_SPANS } from "./perf/perf-labels";
+export {
+  RASTER_HOT_TILE_BUDGET_BYTES,
+  setRasterHotTileBudgetBytes,
+} from "./raster/raster-memory";
+export { RASTER_PYRAMID_MAX_LEVEL } from "./raster/raster-tile-store";
 export type { PerfCounterName, PerfSpanLabel } from "./perf/perf-labels";
 export type { PerfSpanSample } from "./perf/perf-hooks";
 export {

@@ -70,4 +70,9 @@ export const disposeEditor = (editor) => {
   }
 
   editor.cancelPendingViewportFocus();
+  // Unregister this editor's stores from the global hot-tile budget and
+  // drop their decoded pixels — a background tab must not hold budget
+  // share. Asset bytes and raster history stay: the editor object survives
+  // dispose (tab switching re-mounts it) and stores rehydrate on contact.
+  editor.rasterStores?.releaseAll();
 };
