@@ -1,5 +1,5 @@
 ---
-summary: Describes the raster engine architecture: sparse tile store, signed tile coordinates, compositor data flow, mipmap pyramid, stroke lifecycle, persistence projection, tile-delta history, and the hot/cold tile memory model.
+summary: Describes the raster engine architecture: sparse tile store, signed tile coordinates, compositor data flow, mipmap pyramid, lazy per-tile hydration, worker PNG encode and packaging, tile-delta history budgets, and the hot-tile eviction memory model.
 read_when:
   - building or changing raster tools, tile storage, raster compositing, raster LOD, or raster undo
   - debugging wrong pixels, stale tiles, seams, missing zoom levels, or raster memory growth
@@ -10,9 +10,7 @@ read_when:
 
 The raster engine gives every raster layer one canonical runtime pixel
 representation and makes everything else a projection of it. Accepted in
-[Raster tile store pipeline](../decisions/raster-tile-store-pipeline.md);
-migration sequencing lives in the ephemeral
-[raster engine plan](raster-engine-plan.md).
+[Raster tile store pipeline](../decisions/raster-tile-store-pipeline.md).
 
 ```text
             writes dabs                    samples tiles + pyramid
@@ -38,9 +36,8 @@ One store per raster node. The store is derived runtime state: hydrated from
 assets, never serialized itself, safe to drop and rebuild.
 
 - Sparse map keyed by signed `(col, row)`. Only painted tiles exist.
-- A tile owns its decoded pixels: a canvas while hot, an `ImageBitmap` when
-  cooling, or nothing when evicted (encoded payload remains in the asset
-  store).
+- A tile owns its decoded pixels while resident; evicted or not-yet-decoded
+  tiles are hollow markers whose encoded payloads remain in the asset store.
 - Tiles carry a small gutter so anti-aliased dabs overlap neighbors instead of
   baking seams into tile edges.
 - Stroke-time float RGBA scratch buffers attach per touched tile and release at
@@ -131,14 +128,23 @@ Each store maintains downscaled levels for zoomed-out display.
 ## Stroke Lifecycle
 
 ```text
- pointerdown ─ open session, resolve target, mark history
+ pointerdown ─ open session, resolve target, kick background hydration
  pointermove ─ sample → dab into the session stroke buffer
              │   dirty rects accumulate → compositor repaints next frame
- pointerup   ─ merge stroke buffer into the store (budgeted chunks)
+ pointerup   ─ hydrate exactly the store tiles the merge touches (per-tile,
+             │   from manifest payloads), then merge the stroke buffer into
+             │   the store (budgeted chunks)
              │   first write of a store tile copies its before-rect (history)
              ├ record history delta (one entry per stroke)
-             └ queue dirty tiles for encode (no visual effect)
+             └ post dirty-tile pixels to the encode worker (no visual effect)
 ```
+
+First contact on a cold layer never waits for full hydration: the session
+kicks a background per-tile hydration stream (viewport-priority first) and
+the commit merge awaits only its own touched tiles. Undo capture happens
+after that per-tile hydration and before the merge write, so before-rects
+always hold hydrated content. Only a migration commit — one that re-encodes
+every non-blank tile — awaits the full stream.
 
 Brush and Eraser are the same writer with different compositing (paint adds
 color; erase reduces alpha and clips to the existing plane). Future raster
@@ -179,33 +185,51 @@ only when a new document loads.
 - Commits serialize per node: encode reads merged store tiles, so a later
   session's merge never interleaves with an earlier session's encode chunks
   on the same store.
-- Encoding is synchronous `toDataURL` for now — async
-  `toBlob`/`convertToBlob` intermittently kills the Chromium renderer under
-  concurrent large-commit load — and moves off-thread with stage 5b's encode
-  worker.
-- Commits store that `toDataURL` string as-is (`putDataUrl()`); the store
-  only decodes it to bytes lazily, on first `getBytes()`/`getObjectUrl()`
-  access. Nothing needs decoded bytes at commit time — save and export are
-  the first consumers — so the base64→byte decode never lands on the
-  frame-budgeted commit path.
-- Save writes manifest payloads into the package's tiled raster layout via
-  `createPunchPackage(contents, { getAssetBytes })` (see
+- Tile encoding runs in a dedicated Web Worker with a pure-TS PNG codec
+  (`raster-png.ts`: fixed Paeth filter + `CompressionStream` zlib) — no
+  canvas APIs anywhere. Canvas encode premultiplies alpha (lossy for
+  semi-transparent pixels), and the async canvas `toBlob`/`convertToBlob`
+  family intermittently kills the Chromium renderer under concurrent
+  large-commit load, so it stays banned. Commit chunks only copy the tile
+  sub-rect and post it; the synchronous `toDataURL` path survives solely as
+  the headless/worker-failure fallback.
+- A commit registers its manifest refs immediately as PENDING asset
+  entries; the worker bytes land asynchronously. `getBytes`/`getDataUrl`
+  materialize a pending ref synchronously through the fallback encoder
+  (first materialization wins; retained pixels for this are capped at
+  64 MB), render paths simply see no object URL until the encode lands, and
+  save flows call `rasterAssets.flush()` first so worker bytes are what
+  persists. `editor.hasPendingRasterWork()` covers pending encodes.
+- Packaging (zip + payload decode) runs in the app-side package worker
+  (`punch-package-client.ts`): autosave and manual save resolve asset
+  payloads on the main thread, then hand the serialized document to the
+  worker via `createPunchPackage(contents, { getAssetBytes })` (see
   [Punch package](../reference/punch-package.md)); the schema package never
-  reads editor internals.
+  reads editor internals. A sync fallback remains for headless runtimes.
 - Interchange forms are self-contained: hydrated package contents and
   clipboard payloads carry tile pixels as transport-only inline `src` data
-  URLs, which `editor.loadDocument` / paste absorb into the asset store and
-  strip before nodes reach editor state. Export inlines data URLs back out of
-  the store so exported markup renders outside the session.
-- Load hydrates the store lazily: decode the tiles the viewport needs first,
-  the rest on demand. Hydration runs in frame-budgeted chunks (~8 ms of sync
-  work per rAF); painting proceeds against the stroke buffer meanwhile, and
-  only the commit merge awaits full hydration.
+  URLs, which `editor.loadDocument` / paste absorb into the asset store
+  (as-is, bytes decoded lazily) and strip before nodes reach editor state.
+  Export inlines data URLs back out of the store so exported markup renders
+  outside the session.
+- Hydration is tile-major and lazy: `ensureHydrated` indexes every
+  payload-covered tile as hollow and streams per-tile decodes in the
+  background (viewport-priority first, frame-budgeted ~8 ms of sync work per
+  rAF), while `ensureTilesHydrated` decodes exactly the tiles a merge is
+  about to write. Engine-encoded PNG payloads decode through the byte-exact
+  raw path (`decodePngRgba`); anything else takes browser image decode.
+  Large multi-tile sources (imported photos) pre-rasterize once through
+  `createImageBitmap` into a staging canvas — per-tile `drawImage` from a
+  large image element re-decodes the whole source per call.
 - Commit-time merge and encode chunks run on rAF cadence and pause entirely
   while any brush session has an active pointer stroke or un-flushed points,
   so a previous stroke's commit never hitches the next stroke's drag.
 - Encode and decode timing have zero rendering consequences; the store is
-  always ahead of the assets, never behind.
+  always ahead of the assets, never behind. Before full hydration the
+  committed-DOM fallback renders beneath the store surface from a manifest
+  FROZEN at store-entry creation (the surface draws every merged commit on
+  top); at level 0 only merged tiles draw over it, and zoomed-out levels draw
+  the pyramid.
 
 ## History
 
@@ -231,12 +255,14 @@ history restores node state (src-less manifests); the editor-owned
   surface stays mounted through undo/redo.
 - Entries are keyed by a unique id stamped on each pushed document change
   (monotonic, never reused, immune to undo/redo branch divergence).
-- History size scales with touched tiles, not layer size, and is capped at
-  the most recent 20 raster commits (`raster.history.bytes` tracks retained
-  bytes). Undoing a step whose delta was evicted — or any non-brush step that
-  changed an image node's pixel-relevant state — releases only that node's
-  store entry and falls back to committed rendering until the next brush
-  contact rehydrates.
+- History size scales with touched tiles, not layer size, and is capped
+  twice: the most recent 20 raster commits (`RASTER_HISTORY_DEPTH`) and
+  256 MB of retained bytes (`RASTER_HISTORY_BYTES_BUDGET`), evicting oldest
+  first (`raster.history.bytes` tracks retained bytes). Undoing a step whose
+  delta was evicted, whose target tiles went hollow, or any non-brush step
+  that changed an image node's pixel-relevant state releases only that
+  node's store entry and falls back to committed rendering until the next
+  brush contact rehydrates.
 
 ## Memory Model
 
@@ -244,13 +270,31 @@ Decoded tiles are the dominant cost (a 512 px RGBA tile ≈ 1 MB).
 
 | Tile state | Holds | Transition |
 | --- | --- | --- |
-| Hot | Canvas (+ float scratch during a stroke) | Recently painted or visible |
-| Cold | ImageBitmap or nothing decoded | Evicted under budget pressure |
+| Resident | Decoded pixels (+ float scratch during a stroke) | Recently written, hydrated, or composited |
+| Hollow | Nothing decoded; `{col, row, evicted}` marker only | Never decoded yet, or evicted under budget pressure |
 | Persisted | Encoded payload in the asset store | Always, once committed |
 
-- A global hot-tile budget bounds decoded bytes; eviction prefers offscreen,
-  least-recently-used tiles.
-- Evicted tiles rehydrate through the decode worker when the viewport returns.
+- A global budget of **384 MB** (`RASTER_HOT_TILE_BUDGET_BYTES`) bounds
+  decoded level-0 bytes across every registered committed store. Every tile
+  lookup stamps a monotonic use tick; enforcement evicts least-recently-used
+  tiles in rAF-budgeted chunks until under budget.
+- Never evicted: tiles of a node with an unmerged stroke buffer, and tiles
+  of a store with a commit (merge or encode) queued or running. A pinned
+  store can carry the total past the budget until its commit settles.
+- Eviction pre-builds the tile's level-1 pyramid ancestor while pixels are
+  resident, then drops the pixels (buffers recycle through a bounded pool).
+  The tile's self-complete manifest payload is the recovery source.
+- The compositor meeting a hollow tile at level 0 enqueues an async per-tile
+  rehydration (frame-budgeted queue) and draws the nearest resident pyramid
+  ancestor meanwhile; blank flashes are a bug, not a loading state. The
+  raw-PNG rehydration path restores the exact pre-eviction bytes, so it does
+  not re-dirty the pyramid.
+- Pyramid rebuilds are themselves budgeted per draw pass: past the budget a
+  stale tile serves its previous canvas and refines over following frames,
+  so a whole-layer merge never lands a multi-second repaint.
+- Undo/redo apply their tile deltas only when every target tile is resident;
+  a hollow target falls back to releasing the node's store entry.
+- Retained history bytes have their own **256 MB** budget (see History).
 - Sparse allocation plus eviction is the 100k px story: only painted tiles
   exist, only useful tiles are decoded, and zoomed-out views read small
   pyramid levels instead of level-0 data.
@@ -271,7 +315,6 @@ Decoded tiles are the dominant cost (a 512 px RGBA tile ≈ 1 MB).
 ## Related
 
 - [Raster tile store pipeline](../decisions/raster-tile-store-pipeline.md)
-- [Raster engine plan](raster-engine-plan.md) — staged migration, retires when complete
 - [Raster image editor](raster-image-editor.md) — tool policy and target resolution
 - [Punch package](../reference/punch-package.md) — tiled raster asset format
 - [Export pipeline](export-pipeline.md)

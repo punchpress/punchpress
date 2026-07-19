@@ -98,4 +98,3 @@ Rules:
 - [Vector render surface pipeline](vector-render-surface-pipeline.md) — the
   same durable/derived/transient layering applied to vector artwork.
 - [Raster engine](../internals/raster-engine.md) — the architecture in depth.
-- [Raster engine plan](../internals/raster-engine-plan.md) — staged migration.

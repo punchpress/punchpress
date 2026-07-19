@@ -8,11 +8,11 @@ read_when:
 
 # Raster Brush Runtime
 
-This page describes the current working-surface runtime. The accepted
-replacement is the [raster tile store pipeline](../decisions/raster-tile-store-pipeline.md),
-migrated in stages by the [raster engine plan](raster-engine-plan.md). Do not
-extend the working-surface handoff; build new raster behavior against the tile
-store direction.
+This page describes the superseded working-surface runtime. The shipped
+replacement is the [raster engine](raster-engine.md) (accepted in the
+[raster tile store pipeline](../decisions/raster-tile-store-pipeline.md)).
+Do not extend the working-surface handoff; build new raster behavior against
+the tile store.
 
 The raster brush runtime is a working-surface system:
 
