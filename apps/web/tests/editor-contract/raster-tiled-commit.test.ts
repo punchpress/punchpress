@@ -944,7 +944,12 @@ describe("pure-tiled persistence", () => {
     expect(isPureTiledImageNode(node)).toBe(true);
 
     const packageBytes = createPunchPackage(editor.serializeDocument(), {
-      getAssetBytes: (ref) => editor.rasterAssets.get(ref),
+      getAssetBytes: (ref) => {
+        const entry = editor.rasterAssets.get(ref);
+        const bytes = editor.rasterAssets.getBytes(ref);
+
+        return entry && bytes ? { bytes, mimeType: entry.mimeType } : null;
+      },
     });
     const reloadedEditor = new Editor();
 
@@ -1009,7 +1014,12 @@ describe("pure-tiled persistence", () => {
     );
 
     const packageBytes = createPunchPackage(editor.serializeDocument(), {
-      getAssetBytes: (ref) => editor.rasterAssets.get(ref),
+      getAssetBytes: (ref) => {
+        const entry = editor.rasterAssets.get(ref);
+        const bytes = editor.rasterAssets.getBytes(ref);
+
+        return entry && bytes ? { bytes, mimeType: entry.mimeType } : null;
+      },
     });
     const reloadedEditor = new Editor();
 

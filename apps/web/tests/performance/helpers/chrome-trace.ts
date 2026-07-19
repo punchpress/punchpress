@@ -8,6 +8,9 @@ const TRACE_CATEGORIES = [
   "disabled-by-default-devtools.timeline",
   "scheduler",
   "toplevel",
+  "v8",
+  "v8.gc",
+  "disabled-by-default-v8.cpu_profiler",
 ].join(",");
 
 const readChromeTraceStream = async (

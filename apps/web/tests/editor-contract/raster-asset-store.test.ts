@@ -141,4 +141,72 @@ describe("RasterAssetStore", () => {
       expect(store.getObjectUrl("ref-a")).toBe(url);
     }
   );
+
+  test("pending encodes resolve to the worker bytes and flush() awaits them", async () => {
+    const store = new RasterAssetStore();
+    const workerBytes = createBytes(96, 11);
+    let resolveEncode: (bytes: Uint8Array) => void = () => undefined;
+    const encodePromise = new Promise<Uint8Array>((resolve) => {
+      resolveEncode = resolve;
+    });
+
+    store.putPending("ref-pending", "image/png", encodePromise, () => null);
+
+    expect(store.has("ref-pending")).toBe(true);
+    expect(store.hasPendingEncodes).toBe(true);
+    // Render paths never force a main-thread encode for a pending ref.
+    expect(store.getObjectUrl("ref-pending")).toBeNull();
+
+    const flushed = store.flush();
+
+    resolveEncode(workerBytes);
+    await flushed;
+
+    expect(store.hasPendingEncodes).toBe(false);
+    expect(store.getBytes("ref-pending")).toEqual(workerBytes);
+  });
+
+  test("a sync consumer materializes a pending ref through the fallback encoder, and the first materialization wins", async () => {
+    const store = new RasterAssetStore();
+    const fallbackBytes = createBytes(48, 3);
+    const fallbackDataUrl = encodeDataUrl(fallbackBytes, "image/png");
+    let resolveEncode: (bytes: Uint8Array) => void = () => undefined;
+    const encodePromise = new Promise<Uint8Array>((resolve) => {
+      resolveEncode = resolve;
+    });
+
+    store.putPending(
+      "ref-pending",
+      "image/png",
+      encodePromise,
+      () => fallbackDataUrl
+    );
+
+    // Sync access cannot wait for the worker: it materializes now.
+    expect(store.getBytes("ref-pending")).toEqual(fallbackBytes);
+
+    // The worker result must not change the ref's payload afterwards.
+    resolveEncode(createBytes(96, 11));
+    await store.flush();
+
+    expect(store.getBytes("ref-pending")).toEqual(fallbackBytes);
+  });
+
+  test("a failed worker encode falls back to the sync encoder", async () => {
+    const store = new RasterAssetStore();
+    const fallbackBytes = createBytes(32, 9);
+    const fallbackDataUrl = encodeDataUrl(fallbackBytes, "image/png");
+
+    store.putPending(
+      "ref-pending",
+      "image/png",
+      Promise.reject(new Error("worker crashed")),
+      () => fallbackDataUrl
+    );
+
+    await store.flush();
+
+    expect(store.hasPendingEncodes).toBe(false);
+    expect(store.getBytes("ref-pending")).toEqual(fallbackBytes);
+  });
 });

@@ -107,7 +107,7 @@ describe("raster pixels out of document state", () => {
     expect(JSON.stringify(node).length).toBeLessThan(4096);
 
     for (const [index, ref] of TILE_REFS.entries()) {
-      expect(editor.rasterAssets.get(ref)?.bytes).toEqual(
+      expect(editor.rasterAssets.getBytes(ref)).toEqual(
         createTileBytes(index + 3)
       );
     }
@@ -154,7 +154,7 @@ describe("raster pixels out of document state", () => {
       "data:image"
     );
     expect(serializedNode.length).toBeLessThan(4096);
-    expect(editor.rasterAssets.get(commitRef)?.bytes.length).toBe(
+    expect(editor.rasterAssets.getBytes(commitRef)?.length).toBe(
       TILE_BYTE_LENGTH
     );
 
@@ -175,7 +175,12 @@ describe("raster pixels out of document state", () => {
     editor.loadDocument(createTransportTiledDocument());
 
     const packageBytes = createPunchPackage(editor.serializeDocument(), {
-      getAssetBytes: (ref) => editor.rasterAssets.get(ref),
+      getAssetBytes: (ref) => {
+        const entry = editor.rasterAssets.get(ref);
+        const bytes = editor.rasterAssets.getBytes(ref);
+
+        return entry && bytes ? { bytes, mimeType: entry.mimeType } : null;
+      },
     });
     const reloadedEditor = new Editor();
 
@@ -194,7 +199,7 @@ describe("raster pixels out of document state", () => {
     });
 
     for (const [index, ref] of TILE_REFS.entries()) {
-      expect(reloadedEditor.rasterAssets.get(ref)?.bytes).toEqual(
+      expect(reloadedEditor.rasterAssets.getBytes(ref)).toEqual(
         createTileBytes(index + 3)
       );
     }
@@ -233,7 +238,7 @@ describe("raster pixels out of document state", () => {
     });
 
     for (const [index, ref] of TILE_REFS.entries()) {
-      expect(targetEditor.rasterAssets.get(ref)?.bytes).toEqual(
+      expect(targetEditor.rasterAssets.getBytes(ref)).toEqual(
         createTileBytes(index + 3)
       );
     }

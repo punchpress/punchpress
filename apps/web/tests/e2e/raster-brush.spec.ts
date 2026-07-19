@@ -621,6 +621,10 @@ const getCommittedImageSample = (page, samplePoint) => {
       return image;
     };
     const image = imageNode.src ? await loadImage(imageNode.src) : null;
+    // Committed payloads may still be encoding in the worker; sampling
+    // reads bytes, so it flushes the encode queue first, like save does.
+    await window.__PUNCHPRESS_EDITOR__?.rasterAssets?.flush?.();
+
     const tileImages = await Promise.all(
       (imageNode.tileSources || []).map(async (tile) => ({
         image: await loadImage(
@@ -756,6 +760,10 @@ const getCommittedImageSampleAtClientPoint = (page, clientPoint) => {
       return image;
     };
     const image = imageNode.src ? await loadImage(imageNode.src) : null;
+    // Committed payloads may still be encoding in the worker; sampling
+    // reads bytes, so it flushes the encode queue first, like save does.
+    await window.__PUNCHPRESS_EDITOR__?.rasterAssets?.flush?.();
+
     const tileImages = await Promise.all(
       (imageNode.tileSources || []).map(async (tile) => ({
         image: await loadImage(
@@ -1002,6 +1010,10 @@ const getCommittedTileSamples = (page, points) => {
       await loaded;
       return image;
     };
+    // Committed payloads may still be encoding in the worker; sampling
+    // reads bytes, so it flushes the encode queue first, like save does.
+    await window.__PUNCHPRESS_EDITOR__?.rasterAssets?.flush?.();
+
     const tileImages = await Promise.all(
       (imageNode.tileSources || []).map(async (tile) => ({
         image: await loadImage(
@@ -3939,6 +3951,17 @@ test("undoing the first brush stroke on an empty layer restores the empty layer"
       return selectedNode?.type;
     })
     .toBe("image");
+
+  // The stroke's commit must land before undo: materialization flips the
+  // node to "image" at pointerdown, and an undo that races the still-async
+  // commit pops addEmptyLayer instead of the stroke.
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        Boolean(window.__PUNCHPRESS_EDITOR__?.hasPendingRasterWork?.())
+      )
+    )
+    .toBe(false);
 
   await page.keyboard.press("ControlOrMeta+Z");
 
