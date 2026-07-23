@@ -105,6 +105,8 @@ export const createRasterDabGenerator = (
         throw new Error("Cannot append points to a finished Raster stroke");
       }
 
+      assertValidRasterPoints(points, lastInputPoint);
+
       const dabs: RasterDab[] = [];
 
       for (const point of points) {
@@ -153,6 +155,10 @@ const resampleSegment = ({
   const deltaY = end.y - start.y;
   const length = Math.hypot(deltaX, deltaY);
 
+  if (!Number.isFinite(length)) {
+    throw new Error("Raster segment length must be finite");
+  }
+
   if (length === 0) {
     return { distanceToNext, points: [] };
   }
@@ -192,8 +198,13 @@ const interpolatePoint = (
   y: roundCoordinate(start.y + (end.y - start.y) * progress),
 });
 
-const roundCoordinate = (value: number) =>
-  Math.round(value * 1_000_000_000_000) / 1_000_000_000_000;
+const roundCoordinate = (value: number) => {
+  const scaled = value * 1_000_000_000_000;
+
+  return Number.isFinite(scaled)
+    ? Math.round(scaled) / 1_000_000_000_000
+    : value;
+};
 
 const clonePoint = (point: RasterPoint): RasterPoint => ({
   x: roundCoordinate(point.x),
@@ -204,6 +215,28 @@ const pointsEqual = (
   first: RasterPoint,
   second: RasterPoint | null
 ): boolean => first.x === second?.x && first.y === second.y;
+
+const assertValidRasterPoints = (
+  points: readonly RasterPoint[],
+  previousPoint: RasterPoint | null
+) => {
+  let previous = previousPoint;
+
+  for (const point of points) {
+    if (!(Number.isFinite(point.x) && Number.isFinite(point.y))) {
+      throw new Error("Raster points must use finite coordinates");
+    }
+
+    if (
+      previous &&
+      !Number.isFinite(Math.hypot(point.x - previous.x, point.y - previous.y))
+    ) {
+      throw new Error("Raster segment length must be finite");
+    }
+
+    previous = point;
+  }
+};
 
 const cloneSettings = (settings: RasterStrokeSettings): RasterStrokeSettings => ({
   ...settings,

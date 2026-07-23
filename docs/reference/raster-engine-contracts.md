@@ -15,6 +15,8 @@ WebGPU, encoded images, package storage, or Workspace dimensions.
 ## Coordinates And Targets
 
 - Stroke points, Dab centers, Dab size, and target bounds use document units.
+- Stroke points require finite coordinates. Invalid append batches fail before
+  mutating generator state.
 - Spacing and smoothing settings are size multipliers. Their derived distances
   are document-space distances.
 - Effective Dab spacing has a one-document-unit floor. Hard tips use the full

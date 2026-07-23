@@ -176,4 +176,34 @@ describe("raster dab generation", () => {
 
     expect(dabs.at(-1)?.center).toEqual({ x: 100, y: 0 });
   });
+
+  test("rejects non-finite points before mutating generator state", () => {
+    const generator = createRasterDabGenerator(hardRoundSettings);
+
+    expect(() =>
+      generator.append([
+        { x: 0, y: 0 },
+        { x: Number.POSITIVE_INFINITY, y: 0 },
+      ])
+    ).toThrow("Raster points must use finite coordinates");
+    expect(generator.append([{ x: 5, y: 0 }])[0]?.center).toEqual({
+      x: 5,
+      y: 0,
+    });
+    expect(() => generator.append([{ x: Number.NaN, y: 10 }])).toThrow(
+      "Raster points must use finite coordinates"
+    );
+
+    const overflowGenerator = createRasterDabGenerator(hardRoundSettings);
+
+    expect(() =>
+      overflowGenerator.append([
+        { x: Number.MAX_VALUE, y: 0 },
+        { x: -Number.MAX_VALUE, y: 0 },
+      ])
+    ).toThrow("Raster segment length must be finite");
+    expect(
+      overflowGenerator.append([{ x: Number.MAX_VALUE, y: 0 }])[0]?.center
+    ).toEqual({ x: Number.MAX_VALUE, y: 0 });
+  });
 });
