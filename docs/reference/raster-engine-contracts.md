@@ -56,6 +56,24 @@ changes target or switches between `paint` and `erase`.
 The headless operation recorder implements this boundary for engine-contract
 tests. Browser rendering and persistence adapters remain separate consumers.
 
+### Canvas2D Adapter
+
+The browser adapter implements the same boundary for an existing
+single-payload Raster:
+
+- the injected runtime resolves a resident surface by target id and exact pixel
+  dimensions;
+- one stable canvas is both authoritative working memory and the presented node
+  surface;
+- Hard Round paints with native paths and Eraser uses `destination-out`;
+- transient rollback is captured as native dirty-rectangle canvas copies and
+  restored in reverse on cancel;
+- commit returns the clipped union dirty region without readback or encoding.
+
+The adapter rejects non-round or non-hard Dabs in this vertical surface. It
+never calls `getImageData`, `putImageData`, or PNG encoding while a Stroke is
+active.
+
 ## Brush Settings And Presets
 
 Stroke settings contain color, size, opacity, hardness, spacing, smoothing, and

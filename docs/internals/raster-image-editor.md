@@ -22,7 +22,9 @@ canvas buffers render through the raster renderer.
 | Raster worker | Decode, encode, and brush stroke application when work moves off the main thread. |
 | Export | Format-specific compositing, alpha preservation, and flattening. |
 
-Normal canvas rendering does not instantiate the raster-editing backend.
+Tiled and non-editable canvas rendering do not instantiate the resident
+Canvas2D adapter. Eligible single-payload Raster nodes do so because their
+presented canvas is also the live editing surface.
 
 ## Implementation Boundaries
 
@@ -39,6 +41,19 @@ Normal canvas rendering does not instantiate the raster-editing backend.
   rasterize flow exists.
 - The stroke session owns sampled points, dirty bounds, working-surface
   mutation, commit scheduling, and history completion for one active stroke.
+
+### Resident Canvas2D Surface
+
+The browser injects a Canvas2D Raster resolver when it constructs `Editor`.
+React prepares existing single-payload image nodes and mounts the adapter's
+stable canvas in the node render tree. The engine resolves that surface by
+finite target id and pixel dimensions; it does not import DOM or Canvas types.
+
+The initial resident path supports Hard Round paint and alpha-subtractive
+Eraser only. Stroke commit reports dirty pixels synchronously and releases the
+tool without PNG encoding. Source replacement, dirty-region history,
+autosave/package persistence, targeting/materialization breadth, Crop, presets,
+and tiled-runtime cutover belong to their owning follow-up layers.
 
 ## Durable Model
 

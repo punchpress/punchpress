@@ -27,6 +27,7 @@ and future clients should converge here instead of inventing parallel behavior.
 | Clipboard | `copySelection`, `pasteClipboardContent`, `pasteText`. |
 | History | undo, redo, commit history step, dirty/saved marks. |
 | Inspection | debug dump, selection properties, overlay state, node geometry, layer rows. |
+| Raster host | Constructor-injected `RasterSurfaceResolver` for finite browser or headless Raster targets. |
 
 ## Rules
 
@@ -35,3 +36,5 @@ and future clients should converge here instead of inventing parallel behavior.
   method or session model.
 - Keep DOM, pointer capture, native dialogs, and platform-specific file handles
   outside the engine facade.
+- Browser Raster canvas allocation, decode, and presentation stay behind the
+  injected surface resolver; the engine sees only finite Raster contracts.

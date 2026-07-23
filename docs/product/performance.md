@@ -21,6 +21,9 @@ move through real design work.
 - The app and automation share benchmark definitions.
 - Flame charts should use product and architecture labels rather than benchmark
   fixture labels.
+- Resident Raster strokes target 60 FPS, first visible feedback within 16.7 ms,
+  no more than two frames of visual lag, no Brush-owned main-thread stall over
+  50 ms, and pointer release within 50 ms.
 
 See [Performance HUD](performance-hud.md), [Benchmarks](benchmarks.md), and
 [Performance operations](../operations/performance.md).

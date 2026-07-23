@@ -158,6 +158,17 @@ inside those operations emit spans. If a benchmark needs to wrap a whole
 operation because no architectural span exists, add the span at the operation
 boundary instead.
 
+Raster adapter gates:
+
+| Scenario | Contract |
+| --- | --- |
+| `raster-canvas2d-strokes` | Runs pixel zoom, common Hard Round, large Eraser, and extreme zoom-out on one resident `4500 × 5400` Raster. |
+| `raster-canvas2d-extreme-diagonal` | Runs the full-target 4%-zoom diagonal alone for flame and browser-trace capture. |
+
+Raster spans cover surface decode, Stroke begin, first Dab, Dab application,
+commit, cancel, and pointer release. Counters report Dabs, dirty pixel area,
+direct-presentation updates, and visual-lag frames.
+
 Benchmarks are scenarios, not namespaces. If a scenario exposes missing
 instrumentation, fix the product boundary instead of inventing a benchmark-only
 span name.

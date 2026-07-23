@@ -1,12 +1,32 @@
 ---
-summary: Captures the raster brush runtime architecture, reference-editor learnings, and the direct working-surface invariants for huge tiled strokes.
+summary: Captures the finite resident Canvas2D Raster path, legacy brush runtime boundary, and direct working-surface invariants.
 read_when:
+  - changing resident Raster canvases, Canvas2D Stroke application, dirty regions, or cancel rollback
   - changing raster brush working surfaces, tiled stroke commit, dirty-tile scheduling, or raster LOD behavior
   - debugging huge brush strokes that flash, shift, disappear, seam, or lag during pointerup, zoom, or pan
   - comparing PunchPress raster behavior against tldraw, MyPaint, Krita, or PhotoDemon-style rendering pipelines
 ---
 
 # Raster Brush Runtime
+
+## Finite Canvas2D Path
+
+Existing single-payload Raster nodes prepare one resident browser canvas through
+an injected Raster runtime. That canvas decodes the hydrated source once,
+implements the engine `RasterSurface` contract, and remains the node's presented
+surface across Stroke begin, pointer movement, commit, and cancel.
+
+- Hard Round uses native Canvas2D paths with `source-over`.
+- Eraser uses the same Dabs with `destination-out`.
+- Each Dab batch captures its affected pixel rectangle through native
+  `drawImage`; cancel replays those patches in reverse.
+- Commit returns the union pixel dirty region. It does not encode or replace the
+  node source.
+- Pointer movement does not use JavaScript pixel loops, `getImageData`,
+  `putImageData`, or encoded-image handoff.
+
+Target creation, empty-layer materialization, tiled Raster behavior, history
+deltas, persistence, and export remain outside this resident-surface path.
 
 The raster brush runtime is a working-surface system:
 
