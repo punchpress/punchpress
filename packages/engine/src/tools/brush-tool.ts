@@ -81,6 +81,139 @@ const clamp = (value, min, max) => {
   return Math.min(max, Math.max(min, value));
 };
 
+const getPointToSegmentDistanceSquared = (point, startPoint, endPoint) => {
+  const deltaX = endPoint.x - startPoint.x;
+  const deltaY = endPoint.y - startPoint.y;
+  const lengthSquared = deltaX * deltaX + deltaY * deltaY;
+
+  if (lengthSquared === 0) {
+    return (
+      (point.x - startPoint.x) ** 2 + (point.y - startPoint.y) ** 2
+    );
+  }
+
+  const progress = clamp(
+    ((point.x - startPoint.x) * deltaX +
+      (point.y - startPoint.y) * deltaY) /
+      lengthSquared,
+    0,
+    1
+  );
+  const closestX = startPoint.x + progress * deltaX;
+  const closestY = startPoint.y + progress * deltaY;
+
+  return (point.x - closestX) ** 2 + (point.y - closestY) ** 2;
+};
+
+const getSegmentCrossProduct = (startPoint, endPoint, point) =>
+  (endPoint.x - startPoint.x) * (point.y - startPoint.y) -
+  (endPoint.y - startPoint.y) * (point.x - startPoint.x);
+
+const isPointOnSegment = (point, startPoint, endPoint) =>
+  Math.abs(getSegmentCrossProduct(startPoint, endPoint, point)) <=
+    Number.EPSILON &&
+  point.x >= Math.min(startPoint.x, endPoint.x) &&
+  point.x <= Math.max(startPoint.x, endPoint.x) &&
+  point.y >= Math.min(startPoint.y, endPoint.y) &&
+  point.y <= Math.max(startPoint.y, endPoint.y);
+
+const doSegmentsIntersect = (firstStart, firstEnd, secondStart, secondEnd) => {
+  const firstStartSide = getSegmentCrossProduct(
+    secondStart,
+    secondEnd,
+    firstStart
+  );
+  const firstEndSide = getSegmentCrossProduct(
+    secondStart,
+    secondEnd,
+    firstEnd
+  );
+  const secondStartSide = getSegmentCrossProduct(
+    firstStart,
+    firstEnd,
+    secondStart
+  );
+  const secondEndSide = getSegmentCrossProduct(
+    firstStart,
+    firstEnd,
+    secondEnd
+  );
+
+  if (
+    firstStartSide * firstEndSide < 0 &&
+    secondStartSide * secondEndSide < 0
+  ) {
+    return true;
+  }
+
+  return (
+    (firstStartSide === 0 &&
+      isPointOnSegment(firstStart, secondStart, secondEnd)) ||
+    (firstEndSide === 0 &&
+      isPointOnSegment(firstEnd, secondStart, secondEnd)) ||
+    (secondStartSide === 0 &&
+      isPointOnSegment(secondStart, firstStart, firstEnd)) ||
+    (secondEndSide === 0 &&
+      isPointOnSegment(secondEnd, firstStart, firstEnd))
+  );
+};
+
+const getSegmentDistanceSquared = (
+  firstStart,
+  firstEnd,
+  secondStart,
+  secondEnd
+) => {
+  if (doSegmentsIntersect(firstStart, firstEnd, secondStart, secondEnd)) {
+    return 0;
+  }
+
+  return Math.min(
+    getPointToSegmentDistanceSquared(firstStart, secondStart, secondEnd),
+    getPointToSegmentDistanceSquared(firstEnd, secondStart, secondEnd),
+    getPointToSegmentDistanceSquared(secondStart, firstStart, firstEnd),
+    getPointToSegmentDistanceSquared(secondEnd, firstStart, firstEnd)
+  );
+};
+
+const doesRoundStrokeIntersectCanvas = ({
+  canvas,
+  endPoint,
+  radius,
+  startPoint,
+}) => {
+  const isInside = (point) =>
+    point.x >= 0 &&
+    point.x <= canvas.width &&
+    point.y >= 0 &&
+    point.y <= canvas.height;
+
+  if (isInside(startPoint) || isInside(endPoint)) {
+    return true;
+  }
+
+  const topLeft = { x: 0, y: 0 };
+  const topRight = { x: canvas.width, y: 0 };
+  const bottomRight = { x: canvas.width, y: canvas.height };
+  const bottomLeft = { x: 0, y: canvas.height };
+  const radiusSquared = radius * radius;
+
+  return [
+    [topLeft, topRight],
+    [topRight, bottomRight],
+    [bottomRight, bottomLeft],
+    [bottomLeft, topLeft],
+  ].some(
+    ([edgeStart, edgeEnd]) =>
+      getSegmentDistanceSquared(
+        startPoint,
+        endPoint,
+        edgeStart,
+        edgeEnd
+      ) <= radiusSquared
+  );
+};
+
 const getBrushLayerExpansionPadding = (settings) => {
   return Math.max(
     2,
@@ -662,7 +795,16 @@ class BrushStrokeSession {
       ),
     };
 
-    if (bounds.minX >= bounds.maxX || bounds.minY >= bounds.maxY) {
+    if (
+      bounds.minX >= bounds.maxX ||
+      bounds.minY >= bounds.maxY ||
+      !doesRoundStrokeIntersectCanvas({
+        canvas,
+        endPoint,
+        radius: this.settings.size / 2,
+        startPoint,
+      })
+    ) {
       return;
     }
 

@@ -169,12 +169,20 @@ test("placed Raster stays clipped before and after reselection", async ({
   });
 
   const decoding = await placeAndStroke(page, src, "decoding");
+  const outsideCorner = await placeAndStroke(page, src, "decoding", "corner");
   const outside = await placeAndStroke(page, src, "decoding", "outside");
   const immediate = await placeAndStroke(page, src, "selected");
   const reselected = await placeAndStroke(page, src, "reselected");
 
   expect(immediate).toEqual(reselected);
   expect(outside).toMatchObject({
+    height: 64,
+    historyRevisionDelta: 0,
+    sourceChanged: false,
+    transform: { x: 320, y: 220 },
+    width: 64,
+  });
+  expect(outsideCorner).toMatchObject({
     height: 64,
     historyRevisionDelta: 0,
     sourceChanged: false,
@@ -203,7 +211,7 @@ const placeAndStroke = async (
   page: Page,
   src: string,
   mode: "decoding" | "reselected" | "selected",
-  stroke: "crossing" | "outside" = "crossing"
+  stroke: "corner" | "crossing" | "outside" = "crossing"
 ) => {
   return await page.evaluate(
     async ({ imageSource, placementMode, strokeMode }) => {
@@ -256,10 +264,21 @@ const placeAndStroke = async (
         { hardness: 1, opacity: 1, size: 24, spacing: 0 },
         "brush"
       );
-      const startPoint =
-        strokeMode === "outside" ? { x: 440, y: 340 } : { x: 352, y: 252 };
-      const endPoint =
-        strokeMode === "outside" ? { x: 460, y: 360 } : { x: 440, y: 340 };
+      const strokePoints = {
+        corner: {
+          endPoint: { x: 310, y: 210 },
+          startPoint: { x: 310, y: 210 },
+        },
+        crossing: {
+          endPoint: { x: 440, y: 340 },
+          startPoint: { x: 352, y: 252 },
+        },
+        outside: {
+          endPoint: { x: 460, y: 360 },
+          startPoint: { x: 440, y: 340 },
+        },
+      };
+      const { endPoint, startPoint } = strokePoints[strokeMode];
       const historyRevision = editor.history.currentRevision;
 
       const session =
