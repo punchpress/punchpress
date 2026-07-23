@@ -138,6 +138,14 @@ export {
   isInputElement,
   shouldIgnoreGlobalShortcutTarget,
 } from "./primitives/dom";
+export {
+  defineRasterBrushPreset,
+  PUNCHPRESS_RASTER_BRUSH_PRESET_VERSION,
+} from "./raster/brush-preset";
+export type {
+  RasterBrushPreset,
+  RasterBrushPresetSettings,
+} from "./raster/brush-preset";
 export { getResizeCorner } from "./primitives/group-resize";
 export { clamp, format, round, toNumber, toSafeHex } from "./primitives/math";
 export type { GestureTolerance } from "./primitives/pointer-distance";
@@ -164,6 +172,39 @@ export {
   normalizePathPointSelection,
   toPathPointKey,
 } from "./state/store/path/path-point-selection";
+export { createRasterDabGenerator } from "./raster/dab-generator";
+export {
+  compareRasterDabsExact,
+  compareRasterDabsTolerant,
+  RASTER_FIDELITY_FIXTURE_VERSION,
+} from "./raster/fidelity";
+export type {
+  RasterFidelityComparison,
+  RasterFidelityFixture,
+  RasterFidelityFixtureSuite,
+} from "./raster/fidelity";
+export { createRasterOperationRecorder } from "./raster/operation-recorder";
+export type {
+  RasterOperationRecorder,
+  RecordedRasterCommit,
+} from "./raster/operation-recorder";
+export { createRasterStroke } from "./raster/stroke";
+export type { RasterStroke } from "./raster/stroke";
+export type {
+  RasterBrushTip,
+  RasterCommit,
+  RasterDab,
+  RasterDirtyRegion,
+  RasterOperation,
+  RasterPixelSize,
+  RasterPoint,
+  RasterRect,
+  RasterStrokeContext,
+  RasterStrokeSettings,
+  RasterSurface,
+  RasterSurfaceSession,
+  RasterTarget,
+} from "./raster/contracts";
 export type { PenHoverIntent, PenHoverState } from "./tools/pen-tool-types";
 export {
   getNodeLocalMatrix,

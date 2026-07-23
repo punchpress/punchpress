@@ -225,5 +225,6 @@ dependency for the first Brush implementation.
 
 - [Image editing](../product/image-editing.md)
 - [Image nodes](../product/image-nodes.md)
+- [Raster engine contracts](../reference/raster-engine-contracts.md)
 - [Punch package](../reference/punch-package.md)
 - [Export pipeline](export-pipeline.md)
