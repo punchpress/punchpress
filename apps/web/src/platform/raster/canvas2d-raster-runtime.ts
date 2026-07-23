@@ -58,6 +58,11 @@ export const createCanvas2dRasterRuntime = (
   };
 
   return {
+    dispose: () => {
+      records.clear();
+      pending.clear();
+      listeners.clear();
+    },
     ensureSurface: async (input) => {
       const current = records.get(input.id);
 
@@ -68,6 +73,11 @@ export const createCanvas2dRasterRuntime = (
         current.presentation.height === input.height
       ) {
         return current.presentation;
+      }
+
+      if (current) {
+        records.delete(input.id);
+        notify();
       }
 
       const key = getSurfaceKey(input);
@@ -97,6 +107,27 @@ export const createCanvas2dRasterRuntime = (
       }
     },
     getPresentation: (targetId) => records.get(targetId)?.presentation || null,
+    retainTargets: (targetIds) => {
+      const retainedIds = new Set(targetIds);
+      let didChange = false;
+
+      for (const targetId of records.keys()) {
+        if (!retainedIds.has(targetId)) {
+          records.delete(targetId);
+          didChange = true;
+        }
+      }
+
+      for (const targetId of pending.keys()) {
+        if (!retainedIds.has(targetId)) {
+          pending.delete(targetId);
+        }
+      }
+
+      if (didChange) {
+        notify();
+      }
+    },
     resolveSurface: (target) => {
       const record = records.get(target.id);
 

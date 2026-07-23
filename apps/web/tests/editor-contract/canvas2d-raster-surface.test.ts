@@ -27,6 +27,69 @@ const target: RasterTarget = {
 };
 
 describe("Canvas2D Raster surface", () => {
+  test("invalidates a stale presentation while decoding a replacement", async () => {
+    const browser = createFakeCanvasBrowser();
+    const runtime = createCanvas2dRasterRuntime(browser.capabilities);
+
+    await runtime.ensureSurface({
+      height: target.pixelSize.height,
+      id: target.id,
+      src: "data:image/png;base64,first",
+      width: target.pixelSize.width,
+    });
+
+    let finishDecode: ((image: CanvasImageSource) => void) | null = null;
+
+    browser.capabilities.decodeImage = () =>
+      new Promise((resolve) => {
+        finishDecode = resolve;
+      });
+
+    const replacement = runtime.ensureSurface({
+      height: target.pixelSize.height,
+      id: target.id,
+      src: "data:image/png;base64,replacement",
+      width: target.pixelSize.width,
+    });
+
+    expect(runtime.getPresentation(target.id)).toBeNull();
+    expect(runtime.resolveSurface(target)).toBeNull();
+
+    finishDecode?.({ decoded: true } as unknown as CanvasImageSource);
+    await replacement;
+
+    expect(runtime.getPresentation(target.id)).not.toBeNull();
+  });
+
+  test("releases surfaces that leave the mounted editor lifecycle", async () => {
+    const browser = createFakeCanvasBrowser();
+    const runtime = createCanvas2dRasterRuntime(browser.capabilities);
+
+    await Promise.all([
+      runtime.ensureSurface({
+        height: target.pixelSize.height,
+        id: target.id,
+        src: "data:image/png;base64,first",
+        width: target.pixelSize.width,
+      }),
+      runtime.ensureSurface({
+        height: 10,
+        id: "removed-raster",
+        src: "data:image/png;base64,second",
+        width: 10,
+      }),
+    ]);
+
+    runtime.retainTargets?.([target.id]);
+
+    expect(runtime.getPresentation(target.id)).not.toBeNull();
+    expect(runtime.getPresentation("removed-raster")).toBeNull();
+
+    runtime.dispose?.();
+
+    expect(runtime.getPresentation(target.id)).toBeNull();
+  });
+
   test("can retry a failed source decode", async () => {
     const browser = createFakeCanvasBrowser();
     let decodeCount = 0;
@@ -145,7 +208,7 @@ describe("Canvas2D Raster surface", () => {
 });
 
 describe("Editor Raster surface injection", () => {
-  test("leaves soft strokes on the legacy path", () => {
+  test("leaves soft and translucent strokes on the legacy path", () => {
     let resolveCount = 0;
     const editor = new Editor({
       rasterSurface: {
@@ -172,7 +235,46 @@ describe("Editor Raster surface injection", () => {
       point: { x: 25, y: 30 },
     });
 
+    editor.setBrushSettings({ hardness: 1, opacity: 0.5 }, "brush");
+    editor.currentTool.onNodePointerDown({
+      node,
+      point: { x: 25, y: 30 },
+    });
+
     expect(resolveCount).toBe(0);
+  });
+
+  test("reconciles retained Raster targets through editor mount and dispose", () => {
+    const retainedTargets: string[][] = [];
+    let disposeCount = 0;
+    const editor = new Editor({
+      rasterSurface: {
+        dispose: () => {
+          disposeCount += 1;
+        },
+        resolveSurface: () => null,
+        retainTargets: (targetIds) => {
+          retainedTargets.push([...targetIds]);
+        },
+      },
+    });
+    const node = {
+      ...createDefaultImageNode({
+        height: 100,
+        src: "data:image/png;base64,existing",
+        width: 100,
+      }),
+      id: target.id,
+    };
+
+    editor.mount();
+    editor.insertNodes([node]);
+    editor.deleteNode(node.id);
+    editor.dispose();
+
+    expect(retainedTargets).toContainEqual([node.id]);
+    expect(retainedTargets.at(-1)).toEqual([]);
+    expect(disposeCount).toBe(1);
   });
 
   test("routes an existing single-payload image stroke through the injected surface", () => {

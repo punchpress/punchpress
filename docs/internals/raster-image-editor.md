@@ -45,9 +45,10 @@ presented canvas is also the live editing surface.
 ### Resident Canvas2D Surface
 
 The browser injects a Canvas2D Raster resolver when it constructs `Editor`.
-React prepares existing single-payload image nodes and mounts the adapter's
-stable canvas in the node render tree. The engine resolves that surface by
-finite target id and pixel dimensions; it does not import DOM or Canvas types.
+React prepares existing, full-plane, single-payload image nodes and mounts the
+adapter's stable canvas in the node render tree. The engine resolves that
+surface by finite target id and pixel dimensions; it does not import DOM or
+Canvas types. Cropped/base-frame images stay on the existing path.
 
 The initial resident path supports Hard Round paint and alpha-subtractive
 Eraser only. Stroke commit reports dirty pixels synchronously and releases the

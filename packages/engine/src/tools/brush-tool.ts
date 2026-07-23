@@ -1792,6 +1792,11 @@ export class BrushTool extends Tool {
         node.src &&
         !(node.tileSources || []).length &&
         settings.hardness === 1 &&
+        settings.opacity === 1 &&
+        (node.baseX ?? 0) === 0 &&
+        (node.baseY ?? 0) === 0 &&
+        (node.baseWidth ?? node.width) === node.width &&
+        (node.baseHeight ?? node.height) === node.height &&
         this.editor.getNode(node.id)?.type === "image"
       )
     ) {

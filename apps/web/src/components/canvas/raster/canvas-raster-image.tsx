@@ -1051,6 +1051,10 @@ export const CanvasRasterImage = (props) => {
 };
 
 const useResidentRasterSurface = ({
+  baseHeight,
+  baseWidth,
+  baseX,
+  baseY,
   height,
   nodeId,
   src,
@@ -1060,7 +1064,12 @@ const useResidentRasterSurface = ({
   const editor = useEditor();
   const runtime = editor.rasterSurface;
   const isEligible =
-    Boolean(src) && !(Array.isArray(tileSources) && tileSources.length > 0);
+    Boolean(src) &&
+    !(Array.isArray(tileSources) && tileSources.length > 0) &&
+    (baseX ?? 0) === 0 &&
+    (baseY ?? 0) === 0 &&
+    (baseWidth ?? width) === width &&
+    (baseHeight ?? height) === height;
   const subscribe = useCallback(
     (listener) => runtime?.subscribe?.(listener) || (() => undefined),
     [runtime]
