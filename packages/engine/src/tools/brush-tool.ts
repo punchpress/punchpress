@@ -359,24 +359,19 @@ const getTileSourcesRenderKey = (tileSources = []) =>
   tileSources.map((tileSource) => tileSource.ref).join("|");
 
 const getTiledBaseFrame = (node) => {
-  if ((node.tileSources || []).length > 0) {
-    return {
-      baseHeight: node.baseHeight ?? node.height,
-      baseWidth: node.baseWidth ?? node.width,
-      baseX: node.baseX ?? 0,
-      baseY: node.baseY ?? 0,
-    };
-  }
-
   return {
-    baseHeight: node.height,
-    baseWidth: node.width,
-    baseX: 0,
-    baseY: 0,
+    baseHeight: node.baseHeight ?? node.height,
+    baseWidth: node.baseWidth ?? node.width,
+    baseX: node.baseX ?? 0,
+    baseY: node.baseY ?? 0,
   };
 };
 
-const getNextTiledImageNodeState = ({ node, tileSources }) => {
+const getNextTiledImageNodeState = ({
+  node,
+  preserveRasterPlane,
+  tileSources,
+}) => {
   const nextTileSourcesByRef = new Map(
     (node.tileSources || []).map((tileSource) => [tileSource.ref, tileSource])
   );
@@ -387,6 +382,16 @@ const getNextTiledImageNodeState = ({ node, tileSources }) => {
 
   const existingTileSources = [...nextTileSourcesByRef.values()];
   const baseFrame = getTiledBaseFrame(node);
+
+  if (preserveRasterPlane) {
+    return {
+      ...node,
+      ...baseFrame,
+      mimeType: "image/png",
+      tileSources: existingTileSources,
+    };
+  }
+
   const currentNode = {
     ...node,
     ...baseFrame,
@@ -607,7 +612,10 @@ class BrushStrokeSession {
   }
 
   getInitialLocalPoint(point) {
-    if (!(this.initialSourceRect || this.preserveRasterPlane)) {
+    if (
+      this.tileSurface ||
+      !(this.initialSourceRect || this.preserveRasterPlane)
+    ) {
       return point;
     }
 
@@ -1056,9 +1064,11 @@ class BrushStrokeSession {
   }
 
   getCanvasWritablePolygon() {
+    const offset = this.tileSurface ? { x: 0, y: 0 } : this.canvasOffset;
+
     return this.writablePolygon?.map((point) => ({
-      x: point.x - this.canvasOffset.x,
-      y: point.y - this.canvasOffset.y,
+      x: point.x - offset.x,
+      y: point.y - offset.y,
     }));
   }
 
@@ -1535,7 +1545,11 @@ class BrushStrokeSession {
             return node;
           }
 
-          committedNode = getNextTiledImageNodeState({ node, tileSources });
+          committedNode = getNextTiledImageNodeState({
+            node,
+            preserveRasterPlane: this.preserveRasterPlane,
+            tileSources,
+          });
           return committedNode;
         });
       })
@@ -1911,7 +1925,7 @@ class BrushStrokeSession {
 
     const localPoint = getImageLocalPoint(node, point);
 
-    return this.preserveRasterPlane
+    return this.preserveRasterPlane && !this.tileSurface
       ? {
           x: localPoint.x - this.canvasOffset.x,
           y: localPoint.y - this.canvasOffset.y,

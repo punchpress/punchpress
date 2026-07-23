@@ -190,7 +190,7 @@ export const CanvasRasterCropOverlay = () => {
   };
 
   return (
-    <div data-raster-crop-overlay="true">
+    <div data-raster-crop-root="true">
       <div className="pointer-events-none absolute -inset-[80000px] z-40 bg-black/45" />
       <div
         className="absolute z-50 overflow-visible"
@@ -248,6 +248,7 @@ export const CanvasRasterCropOverlay = () => {
           aria-label="Move Crop bounds"
           className="absolute cursor-move bg-transparent"
           data-raster-crop-handle="move"
+          data-raster-crop-overlay="true"
           onPointerDown={(event) =>
             startCropDrag({ editor, event, handle: "move", node, rect })
           }
@@ -275,6 +276,7 @@ export const CanvasRasterCropOverlay = () => {
                   : "absolute border-[var(--canvas-selected)] border-t-2 border-l-2 bg-transparent"
               }
               data-raster-crop-handle={handle}
+              data-raster-crop-overlay="true"
               key={handle}
               onPointerDown={(event) =>
                 startCropDrag({ editor, event, handle, node, rect })
@@ -292,6 +294,7 @@ export const CanvasRasterCropOverlay = () => {
         })}
         <Button
           className="absolute"
+          data-raster-crop-overlay="true"
           data-testid="raster-crop-done"
           onClick={() => editor.commitCrop()}
           size="sm"

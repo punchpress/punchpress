@@ -238,9 +238,20 @@ test("Crop changes bounds with stationary retained pixels and supports cancel", 
   await page.mouse.down();
   await page.mouse.move(nextNorthwestBox.x + 22, nextNorthwestBox.y + 12);
   await page.mouse.up();
-  await page.getByTestId("raster-crop-done").click();
+  const cropOverlayBox = await page
+    .getByTestId("raster-crop-overlay")
+    .boundingBox();
+
+  if (!cropOverlayBox) {
+    throw new Error("Expected Crop overlay");
+  }
+
+  await page.mouse.click(cropOverlayBox.x + 4, cropOverlayBox.y + 4);
 
   await expect(page.getByTestId("raster-crop-overlay")).toBeHidden();
+  expect(
+    await page.evaluate(() => window.__PUNCHPRESS_EDITOR__?.selectedNodeId)
+  ).toBeNull();
   await expect(
     page.locator('[data-raster-resident-surface="canvas2d"]')
   ).toBeVisible();
@@ -259,6 +270,7 @@ test("Crop changes bounds with stationary retained pixels and supports cancel", 
   const sourceBeforeBrush = await page.evaluate(
     () => window.__PUNCHPRESS_EDITOR__?.getNode("raster")?.src
   );
+  await page.evaluate(() => window.__PUNCHPRESS_EDITOR__?.select("raster"));
   await page.keyboard.press("b");
   const paintPoint = await getStagePoint(page, { x: 380, y: 285 });
   await page.mouse.move(paintPoint.x, paintPoint.y);
@@ -293,4 +305,111 @@ test("Crop changes bounds with stationary retained pixels and supports cancel", 
       sourceChanged: true,
       width: 80,
     });
+});
+
+test("tiled painting preserves a cropped Raster plane and local coordinates", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  const src = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+
+    canvas.width = 100;
+    canvas.height = 80;
+    if (!context) {
+      throw new Error("Expected Canvas2D context");
+    }
+    context.fillStyle = "#3355ff";
+    context.fillRect(0, 0, 100, 80);
+    return canvas.toDataURL("image/png");
+  });
+
+  await loadDocument(
+    page,
+    JSON.stringify({
+      nodes: [
+        {
+          assetId: "asset-raster",
+          height: 80,
+          id: "raster",
+          mimeType: "image/png",
+          name: "Raster",
+          opacity: 1,
+          parentId: "root",
+          src,
+          transform: transform(320, 240),
+          type: "image",
+          visible: true,
+          width: 100,
+        },
+      ],
+      version: "1.8",
+    })
+  );
+  await resetViewport(page);
+  await setViewport(page, { x: 0, y: 0, zoom: 0.1 });
+
+  const result = await page.evaluate(async () => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    if (!editor) {
+      throw new Error("Expected editor");
+    }
+
+    editor.select("raster");
+    editor.startCrop();
+    editor.updateCrop({ height: 70, width: 80, x: 20, y: 10 });
+    editor.commitCrop();
+    editor.setBrushSettings(
+      {
+        hardness: 1,
+        opacity: 1,
+        size: 4,
+        spacing: 0,
+      },
+      "brush"
+    );
+    editor.setActiveTool("brush");
+    const raster = editor.getNode("raster");
+
+    if (raster?.type !== "image") {
+      throw new Error("Expected Raster");
+    }
+
+    const session = editor.dispatchNodePointerDown({
+      node: raster,
+      point: { x: 330, y: 255 },
+    });
+
+    await session?.complete({ point: { x: 334, y: 255 } });
+    const committed = editor.getNode("raster");
+
+    return committed?.type === "image"
+      ? {
+          baseHeight: committed.baseHeight,
+          baseWidth: committed.baseWidth,
+          baseX: committed.baseX,
+          baseY: committed.baseY,
+          height: committed.height,
+          tileMinX: Math.min(
+            ...(committed.tileSources || []).map((tile) => tile.x)
+          ),
+          tileSourceCount: committed.tileSources?.length || 0,
+          width: committed.width,
+        }
+      : null;
+  });
+
+  expect(result).toMatchObject({
+    baseHeight: 80,
+    baseWidth: 100,
+    baseX: -20,
+    baseY: -10,
+    height: 70,
+    tileMinX: expect.any(Number),
+    width: 80,
+  });
+  expect(result?.tileSourceCount).toBeGreaterThan(0);
+  expect(result?.tileMinX).toBeLessThan(20);
 });
