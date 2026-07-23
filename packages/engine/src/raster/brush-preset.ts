@@ -36,7 +36,11 @@ export const defineRasterBrushPreset = ({
     id,
     name,
     settings: Object.freeze({
-      ...settings,
+      hardness: settings.hardness,
+      opacity: settings.opacity,
+      size: settings.size,
+      smoothing: settings.smoothing,
+      spacing: settings.spacing,
       tip: Object.freeze({ ...settings.tip }),
     }),
     version: PUNCHPRESS_RASTER_BRUSH_PRESET_VERSION,

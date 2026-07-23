@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   defineRasterBrushPreset,
   PUNCHPRESS_RASTER_BRUSH_PRESET_VERSION,
+  type RasterStrokeSettings,
 } from "@punchpress/engine";
 
 describe("native raster brush presets", () => {
@@ -52,5 +53,24 @@ describe("native raster brush presets", () => {
         },
       })
     ).toThrow("Raster smoothing must be a non-negative finite number");
+  });
+
+  test("strips color from structurally compatible Stroke settings", () => {
+    const strokeSettings: RasterStrokeSettings = {
+      color: "#FF0000",
+      hardness: 1,
+      opacity: 1,
+      size: 24,
+      smoothing: 0,
+      spacing: 0,
+      tip: { kind: "round" },
+    };
+    const preset = defineRasterBrushPreset({
+      id: "hard-round",
+      name: "Hard Round",
+      settings: strokeSettings,
+    });
+
+    expect(preset.settings).not.toHaveProperty("color");
   });
 });

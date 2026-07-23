@@ -31,7 +31,6 @@ export const createRasterDabGenerator = (
   let finished = false;
   let lastDabPathPoint: RasterPoint | null = null;
   let lastInputPoint: RasterPoint | null = null;
-  let lastSmoothingGuide: RasterPoint | null = null;
   let smoothedPoint: RasterPoint | null = null;
 
   const appendDabPathPoint = (point: RasterPoint, dabs: RasterDab[]) => {
@@ -65,14 +64,12 @@ export const createRasterDabGenerator = (
       smoothedPoint = interpolatePoint(smoothedPoint, guide, alpha);
     }
 
-    lastSmoothingGuide = clonePoint(guide);
     appendDabPathPoint(smoothedPoint, dabs);
   };
 
   const appendInputPoint = (point: RasterPoint, dabs: RasterDab[]) => {
     if (!lastInputPoint) {
       lastInputPoint = clonePoint(point);
-      lastSmoothingGuide = clonePoint(point);
       appendDabPathPoint(point, dabs);
 
       if (smoothingDistance > 0) {
@@ -126,7 +123,7 @@ export const createRasterDabGenerator = (
       if (
         smoothingDistance === 0 ||
         !lastInputPoint ||
-        pointsEqual(lastInputPoint, lastSmoothingGuide)
+        pointsEqual(lastInputPoint, lastDabPathPoint)
       ) {
         return [];
       }

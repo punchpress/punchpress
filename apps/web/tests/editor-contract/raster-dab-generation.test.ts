@@ -158,4 +158,22 @@ describe("raster dab generation", () => {
       })
     ).toThrow("Raster smoothing must be a non-negative finite number");
   });
+
+  test("finish flushes a smoothed tail ending on a guide boundary", () => {
+    const generator = createRasterDabGenerator({
+      ...hardRoundSettings,
+      size: 20,
+      smoothing: 1,
+      spacing: 0.25,
+    });
+    const dabs = [
+      ...generator.append([
+        { x: 0, y: 0 },
+        { x: 100, y: 0 },
+      ]),
+      ...generator.finish(),
+    ];
+
+    expect(dabs.at(-1)?.center).toEqual({ x: 100, y: 0 });
+  });
 });
