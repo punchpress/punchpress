@@ -1,4 +1,5 @@
 import type { RasterBrushTip, RasterStrokeSettings } from "./contracts";
+import { assertValidRasterDynamics } from "./settings";
 
 export const PUNCHPRESS_RASTER_BRUSH_PRESET_VERSION = 1 as const;
 
@@ -27,8 +28,10 @@ export const defineRasterBrushPreset = ({
   id,
   name,
   settings,
-}: RasterBrushPresetInput): RasterBrushPreset =>
-  Object.freeze({
+}: RasterBrushPresetInput): RasterBrushPreset => {
+  assertValidRasterDynamics(settings);
+
+  return Object.freeze({
     format: "punchpress-raster-brush",
     id,
     name,
@@ -38,3 +41,4 @@ export const defineRasterBrushPreset = ({
     }),
     version: PUNCHPRESS_RASTER_BRUSH_PRESET_VERSION,
   });
+};

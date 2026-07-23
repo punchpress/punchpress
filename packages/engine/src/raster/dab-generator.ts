@@ -3,6 +3,8 @@ import type {
   RasterPoint,
   RasterStrokeSettings,
 } from "./contracts";
+import { getRasterDabSpacing } from "./dab-spacing";
+import { assertValidRasterDynamics } from "./settings";
 
 const RESAMPLE_EPSILON = 1e-9;
 
@@ -15,12 +17,10 @@ export const createRasterDabGenerator = (
   settings: RasterStrokeSettings
 ): RasterDabGenerator => {
   const fixedSettings = cloneSettings(settings);
-  const spacing = fixedSettings.size * fixedSettings.spacing;
 
-  if (!(Number.isFinite(spacing) && spacing > 0)) {
-    throw new Error("Raster dab spacing must be a positive finite distance");
-  }
+  assertValidRasterDynamics(fixedSettings);
 
+  const spacing = getRasterDabSpacing(fixedSettings);
   const smoothingDistance = fixedSettings.size * fixedSettings.smoothing;
   const smoothingSampleDistance =
     smoothingDistance > 0

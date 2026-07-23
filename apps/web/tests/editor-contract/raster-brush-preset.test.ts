@@ -36,4 +36,21 @@ describe("native raster brush presets", () => {
     expect(PUNCHPRESS_RASTER_BRUSH_PRESET_VERSION).toBe(1);
     expect(Object.isFrozen(preset.settings.tip)).toBe(true);
   });
+
+  test("rejects invalid preset dynamics", () => {
+    expect(() =>
+      defineRasterBrushPreset({
+        id: "invalid",
+        name: "Invalid",
+        settings: {
+          hardness: 1,
+          opacity: 1,
+          size: 24,
+          smoothing: -0.1,
+          spacing: 0,
+          tip: { kind: "round" },
+        },
+      })
+    ).toThrow("Raster smoothing must be a non-negative finite number");
+  });
 });

@@ -53,7 +53,7 @@ describe("raster stroke contract", () => {
       true
     );
     expect(commit).toEqual({
-      dirtyRegion: { height: 40, width: 80, x: 0, y: 0 },
+      dirtyRegion: { height: 40, width: 73, x: 0, y: 0 },
       targetId: "raster-a",
     });
   });

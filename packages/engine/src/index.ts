@@ -173,6 +173,7 @@ export {
   toPathPointKey,
 } from "./state/store/path/path-point-selection";
 export { createRasterDabGenerator } from "./raster/dab-generator";
+export { getRasterDabSpacing } from "./raster/dab-spacing";
 export {
   compareRasterDabsExact,
   compareRasterDabsTolerant,

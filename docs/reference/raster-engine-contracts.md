@@ -17,6 +17,9 @@ WebGPU, encoded images, package storage, or Workspace dimensions.
 - Stroke points, Dab centers, Dab size, and target bounds use document units.
 - Spacing and smoothing settings are size multipliers. Their derived distances
   are document-space distances.
+- Effective Dab spacing has a one-document-unit floor. Hard tips use the full
+  size-scaled spacing; softer tips reduce it toward one quarter so their falloff
+  does not reveal stamp rings. A zero spacing setting uses the floor.
 - A `RasterTarget` locks one finite target id, document bounds, and pixel
   dimensions for the full Stroke.
 - Pixel allocation belongs to the surface adapter and is bounded by the target
@@ -56,6 +59,9 @@ tests. Browser rendering and persistence adapters remain separate consumers.
 Stroke settings contain color, size, opacity, hardness, spacing, smoothing, and
 a round or sampled tip descriptor. Sampled tips use an opaque native `sampleId`;
 the engine contract does not carry sample bytes or encoded image types.
+Size must be positive; spacing and smoothing must be non-negative; opacity and
+hardness stay between zero and one. Invalid numeric settings fail before input
+processing begins.
 
 Native presets use format `punchpress-raster-brush` and version `1`. Presets
 store default settings except color so choosing a preset does not replace the

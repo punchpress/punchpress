@@ -21,7 +21,7 @@ describe("raster fidelity fixtures", () => {
     expect(fixtures.version).toBe(RASTER_FIDELITY_FIXTURE_VERSION);
     expect(fixtures.cases.map(({ id }) => id)).toEqual([
       "hard-click",
-      "soft-click",
+      "soft-stroke",
       "sampled-click",
       "erase-click",
       "spacing-residual",

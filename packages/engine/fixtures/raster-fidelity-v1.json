@@ -26,7 +26,7 @@
       ]
     },
     {
-      "id": "soft-click",
+      "id": "soft-stroke",
       "operation": "paint",
       "settings": {
         "color": "#445566",
@@ -37,10 +37,36 @@
         "spacing": 0.25,
         "tip": { "kind": "round" }
       },
-      "inputVariants": [[[{ "x": 20, "y": 25 }]]],
+      "inputVariants": [
+        [[{ "x": 20, "y": 25 }, { "x": 30, "y": 25 }]]
+      ],
       "expectedDabs": [
         {
           "center": { "x": 20, "y": 25 },
+          "color": "#445566",
+          "hardness": 0.2,
+          "opacity": 0.6,
+          "size": 30,
+          "tip": { "kind": "round" }
+        },
+        {
+          "center": { "x": 23, "y": 25 },
+          "color": "#445566",
+          "hardness": 0.2,
+          "opacity": 0.6,
+          "size": 30,
+          "tip": { "kind": "round" }
+        },
+        {
+          "center": { "x": 26, "y": 25 },
+          "color": "#445566",
+          "hardness": 0.2,
+          "opacity": 0.6,
+          "size": 30,
+          "tip": { "kind": "round" }
+        },
+        {
+          "center": { "x": 29, "y": 25 },
           "color": "#445566",
           "hardness": 0.2,
           "opacity": 0.6,

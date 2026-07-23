@@ -98,4 +98,64 @@ describe("raster dab generation", () => {
       true
     );
   });
+
+  test("zero spacing uses the minimum document-space sampling interval", () => {
+    const generator = createRasterDabGenerator({
+      ...hardRoundSettings,
+      size: 20,
+      spacing: 0,
+    });
+
+    expect(
+      generator
+        .append([
+          { x: 0, y: 0 },
+          { x: 3, y: 0 },
+        ])
+        .map(({ center }) => center)
+    ).toEqual([
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 2, y: 0 },
+      { x: 3, y: 0 },
+    ]);
+  });
+
+  test("soft brushes sample more densely than hard brushes", () => {
+    const hard = createRasterDabGenerator({
+      ...hardRoundSettings,
+      size: 100,
+      spacing: 0.18,
+    });
+    const soft = createRasterDabGenerator({
+      ...hardRoundSettings,
+      hardness: 0,
+      size: 100,
+      spacing: 0.18,
+    });
+    const points = [
+      { x: 0, y: 0 },
+      { x: 20, y: 0 },
+    ];
+
+    expect(hard.append(points).map(({ center }) => center.x)).toEqual([0, 18]);
+    expect(soft.append(points).map(({ center }) => center.x)).toEqual([
+      0, 4.5, 9, 13.5, 18,
+    ]);
+  });
+
+  test("rejects invalid smoothing before processing input", () => {
+    expect(() =>
+      createRasterDabGenerator({
+        ...hardRoundSettings,
+        smoothing: -0.1,
+      })
+    ).toThrow("Raster smoothing must be a non-negative finite number");
+    expect(() =>
+      createRasterDabGenerator({
+        ...hardRoundSettings,
+        smoothing: Number.NaN,
+      })
+    ).toThrow("Raster smoothing must be a non-negative finite number");
+  });
 });
