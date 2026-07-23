@@ -147,6 +147,133 @@ test("existing Raster paints, erases, and cancels on one resident Canvas2D surfa
   expect(result.surfaceIdentity).toBeTruthy();
 });
 
+test("placed Raster stays clipped before and after reselection", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  const src = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+
+    canvas.width = 64;
+    canvas.height = 64;
+
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      throw new Error("Expected Canvas2D");
+    }
+
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/png");
+  });
+
+  const immediate = await placeAndStroke(page, src, false);
+  const reselected = await placeAndStroke(page, src, true);
+
+  expect(immediate).toEqual(reselected);
+  expect(immediate).toMatchObject({
+    height: 64,
+    workingSurface: null,
+    selectedNodeIds: ["placed-raster"],
+    transform: { x: 320, y: 220 },
+    width: 64,
+  });
+});
+
+const placeAndStroke = async (page: Page, src: string, reselect: boolean) => {
+  return await page.evaluate(
+    async ({ imageSource, shouldReselect }) => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
+
+      if (!editor) {
+        throw new Error("Expected editor");
+      }
+
+      editor.newDocument();
+      const node = {
+        assetId: "asset-placed-raster",
+        height: 64,
+        id: "placed-raster",
+        mimeType: "image/png",
+        name: "Placed Raster",
+        opacity: 1,
+        parentId: "root",
+        src: imageSource,
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 320,
+          y: 220,
+        },
+        type: "image",
+        visible: true,
+        width: 64,
+      };
+
+      editor.insertNodes([node]);
+      await editor.rasterSurface.ensureSurface({
+        height: node.height,
+        id: node.id,
+        src: node.src,
+        width: node.width,
+      });
+
+      if (shouldReselect) {
+        editor.clearSelection();
+        editor.select(node.id);
+      }
+
+      editor.setActiveTool("brush");
+      editor.setBrushSettings(
+        { hardness: 1, opacity: 1, size: 24, spacing: 0 },
+        "brush"
+      );
+
+      const session = shouldReselect
+        ? editor.currentTool.onNodePointerDown({
+            node,
+            point: { x: 352, y: 252 },
+          })
+        : editor.currentTool.onCanvasPointerDown({
+            point: { x: 352, y: 252 },
+          });
+
+      if (!session) {
+        throw new Error("Expected Brush session");
+      }
+
+      session.update({ point: { x: 440, y: 340 } });
+      const workingSurface =
+        editor.getBrushWorkingSurfaceStateForNode("placed-raster");
+
+      await session.complete({ point: { x: 440, y: 340 } });
+
+      const result = editor.getNode("placed-raster");
+
+      if (result?.type !== "image") {
+        throw new Error("Expected committed Raster");
+      }
+
+      return {
+        height: result.height,
+        selectedNodeIds: editor.selectedNodeIds,
+        transform: result.transform,
+        width: result.width,
+        workingSurface: workingSurface
+          ? {
+              height: workingSurface.height,
+              type: workingSurface.type,
+              width: workingSurface.width,
+            }
+          : null,
+      };
+    },
+    { imageSource: src, shouldReselect: reselect }
+  );
+};
+
 const sampleAlpha = (canvas: Locator, point: { x: number; y: number }) =>
   canvas.evaluate(
     (element: HTMLCanvasElement, samplePoint: { x: number; y: number }) =>

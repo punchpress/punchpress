@@ -1785,18 +1785,23 @@ export class BrushTool extends Tool {
 
   beginResidentStroke({ node, point }) {
     const settings = this.getSettings();
+    const targetNode =
+      node ||
+      (this.editor.selectedNodeIds.length === 1
+        ? this.editor.getNode(this.editor.selectedNodeIds[0])
+        : null);
 
     if (
       !(
-        node?.type === "image" &&
-        node.src &&
-        !(node.tileSources || []).length &&
+        targetNode?.type === "image" &&
+        targetNode.src &&
+        !(targetNode.tileSources || []).length &&
         settings.hardness === 1 &&
-        (node.baseX ?? 0) === 0 &&
-        (node.baseY ?? 0) === 0 &&
-        (node.baseWidth ?? node.width) === node.width &&
-        (node.baseHeight ?? node.height) === node.height &&
-        this.editor.getNode(node.id)?.type === "image"
+        (targetNode.baseX ?? 0) === 0 &&
+        (targetNode.baseY ?? 0) === 0 &&
+        (targetNode.baseWidth ?? targetNode.width) === targetNode.width &&
+        (targetNode.baseHeight ?? targetNode.height) === targetNode.height &&
+        this.editor.getNode(targetNode.id)?.type === "image"
       )
     ) {
       return null;
@@ -1804,15 +1809,15 @@ export class BrushTool extends Tool {
 
     const target = {
       bounds: {
-        height: node.height,
-        width: node.width,
+        height: targetNode.height,
+        width: targetNode.width,
         x: 0,
         y: 0,
       },
-      id: node.id,
+      id: targetNode.id,
       pixelSize: {
-        height: node.height,
-        width: node.width,
+        height: targetNode.height,
+        width: targetNode.width,
       },
     };
     const surface = this.editor.rasterSurface?.resolveSurface?.(target);
@@ -1824,7 +1829,7 @@ export class BrushTool extends Tool {
     const stroke = measurePerf(PERF_SPANS.rasterStrokeBegin, () =>
       createRasterStroke({
         operation: this.operation,
-        point: getImageLocalPoint(node, point),
+        point: getImageLocalPoint(targetNode, point),
         settings: {
           ...settings,
           smoothing: 0,
@@ -1850,7 +1855,7 @@ export class BrushTool extends Tool {
       },
       complete: ({ point: endPoint }) => {
         const commit = measurePerf(PERF_SPANS.rasterStrokePointerRelease, () => {
-          stroke.append([getImageLocalPoint(node, endPoint)]);
+          stroke.append([getImageLocalPoint(targetNode, endPoint)]);
           return stroke.commit();
         });
         finish();
@@ -1859,7 +1864,7 @@ export class BrushTool extends Tool {
       getWorkingSurfaceState: () => null,
       hasPendingWorkingSurface: () => false,
       update: ({ point: nextPoint }) => {
-        stroke.append([getImageLocalPoint(node, nextPoint)]);
+        stroke.append([getImageLocalPoint(targetNode, nextPoint)]);
       },
     };
 

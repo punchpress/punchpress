@@ -68,17 +68,16 @@ Brush color is hidden for Eraser.
   raster working surface while the pointer moves.
 - **Eraser stroke.** Dragging removes alpha from the current raster working
   surface using the same brush engine as Brush.
-- **Raster layer.** A brush stroke on a selected image node updates that node's
-  current raster asset, even when the stroke starts outside the node's current
-  trimmed bounds.
+- **Raster layer.** A brush stroke on a selected image node targets that node
+  even when the stroke starts outside its bounds. Paint and Eraser remain
+  clipped to the existing raster plane.
 - **Empty layer.** A brush stroke on an empty layer turns that layer into a
   raster image node and writes the first stroke into its raster asset.
 - **No target.** A brush stroke with no compatible target creates a new layer,
   materializes it as raster content, and writes the stroke.
 - **Bounds.** Brush-created layers can grow from their painted pixels. Existing
-  raster layers preserve their intrinsic pixel plane; paint does not shrink the
-  layer to the latest stroke, and Eraser does not expand a layer by erasing
-  transparent space.
+  raster layers preserve their intrinsic pixel plane; Brush and Eraser do not
+  expand it. Crop expansion explicitly creates additional paintable area.
 
 ## Layer Materialization
 

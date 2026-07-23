@@ -16,6 +16,9 @@ an injected Raster runtime. That canvas decodes the hydrated source once,
 implements the engine `RasterSurface` contract, and remains the node's presented
 surface across Stroke begin, pointer movement, commit, and cancel.
 
+- Canvas-entry strokes reuse the single selected eligible Raster target, so
+  placement-preserved selection and explicit reselection share the same finite
+  resident surface.
 - Hard Round uses native Canvas2D paths with `source-over`.
 - Eraser uses the same Dabs with `destination-out`.
 - Each Dab batch captures its affected pixel rectangle through native
