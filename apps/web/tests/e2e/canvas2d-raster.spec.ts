@@ -169,13 +169,23 @@ test("placed Raster stays clipped before and after reselection", async ({
   });
 
   const decoding = await placeAndStroke(page, src, "decoding");
+  const outside = await placeAndStroke(page, src, "decoding", "outside");
   const immediate = await placeAndStroke(page, src, "selected");
   const reselected = await placeAndStroke(page, src, "reselected");
 
   expect(immediate).toEqual(reselected);
+  expect(outside).toMatchObject({
+    height: 64,
+    historyRevisionDelta: 0,
+    sourceChanged: false,
+    transform: { x: 320, y: 220 },
+    width: 64,
+  });
   expect(decoding).toMatchObject({
     height: 64,
+    historyRevisionDelta: 1,
     selectedNodeIds: ["placed-raster"],
+    sourceChanged: true,
     transform: { x: 320, y: 220 },
     width: 64,
     workingSurface: { height: 64, type: "canvas", width: 64 },
@@ -192,10 +202,11 @@ test("placed Raster stays clipped before and after reselection", async ({
 const placeAndStroke = async (
   page: Page,
   src: string,
-  mode: "decoding" | "reselected" | "selected"
+  mode: "decoding" | "reselected" | "selected",
+  stroke: "crossing" | "outside" = "crossing"
 ) => {
   return await page.evaluate(
-    async ({ imageSource, placementMode }) => {
+    async ({ imageSource, placementMode, strokeMode }) => {
       const editor = window.__PUNCHPRESS_EDITOR__;
 
       if (!editor) {
@@ -245,32 +256,33 @@ const placeAndStroke = async (
         { hardness: 1, opacity: 1, size: 24, spacing: 0 },
         "brush"
       );
+      const startPoint =
+        strokeMode === "outside" ? { x: 440, y: 340 } : { x: 352, y: 252 };
+      const endPoint =
+        strokeMode === "outside" ? { x: 460, y: 360 } : { x: 440, y: 340 };
+      const historyRevision = editor.history.currentRevision;
 
       const session =
         placementMode === "reselected"
           ? editor.currentTool.onNodePointerDown({
               node,
-              point: { x: 352, y: 252 },
+              point: startPoint,
             })
           : editor.currentTool.onCanvasPointerDown({
-              point: { x: 352, y: 252 },
+              point: startPoint,
             });
 
       if (!session) {
         throw new Error("Expected Brush session");
       }
 
-      session.update({ point: { x: 440, y: 340 } });
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => resolve());
-        });
-      });
+      session.update({ point: endPoint });
+      await session.ready;
 
       const workingSurface =
         editor.getBrushWorkingSurfaceStateForNode("placed-raster");
 
-      await session.complete({ point: { x: 440, y: 340 } });
+      await session.complete({ point: endPoint });
 
       const result = editor.getNode("placed-raster");
 
@@ -280,7 +292,9 @@ const placeAndStroke = async (
 
       return {
         height: result.height,
+        historyRevisionDelta: editor.history.currentRevision - historyRevision,
         selectedNodeIds: editor.selectedNodeIds,
+        sourceChanged: result.src !== imageSource,
         transform: result.transform,
         width: result.width,
         workingSurface: workingSurface
@@ -292,7 +306,7 @@ const placeAndStroke = async (
           : null,
       };
     },
-    { imageSource: src, placementMode: mode }
+    { imageSource: src, placementMode: mode, strokeMode: stroke }
   );
 };
 

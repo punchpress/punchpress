@@ -638,17 +638,33 @@ class BrushStrokeSession {
   }
 
   applyNativeStroke(startPoint, endPoint) {
-    const { context } = this.canvasState;
+    const { canvas, context } = this.canvasState;
     const renderRadius = getBrushDabRenderRadius(
       this.settings.size,
       this.settings.hardness
     );
     const bounds = {
-      maxX: Math.ceil(Math.max(startPoint.x, endPoint.x) + renderRadius),
-      maxY: Math.ceil(Math.max(startPoint.y, endPoint.y) + renderRadius),
-      minX: Math.floor(Math.min(startPoint.x, endPoint.x) - renderRadius),
-      minY: Math.floor(Math.min(startPoint.y, endPoint.y) - renderRadius),
+      maxX: Math.min(
+        canvas.width,
+        Math.ceil(Math.max(startPoint.x, endPoint.x) + renderRadius)
+      ),
+      maxY: Math.min(
+        canvas.height,
+        Math.ceil(Math.max(startPoint.y, endPoint.y) + renderRadius)
+      ),
+      minX: Math.max(
+        0,
+        Math.floor(Math.min(startPoint.x, endPoint.x) - renderRadius)
+      ),
+      minY: Math.max(
+        0,
+        Math.floor(Math.min(startPoint.y, endPoint.y) - renderRadius)
+      ),
     };
+
+    if (bounds.minX >= bounds.maxX || bounds.minY >= bounds.maxY) {
+      return;
+    }
 
     measurePerf("brush.nativeStroke.draw", () => {
       const color = getBrushColorRgb(this.settings.color);
