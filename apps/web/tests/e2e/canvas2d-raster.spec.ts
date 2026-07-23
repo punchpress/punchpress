@@ -168,10 +168,18 @@ test("placed Raster stays clipped before and after reselection", async ({
     return canvas.toDataURL("image/png");
   });
 
-  const immediate = await placeAndStroke(page, src, false);
-  const reselected = await placeAndStroke(page, src, true);
+  const decoding = await placeAndStroke(page, src, "decoding");
+  const immediate = await placeAndStroke(page, src, "selected");
+  const reselected = await placeAndStroke(page, src, "reselected");
 
   expect(immediate).toEqual(reselected);
+  expect(decoding).toMatchObject({
+    height: 64,
+    selectedNodeIds: ["placed-raster"],
+    transform: { x: 320, y: 220 },
+    width: 64,
+    workingSurface: { height: 64, type: "canvas", width: 64 },
+  });
   expect(immediate).toMatchObject({
     height: 64,
     workingSurface: null,
@@ -181,9 +189,13 @@ test("placed Raster stays clipped before and after reselection", async ({
   });
 });
 
-const placeAndStroke = async (page: Page, src: string, reselect: boolean) => {
+const placeAndStroke = async (
+  page: Page,
+  src: string,
+  mode: "decoding" | "reselected" | "selected"
+) => {
   return await page.evaluate(
-    async ({ imageSource, shouldReselect }) => {
+    async ({ imageSource, placementMode }) => {
       const editor = window.__PUNCHPRESS_EDITOR__;
 
       if (!editor) {
@@ -213,14 +225,17 @@ const placeAndStroke = async (page: Page, src: string, reselect: boolean) => {
       };
 
       editor.insertNodes([node]);
-      await editor.rasterSurface.ensureSurface({
-        height: node.height,
-        id: node.id,
-        src: node.src,
-        width: node.width,
-      });
 
-      if (shouldReselect) {
+      if (placementMode !== "decoding") {
+        await editor.rasterSurface.ensureSurface({
+          height: node.height,
+          id: node.id,
+          src: node.src,
+          width: node.width,
+        });
+      }
+
+      if (placementMode === "reselected") {
         editor.clearSelection();
         editor.select(node.id);
       }
@@ -231,20 +246,27 @@ const placeAndStroke = async (page: Page, src: string, reselect: boolean) => {
         "brush"
       );
 
-      const session = shouldReselect
-        ? editor.currentTool.onNodePointerDown({
-            node,
-            point: { x: 352, y: 252 },
-          })
-        : editor.currentTool.onCanvasPointerDown({
-            point: { x: 352, y: 252 },
-          });
+      const session =
+        placementMode === "reselected"
+          ? editor.currentTool.onNodePointerDown({
+              node,
+              point: { x: 352, y: 252 },
+            })
+          : editor.currentTool.onCanvasPointerDown({
+              point: { x: 352, y: 252 },
+            });
 
       if (!session) {
         throw new Error("Expected Brush session");
       }
 
       session.update({ point: { x: 440, y: 340 } });
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => resolve());
+        });
+      });
+
       const workingSurface =
         editor.getBrushWorkingSurfaceStateForNode("placed-raster");
 
@@ -270,7 +292,7 @@ const placeAndStroke = async (page: Page, src: string, reselect: boolean) => {
           : null,
       };
     },
-    { imageSource: src, shouldReselect: reselect }
+    { imageSource: src, placementMode: mode }
   );
 };
 

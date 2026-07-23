@@ -895,7 +895,7 @@ class BrushStrokeSession {
   }
 
   ensureCanvasIncludesDab(point) {
-    if (this.operation === "erase") {
+    if (this.operation === "erase" || this.preserveRasterPlane) {
       return point;
     }
 
