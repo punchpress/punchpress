@@ -166,25 +166,45 @@ const paintDabs = (
     strokeContext.operation === "erase"
       ? "#000000"
       : strokeContext.settings.color;
-  context.beginPath();
 
-  for (const dab of dabs) {
-    const x = (dab.center.x - strokeContext.target.bounds.x) * scaleX;
-    const y = (dab.center.y - strokeContext.target.bounds.y) * scaleY;
-    const radiusX = (dab.size * scaleX) / 2;
-    const radiusY = (dab.size * scaleY) / 2;
+  if (strokeContext.settings.opacity === 1) {
+    context.beginPath();
 
-    if (Math.abs(radiusX - radiusY) < 1e-9) {
-      context.moveTo(x + radiusX, y);
-      context.arc(x, y, radiusX, 0, Math.PI * 2);
-    } else {
-      context.moveTo(x + radiusX, y);
-      context.ellipse(x, y, radiusX, radiusY, 0, 0, Math.PI * 2);
+    for (const dab of dabs) {
+      appendDabPath(context, dab, strokeContext.target, scaleX, scaleY);
+    }
+
+    context.fill();
+  } else {
+    for (const dab of dabs) {
+      context.beginPath();
+      appendDabPath(context, dab, strokeContext.target, scaleX, scaleY);
+      context.fill();
     }
   }
 
-  context.fill();
   context.restore();
+};
+
+const appendDabPath = (
+  context: CanvasRenderingContext2D,
+  dab: RasterDab,
+  target: Readonly<RasterTarget>,
+  scaleX: number,
+  scaleY: number
+) => {
+  const x = (dab.center.x - target.bounds.x) * scaleX;
+  const y = (dab.center.y - target.bounds.y) * scaleY;
+  const radiusX = (dab.size * scaleX) / 2;
+  const radiusY = (dab.size * scaleY) / 2;
+
+  context.moveTo(x + radiusX, y);
+
+  if (Math.abs(radiusX - radiusY) < 1e-9) {
+    context.arc(x, y, radiusX, 0, Math.PI * 2);
+  } else {
+    context.ellipse(x, y, radiusX, radiusY, 0, 0, Math.PI * 2);
+  }
 };
 
 const getDabsDirtyRegion = (

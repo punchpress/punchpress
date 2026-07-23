@@ -84,10 +84,6 @@ describe("Canvas2D Raster surface", () => {
 
     expect(runtime.getPresentation(target.id)).not.toBeNull();
     expect(runtime.getPresentation("removed-raster")).toBeNull();
-
-    runtime.dispose?.();
-
-    expect(runtime.getPresentation(target.id)).toBeNull();
   });
 
   test("can retry a failed source decode", async () => {
@@ -148,6 +144,7 @@ describe("Canvas2D Raster surface", () => {
       surface,
       target,
     });
+    stroke.append([{ x: 55, y: 50 }]);
     const commit = stroke.commit();
     const presentedContext = browser.contexts.get(presentation?.canvas);
 
@@ -159,8 +156,9 @@ describe("Canvas2D Raster surface", () => {
       x: 100,
       y: 100,
     });
+    expect(presentedContext?.fillCount).toBe(presentedContext?.arcs.length);
     expect(commit).toEqual({
-      dirtyRegion: { height: 40, width: 40, x: 80, y: 80 },
+      dirtyRegion: { height: 40, width: 50, x: 80, y: 80 },
       targetId: target.id,
     });
     expect(browser.hotPathReadbacks).toEqual([]);
@@ -208,7 +206,7 @@ describe("Canvas2D Raster surface", () => {
 });
 
 describe("Editor Raster surface injection", () => {
-  test("leaves soft and translucent strokes on the legacy path", () => {
+  test("leaves soft strokes on legacy and routes translucent Hard Round", () => {
     let resolveCount = 0;
     const editor = new Editor({
       rasterSurface: {
@@ -236,22 +234,19 @@ describe("Editor Raster surface injection", () => {
     });
 
     editor.setBrushSettings({ hardness: 1, opacity: 0.5 }, "brush");
-    editor.currentTool.onNodePointerDown({
+    const session = editor.currentTool.onNodePointerDown({
       node,
       point: { x: 25, y: 30 },
     });
 
-    expect(resolveCount).toBe(0);
+    expect(resolveCount).toBe(1);
+    session?.cancel();
   });
 
   test("reconciles retained Raster targets through editor mount and dispose", () => {
     const retainedTargets: string[][] = [];
-    let disposeCount = 0;
     const editor = new Editor({
       rasterSurface: {
-        dispose: () => {
-          disposeCount += 1;
-        },
         resolveSurface: () => null,
         retainTargets: (targetIds) => {
           retainedTargets.push([...targetIds]);
@@ -274,7 +269,35 @@ describe("Editor Raster surface injection", () => {
 
     expect(retainedTargets).toContainEqual([node.id]);
     expect(retainedTargets.at(-1)).toEqual([]);
-    expect(disposeCount).toBe(1);
+  });
+
+  test("preserves resident pixels across editor deactivate and remount", async () => {
+    const browser = createFakeCanvasBrowser();
+    const runtime = createCanvas2dRasterRuntime(browser.capabilities);
+    const editor = new Editor({ rasterSurface: runtime });
+    const node = {
+      ...createDefaultImageNode({
+        height: 100,
+        src: "data:image/png;base64,existing",
+        width: 100,
+      }),
+      id: target.id,
+    };
+
+    editor.insertNodes([node]);
+    const presentation = await runtime.ensureSurface({
+      height: 100,
+      id: node.id,
+      src: node.src,
+      width: 100,
+    });
+    editor.mount();
+    editor.dispose();
+    editor.mount();
+
+    expect(runtime.getPresentation(node.id)?.canvas).toBe(presentation.canvas);
+
+    editor.dispose();
   });
 
   test("routes an existing single-payload image stroke through the injected surface", () => {
@@ -360,7 +383,10 @@ const createFakeCanvasBrowser = () => {
     clearRect: () => undefined,
     compositeModes: [] as string[],
     drawImageCalls: [] as unknown[][],
-    fill: () => undefined,
+    fillCount: 0,
+    fill() {
+      this.fillCount += 1;
+    },
     fillStyle: "",
     ellipse: () => undefined,
     get globalCompositeOperation() {

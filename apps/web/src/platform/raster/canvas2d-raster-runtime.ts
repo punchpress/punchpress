@@ -58,11 +58,6 @@ export const createCanvas2dRasterRuntime = (
   };
 
   return {
-    dispose: () => {
-      records.clear();
-      pending.clear();
-      listeners.clear();
-    },
     ensureSurface: async (input) => {
       const current = records.get(input.id);
 

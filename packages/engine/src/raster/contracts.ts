@@ -75,7 +75,6 @@ export type RasterSurface = {
 };
 
 export type RasterSurfaceResolver = {
-  dispose?: () => void;
   retainTargets?: (targetIds: readonly string[]) => void;
   resolveSurface: (target: Readonly<RasterTarget>) => RasterSurface | null;
 };

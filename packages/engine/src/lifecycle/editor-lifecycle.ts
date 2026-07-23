@@ -47,7 +47,6 @@ export const mountEditor = (editor) => {
 };
 
 export const disposeEditor = (editor) => {
-  editor.rasterSurface?.dispose?.();
   editor.unsubscribe?.();
   editor.unsubscribe = null;
 
