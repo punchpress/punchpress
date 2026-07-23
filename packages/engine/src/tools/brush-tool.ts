@@ -19,6 +19,7 @@ import {
   cancelRasterFrame,
   canScheduleRasterFrame,
   createCanvas,
+  getRasterCanvasBounds,
   getNow,
   hasRasterRuntime,
   loadImageToCanvas,
@@ -28,8 +29,12 @@ import { DEFAULT_BRUSH_SETTINGS, getBrushColorRgb } from "./brush-settings";
 import {
   getArtboardClipSourceRect,
   getImageLocalClipBounds,
+  getImageLocalClipPolygon,
   getImageLocalPoint,
   getImageNodeCroppedToSourceRect,
+  getRasterTargetState,
+  getRasterWritableBounds,
+  getRasterWritablePolygon,
   materializeBrushTarget,
   resolveBrushTarget,
 } from "./brush-target";
@@ -502,9 +507,20 @@ class BrushStrokeSession {
     this.historyMark = editor.markHistoryStep(
       operation === "erase" ? "erase brush stroke" : "paint brush stroke"
     );
-    this.initialSourceRect = getArtboardClipSourceRect(editor, node);
-    this.preserveRasterPlane =
-      editor.getNode(node.id)?.type === "image" && !this.initialSourceRect;
+    const targetsExistingRaster = editor.getNode(node.id)?.type === "image";
+    this.initialSourceRect = targetsExistingRaster
+      ? null
+      : getArtboardClipSourceRect(editor, node);
+    const initialCanvasBounds = getRasterCanvasBounds(
+      node,
+      this.initialSourceRect
+    );
+    this.canvasOffset = {
+      x: initialCanvasBounds.x,
+      y: initialCanvasBounds.y,
+    };
+    this.preserveRasterPlane = targetsExistingRaster;
+    this.writablePolygon = getImageLocalClipPolygon(editor, node);
     this.commitReady = Promise.resolve();
     this.commitRenderKey = null;
     this.floatPixels = null;
@@ -560,6 +576,10 @@ class BrushStrokeSession {
         })
       : loadImageToCanvas(node, this.initialSourceRect).then((canvasState) => {
           this.canvasState = canvasState;
+          this.canvasOffset = {
+            x: canvasState?.offset?.x ?? this.canvasOffset.x,
+            y: canvasState?.offset?.y ?? this.canvasOffset.y,
+          };
           this.floatPixels =
             canvasState && !this.usesNativeStroke
               ? measurePerf("brush.stroke.createFloatPixels", () =>
@@ -587,13 +607,13 @@ class BrushStrokeSession {
   }
 
   getInitialLocalPoint(point) {
-    if (!this.initialSourceRect) {
+    if (!(this.initialSourceRect || this.preserveRasterPlane)) {
       return point;
     }
 
     return {
-      x: point.x - this.initialSourceRect.x,
-      y: point.y - this.initialSourceRect.y,
+      x: point.x - this.canvasOffset.x,
+      y: point.y - this.canvasOffset.y,
     };
   }
 
@@ -812,6 +832,7 @@ class BrushStrokeSession {
       const color = getBrushColorRgb(this.settings.color);
 
       context.save();
+      this.clipContextToWritablePolygon(context);
       context.globalAlpha = 1;
       context.globalCompositeOperation =
         this.operation === "erase" ? "destination-out" : "source-over";
@@ -867,6 +888,7 @@ class BrushStrokeSession {
       endPoint,
       lineWidth: this.settings.size,
       startPoint,
+      writablePolygon: this.getCanvasWritablePolygon(),
     });
 
     incrementPerfCounter("brush.nativeStroke.segment");
@@ -889,6 +911,10 @@ class BrushStrokeSession {
       bounds,
       color: getBrushColorRgb(this.settings.color),
       getCoverage: (x, y, centerPoint) => {
+        if (!this.isCanvasPointWritable({ x, y })) {
+          return 0;
+        }
+
         const dx = x - centerPoint.x;
         const dy = y - centerPoint.y;
         const normalizedDistanceSquared =
@@ -933,6 +959,11 @@ class BrushStrokeSession {
       for (let localX = 0; localX < width; localX += 1) {
         const x = minX + localX;
         const y = minY + localY;
+
+        if (!this.isCanvasPointWritable({ x: x + 0.5, y: y + 0.5 })) {
+          continue;
+        }
+
         const dx = x + 0.5 - point.x;
         const dy = y + 0.5 - point.y;
         const normalizedDistanceSquared =
@@ -1022,6 +1053,60 @@ class BrushStrokeSession {
     context.putImageData(imageData, minX, minY);
     this.recordDirtyBounds({ maxX, maxY, minX, minY });
     this.scheduleLivePreview();
+  }
+
+  getCanvasWritablePolygon() {
+    return this.writablePolygon?.map((point) => ({
+      x: point.x - this.canvasOffset.x,
+      y: point.y - this.canvasOffset.y,
+    }));
+  }
+
+  isCanvasPointWritable(point) {
+    const polygon = this.getCanvasWritablePolygon();
+
+    if (!polygon) {
+      return true;
+    }
+
+    let inside = false;
+
+    for (
+      let index = 0, previousIndex = polygon.length - 1;
+      index < polygon.length;
+      previousIndex = index, index += 1
+    ) {
+      const current = polygon[index];
+      const previous = polygon[previousIndex];
+      const crosses =
+        current.y > point.y !== previous.y > point.y &&
+        point.x <
+          ((previous.x - current.x) * (point.y - current.y)) /
+            (previous.y - current.y) +
+            current.x;
+
+      if (crosses) {
+        inside = !inside;
+      }
+    }
+
+    return inside;
+  }
+
+  clipContextToWritablePolygon(context) {
+    const polygon = this.getCanvasWritablePolygon();
+
+    if (!polygon?.length) {
+      return;
+    }
+
+    context.beginPath();
+    context.moveTo(polygon[0].x, polygon[0].y);
+    for (const point of polygon.slice(1)) {
+      context.lineTo(point.x, point.y);
+    }
+    context.closePath();
+    context.clip();
   }
 
   expandFloatPixels({ bottom, left, right, top }) {
@@ -1302,16 +1387,16 @@ class BrushStrokeSession {
             ...node,
             baseHeight: committedCanvas.height,
             baseWidth: committedCanvas.width,
-            baseX: 0,
-            baseY: 0,
-            height: committedCanvas.height,
+            baseX: committedCanvas.baseX ?? 0,
+            baseY: committedCanvas.baseY ?? 0,
+            height: committedCanvas.visibleHeight ?? committedCanvas.height,
             mimeType: "image/png",
             src,
             transform: {
               ...node.transform,
               ...committedCanvas.transform,
             },
-            width: committedCanvas.width,
+            width: committedCanvas.visibleWidth ?? committedCanvas.width,
           };
         });
       })
@@ -1603,6 +1688,7 @@ class BrushStrokeSession {
     }
 
     return {
+      allowOverflow: !this.preserveRasterPlane,
       canvas: this.canvasState.canvas,
       completed: this.completed,
       height: this.canvasState.canvas.height,
@@ -1716,9 +1802,13 @@ class BrushStrokeSession {
     const node = this.editor.getNode(this.nodeId);
 
     return {
+      baseX: this.canvasOffset.x,
+      baseY: this.canvasOffset.y,
       canvas: this.canvasState.canvas,
       height: this.canvasState.canvas.height,
       transform: this.previewNode?.transform || node?.transform || {},
+      visibleHeight: node?.height ?? this.canvasState.canvas.height,
+      visibleWidth: node?.width ?? this.canvasState.canvas.width,
       width: this.canvasState.canvas.width,
     };
   }
@@ -1819,7 +1909,14 @@ class BrushStrokeSession {
       return point;
     }
 
-    return getImageLocalPoint(node, point);
+    const localPoint = getImageLocalPoint(node, point);
+
+    return this.preserveRasterPlane
+      ? {
+          x: localPoint.x - this.canvasOffset.x,
+          y: localPoint.y - this.canvasOffset.y,
+        }
+      : localPoint;
   }
 }
 
@@ -1839,6 +1936,10 @@ export class BrushTool extends Tool {
         ? state.eraserSettings
         : state.brushSettings) || DEFAULT_BRUSH_SETTINGS
     );
+  }
+
+  hasActiveSession() {
+    return Boolean(this.activeSession);
   }
 
   getWorkingSurfaceStates() {
@@ -1913,7 +2014,12 @@ export class BrushTool extends Tool {
 
       const settings = this.getSettings();
       const targetNode = measurePerf("brush.target.resolve", () =>
-        resolveBrushTarget(this.editor, point, node, settings)
+        resolveBrushTarget(
+          this.editor,
+          point,
+          settings,
+          this.operation === "erase" ? "eraser" : "brush"
+        )
       );
 
       if (!targetNode) {
@@ -1943,11 +2049,14 @@ export class BrushTool extends Tool {
 
   beginResidentStroke({ node, point }) {
     const settings = this.getSettings();
+    const targetState = getRasterTargetState(this.editor, {
+      point,
+      tool: this.operation === "erase" ? "eraser" : "brush",
+    });
     const targetNode =
-      node ||
-      (this.editor.selectedNodeIds.length === 1
-        ? this.editor.getNode(this.editor.selectedNodeIds[0])
-        : null);
+      targetState.enabled && targetState.kind === "existing"
+        ? this.editor.getNode(targetState.nodeId)
+        : null;
 
     if (
       !(
@@ -1965,6 +2074,8 @@ export class BrushTool extends Tool {
       return null;
     }
 
+    const writableBounds = getRasterWritableBounds(this.editor, targetNode);
+    const writablePolygon = getRasterWritablePolygon(this.editor, targetNode);
     const target = {
       bounds: {
         height: targetNode.height,
@@ -1977,6 +2088,8 @@ export class BrushTool extends Tool {
         height: targetNode.height,
         width: targetNode.width,
       },
+      ...(writableBounds ? { writableBounds } : {}),
+      ...(writablePolygon ? { writablePolygon } : {}),
     };
     const surface = this.editor.rasterSurface?.resolveSurface?.(target);
 

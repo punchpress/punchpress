@@ -36,6 +36,10 @@ Image nodes represent raster artwork in a PunchPress document.
 - Image nodes do not support direct path or text editing.
 - Image editing mode supports raster image editing for image nodes.
 - Crop is node-local framing and does not rewrite pixels.
+- Crop trim retains hidden source pixels; Crop extension exposes transparent
+  area without moving or resampling existing pixels.
+- Imported-image bounds remain fixed during Brush and Eraser. Only Crop changes
+  their visible raster plane.
 - Pixel edits write a new current raster asset for the image node.
 - Masks are explicit image-node modifiers, not the default result of normal
   eraser or selection-delete tools.

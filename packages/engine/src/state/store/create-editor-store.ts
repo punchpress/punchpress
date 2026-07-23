@@ -45,6 +45,7 @@ export const createEditorStore = ({
     pathEditingPoints: [],
     penDirectSelectionModifierPressed: false,
     penPointTypeToggleModifierPressed: false,
+    rasterCropSession: null,
     selectedNodeIds: [],
     spacePressed: false,
     viewport: {
@@ -68,6 +69,9 @@ export const createEditorStore = ({
               ),
             }),
       }));
+    },
+    setRasterCropSession: (rasterCropSession) => {
+      set({ rasterCropSession });
     },
     ...createDocumentStoreActions(set, getDefaultFont),
     ...createEditingStoreActions(set),

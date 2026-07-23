@@ -344,20 +344,29 @@ export const CanvasNodeRenderTree = ({
 
     if (item.type === "image") {
       return (
-        <CanvasRasterImage
-          baseHeight={item.baseHeight}
-          baseWidth={item.baseWidth}
-          baseX={item.baseX}
-          baseY={item.baseY}
-          height={item.height}
-          key={item.key}
-          nodeId={item.nodeId}
-          opacity={isEditing ? 0 : (item.opacity ?? 1)}
-          src={item.src}
-          tileSources={item.tileSources}
-          transform={item.transform || undefined}
-          width={item.width}
-        />
+        <g key={item.key} transform={item.transform || undefined}>
+          <svg
+            aria-hidden="true"
+            height={item.height}
+            overflow="hidden"
+            width={item.width}
+            x={0}
+            y={0}
+          >
+            <CanvasRasterImage
+              baseHeight={item.baseHeight}
+              baseWidth={item.baseWidth}
+              baseX={item.baseX}
+              baseY={item.baseY}
+              height={item.height}
+              nodeId={item.nodeId}
+              opacity={isEditing ? 0 : (item.opacity ?? 1)}
+              src={item.src}
+              tileSources={item.tileSources}
+              width={item.width}
+            />
+          </svg>
+        </g>
       );
     }
 

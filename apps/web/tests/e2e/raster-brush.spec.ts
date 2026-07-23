@@ -56,6 +56,25 @@ const createLargeArtboardDocument = () =>
     version: DOCUMENT_VERSION,
   });
 
+const createExtremeArtboardDocument = () =>
+  JSON.stringify({
+    nodes: [
+      {
+        background: "#ffffff",
+        height: 60_000,
+        id: "artboard-1",
+        locked: false,
+        name: "Frame 1",
+        parentId: "root",
+        transform: transform(0, 0),
+        type: "artboard",
+        visible: true,
+        width: 100_000,
+      },
+    ],
+    version: DOCUMENT_VERSION,
+  });
+
 const createBloatedArtboardImageDocument = (src) =>
   JSON.stringify({
     nodes: [
@@ -149,12 +168,6 @@ const createHugeImageDocument = (src) =>
         width: 12_400,
       },
     ],
-    version: DOCUMENT_VERSION,
-  });
-
-const createEmptyDocument = () =>
-  JSON.stringify({
-    nodes: [],
     version: DOCUMENT_VERSION,
   });
 
@@ -895,6 +908,40 @@ const getCommittedImageSampleAtClientPoint = (page, clientPoint) => {
             scaleY
       ),
     };
+    const residentCanvas = editor.rasterSurface?.getPresentation?.(
+      imageNode.id
+    )?.canvas;
+
+    if (residentCanvas) {
+      const context = residentCanvas.getContext("2d");
+      const sampleX = Math.max(
+        0,
+        Math.min(
+          residentCanvas.width - 1,
+          localPoint.x - (imageNode.baseX ?? 0)
+        )
+      );
+      const sampleY = Math.max(
+        0,
+        Math.min(
+          residentCanvas.height - 1,
+          localPoint.y - (imageNode.baseY ?? 0)
+        )
+      );
+      const data = context?.getImageData(sampleX, sampleY, 1, 1).data;
+
+      return data
+        ? {
+            a: data[3],
+            b: data[2],
+            g: data[1],
+            imageHeight: imageNode.height,
+            imageWidth: imageNode.width,
+            r: data[0],
+          }
+        : null;
+    }
+
     const loadImage = async (src) => {
       const image = new Image();
       const loaded = new Promise((resolve, reject) => {
@@ -1147,8 +1194,16 @@ const dragBrush = async (page, points, { release = true, steps = 8 } = {}) => {
   }
 };
 
-test("brush shows a footprint cursor over the canvas", async ({ page }) => {
+const gotoRasterFrameEditor = async (page) => {
   await gotoEditor(page);
+  await loadRasterTestDocument(page, createArtboardDocument());
+  await page.evaluate(() => {
+    window.__PUNCHPRESS_EDITOR__?.clearSelection();
+  });
+};
+
+test("brush shows a footprint cursor over the canvas", async ({ page }) => {
+  await gotoRasterFrameEditor(page);
   await page.keyboard.press("b");
 
   const point = await getCanvasStagePoint(page, { x: 320, y: 240 });
@@ -1173,7 +1228,7 @@ test("brush shows a footprint cursor over the canvas", async ({ page }) => {
 test("brush cursor appears immediately when switching tools under the pointer", async ({
   page,
 }) => {
-  await gotoEditor(page);
+  await gotoRasterFrameEditor(page);
 
   const point = await getCanvasStagePoint(page, { x: 320, y: 240 });
   await page.mouse.move(point.x, point.y);
@@ -1188,7 +1243,7 @@ test("brush cursor appears immediately when switching tools under the pointer", 
 test("brush properties update settings and the brush cursor", async ({
   page,
 }) => {
-  await gotoEditor(page);
+  await gotoRasterFrameEditor(page);
   await page.keyboard.press("b");
 
   await expect(page.getByText("Brush")).toBeVisible();
@@ -1226,7 +1281,7 @@ test("brush properties update settings and the brush cursor", async ({
 });
 
 test("brush and eraser remember separate raster settings", async ({ page }) => {
-  await gotoEditor(page);
+  await gotoRasterFrameEditor(page);
 
   await page.keyboard.press("b");
   await expect(page.getByText("Brush")).toBeVisible();
@@ -1267,7 +1322,7 @@ test("brush and eraser remember separate raster settings", async ({ page }) => {
 test("brush properties affect subsequently committed pixels", async ({
   page,
 }) => {
-  await gotoEditor(page);
+  await gotoRasterFrameEditor(page);
   await page.keyboard.press("b");
 
   await setBrushHexColor(page, "#FF0033");
@@ -1303,7 +1358,7 @@ test("brush properties affect subsequently committed pixels", async ({
 test("brush writes into a raster working surface before pointerup", async ({
   page,
 }) => {
-  await gotoEditor(page);
+  await gotoRasterFrameEditor(page);
   await page.keyboard.press("b");
 
   const start = await getCanvasStagePoint(page, { x: 320, y: 240 });
@@ -1346,7 +1401,7 @@ test("brush writes into a raster working surface before pointerup", async ({
 test("eraser removes committed brush pixels through the shared brush path", async ({
   page,
 }) => {
-  await gotoEditor(page);
+  await gotoRasterFrameEditor(page);
   await page.keyboard.press("b");
 
   await setBrushSliderValue(page, "Brush size", 72);
@@ -1382,7 +1437,7 @@ test("eraser removes committed brush pixels through the shared brush path", asyn
 test("soft eraser opacity reduces alpha with brush falloff", async ({
   page,
 }) => {
-  await gotoEditor(page);
+  await gotoRasterFrameEditor(page);
   await page.keyboard.press("b");
 
   await setBrushSliderValue(page, "Brush size", 100);
@@ -1488,7 +1543,7 @@ test("artboard brush strokes do not grow raster payloads outside the frame", asy
   );
 });
 
-test("painting a bloated artboard raster clips it back to the frame", async ({
+test("painting a Frame-crossing imported Raster preserves its bounds", async ({
   page,
 }) => {
   await gotoEditor(page);
@@ -1506,9 +1561,7 @@ test("painting a bloated artboard raster clips it back to the frame", async ({
   const workingSurface = await getRasterWorkingSurfaceState(page);
 
   expect(await getBrushPreviewState(page)).toBeNull();
-  expect(workingSurface.canvasCount).toBe(1);
-  expect(workingSurface.maxCanvasWidth).toBeLessThanOrEqual(340);
-  expect(workingSurface.maxCanvasHeight).toBeLessThanOrEqual(260);
+  expect(workingSurface.canvasCount).toBe(0);
 
   await page.mouse.up();
 
@@ -1516,14 +1569,10 @@ test("painting a bloated artboard raster clips it back to the frame", async ({
 
   expect(imageState?.id).toBe("image-1");
   expect(imageState?.parentId).toBe("artboard-1");
-  expect(imageState?.width).toBeLessThanOrEqual(340);
-  expect(imageState?.height).toBeLessThanOrEqual(260);
-  expect((imageState?.x || 0) + (imageState?.width || 0)).toBeLessThanOrEqual(
-    560
-  );
-  expect((imageState?.y || 0) + (imageState?.height || 0)).toBeLessThanOrEqual(
-    420
-  );
+  expect(imageState?.width).toBe(900);
+  expect(imageState?.height).toBe(700);
+  expect(imageState?.x).toBe(120);
+  expect(imageState?.y).toBe(80);
 });
 
 test("large raster brush paints through the working raster surface", async ({
@@ -3205,7 +3254,7 @@ test("real pointer extreme zoom brush release does not blank visible ink", async
 }, testInfo) => {
   testInfo.setTimeout(90_000);
   await gotoEditor(page);
-  await loadRasterTestDocument(page, createEmptyDocument());
+  await loadRasterTestDocument(page, createExtremeArtboardDocument());
   await page.evaluate(async () => {
     const editor = window.__PUNCHPRESS_EDITOR__;
 
@@ -3213,7 +3262,17 @@ test("real pointer extreme zoom brush release does not blank visible ink", async
       throw new Error("Expected editor");
     }
 
-    const emptyLayerId = editor.addEmptyLayer();
+    const emptyLayerId = "empty-layer";
+    editor.insertNodes([
+      {
+        id: emptyLayerId,
+        name: "Layer",
+        opacity: 1,
+        parentId: "artboard-1",
+        type: "empty",
+        visible: true,
+      },
+    ]);
     const zoom = 0.01;
     const viewport = {
       x: 0,
@@ -5373,9 +5432,26 @@ test("eraser strokes undo and redo restored raster pixels", async ({
 test("undoing the first brush stroke on an empty layer restores the empty layer", async ({
   page,
 }) => {
-  await gotoEditor(page);
+  await gotoRasterFrameEditor(page);
   const emptyLayerId = await page.evaluate(() => {
-    return window.__PUNCHPRESS_EDITOR__?.addEmptyLayer();
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const id = "empty-layer";
+
+    if (editor) {
+      editor.insertNodes([
+        {
+          id,
+          name: "Layer",
+          opacity: 1,
+          parentId: "artboard-1",
+          type: "empty",
+          visible: true,
+        },
+      ]);
+      editor.select(id);
+    }
+
+    return id;
   });
 
   await page.keyboard.press("b");
@@ -5414,7 +5490,7 @@ test("undoing the first brush stroke on an empty layer restores the empty layer"
 test("working brush surface does not resize the durable layer shell mid-stroke", async ({
   page,
 }) => {
-  await gotoEditor(page);
+  await gotoRasterFrameEditor(page);
   await page.keyboard.press("b");
 
   const start = await getCanvasStagePoint(page, { x: 300, y: 240 });
@@ -5468,7 +5544,7 @@ test("working brush surface does not resize the durable layer shell mid-stroke",
 test("new brush strokes keep painting into the selected raster layer", async ({
   page,
 }) => {
-  await gotoEditor(page);
+  await gotoRasterFrameEditor(page);
   await page.keyboard.press("b");
 
   const firstStart = await getCanvasStagePoint(page, { x: 300, y: 240 });

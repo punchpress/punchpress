@@ -59,7 +59,7 @@ const getEditableToolbarNodeState = (editor, visibleSelectedNodeIds) => {
 
 export const useSelectionToolbarState = () => {
   return useEditorValue((editor, state) => {
-    if (state.editingNodeId) {
+    if (state.editingNodeId || state.rasterCropSession) {
       return null;
     }
 

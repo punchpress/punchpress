@@ -272,7 +272,14 @@ export class RasterTileSurface {
       : clampedBounds;
   }
 
-  drawNativeStroke({ bounds, color, endPoint, lineWidth, startPoint }) {
+  drawNativeStroke({
+    bounds,
+    color,
+    endPoint,
+    lineWidth,
+    startPoint,
+    writablePolygon,
+  }) {
     const tiles = this.getTilesForNativeStroke({
       bounds,
       endPoint,
@@ -286,6 +293,15 @@ export class RasterTileSurface {
 
         context.save();
         context.translate(-tile.x, -tile.y);
+        if (writablePolygon?.length) {
+          context.beginPath();
+          context.moveTo(writablePolygon[0].x, writablePolygon[0].y);
+          for (const point of writablePolygon.slice(1)) {
+            context.lineTo(point.x, point.y);
+          }
+          context.closePath();
+          context.clip();
+        }
         context.globalAlpha = 1;
         context.globalCompositeOperation = "source-over";
         context.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;

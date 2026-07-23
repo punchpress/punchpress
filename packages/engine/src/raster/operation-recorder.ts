@@ -72,6 +72,27 @@ const getDirtyRegion = (
 
   const scaleX = target.pixelSize.width / target.bounds.width;
   const scaleY = target.pixelSize.height / target.bounds.height;
+  const writableBounds = target.writableBounds || target.bounds;
+  const writableMinX = Math.max(
+    0,
+    Math.floor((writableBounds.x - target.bounds.x) * scaleX)
+  );
+  const writableMinY = Math.max(
+    0,
+    Math.floor((writableBounds.y - target.bounds.y) * scaleY)
+  );
+  const writableMaxX = Math.min(
+    target.pixelSize.width,
+    Math.ceil(
+      (writableBounds.x + writableBounds.width - target.bounds.x) * scaleX
+    )
+  );
+  const writableMaxY = Math.min(
+    target.pixelSize.height,
+    Math.ceil(
+      (writableBounds.y + writableBounds.height - target.bounds.y) * scaleY
+    )
+  );
   let minX = target.pixelSize.width;
   let minY = target.pixelSize.height;
   let maxX = 0;
@@ -83,28 +104,28 @@ const getDirtyRegion = (
     minX = Math.min(
       minX,
       Math.max(
-        0,
+        writableMinX,
         Math.floor((dab.center.x - radius - target.bounds.x) * scaleX)
       )
     );
     minY = Math.min(
       minY,
       Math.max(
-        0,
+        writableMinY,
         Math.floor((dab.center.y - radius - target.bounds.y) * scaleY)
       )
     );
     maxX = Math.max(
       maxX,
       Math.min(
-        target.pixelSize.width,
+        writableMaxX,
         Math.ceil((dab.center.x + radius - target.bounds.x) * scaleX)
       )
     );
     maxY = Math.max(
       maxY,
       Math.min(
-        target.pixelSize.height,
+        writableMaxY,
         Math.ceil((dab.center.y + radius - target.bounds.y) * scaleY)
       )
     );
@@ -136,9 +157,15 @@ const cloneContext = (
     ...context.settings,
     tip: { ...context.settings.tip },
   },
-  target: {
-    ...context.target,
-    bounds: { ...context.target.bounds },
-    pixelSize: { ...context.target.pixelSize },
-  },
-});
+    target: {
+      ...context.target,
+      bounds: { ...context.target.bounds },
+      pixelSize: { ...context.target.pixelSize },
+      writableBounds: context.target.writableBounds
+        ? { ...context.target.writableBounds }
+        : undefined,
+      writablePolygon: context.target.writablePolygon?.map((point) => ({
+        ...point,
+      })),
+    },
+  });

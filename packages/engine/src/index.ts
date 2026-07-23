@@ -191,6 +191,13 @@ export type {
 } from "./raster/operation-recorder";
 export { createRasterStroke } from "./raster/stroke";
 export type { RasterStroke } from "./raster/stroke";
+export {
+  getCroppedImageNode,
+  MAX_RASTER_CROP_AREA,
+  MAX_RASTER_CROP_DIMENSION,
+  normalizeRasterCropRect,
+} from "./raster/crop";
+export type { RasterCropRect } from "./raster/crop";
 export type {
   RasterBrushTip,
   RasterCommit,

@@ -44,6 +44,8 @@ export type RasterTarget = {
   bounds: RasterRect;
   id: string;
   pixelSize: RasterPixelSize;
+  writableBounds?: RasterRect;
+  writablePolygon?: readonly RasterPoint[];
 };
 
 export type RasterStrokeContext = {
@@ -54,6 +56,8 @@ export type RasterStrokeContext = {
   readonly target: Readonly<Omit<RasterTarget, "bounds" | "pixelSize">> & {
     readonly bounds: Readonly<RasterRect>;
     readonly pixelSize: Readonly<RasterPixelSize>;
+    readonly writableBounds?: Readonly<RasterRect>;
+    readonly writablePolygon?: readonly Readonly<RasterPoint>[];
   };
 };
 
@@ -75,6 +79,9 @@ export type RasterSurface = {
 };
 
 export type RasterSurfaceResolver = {
+  snapshotSurface?: (
+    targetId: string
+  ) => { height: number; src: string; width: number } | null;
   retainTargets?: (targetIds: readonly string[]) => void;
   resolveSurface: (target: Readonly<RasterTarget>) => RasterSurface | null;
 };

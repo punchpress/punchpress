@@ -5,6 +5,7 @@ import {
   PERF_SPANS,
   type RasterDab,
   type RasterDirtyRegion,
+  type RasterPoint,
   type RasterStrokeContext,
   type RasterSurface,
   type RasterSurfaceSession,
@@ -67,7 +68,13 @@ const createCanvas2dRasterSurfaceSession = (
           })
         );
         dirtyRegion = unionRects(dirtyRegion, nextDirtyRegion);
+        context.save();
+        clipContextToWritablePolygon(
+          context,
+          strokeContext.target.writablePolygon
+        );
         paintDabs(context, dabs, strokeContext);
+        context.restore();
         incrementPerfCounter(PERF_COUNTERS.rasterStrokeDabs, dabs.length);
         incrementPerfCounter(PERF_COUNTERS.rasterStrokeDirectPresentation);
         incrementPerfCounter(PERF_COUNTERS.rasterStrokeVisualLagFrames, 0);
@@ -121,6 +128,23 @@ const createCanvas2dRasterSurfaceSession = (
   };
 };
 
+const clipContextToWritablePolygon = (
+  context: CanvasRenderingContext2D,
+  polygon: readonly Readonly<RasterPoint>[] | undefined
+) => {
+  if (!polygon?.length) {
+    return;
+  }
+
+  context.beginPath();
+  context.moveTo(polygon[0].x, polygon[0].y);
+  for (const point of polygon.slice(1)) {
+    context.lineTo(point.x, point.y);
+  }
+  context.closePath();
+  context.clip();
+};
+
 const captureRollbackPatch = ({
   capabilities,
   region,
@@ -157,8 +181,20 @@ const paintDabs = (
     strokeContext.target.pixelSize.width / strokeContext.target.bounds.width;
   const scaleY =
     strokeContext.target.pixelSize.height / strokeContext.target.bounds.height;
+  const writableBounds =
+    strokeContext.target.writableBounds || strokeContext.target.bounds;
 
   context.save();
+  if (strokeContext.target.writableBounds) {
+    context.beginPath();
+    context.rect(
+      (writableBounds.x - strokeContext.target.bounds.x) * scaleX,
+      (writableBounds.y - strokeContext.target.bounds.y) * scaleY,
+      writableBounds.width * scaleX,
+      writableBounds.height * scaleY
+    );
+    context.clip();
+  }
   context.globalAlpha = strokeContext.settings.opacity;
   context.globalCompositeOperation =
     strokeContext.operation === "erase" ? "destination-out" : "source-over";
@@ -214,19 +250,37 @@ const getDabsDirtyRegion = (
   let region: RasterDirtyRegion | null = null;
   const scaleX = target.pixelSize.width / target.bounds.width;
   const scaleY = target.pixelSize.height / target.bounds.height;
+  const writableBounds = target.writableBounds || target.bounds;
+  const writableMinX = Math.max(
+    0,
+    Math.floor((writableBounds.x - target.bounds.x) * scaleX)
+  );
+  const writableMinY = Math.max(
+    0,
+    Math.floor((writableBounds.y - target.bounds.y) * scaleY)
+  );
+  const writableMaxX = Math.min(
+    target.pixelSize.width,
+    Math.ceil(
+      (writableBounds.x + writableBounds.width - target.bounds.x) * scaleX
+    )
+  );
+  const writableMaxY = Math.min(
+    target.pixelSize.height,
+    Math.ceil(
+      (writableBounds.y + writableBounds.height - target.bounds.y) * scaleY
+    )
+  );
 
   for (const dab of dabs) {
     const centerX = (dab.center.x - target.bounds.x) * scaleX;
     const centerY = (dab.center.y - target.bounds.y) * scaleY;
     const radiusX = (dab.size * scaleX) / 2;
     const radiusY = (dab.size * scaleY) / 2;
-    const minX = Math.max(0, Math.floor(centerX - radiusX));
-    const minY = Math.max(0, Math.floor(centerY - radiusY));
-    const maxX = Math.min(target.pixelSize.width, Math.ceil(centerX + radiusX));
-    const maxY = Math.min(
-      target.pixelSize.height,
-      Math.ceil(centerY + radiusY)
-    );
+    const minX = Math.max(writableMinX, Math.floor(centerX - radiusX));
+    const minY = Math.max(writableMinY, Math.floor(centerY - radiusY));
+    const maxX = Math.min(writableMaxX, Math.ceil(centerX + radiusX));
+    const maxY = Math.min(writableMaxY, Math.ceil(centerY + radiusY));
 
     if (maxX <= minX || maxY <= minY) {
       continue;

@@ -683,11 +683,23 @@ const RasterWorkingCanvas = ({ canvas, height, testId, width, x, y }) => {
     canvas.style.pointerEvents = "none";
     canvas.style.width = "100%";
     canvas.setAttribute("aria-hidden", "true");
+    const previousParent = canvas.parentElement;
+    const previousNextSibling = canvas.nextSibling;
+
     host.replaceChildren(canvas);
 
     return () => {
       if (canvas.parentElement === host) {
         host.removeChild(canvas);
+      }
+
+      if (previousParent?.isConnected) {
+        previousParent.insertBefore(
+          canvas,
+          previousNextSibling?.parentNode === previousParent
+            ? previousNextSibling
+            : null
+        );
       }
     };
   }, [canvas]);
@@ -1024,11 +1036,11 @@ export const CanvasRasterImage = (props) => {
       >
         <RasterWorkingCanvas
           canvas={residentSurface.canvas}
-          height={props.height}
+          height={props.baseHeight ?? props.height}
           testId="raster-resident-canvas"
-          width={props.width}
-          x={0}
-          y={0}
+          width={props.baseWidth ?? props.width}
+          x={props.baseX ?? 0}
+          y={props.baseY ?? 0}
         />
       </g>
     );
@@ -1037,13 +1049,13 @@ export const CanvasRasterImage = (props) => {
   return (
     <g opacity={props.opacity ?? 1} transform={props.transform || undefined}>
       <image
-        height={props.height}
+        height={props.baseHeight ?? props.height}
         href={props.src}
         pointerEvents="none"
         preserveAspectRatio="none"
-        width={props.width}
-        x={0}
-        y={0}
+        width={props.baseWidth ?? props.width}
+        x={props.baseX ?? 0}
+        y={props.baseY ?? 0}
       />
       <RasterWorkingSurface surface={workingSurface} />
     </g>
@@ -1053,8 +1065,6 @@ export const CanvasRasterImage = (props) => {
 const useResidentRasterSurface = ({
   baseHeight,
   baseWidth,
-  baseX,
-  baseY,
   height,
   nodeId,
   src,
@@ -1064,12 +1074,9 @@ const useResidentRasterSurface = ({
   const editor = useEditor();
   const runtime = editor.rasterSurface;
   const isEligible =
-    Boolean(src) &&
-    !(Array.isArray(tileSources) && tileSources.length > 0) &&
-    (baseX ?? 0) === 0 &&
-    (baseY ?? 0) === 0 &&
-    (baseWidth ?? width) === width &&
-    (baseHeight ?? height) === height;
+    Boolean(src) && !(Array.isArray(tileSources) && tileSources.length > 0);
+  const surfaceHeight = baseHeight ?? height;
+  const surfaceWidth = baseWidth ?? width;
   const subscribe = useCallback(
     (listener) => runtime?.subscribe?.(listener) || (() => undefined),
     [runtime]
@@ -1089,10 +1096,10 @@ const useResidentRasterSurface = ({
 
     runtime
       .ensureSurface({
-        height: Math.max(1, Math.round(height)),
+        height: Math.max(1, Math.round(surfaceHeight)),
         id: nodeId,
         src,
-        width: Math.max(1, Math.round(width)),
+        width: Math.max(1, Math.round(surfaceWidth)),
       })
       .catch((error) => {
         if (active) {
@@ -1103,7 +1110,7 @@ const useResidentRasterSurface = ({
     return () => {
       active = false;
     };
-  }, [height, isEligible, nodeId, runtime, src, width]);
+  }, [isEligible, nodeId, runtime, src, surfaceHeight, surfaceWidth]);
 
   return presentation;
 };

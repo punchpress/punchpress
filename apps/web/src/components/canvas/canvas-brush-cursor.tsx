@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
+import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
 
 interface BrushCursorPosition {
@@ -24,13 +25,20 @@ export const CanvasBrushCursor = ({
 }: {
   hostElement: HTMLDivElement | null;
 }) => {
-  const { activeTool, settings, zoom } = useEditorValue((editor, state) => {
-    return {
-      activeTool: state.activeTool,
-      settings: editor.getBrushToolSettings(state.activeTool),
-      zoom: state.viewport.zoom,
-    };
-  });
+  const editor = useEditor();
+  const { activeTool, settings, targetRevision, viewportX, viewportY, zoom } =
+    useEditorValue((editor, state) => {
+      return {
+        activeTool: state.activeTool,
+        settings: editor.getBrushToolSettings(state.activeTool),
+        targetRevision: `${state.selectedNodeIds.join(",")}:${state.nodes
+          .map((node) => `${node.id}:${node.visible}:${node.locked ?? ""}`)
+          .join("|")}`,
+        viewportX: state.viewport.x,
+        viewportY: state.viewport.y,
+        zoom: state.viewport.zoom,
+      };
+    });
   const [position, setPosition] = useState<BrushCursorPosition | null>(null);
 
   useEffect(() => {
@@ -87,7 +95,35 @@ export const CanvasBrushCursor = ({
     };
   }, [hostElement]);
 
-  if (!(position && settings && isRasterTool(activeTool))) {
+  const point =
+    position && editor.viewerRef
+      ? {
+          x: viewportX + position.x / zoom,
+          y: viewportY + position.y / zoom,
+        }
+      : null;
+  const disabled = Boolean(
+    targetRevision &&
+      point &&
+      isRasterTool(activeTool) &&
+      !editor.currentTool.hasActiveSession?.() &&
+      !editor.getRasterTargetState({ point, tool: activeTool }).enabled
+  );
+
+  useLayoutEffect(() => {
+    if (!hostElement) {
+      return;
+    }
+
+    if (disabled) {
+      hostElement.dataset.rasterCursorDisabled = "true";
+      return;
+    }
+
+    delete hostElement.dataset.rasterCursorDisabled;
+  }, [disabled, hostElement]);
+
+  if (!(position && settings && isRasterTool(activeTool) && !disabled)) {
     return null;
   }
 
@@ -97,6 +133,7 @@ export const CanvasBrushCursor = ({
     <div
       aria-hidden="true"
       className="pointer-events-none absolute top-0 left-0 z-40 rounded-full border border-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.75),0_0_3px_rgba(0,0,0,0.35)]"
+      data-raster-target="enabled"
       data-testid="brush-cursor"
       style={{
         height: size,

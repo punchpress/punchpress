@@ -129,6 +129,27 @@ const handlePathEditingEscapeShortcutKeyDown = (
 };
 
 export const handleCanvasShortcutKeyDown = (editor, event, key) => {
+  if (editor.rasterCropSession) {
+    if (key === "escape") {
+      event.preventDefault();
+      editor.cancelCrop();
+      return true;
+    }
+
+    if (key === "enter") {
+      event.preventDefault();
+      editor.commitCrop();
+      return true;
+    }
+
+    if (event.code !== "Space") {
+      event.preventDefault();
+      return true;
+    }
+
+    return false;
+  }
+
   const currentTool = editor.currentTool;
   const toolOwnsEscape = Boolean(
     key === "escape" &&
@@ -197,6 +218,13 @@ export const handleWindowKeyDown = (editor, event) => {
   }
 
   const key = event.key.toLowerCase();
+  if (
+    editor.rasterCropSession &&
+    handleCanvasShortcutKeyDown(editor, event, key)
+  ) {
+    return;
+  }
+
   if (handleEditingShortcutKeyDown(editor, event, key)) {
     return;
   }

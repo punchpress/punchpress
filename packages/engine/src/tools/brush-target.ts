@@ -1,5 +1,5 @@
 // @ts-nocheck TODO(typecheck-baseline): raster runtime exempt — in-flight redesign owns these files
-import { getTopmostArtboardAtPoint } from "../nodes/artboard/artboard-hit-test";
+import { containsPoint } from "../nodes/artboard/artboard-hit-test";
 import { getImageNodeBounds } from "../nodes/image/image-capabilities";
 import { createDefaultImageNode } from "../nodes/image/model";
 import { getNodeSourceKind } from "../nodes/node-capabilities";
@@ -21,29 +21,51 @@ export const getImageLocalPoint = (node, point) => {
   return getNodeLocalPoint(node, getImageNodeBounds(node), point);
 };
 
-export const getNodeArtboardClipBounds = (editor, node) => {
-  const parent = node?.parentId ? editor.getNode(node.parentId) : null;
+const getOwningFrame = (editor, node) => {
+  let parent = node?.parentId ? editor.getNode(node.parentId) : null;
 
-  if (parent?.type !== "artboard") {
+  while (parent) {
+    if (parent.type === "artboard") {
+      return parent;
+    }
+
+    parent = parent.parentId ? editor.getNode(parent.parentId) : null;
+  }
+
+  return null;
+};
+
+export const getNodeArtboardClipBounds = (editor, node) => {
+  const frame = getOwningFrame(editor, node);
+
+  if (!frame) {
     return null;
   }
 
-  return editor.getNodeRenderFrame(parent.id)?.bounds || null;
+  return editor.getNodeRenderFrame(frame.id)?.bounds || null;
 };
 
-export const getImageLocalClipBounds = (editor, node) => {
+export const getImageLocalClipPolygon = (editor, node) => {
   const bounds = getNodeArtboardClipBounds(editor, node);
 
   if (!bounds) {
     return null;
   }
 
-  const points = [
+  return [
     getImageLocalPoint(node, { x: bounds.minX, y: bounds.minY }),
     getImageLocalPoint(node, { x: bounds.maxX, y: bounds.minY }),
     getImageLocalPoint(node, { x: bounds.maxX, y: bounds.maxY }),
     getImageLocalPoint(node, { x: bounds.minX, y: bounds.maxY }),
   ];
+};
+
+export const getImageLocalClipBounds = (editor, node) => {
+  const points = getImageLocalClipPolygon(editor, node);
+
+  if (!points) {
+    return null;
+  }
 
   return {
     maxX: Math.max(...points.map((point) => point.x)),
@@ -128,9 +150,11 @@ const createBrushImageNode = ({
   artboard = null,
   id,
   name,
+  opacity,
   parentId,
   point,
   settings,
+  visible,
 }) => {
   const margin = getInitialBrushLayerMargin(settings);
   const minX = artboard
@@ -159,7 +183,9 @@ const createBrushImageNode = ({
     ...node,
     id: id || node.id,
     name: name || node.name,
+    opacity: opacity ?? node.opacity,
     parentId: parentId || node.parentId,
+    visible: visible ?? node.visible,
     transform: {
       ...node.transform,
       x: round(minX, 2),
@@ -176,57 +202,194 @@ const getSelectedSingleNode = (editor) => {
   return editor.getNode(editor.selectedNodeIds[0]);
 };
 
-const canCreateRasterAtTarget = (node) => {
-  const sourceKind = getNodeSourceKind(node);
-
-  return !sourceKind || sourceKind === "artboard" || sourceKind === "empty";
+const isFrameWritable = (editor, frame) => {
+  return Boolean(
+    frame?.type === "artboard" &&
+      !frame.locked &&
+      editor.isNodeEffectivelyVisible(frame.id)
+  );
 };
 
-export const resolveBrushTarget = (editor, point, node, settings) => {
-  if (getNodeSourceKind(node) === "raster") {
-    return node;
+const isNodeTreeUnlocked = (editor, node) => {
+  let current = node;
+
+  while (current) {
+    if (current.locked === true) {
+      return false;
+    }
+
+    current =
+      current.parentId && current.parentId !== "root"
+        ? editor.getNode(current.parentId)
+        : null;
   }
 
-  if (!canCreateRasterAtTarget(node)) {
-    return null;
+  return true;
+};
+
+const isRasterWritable = (editor, node) => {
+  if (
+    !(
+      getNodeSourceKind(node) === "raster" &&
+      editor.isNodeEffectivelyVisible(node.id) &&
+      isNodeTreeUnlocked(editor, node)
+    )
+  ) {
+    return false;
+  }
+
+  const frame = getOwningFrame(editor, node);
+
+  return !frame || isFrameWritable(editor, frame);
+};
+
+const isPointInsideFrame = (editor, frame, point) => {
+  return Boolean(
+    isFrameWritable(editor, frame) &&
+      containsPoint(editor.getNodeRenderFrame(frame.id)?.bounds, point)
+  );
+};
+
+export const getRasterTargetState = (
+  editor,
+  { point, tool = editor.activeTool }
+) => {
+  if (!(tool === "brush" || tool === "eraser")) {
+    return { enabled: false, kind: "invalid" };
+  }
+
+  if (editor.selectedNodeIds.length > 1) {
+    return { enabled: false, kind: "invalid" };
   }
 
   const selectedNode = getSelectedSingleNode(editor);
 
-  if (getNodeSourceKind(selectedNode) === "raster") {
-    return selectedNode;
+  if (isRasterWritable(editor, selectedNode)) {
+    return {
+      enabled: true,
+      kind: "existing",
+      nodeId: selectedNode.id,
+    };
+  }
+
+  if (tool === "eraser") {
+    return { enabled: false, kind: "invalid" };
   }
 
   if (getNodeSourceKind(selectedNode) === "empty") {
-    const parentArtboard =
-      selectedNode.parentId &&
-      editor.getNode(selectedNode.parentId)?.type === "artboard"
-        ? editor.getNode(selectedNode.parentId)
-        : null;
+    const frame = getOwningFrame(editor, selectedNode);
 
-    return createBrushImageNode({
-      artboard: parentArtboard,
-      id: selectedNode.id,
-      name: selectedNode.name,
-      parentId: selectedNode.parentId,
-      point,
-      settings,
-    });
+    return isPointInsideFrame(editor, frame, point) &&
+      editor.isNodeEffectivelyVisible(selectedNode.id) &&
+      isNodeTreeUnlocked(editor, selectedNode)
+      ? {
+          enabled: true,
+          frameId: frame.id,
+          kind: "materialize",
+          nodeId: selectedNode.id,
+        }
+      : { enabled: false, kind: "invalid" };
   }
 
-  if (!canCreateRasterAtTarget(selectedNode)) {
+  if (selectedNode?.type === "artboard") {
+    return isPointInsideFrame(editor, selectedNode, point)
+      ? {
+          enabled: true,
+          frameId: selectedNode.id,
+          kind: "create",
+        }
+      : { enabled: false, kind: "invalid" };
+  }
+
+  if (selectedNode) {
+    return { enabled: false, kind: "invalid" };
+  }
+
+  const frame = [...editor.nodes]
+    .reverse()
+    .find(
+      (node) =>
+        node.type === "artboard" &&
+        isFrameWritable(editor, node) &&
+        isPointInsideFrame(editor, node, point)
+    );
+
+  return isFrameWritable(editor, frame)
+    ? {
+        enabled: true,
+        frameId: frame.id,
+        kind: "create",
+      }
+    : { enabled: false, kind: "invalid" };
+};
+
+export const resolveBrushTarget = (
+  editor,
+  point,
+  settings,
+  tool = editor.activeTool
+) => {
+  const state = getRasterTargetState(editor, { point, tool });
+
+  if (!state.enabled) {
     return null;
   }
 
-  const artboard = getTopmostArtboardAtPoint(editor, point);
+  if (state.kind === "existing") {
+    return editor.getNode(state.nodeId);
+  }
+
+  const frame = editor.getNode(state.frameId);
+
+  if (state.kind === "materialize") {
+    const selectedNode = editor.getNode(state.nodeId);
+
+    return createBrushImageNode({
+      artboard: frame,
+      id: selectedNode.id,
+      name: selectedNode.name,
+      opacity: selectedNode.opacity,
+      parentId: selectedNode.parentId,
+      point,
+      settings,
+      visible: selectedNode.visible,
+    });
+  }
 
   return createBrushImageNode({
-    artboard,
-    parentId: artboard?.id,
+    artboard: frame,
+    parentId: frame.id,
     point,
     settings,
   });
 };
+
+export const getRasterWritableBounds = (editor, node) => {
+  if (node?.type !== "image") {
+    return null;
+  }
+
+  const clipBounds = getImageLocalClipBounds(editor, node);
+
+  if (!clipBounds) {
+    return null;
+  }
+
+  const minX = Math.max(0, clipBounds.minX);
+  const minY = Math.max(0, clipBounds.minY);
+  const maxX = Math.min(node.width, clipBounds.maxX);
+  const maxY = Math.min(node.height, clipBounds.maxY);
+
+  return {
+    height: Math.max(0, maxY - minY),
+    width: Math.max(0, maxX - minX),
+    x: minX,
+    y: minY,
+  };
+};
+
+export const getRasterWritablePolygon = (editor, node) =>
+  node?.type === "image" ? getImageLocalClipPolygon(editor, node) : null;
 
 export const materializeBrushTarget = (editor, targetNode) => {
   const existingNode = editor.getNode(targetNode.id);

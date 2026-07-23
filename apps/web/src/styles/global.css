@@ -527,6 +527,12 @@ textarea,
   cursor: none;
 }
 
+.canvas-host[data-raster-cursor-disabled="true"] .canvas-surface,
+.canvas-host[data-raster-cursor-disabled="true"] .canvas-node,
+.canvas-host[data-raster-cursor-disabled="true"] .canvas-node * {
+  cursor: not-allowed !important;
+}
+
 .canvas-host[data-panning="true"],
 .canvas-host[data-panning="true"] .canvas-surface,
 .canvas-host[data-panning="true"] .canvas-node,

@@ -37,24 +37,25 @@ presented canvas is also the live editing surface.
   brush policy calls the seam instead of reaching directly for DOM globals.
 - Brush target selection lives in the brush target resolver. It asks node
   capabilities for source kind, then decides whether to reuse a raster node,
-  materialize an empty layer, create an artboard child raster, or no-op until a
-  rasterize flow exists.
+  materialize an empty layer inside its Frame, create a Frame child Raster, or
+  reject a non-finite Workspace target.
 - The stroke session owns sampled points, dirty bounds, working-surface
   mutation, commit scheduling, and history completion for one active stroke.
 
 ### Resident Canvas2D Surface
 
 The browser injects a Canvas2D Raster resolver when it constructs `Editor`.
-React prepares existing, full-plane, single-payload image nodes and mounts the
-adapter's stable canvas in the node render tree. The engine resolves that
-surface by finite target id and pixel dimensions; it does not import DOM or
-Canvas types. Cropped/base-frame images stay on the existing path.
+React prepares existing, single-payload image nodes and mounts the adapter's
+stable canvas in the node render tree. The engine resolves that surface by
+finite target id, pixel dimensions, and optional writable bounds; it does not
+import DOM or Canvas types. The resident presentation stays mounted when Crop
+changes the visible frame around its base pixels.
 
 The initial resident path supports Hard Round paint and alpha-subtractive
 Eraser only. Stroke commit reports dirty pixels synchronously and releases the
 tool without PNG encoding. Source replacement, dirty-region history,
-autosave/package persistence, targeting/materialization breadth, Crop, presets,
-and tiled-runtime cutover belong to their owning follow-up layers.
+autosave/package persistence, presets, and tiled-runtime cutover belong to
+their owning follow-up layers.
 
 ## Durable Model
 
@@ -125,17 +126,18 @@ therefore follow source-over math instead of depending on sub-byte rounding.
 
 ## Target Resolution And Layer Materialization
 
-Brush resolves the active target from hover, selected node, or selected layer.
-Target resolution uses source-kind capabilities instead of React branches on
-node type.
+Brush resolves the active target once at pointer-down. Selection is
+authoritative; hover never retargets an active Stroke. Target resolution uses
+source-kind capabilities instead of React branches on node type.
 
 | Target kind | Behavior |
 | --- | --- |
-| Image node | Use the node's raster asset directly. |
-| Empty layer | Materialize the layer as an image node and write the first stroke. |
-| No compatible selected layer | Create a new layer, materialize it as an image node, and write the first stroke. |
-| Artboard body | Allow the stroke to start on the frame surface; a compatible selected raster layer still wins, otherwise a new raster layer is created inside the artboard. |
-| Text, shape, path, vector, group | No-op for the initial raster-tool slice. A later rasterize flow can replace this no-op with an explicit conversion dialog. |
+| One selected writable Raster | Use it regardless of pointer location and lock it for the Stroke. |
+| One selected empty layer in a Frame | Brush materializes it only when pointer-down is inside that Frame. |
+| One selected Frame | Brush creates a child Raster only when pointer-down is inside it. |
+| No selection over a Frame | Brush creates a Raster in the topmost writable Frame. |
+| Workspace, multiple selection, incompatible, hidden, or locked target | Disabled cursor and no-op. |
+| Eraser without a selected writable Raster | Disabled cursor and no-op; Eraser never creates or materializes. |
 
 ## Pixel Buffers
 
@@ -152,9 +154,9 @@ node type.
 - Existing unclipped raster layers preserve their raster plane when a stroke
   commits. Width, height, transform, base dimensions, and rotation remain node
   metadata; brush commits do not trim them to the latest alpha bounds.
-- Raster payloads parented to an artboard are clipped to the artboard bounds.
-  Invisible off-frame paint does not grow the backing bitmap, and a subsequent
-  paint commit clips an oversized artboard child raster back to the frame.
+- Raster payloads parented to a Frame are clipped before Dab generation and
+  pixel work. Invisible off-Frame drag distance does not grow the backing
+  bitmap or generate unbounded work.
 - Eraser clips to the existing raster plane and does not grow the layer by
   erasing transparent space.
 - Large-operation thresholds may move encode and decode into a worker without
@@ -219,6 +221,16 @@ Brush strokes commit as one history step per completed stroke.
 | Eraser stroke | One asset update for the completed stroke. |
 
 Pointermove updates do not create history entries or replace document assets.
+The first Stroke's target creation or empty-layer materialization and its
+pixels share one logical change seam.
+
+## Crop
+
+Crop stores a transient node-local rectangle outside durable document state.
+Commit adjusts the image node's logical width, height, base offsets, and
+transform so retained source pixels stay at the same world position. Source
+pixels and resident Canvas2D dimensions remain unchanged. Cancel discards the
+session; a changed commit is one history step.
 
 ## Export
 

@@ -28,6 +28,7 @@ and future clients should converge here instead of inventing parallel behavior.
 | History | undo, redo, commit history step, dirty/saved marks. |
 | Inspection | debug dump, selection properties, overlay state, node geometry, layer rows. |
 | Raster host | Constructor-injected `RasterSurfaceResolver` for finite browser or headless Raster targets. |
+| Raster editing | `getRasterTargetState`, `startCrop`, `updateCrop`, `commitCrop`, `cancelCrop`, `getRasterCropPreviewNode`. |
 
 ## Rules
 

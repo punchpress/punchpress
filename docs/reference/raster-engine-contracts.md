@@ -22,8 +22,12 @@ WebGPU, encoded images, package storage, or Workspace dimensions.
 - Effective Dab spacing has a one-document-unit floor. Hard tips use the full
   size-scaled spacing; softer tips reduce it toward one quarter so their falloff
   does not reveal stamp rings. A zero spacing setting uses the floor.
-- A `RasterTarget` locks one finite target id, document bounds, and pixel
-  dimensions for the full Stroke.
+- A `RasterTarget` locks one finite target id, document bounds, pixel
+  dimensions, and optional writable bounds and transformed Frame polygon for
+  the full Stroke.
+- Input segments are clipped to writable bounds expanded by the Dab radius
+  before spacing or smoothing work. A drag crossing enormous off-target
+  distances therefore emits work only near the finite target.
 - Pixel allocation belongs to the surface adapter and is bounded by the target
   and dirty region, never by the Workspace.
 - Viewport zoom does not enter the Raster API. Clients convert pointer input to
@@ -49,7 +53,7 @@ changes target or switches between `paint` and `erase`.
 
 | Operation | Contract |
 | --- | --- |
-| `applyDabs(dabs)` | Apply transient Dabs to the locked working surface. |
+| `applyDabs(dabs)` | Apply transient Dabs to the locked working surface, clipped again to writable bounds by the adapter. |
 | `commit()` | Make the session durable and report its clipped pixel dirty region. |
 | `cancel()` | Discard transient work without a durable change. |
 

@@ -109,10 +109,15 @@ const buildSvgImageMarkup = (node, geometry, inheritedOpacity, offsetX, offsetY)
         )}" preserveAspectRatio="none"${opacity}/>`
     )
     .join("");
+  const clippedRasterMarkup = `<svg x="0" y="0" width="${format(
+    node.width
+  )}" height="${format(
+    node.height
+  )}" overflow="hidden">${baseMarkup}${tileMarkup}</svg>`;
 
   return `<g transform="translate(${format(getNodeX(node) - offsetX)} ${format(
     getNodeY(node) - offsetY
-  )})">${openLocalTransform}${baseMarkup}${tileMarkup}${closeLocalTransform}</g>`;
+  )})">${openLocalTransform}${clippedRasterMarkup}${closeLocalTransform}</g>`;
 };
 
 export const buildSvgExport = (nodes, geometryById, options: { width?: any; height?: any; offsetX?: any; offsetY?: any; inheritedOpacityById?: any; background?: any } = {}) => {

@@ -166,6 +166,10 @@ const shouldIgnoreCanvasPointerTarget = (event, activeTool) => {
     return true;
   }
 
+  if (event.target.closest("[data-raster-crop-overlay]")) {
+    return true;
+  }
+
   if (
     event.target.closest("[data-node-id], [data-testid='canvas-text-input']")
   ) {
@@ -187,6 +191,16 @@ const shouldIgnoreCanvasPointerTarget = (event, activeTool) => {
   }
 
   return Boolean(!isRasterTool && event.target.closest(".canvas-moveable"));
+};
+
+const commitCropFromOutsidePress = (editor, event) => {
+  if (
+    editor.rasterCropSession &&
+    event.target instanceof Element &&
+    !event.target.closest("[data-raster-crop-overlay]")
+  ) {
+    editor.commitCrop();
+  }
 };
 
 const isTransformOverlayWheelTarget = (target) => {
@@ -464,6 +478,8 @@ export const Canvas = () => {
       if (spacePressed || activeTool === "hand") {
         return;
       }
+
+      commitCropFromOutsidePress(editor, event);
 
       if (
         pathEditingNodeId &&

@@ -18,6 +18,10 @@ History tracks logical document edits, not raw pointer events.
   until commit.
 - Programmatic editor actions should create history steps at the same semantic
   boundary a user action would.
+- A first Brush Stroke includes Raster creation or empty-layer materialization
+  and committed pixels in one logical step.
+- A changed Crop commit is one logical step; Crop preview and cancellation are
+  not history.
 
 ## Undo And Redo
 

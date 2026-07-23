@@ -127,6 +127,13 @@ import {
   createDocumentChange,
 } from "./history/document-change";
 import {
+  cancelRasterCrop as cancelEditorRasterCrop,
+  commitRasterCrop as commitEditorRasterCrop,
+  getRasterCropPreviewNode as getEditorRasterCropPreviewNode,
+  startRasterCrop as startEditorRasterCrop,
+  updateRasterCrop as updateEditorRasterCrop,
+} from "./raster/crop";
+import {
   handleCanvasShortcutKeyDown as handleEditorCanvasShortcutKeyDown,
   handleEditingShortcutKeyDown as handleEditorEditingShortcutKeyDown,
   handlePenDirectSelectionModifierDown as handleEditorPenDirectSelectionModifierDown,
@@ -238,6 +245,7 @@ import { getSelectionBounds as getEditorSelectionBounds } from "./selection/sele
 import { createEditorStore } from "./state/store/create-editor-store";
 import { HandTool } from "./tools/hand-tool";
 import { BrushTool } from "./tools/brush-tool";
+import { getRasterTargetState as getEditorRasterTargetState } from "./tools/brush-target";
 import { NodeTool } from "./tools/node-tool";
 import { PenTool } from "./tools/pen-tool";
 import { PointerTool } from "./tools/pointer-tool";
@@ -1039,6 +1047,34 @@ export class Editor {
     return this.tools.get(toolId)?.getSettings?.() || null;
   }
 
+  getRasterTargetState(input) {
+    return getEditorRasterTargetState(this, input);
+  }
+
+  get rasterCropSession() {
+    return this.getState().rasterCropSession;
+  }
+
+  startCrop(nodeId = this.selectedNodeId) {
+    return startEditorRasterCrop(this, nodeId);
+  }
+
+  updateCrop(rect) {
+    return updateEditorRasterCrop(this, rect);
+  }
+
+  commitCrop() {
+    return commitEditorRasterCrop(this);
+  }
+
+  cancelCrop() {
+    return cancelEditorRasterCrop(this);
+  }
+
+  getRasterCropPreviewNode() {
+    return getEditorRasterCropPreviewNode(this);
+  }
+
   setBrushSettings(patch, toolId) {
     this.getState().setBrushSettings(patch, toolId);
   }
@@ -1115,10 +1151,12 @@ export class Editor {
   }
 
   clearSelection() {
+    this.commitCrop();
     clearEditorSelection(this);
   }
 
   clearSelectionPreservingFocus() {
+    this.commitCrop();
     clearEditorSelectionPreservingFocus(this);
   }
 
@@ -1244,14 +1282,29 @@ export class Editor {
   }
 
   select(nodeId) {
+    if (
+      this.rasterCropSession &&
+      (this.selectedNodeIds.length !== 1 || this.selectedNodeId !== nodeId)
+    ) {
+      this.commitCrop();
+    }
     selectEditorNode(this, nodeId);
   }
 
   setSelectedNodes(nodeIds) {
+    if (
+      this.rasterCropSession &&
+      (nodeIds.length !== 1 || nodeIds[0] !== this.selectedNodeId)
+    ) {
+      this.commitCrop();
+    }
     setEditorSelectedNodes(this, nodeIds);
   }
 
   toggleSelection(nodeId) {
+    if (this.rasterCropSession) {
+      this.commitCrop();
+    }
     toggleEditorSelection(this, nodeId);
   }
 
@@ -1260,6 +1313,9 @@ export class Editor {
   }
 
   deselect(nodeId) {
+    if (this.rasterCropSession) {
+      this.commitCrop();
+    }
     deselectEditorNode(this, nodeId);
   }
 
@@ -1441,6 +1497,9 @@ export class Editor {
   }
 
   setActiveTool(toolId) {
+    if (this.rasterCropSession && toolId !== this.activeTool) {
+      this.commitCrop();
+    }
     setEditorActiveTool(this, toolId);
   }
 

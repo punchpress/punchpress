@@ -29,6 +29,9 @@ export interface Canvas2dRasterRuntime extends RasterSurfaceResolver {
     input: EnsureCanvas2dRasterSurfaceInput
   ) => Promise<Canvas2dRasterPresentation>;
   getPresentation: (targetId: string) => Canvas2dRasterPresentation | null;
+  snapshotSurface: (
+    targetId: string
+  ) => { height: number; src: string; width: number } | null;
   subscribe: (listener: () => void) => () => void;
 }
 
@@ -137,6 +140,17 @@ export const createCanvas2dRasterRuntime = (
       }
 
       return record.surface;
+    },
+    snapshotSurface: (targetId) => {
+      const presentation = records.get(targetId)?.presentation;
+
+      return presentation
+        ? {
+            height: presentation.canvas.height,
+            src: presentation.canvas.toDataURL("image/png"),
+            width: presentation.canvas.width,
+          }
+        : null;
     },
     subscribe: (listener) => {
       listeners.add(listener);

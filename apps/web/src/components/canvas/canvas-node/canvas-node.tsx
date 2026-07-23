@@ -329,6 +329,11 @@ const CanvasStandardNodeArt = ({ nodeId }) => {
   const paintPreview = useEditorSurfaceValue((editor) =>
     editor.getSelectionColorPreviewForNode(nodeId)
   );
+  const allowsRasterWorkingSurfaceOverflow = useEditorSurfaceValue(
+    (editor) =>
+      editor.getBrushWorkingSurfaceStateForNode?.(nodeId)?.allowOverflow ===
+      true
+  );
   const editor = useEditor();
   const artState = useMemo(
     () =>
@@ -338,6 +343,7 @@ const CanvasStandardNodeArt = ({ nodeId }) => {
 
   return artState ? (
     <CanvasNodeArt
+      allowImageOverflow={allowsRasterWorkingSurfaceOverflow}
       bbox={artState.bbox}
       fill={artState.fill}
       fillRule={artState.fillRule}
@@ -435,6 +441,7 @@ export const CanvasNode = memo(CanvasNodeComponent);
 
 const CanvasNodeArt = memo(
   ({
+    allowImageOverflow,
     bbox,
     fill,
     fillRule,
@@ -508,7 +515,10 @@ const CanvasNodeArt = memo(
     return (
       <svg
         aria-label="Canvas node"
-        className="pointer-events-none block h-full w-full overflow-visible"
+        className={cn(
+          "pointer-events-none block h-full w-full",
+          image && !allowImageOverflow ? "overflow-hidden" : "overflow-visible"
+        )}
         height={height}
         role="img"
         style={getPaintPreviewStyle(paintPreview)}
