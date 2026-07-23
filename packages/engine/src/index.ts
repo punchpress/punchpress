@@ -203,6 +203,7 @@ export type {
   RasterStrokeContext,
   RasterStrokeSettings,
   RasterSurface,
+  RasterSurfaceResolver,
   RasterSurfaceSession,
   RasterTarget,
 } from "./raster/contracts";

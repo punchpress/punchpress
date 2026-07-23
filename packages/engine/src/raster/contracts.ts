@@ -73,3 +73,7 @@ export type RasterSurfaceSession = {
 export type RasterSurface = {
   beginStroke: (context: Readonly<RasterStrokeContext>) => RasterSurfaceSession;
 };
+
+export type RasterSurfaceResolver = {
+  resolveSurface: (target: Readonly<RasterTarget>) => RasterSurface | null;
+};

@@ -322,6 +322,7 @@ export interface Editor {
   tools: any;
   unsubscribe: any;
   vectorRenderSurfaces: any;
+  rasterSurface: any;
   viewerRef: any;
   viewportFocusRequest: any;
   viewportInteracting: any;
@@ -329,7 +330,7 @@ export interface Editor {
 }
 
 export class Editor {
-  constructor({ accent = UI_ACCENT, initialZoom = 1 } = {}) {
+  constructor({ accent = UI_ACCENT, initialZoom = 1, rasterSurface = null } = {}) {
     this.accent = accent;
     this.availableFonts = [];
     this.defaultFont = createLocalFontDescriptor(DEFAULT_LOCAL_FONT);
@@ -354,6 +355,7 @@ export class Editor {
     this.geometry = new GeometryManager(this.fonts);
     this.nodeTree = new NodeTreeManager();
     this.vectorRenderSurfaces = new VectorRenderSurfaceManager();
+    this.rasterSurface = rasterSurface;
     // @ts-expect-error TODO(typecheck-baseline): Map infers narrowest tool overload; union is correct at runtime
     this.tools = new Map([
       ["pointer", new PointerTool(this)],

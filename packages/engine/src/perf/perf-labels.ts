@@ -56,6 +56,14 @@ export const PERF_SPANS = {
 
   renderCanvasReact: "render.canvas.react",
 
+  rasterStrokeApplyDabs: "raster.stroke.applyDabs",
+  rasterStrokeBegin: "raster.stroke.begin",
+  rasterStrokeCancel: "raster.stroke.cancel",
+  rasterStrokeCommit: "raster.stroke.commit",
+  rasterStrokeFirstDab: "raster.stroke.firstDab",
+  rasterStrokePointerRelease: "raster.stroke.pointerRelease",
+  rasterSurfaceDecode: "raster.surface.decode",
+
   layersSelectorDragging: "layers.selector.dragging",
   layersSelectorNodeIds: "layers.selector.nodeIds",
   layersSelectorVisibleNodeIds: "layers.selector.visibleNodeIds",
@@ -77,6 +85,14 @@ export const PERF_COUNTERS = {
   renderPanelLayerRow: "render.panelLayerRow.count",
   renderPanelLayers: "render.panelLayers.count",
   renderPanelProperties: "render.panelProperties.count",
+  rasterStrokeDabs: "raster.stroke.dabs",
+  rasterStrokeDirtyAreaPixels: "raster.stroke.dirtyAreaPixels",
+  rasterStrokeDirectPresentation: "raster.stroke.directPresentation",
+  rasterStrokeVisualLagFrames: "raster.stroke.visualLagFrames",
+  rasterBenchmarkCommonHardRound: "raster.benchmark.commonHardRound",
+  rasterBenchmarkExtremeZoomOut: "raster.benchmark.extremeZoomOut",
+  rasterBenchmarkLargeEraser: "raster.benchmark.largeEraser",
+  rasterBenchmarkPixelZoom: "raster.benchmark.pixelZoom",
 } as const;
 
 export type PerfCounterName = (typeof PERF_COUNTERS)[keyof typeof PERF_COUNTERS];

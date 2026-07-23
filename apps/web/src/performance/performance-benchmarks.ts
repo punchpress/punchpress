@@ -13,6 +13,10 @@ import {
   largeSvgTextDeselectBenchmark,
   largeSvgViewportBenchmark,
 } from "./benchmarks/large-svg-benchmark";
+import {
+  rasterCanvas2dBenchmark,
+  rasterCanvas2dExtremeDiagonalBenchmark,
+} from "./benchmarks/raster-canvas2d-benchmark";
 import { shapeDragBenchmarkLarge } from "./benchmarks/square-drag-benchmark";
 import {
   textDragBenchmark,
@@ -37,6 +41,8 @@ export const performanceBenchmarks = [
   largeSvgPathPointDragBenchmark,
   simpleVectorPathPointDragBenchmark,
   hugeRasterViewportBenchmark,
+  rasterCanvas2dBenchmark,
+  rasterCanvas2dExtremeDiagonalBenchmark,
   compoundVectorDragBenchmark,
   idleSoakBenchmark,
   shapeDragBenchmarkLarge,

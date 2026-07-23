@@ -1,5 +1,13 @@
 import { getNodeLocalPoint, getNodeScaleX } from "@punchpress/engine";
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
 
 interface RasterDebugRecord {
@@ -986,6 +994,7 @@ const CanvasTiledRasterImage = ({
 };
 
 export const CanvasRasterImage = (props) => {
+  const residentSurface = useResidentRasterSurface(props);
   const workingSurface = useEditorSurfaceValue((editor) =>
     editor.getBrushWorkingSurfaceStateForNode?.(props.nodeId)
   );
@@ -1006,6 +1015,25 @@ export const CanvasRasterImage = (props) => {
     );
   }
 
+  if (residentSurface) {
+    return (
+      <g
+        data-raster-resident-surface="canvas2d"
+        opacity={props.opacity ?? 1}
+        transform={props.transform || undefined}
+      >
+        <RasterWorkingCanvas
+          canvas={residentSurface.canvas}
+          height={props.height}
+          testId="raster-resident-canvas"
+          width={props.width}
+          x={0}
+          y={0}
+        />
+      </g>
+    );
+  }
+
   return (
     <g opacity={props.opacity ?? 1} transform={props.transform || undefined}>
       <image
@@ -1020,4 +1048,53 @@ export const CanvasRasterImage = (props) => {
       <RasterWorkingSurface surface={workingSurface} />
     </g>
   );
+};
+
+const useResidentRasterSurface = ({
+  height,
+  nodeId,
+  src,
+  tileSources,
+  width,
+}) => {
+  const editor = useEditor();
+  const runtime = editor.rasterSurface;
+  const isEligible =
+    Boolean(src) && !(Array.isArray(tileSources) && tileSources.length > 0);
+  const subscribe = useCallback(
+    (listener) => runtime?.subscribe?.(listener) || (() => undefined),
+    [runtime]
+  );
+  const getSnapshot = useCallback(
+    () => (isEligible ? runtime?.getPresentation?.(nodeId) || null : null),
+    [isEligible, nodeId, runtime]
+  );
+  const presentation = useSyncExternalStore(subscribe, getSnapshot, () => null);
+
+  useEffect(() => {
+    if (!(isEligible && runtime?.ensureSurface)) {
+      return;
+    }
+
+    let active = true;
+
+    runtime
+      .ensureSurface({
+        height: Math.max(1, Math.round(height)),
+        id: nodeId,
+        src,
+        width: Math.max(1, Math.round(width)),
+      })
+      .catch((error) => {
+        if (active) {
+          console.error("Failed to prepare Canvas2D Raster surface", error);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [height, isEligible, nodeId, runtime, src, width]);
+
+  return presentation;
 };

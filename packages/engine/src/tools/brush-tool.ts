@@ -2,6 +2,8 @@
 import { getImageNodeBounds } from "../nodes/image/image-capabilities";
 import { getNodeScaleX } from "../nodes/text/model";
 import { incrementPerfCounter, measurePerf } from "../perf/perf-hooks";
+import { PERF_SPANS } from "../perf/perf-labels";
+import { createRasterStroke } from "../raster/stroke";
 import {
   getNodeTransformForPinnedWorldPoint,
   getNodeWorldPoint,
@@ -1725,6 +1727,12 @@ export class BrushTool extends Tool {
   }
 
   beginStroke({ node = null, point }) {
+    const residentSession = this.beginResidentStroke({ node, point });
+
+    if (residentSession) {
+      return residentSession;
+    }
+
     if (!hasRasterRuntime()) {
       return null;
     }
@@ -1773,6 +1781,86 @@ export class BrushTool extends Tool {
 
       return session;
     });
+  }
+
+  beginResidentStroke({ node, point }) {
+    const settings = this.getSettings();
+
+    if (
+      !(
+        node?.type === "image" &&
+        node.src &&
+        !(node.tileSources || []).length &&
+        settings.hardness === 1 &&
+        this.editor.getNode(node.id)?.type === "image"
+      )
+    ) {
+      return null;
+    }
+
+    const target = {
+      bounds: {
+        height: node.height,
+        width: node.width,
+        x: 0,
+        y: 0,
+      },
+      id: node.id,
+      pixelSize: {
+        height: node.height,
+        width: node.width,
+      },
+    };
+    const surface = this.editor.rasterSurface?.resolveSurface?.(target);
+
+    if (!surface) {
+      return null;
+    }
+
+    const stroke = measurePerf(PERF_SPANS.rasterStrokeBegin, () =>
+      createRasterStroke({
+        operation: this.operation,
+        point: getImageLocalPoint(node, point),
+        settings: {
+          ...settings,
+          smoothing: 0,
+          tip: { kind: "round" },
+        },
+        surface,
+        target,
+      })
+    );
+    let active = true;
+    const finish = () => {
+      if (!active) {
+        return;
+      }
+
+      active = false;
+      this.clearActiveSession(session);
+    };
+    const session = {
+      cancel: () => {
+        stroke.cancel();
+        finish();
+      },
+      complete: ({ point: endPoint }) => {
+        const commit = measurePerf(PERF_SPANS.rasterStrokePointerRelease, () => {
+          stroke.append([getImageLocalPoint(node, endPoint)]);
+          return stroke.commit();
+        });
+        finish();
+        return Promise.resolve(commit);
+      },
+      getWorkingSurfaceState: () => null,
+      hasPendingWorkingSurface: () => false,
+      update: ({ point: nextPoint }) => {
+        stroke.append([getImageLocalPoint(node, nextPoint)]);
+      },
+    };
+
+    this.activeSession = session;
+    return session;
   }
 
   clearPendingPreview(session) {
