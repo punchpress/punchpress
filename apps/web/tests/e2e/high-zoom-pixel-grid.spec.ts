@@ -30,6 +30,27 @@ const createRasterSource = (page: Page) => {
   });
 };
 
+const createContrastRasterSource = (page: Page) => {
+  return page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+
+    canvas.width = 2;
+    canvas.height = 1;
+
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      throw new Error("Expected Canvas2D");
+    }
+
+    context.fillStyle = "#000";
+    context.fillRect(0, 0, 1, 1);
+    context.fillStyle = "#fff";
+    context.fillRect(1, 0, 1, 1);
+    return canvas.toDataURL("image/png");
+  });
+};
+
 const setConvergedViewport = async (
   page: Page,
   viewport: { x: number; y: number; zoom: number }
@@ -165,6 +186,37 @@ const createDenseTiledDocument = (src: string) =>
         type: "image",
         visible: true,
         width: 129,
+      },
+    ],
+    version: "1.8",
+  });
+
+const createFractionalRasterDocument = (src: string) =>
+  JSON.stringify({
+    nodes: [
+      {
+        assetId: "asset-fractional-raster",
+        baseHeight: 3.6,
+        baseWidth: 7.4,
+        baseX: 0.4,
+        baseY: -0.45,
+        height: 3.6,
+        id: "fractional-raster",
+        mimeType: "image/png",
+        name: "Fractional Raster",
+        opacity: 1,
+        parentId: "root",
+        src,
+        transform: {
+          rotation: 0,
+          scaleX: 1.25,
+          scaleY: 0.8,
+          x: 320.3,
+          y: 220.6,
+        },
+        type: "image",
+        visible: true,
+        width: 7.4,
       },
     ],
     version: "1.8",
@@ -452,4 +504,94 @@ test("keeps Crop, selection, Brush cursor, and live painting aligned at high zoo
       '[data-node-id="standalone-raster"] [data-raster-sampling="exact"]'
     )
   ).toBeVisible();
+});
+
+test.describe("fractional exact Raster pixel grid", () => {
+  test.use({ deviceScaleFactor: 1.5 });
+
+  test("aligns one grid cell per exact sample with contrast on black and white", async ({
+    page,
+  }) => {
+    await gotoEditor(page);
+    const src = await createContrastRasterSource(page);
+
+    await loadDocument(page, createFractionalRasterDocument(src));
+    await page.evaluate(() => {
+      window.__PUNCHPRESS_EDITOR__?.select("fractional-raster");
+    });
+    await setConvergedViewport(page, {
+      x: 318.25,
+      y: 218.75,
+      zoom: 6.375,
+    });
+
+    const grid = page.locator('[data-pixel-grid-node-id="fractional-raster"]');
+    const pattern = grid.getByTestId("pixel-grid-pattern");
+    const resident = page.locator(
+      '[data-node-id="fractional-raster"] [data-testid="raster-resident-canvas"] canvas'
+    );
+
+    await expect(grid).toBeVisible();
+    await expect(pattern).toBeAttached();
+    await expect(resident).toBeVisible();
+    await expect(grid.locator('[data-pixel-grid-tone="dark"]')).toHaveCount(2);
+    await expect(grid.locator('[data-pixel-grid-tone="light"]')).toHaveCount(2);
+
+    const geometry = await page.evaluate(() => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
+      const node = editor?.getNode("fractional-raster");
+      const gridElement = document.querySelector<SVGSVGElement>(
+        '[data-pixel-grid-node-id="fractional-raster"]'
+      );
+      const patternElement = gridElement?.querySelector("pattern");
+      const canvas = document.querySelector<HTMLCanvasElement>(
+        '[data-node-id="fractional-raster"] [data-testid="raster-resident-canvas"] canvas'
+      );
+
+      if (!(node && gridElement && patternElement && canvas)) {
+        return null;
+      }
+
+      const gridRect = gridElement.getBoundingClientRect();
+      const canvasRect = canvas.getBoundingClientRect();
+      const localScaleX = gridRect.width / node.width;
+      const localScaleY = gridRect.height / node.height;
+
+      return {
+        actualCellHeight:
+          Number(patternElement.getAttribute("height")) * localScaleY,
+        actualCellWidth:
+          Number(patternElement.getAttribute("width")) * localScaleX,
+        actualOriginX:
+          gridRect.left +
+          Number(patternElement.getAttribute("x")) * localScaleX,
+        actualOriginY:
+          gridRect.top + Number(patternElement.getAttribute("y")) * localScaleY,
+        devicePixelRatio: window.devicePixelRatio,
+        expectedCellHeight: canvasRect.height / canvas.height,
+        expectedCellWidth: canvasRect.width / canvas.width,
+        expectedOriginX: canvasRect.left,
+        expectedOriginY: canvasRect.top,
+      };
+    });
+
+    expect(geometry).not.toBeNull();
+    expect(geometry?.devicePixelRatio).toBe(1.5);
+    expect(geometry?.actualCellWidth).toBeCloseTo(
+      geometry?.expectedCellWidth || 0,
+      5
+    );
+    expect(geometry?.actualCellHeight).toBeCloseTo(
+      geometry?.expectedCellHeight || 0,
+      5
+    );
+    expect(geometry?.actualOriginX).toBeCloseTo(
+      geometry?.expectedOriginX || 0,
+      5
+    );
+    expect(geometry?.actualOriginY).toBeCloseTo(
+      geometry?.expectedOriginY || 0,
+      5
+    );
+  });
 });

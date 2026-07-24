@@ -8,6 +8,7 @@ import {
   PIXEL_GRID_ZOOM_THRESHOLD,
 } from "@punchpress/engine";
 import {
+  getPixelGridPlane,
   getPixelGridPreviewNode,
   getPixelGridStrokeWidths,
 } from "../../src/components/canvas/canvas-pixel-grid-math";
@@ -219,6 +220,28 @@ describe("high-zoom Raster presentation", () => {
     ).toEqual({
       horizontal: 1 / (0.75 * 7.25 * 0.8),
       vertical: 1 / (0.75 * 7.25 * 1.25),
+    });
+  });
+
+  test("maps fractional Raster layout bounds to exact integer samples", () => {
+    expect(
+      getPixelGridPlane(
+        {
+          baseHeight: 3.6,
+          baseWidth: 7.4,
+          baseX: 0.4,
+          baseY: -0.45,
+        },
+        {
+          height: 4,
+          width: 7,
+        }
+      )
+    ).toEqual({
+      cellHeight: 0.9,
+      cellWidth: 7.4 / 7,
+      originX: 0.4,
+      originY: -0.45,
     });
   });
 });

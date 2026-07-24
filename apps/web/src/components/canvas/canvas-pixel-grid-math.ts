@@ -5,6 +5,30 @@ interface PixelGridStrokeWidthOptions {
   zoom: number;
 }
 
+interface PixelGridSampleSize {
+  height: number;
+  width: number;
+}
+
+interface PixelGridPlaneNode {
+  baseHeight?: number;
+  baseWidth?: number;
+  baseX?: number;
+  baseY?: number;
+}
+
+export const getPixelGridPlane = (
+  node: PixelGridPlaneNode,
+  sampleSize: PixelGridSampleSize
+) => ({
+  cellHeight:
+    (node.baseHeight ?? sampleSize.height) / Math.max(1, sampleSize.height),
+  cellWidth:
+    (node.baseWidth ?? sampleSize.width) / Math.max(1, sampleSize.width),
+  originX: node.baseX ?? 0,
+  originY: node.baseY ?? 0,
+});
+
 export const getPixelGridPreviewNode = (node, preview) => {
   if (!preview?.nodeIds?.includes(node.id)) {
     return node;
