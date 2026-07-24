@@ -69,66 +69,85 @@ export const CanvasPixelGrid = () => {
   });
 
   return (
-    <svg
+    <div
       aria-hidden="true"
-      className={`canvas-pixel-grid pointer-events-none absolute overflow-hidden ${
+      className={`canvas-pixel-grid pointer-events-none absolute ${
         state.cropActive ? "z-[55]" : "z-[5]"
       }`}
-      data-pixel-grid-kind={kind}
-      data-pixel-grid-node-id={node.id}
-      data-pixel-grid-source-node-id={sourceNodeId}
-      height={node.height}
       style={{
-        left: getNodeX(node),
-        top: getNodeY(node),
-        transform: getNodeCssTransform(node),
-        transformOrigin: "center center",
+        height: node.height,
+        ...(kind === "raster"
+          ? {
+              transform: `translate3d(${getNodeX(node)}px, ${getNodeY(node)}px, 0)`,
+            }
+          : {
+              left: getNodeX(node),
+              top: getNodeY(node),
+            }),
+        width: node.width,
       }}
-      viewBox={`0 0 ${node.width} ${node.height}`}
-      width={node.width}
     >
-      <defs>
-        <pattern
-          data-testid="pixel-grid-pattern"
-          height={plane.cellHeight}
-          id={id}
-          patternUnits="userSpaceOnUse"
-          width={plane.cellWidth}
-          x={plane.originX}
-          y={plane.originY}
+      <div
+        className="absolute h-full w-full"
+        data-pixel-grid-kind={kind}
+        data-pixel-grid-node-id={node.id}
+        data-pixel-grid-source-node-id={sourceNodeId}
+        style={{
+          transform: getNodeCssTransform(node),
+          transformOrigin: "center center",
+        }}
+      >
+        <svg
+          aria-hidden="true"
+          className="block h-full w-full overflow-hidden"
+          height={node.height}
+          viewBox={`0 0 ${node.width} ${node.height}`}
+          width={node.width}
         >
-          <path
-            d={`M0 0V${plane.cellHeight}`}
-            data-pixel-grid-tone="dark"
-            stroke="#000"
-            strokeOpacity="0.52"
-            strokeWidth={strokeWidths.vertical * 2}
-          />
-          <path
-            d={`M0 0H${plane.cellWidth}`}
-            data-pixel-grid-tone="dark"
-            stroke="#000"
-            strokeOpacity="0.52"
-            strokeWidth={strokeWidths.horizontal * 2}
-          />
-          <path
-            d={`M0 0V${plane.cellHeight}`}
-            data-pixel-grid-tone="light"
-            stroke="#fff"
-            strokeOpacity="0.72"
-            strokeWidth={strokeWidths.vertical}
-          />
-          <path
-            d={`M0 0H${plane.cellWidth}`}
-            data-pixel-grid-tone="light"
-            stroke="#fff"
-            strokeOpacity="0.72"
-            strokeWidth={strokeWidths.horizontal}
-          />
-        </pattern>
-      </defs>
-      <rect fill={`url(#${id})`} height="100%" width="100%" />
-    </svg>
+          <defs>
+            <pattern
+              data-testid="pixel-grid-pattern"
+              height={plane.cellHeight}
+              id={id}
+              patternUnits="userSpaceOnUse"
+              width={plane.cellWidth}
+              x={plane.originX}
+              y={plane.originY}
+            >
+              <path
+                d={`M0 0V${plane.cellHeight}`}
+                data-pixel-grid-tone="dark"
+                stroke="#000"
+                strokeOpacity="0.52"
+                strokeWidth={strokeWidths.vertical * 2}
+              />
+              <path
+                d={`M0 0H${plane.cellWidth}`}
+                data-pixel-grid-tone="dark"
+                stroke="#000"
+                strokeOpacity="0.52"
+                strokeWidth={strokeWidths.horizontal * 2}
+              />
+              <path
+                d={`M0 0V${plane.cellHeight}`}
+                data-pixel-grid-tone="light"
+                stroke="#fff"
+                strokeOpacity="0.72"
+                strokeWidth={strokeWidths.vertical}
+              />
+              <path
+                d={`M0 0H${plane.cellWidth}`}
+                data-pixel-grid-tone="light"
+                stroke="#fff"
+                strokeOpacity="0.72"
+                strokeWidth={strokeWidths.horizontal}
+              />
+            </pattern>
+          </defs>
+          <rect fill={`url(#${id})`} height="100%" width="100%" />
+        </svg>
+      </div>
+    </div>
   );
 };
 

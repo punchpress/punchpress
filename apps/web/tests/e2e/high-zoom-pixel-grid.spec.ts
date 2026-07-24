@@ -540,7 +540,7 @@ test.describe("fractional exact Raster pixel grid", () => {
     const geometry = await page.evaluate(() => {
       const editor = window.__PUNCHPRESS_EDITOR__;
       const node = editor?.getNode("fractional-raster");
-      const gridElement = document.querySelector<SVGSVGElement>(
+      const gridElement = document.querySelector<HTMLElement>(
         '[data-pixel-grid-node-id="fractional-raster"]'
       );
       const patternElement = gridElement?.querySelector("pattern");
