@@ -7,7 +7,20 @@ read_when:
 
 # Selection
 
-Selection identifies the current canvas target for editing.
+Selection identifies the current canvas target for transform chrome and direct
+editing. It is separate from the persistent active layer used by layer-targeted
+tools.
+
+## Active Layer
+
+- Every non-empty document keeps one active layer.
+- Clearing canvas selection removes transform handles while the active layer
+  remains highlighted in Layers.
+- Selecting a canvas object or layer row also makes that node active.
+- Hidden or locked nodes may remain active, but incompatible tools stay
+  disabled instead of retargeting.
+- Deleting the active layer chooses the nearest surviving sibling, then its
+  parent Frame.
 
 ## Targeting
 

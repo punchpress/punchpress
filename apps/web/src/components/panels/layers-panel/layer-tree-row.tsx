@@ -138,7 +138,7 @@ const LayerRowPrimaryControl = ({
 }) => {
   const iconClassName = cn(
     getLayerNodeIconClassName({
-      isSelected: layer.isSelected,
+      isSelected: layer.isSelected || layer.isActive,
       isVisible: layer.isVisible,
     })
   );
@@ -175,6 +175,7 @@ const LayerRowPrimaryControl = ({
   if (!showCompoundOperationMenu) {
     return (
       <button
+        aria-current={layer.isActive ? "true" : undefined}
         aria-label={layer.label}
         aria-pressed={layer.isSelected}
         className={primaryButtonClassName}
@@ -204,6 +205,7 @@ const LayerRowPrimaryControl = ({
           onSelect={onSelect}
         />
         <button
+          aria-current={layer.isActive ? "true" : undefined}
           aria-label={layer.label}
           aria-pressed={layer.isSelected}
           className="min-w-0 flex-1 border-0 bg-transparent p-0 text-left text-inherit shadow-none outline-none"
@@ -445,15 +447,16 @@ export const LayerTreeRow = memo(function LayerTreeRow({
       : [];
   const VisibilityIcon = layer.isVisible ? ViewIcon : ViewOffIcon;
   const focusParentId = getFocusParentId(layer.node.parentId);
+  const isHighlighted = layer.isSelected || layer.isActive;
   const primaryButtonClassName = getLayerPrimaryButtonClassName({
-    isSelected: layer.isSelected,
+    isSelected: isHighlighted,
   });
   const visibilityButtonClassName = getLayerVisibilityButtonClassName({
-    isSelected: layer.isSelected,
+    isSelected: isHighlighted,
     isVisible: layer.isVisible,
   });
   const labelClassName = getLayerLabelClassName({
-    isSelected: layer.isSelected,
+    isSelected: isHighlighted,
     isVisible: layer.isVisible,
   });
 
@@ -541,9 +544,10 @@ export const LayerTreeRow = memo(function LayerTreeRow({
                 "group box-border flex w-full items-stretch gap-0 overflow-hidden rounded-[8px]",
                 getLayerRowClassName({
                   isHovered,
-                  isSelected: layer.isSelected,
+                  isSelected: isHighlighted,
                 })
               )}
+              data-active-layer={layer.isActive ? "true" : undefined}
               data-layer-row-id={nodeId}
               {...(isRenaming ? {} : dragHandleProps)}
               style={{
@@ -556,7 +560,7 @@ export const LayerTreeRow = memo(function LayerTreeRow({
                     isExpanded ? "Collapse container" : "Expand container"
                   }
                   className={getLayerDisclosureClassName({
-                    isSelected: layer.isSelected,
+                    isSelected: isHighlighted,
                   })}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -603,7 +607,7 @@ export const LayerTreeRow = memo(function LayerTreeRow({
               >
                 <span
                   className={getLayerVisibilityIconClassName({
-                    isSelected: layer.isSelected,
+                    isSelected: isHighlighted,
                     isVisible: layer.isVisible,
                   })}
                 >

@@ -77,12 +77,11 @@ export const getScaledGroupNodeUpdate = (node, bbox, anchor, scale) => {
 
   if (node.type === "image") {
     return {
-      height: round(Math.max(1, node.height * scale), 2),
+      ...getScaledImageNodeUpdate(node, scale),
       transform: {
         x: round(anchor.x + (getNodeX(node) - anchor.x) * scale, 2),
         y: round(anchor.y + (getNodeY(node) - anchor.y) * scale, 2),
       },
-      width: round(Math.max(1, node.width * scale), 2),
     };
   }
 
@@ -184,9 +183,8 @@ export const getResizedNodeUpdate = (node, bbox, anchor, scale, direction) => {
 
   if (node.type === "image") {
     return {
-      height: round(Math.max(1, node.height * scale), 2),
+      ...getScaledImageNodeUpdate(node, scale),
       transform,
-      width: round(Math.max(1, node.width * scale), 2),
     };
   }
 
@@ -219,3 +217,30 @@ export const getResizedNodeUpdate = (node, bbox, anchor, scale, direction) => {
     warp: getScaledWarp(node.warp, scale),
   };
 };
+
+export const getScaledImageNodeUpdate = (
+  node,
+  scaleX,
+  scaleY = scaleX
+) => ({
+  baseHeight: round(
+    Math.max(1, (node.baseHeight ?? node.height) * scaleY),
+    2
+  ),
+  baseWidth: round(Math.max(1, (node.baseWidth ?? node.width) * scaleX), 2),
+  baseX: round((node.baseX ?? 0) * scaleX, 2),
+  baseY: round((node.baseY ?? 0) * scaleY, 2),
+  height: round(Math.max(1, node.height * scaleY), 2),
+  ...(node.tileSources
+    ? {
+        tileSources: node.tileSources.map((tile) => ({
+          ...tile,
+          height: round(Math.max(1, tile.height * scaleY), 2),
+          width: round(Math.max(1, tile.width * scaleX), 2),
+          x: round(tile.x * scaleX, 2),
+          y: round(tile.y * scaleY, 2),
+        })),
+      }
+    : {}),
+  width: round(Math.max(1, node.width * scaleX), 2),
+});

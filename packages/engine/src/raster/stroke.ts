@@ -23,6 +23,36 @@ export type RasterStroke = {
   commit: () => RasterCommit;
 };
 
+export const clipRasterSegmentToTarget = ({
+  end,
+  radius,
+  start,
+  target,
+}: {
+  end: RasterPoint;
+  radius: number;
+  start: RasterPoint;
+  target: RasterTarget;
+}) => {
+  const writableBounds = target.writableBounds || target.bounds;
+  const clipBounds = {
+    maxX: writableBounds.x + writableBounds.width + radius,
+    maxY: writableBounds.y + writableBounds.height + radius,
+    minX: writableBounds.x - radius,
+    minY: writableBounds.y - radius,
+  };
+  const boundsClipped = clipSegment(start, end, clipBounds);
+
+  return boundsClipped && target.writablePolygon
+    ? clipSegmentToConvexPolygon(
+        boundsClipped.start,
+        boundsClipped.end,
+        target.writablePolygon,
+        radius
+      )
+    : boundsClipped;
+};
+
 export const createRasterStroke = ({
   operation,
   point,
@@ -123,16 +153,12 @@ const createBoundedDabGenerator = (
           continue;
         }
 
-        const boundsClipped = clipSegment(previousPoint, point, clipBounds);
-        const clipped =
-          boundsClipped && context.target.writablePolygon
-            ? clipSegmentToConvexPolygon(
-                boundsClipped.start,
-                boundsClipped.end,
-                context.target.writablePolygon,
-                radius
-              )
-            : boundsClipped;
+        const clipped = clipRasterSegmentToTarget({
+          end: point,
+          radius,
+          start: previousPoint,
+          target: context.target,
+        });
 
         if (!clipped) {
           generator = null;

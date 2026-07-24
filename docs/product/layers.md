@@ -1,5 +1,5 @@
 ---
-summary: Defines layers panel behavior for document tree display, empty layer materialization, source kind, selection sync, ordering, visibility, groups, vectors, and compounds.
+summary: Defines layers panel behavior for document tree display, persistent active layer state, empty layer materialization, source kind, transform-selection sync, ordering, visibility, groups, vectors, and compounds.
 read_when:
   - changing layer rows, empty layer materialization, source-kind display, drag reorder, layer selection, visibility toggles, group rows, vector child rows, or compound layer actions
   - debugging a mismatch between canvas selection and the layers panel
@@ -13,8 +13,14 @@ The layers panel exposes the document tree as editable layer rows.
 ## Contract
 
 - Rows mirror document hierarchy and layer order.
-- Selecting a row selects the corresponding canvas node.
-- Canvas selection updates the highlighted row.
+- Every non-empty document has one persistent active layer. The active row
+  remains highlighted when canvas transform selection is empty.
+- Selecting a row makes it active and selects the corresponding canvas node for
+  transform chrome.
+- Canvas selection makes its primary node active. Clearing canvas selection
+  hides transform handles without clearing the active layer.
+- Deleting the active layer activates the nearest surviving sibling, then its
+  parent Frame. An empty document has no active layer.
 - Reordering rows changes document order.
 - Visibility toggles update node visibility.
 - Group and vector rows can expose child rows.
@@ -45,5 +51,6 @@ Layer rows expose node source kind through the node type.
 | `group` | Container of mixed source content. |
 | `artboard` | Production surface and container. |
 
-Brush acts directly on image nodes. When Brush targets an empty layer,
-PunchPress materializes that layer as raster image content.
+Brush targets the active layer. It acts directly on a writable image node, or
+materializes an active empty layer after a Stroke first intersects its writable
+Frame. Frames are active insertion targets, not pixel buffers.

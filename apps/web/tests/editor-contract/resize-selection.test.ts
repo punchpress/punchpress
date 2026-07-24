@@ -88,6 +88,53 @@ describe("Editor.resizeSelectionFromCorner", () => {
     expect(afterFrame?.bounds.minY).toBeCloseTo(fixedCornerBefore?.y || 0, 2);
   });
 
+  test("scales retained Raster content on resize while Crop only changes visible bounds", () => {
+    const editor = new Editor();
+    const imageNode = {
+      ...createDefaultImageNode({
+        height: 180,
+        name: "Dropped image",
+        src: "data:image/png;base64,test",
+        width: 240,
+      }),
+      id: "image-node",
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: 320,
+        y: 240,
+      },
+    };
+
+    editor.getState().loadNodes([imageNode]);
+    editor.select(imageNode.id);
+    editor.resizeSelectionFromCorner({ corner: "se", scale: 0.5 });
+
+    const resized = editor.getNode(imageNode.id);
+    expect(resized).toMatchObject({
+      baseHeight: 90,
+      baseWidth: 120,
+      baseX: 0,
+      baseY: 0,
+      height: 90,
+      width: 120,
+    });
+
+    expect(editor.startCrop()).toBe(true);
+    editor.updateCrop({ height: 60, width: 80, x: 20, y: 10 });
+    expect(editor.commitCrop()).toBe(true);
+
+    expect(editor.getNode(imageNode.id)).toMatchObject({
+      baseHeight: 90,
+      baseWidth: 120,
+      baseX: -20,
+      baseY: -10,
+      height: 60,
+      width: 80,
+    });
+  });
+
   test("previews shape box resize without rewriting width and height until commit", () => {
     const editor = new Editor();
 

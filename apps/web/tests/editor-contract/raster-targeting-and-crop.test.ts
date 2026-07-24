@@ -4,6 +4,7 @@ import {
   createDefaultEmptyNode,
   createDefaultGroupNode,
   createDefaultImageNode,
+  createDefaultNode,
   createDefaultShapeNode,
   createRasterOperationRecorder,
   createRasterStroke,
@@ -91,7 +92,7 @@ describe("Raster targeting", () => {
     ]);
   });
 
-  test("selected writable Raster is authoritative and locks for the Stroke", async () => {
+  test("active writable Raster stays locked and allocates only after intersection", async () => {
     const recorders = new Map([
       ["raster-a", createRasterOperationRecorder()],
       ["raster-b", createRasterOperationRecorder()],
@@ -118,23 +119,193 @@ describe("Raster targeting", () => {
 
     editor.insertNodes([rasterA, rasterB]);
     editor.select(rasterA.id);
+    editor.clearSelection();
     editor.setActiveTool("brush");
     const session = editor.dispatchNodePointerDown({
       node: rasterB,
-      point: { x: 325, y: 125 },
+      point: { x: 50, y: 125 },
     });
 
     expect(session).not.toBeNull();
+    expect(resolvedTargets).toHaveLength(0);
     editor.select(rasterB.id);
-    session?.update({ point: { x: 350, y: 125 } });
-    await session?.complete({ point: { x: 360, y: 125 } });
+    session?.update({ point: { x: 150, y: 125 } });
+    await session?.complete({ point: { x: 1_000_000, y: 125 } });
 
     expect(resolvedTargets.map((target) => target.id)).toEqual(["raster-a"]);
     expect(recorders.get("raster-a")?.commits).toHaveLength(1);
     expect(recorders.get("raster-b")?.commits).toHaveLength(0);
+    expect(recorders.get("raster-a")?.commits[0]?.dabs.length).toBeLessThan(
+      200
+    );
+    expect(
+      recorders
+        .get("raster-a")
+        ?.commits[0]?.dabs.every((dab) => Math.abs(dab.center.x) <= 200)
+    ).toBe(true);
   });
 
-  test("only approved Brush selection states create inside a Frame", () => {
+  test("outside-only Raster gesture is allocation-free and leaves no history", async () => {
+    const recorder = createRasterOperationRecorder();
+    let resolveCount = 0;
+    const editor = new Editor({
+      rasterSurface: {
+        resolveSurface: () => {
+          resolveCount += 1;
+          return recorder;
+        },
+      },
+    });
+    const raster = createImage("raster");
+
+    editor.insertNodes([raster]);
+    editor.clearSelection();
+    editor.resetHistory();
+    editor.setActiveTool("brush");
+    const session = editor.dispatchCanvasPointerDown({
+      point: { x: -1_000_000, y: -1_000_000 },
+    });
+
+    session?.update({ point: { x: -500_000, y: -500_000 } });
+    await session?.complete({ point: { x: -250_000, y: -250_000 } });
+
+    expect(session).not.toBeNull();
+    expect(resolveCount).toBe(0);
+    expect(recorder.commits).toHaveLength(0);
+    expect(editor.getNode(raster.id)).toEqual(raster);
+    expect(editor.canUndo).toBe(false);
+  });
+
+  test("active Frame creates one Raster only when an outside gesture intersects", async () => {
+    const recorder = createRasterOperationRecorder();
+    let resolveCount = 0;
+    const editor = new Editor({
+      rasterSurface: {
+        resolveSurface: () => {
+          resolveCount += 1;
+          return recorder;
+        },
+      },
+    });
+    const frame = createFrame("frame", { height: 100, width: 100 });
+    const unrelated = {
+      ...createDefaultShapeNode(),
+      id: "other",
+    };
+
+    editor.insertNodes([frame, unrelated]);
+    editor.select(frame.id);
+    editor.clearSelection();
+    editor.resetHistory();
+    editor.setActiveTool("brush");
+    const session = editor.dispatchCanvasPointerDown({
+      point: { x: -500, y: 50 },
+    });
+
+    session?.update({ point: { x: -100, y: 50 } });
+
+    expect(editor.nodes).toEqual([frame, unrelated]);
+    expect(resolveCount).toBe(0);
+    expect(editor.canUndo).toBe(false);
+
+    session?.update({ point: { x: 50, y: 50 } });
+
+    const raster = editor.nodes.find((node) => node.type === "image");
+    expect(raster).toMatchObject({
+      parentId: frame.id,
+      type: "image",
+    });
+    expect(editor.activeLayerId).toBe(raster?.id);
+    expect(resolveCount).toBe(1);
+
+    await session?.complete({ point: { x: 80, y: 50 } });
+
+    expect(recorder.commits).toHaveLength(1);
+    expect(editor.currentTool.hasActiveSession()).toBe(false);
+    expect(editor.canUndo).toBe(true);
+    expect(editor.undo()).toBe(true);
+    expect(editor.nodes).toEqual([frame, unrelated]);
+    expect(editor.activeLayerId).toBe(frame.id);
+  });
+
+  test("canceling headless Frame materialization restores state and retires the session", () => {
+    const recorder = createRasterOperationRecorder();
+    const editor = new Editor({
+      rasterSurface: {
+        resolveSurface: () => recorder,
+      },
+    });
+    const frame = createFrame("frame", { height: 100, width: 100 });
+    const unrelated = {
+      ...createDefaultShapeNode(),
+      id: "other",
+    };
+
+    editor.insertNodes([frame, unrelated]);
+    editor.select(frame.id);
+    editor.clearSelection();
+    editor.resetHistory();
+    editor.setActiveTool("brush");
+    const session = editor.dispatchCanvasPointerDown({
+      point: { x: -100, y: 50 },
+    });
+
+    session?.update({ point: { x: 50, y: 50 } });
+
+    expect(editor.nodes.some((node) => node.type === "image")).toBe(true);
+    expect(editor.currentTool.hasActiveSession()).toBe(true);
+
+    session?.cancel();
+
+    expect(editor.nodes).toEqual([frame, unrelated]);
+    expect(editor.activeLayerId).toBe(frame.id);
+    expect(editor.currentTool.hasActiveSession()).toBe(false);
+    expect(recorder.commits).toHaveLength(0);
+    expect(editor.canUndo).toBe(false);
+  });
+
+  test("active empty layer materializes at first Frame intersection in one history seam", async () => {
+    const recorder = createRasterOperationRecorder();
+    const editor = new Editor({
+      rasterSurface: {
+        resolveSurface: () => recorder,
+      },
+    });
+    const frame = createFrame("frame", { height: 100, width: 100 });
+    const empty = {
+      ...createDefaultEmptyNode(),
+      id: "empty",
+      parentId: frame.id,
+    };
+
+    editor.insertNodes([frame, empty]);
+    editor.select(empty.id);
+    editor.clearSelection();
+    editor.resetHistory();
+    editor.setActiveTool("brush");
+    const session = editor.dispatchCanvasPointerDown({
+      point: { x: -500, y: 50 },
+    });
+
+    expect(editor.getNode(empty.id)?.type).toBe("empty");
+
+    session?.update({ point: { x: 50, y: 50 } });
+    await session?.complete({ point: { x: 80, y: 50 } });
+
+    expect(editor.getNode(empty.id)).toMatchObject({
+      id: empty.id,
+      parentId: frame.id,
+      type: "image",
+    });
+    expect(recorder.commits).toHaveLength(1);
+    expect(editor.currentTool.hasActiveSession()).toBe(false);
+    expect(editor.canUndo).toBe(true);
+    expect(editor.undo()).toBe(true);
+    expect(editor.getNode(empty.id)).toEqual(empty);
+    expect(editor.canUndo).toBe(false);
+  });
+
+  test("only approved active layers can target Brush", () => {
     const editor = new Editor();
     const frame = createFrame("frame");
     const empty = {
@@ -162,7 +333,7 @@ describe("Raster targeting", () => {
         point: { x: 800, y: 800 },
         tool: "brush",
       })
-    ).toEqual({ enabled: false, kind: "invalid" });
+    ).toMatchObject({ enabled: true, frameId: frame.id, kind: "create" });
 
     editor.select(frame.id);
     expect(
@@ -173,7 +344,7 @@ describe("Raster targeting", () => {
         point: { x: 800, y: 800 },
         tool: "brush",
       })
-    ).toEqual({ enabled: false, kind: "invalid" });
+    ).toMatchObject({ enabled: true, frameId: frame.id, kind: "create" });
 
     editor.select(empty.id);
     expect(editor.getNodeFrame(empty.id)).toBeNull();
@@ -188,6 +359,17 @@ describe("Raster targeting", () => {
     expect(
       editor.getRasterTargetState({ point: { x: 50, y: 50 }, tool: "eraser" })
     ).toEqual({ enabled: false, kind: "invalid" });
+    expect(
+      editor.getRasterTargetState({
+        point: { x: 800, y: 800 },
+        tool: "brush",
+      })
+    ).toMatchObject({
+      enabled: true,
+      frameId: frame.id,
+      kind: "materialize",
+      nodeId: empty.id,
+    });
 
     editor.getState().updateNodeById(empty.id, (node) => ({
       ...node,
@@ -208,7 +390,59 @@ describe("Raster targeting", () => {
     ).toEqual({ enabled: false, kind: "invalid" });
   });
 
-  test("no-selection targeting skips locked overlapping Frames", () => {
+  test("empty and incompatible active layers keep Brush disabled", () => {
+    const editor = new Editor();
+
+    expect(editor.activeLayerId).toBeNull();
+    expect(
+      editor.getRasterTargetState({ point: { x: 50, y: 50 }, tool: "brush" })
+    ).toEqual({ enabled: false, kind: "invalid" });
+
+    const shape = {
+      ...createDefaultShapeNode(),
+      id: "shape",
+    };
+    editor.insertNodes([shape]);
+    editor.clearSelection();
+
+    expect(editor.activeLayerId).toBe(shape.id);
+    expect(
+      editor.getRasterTargetState({ point: { x: 50, y: 50 }, tool: "brush" })
+    ).toEqual({ enabled: false, kind: "invalid" });
+
+    const text = {
+      ...createDefaultNode(),
+      id: "text",
+    };
+    editor.insertNodes([text]);
+    editor.clearSelection();
+
+    expect(editor.activeLayerId).toBe(text.id);
+    expect(
+      editor.getRasterTargetState({ point: { x: 50, y: 50 }, tool: "brush" })
+    ).toEqual({ enabled: false, kind: "invalid" });
+
+    const raster = createImage("raster");
+    editor.insertNodes([raster]);
+    editor.clearSelection();
+    editor.getState().updateNodeById(raster.id, { visible: false });
+
+    expect(editor.activeLayerId).toBe(raster.id);
+    expect(
+      editor.getRasterTargetState({ point: { x: 120, y: 120 }, tool: "brush" })
+    ).toEqual({ enabled: false, kind: "invalid" });
+
+    editor.getState().updateNodeById(raster.id, {
+      locked: true,
+      visible: true,
+    });
+
+    expect(
+      editor.getRasterTargetState({ point: { x: 120, y: 120 }, tool: "brush" })
+    ).toEqual({ enabled: false, kind: "invalid" });
+  });
+
+  test("cleared selection never retargets from a locked active Frame", () => {
     const editor = new Editor();
     const writableFrame = createFrame("writable-frame");
     const lockedFrame = createFrame("locked-frame", { locked: true });
@@ -218,6 +452,16 @@ describe("Raster targeting", () => {
 
     expect(
       editor.getRasterTargetState({ point: { x: 50, y: 50 }, tool: "brush" })
+    ).toEqual({ enabled: false, kind: "invalid" });
+
+    editor.select(writableFrame.id);
+    editor.clearSelection();
+
+    expect(
+      editor.getRasterTargetState({
+        point: { x: 800, y: 800 },
+        tool: "brush",
+      })
     ).toMatchObject({
       enabled: true,
       frameId: writableFrame.id,
@@ -355,7 +599,7 @@ describe("Raster targeting", () => {
     );
   });
 
-  test("clips rotated Raster Dabs to the owning Frame polygon", async () => {
+  test("does not allocate for a rotated Raster gesture outside its Frame polygon", async () => {
     const recorder = createRasterOperationRecorder();
     const editor = new Editor({
       rasterSurface: {
@@ -385,9 +629,7 @@ describe("Raster targeting", () => {
       .dispatchNodePointerDown({ node: image, point: outsideFramePoint })
       ?.complete({ point: outsideFramePoint });
 
-    expect(recorder.commits).toHaveLength(1);
-    expect(recorder.commits[0]?.context.target.writablePolygon).toHaveLength(4);
-    expect(recorder.commits[0]?.dabs).toHaveLength(0);
+    expect(recorder.commits).toHaveLength(0);
   });
 });
 

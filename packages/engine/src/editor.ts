@@ -620,6 +620,14 @@ export class Editor {
     return [...this.getChildNodeIds(ROOT_PARENT_ID)].reverse();
   }
 
+  get activeLayer() {
+    return this.getNode(this.activeLayerId);
+  }
+
+  get activeLayerId() {
+    return this.getState().activeLayerId;
+  }
+
   get selectedNode() {
     return this.getNode(this.selectedNodeId);
   }
@@ -792,6 +800,10 @@ export class Editor {
 
   isArtboardNode(nodeId) {
     return isArtboardNode(this.getNode(nodeId));
+  }
+
+  isActiveLayer(nodeId) {
+    return Boolean(nodeId && this.activeLayerId === nodeId);
   }
 
   isNodeEffectivelyVisible(nodeId) {

@@ -1,5 +1,4 @@
 // @ts-nocheck TODO(typecheck-baseline): raster runtime exempt — in-flight redesign owns these files
-import { containsPoint } from "../nodes/artboard/artboard-hit-test";
 import { getImageNodeBounds } from "../nodes/image/image-capabilities";
 import { createDefaultImageNode } from "../nodes/image/model";
 import { getNodeSourceKind } from "../nodes/node-capabilities";
@@ -194,14 +193,6 @@ const createBrushImageNode = ({
   };
 };
 
-const getSelectedSingleNode = (editor) => {
-  if (editor.selectedNodeIds.length !== 1) {
-    return null;
-  }
-
-  return editor.getNode(editor.selectedNodeIds[0]);
-};
-
 const isFrameWritable = (editor, frame) => {
   return Boolean(
     frame?.type === "artboard" &&
@@ -243,32 +234,21 @@ const isRasterWritable = (editor, node) => {
   return !frame || isFrameWritable(editor, frame);
 };
 
-const isPointInsideFrame = (editor, frame, point) => {
-  return Boolean(
-    isFrameWritable(editor, frame) &&
-      containsPoint(editor.getNodeRenderFrame(frame.id)?.bounds, point)
-  );
-};
-
 export const getRasterTargetState = (
   editor,
-  { point, tool = editor.activeTool }
+  { tool = editor.activeTool }
 ) => {
   if (!(tool === "brush" || tool === "eraser")) {
     return { enabled: false, kind: "invalid" };
   }
 
-  if (editor.selectedNodeIds.length > 1) {
-    return { enabled: false, kind: "invalid" };
-  }
+  const activeNode = editor.activeLayer;
 
-  const selectedNode = getSelectedSingleNode(editor);
-
-  if (isRasterWritable(editor, selectedNode)) {
+  if (isRasterWritable(editor, activeNode)) {
     return {
       enabled: true,
       kind: "existing",
-      nodeId: selectedNode.id,
+      nodeId: activeNode.id,
     };
   }
 
@@ -276,51 +256,32 @@ export const getRasterTargetState = (
     return { enabled: false, kind: "invalid" };
   }
 
-  if (getNodeSourceKind(selectedNode) === "empty") {
-    const frame = getOwningFrame(editor, selectedNode);
+  if (getNodeSourceKind(activeNode) === "empty") {
+    const frame = getOwningFrame(editor, activeNode);
 
-    return isPointInsideFrame(editor, frame, point) &&
-      editor.isNodeEffectivelyVisible(selectedNode.id) &&
-      isNodeTreeUnlocked(editor, selectedNode)
+    return isFrameWritable(editor, frame) &&
+      editor.isNodeEffectivelyVisible(activeNode.id) &&
+      isNodeTreeUnlocked(editor, activeNode)
       ? {
           enabled: true,
           frameId: frame.id,
           kind: "materialize",
-          nodeId: selectedNode.id,
+          nodeId: activeNode.id,
         }
       : { enabled: false, kind: "invalid" };
   }
 
-  if (selectedNode?.type === "artboard") {
-    return isPointInsideFrame(editor, selectedNode, point)
+  if (activeNode?.type === "artboard") {
+    return isFrameWritable(editor, activeNode)
       ? {
           enabled: true,
-          frameId: selectedNode.id,
+          frameId: activeNode.id,
           kind: "create",
         }
       : { enabled: false, kind: "invalid" };
   }
 
-  if (selectedNode) {
-    return { enabled: false, kind: "invalid" };
-  }
-
-  const frame = [...editor.nodes]
-    .reverse()
-    .find(
-      (node) =>
-        node.type === "artboard" &&
-        isFrameWritable(editor, node) &&
-        isPointInsideFrame(editor, node, point)
-    );
-
-  return isFrameWritable(editor, frame)
-    ? {
-        enabled: true,
-        frameId: frame.id,
-        kind: "create",
-      }
-    : { enabled: false, kind: "invalid" };
+  return { enabled: false, kind: "invalid" };
 };
 
 export const resolveBrushTarget = (
@@ -331,6 +292,15 @@ export const resolveBrushTarget = (
 ) => {
   const state = getRasterTargetState(editor, { point, tool });
 
+  return resolveBrushTargetState(editor, state, point, settings);
+};
+
+export const resolveBrushTargetState = (
+  editor,
+  state,
+  point,
+  settings
+) => {
   if (!state.enabled) {
     return null;
   }
@@ -344,6 +314,10 @@ export const resolveBrushTarget = (
   if (state.kind === "materialize") {
     const selectedNode = editor.getNode(state.nodeId);
 
+    if (!(selectedNode?.type === "empty" && isFrameWritable(editor, frame))) {
+      return null;
+    }
+
     return createBrushImageNode({
       artboard: frame,
       id: selectedNode.id,
@@ -354,6 +328,10 @@ export const resolveBrushTarget = (
       settings,
       visible: selectedNode.visible,
     });
+  }
+
+  if (!isFrameWritable(editor, frame)) {
+    return null;
   }
 
   return createBrushImageNode({

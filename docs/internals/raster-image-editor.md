@@ -35,10 +35,12 @@ presented canvas is also the live editing surface.
 - Browser raster primitives live behind the brush runtime seam. Canvas creation,
   image decode, frame scheduling, and render-ready events are runtime services;
   brush policy calls the seam instead of reaching directly for DOM globals.
-- Brush target selection lives in the brush target resolver. It asks node
-  capabilities for source kind, then decides whether to reuse a raster node,
-  materialize an empty layer inside its Frame, create a Frame child Raster, or
-  reject a non-finite Workspace target.
+- Brush target selection lives in the brush target resolver. It reads the
+  persistent active layer, asks node capabilities for source kind, then locks a
+  finite Raster or Frame without inspecting pixels under the pointer.
+- Pointer-down creates a deferred gesture. Surface resolution, layer
+  materialization, pixel allocation, and the history mark wait until the
+  gesture first intersects the locked finite target.
 - The stroke session owns sampled points, dirty bounds, working-surface
   mutation, commit scheduling, and history completion for one active stroke.
 
@@ -126,18 +128,21 @@ therefore follow source-over math instead of depending on sub-byte rounding.
 
 ## Target Resolution And Layer Materialization
 
-Brush resolves the active target once at pointer-down. Selection is
-authoritative; hover never retargets an active Stroke. Target resolution uses
-source-kind capabilities instead of React branches on node type.
+Brush resolves the active layer once at pointer-down. Transform selection and
+hover never retarget an active Stroke. Target resolution uses source-kind
+capabilities instead of React branches on node type.
 
 | Target kind | Behavior |
 | --- | --- |
-| One selected writable Raster | Use it regardless of pointer location and lock it for the Stroke. |
-| One selected empty layer in a Frame | Brush materializes it only when pointer-down is inside that Frame. |
-| One selected Frame | Brush creates a child Raster only when pointer-down is inside it. |
-| No selection over a Frame | Brush creates a Raster in the topmost writable Frame. |
-| Workspace, multiple selection, incompatible, hidden, or locked target | Disabled cursor and no-op. |
-| Eraser without a selected writable Raster | Disabled cursor and no-op; Eraser never creates or materializes. |
+| Active writable Raster | Lock it for the Stroke; resolve its surface only after first intersection. |
+| Active empty layer in a Frame | Materialize it after first Frame intersection. |
+| Active Frame | Create one child Raster after first Frame intersection. |
+| Empty document, incompatible, hidden, or locked active layer | Disabled cursor and no-op. |
+| Eraser without an active writable Raster | Disabled cursor and no-op; Eraser never creates or materializes. |
+
+An outside-only gesture does not open a working surface, materialize a node, or
+create a history seam. After first intersection, all Dab and pixel work remains
+clipped to the locked target.
 
 ## Pixel Buffers
 

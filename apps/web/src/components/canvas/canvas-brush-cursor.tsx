@@ -20,6 +20,23 @@ const isBrushCursorTarget = (target: EventTarget | null) => {
   );
 };
 
+const getBrushCursorPosition = (
+  hostElement: HTMLDivElement,
+  event: PointerEvent,
+  target: EventTarget | null
+): BrushCursorPosition | null => {
+  if (!isBrushCursorTarget(target)) {
+    return null;
+  }
+
+  const rect = hostElement.getBoundingClientRect();
+
+  return {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+  };
+};
+
 export const CanvasBrushCursor = ({
   hostElement,
 }: {
@@ -31,7 +48,7 @@ export const CanvasBrushCursor = ({
       return {
         activeTool: state.activeTool,
         settings: editor.getBrushToolSettings(state.activeTool),
-        targetRevision: `${state.selectedNodeIds.join(",")}:${state.nodes
+        targetRevision: `${state.activeLayerId || ""}:${state.selectedNodeIds.join(",")}:${state.nodes
           .map((node) => `${node.id}:${node.visible}:${node.locked ?? ""}`)
           .join("|")}`,
         viewportX: state.viewport.x,
@@ -66,16 +83,15 @@ export const CanvasBrushCursor = ({
     };
 
     const handlePointerMove = (event: PointerEvent) => {
-      if (!isBrushCursorTarget(event.target)) {
-        schedulePosition(null);
-        return;
-      }
-
-      const rect = hostElement.getBoundingClientRect();
-      schedulePosition({
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top,
-      });
+      schedulePosition(
+        getBrushCursorPosition(
+          hostElement,
+          event,
+          isBrushCursorTarget(event.target)
+            ? event.target
+            : document.elementFromPoint(event.clientX, event.clientY)
+        )
+      );
     };
 
     const handlePointerLeave = () => {
@@ -109,6 +125,9 @@ export const CanvasBrushCursor = ({
       !editor.currentTool.hasActiveSession?.() &&
       !editor.getRasterTargetState({ point, tool: activeTool }).enabled
   );
+  const enabled = Boolean(
+    position && settings && isRasterTool(activeTool) && !disabled
+  );
 
   useLayoutEffect(() => {
     if (!hostElement) {
@@ -117,13 +136,23 @@ export const CanvasBrushCursor = ({
 
     if (disabled) {
       hostElement.dataset.rasterCursorDisabled = "true";
-      return;
+    } else {
+      delete hostElement.dataset.rasterCursorDisabled;
     }
 
-    delete hostElement.dataset.rasterCursorDisabled;
-  }, [disabled, hostElement]);
+    if (enabled) {
+      hostElement.dataset.rasterCursorEnabled = "true";
+    } else {
+      delete hostElement.dataset.rasterCursorEnabled;
+    }
 
-  if (!(position && settings && isRasterTool(activeTool) && !disabled)) {
+    return () => {
+      delete hostElement.dataset.rasterCursorDisabled;
+      delete hostElement.dataset.rasterCursorEnabled;
+    };
+  }, [disabled, enabled, hostElement]);
+
+  if (!enabled) {
     return null;
   }
 

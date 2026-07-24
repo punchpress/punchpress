@@ -4,6 +4,7 @@ export const getEditorDebugDump = (editor) => {
   const document = JSON.parse(serializedDocument);
 
   return {
+    activeLayerId: editor.activeLayerId,
     bootstrap: {
       defaultFont: { ...editor.getDefaultFont() },
       error: editor.fontCatalogError,

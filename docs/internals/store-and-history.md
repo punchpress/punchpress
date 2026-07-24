@@ -15,7 +15,7 @@ state.
 | State | Examples |
 | --- | --- |
 | Durable document | nodes, transforms, visibility, text, styling, vector geometry, artboards. |
-| Session state | active tool, selection, focused group, viewport, font catalog. |
+| Session state | active tool, active layer, transform selection, focused group, viewport, font catalog. |
 | Transient interaction | hover, drag preview, rotation session, path positioning, panning. |
 | Clipboard state | copied PunchPress payload and paste sequencing. |
 
@@ -28,3 +28,7 @@ state.
 
 Do not store hover, viewport, cursor, Paper sessions, or render caches in saved
 documents.
+
+Active layer is session state rather than saved document data. Store mutations
+reconcile it after insert, load, undo, redo, and deletion so a non-empty
+document always has exactly one. Transform selection may be empty independently.

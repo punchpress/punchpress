@@ -3,7 +3,10 @@ import { getImageNodeBounds } from "../nodes/image/image-capabilities";
 import { getNodeScaleX } from "../nodes/text/model";
 import { incrementPerfCounter, measurePerf } from "../perf/perf-hooks";
 import { PERF_SPANS } from "../perf/perf-labels";
-import { createRasterStroke } from "../raster/stroke";
+import {
+  clipRasterSegmentToTarget,
+  createRasterStroke,
+} from "../raster/stroke";
 import {
   getNodeTransformForPinnedWorldPoint,
   getNodeWorldPoint,
@@ -36,7 +39,7 @@ import {
   getRasterWritableBounds,
   getRasterWritablePolygon,
   materializeBrushTarget,
-  resolveBrushTarget,
+  resolveBrushTargetState,
 } from "./brush-target";
 import { RASTER_TILE_SIZE, RasterTileSurface } from "./raster-tile-surface";
 import { selectToolFromShortcut, Tool } from "./tool";
@@ -506,6 +509,7 @@ class BrushStrokeSession {
     this.canvasState = null;
     this.canvasOffset = { x: 0, y: 0 };
     this.completed = false;
+    this.commitStarted = false;
     this.commitHandoffCancel = null;
     this.dirtyBounds = null;
     this.editor = editor;
@@ -598,6 +602,7 @@ class BrushStrokeSession {
           }
         });
     this.tool = tool;
+    this.requiresFiniteInputClipping = true;
 
     measurePerf("brush.stroke.materializeTarget", () =>
       editor.run(() => {
@@ -625,8 +630,8 @@ class BrushStrokeSession {
     };
   }
 
-  addPoint(point) {
-    this.points.push(point);
+  addPoint(point, { breakBefore = false } = {}) {
+    this.points.push({ breakBefore, point });
     this.flushPoints();
   }
 
@@ -642,10 +647,13 @@ class BrushStrokeSession {
       let processedCount = 0;
 
       while (this.pointReadIndex < this.points.length) {
-        const point = this.points[this.pointReadIndex];
+        const queuedPoint = this.points[this.pointReadIndex];
 
         this.pointReadIndex += 1;
-        this.applyPoint(point);
+        if (queuedPoint.breakBefore) {
+          this.lastPoint = null;
+        }
+        this.applyPoint(queuedPoint.point);
         processedCount += 1;
 
         if (
@@ -1239,8 +1247,11 @@ class BrushStrokeSession {
       }
 
       this.points = this.points.map((queuedPoint) => ({
-        x: queuedPoint.x + left,
-        y: queuedPoint.y + top,
+        ...queuedPoint,
+        point: {
+          x: queuedPoint.point.x + left,
+          y: queuedPoint.point.y + top,
+        },
       }));
 
       if (this.dirtyBounds) {
@@ -1316,14 +1327,22 @@ class BrushStrokeSession {
     this.addPoint(this.getLocalPoint(point));
   }
 
+  restart({ point }) {
+    this.addPoint(this.getLocalPoint(point), { breakBefore: true });
+  }
+
   complete({ point }) {
+    this.addPoint(this.getLocalPoint(point));
+    return this.completeCurrent();
+  }
+
+  completeCurrent() {
     recordRasterDebugEvent("session.complete.start", {
       nodeId: this.nodeId,
       pendingPointCount: this.points.length,
       tileSurface: Boolean(this.tileSurface),
       workingSurfaceId: this.workingSurfaceId,
     });
-    this.addPoint(this.getLocalPoint(point));
     this.completed = true;
     this.cancelQueuedPointFlush();
 
@@ -1351,10 +1370,11 @@ class BrushStrokeSession {
   }
 
   commit() {
-    if (!this.completed) {
+    if (!(this.completed && !this.commitStarted)) {
       return this.commitReady;
     }
 
+    this.commitStarted = true;
     this.cancelLivePreview();
     recordRasterDebugEvent("commit.start", {
       dirtyBounds: this.dirtyBounds,
@@ -1934,6 +1954,254 @@ class BrushStrokeSession {
   }
 }
 
+const getRasterStrokeTarget = (editor, node) => {
+  const writableBounds = getRasterWritableBounds(editor, node);
+  const writablePolygon = getRasterWritablePolygon(editor, node);
+
+  return {
+    bounds: {
+      height: node.height,
+      width: node.width,
+      x: 0,
+      y: 0,
+    },
+    id: node.id,
+    pixelSize: {
+      height: node.height,
+      width: node.width,
+    },
+    ...(writableBounds ? { writableBounds } : {}),
+    ...(writablePolygon ? { writablePolygon } : {}),
+  };
+};
+
+const getLockedTargetProjection = (editor, targetState) => {
+  if (targetState.kind === "existing") {
+    const node = editor.getNode(targetState.nodeId);
+
+    if (node?.type !== "image") {
+      return null;
+    }
+
+    const bounds = getImageNodeBounds(node);
+
+    return {
+      target: getRasterStrokeTarget(editor, node),
+      toTargetPoint: (point) => getImageLocalPoint(node, point),
+      toWorldPoint: (point) => getNodeWorldPoint(node, bounds, point),
+    };
+  }
+
+  const frame = editor.getNode(targetState.frameId);
+  const bounds = editor.getNodeRenderFrame(frame?.id)?.bounds;
+
+  if (!(frame?.type === "artboard" && bounds)) {
+    return null;
+  }
+
+  return {
+    target: {
+      bounds: {
+        height: bounds.height,
+        width: bounds.width,
+        x: bounds.minX,
+        y: bounds.minY,
+      },
+      id: frame.id,
+      pixelSize: {
+        height: Math.max(1, Math.ceil(bounds.height)),
+        width: Math.max(1, Math.ceil(bounds.width)),
+      },
+    },
+    toTargetPoint: (point) => point,
+    toWorldPoint: (point) => point,
+  };
+};
+
+class DeferredBrushStrokeSession {
+  constructor({ point, settings, targetState, tool }) {
+    this.delegate = null;
+    this.delegateDisconnected = false;
+    this.lastDelegatePoint = null;
+    this.previousPoint = point;
+    this.projection = getLockedTargetProjection(tool.editor, targetState);
+    this.settings = settings;
+    this.targetState = targetState;
+    this.tool = tool;
+    this.workingSurfaceId = null;
+    this.activate(point, point);
+  }
+
+  getWorkingSurfaceState() {
+    return this.delegate?.getWorkingSurfaceState?.() || null;
+  }
+
+  hasPendingWorkingSurface() {
+    return Boolean(this.delegate?.hasPendingWorkingSurface?.());
+  }
+
+  update({ point }) {
+    if (this.delegate) {
+      if (this.delegate.requiresFiniteInputClipping) {
+        this.forwardClippedSegment(this.previousPoint, point);
+      } else {
+        this.delegate.update({ point });
+      }
+      this.previousPoint = point;
+      return;
+    }
+
+    this.activate(this.previousPoint, point);
+    this.previousPoint = point;
+  }
+
+  complete({ point }) {
+    if (this.delegate) {
+      if (this.delegate.requiresFiniteInputClipping) {
+        this.forwardClippedSegment(this.previousPoint, point);
+        this.previousPoint = point;
+        return this.delegate.completeCurrent();
+      }
+
+      this.previousPoint = point;
+      return this.delegate.complete({ point });
+    }
+
+    const activatedPoint = this.activate(this.previousPoint, point);
+    this.previousPoint = point;
+
+    if (this.delegate) {
+      return this.delegate.requiresFiniteInputClipping
+        ? this.delegate.completeCurrent()
+        : this.delegate.complete({ point: activatedPoint || point });
+    }
+
+    this.tool.clearActiveSession(this);
+    return Promise.resolve();
+  }
+
+  cancel() {
+    if (this.delegate) {
+      this.delegate.cancel();
+      return;
+    }
+
+    this.tool.clearActiveSession(this);
+  }
+
+  activate(startPoint, endPoint) {
+    if (!this.projection) {
+      return null;
+    }
+
+    const clipped = clipRasterSegmentToTarget({
+      end: this.projection.toTargetPoint(endPoint),
+      radius: this.settings.size / 2,
+      start: this.projection.toTargetPoint(startPoint),
+      target: this.projection.target,
+    });
+
+    if (!clipped) {
+      return null;
+    }
+
+    const clippedStartPoint = this.projection.toWorldPoint(clipped.start);
+    const clippedEndPoint = this.projection.toWorldPoint(clipped.end);
+    const targetNode = resolveBrushTargetState(
+      this.tool.editor,
+      this.targetState,
+      clippedStartPoint,
+      this.settings
+    );
+
+    if (!targetNode) {
+      return null;
+    }
+
+    this.delegate = this.tool.beginResolvedStroke({
+      node: targetNode,
+      point: clippedStartPoint,
+      settings: this.settings,
+    });
+
+    if (!this.delegate) {
+      return null;
+    }
+
+    this.workingSurfaceId = this.delegate.workingSurfaceId || null;
+    this.lastDelegatePoint = clippedStartPoint;
+
+    if (
+      clippedEndPoint.x !== clippedStartPoint.x ||
+      clippedEndPoint.y !== clippedStartPoint.y
+    ) {
+      this.delegate.update({ point: clippedEndPoint });
+    }
+    this.lastDelegatePoint = clippedEndPoint;
+    this.delegateDisconnected = !this.getClippedWorldSegment(
+      endPoint,
+      endPoint
+    );
+
+    return clippedEndPoint;
+  }
+
+  forwardClippedSegment(startPoint, endPoint) {
+    const clipped = this.getClippedWorldSegment(startPoint, endPoint);
+
+    if (!clipped) {
+      this.delegateDisconnected = true;
+      return null;
+    }
+
+    if (this.delegateDisconnected) {
+      this.delegate.restart?.({ point: clipped.start });
+      this.lastDelegatePoint = clipped.start;
+    } else if (
+      this.lastDelegatePoint &&
+      (this.lastDelegatePoint.x !== clipped.start.x ||
+        this.lastDelegatePoint.y !== clipped.start.y)
+    ) {
+      this.delegate.update({ point: clipped.start });
+    }
+
+    if (
+      !this.lastDelegatePoint ||
+      this.lastDelegatePoint.x !== clipped.end.x ||
+      this.lastDelegatePoint.y !== clipped.end.y
+    ) {
+      this.delegate.update({ point: clipped.end });
+    }
+
+    this.delegateDisconnected = !this.getClippedWorldSegment(
+      endPoint,
+      endPoint
+    );
+    this.lastDelegatePoint = clipped.end;
+    return clipped.end;
+  }
+
+  getClippedWorldSegment(startPoint, endPoint) {
+    if (!this.projection) {
+      return null;
+    }
+
+    const clipped = clipRasterSegmentToTarget({
+      end: this.projection.toTargetPoint(endPoint),
+      radius: this.settings.size / 2,
+      start: this.projection.toTargetPoint(startPoint),
+      target: this.projection.target,
+    });
+
+    return clipped
+      ? {
+          end: this.projection.toWorldPoint(clipped.end),
+          start: this.projection.toWorldPoint(clipped.start),
+        }
+      : null;
+  }
+}
+
 export class BrushTool extends Tool {
   constructor(editor, operation = "paint") {
     super(editor);
@@ -1999,17 +2267,7 @@ export class BrushTool extends Tool {
     return this.beginStroke({ node, point });
   }
 
-  beginStroke({ node = null, point }) {
-    const residentSession = this.beginResidentStroke({ node, point });
-
-    if (residentSession) {
-      return residentSession;
-    }
-
-    if (!hasRasterRuntime()) {
-      return null;
-    }
-
+  beginStroke({ point }) {
     return measurePerf("brush.stroke.begin", () => {
       if (this.activeSession?.hasPendingWorkingSurface()) {
         recordRasterDebugEvent("tool.promotePendingWorkingSurface", {
@@ -2027,31 +2285,23 @@ export class BrushTool extends Tool {
       }
 
       const settings = this.getSettings();
-      const targetNode = measurePerf("brush.target.resolve", () =>
-        resolveBrushTarget(
-          this.editor,
-          point,
-          settings,
-          this.operation === "erase" ? "eraser" : "brush"
-        )
-      );
+      const targetState = getRasterTargetState(this.editor, {
+        point,
+        tool: this.operation === "erase" ? "eraser" : "brush",
+      });
 
-      if (!targetNode) {
+      if (!targetState.enabled) {
         recordRasterDebugEvent("target.missing", {
+          activeLayerId: this.editor.activeLayerId,
           activeTool: this.editor.activeTool,
-          selectedNodeIds: this.editor.selectedNodeIds,
         });
         return null;
       }
 
-      const localPoint = getImageLocalPoint(targetNode, point);
-
-      const session = new BrushStrokeSession({
-        editor: this.editor,
-        node: targetNode,
-        operation: this.operation,
+      const session = new DeferredBrushStrokeSession({
+        point,
         settings,
-        startPoint: localPoint,
+        targetState,
         tool: this,
       });
       this.activeSession = session;
@@ -2061,21 +2311,85 @@ export class BrushTool extends Tool {
     });
   }
 
-  beginResidentStroke({ node, point }) {
-    const settings = this.getSettings();
-    const targetState = getRasterTargetState(this.editor, {
-      point,
-      tool: this.operation === "erase" ? "eraser" : "brush",
-    });
-    const targetNode =
-      targetState.enabled && targetState.kind === "existing"
-        ? this.editor.getNode(targetState.nodeId)
-        : null;
+  beginResolvedStroke({ node, point, settings }) {
+    const targetsExistingRaster =
+      this.editor.getNode(node.id)?.type === "image";
 
+    if (
+      !targetsExistingRaster &&
+      !hasRasterRuntime() &&
+      this.editor.rasterSurface?.resolveSurface
+    ) {
+      const historyMark = this.editor.markHistoryStep(
+        this.operation === "erase"
+          ? "erase brush stroke"
+          : "paint brush stroke"
+      );
+
+      this.editor.run(() => {
+        materializeBrushTarget(this.editor, node);
+      });
+      const residentSession = this.beginResidentStroke({
+        node,
+        point,
+        settings,
+      });
+
+      if (!residentSession) {
+        this.editor.revertToMark(historyMark);
+        return null;
+      }
+
+      const materializedSession = {
+        cancel: () => {
+          residentSession.cancel();
+          this.editor.revertToMark(historyMark);
+          this.clearActiveSession(materializedSession);
+        },
+        complete: async (info) => {
+          try {
+            const commit = await residentSession.complete(info);
+            this.editor.commitHistoryStep(historyMark);
+            return commit;
+          } catch (error) {
+            this.editor.revertToMark(historyMark);
+            throw error;
+          } finally {
+            this.clearActiveSession(materializedSession);
+          }
+        },
+        getWorkingSurfaceState: () => null,
+        hasPendingWorkingSurface: () => false,
+        update: (info) => residentSession.update(info),
+      };
+
+      return materializedSession;
+    }
+
+    const residentSession = this.beginResidentStroke({ node, point, settings });
+
+    if (residentSession) {
+      return residentSession;
+    }
+
+    if (!hasRasterRuntime()) {
+      return null;
+    }
+
+    return new BrushStrokeSession({
+      editor: this.editor,
+      node,
+      operation: this.operation,
+      settings,
+      startPoint: getImageLocalPoint(node, point),
+      tool: this,
+    });
+  }
+
+  beginResidentStroke({ node: targetNode, point, settings }) {
     if (
       !(
         targetNode?.type === "image" &&
-        targetNode.src &&
         !(targetNode.tileSources || []).length &&
         settings.hardness === 1 &&
         (targetNode.baseX ?? 0) === 0 &&
@@ -2088,23 +2402,7 @@ export class BrushTool extends Tool {
       return null;
     }
 
-    const writableBounds = getRasterWritableBounds(this.editor, targetNode);
-    const writablePolygon = getRasterWritablePolygon(this.editor, targetNode);
-    const target = {
-      bounds: {
-        height: targetNode.height,
-        width: targetNode.width,
-        x: 0,
-        y: 0,
-      },
-      id: targetNode.id,
-      pixelSize: {
-        height: targetNode.height,
-        width: targetNode.width,
-      },
-      ...(writableBounds ? { writableBounds } : {}),
-      ...(writablePolygon ? { writablePolygon } : {}),
-    };
+    const target = getRasterStrokeTarget(this.editor, targetNode);
     const surface = this.editor.rasterSurface?.resolveSurface?.(target);
 
     if (!surface) {
@@ -2153,14 +2451,15 @@ export class BrushTool extends Tool {
       },
     };
 
-    this.activeSession = session;
     return session;
   }
 
   clearPendingPreview(session) {
-    const nextWorkingSurfaces = this.pendingWorkingSurfaces.filter(
-      (entry) => entry.session !== session
-    );
+    const nextWorkingSurfaces = this.pendingWorkingSurfaces.filter((entry) => {
+      return !(
+        entry.session === session || entry.session?.delegate === session
+      );
+    });
 
     if (nextWorkingSurfaces.length === this.pendingWorkingSurfaces.length) {
       return;
@@ -2175,7 +2474,10 @@ export class BrushTool extends Tool {
   }
 
   clearActiveSession(session) {
-    if (this.activeSession === session) {
+    if (
+      this.activeSession === session ||
+      this.activeSession?.delegate === session
+    ) {
       this.activeSession = null;
       recordRasterDebugEvent("tool.clearActiveSession", {
         workingSurfaceId: session.workingSurfaceId,

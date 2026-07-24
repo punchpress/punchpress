@@ -230,13 +230,13 @@ describe("Editor Raster surface injection", () => {
     editor.setActiveTool("brush");
     editor.currentTool.onNodePointerDown({
       node,
-      point: { x: 25, y: 30 },
+      point: { x: 2275, y: 2730 },
     });
 
     editor.setBrushSettings({ hardness: 1, opacity: 0.5 }, "brush");
     const session = editor.currentTool.onNodePointerDown({
       node,
-      point: { x: 25, y: 30 },
+      point: { x: 2275, y: 2730 },
     });
 
     expect(resolveCount).toBe(1);
@@ -324,11 +324,11 @@ describe("Editor Raster surface injection", () => {
     editor.setActiveTool("brush");
     const session = editor.currentTool.onNodePointerDown({
       node,
-      point: { x: 25, y: 30 },
+      point: { x: 2275, y: 2730 },
     });
 
     expect(session).not.toBeNull();
-    session?.complete({ point: { x: 35, y: 30 } });
+    session?.complete({ point: { x: 2285, y: 2730 } });
 
     expect(resolvedTarget).toEqual({
       bounds: { height: 100, width: 100, x: 0, y: 0 },

@@ -99,16 +99,18 @@ belong to raster surfaces, while cursor chrome belongs to the tool overlay.
 
 ## Runtime Flow
 
-1. Pointer down resolves a raster target and opens one stroke session.
-2. Pointer move appends points and flushes them into the working canvas or
-   touched working tiles.
-3. The raster renderer mounts the working canvas or working tiles inside the
+1. Pointer down locks the active finite Raster or Frame in a deferred gesture.
+2. Pointer movement outside that target performs no surface resolution or
+   allocation.
+3. First intersection opens one Stroke session and appends clipped points into
+   the working canvas or touched working tiles.
+4. The raster renderer mounts the working canvas or working tiles inside the
    image node's normal render tree.
-4. Pointerup flushes remaining points and starts commit.
-5. Commit encodes dirty PNG tile sources or the dirty single raster payload.
-6. The completed working surface stays visible until committed raster rendering
+5. Pointerup flushes remaining points and starts commit.
+6. Commit encodes dirty PNG tile sources or the dirty single raster payload.
+7. The completed working surface stays visible until committed raster rendering
    acknowledges the matching render key.
-7. The session retires and undo/redo treats the stroke as one history step.
+8. The session retires and undo/redo treats the stroke as one history step.
 
 ## Debug Capture
 

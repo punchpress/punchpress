@@ -92,6 +92,7 @@ export const getLayerRow = (editor, nodeId) => {
     isFrontmost: layerMeta.isFrontmost,
     isEmpty: isEmptyNode(node),
     isGroup: isGroupNode(node),
+    isActive: editor.activeLayerId === node.id,
     isSelected: editor.isSelected(node.id),
     isVector: isVectorNode(node),
     isVisible,

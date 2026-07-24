@@ -17,7 +17,7 @@ and future clients should converge here instead of inventing parallel behavior.
 | --- | --- |
 | Document | `newDocument`, `loadDocument`, `serializeDocument`, `exportDocument`, `markDocumentSaved`. |
 | Nodes | `addTextNode`, `addShapeNode`, `addArtboardNode`, `insertNodes`, `updateNode`, `deleteSelected`, `duplicate`, `groupSelected`, `ungroup`. |
-| Selection | `select`, `setSelectedNodes`, `toggleSelection`, `clearSelection`, `ensureSelected`, `isSelected`. |
+| Active layer and selection | `activeLayerId`, `activeLayer`, `select`, `setSelectedNodes`, `toggleSelection`, `clearSelection`, `ensureSelected`, `isSelected`. |
 | Layering | `bringToFront`, `sendToBack`, `setNodeOrder`, `moveNodeToParent`, `toggleVisibility`. |
 | Editing modes | `setActiveTool`, `startEditing`, `commitEditing`, `cancelEditing`, `startPathEditing`, `stopPathEditing`. |
 | Vector/path | point movement, point deletion, topology operations, curve merge/separate/join, compound paths, boolean operations. |

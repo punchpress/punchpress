@@ -29,9 +29,11 @@ undoable action.
 - **Stable existing raster planes.** Existing image layers keep their width,
   height, transform, rotation, and base raster plane while Brush and Eraser
   update pixels.
-- **Finite auto creation.** Brush creates a Raster only inside a visible,
-  writable Frame under the targeting rules below. Workspace presses are
-  disabled no-ops.
+- **Ordinary resize.** Selection handles scale retained Raster content and its
+  visible bounds together. Crop is the only bounds-only image resize.
+- **Finite auto creation.** An active visible, writable Frame is a finite
+  insertion target. Brush creates a Raster only when a gesture first intersects
+  that Frame.
 - **Crop.** Crop changes a Raster's visible bounds without deleting hidden
   pixels. Expansion adds transparent paintable area.
 - **Export.** Export preserves transparency when the chosen format supports it
@@ -70,19 +72,22 @@ Brush color is hidden for Eraser.
   raster working surface while the pointer moves.
 - **Eraser stroke.** Dragging removes alpha from the current raster working
   surface using the same brush engine as Brush.
-- **Selected Raster.** One selected visible, unlocked Raster is authoritative,
-  even when the pointer starts over another layer. The Stroke locks that target
-  until release.
-- **Empty layer.** Brush materializes one selected visible empty layer only
-  when it belongs to a writable Frame and the pointer starts inside that Frame.
-- **Selected Frame.** Brush creates a Raster child only when the pointer starts
-  inside that selected writable Frame.
-- **No selection.** Brush creates a Raster in the topmost writable Frame under
-  the pointer.
-- **Invalid target.** Multiple selection, incompatible selected content,
-  hidden or locked targets, and Workspace outside a finite Raster target show a
-  disabled Brush cursor and do nothing.
-- **Eraser.** Eraser requires a selected writable Raster. It never creates,
+- **Active Raster.** One active visible, unlocked Raster is authoritative even
+  when transform selection is empty or the pointer starts over another layer.
+  The Stroke locks that target until release.
+- **Deferred intersection.** A gesture may begin outside its active Raster or
+  Frame. It stays allocation-free and produces no Dabs until its path first
+  intersects the finite target.
+- **Active empty layer.** Brush materializes one active visible empty layer
+  only after the gesture intersects its writable parent Frame.
+- **Active Frame.** Brush creates one Raster child at first intersection. The
+  Frame remains a container and insertion target, never a pixel buffer.
+- **Outside-only gesture.** A gesture that never intersects the active finite
+  target creates no layer, pixels, allocation, or history step.
+- **Invalid target.** Empty documents and active vector, text, hidden, or
+  locked layers show a disabled Brush cursor and do nothing. Brush never
+  retargets from pixels or Frames under the pointer.
+- **Eraser.** Eraser requires an active writable Raster. It never creates,
   materializes, or expands a Raster.
 - **Bounds.** Brush-created layers can grow from their painted pixels. Existing
   raster layers preserve their intrinsic pixel plane; Brush and Eraser do not
@@ -97,7 +102,7 @@ The first content action sets the source kind.
 
 | First action | Result |
 | --- | --- |
-| Brush stroke inside the layer's Frame | Raster image layer. |
+| Brush Stroke whose path intersects the layer's Frame | Raster image layer. |
 | Eraser stroke | No materialization. |
 | Shape, Pen, or vector action | Vector content. |
 | Text action | Text content. |

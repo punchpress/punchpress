@@ -25,6 +25,11 @@ WebGPU, encoded images, package storage, or Workspace dimensions.
 - A `RasterTarget` locks one finite target id, document bounds, pixel
   dimensions, and optional writable bounds and transformed Frame polygon for
   the full Stroke.
+- Tool pointer-down may hold a deferred target lock without opening a
+  `RasterSurface`. Surface resolution and Stroke creation begin only when the
+  input path first intersects the finite target expanded by the Dab radius.
+- A deferred gesture that never intersects creates no surface session, Dabs,
+  pixels, layer, or history step.
 - Input segments are clipped to writable bounds expanded by the Dab radius
   before spacing or smoothing work. A drag crossing enormous off-target
   distances therefore emits work only near the finite target.
