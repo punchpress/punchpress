@@ -28,4 +28,22 @@
   .dark .canvas-dot-grid {
     color: rgb(255 255 255 / 0.18);
   }
+
+  .canvas-pixel-grid {
+    color: color-mix(in srgb, var(--foreground) 24%, transparent);
+  }
+
+  .dark .canvas-pixel-grid {
+    color: rgb(255 255 255 / 0.22);
+  }
+
+  [data-raster-sampling="smooth"] image,
+  [data-raster-sampling="smooth"] canvas {
+    image-rendering: auto;
+  }
+
+  [data-raster-sampling="exact"] image,
+  [data-raster-sampling="exact"] canvas {
+    image-rendering: pixelated;
+  }
 }

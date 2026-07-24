@@ -16,6 +16,7 @@ import {
 import {
   rasterCanvas2dBenchmark,
   rasterCanvas2dExtremeDiagonalBenchmark,
+  rasterHighZoomBenchmark,
 } from "./benchmarks/raster-canvas2d-benchmark";
 import { shapeDragBenchmarkLarge } from "./benchmarks/square-drag-benchmark";
 import {
@@ -43,6 +44,7 @@ export const performanceBenchmarks = [
   hugeRasterViewportBenchmark,
   rasterCanvas2dBenchmark,
   rasterCanvas2dExtremeDiagonalBenchmark,
+  rasterHighZoomBenchmark,
   compoundVectorDragBenchmark,
   idleSoakBenchmark,
   shapeDragBenchmarkLarge,

@@ -164,6 +164,7 @@ Raster adapter gates:
 | --- | --- |
 | `raster-canvas2d-strokes` | Runs pixel zoom, common Hard Round, large Eraser, and extreme zoom-out on one resident `4500 × 5400` Raster. |
 | `raster-canvas2d-extreme-diagonal` | Runs the full-target 4%-zoom diagonal alone for flame and browser-trace capture. |
+| `raster-high-zoom` | Pans a resident `4500 × 5400` Frame/Raster at 12,800% with exact samples and the Frame-local pixel grid visible. |
 
 Raster spans cover surface decode, Stroke begin, first Dab, Dab application,
 commit, cancel, and pointer release. Counters report Dabs, dirty pixel area,

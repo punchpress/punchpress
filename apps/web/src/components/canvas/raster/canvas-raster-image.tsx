@@ -1,4 +1,8 @@
-import { getNodeLocalPoint, getNodeScaleX } from "@punchpress/engine";
+import {
+  getNodeLocalPoint,
+  getNodeScaleX,
+  getRasterPresentationPolicy,
+} from "@punchpress/engine";
 import {
   useCallback,
   useEffect,
@@ -382,12 +386,16 @@ const getNodeLocalViewportBounds = (editor, state, node) => {
 };
 
 const getRasterTileCullState = (editor, state, nodeId, tileSources) => {
+  const zoom = Math.max(0.0001, state.viewport?.zoom || editor.zoom || 1);
+  const presentation = getRasterPresentationPolicy(zoom);
   const fallbackState = {
     bounds: null,
     previewKey: null,
+    sampling: presentation.sampling,
     shouldBuildPreview: false,
     shouldUsePreview: false,
     tileSources,
+    zoom,
   };
 
   if (
@@ -418,11 +426,11 @@ const getRasterTileCullState = (editor, state, nodeId, tileSources) => {
     );
   });
   const nodeScale = Math.max(0.0001, Math.abs(getNodeScaleX(node) || 1));
-  const zoom = Math.max(0.0001, state.viewport?.zoom || editor.zoom || 1);
   const pixelDensity = 1 / (zoom * nodeScale);
   const hasBrushWorkingSurface = hasBrushWorkingSurfaceForNode(editor, nodeId);
   const shouldBuildPreview =
     !hasBrushWorkingSurface &&
+    presentation.sampling !== "exact" &&
     visibleTileSources.length > RASTER_TILE_PREVIEW_TILE_THRESHOLD &&
     pixelDensity >= RASTER_TILE_PREVIEW_DENSITY_THRESHOLD;
   const previewBounds = {
@@ -461,6 +469,7 @@ const getRasterTileCullState = (editor, state, nodeId, tileSources) => {
           bounds.maxY,
           previewSourcesKey,
         ].join(":"),
+    sampling: presentation.sampling,
     shouldBuildPreview,
     shouldUsePreview: shouldBuildPreview,
     tileSources: previewTileSources,
@@ -968,6 +977,7 @@ const CanvasTiledRasterImage = ({
         cullState.shouldBuildPreview ? "true" : "false"
       }
       data-raster-render-key={rasterRenderKey}
+      data-raster-sampling={cullState.sampling}
       data-raster-total-tile-count={tileSources.length}
       data-raster-visible-tile-count={visibleTileSources.length}
       opacity={opacity ?? 1}
@@ -1007,6 +1017,9 @@ const CanvasTiledRasterImage = ({
 
 export const CanvasRasterImage = (props) => {
   const residentSurface = useResidentRasterSurface(props);
+  const sampling = useEditorSurfaceValue((_, state) => {
+    return getRasterPresentationPolicy(state.viewport.zoom).sampling;
+  });
   const workingSurface = useEditorSurfaceValue((editor) =>
     editor.getBrushWorkingSurfaceStateForNode?.(props.nodeId)
   );
@@ -1018,6 +1031,7 @@ export const CanvasRasterImage = (props) => {
   if (workingSurface?.type === "canvas") {
     return (
       <g
+        data-raster-sampling={sampling}
         data-raster-working-replaces-node="true"
         opacity={props.opacity ?? 1}
         transform={props.transform || undefined}
@@ -1031,6 +1045,7 @@ export const CanvasRasterImage = (props) => {
     return (
       <g
         data-raster-resident-surface="canvas2d"
+        data-raster-sampling={sampling}
         opacity={props.opacity ?? 1}
         transform={props.transform || undefined}
       >
@@ -1047,7 +1062,11 @@ export const CanvasRasterImage = (props) => {
   }
 
   return (
-    <g opacity={props.opacity ?? 1} transform={props.transform || undefined}>
+    <g
+      data-raster-sampling={sampling}
+      opacity={props.opacity ?? 1}
+      transform={props.transform || undefined}
+    >
       <image
         height={props.baseHeight ?? props.height}
         href={props.src}

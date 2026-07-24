@@ -32,6 +32,10 @@ presented canvas is also the live editing surface.
   `apps/web/src/components/canvas/raster/`. The generic canvas node renderer
   delegates image and tiled-image rendering there instead of owning culling,
   tile DOM, or over-dense projection.
+- One zoom presentation policy selects smooth ordinary sampling or exact
+  high-zoom sampling for image elements, resident canvases, exact tiles,
+  preview canvases, and live working surfaces. Pixel-grid zoom always disables
+  low-resolution Raster previews.
 - Browser raster primitives live behind the brush runtime seam. Canvas creation,
   image decode, frame scheduling, and render-ready events are runtime services;
   brush policy calls the seam instead of reaching directly for DOM globals.

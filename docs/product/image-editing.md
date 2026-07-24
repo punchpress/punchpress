@@ -36,6 +36,12 @@ undoable action.
   that Frame.
 - **Crop.** Crop changes a Raster's visible bounds without deleting hidden
   pixels. Expansion adds transparent paintable area.
+- **Pixel presentation.** Raster zoom is presentation-only. Ordinary zoom uses
+  smooth sampling; above `500%`, imported, resident, tiled, and live Brush
+  pixels use exact nearest-neighbor samples.
+- **Pixel grid.** Above `500%`, a non-exporting grid follows the active Frame's
+  output pixels or a standalone Raster's visible Crop plane. Frame-owned Raster
+  growth never moves the Frame-local grid.
 - **Export.** Export preserves transparency when the chosen format supports it
   and flattens against a chosen background when it does not.
 

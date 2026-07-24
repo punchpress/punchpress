@@ -198,6 +198,14 @@ export {
   normalizeRasterCropRect,
 } from "./raster/crop";
 export type { RasterCropRect } from "./raster/crop";
+export {
+  getRasterPresentationPolicy,
+  PIXEL_GRID_ZOOM_THRESHOLD,
+} from "./raster/presentation";
+export type {
+  RasterPresentationPolicy,
+  RasterSampling,
+} from "./raster/presentation";
 export type {
   RasterBrushTip,
   RasterCommit,
@@ -215,6 +223,8 @@ export type {
   RasterTarget,
 } from "./raster/contracts";
 export type { PenHoverIntent, PenHoverState } from "./tools/pen-tool-types";
+export { getPixelGridTarget } from "./viewport/pixel-grid-target";
+export type { PixelGridTarget } from "./viewport/pixel-grid-target";
 export {
   getNodeLocalMatrix,
   getNodeLocalTransformBounds,

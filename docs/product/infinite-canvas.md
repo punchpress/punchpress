@@ -15,12 +15,15 @@ product meaning.
 ## Zoom
 
 - At `100%`, one canvas world unit maps to one device pixel.
+- Viewport zoom ranges from `1%` through `12,800%`.
 - Zoom remains numerically honest. Fit-to-view may produce a low zoom value; it
   does not redefine `100%`.
 - Wheel, trackpad, and pinch zoom should feel steady.
 - One zoom update is capped so large device deltas do not runaway.
 - Zoom focuses on the pointer so content under the cursor stays under it.
 - Users can fit selected content or an artboard on demand.
+- Above `500%`, the active finite Frame or standalone Raster automatically
+  shows a subtle pixel grid. The infinite Workspace never receives that grid.
 
 ## Pan
 

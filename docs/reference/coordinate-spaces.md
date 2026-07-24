@@ -24,4 +24,7 @@ Coordinate spaces must stay explicit.
 - Zoom-sensitive values must declare whether they are screen-space or
   canvas-space.
 - Screen-sized handles stay screen-sized across zoom.
+- Pixel-grid cells stay in finite Frame/Raster-local pixel space. Grid strokes
+  account for viewport zoom, node scale, and device pixel ratio so they remain
+  device-pixel-thin without changing document geometry.
 - Durable node data stores document meaning, not viewport placement.

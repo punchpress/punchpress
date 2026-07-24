@@ -35,6 +35,7 @@ import { CanvasHostOverlays } from "./canvas-overlay/host-overlays";
 import { CanvasStageOverlays } from "./canvas-overlay/stage-overlays";
 import { getCanvasDeepLeafNodeIdAtPoint } from "./canvas-overlay/vector-path/canvas-node-hit-target";
 import { resolveVectorPenHoverAction } from "./canvas-overlay/vector-path/pen-hover";
+import { CanvasPixelGrid } from "./canvas-pixel-grid";
 import { CanvasTextEditor } from "./canvas-text-editor";
 import { startCanvasToolPlacementSession } from "./canvas-tool-placement-session";
 import { CanvasToolbar } from "./canvas-toolbar";
@@ -695,6 +696,7 @@ export const Canvas = () => {
               />
               <CanvasArtboards />
               <CanvasNodes />
+              <CanvasPixelGrid />
               <CanvasStageOverlays />
               <CanvasTextEditor />
             </Profiler>
