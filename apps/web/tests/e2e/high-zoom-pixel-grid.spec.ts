@@ -6,6 +6,8 @@ import {
   setViewport,
 } from "./helpers/editor";
 
+const MAX_EXACT_ALIGNMENT_ERROR_PHYSICAL_PIXELS = 0.01;
+
 const createRasterSource = (page: Page) => {
   return page.evaluate(() => {
     const canvas = document.createElement("canvas");
@@ -590,17 +592,39 @@ test("keeps Crop, selection, Brush cursor, and live painting aligned at high zoo
       '[data-node-id="standalone-raster"] [data-raster-resident-surface="canvas2d"][data-raster-sampling="exact"]'
     )
   ).toBeVisible();
-  const liveGrid = page.locator('[data-pixel-grid-kind="raster"]');
 
   await page.mouse.move(point.x + 12.5, point.y, { steps: 3 });
-  await expect(liveGrid).toHaveCount(1);
-  expect(
-    await liveGrid.evaluate((element) => {
-      return element
-        .closest("[data-raster-canvas-host]")
-        ?.parentElement?.getAttribute("data-testid");
+  await expect
+    .poll(() => {
+      return page.evaluate(() => {
+        const grids = Array.from(
+          document.querySelectorAll('[data-pixel-grid-kind="raster"]')
+        );
+        const visibleCanvasSurfaces = Array.from(
+          document.querySelectorAll(
+            '[data-testid="raster-resident-canvas"], [data-testid="raster-working-canvas"]'
+          )
+        ).filter((surface) => {
+          const rect = surface.getBoundingClientRect();
+
+          return rect.height > 0 && rect.width > 0;
+        });
+        const gridHost = grids[0]?.closest("[data-raster-canvas-host]");
+
+        return {
+          gridCount: grids.length,
+          gridSharesVisibleCanvasHost: visibleCanvasSurfaces.some((surface) =>
+            surface.contains(gridHost)
+          ),
+          visibleCanvasCount: visibleCanvasSurfaces.length,
+        };
+      });
     })
-  ).toBe("raster-working-canvas");
+    .toEqual({
+      gridCount: 1,
+      gridSharesVisibleCanvasHost: true,
+      visibleCanvasCount: 1,
+    });
   await page.mouse.up();
 
   await expect
@@ -642,6 +666,7 @@ test.describe("fractional exact Raster pixel grid", () => {
       '[data-node-id="fractional-raster"] [data-testid="raster-resident-canvas"] canvas'
     );
 
+    await expect(grid).toHaveCount(1);
     await expect(grid).toBeVisible();
     await expect(pattern).toBeAttached();
     await expect(resident).toBeVisible();
@@ -718,6 +743,8 @@ test.describe("fractional exact Raster pixel grid", () => {
         },
         gridRect: {
           height: gridRect.height,
+          left: gridRect.left,
+          top: gridRect.top,
           width: gridRect.width,
         },
         gridSharesCanvasHost: canvasHost.contains(gridElement),
@@ -729,6 +756,12 @@ test.describe("fractional exact Raster pixel grid", () => {
           height: canvas.height,
           width: canvas.width,
         },
+        residentRect: {
+          height: canvasRect.height,
+          left: canvasRect.left,
+          top: canvasRect.top,
+          width: canvasRect.width,
+        },
       };
     });
 
@@ -737,21 +770,52 @@ test.describe("fractional exact Raster pixel grid", () => {
     const geometryDiagnostics = JSON.stringify(geometry, null, 2);
 
     expect(geometry?.gridSharesCanvasHost, geometryDiagnostics).toBe(true);
-    expect(geometry?.actualCellWidth, geometryDiagnostics).toBeCloseTo(
-      geometry?.expectedCellWidth || 0,
-      5
+    expect(geometry?.residentSamples, geometryDiagnostics).toEqual({
+      height: 4,
+      width: 7,
+    });
+    const physicalError = (actual?: number, expected?: number) => {
+      return (
+        Math.abs(
+          (actual ?? Number.POSITIVE_INFINITY) -
+            (expected ?? Number.NEGATIVE_INFINITY)
+        ) * (geometry?.devicePixelRatio || 1)
+      );
+    };
+    const expectExactAlignment = (actual?: number, expected?: number) => {
+      expect(physicalError(actual, expected), geometryDiagnostics).toBeLessThan(
+        MAX_EXACT_ALIGNMENT_ERROR_PHYSICAL_PIXELS
+      );
+    };
+
+    expectExactAlignment(
+      geometry?.actualCellWidth,
+      geometry?.expectedCellWidth
     );
-    expect(geometry?.actualCellHeight, geometryDiagnostics).toBeCloseTo(
-      geometry?.expectedCellHeight || 0,
-      5
+    expectExactAlignment(
+      geometry?.actualCellHeight,
+      geometry?.expectedCellHeight
     );
-    expect(geometry?.actualOriginX, geometryDiagnostics).toBeCloseTo(
-      geometry?.expectedOriginX || 0,
-      5
+    expectExactAlignment(geometry?.actualOriginX, geometry?.expectedOriginX);
+    expectExactAlignment(geometry?.actualOriginY, geometry?.expectedOriginY);
+    expectExactAlignment(
+      geometry?.gridRect.width,
+      geometry?.residentRect.width
     );
-    expect(geometry?.actualOriginY, geometryDiagnostics).toBeCloseTo(
-      geometry?.expectedOriginY || 0,
-      5
+    expectExactAlignment(
+      geometry?.gridRect.height,
+      geometry?.residentRect.height
+    );
+    expectExactAlignment(geometry?.gridRect.left, geometry?.residentRect.left);
+    expectExactAlignment(geometry?.gridRect.top, geometry?.residentRect.top);
+    expectExactAlignment(
+      (geometry?.actualCellWidth || 0) * (geometry?.residentSamples.width || 0),
+      geometry?.residentRect.width
+    );
+    expectExactAlignment(
+      (geometry?.actualCellHeight || 0) *
+        (geometry?.residentSamples.height || 0),
+      geometry?.residentRect.height
     );
   });
 });
