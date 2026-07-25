@@ -4,6 +4,7 @@ import {
   getRasterPresentationPolicy,
 } from "@punchpress/engine";
 import {
+  type ReactNode,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -13,6 +14,7 @@ import {
 } from "react";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
+import { CanvasRasterPixelGrid } from "./canvas-raster-pixel-grid";
 
 interface RasterDebugRecord {
   event: string;
@@ -1023,31 +1025,26 @@ export const CanvasRasterImage = (props) => {
   const workingSurface = useEditorSurfaceValue((editor) =>
     editor.getBrushWorkingSurfaceStateForNode?.(props.nodeId)
   );
+  let artwork: ReactNode;
 
   if (Array.isArray(props.tileSources) && props.tileSources.length > 0) {
-    return <CanvasTiledRasterImage {...props} />;
-  }
-
-  if (workingSurface?.type === "canvas") {
-    return (
+    artwork = <CanvasTiledRasterImage {...props} transform={undefined} />;
+  } else if (workingSurface?.type === "canvas") {
+    artwork = (
       <g
         data-raster-sampling={sampling}
         data-raster-working-replaces-node="true"
         opacity={props.opacity ?? 1}
-        transform={props.transform || undefined}
       >
         <RasterWorkingSurface surface={workingSurface} />
       </g>
     );
-  }
-
-  if (residentSurface) {
-    return (
+  } else if (residentSurface) {
+    artwork = (
       <g
         data-raster-resident-surface="canvas2d"
         data-raster-sampling={sampling}
         opacity={props.opacity ?? 1}
-        transform={props.transform || undefined}
       >
         <RasterWorkingCanvas
           canvas={residentSurface.canvas}
@@ -1059,24 +1056,36 @@ export const CanvasRasterImage = (props) => {
         />
       </g>
     );
+  } else {
+    artwork = (
+      <g data-raster-sampling={sampling} opacity={props.opacity ?? 1}>
+        <image
+          height={props.baseHeight ?? props.height}
+          href={props.src}
+          pointerEvents="none"
+          preserveAspectRatio="none"
+          width={props.baseWidth ?? props.width}
+          x={props.baseX ?? 0}
+          y={props.baseY ?? 0}
+        />
+        <RasterWorkingSurface surface={workingSurface} />
+      </g>
+    );
   }
 
   return (
-    <g
-      data-raster-sampling={sampling}
-      opacity={props.opacity ?? 1}
-      transform={props.transform || undefined}
-    >
-      <image
-        height={props.baseHeight ?? props.height}
-        href={props.src}
-        pointerEvents="none"
-        preserveAspectRatio="none"
-        width={props.baseWidth ?? props.width}
-        x={props.baseX ?? 0}
-        y={props.baseY ?? 0}
+    <g transform={props.transform || undefined}>
+      {artwork}
+      <CanvasRasterPixelGrid
+        baseHeight={props.baseHeight}
+        baseWidth={props.baseWidth}
+        baseX={props.baseX}
+        baseY={props.baseY}
+        height={props.height}
+        nodeId={props.nodeId}
+        surface={props.pixelGridSurface}
+        width={props.width}
       />
-      <RasterWorkingSurface surface={workingSurface} />
     </g>
   );
 };

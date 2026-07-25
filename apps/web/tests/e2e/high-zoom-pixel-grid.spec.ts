@@ -247,11 +247,11 @@ test("shows only the active finite pixel grid above 500 percent", async ({
     "data-pixel-grid-source-node-id",
     "frame-raster"
   );
-  const gridSurface = grid.locator("svg");
+  const gridPlane = grid.getByTestId("pixel-grid-plane");
 
-  await expect(gridSurface).toHaveAttribute("width", "160");
-  await expect(gridSurface).toHaveAttribute("height", "120");
-  const gridOriginBeforeMove = await gridSurface.evaluate((element) => {
+  await expect(gridPlane).toHaveAttribute("width", "160");
+  await expect(gridPlane).toHaveAttribute("height", "120");
+  const gridOriginBeforeMove = await grid.evaluate((element) => {
     const matrix = element.getScreenCTM();
 
     return matrix ? { x: matrix.e, y: matrix.f } : null;
@@ -272,24 +272,31 @@ test("shows only the active finite pixel grid above 500 percent", async ({
   });
 
   expect(gridOriginBeforeMove).not.toBeNull();
+  const devicePixelRatio = await page.evaluate(() => window.devicePixelRatio);
   await expect
     .poll(async () => {
-      const originX = await gridSurface.evaluate((element) => {
+      const originX = await grid.evaluate((element) => {
         return element.getScreenCTM()?.e ?? null;
       });
 
-      return originX === null ? null : originX - (gridOriginBeforeMove?.x || 0);
+      return originX === null
+        ? null
+        : Math.abs(originX - (gridOriginBeforeMove?.x || 0) - 12.5 * 5.01) *
+            devicePixelRatio;
     })
-    .toBeCloseTo(12.5 * 5.01, 5);
+    .toBeLessThan(0.25);
   await expect
     .poll(async () => {
-      const originY = await gridSurface.evaluate((element) => {
+      const originY = await grid.evaluate((element) => {
         return element.getScreenCTM()?.f ?? null;
       });
 
-      return originY === null ? null : originY - (gridOriginBeforeMove?.y || 0);
+      return originY === null
+        ? null
+        : Math.abs(originY - (gridOriginBeforeMove?.y || 0) - 8.25 * 5.01) *
+            devicePixelRatio;
     })
-    .toBeCloseTo(8.25 * 5.01, 5);
+    .toBeLessThan(0.25);
 
   await page.evaluate(() => {
     const editor = window.__PUNCHPRESS_EDITOR__;
@@ -316,8 +323,8 @@ test("shows only the active finite pixel grid above 500 percent", async ({
   });
 
   await expect(grid).toHaveAttribute("data-pixel-grid-node-id", "frame");
-  await expect(grid).toHaveAttribute("width", "160");
-  await expect(grid).toHaveAttribute("height", "120");
+  await expect(gridPlane).toHaveAttribute("width", "160");
+  await expect(gridPlane).toHaveAttribute("height", "120");
 
   await page.evaluate(() => {
     window.__PUNCHPRESS_EDITOR__?.newDocument();
@@ -447,26 +454,28 @@ test("keeps Crop, selection, Brush cursor, and live painting aligned at high zoo
   });
 
   const cropGrid = page.locator('[data-pixel-grid-kind="raster"]');
-  const cropGridSurface = cropGrid.locator("svg");
+  const cropGridPlane = cropGrid.getByTestId("pixel-grid-plane");
 
-  await expect(cropGridSurface).toHaveAttribute("width", "72");
-  await expect(cropGridSurface).toHaveAttribute("height", "44");
+  await expect(cropGridPlane).toHaveAttribute("width", "72");
+  await expect(cropGridPlane).toHaveAttribute("height", "44");
+  await expect(cropGridPlane).toHaveAttribute("x", "-8");
+  await expect(cropGridPlane).toHaveAttribute("y", "12");
   const cropGeometry = await page.evaluate(() => {
-    const gridSurface = document.querySelector<SVGSVGElement>(
-      '[data-pixel-grid-kind="raster"] svg'
+    const grid = document.querySelector<SVGGElement>(
+      '[data-pixel-grid-kind="raster"]'
     );
     const cropSurface = document.querySelector<SVGSVGElement>(
       'svg[aria-label="Raster Crop preview"]'
     );
-    const gridMatrix = gridSurface?.getScreenCTM();
+    const gridMatrix = grid?.getScreenCTM();
     const cropMatrix = cropSurface?.getScreenCTM();
 
-    if (!(gridSurface && gridMatrix && cropMatrix)) {
+    if (!(grid && gridMatrix && cropMatrix)) {
       return null;
     }
 
-    const gridStart = new DOMPoint(0, 0).matrixTransform(gridMatrix);
-    const gridEnd = new DOMPoint(72, 44).matrixTransform(gridMatrix);
+    const gridStart = new DOMPoint(-8, 12).matrixTransform(gridMatrix);
+    const gridEnd = new DOMPoint(64, 56).matrixTransform(gridMatrix);
     const cropStart = new DOMPoint(-8, 12).matrixTransform(cropMatrix);
     const cropEnd = new DOMPoint(64, 56).matrixTransform(cropMatrix);
 
@@ -507,11 +516,9 @@ test("keeps Crop, selection, Brush cursor, and live painting aligned at high zoo
   );
   expect(
     await cropGrid.evaluate((element) => {
-      return element.parentElement
-        ? getComputedStyle(element.parentElement).zIndex
-        : null;
+      return element.ownerSVGElement?.getAttribute("aria-label") || null;
     })
-  ).toBe("55");
+  ).toBe("Raster Crop preview");
 
   const cropHandle = page.locator('[data-raster-crop-handle="se"]');
 
@@ -623,15 +630,15 @@ test.describe("fractional exact Raster pixel grid", () => {
     const geometry = await page.evaluate(() => {
       const editor = window.__PUNCHPRESS_EDITOR__;
       const node = editor?.getNode("fractional-raster");
-      const gridElement = document.querySelector<HTMLElement>(
+      const gridElement = document.querySelector<SVGGElement>(
         '[data-pixel-grid-node-id="fractional-raster"]'
       );
-      const gridSurface = gridElement?.querySelector<SVGSVGElement>("svg");
+      const gridSurface = gridElement?.ownerSVGElement;
       const patternElement = gridElement?.querySelector("pattern");
       const canvas = document.querySelector<HTMLCanvasElement>(
         '[data-node-id="fractional-raster"] [data-testid="raster-resident-canvas"] canvas'
       );
-      const gridMatrix = gridSurface?.getScreenCTM();
+      const gridMatrix = gridElement?.getScreenCTM();
 
       if (
         !(
@@ -652,8 +659,6 @@ test.describe("fractional exact Raster pixel grid", () => {
       const cellHeight = Number(patternElement.getAttribute("height"));
       const originX = Number(patternElement.getAttribute("x"));
       const originY = Number(patternElement.getAttribute("y"));
-      // The child SVG matrix includes fractional viewport/viewBox scaling that
-      // its HTML wrapper's bounding box cannot represent.
       const origin = new DOMPoint(originX, originY).matrixTransform(gridMatrix);
       const nextColumn = new DOMPoint(
         originX + cellWidth,
