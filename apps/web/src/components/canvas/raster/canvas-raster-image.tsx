@@ -679,7 +679,16 @@ const RasterTileImages = ({ onTileLoad, tileSources }) => {
   ));
 };
 
-const RasterWorkingCanvas = ({ canvas, height, testId, width, x, y }) => {
+const RasterWorkingCanvas = ({
+  artworkOpacity = 1,
+  canvas,
+  height,
+  pixelGridProps,
+  testId,
+  width,
+  x,
+  y,
+}) => {
   const hostRef = useRef<HTMLDivElement | null>(null);
 
   useLayoutEffect(() => {
@@ -726,18 +735,38 @@ const RasterWorkingCanvas = ({ canvas, height, testId, width, x, y }) => {
       y={y}
     >
       <div
-        ref={hostRef}
+        data-raster-canvas-host="true"
         style={{
           height: "100%",
           overflow: "visible",
+          position: "relative",
           width: "100%",
         }}
-      />
+      >
+        <div
+          ref={hostRef}
+          style={{
+            height: "100%",
+            inset: 0,
+            opacity: artworkOpacity,
+            position: "absolute",
+            width: "100%",
+          }}
+        />
+        {pixelGridProps ? (
+          <CanvasRasterPixelGrid
+            {...pixelGridProps}
+            htmlHost={{ height, width, x, y }}
+            sampleHeight={canvas.height}
+            sampleWidth={canvas.width}
+          />
+        ) : null}
+      </div>
     </foreignObject>
   );
 };
 
-const RasterWorkingSurface = ({ surface }) => {
+const RasterWorkingSurface = ({ artworkOpacity, pixelGridProps, surface }) => {
   if (!surface) {
     return null;
   }
@@ -771,8 +800,10 @@ const RasterWorkingSurface = ({ surface }) => {
         data-raster-working-surface="canvas"
       >
         <RasterWorkingCanvas
+          artworkOpacity={artworkOpacity}
           canvas={surface.canvas}
           height={surface.height}
+          pixelGridProps={pixelGridProps}
           testId="raster-working-canvas"
           width={surface.width}
           x={surface.x ?? 0}
@@ -1025,30 +1056,47 @@ export const CanvasRasterImage = (props) => {
   const workingSurface = useEditorSurfaceValue((editor) =>
     editor.getBrushWorkingSurfaceStateForNode?.(props.nodeId)
   );
+  const pixelGridProps = {
+    baseHeight: props.baseHeight,
+    baseWidth: props.baseWidth,
+    baseX: props.baseX,
+    baseY: props.baseY,
+    height: props.height,
+    nodeId: props.nodeId,
+    surface: props.pixelGridSurface,
+    width: props.width,
+  };
+  let hasHtmlPixelGrid = false;
   let artwork: ReactNode;
 
   if (Array.isArray(props.tileSources) && props.tileSources.length > 0) {
     artwork = <CanvasTiledRasterImage {...props} transform={undefined} />;
   } else if (workingSurface?.type === "canvas") {
+    hasHtmlPixelGrid = true;
     artwork = (
       <g
         data-raster-sampling={sampling}
         data-raster-working-replaces-node="true"
-        opacity={props.opacity ?? 1}
       >
-        <RasterWorkingSurface surface={workingSurface} />
+        <RasterWorkingSurface
+          artworkOpacity={props.opacity ?? 1}
+          pixelGridProps={pixelGridProps}
+          surface={workingSurface}
+        />
       </g>
     );
   } else if (residentSurface) {
+    hasHtmlPixelGrid = true;
     artwork = (
       <g
         data-raster-resident-surface="canvas2d"
         data-raster-sampling={sampling}
-        opacity={props.opacity ?? 1}
       >
         <RasterWorkingCanvas
+          artworkOpacity={props.opacity ?? 1}
           canvas={residentSurface.canvas}
           height={props.baseHeight ?? props.height}
+          pixelGridProps={pixelGridProps}
           testId="raster-resident-canvas"
           width={props.baseWidth ?? props.width}
           x={props.baseX ?? 0}
@@ -1076,16 +1124,7 @@ export const CanvasRasterImage = (props) => {
   return (
     <g transform={props.transform || undefined}>
       {artwork}
-      <CanvasRasterPixelGrid
-        baseHeight={props.baseHeight}
-        baseWidth={props.baseWidth}
-        baseX={props.baseX}
-        baseY={props.baseY}
-        height={props.height}
-        nodeId={props.nodeId}
-        surface={props.pixelGridSurface}
-        width={props.width}
-      />
+      {hasHtmlPixelGrid ? null : <CanvasRasterPixelGrid {...pixelGridProps} />}
     </g>
   );
 };

@@ -456,6 +456,7 @@ test("keeps Crop, selection, Brush cursor, and live painting aligned at high zoo
   const cropGrid = page.locator('[data-pixel-grid-kind="raster"]');
   const cropGridPlane = cropGrid.getByTestId("pixel-grid-plane");
 
+  await expect(cropGrid).toHaveCount(1);
   await expect(cropGridPlane).toHaveAttribute("width", "72");
   await expect(cropGridPlane).toHaveAttribute("height", "44");
   await expect(cropGridPlane).toHaveAttribute("x", "-8");
@@ -516,9 +517,20 @@ test("keeps Crop, selection, Brush cursor, and live painting aligned at high zoo
   );
   expect(
     await cropGrid.evaluate((element) => {
-      return element.ownerSVGElement?.getAttribute("aria-label") || null;
+      const canvasHost = element.closest("[data-raster-canvas-host]");
+      const cropPreview = element.closest(
+        'svg[aria-label="Raster Crop preview"]'
+      );
+
+      return {
+        cropPreviewLabel: cropPreview?.getAttribute("aria-label") || null,
+        sharesCanvasHost: Boolean(canvasHost?.querySelector("canvas")),
+      };
     })
-  ).toBe("Raster Crop preview");
+  ).toEqual({
+    cropPreviewLabel: "Raster Crop preview",
+    sharesCanvasHost: true,
+  });
 
   const cropHandle = page.locator('[data-raster-crop-handle="se"]');
 
@@ -578,8 +590,17 @@ test("keeps Crop, selection, Brush cursor, and live painting aligned at high zoo
       '[data-node-id="standalone-raster"] [data-raster-resident-surface="canvas2d"][data-raster-sampling="exact"]'
     )
   ).toBeVisible();
+  const liveGrid = page.locator('[data-pixel-grid-kind="raster"]');
 
   await page.mouse.move(point.x + 12.5, point.y, { steps: 3 });
+  await expect(liveGrid).toHaveCount(1);
+  expect(
+    await liveGrid.evaluate((element) => {
+      return element
+        .closest("[data-raster-canvas-host]")
+        ?.parentElement?.getAttribute("data-testid");
+    })
+  ).toBe("raster-working-canvas");
   await page.mouse.up();
 
   await expect
@@ -638,6 +659,7 @@ test.describe("fractional exact Raster pixel grid", () => {
       const canvas = document.querySelector<HTMLCanvasElement>(
         '[data-node-id="fractional-raster"] [data-testid="raster-resident-canvas"] canvas'
       );
+      const canvasHost = canvas?.closest("[data-raster-canvas-host]");
       const gridMatrix = gridElement?.getScreenCTM();
 
       if (
@@ -647,6 +669,7 @@ test.describe("fractional exact Raster pixel grid", () => {
           gridSurface &&
           patternElement &&
           canvas &&
+          canvasHost &&
           gridMatrix
         )
       ) {
@@ -697,6 +720,7 @@ test.describe("fractional exact Raster pixel grid", () => {
           height: gridRect.height,
           width: gridRect.width,
         },
+        gridSharesCanvasHost: canvasHost.contains(gridElement),
         gridViewBox: {
           height: gridSurface.viewBox.baseVal.height,
           width: gridSurface.viewBox.baseVal.width,
@@ -712,6 +736,7 @@ test.describe("fractional exact Raster pixel grid", () => {
     expect(geometry?.devicePixelRatio).toBe(1.5);
     const geometryDiagnostics = JSON.stringify(geometry, null, 2);
 
+    expect(geometry?.gridSharesCanvasHost, geometryDiagnostics).toBe(true);
     expect(geometry?.actualCellWidth, geometryDiagnostics).toBeCloseTo(
       geometry?.expectedCellWidth || 0,
       5

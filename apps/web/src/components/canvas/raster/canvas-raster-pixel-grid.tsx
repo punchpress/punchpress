@@ -20,7 +20,15 @@ interface CanvasRasterPixelGridProps {
   baseX?: number;
   baseY?: number;
   height: number;
+  htmlHost?: {
+    height: number;
+    width: number;
+    x: number;
+    y: number;
+  };
   nodeId: string;
+  sampleHeight?: number;
+  sampleWidth?: number;
   surface?: "crop" | "node";
   width: number;
 }
@@ -31,7 +39,10 @@ export const CanvasRasterPixelGrid = ({
   baseX,
   baseY,
   height,
+  htmlHost,
   nodeId,
+  sampleHeight,
+  sampleWidth,
   surface = "node",
   width,
 }: CanvasRasterPixelGridProps) => {
@@ -66,31 +77,44 @@ export const CanvasRasterPixelGrid = ({
       zoom: store.viewport.zoom,
     };
   });
-  const sampleSize = useRasterSampleSize(editor, state.bounds ? nodeId : null, {
-    baseHeight,
-    baseWidth,
-    height,
-    width,
-  });
+  const runtimeSampleSize = useRasterSampleSize(
+    editor,
+    state.bounds && !(sampleHeight && sampleWidth) ? nodeId : null,
+    {
+      baseHeight,
+      baseWidth,
+      height,
+      width,
+    }
+  );
 
   if (!(state.bounds && state.node)) {
     return null;
   }
 
-  const plane = getPixelGridPlane(
-    { baseHeight, baseWidth, baseX, baseY },
-    sampleSize
-  );
+  const sampleSize = {
+    height: sampleHeight || runtimeSampleSize.height,
+    width: sampleWidth || runtimeSampleSize.width,
+  };
+  const planeNode = htmlHost
+    ? {
+        baseHeight: htmlHost.height,
+        baseWidth: htmlHost.width,
+        baseX: htmlHost.x,
+        baseY: htmlHost.y,
+      }
+    : { baseHeight, baseWidth, baseX, baseY };
+  const plane = getPixelGridPlane(planeNode, sampleSize);
   const strokeWidths = getPixelGridStrokeWidths({
     devicePixelRatio: state.devicePixelRatio,
     scaleX: getNodeScaleX(state.node) ?? 1,
     scaleY: getNodeScaleY(state.node) ?? 1,
     zoom: state.zoom,
   });
-
-  return (
+  const bounds = htmlHost && surface === "node" ? htmlHost : state.bounds;
+  const pattern = (
     <CanvasPixelGridPattern
-      bounds={state.bounds}
+      bounds={bounds}
       kind="raster"
       nodeId={nodeId}
       plane={plane}
@@ -98,6 +122,21 @@ export const CanvasRasterPixelGrid = ({
       strokeWidths={strokeWidths}
     />
   );
+
+  if (htmlHost) {
+    return (
+      <svg
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 size-full"
+        preserveAspectRatio="none"
+        viewBox={`${htmlHost.x} ${htmlHost.y} ${htmlHost.width} ${htmlHost.height}`}
+      >
+        {pattern}
+      </svg>
+    );
+  }
+
+  return pattern;
 };
 
 const useRasterSampleSize = (editor, nodeId, node) => {
