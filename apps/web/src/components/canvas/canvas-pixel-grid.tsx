@@ -5,7 +5,8 @@ import {
   getNodeX,
   getNodeY,
   getPixelGridTarget,
-  getRasterPresentationPolicy,
+  getRasterPixelFootprint,
+  shouldShowPixelGrid,
 } from "@punchpress/engine";
 import { useEditorSelectionDragSurfaceValue } from "../../editor-react/use-editor-selection-drag-surface-value";
 import {
@@ -16,23 +17,36 @@ import { CanvasPixelGridPattern } from "./canvas-pixel-grid-pattern";
 
 export const CanvasPixelGrid = () => {
   const state = useEditorSelectionDragSurfaceValue((editor, store) => {
-    const policy = getRasterPresentationPolicy(store.viewport.zoom);
-    const target = policy.showPixelGrid ? getPixelGridTarget(editor) : null;
+    const target = getPixelGridTarget(editor);
     const frameTarget = target?.kind === "frame" ? target : null;
+    const node = frameTarget
+      ? getPixelGridPreviewNode(frameTarget.node, editor.selectionDragPreview)
+      : null;
+    const showPixelGrid =
+      node &&
+      shouldShowPixelGrid(
+        getRasterPixelFootprint({
+          displayedHeight: 1,
+          displayedWidth: 1,
+          sampleHeight: 1,
+          sampleWidth: 1,
+          scaleX: getNodeScaleX(node) ?? 1,
+          scaleY: getNodeScaleY(node) ?? 1,
+          zoom: store.viewport.zoom,
+        })
+      );
 
     return {
       cropActive: Boolean(store.rasterCropSession),
       devicePixelRatio:
         typeof window === "undefined" ? 1 : window.devicePixelRatio,
-      target: frameTarget
-        ? {
-            ...frameTarget,
-            node: getPixelGridPreviewNode(
-              frameTarget.node,
-              editor.selectionDragPreview
-            ),
-          }
-        : null,
+      target:
+        frameTarget && node && showPixelGrid
+          ? {
+              ...frameTarget,
+              node,
+            }
+          : null,
       zoom: store.viewport.zoom,
     };
   });

@@ -355,6 +355,7 @@ const CanvasStandardNodeArt = ({ nodeId }) => {
       paintPreview={paintPreview}
       paths={artState.paths}
       renderMode={artState.renderMode}
+      renderRootNodeId={nodeId}
       renderTree={artState.renderTree}
       stroke={artState.stroke}
       strokeLineCap={artState.strokeLineCap}
@@ -395,6 +396,7 @@ const CanvasVectorNodeArt = ({ nodeId }) => {
       paintPreview={paintPreview}
       paths={artState.paths}
       renderMode={artState.renderMode}
+      renderRootNodeId={nodeId}
       renderTree={artState.renderTree}
       stroke={artState.stroke}
       strokeLineCap={artState.strokeLineCap}
@@ -452,6 +454,7 @@ const CanvasNodeArt = memo(
     opacity,
     paintPreview,
     paths,
+    renderRootNodeId,
     renderMode,
     renderTree,
     stroke,
@@ -473,6 +476,7 @@ const CanvasNodeArt = memo(
             baseY={image.baseY}
             height={image.height}
             nodeId={image.id}
+            renderRootNodeId={renderRootNodeId}
             src={image.src}
             tileSources={image.tileSources}
             width={image.width}
@@ -485,6 +489,7 @@ const CanvasNodeArt = memo(
             fillRule={fillRule}
             isEditing={isEditing}
             items={renderTree}
+            renderRootNodeId={renderRootNodeId}
             stroke={stroke}
             strokeLineCap={strokeLineCap}
             strokeLineJoin={strokeLineJoin}

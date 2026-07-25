@@ -199,11 +199,16 @@ export {
 } from "./raster/crop";
 export type { RasterCropRect } from "./raster/crop";
 export {
-  getRasterPresentationPolicy,
-  PIXEL_GRID_ZOOM_THRESHOLD,
+  getRasterPixelFootprint,
+  getRasterSampling,
+  PIXEL_GRID_SCREEN_PIXEL_THRESHOLD,
+  RASTER_MAGNIFIED_SCREEN_PIXEL_THRESHOLD,
+  shouldShowPixelGrid,
+  shouldUseFullResolutionRasterSource,
 } from "./raster/presentation";
 export type {
-  RasterPresentationPolicy,
+  RasterPixelFootprint,
+  RasterPixelFootprintOptions,
   RasterSampling,
 } from "./raster/presentation";
 export type {
@@ -228,4 +233,5 @@ export type { PixelGridTarget } from "./viewport/pixel-grid-target";
 export {
   getNodeLocalMatrix,
   getNodeLocalTransformBounds,
+  multiplyMatrix,
 } from "./transform/node-transform-matrix";

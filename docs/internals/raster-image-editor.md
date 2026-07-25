@@ -32,10 +32,17 @@ presented canvas is also the live editing surface.
   `apps/web/src/components/canvas/raster/`. The generic canvas node renderer
   delegates image and tiled-image rendering there instead of owning culling,
   tile DOM, or over-dense projection.
-- One zoom presentation policy selects smooth ordinary sampling or exact
-  high-zoom sampling for image elements, resident canvases, exact tiles,
-  preview canvases, and live working surfaces. Pixel-grid zoom always disables
-  low-resolution Raster previews.
+- PunchPress computes each Raster's logical screen footprint per intrinsic
+  source pixel. Chromium performs viewport sampling: either-axis
+  minification stays smooth, while both axes at `2` or more screen pixels use
+  pixel-preserving sampling for image elements, resident canvases, exact tiles,
+  preview canvases, and live working surfaces. The footprint follows the
+  transform chain of the Raster's current render surface, including transient
+  aggregate-resize scale exactly once.
+- Full-resolution source selection begins at the same `2` px magnification
+  threshold, before the `5` px pixel-grid threshold. Crossing the grid
+  threshold therefore changes only the overlay, and a visible grid never uses
+  a low-resolution Raster preview.
 - Browser raster primitives live behind the brush runtime seam. Canvas creation,
   image decode, frame scheduling, and render-ready events are runtime services;
   brush policy calls the seam instead of reaching directly for DOM globals.

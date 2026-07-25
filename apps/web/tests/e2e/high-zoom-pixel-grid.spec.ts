@@ -73,6 +73,51 @@ const setConvergedViewport = async (
     .toBe(viewport.zoom);
 };
 
+const captureRasterPresentation = (page: Page, nodeId: string) => {
+  return page.evaluate((id) => {
+    const nodeRoot = document.querySelector(`[data-node-id="${id}"]`);
+    const samplingSurface = nodeRoot?.querySelector("[data-raster-sampling]");
+    const residentCanvas = nodeRoot?.querySelector<HTMLCanvasElement>(
+      '[data-testid="raster-resident-canvas"] canvas'
+    );
+    const tiledSurface = nodeRoot?.querySelector("[data-raster-node-id]");
+    const importedImage = nodeRoot?.querySelector("image");
+
+    return {
+      gridCount: document.querySelectorAll("[data-pixel-grid-kind]").length,
+      imageRendering: residentCanvas
+        ? getComputedStyle(residentCanvas).imageRendering
+        : null,
+      pixelOutput: residentCanvas?.toDataURL() || null,
+      renderedSource: residentCanvas
+        ? {
+            height: residentCanvas.height,
+            kind: "resident-canvas",
+            width: residentCanvas.width,
+          }
+        : {
+            href: importedImage?.getAttribute("href") || null,
+            kind:
+              tiledSurface?.getAttribute("data-raster-preview-active") ===
+              "true"
+                ? "tile-preview"
+                : "svg-source",
+            previewActive:
+              tiledSurface?.getAttribute("data-raster-preview-active") || null,
+            previewEligible:
+              tiledSurface?.getAttribute("data-raster-preview-eligible") ||
+              null,
+            renderKey:
+              tiledSurface?.getAttribute("data-raster-render-key") || null,
+            visibleTileCount:
+              tiledSurface?.getAttribute("data-raster-visible-tile-count") ||
+              null,
+          },
+      sampling: samplingSurface?.getAttribute("data-raster-sampling") || null,
+    };
+  }, nodeId);
+};
+
 const createFrameDocument = (src: string) =>
   JSON.stringify({
     nodes: [
@@ -117,6 +162,39 @@ const createFrameDocument = (src: string) =>
         type: "image",
         visible: true,
         width: 48,
+      },
+      {
+        assetId: "asset-frame-tiled-raster",
+        baseHeight: 1,
+        baseWidth: 129,
+        baseX: 0,
+        baseY: 0,
+        height: 1,
+        id: "frame-tiled-raster",
+        mimeType: "image/png",
+        name: "Frame Tiled Raster",
+        opacity: 1,
+        parentId: "frame",
+        tileSources: Array.from({ length: 129 }, (_, index) => ({
+          col: index,
+          height: 1,
+          ref: `assets/raster/frame-tile-${index}.png`,
+          row: 0,
+          src,
+          width: 1,
+          x: index,
+          y: 0,
+        })),
+        transform: {
+          rotation: 0,
+          scaleX: 0.01,
+          scaleY: 0.01,
+          x: 220,
+          y: 200,
+        },
+        type: "image",
+        visible: true,
+        width: 129,
       },
     ],
     version: "1.8",
@@ -197,6 +275,34 @@ const createFractionalRasterDocument = (src: string) =>
   JSON.stringify({
     nodes: [
       {
+        id: "fractional-render-root",
+        name: "Rendered Raster group",
+        parentId: "root",
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 0,
+          y: 0,
+        },
+        type: "group",
+        visible: true,
+      },
+      {
+        id: "fractional-group",
+        name: "Scaled Raster group",
+        parentId: "fractional-render-root",
+        transform: {
+          rotation: 0,
+          scaleX: 4,
+          scaleY: 4,
+          x: 0,
+          y: 0,
+        },
+        type: "group",
+        visible: true,
+      },
+      {
         assetId: "asset-fractional-raster",
         baseHeight: 3.6,
         baseWidth: 7.4,
@@ -207,7 +313,7 @@ const createFractionalRasterDocument = (src: string) =>
         mimeType: "image/png",
         name: "Fractional Raster",
         opacity: 1,
-        parentId: "root",
+        parentId: "fractional-group",
         src,
         transform: {
           rotation: 0,
@@ -220,6 +326,27 @@ const createFractionalRasterDocument = (src: string) =>
         visible: true,
         width: 7.4,
       },
+      ...Array.from({ length: 300 }, (_, index) => ({
+        cornerRadius: 0,
+        fill: "#000000",
+        height: 1,
+        id: `fractional-density-${index}`,
+        opacity: 0,
+        parentId: "fractional-render-root",
+        shape: "polygon",
+        stroke: null,
+        strokeWidth: 0,
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 320 + (index % 20),
+          y: 220 + Math.floor(index / 20),
+        },
+        type: "shape",
+        visible: true,
+        width: 1,
+      })),
     ],
     version: "1.8",
   });
@@ -235,11 +362,86 @@ test("shows only the active finite pixel grid above 500 percent", async ({
   await page.evaluate(() => {
     window.__PUNCHPRESS_EDITOR__?.select("frame-raster");
   });
-  await setConvergedViewport(page, { x: 180, y: 160, zoom: 5 });
+  const belowGridZoom = 4.999;
+  const aboveGridZoom = 5.001;
 
-  await expect(page.locator("[data-pixel-grid-kind]")).toHaveCount(0);
+  await setConvergedViewport(page, {
+    x: 180,
+    y: 160,
+    zoom: belowGridZoom,
+  });
+  await expect(
+    page.locator(
+      '[data-node-id="frame-raster"] [data-testid="raster-resident-canvas"] canvas'
+    )
+  ).toBeVisible();
+  const frameTiledRaster = page.locator(
+    '[data-node-id="frame-tiled-raster"] [data-raster-node-id="frame-tiled-raster"]'
+  );
 
-  await setConvergedViewport(page, { x: 180, y: 160, zoom: 5.01 });
+  await expect(frameTiledRaster).toHaveAttribute(
+    "data-raster-preview-active",
+    "false"
+  );
+  const presentationBelowGrid = await captureRasterPresentation(
+    page,
+    "frame-raster"
+  );
+  const tiledPresentationBelowGrid = await captureRasterPresentation(
+    page,
+    "frame-tiled-raster"
+  );
+
+  expect(presentationBelowGrid.gridCount).toBe(0);
+
+  await setConvergedViewport(page, {
+    x: 180,
+    y: 160,
+    zoom: aboveGridZoom,
+  });
+  await expect(page.locator("[data-pixel-grid-kind]")).toHaveCount(1);
+  await expect(frameTiledRaster).toHaveAttribute(
+    "data-raster-preview-active",
+    "false"
+  );
+  const presentationAboveGrid = await captureRasterPresentation(
+    page,
+    "frame-raster"
+  );
+  const tiledPresentationAboveGrid = await captureRasterPresentation(
+    page,
+    "frame-tiled-raster"
+  );
+  const { gridCount: belowGridCount, ...stablePresentationBelowGrid } =
+    presentationBelowGrid;
+  const { gridCount: aboveGridCount, ...stablePresentationAboveGrid } =
+    presentationAboveGrid;
+
+  expect(belowGridCount).toBe(0);
+  expect(aboveGridCount).toBe(1);
+  expect(stablePresentationBelowGrid).toMatchObject({
+    imageRendering: "pixelated",
+    renderedSource: {
+      height: 32,
+      kind: "resident-canvas",
+      width: 48,
+    },
+    sampling: "exact",
+  });
+  expect(stablePresentationAboveGrid).toEqual(stablePresentationBelowGrid);
+  expect(tiledPresentationBelowGrid).toMatchObject({
+    gridCount: 0,
+    renderedSource: {
+      kind: "svg-source",
+      previewActive: "false",
+      previewEligible: "false",
+    },
+    sampling: "smooth",
+  });
+  expect(tiledPresentationAboveGrid).toEqual({
+    ...tiledPresentationBelowGrid,
+    gridCount: 1,
+  });
 
   const grid = page.locator("[data-pixel-grid-kind]");
 
@@ -283,8 +485,9 @@ test("shows only the active finite pixel grid above 500 percent", async ({
 
       return originX === null
         ? null
-        : Math.abs(originX - (gridOriginBeforeMove?.x || 0) - 12.5 * 5.01) *
-            devicePixelRatio;
+        : Math.abs(
+            originX - (gridOriginBeforeMove?.x || 0) - 12.5 * aboveGridZoom
+          ) * devicePixelRatio;
     })
     .toBeLessThan(0.25);
   await expect
@@ -295,8 +498,9 @@ test("shows only the active finite pixel grid above 500 percent", async ({
 
       return originY === null
         ? null
-        : Math.abs(originY - (gridOriginBeforeMove?.y || 0) - 8.25 * 5.01) *
-            devicePixelRatio;
+        : Math.abs(
+            originY - (gridOriginBeforeMove?.y || 0) - 8.25 * aboveGridZoom
+          ) * devicePixelRatio;
     })
     .toBeLessThan(0.25);
 
@@ -335,7 +539,7 @@ test("shows only the active finite pixel grid above 500 percent", async ({
   await expect(page.locator("[data-pixel-grid-kind]")).toHaveCount(0);
 });
 
-test("uses exact samples for resident, tiled, and preview-capable Raster paths", async ({
+test("uses effective source pixels across resident and tiled Raster paths", async ({
   page,
 }) => {
   await gotoEditor(page);
@@ -391,25 +595,28 @@ test("uses exact samples for resident, tiled, and preview-capable Raster paths",
     "data-raster-preview-active",
     "true"
   );
+  const tiledPresentationAtOne = await captureRasterPresentation(
+    page,
+    "tiled-raster"
+  );
 
   await setConvergedViewport(page, { x: 300, y: 200, zoom: 6.25 });
 
-  await expect(tiledRaster).toHaveAttribute("data-raster-sampling", "exact");
+  await expect(tiledRaster).toHaveAttribute("data-raster-sampling", "smooth");
   await expect(tiledRaster).toHaveAttribute(
     "data-raster-preview-eligible",
-    "false"
+    "true"
   );
   await expect(tiledRaster).toHaveAttribute(
     "data-raster-preview-active",
-    "false"
+    "true"
+  );
+  const tiledPresentationAtHighViewportZoom = await captureRasterPresentation(
+    page,
+    "tiled-raster"
   );
 
-  const exactTile = tiledRaster.locator("[data-raster-tile-ref]").first();
-
-  await expect(exactTile).toBeAttached();
-  expect(
-    await exactTile.evaluate((node) => getComputedStyle(node).imageRendering)
-  ).toBe("pixelated");
+  expect(tiledPresentationAtHighViewportZoom).toEqual(tiledPresentationAtOne);
 });
 
 test("keeps Crop, selection, Brush cursor, and live painting aligned at high zoom", async ({
@@ -641,10 +848,10 @@ test("keeps Crop, selection, Brush cursor, and live painting aligned at high zoo
   ).toBeVisible();
 });
 
-test.describe("fractional exact Raster pixel grid", () => {
+test.describe("transformed fractional exact Raster pixel grid", () => {
   test.use({ deviceScaleFactor: 1.5 });
 
-  test("aligns one grid cell per exact sample with contrast on black and white", async ({
+  test("shares transform and resize thresholds while aligning exact contrasting cells", async ({
     page,
   }) => {
     await gotoEditor(page);
@@ -654,18 +861,102 @@ test.describe("fractional exact Raster pixel grid", () => {
     await page.evaluate(() => {
       window.__PUNCHPRESS_EDITOR__?.select("fractional-raster");
     });
+    const grid = page.locator('[data-pixel-grid-node-id="fractional-raster"]');
+    const rasterPresentation = page.locator(
+      '[data-node-id="fractional-render-root"] [data-raster-sampling]'
+    );
+    const resident = page.locator(
+      '[data-node-id="fractional-render-root"] [data-testid="raster-resident-canvas"] canvas'
+    );
+    const getMinSourcePixelFootprint = () =>
+      resident.evaluate((canvas: HTMLCanvasElement) => {
+        const rect = canvas.getBoundingClientRect();
+
+        return Math.min(rect.height / canvas.height, rect.width / canvas.width);
+      });
+
     await setConvergedViewport(page, {
       x: 318.25,
       y: 218.75,
-      zoom: 6.375,
+      zoom: 0.5,
     });
+    await expect(grid).toHaveCount(0);
+    await expect(rasterPresentation).toHaveAttribute(
+      "data-raster-sampling",
+      "smooth"
+    );
+    expect(await getMinSourcePixelFootprint()).toBeLessThan(2);
+    await page.evaluate(() => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
+      const bounds = editor?.getNodeRenderFrame(
+        "fractional-render-root"
+      )?.bounds;
+      const session = bounds
+        ? editor?.beginResizeSelection({
+            anchorCanvas: { x: bounds.minX, y: bounds.minY },
+            nodeIds: ["fractional-render-root"],
+          })
+        : null;
 
-    const grid = page.locator('[data-pixel-grid-node-id="fractional-raster"]');
-    const pattern = grid.getByTestId("pixel-grid-pattern");
-    const resident = page.locator(
-      '[data-node-id="fractional-raster"] [data-testid="raster-resident-canvas"] canvas'
+      if (!(editor && session)) {
+        throw new Error("Expected aggregate Raster resize session");
+      }
+
+      editor.updateResizeSelection(session, {
+        scale: 4,
+      });
+    });
+    await expect(grid).toHaveCount(1);
+    await expect(rasterPresentation).toHaveAttribute(
+      "data-raster-sampling",
+      "exact"
+    );
+    expect(await getMinSourcePixelFootprint()).toBeGreaterThan(5);
+    await page.evaluate(() => {
+      window.__PUNCHPRESS_EDITOR__?.setSelectionDragPreview(null);
+    });
+    await expect(grid).toHaveCount(0);
+    await expect(rasterPresentation).toHaveAttribute(
+      "data-raster-sampling",
+      "smooth"
     );
 
+    await setConvergedViewport(page, {
+      x: 318.25,
+      y: 218.75,
+      zoom: 1.7,
+    });
+    await expect(grid).toHaveCount(0);
+    await expect(rasterPresentation).toHaveAttribute(
+      "data-raster-sampling",
+      "exact"
+    );
+    expect(await getMinSourcePixelFootprint()).toBeLessThanOrEqual(5);
+    const presentationBelowGrid = await captureRasterPresentation(
+      page,
+      "fractional-render-root"
+    );
+    await setConvergedViewport(page, {
+      x: 318.25,
+      y: 218.75,
+      zoom: 1.75,
+    });
+    await expect(grid).toHaveCount(1);
+    expect(await getMinSourcePixelFootprint()).toBeGreaterThan(5);
+    const presentationAboveGrid = await captureRasterPresentation(
+      page,
+      "fractional-render-root"
+    );
+    const { gridCount: belowGridCount, ...stablePresentationBelowGrid } =
+      presentationBelowGrid;
+    const { gridCount: aboveGridCount, ...stablePresentationAboveGrid } =
+      presentationAboveGrid;
+
+    expect(belowGridCount).toBe(0);
+    expect(aboveGridCount).toBe(1);
+    expect(stablePresentationAboveGrid).toEqual(stablePresentationBelowGrid);
+
+    const pattern = grid.getByTestId("pixel-grid-pattern");
     await expect(grid).toHaveCount(1);
     await expect(grid).toBeVisible();
     await expect(pattern).toBeAttached();
@@ -682,7 +973,7 @@ test.describe("fractional exact Raster pixel grid", () => {
       const gridSurface = gridElement?.ownerSVGElement;
       const patternElement = gridElement?.querySelector("pattern");
       const canvas = document.querySelector<HTMLCanvasElement>(
-        '[data-node-id="fractional-raster"] [data-testid="raster-resident-canvas"] canvas'
+        '[data-node-id="fractional-render-root"] [data-testid="raster-resident-canvas"] canvas'
       );
       const canvasHost = canvas?.closest("[data-raster-canvas-host]");
       const gridMatrix = gridElement?.getScreenCTM();

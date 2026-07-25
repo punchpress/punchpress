@@ -22,8 +22,11 @@ product meaning.
 - One zoom update is capped so large device deltas do not runaway.
 - Zoom focuses on the pointer so content under the cursor stays under it.
 - Users can fit selected content or an artboard on demand.
-- Above `500%`, the active finite Frame or standalone Raster automatically
-  shows a subtle pixel grid. The infinite Workspace never receives that grid.
+- The active finite Frame or standalone Raster shows a subtle pixel grid once
+  both target pixel axes exceed `5` logical screen pixels. That is above `500%`
+  for an untransformed Frame; Raster display transforms and intrinsic sample
+  density affect standalone Raster grids. The infinite Workspace never
+  receives a grid.
 
 ## Pan
 

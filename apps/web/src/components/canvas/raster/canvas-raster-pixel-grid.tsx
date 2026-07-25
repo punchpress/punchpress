@@ -1,9 +1,4 @@
-import {
-  getNodeScaleX,
-  getNodeScaleY,
-  getPixelGridTarget,
-  getRasterPresentationPolicy,
-} from "@punchpress/engine";
+import { getPixelGridTarget, shouldShowPixelGrid } from "@punchpress/engine";
 import { useCallback, useSyncExternalStore } from "react";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorSelectionDragSurfaceValue } from "../../../editor-react/use-editor-selection-drag-surface-value";
@@ -13,6 +8,10 @@ import {
   getPixelGridStrokeWidths,
 } from "../canvas-pixel-grid-math";
 import { CanvasPixelGridPattern } from "../canvas-pixel-grid-pattern";
+import {
+  getRasterPresentationFootprint,
+  getRasterRenderScale,
+} from "./canvas-raster-presentation";
 
 interface CanvasRasterPixelGridProps {
   baseHeight?: number;
@@ -27,6 +26,7 @@ interface CanvasRasterPixelGridProps {
     y: number;
   };
   nodeId: string;
+  renderRootNodeId?: string;
   sampleHeight?: number;
   sampleWidth?: number;
   surface?: "crop" | "node";
@@ -41,6 +41,7 @@ export const CanvasRasterPixelGrid = ({
   height,
   htmlHost,
   nodeId,
+  renderRootNodeId = nodeId,
   sampleHeight,
   sampleWidth,
   surface = "node",
@@ -48,10 +49,7 @@ export const CanvasRasterPixelGrid = ({
 }: CanvasRasterPixelGridProps) => {
   const editor = useEditor();
   const state = useEditorSelectionDragSurfaceValue((editor, store) => {
-    const target = getRasterPresentationPolicy(store.viewport.zoom)
-      .showPixelGrid
-      ? getPixelGridTarget(editor)
-      : null;
+    const target = getPixelGridTarget(editor);
     const cropRect =
       store.rasterCropSession?.nodeId === nodeId
         ? store.rasterCropSession.rect
@@ -69,10 +67,7 @@ export const CanvasRasterPixelGrid = ({
       devicePixelRatio:
         typeof window === "undefined" ? 1 : window.devicePixelRatio,
       node: shouldRender
-        ? getPixelGridPreviewNode(
-            editor.getNode(nodeId),
-            editor.selectionDragPreview
-          )
+        ? getPixelGridPreviewNode(target.node, editor.selectionDragPreview)
         : null,
       zoom: store.viewport.zoom,
     };
@@ -96,6 +91,22 @@ export const CanvasRasterPixelGrid = ({
     height: sampleHeight || runtimeSampleSize.height,
     width: sampleWidth || runtimeSampleSize.width,
   };
+  const displayedHeight = htmlHost?.height ?? baseHeight ?? height;
+  const displayedWidth = htmlHost?.width ?? baseWidth ?? width;
+  const footprint = getRasterPresentationFootprint(editor, {
+    displayedHeight,
+    displayedWidth,
+    nodeId,
+    renderRootNodeId,
+    sampleHeight: sampleSize.height,
+    sampleWidth: sampleSize.width,
+    zoom: state.zoom,
+  });
+
+  if (!shouldShowPixelGrid(footprint)) {
+    return null;
+  }
+
   const planeNode = htmlHost
     ? {
         baseHeight: htmlHost.height,
@@ -105,10 +116,11 @@ export const CanvasRasterPixelGrid = ({
       }
     : { baseHeight, baseWidth, baseX, baseY };
   const plane = getPixelGridPlane(planeNode, sampleSize);
+  const renderScale = getRasterRenderScale(editor, nodeId, renderRootNodeId);
   const strokeWidths = getPixelGridStrokeWidths({
     devicePixelRatio: state.devicePixelRatio,
-    scaleX: getNodeScaleX(state.node) ?? 1,
-    scaleY: getNodeScaleY(state.node) ?? 1,
+    scaleX: renderScale.x,
+    scaleY: renderScale.y,
     zoom: state.zoom,
   });
   const bounds = htmlHost && surface === "node" ? htmlHost : state.bounds;

@@ -93,8 +93,10 @@ belong to raster surfaces, while cursor chrome belongs to the tool overlay.
   between adjacent committed tile images and working tile canvases.
 - Raster LOD previews are derived from committed raster/tile data. They do not
   own brush commit state.
-- Raster LOD previews never render while the automatic pixel grid is visible;
-  exact committed samples remain mounted at high zoom.
+- Raster LOD previews retire at the `2` logical-screen-pixel magnification
+  threshold, before the automatic grid appears above `5` px. Crossing the grid
+  threshold changes only the overlay; full-resolution committed samples remain
+  mounted while it is visible.
 - When a working surface exists for a raster node, that node's raster LOD
   preview yields and exact committed tiles remain mounted. The normal
   low-resolution projection resumes after the working surface retires.

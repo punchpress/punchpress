@@ -313,6 +313,7 @@ export const CanvasNodeRenderTree = ({
   fillRule,
   isEditing,
   items,
+  renderRootNodeId,
   stroke,
   strokeLineCap,
   strokeLineJoin,
@@ -332,6 +333,7 @@ export const CanvasNodeRenderTree = ({
             fillRule={fillRule}
             isEditing={isEditing}
             items={item.children || []}
+            renderRootNodeId={renderRootNodeId}
             stroke={stroke}
             strokeLineCap={strokeLineCap}
             strokeLineJoin={strokeLineJoin}
@@ -361,6 +363,7 @@ export const CanvasNodeRenderTree = ({
               height={item.height}
               nodeId={item.nodeId}
               opacity={isEditing ? 0 : (item.opacity ?? 1)}
+              renderRootNodeId={renderRootNodeId}
               src={item.src}
               tileSources={item.tileSources}
               width={item.width}

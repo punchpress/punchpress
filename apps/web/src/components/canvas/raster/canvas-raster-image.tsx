@@ -1,7 +1,8 @@
 import {
   getNodeLocalPoint,
-  getNodeScaleX,
-  getRasterPresentationPolicy,
+  getPixelGridTarget,
+  getRasterSampling,
+  shouldUseFullResolutionRasterSource,
 } from "@punchpress/engine";
 import {
   type ReactNode,
@@ -15,6 +16,7 @@ import {
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
 import { CanvasRasterPixelGrid } from "./canvas-raster-pixel-grid";
+import { getRasterPresentationFootprint } from "./canvas-raster-presentation";
 
 interface RasterDebugRecord {
   event: string;
@@ -387,13 +389,100 @@ const getNodeLocalViewportBounds = (editor, state, node) => {
   };
 };
 
-const getRasterTileCullState = (editor, state, nodeId, tileSources) => {
+const getNodeRasterPixelFootprint = (
+  editor,
+  {
+    displayedHeight,
+    displayedWidth,
+    nodeId,
+    renderRootNodeId,
+    sampleHeight,
+    sampleWidth,
+    zoom,
+  }
+) =>
+  getRasterPresentationFootprint(editor, {
+    displayedHeight,
+    displayedWidth,
+    nodeId,
+    renderRootNodeId,
+    sampleHeight,
+    sampleWidth,
+    zoom,
+  });
+
+const getGridPixelFootprint = (editor, nodeId, sourceFootprint, zoom) => {
+  const target = getPixelGridTarget(editor);
+
+  if (
+    !target ||
+    (target.kind === "raster" && target.sourceNodeId !== nodeId) ||
+    (target.kind === "frame" &&
+      !isNodeOwnedByFrame(editor, nodeId, target.node.id))
+  ) {
+    return sourceFootprint;
+  }
+
+  if (target.kind === "raster") {
+    return sourceFootprint;
+  }
+
+  return getNodeRasterPixelFootprint(editor, {
+    displayedHeight: 1,
+    displayedWidth: 1,
+    nodeId: target.node.id,
+    renderRootNodeId: target.node.id,
+    sampleHeight: 1,
+    sampleWidth: 1,
+    zoom,
+  });
+};
+
+const isNodeOwnedByFrame = (editor, nodeId, frameId) => {
+  let node = editor.getNode(nodeId);
+
+  while (node?.parentId && node.parentId !== "root") {
+    if (node.parentId === frameId) {
+      return true;
+    }
+
+    node = editor.getNode(node.parentId);
+  }
+
+  return false;
+};
+
+const getRasterTileCullState = (
+  editor,
+  state,
+  nodeId,
+  renderRootNodeId,
+  tileSources
+) => {
   const zoom = Math.max(0.0001, state.viewport?.zoom || editor.zoom || 1);
-  const presentation = getRasterPresentationPolicy(zoom);
+  const node = editor.getNode(nodeId);
+  const sourceFootprint = getNodeRasterPixelFootprint(editor, {
+    displayedHeight: 1,
+    displayedWidth: 1,
+    nodeId,
+    renderRootNodeId,
+    sampleHeight: 1,
+    sampleWidth: 1,
+    zoom,
+  });
+  const gridFootprint = getGridPixelFootprint(
+    editor,
+    nodeId,
+    sourceFootprint,
+    zoom
+  );
+  const sampling = getRasterSampling(sourceFootprint);
+  const useFullResolutionSource =
+    shouldUseFullResolutionRasterSource(gridFootprint);
   const fallbackState = {
     bounds: null,
     previewKey: null,
-    sampling: presentation.sampling,
+    sampling,
     shouldBuildPreview: false,
     shouldUsePreview: false,
     tileSources,
@@ -406,8 +495,6 @@ const getRasterTileCullState = (editor, state, nodeId, tileSources) => {
   ) {
     return fallbackState;
   }
-
-  const node = editor.getNode(nodeId);
 
   if (node?.type !== "image") {
     return fallbackState;
@@ -427,12 +514,12 @@ const getRasterTileCullState = (editor, state, nodeId, tileSources) => {
       tile.y > bounds.maxY
     );
   });
-  const nodeScale = Math.max(0.0001, Math.abs(getNodeScaleX(node) || 1));
-  const pixelDensity = 1 / (zoom * nodeScale);
+  const pixelDensity =
+    1 /
+    Math.max(0.0001, Math.min(sourceFootprint.height, sourceFootprint.width));
   const hasBrushWorkingSurface = hasBrushWorkingSurfaceForNode(editor, nodeId);
   const shouldBuildPreview =
-    !hasBrushWorkingSurface &&
-    presentation.sampling !== "exact" &&
+    !(hasBrushWorkingSurface || useFullResolutionSource) &&
     visibleTileSources.length > RASTER_TILE_PREVIEW_TILE_THRESHOLD &&
     pixelDensity >= RASTER_TILE_PREVIEW_DENSITY_THRESHOLD;
   const previewBounds = {
@@ -471,7 +558,7 @@ const getRasterTileCullState = (editor, state, nodeId, tileSources) => {
           bounds.maxY,
           previewSourcesKey,
         ].join(":"),
-    sampling: presentation.sampling,
+    sampling,
     shouldBuildPreview,
     shouldUsePreview: shouldBuildPreview,
     tileSources: previewTileSources,
@@ -824,13 +911,14 @@ const CanvasTiledRasterImage = ({
   height,
   nodeId,
   opacity,
+  renderRootNodeId = nodeId,
   src,
   tileSources,
   transform,
   width,
 }) => {
   const cullState = useEditorSurfaceValue((editor, state) =>
-    getRasterTileCullState(editor, state, nodeId, tileSources)
+    getRasterTileCullState(editor, state, nodeId, renderRootNodeId, tileSources)
   );
   const workingSurface = useEditorSurfaceValue((editor) =>
     editor.getBrushWorkingSurfaceStateForNode?.(nodeId)
@@ -1049,13 +1137,19 @@ const CanvasTiledRasterImage = ({
 };
 
 export const CanvasRasterImage = (props) => {
+  const editor = useEditor();
   const residentSurface = useResidentRasterSurface(props);
-  const sampling = useEditorSurfaceValue((_, state) => {
-    return getRasterPresentationPolicy(state.viewport.zoom).sampling;
-  });
   const workingSurface = useEditorSurfaceValue((editor) =>
     editor.getBrushWorkingSurfaceStateForNode?.(props.nodeId)
   );
+  const zoom = useEditorSurfaceValue((_, state) => state.viewport.zoom);
+  const sampling = getCanvasRasterSampling({
+    editor,
+    props,
+    residentSurface,
+    workingSurface,
+    zoom,
+  });
   const pixelGridProps = {
     baseHeight: props.baseHeight,
     baseWidth: props.baseWidth,
@@ -1063,6 +1157,7 @@ export const CanvasRasterImage = (props) => {
     baseY: props.baseY,
     height: props.height,
     nodeId: props.nodeId,
+    renderRootNodeId: props.renderRootNodeId ?? props.nodeId,
     surface: props.pixelGridSurface,
     width: props.width,
   };
@@ -1126,6 +1221,40 @@ export const CanvasRasterImage = (props) => {
       {artwork}
       {hasHtmlPixelGrid ? null : <CanvasRasterPixelGrid {...pixelGridProps} />}
     </g>
+  );
+};
+
+const getCanvasRasterSampling = ({
+  editor,
+  props,
+  residentSurface,
+  workingSurface,
+  zoom,
+}) => {
+  const workingCanvas =
+    workingSurface?.type === "canvas" ? workingSurface : null;
+  const displayedHeight =
+    workingCanvas?.height ?? props.baseHeight ?? props.height;
+  const displayedWidth = workingCanvas?.width ?? props.baseWidth ?? props.width;
+  const sampleHeight =
+    workingCanvas?.canvas.height ??
+    residentSurface?.height ??
+    Math.max(1, Math.round(displayedHeight));
+  const sampleWidth =
+    workingCanvas?.canvas.width ??
+    residentSurface?.width ??
+    Math.max(1, Math.round(displayedWidth));
+
+  return getRasterSampling(
+    getNodeRasterPixelFootprint(editor, {
+      displayedHeight,
+      displayedWidth,
+      nodeId: props.nodeId,
+      renderRootNodeId: props.renderRootNodeId ?? props.nodeId,
+      sampleHeight,
+      sampleWidth,
+      zoom,
+    })
   );
 };
 
