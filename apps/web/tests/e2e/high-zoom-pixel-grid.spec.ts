@@ -247,8 +247,15 @@ test("shows only the active finite pixel grid above 500 percent", async ({
     "data-pixel-grid-source-node-id",
     "frame-raster"
   );
-  await expect(grid).toHaveAttribute("width", "160");
-  await expect(grid).toHaveAttribute("height", "120");
+  const gridSurface = grid.locator("svg");
+
+  await expect(gridSurface).toHaveAttribute("width", "160");
+  await expect(gridSurface).toHaveAttribute("height", "120");
+  const gridOriginBeforeMove = await gridSurface.evaluate((element) => {
+    const matrix = element.getScreenCTM();
+
+    return matrix ? { x: matrix.e, y: matrix.f } : null;
+  });
 
   await page.evaluate(() => {
     const editor = window.__PUNCHPRESS_EDITOR__;
@@ -264,8 +271,25 @@ test("shows only the active finite pixel grid above 500 percent", async ({
     });
   });
 
-  await expect(grid).toHaveCSS("left", "212.5px");
-  await expect(grid).toHaveCSS("top", "188.25px");
+  expect(gridOriginBeforeMove).not.toBeNull();
+  await expect
+    .poll(async () => {
+      const originX = await gridSurface.evaluate((element) => {
+        return element.getScreenCTM()?.e ?? null;
+      });
+
+      return originX === null ? null : originX - (gridOriginBeforeMove?.x || 0);
+    })
+    .toBeCloseTo(12.5 * 5.01, 5);
+  await expect
+    .poll(async () => {
+      const originY = await gridSurface.evaluate((element) => {
+        return element.getScreenCTM()?.f ?? null;
+      });
+
+      return originY === null ? null : originY - (gridOriginBeforeMove?.y || 0);
+    })
+    .toBeCloseTo(8.25 * 5.01, 5);
 
   await page.evaluate(() => {
     const editor = window.__PUNCHPRESS_EDITOR__;
@@ -423,12 +447,71 @@ test("keeps Crop, selection, Brush cursor, and live painting aligned at high zoo
   });
 
   const cropGrid = page.locator('[data-pixel-grid-kind="raster"]');
+  const cropGridSurface = cropGrid.locator("svg");
 
-  await expect(cropGrid).toHaveAttribute("width", "72");
-  await expect(cropGrid).toHaveAttribute("height", "44");
-  await expect(cropGrid).toHaveCSS("left", "312px");
-  await expect(cropGrid).toHaveCSS("top", "232px");
-  await expect(cropGrid).toHaveCSS("z-index", "55");
+  await expect(cropGridSurface).toHaveAttribute("width", "72");
+  await expect(cropGridSurface).toHaveAttribute("height", "44");
+  const cropGeometry = await page.evaluate(() => {
+    const gridSurface = document.querySelector<SVGSVGElement>(
+      '[data-pixel-grid-kind="raster"] svg'
+    );
+    const cropSurface = document.querySelector<SVGSVGElement>(
+      'svg[aria-label="Raster Crop preview"]'
+    );
+    const gridMatrix = gridSurface?.getScreenCTM();
+    const cropMatrix = cropSurface?.getScreenCTM();
+
+    if (!(gridSurface && gridMatrix && cropMatrix)) {
+      return null;
+    }
+
+    const gridStart = new DOMPoint(0, 0).matrixTransform(gridMatrix);
+    const gridEnd = new DOMPoint(72, 44).matrixTransform(gridMatrix);
+    const cropStart = new DOMPoint(-8, 12).matrixTransform(cropMatrix);
+    const cropEnd = new DOMPoint(64, 56).matrixTransform(cropMatrix);
+
+    return {
+      actual: {
+        height: Math.abs(gridEnd.y - gridStart.y),
+        left: Math.min(gridStart.x, gridEnd.x),
+        top: Math.min(gridStart.y, gridEnd.y),
+        width: Math.abs(gridEnd.x - gridStart.x),
+      },
+      expected: {
+        height: Math.abs(cropEnd.y - cropStart.y),
+        left: Math.min(cropStart.x, cropEnd.x),
+        top: Math.min(cropStart.y, cropEnd.y),
+        width: Math.abs(cropEnd.x - cropStart.x),
+      },
+    };
+  });
+
+  expect(cropGeometry).not.toBeNull();
+  const cropGeometryDiagnostics = JSON.stringify(cropGeometry, null, 2);
+
+  expect(cropGeometry?.actual.height, cropGeometryDiagnostics).toBeCloseTo(
+    cropGeometry?.expected.height || 0,
+    5
+  );
+  expect(cropGeometry?.actual.left, cropGeometryDiagnostics).toBeCloseTo(
+    cropGeometry?.expected.left || 0,
+    5
+  );
+  expect(cropGeometry?.actual.top, cropGeometryDiagnostics).toBeCloseTo(
+    cropGeometry?.expected.top || 0,
+    5
+  );
+  expect(cropGeometry?.actual.width, cropGeometryDiagnostics).toBeCloseTo(
+    cropGeometry?.expected.width || 0,
+    5
+  );
+  expect(
+    await cropGrid.evaluate((element) => {
+      return element.parentElement
+        ? getComputedStyle(element.parentElement).zIndex
+        : null;
+    })
+  ).toBe("55");
 
   const cropHandle = page.locator('[data-raster-crop-handle="se"]');
 
@@ -543,53 +626,100 @@ test.describe("fractional exact Raster pixel grid", () => {
       const gridElement = document.querySelector<HTMLElement>(
         '[data-pixel-grid-node-id="fractional-raster"]'
       );
+      const gridSurface = gridElement?.querySelector<SVGSVGElement>("svg");
       const patternElement = gridElement?.querySelector("pattern");
       const canvas = document.querySelector<HTMLCanvasElement>(
         '[data-node-id="fractional-raster"] [data-testid="raster-resident-canvas"] canvas'
       );
+      const gridMatrix = gridSurface?.getScreenCTM();
 
-      if (!(node && gridElement && patternElement && canvas)) {
+      if (
+        !(
+          node &&
+          gridElement &&
+          gridSurface &&
+          patternElement &&
+          canvas &&
+          gridMatrix
+        )
+      ) {
         return null;
       }
 
       const gridRect = gridElement.getBoundingClientRect();
       const canvasRect = canvas.getBoundingClientRect();
-      const localScaleX = gridRect.width / node.width;
-      const localScaleY = gridRect.height / node.height;
+      const cellWidth = Number(patternElement.getAttribute("width"));
+      const cellHeight = Number(patternElement.getAttribute("height"));
+      const originX = Number(patternElement.getAttribute("x"));
+      const originY = Number(patternElement.getAttribute("y"));
+      // The child SVG matrix includes fractional viewport/viewBox scaling that
+      // its HTML wrapper's bounding box cannot represent.
+      const origin = new DOMPoint(originX, originY).matrixTransform(gridMatrix);
+      const nextColumn = new DOMPoint(
+        originX + cellWidth,
+        originY
+      ).matrixTransform(gridMatrix);
+      const nextRow = new DOMPoint(
+        originX,
+        originY + cellHeight
+      ).matrixTransform(gridMatrix);
 
       return {
-        actualCellHeight:
-          Number(patternElement.getAttribute("height")) * localScaleY,
-        actualCellWidth:
-          Number(patternElement.getAttribute("width")) * localScaleX,
-        actualOriginX:
-          gridRect.left +
-          Number(patternElement.getAttribute("x")) * localScaleX,
-        actualOriginY:
-          gridRect.top + Number(patternElement.getAttribute("y")) * localScaleY,
+        actualCellHeight: Math.hypot(
+          nextRow.x - origin.x,
+          nextRow.y - origin.y
+        ),
+        actualCellWidth: Math.hypot(
+          nextColumn.x - origin.x,
+          nextColumn.y - origin.y
+        ),
+        actualOriginX: origin.x,
+        actualOriginY: origin.y,
         devicePixelRatio: window.devicePixelRatio,
         expectedCellHeight: canvasRect.height / canvas.height,
         expectedCellWidth: canvasRect.width / canvas.width,
         expectedOriginX: canvasRect.left,
         expectedOriginY: canvasRect.top,
+        gridMatrix: {
+          a: gridMatrix.a,
+          b: gridMatrix.b,
+          c: gridMatrix.c,
+          d: gridMatrix.d,
+          e: gridMatrix.e,
+          f: gridMatrix.f,
+        },
+        gridRect: {
+          height: gridRect.height,
+          width: gridRect.width,
+        },
+        gridViewBox: {
+          height: gridSurface.viewBox.baseVal.height,
+          width: gridSurface.viewBox.baseVal.width,
+        },
+        residentSamples: {
+          height: canvas.height,
+          width: canvas.width,
+        },
       };
     });
 
     expect(geometry).not.toBeNull();
     expect(geometry?.devicePixelRatio).toBe(1.5);
-    expect(geometry?.actualCellWidth).toBeCloseTo(
+    const geometryDiagnostics = JSON.stringify(geometry, null, 2);
+
+    expect(geometry?.actualCellWidth, geometryDiagnostics).toBeCloseTo(
       geometry?.expectedCellWidth || 0,
       5
     );
-    expect(geometry?.actualCellHeight).toBeCloseTo(
+    expect(geometry?.actualCellHeight, geometryDiagnostics).toBeCloseTo(
       geometry?.expectedCellHeight || 0,
       5
     );
-    expect(geometry?.actualOriginX).toBeCloseTo(
+    expect(geometry?.actualOriginX, geometryDiagnostics).toBeCloseTo(
       geometry?.expectedOriginX || 0,
       5
     );
-    expect(geometry?.actualOriginY).toBeCloseTo(
+    expect(geometry?.actualOriginY, geometryDiagnostics).toBeCloseTo(
       geometry?.expectedOriginY || 0,
       5
     );
