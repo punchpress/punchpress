@@ -204,3 +204,142 @@ test("wheel pan over selected artboard chrome respects viewport zoom", async ({
   expect(overlayPan.x).toBeCloseTo(expectedDelta.x, 0);
   expect(overlayPan.y).toBeCloseTo(expectedDelta.y, 0);
 });
+
+test("wheel pan keeps the same screen-space speed at high zoom", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(page, ARTBOARD_DOCUMENT);
+  await resetViewport(page);
+  await setViewport(page, { x: 260, y: 180, zoom: 16 });
+
+  const host = page.locator(".canvas-host");
+  const hostBox = await host.boundingBox();
+
+  if (!hostBox) {
+    throw new Error("Missing canvas host");
+  }
+
+  const wheelPoint = {
+    x: hostBox.x + hostBox.width / 2,
+    y: hostBox.y + hostBox.height / 2,
+  };
+  const wheelDelta = {
+    deltaX: 96,
+    deltaY: 64,
+  };
+  const pan = await mouseWheelAndMeasureScrollDelta(
+    page,
+    wheelPoint,
+    wheelDelta
+  );
+
+  expect(pan.x).toBeCloseTo(wheelDelta.deltaX / 16, 0);
+  expect(pan.y).toBeCloseTo(wheelDelta.deltaY / 16, 0);
+});
+
+test("space-drag pan keeps the same screen-space speed at high zoom", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(page, ARTBOARD_DOCUMENT);
+  await resetViewport(page);
+  await setViewport(page, { x: 260, y: 180, zoom: 16 });
+
+  const hostBox = await page.locator(".canvas-host").boundingBox();
+
+  if (!hostBox) {
+    throw new Error("Missing canvas host");
+  }
+
+  const start = {
+    x: hostBox.x + hostBox.width / 2,
+    y: hostBox.y + hostBox.height / 2,
+  };
+  const dragDelta = {
+    x: 96,
+    y: 64,
+  };
+  const initialScroll = await getViewerScroll(page);
+
+  await page.keyboard.down("Space");
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + dragDelta.x, start.y + dragDelta.y, {
+    steps: 4,
+  });
+  await page.mouse.up();
+  await page.keyboard.up("Space");
+  await expect.poll(() => getViewerScroll(page)).not.toEqual(initialScroll);
+  const nextScroll = await getViewerScroll(page);
+
+  expect((nextScroll?.x || 0) - (initialScroll?.x || 0)).toBeCloseTo(
+    -dragDelta.x / 16,
+    0
+  );
+  expect((nextScroll?.y || 0) - (initialScroll?.y || 0)).toBeCloseTo(
+    -dragDelta.y / 16,
+    0
+  );
+});
+
+test("repeated control-wheel zoom keeps the cursor world point anchored", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(page, ARTBOARD_DOCUMENT);
+  await resetViewport(page);
+  await setViewport(page, { x: 260, y: 180, zoom: 16 });
+
+  const host = page.locator(".canvas-host");
+  const hostBox = await host.boundingBox();
+
+  if (!hostBox) {
+    throw new Error("Missing canvas host");
+  }
+
+  const wheelPoint = {
+    x: Math.round(hostBox.x + hostBox.width * 0.72),
+    y: Math.round(hostBox.y + hostBox.height * 0.38),
+  };
+  const getWorldPoint = () =>
+    page.evaluate((point) => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
+      const hostRect = editor?.hostRef?.getBoundingClientRect();
+
+      if (!(editor && hostRect)) {
+        return null;
+      }
+
+      return {
+        x: editor.viewport.x + (point.x - hostRect.left) / editor.viewport.zoom,
+        y: editor.viewport.y + (point.y - hostRect.top) / editor.viewport.zoom,
+        zoom: editor.viewport.zoom,
+      };
+    }, wheelPoint);
+  const before = await getWorldPoint();
+
+  await page.keyboard.down("Control");
+
+  for (let index = 0; index < 20; index += 1) {
+    const previousZoom = (await getWorldPoint())?.zoom;
+
+    await page.mouse.move(wheelPoint.x, wheelPoint.y);
+    await page.mouse.wheel(0, -12);
+    await expect
+      .poll(async () => (await getWorldPoint())?.zoom)
+      .not.toBe(previousZoom);
+  }
+
+  await page.keyboard.up("Control");
+  const after = await getWorldPoint();
+
+  expect(before).not.toBeNull();
+  expect(after).not.toBeNull();
+  expect(
+    Math.abs((after?.x || 0) - (before?.x || 0)) * (after?.zoom || 1)
+  ).toBeLessThan(1);
+  expect(
+    Math.abs((after?.y || 0) - (before?.y || 0)) * (after?.zoom || 1)
+  ).toBeLessThan(1);
+});

@@ -1512,6 +1512,9 @@ export class Editor {
     if (this.rasterCropSession && toolId !== this.activeTool) {
       this.commitCrop();
     }
+    if (toolId === "hand" && toolId !== this.activeTool) {
+      this.setViewportInteracting(false);
+    }
     setEditorActiveTool(this, toolId);
   }
 

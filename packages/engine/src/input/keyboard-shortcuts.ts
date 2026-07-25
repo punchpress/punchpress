@@ -290,6 +290,11 @@ export const handleSpaceDown = (editor, event) => {
   }
 
   event.preventDefault();
+  if (editor.getState().spacePressed) {
+    return;
+  }
+
+  editor.setViewportInteracting(false);
   editor.getState().setSpacePressed(true);
 };
 

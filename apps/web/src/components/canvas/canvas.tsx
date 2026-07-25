@@ -409,6 +409,13 @@ export const Canvas = () => {
     },
     [editor]
   );
+  const handleCanvasPanEnd = useCallback(() => {
+    queueMicrotask(() => {
+      // InfiniteViewer applies pointer velocity as unscaled world-space
+      // momentum. Stop that fling so drag panning remains screen-space.
+      viewerRef.current?.scrollBy?.(0, 0);
+    });
+  }, []);
   const getCanvasDropPoint = useCallback(
     (clientX, clientY) =>
       getCanvasPoint(
@@ -672,6 +679,7 @@ export const Canvas = () => {
         <InfiniteViewer
           className="canvas-surface relative z-[1] h-full w-full"
           margin={CANVAS_STAGE_MARGIN}
+          onDragEnd={handleCanvasPanEnd}
           onScroll={handleScroll}
           ref={viewerRef}
           threshold={0}
