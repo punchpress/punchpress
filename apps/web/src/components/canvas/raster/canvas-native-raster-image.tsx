@@ -57,22 +57,27 @@ export const CanvasNativeRasterImage = ({
       ref={surfaceRef}
     >
       {showsExactPresentation ? (
-        <foreignObject
-          data-raster-native-node-id={nodeId}
-          data-testid="raster-native-image"
-          height={presentation.bounds.height}
-          overflow="hidden"
-          pointerEvents="none"
-          width={presentation.bounds.width}
-          x={presentation.bounds.x}
-          y={presentation.bounds.y}
+        // Keep foreignObject at (0,0); its x/y are quantized before SVG zoom.
+        <g
+          transform={`translate(${presentation.bounds.x} ${presentation.bounds.y})`}
         >
-          <CanvasExactRaster
-            opacity={artworkOpacity}
-            presentation={presentation}
-            source={loadedImage.image}
-          />
-        </foreignObject>
+          <foreignObject
+            data-raster-native-node-id={nodeId}
+            data-testid="raster-native-image"
+            height={presentation.bounds.height}
+            overflow="hidden"
+            pointerEvents="none"
+            width={presentation.bounds.width}
+            x={0}
+            y={0}
+          >
+            <CanvasExactRaster
+              opacity={artworkOpacity}
+              presentation={presentation}
+              source={loadedImage.image}
+            />
+          </foreignObject>
+        </g>
       ) : (
         <image
           height={display.height}

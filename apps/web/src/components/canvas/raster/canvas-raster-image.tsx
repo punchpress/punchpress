@@ -840,43 +840,50 @@ const RasterWorkingCanvas = ({
       data-testid={`${testId}-surface`}
       ref={surfaceRef}
     >
-      <foreignObject
-        data-raster-working-canvas="true"
-        data-testid={testId}
-        height={showsExactPresentation ? presentation.bounds.height : height}
-        overflow="hidden"
-        pointerEvents="none"
-        width={showsExactPresentation ? presentation.bounds.width : width}
-        x={showsExactPresentation ? presentation.bounds.x : x}
-        y={showsExactPresentation ? presentation.bounds.y : y}
+      {/* Chromium quantizes foreignObject x/y before the outer SVG zoom. */}
+      <g
+        transform={`translate(${
+          showsExactPresentation ? presentation.bounds.x : x
+        } ${showsExactPresentation ? presentation.bounds.y : y})`}
       >
-        <div
-          style={{
-            height: "100%",
-            overflow: "hidden",
-            position: "relative",
-            width: "100%",
-          }}
+        <foreignObject
+          data-raster-working-canvas="true"
+          data-testid={testId}
+          height={showsExactPresentation ? presentation.bounds.height : height}
+          overflow="hidden"
+          pointerEvents="none"
+          width={showsExactPresentation ? presentation.bounds.width : width}
+          x={0}
+          y={0}
         >
           <div
-            ref={hostRef}
             style={{
               height: "100%",
-              inset: 0,
-              opacity: artworkOpacity,
-              position: "absolute",
+              overflow: "hidden",
+              position: "relative",
               width: "100%",
             }}
-          />
-          {showsExactPresentation ? (
-            <CanvasExactRaster
-              opacity={artworkOpacity}
-              presentation={presentation}
-              source={canvas}
+          >
+            <div
+              ref={hostRef}
+              style={{
+                height: "100%",
+                inset: 0,
+                opacity: artworkOpacity,
+                position: "absolute",
+                width: "100%",
+              }}
             />
-          ) : null}
-        </div>
-      </foreignObject>
+            {showsExactPresentation ? (
+              <CanvasExactRaster
+                opacity={artworkOpacity}
+                presentation={presentation}
+                source={canvas}
+              />
+            ) : null}
+          </div>
+        </foreignObject>
+      </g>
       {pixelGridProps ? (
         <CanvasRasterPixelGrid
           {...pixelGridProps}

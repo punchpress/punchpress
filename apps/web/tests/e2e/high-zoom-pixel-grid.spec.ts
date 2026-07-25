@@ -1548,7 +1548,7 @@ test.describe("transformed fractional exact Raster pixel grid", () => {
   });
 });
 
-test.describe("imported native JPEG pixel grid", () => {
+test.describe("high-zoom Raster pixel alignment", () => {
   test.use({ deviceScaleFactor: 2 });
 
   test("shares decoded sample boundaries through fractional native presentation", async ({
@@ -2229,6 +2229,241 @@ test.describe("imported native JPEG pixel grid", () => {
         Math.abs(sample.boundary - residentExpectedBoundaries[index]),
         residentDiagnostics
       ).toBeLessThan(2);
+    }
+  });
+
+  test("keeps resident pixel phase aligned while zooming a viewport-clipped Raster", async ({
+    page,
+  }) => {
+    await gotoEditor(page);
+    const src = await page.evaluate(() => {
+      const canvas = document.createElement("canvas");
+
+      canvas.width = 1085;
+      canvas.height = 8;
+      const context = canvas.getContext("2d");
+
+      if (!context) {
+        throw new Error("Expected Canvas2D");
+      }
+
+      for (let x = 0; x < canvas.width; x += 1) {
+        context.fillStyle = x % 2 === 0 ? "#000" : "#fff";
+        context.fillRect(x, 0, 1, canvas.height);
+      }
+
+      return canvas.toDataURL("image/png");
+    });
+
+    await loadDocument(
+      page,
+      JSON.stringify({
+        nodes: [
+          {
+            assetId: "asset-zoom-phase",
+            baseHeight: 8.41,
+            baseWidth: 1084.63,
+            baseX: 0,
+            baseY: 0,
+            height: 8.41,
+            id: "zoom-phase",
+            mimeType: "image/png",
+            name: "Zoom phase",
+            opacity: 1,
+            parentId: "root",
+            src,
+            transform: {
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+              x: 320.3,
+              y: 220.6,
+            },
+            type: "image",
+            visible: true,
+            width: 1084.63,
+          },
+        ],
+        version: "1.8",
+      })
+    );
+    await page.evaluate(() => {
+      window.__PUNCHPRESS_EDITOR__?.select("zoom-phase");
+    });
+
+    const grid = page.locator(
+      '[data-node-id="zoom-phase"] [data-pixel-grid-node-id="zoom-phase"]'
+    );
+    const image = page.locator(
+      '[data-node-id="zoom-phase"] [data-testid="raster-resident-canvas"] canvas[data-raster-exact-backing="true"]'
+    );
+
+    for (const zoom of [74.08, 82.31, 86.97]) {
+      await setConvergedViewport(page, {
+        x: 820,
+        y: 220,
+        zoom,
+      });
+      await expect(grid).toBeVisible();
+      await expect(image).toBeVisible();
+      const geometry = await page.evaluate(() => {
+        const gridElement = document.querySelector<SVGGElement>(
+          '[data-node-id="zoom-phase"] [data-pixel-grid-node-id="zoom-phase"]'
+        );
+        const pattern = gridElement?.querySelector("pattern");
+        const matrix = gridElement?.getScreenCTM();
+        const canvas = document.querySelector<HTMLCanvasElement>(
+          '[data-node-id="zoom-phase"] [data-testid="raster-resident-canvas"] canvas[data-raster-exact-backing="true"]'
+        );
+
+        if (!(canvas && gridElement && matrix && pattern)) {
+          return null;
+        }
+
+        const origin = new DOMPoint(
+          Number(pattern.getAttribute("x")),
+          Number(pattern.getAttribute("y"))
+        ).matrixTransform(matrix);
+        const nextColumn = new DOMPoint(
+          Number(pattern.getAttribute("x")) +
+            Number(pattern.getAttribute("width")),
+          Number(pattern.getAttribute("y"))
+        ).matrixTransform(matrix);
+        const rect = canvas.getBoundingClientRect();
+
+        return {
+          cellWidth: nextColumn.x - origin.x,
+          devicePixelRatio: window.devicePixelRatio,
+          originX: origin.x,
+          sourceX: Number(canvas.getAttribute("data-raster-native-source-x")),
+          rect: {
+            bottom: rect.bottom,
+            height: rect.height,
+            left: rect.left,
+            right: rect.right,
+            top: rect.top,
+            width: rect.width,
+          },
+        };
+      });
+
+      expect(geometry).not.toBeNull();
+      const viewport = page.viewportSize();
+
+      if (!(geometry && viewport)) {
+        throw new Error("Expected zoom-phase presentation geometry");
+      }
+
+      const captureBox = {
+        height:
+          Math.floor(Math.min(viewport.height, geometry.rect.bottom)) -
+          Math.ceil(Math.max(0, geometry.rect.top)),
+        width:
+          Math.floor(Math.min(viewport.width, geometry.rect.right)) -
+          Math.ceil(Math.max(0, geometry.rect.left)),
+        x: Math.ceil(Math.max(0, geometry.rect.left)),
+        y: Math.ceil(Math.max(0, geometry.rect.top)),
+      };
+
+      expect(captureBox.height).toBeGreaterThan(20);
+      expect(captureBox.width).toBeGreaterThan(200);
+      expect(geometry.sourceX).toBeGreaterThan(300);
+      const expectedBoundaries = Array.from({ length: 1084 }, (_, index) => {
+        return (
+          (geometry.originX + geometry.cellWidth * (index + 1) - captureBox.x) *
+          geometry.devicePixelRatio
+        );
+      }).filter(
+        (boundary) =>
+          boundary > geometry.cellWidth * geometry.devicePixelRatio * 0.5 &&
+          boundary <
+            captureBox.width * geometry.devicePixelRatio -
+              geometry.cellWidth * geometry.devicePixelRatio * 0.5
+      );
+
+      expect(expectedBoundaries.length).toBeGreaterThan(3);
+      await grid.evaluate((element) => {
+        element.style.visibility = "hidden";
+      });
+      const screenshot = await page.screenshot({
+        clip: captureBox,
+        type: "png",
+      });
+      await grid.evaluate((element) => {
+        element.style.removeProperty("visibility");
+      });
+      const samples = await page.evaluate(
+        async ({ encoded, expectedBoundaries, sampleY, searchRadius }) => {
+          const raster = new Image();
+
+          raster.src = `data:image/png;base64,${encoded}`;
+          await raster.decode();
+          const canvas = document.createElement("canvas");
+
+          canvas.width = raster.naturalWidth;
+          canvas.height = raster.naturalHeight;
+          const context = canvas.getContext("2d");
+
+          if (!context) {
+            throw new Error("Expected screenshot Canvas2D");
+          }
+
+          context.drawImage(raster, 0, 0);
+          const row = context.getImageData(
+            0,
+            Math.round(sampleY),
+            canvas.width,
+            1
+          ).data;
+          const lightness = Array.from({ length: canvas.width }, (_, x) => {
+            const offset = x * 4;
+
+            return (
+              (row[offset] + row[offset + 1] + row[offset + 2]) / (3 * 255)
+            );
+          });
+
+          return expectedBoundaries.map((expected) => {
+            const min = Math.max(1, Math.floor(expected - searchRadius));
+            const max = Math.min(
+              canvas.width - 1,
+              Math.ceil(expected + searchRadius)
+            );
+            let boundary = min;
+            let contrast = 0;
+
+            for (let x = min; x <= max; x += 1) {
+              const nextContrast = Math.abs(lightness[x] - lightness[x - 1]);
+
+              if (nextContrast > contrast) {
+                boundary = x;
+                contrast = nextContrast;
+              }
+            }
+
+            return {
+              boundary,
+              contrast,
+              error: Math.abs(boundary - expected),
+              expected,
+            };
+          });
+        },
+        {
+          encoded: screenshot.toString("base64"),
+          expectedBoundaries,
+          sampleY:
+            (geometry.rect.top + geometry.rect.height / 2 - captureBox.y) *
+            geometry.devicePixelRatio,
+          searchRadius: geometry.cellWidth * geometry.devicePixelRatio * 0.45,
+        }
+      );
+      const diagnostics = JSON.stringify({ geometry, samples, zoom }, null, 2);
+
+      for (const sample of samples) {
+        expect(sample.contrast, diagnostics).toBeGreaterThan(0.8);
+        expect(sample.error, diagnostics).toBeLessThan(2);
+      }
     }
   });
 });
