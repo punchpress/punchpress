@@ -1,6 +1,7 @@
 import { getPixelGridTarget, shouldShowPixelGrid } from "@punchpress/engine";
 import { useCallback, useSyncExternalStore } from "react";
 import { useEditor } from "../../../editor-react/use-editor";
+import { useEditorSelectionDragPreviewValue } from "../../../editor-react/use-editor-selection-drag-preview-value";
 import { useEditorSelectionDragSurfaceValue } from "../../../editor-react/use-editor-selection-drag-surface-value";
 import {
   getPixelGridPlane,
@@ -48,6 +49,9 @@ export const CanvasRasterPixelGrid = ({
   width,
 }: CanvasRasterPixelGridProps) => {
   const editor = useEditor();
+  const preview = useEditorSelectionDragPreviewValue(
+    (editor) => editor.selectionDragPreview
+  );
   const state = useEditorSelectionDragSurfaceValue((editor, store) => {
     const target = getPixelGridTarget(editor);
     const cropRect =
@@ -66,9 +70,7 @@ export const CanvasRasterPixelGrid = ({
       bounds,
       devicePixelRatio:
         typeof window === "undefined" ? 1 : window.devicePixelRatio,
-      node: shouldRender
-        ? getPixelGridPreviewNode(target.node, editor.selectionDragPreview)
-        : null,
+      node: shouldRender ? getPixelGridPreviewNode(target.node, preview) : null,
       zoom: store.viewport.zoom,
     };
   });

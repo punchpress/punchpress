@@ -314,14 +314,51 @@ describe("high-zoom Raster presentation", () => {
       x: 2.5,
       y: 1.6,
     });
+    editor.setSelectionDragPreview(null);
+    editor.select(raster.id);
 
-    editor.setSelectionDragPreview({
-      effectiveNodeIdSet: new Set([raster.id]),
+    expect(editor.activeLayerId).toBe(group.id);
+    expect(getPixelGridTarget(editor)).toBeNull();
+
+    editor.setFocusedGroup(group.id);
+    editor.select(raster.id);
+
+    expect(editor.activeLayerId).toBe(raster.id);
+    expect(getPixelGridTarget(editor)).toMatchObject({
+      kind: "raster",
+      node: { id: raster.id },
+      sourceNodeId: raster.id,
+    });
+
+    const groupBounds = editor.getNodeRenderFrame(group.id)?.bounds;
+    const session = groupBounds
+      ? editor.beginResizeSelection({
+          anchorCanvas: {
+            x: groupBounds.minX,
+            y: groupBounds.minY,
+          },
+          nodeIds: [group.id],
+        })
+      : null;
+
+    expect(session).not.toBeNull();
+    editor.updateResizeSelection(session, {
+      scale: 3,
+    });
+    expect(editor.selectionDragPreview).toMatchObject({
       nodeIds: [group.id],
       resize: {
-        anchorCanvas: { x: 0, y: 0 },
         scale: 3,
       },
+    });
+    expect(editor.selectionDragPreview?.effectiveNodeIdSet).toEqual(
+      new Set([raster.id])
+    );
+    expect(editor.activeLayerId).toBe(raster.id);
+    expect(getPixelGridTarget(editor)).toMatchObject({
+      kind: "raster",
+      node: { id: raster.id },
+      sourceNodeId: raster.id,
     });
 
     const aggregatePreviewScale = getRasterRenderScale(

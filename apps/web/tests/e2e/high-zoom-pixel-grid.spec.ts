@@ -859,7 +859,10 @@ test.describe("transformed fractional exact Raster pixel grid", () => {
 
     await loadDocument(page, createFractionalRasterDocument(src));
     await page.evaluate(() => {
-      window.__PUNCHPRESS_EDITOR__?.select("fractional-raster");
+      const editor = window.__PUNCHPRESS_EDITOR__;
+
+      editor?.setFocusedGroup("fractional-group");
+      editor?.select("fractional-raster");
     });
     const grid = page.locator('[data-pixel-grid-node-id="fractional-raster"]');
     const rasterPresentation = page.locator(
@@ -874,6 +877,50 @@ test.describe("transformed fractional exact Raster pixel grid", () => {
 
         return Math.min(rect.height / canvas.height, rect.width / canvas.width);
       });
+    const getEditorPreviewSnapshot = () =>
+      page.evaluate(() => {
+        const editor = window.__PUNCHPRESS_EDITOR__;
+        const preview = editor?.selectionDragPreview;
+        const canvas = document.querySelector<HTMLCanvasElement>(
+          '[data-node-id="fractional-render-root"] [data-testid="raster-resident-canvas"] canvas'
+        );
+        const canvasRect = canvas?.getBoundingClientRect();
+
+        return {
+          activeLayerId: editor?.activeLayerId || null,
+          activeLayerType: editor?.activeLayer?.type || null,
+          actualSourcePixelFootprint: {
+            height:
+              canvasRect && canvas ? canvasRect.height / canvas.height : null,
+            width:
+              canvasRect && canvas ? canvasRect.width / canvas.width : null,
+          },
+          componentHostPresent: Boolean(
+            canvas?.closest("[data-raster-canvas-host]")
+          ),
+          focusedGroupId: editor?.focusedGroupId || null,
+          gridCount: document.querySelectorAll(
+            '[data-pixel-grid-node-id="fractional-raster"]'
+          ).length,
+          preview: {
+            effectiveNodeIds: preview?.effectiveNodeIdSet
+              ? [...preview.effectiveNodeIdSet]
+              : [],
+            nodeIds: preview?.nodeIds || [],
+            scale: preview?.resize?.scale ?? null,
+          },
+          selectedNodeIds: editor?.selectedNodeIds || [],
+        };
+      });
+    const activeRasterSnapshot = await getEditorPreviewSnapshot();
+
+    expect(activeRasterSnapshot).toMatchObject({
+      activeLayerId: "fractional-raster",
+      activeLayerType: "image",
+      componentHostPresent: true,
+      focusedGroupId: "fractional-group",
+      selectedNodeIds: ["fractional-raster"],
+    });
 
     await setConvergedViewport(page, {
       x: 318.25,
@@ -906,6 +953,37 @@ test.describe("transformed fractional exact Raster pixel grid", () => {
         scale: 4,
       });
     });
+    await expect.poll(getMinSourcePixelFootprint).toBeGreaterThan(5);
+    const resizePreviewSnapshot = await getEditorPreviewSnapshot();
+    const resizePreviewDiagnostics = JSON.stringify(
+      resizePreviewSnapshot,
+      null,
+      2
+    );
+
+    expect(resizePreviewSnapshot, resizePreviewDiagnostics).toMatchObject({
+      activeLayerId: "fractional-raster",
+      activeLayerType: "image",
+      componentHostPresent: true,
+      focusedGroupId: "fractional-group",
+      preview: {
+        nodeIds: ["fractional-render-root"],
+        scale: 4,
+      },
+      selectedNodeIds: ["fractional-raster"],
+    });
+    expect(
+      resizePreviewSnapshot.preview.effectiveNodeIds,
+      resizePreviewDiagnostics
+    ).toContain("fractional-raster");
+    expect(
+      resizePreviewSnapshot.actualSourcePixelFootprint.width,
+      resizePreviewDiagnostics
+    ).toBeGreaterThan(5);
+    expect(
+      resizePreviewSnapshot.actualSourcePixelFootprint.height,
+      resizePreviewDiagnostics
+    ).toBeGreaterThan(5);
     await expect(grid).toHaveCount(1);
     await expect(rasterPresentation).toHaveAttribute(
       "data-raster-sampling",
