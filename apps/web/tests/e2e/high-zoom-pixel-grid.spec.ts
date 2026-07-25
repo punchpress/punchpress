@@ -7,6 +7,7 @@ import {
 } from "./helpers/editor";
 
 const MAX_EXACT_ALIGNMENT_ERROR_PHYSICAL_PIXELS = 0.01;
+const MAX_NATIVE_PRESENTATION_EDGE_ERROR_PHYSICAL_PIXELS = 1;
 
 const createRasterSource = (page: Page) => {
   return page.evaluate(() => {
@@ -53,6 +54,28 @@ const createContrastRasterSource = (page: Page) => {
   });
 };
 
+const createNativeJpegSource = (page: Page) => {
+  return page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+
+    canvas.width = 16;
+    canvas.height = 8;
+
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      throw new Error("Expected Canvas2D");
+    }
+
+    for (let x = 0; x < canvas.width; x += 1) {
+      context.fillStyle = Math.floor(x / 4) % 2 === 0 ? "#000" : "#fff";
+      context.fillRect(x, 0, 1, canvas.height);
+    }
+
+    return canvas.toDataURL("image/jpeg", 1);
+  });
+};
+
 const setConvergedViewport = async (
   page: Page,
   viewport: { x: number; y: number; zoom: number }
@@ -77,26 +100,33 @@ const captureRasterPresentation = (page: Page, nodeId: string) => {
   return page.evaluate((id) => {
     const nodeRoot = document.querySelector(`[data-node-id="${id}"]`);
     const samplingSurface = nodeRoot?.querySelector("[data-raster-sampling]");
-    const residentCanvas = nodeRoot?.querySelector<HTMLCanvasElement>(
-      '[data-testid="raster-resident-canvas"] canvas'
+    const sourceCanvas = nodeRoot?.querySelector<HTMLCanvasElement>(
+      '[data-testid="raster-resident-canvas"] canvas[data-raster-source-canvas="true"]'
     );
+    const presentationCanvas = nodeRoot?.querySelector<HTMLCanvasElement>(
+      '[data-testid="raster-resident-canvas"] canvas[data-raster-exact-backing="true"]'
+    );
+    const visibleCanvas = presentationCanvas || sourceCanvas;
     const tiledSurface = nodeRoot?.querySelector("[data-raster-node-id]");
-    const importedImage = nodeRoot?.querySelector("image");
+    const importedImage = nodeRoot?.querySelector("image, img");
 
     return {
       gridCount: document.querySelectorAll("[data-pixel-grid-kind]").length,
-      imageRendering: residentCanvas
-        ? getComputedStyle(residentCanvas).imageRendering
+      imageRendering: visibleCanvas
+        ? getComputedStyle(visibleCanvas).imageRendering
         : null,
-      pixelOutput: residentCanvas?.toDataURL() || null,
-      renderedSource: residentCanvas
+      pixelOutput: sourceCanvas?.toDataURL() || null,
+      renderedSource: sourceCanvas
         ? {
-            height: residentCanvas.height,
+            height: sourceCanvas.height,
             kind: "resident-canvas",
-            width: residentCanvas.width,
+            width: sourceCanvas.width,
           }
         : {
-            href: importedImage?.getAttribute("href") || null,
+            href:
+              importedImage?.getAttribute("href") ||
+              importedImage?.getAttribute("src") ||
+              null,
             kind:
               tiledSurface?.getAttribute("data-raster-preview-active") ===
               "true"
@@ -226,6 +256,37 @@ const createStandaloneRasterDocument = (src: string) =>
         type: "image",
         visible: true,
         width: 96,
+      },
+    ],
+    version: "1.8",
+  });
+
+const createNativeJpegDocument = (src: string) =>
+  JSON.stringify({
+    nodes: [
+      {
+        assetId: "asset-native-jpeg",
+        baseHeight: 8.41,
+        baseWidth: 16.37,
+        baseX: 0,
+        baseY: 0,
+        height: 8.41,
+        id: "native-jpeg",
+        mimeType: "image/jpeg",
+        name: "Imported native JPEG",
+        opacity: 1,
+        parentId: "root",
+        src,
+        transform: {
+          rotation: 0,
+          scaleX: 1.25,
+          scaleY: 0.9,
+          x: 320.3,
+          y: 220.6,
+        },
+        type: "image",
+        visible: true,
+        width: 16.37,
       },
     ],
     version: "1.8",
@@ -372,7 +433,8 @@ test("shows only the active finite pixel grid above 500 percent", async ({
   });
   await expect(
     page.locator(
-      '[data-node-id="frame-raster"] [data-testid="raster-resident-canvas"] canvas'
+      '[data-node-id="frame-raster"] [data-testid="raster-resident-canvas"] canvas' +
+        '[data-raster-exact-backing="true"]'
     )
   ).toBeVisible();
   const frameTiledRaster = page.locator(
@@ -420,7 +482,7 @@ test("shows only the active finite pixel grid above 500 percent", async ({
   expect(belowGridCount).toBe(0);
   expect(aboveGridCount).toBe(1);
   expect(stablePresentationBelowGrid).toMatchObject({
-    imageRendering: "pixelated",
+    imageRendering: "auto",
     renderedSource: {
       height: 32,
       kind: "resident-canvas",
@@ -552,7 +614,7 @@ test("uses effective source pixels across resident and tiled Raster paths", asyn
   });
 
   const resident = page.locator(
-    '[data-node-id="standalone-raster"] [data-testid="raster-resident-canvas"] canvas'
+    '[data-node-id="standalone-raster"] [data-testid="raster-resident-canvas"] canvas[data-raster-source-canvas="true"]'
   );
 
   await expect(resident).toBeVisible();
@@ -572,9 +634,16 @@ test("uses effective source pixels across resident and tiled Raster paths", asyn
       '[data-node-id="standalone-raster"] [data-raster-sampling="exact"]'
     )
   ).toBeVisible();
+  const exactPresentation = page.locator(
+    '[data-node-id="standalone-raster"] [data-testid="raster-resident-canvas"] canvas[data-raster-exact-backing="true"]'
+  );
+
+  await expect(exactPresentation).toBeVisible();
   expect(
-    await resident.evaluate((node) => getComputedStyle(node).imageRendering)
-  ).toBe("pixelated");
+    await exactPresentation.evaluate(
+      (node) => getComputedStyle(node).imageRendering
+    )
+  ).toBe("auto");
 
   await loadDocument(page, createDenseTiledDocument(src));
   await resetViewport(page);
@@ -763,10 +832,13 @@ test("keeps Crop, selection, Brush cursor, and live painting aligned at high zoo
     );
   });
 
-  const resident = page.locator(
-    '[data-node-id="standalone-raster"] [data-testid="raster-resident-canvas"] canvas'
+  const residentSource = page.locator(
+    '[data-node-id="standalone-raster"] [data-testid="raster-resident-canvas"] canvas[data-raster-source-canvas="true"]'
   );
-  const residentBox = await resident.boundingBox();
+  const residentPresentation = page.locator(
+    '[data-node-id="standalone-raster"] [data-testid="raster-resident-canvas"] canvas[data-raster-exact-backing="true"]'
+  );
+  const residentBox = await residentPresentation.boundingBox();
 
   if (!residentBox) {
     throw new Error("Expected resident Raster bounds");
@@ -788,9 +860,11 @@ test("keeps Crop, selection, Brush cursor, and live painting aligned at high zoo
   expect(cursorBox?.x).toBeCloseTo(point.x - (cursorBox?.width || 0) / 2, 0);
   expect(cursorBox?.y).toBeCloseTo(point.y - (cursorBox?.height || 0) / 2, 0);
 
-  const alphaBefore = await resident.evaluate((canvas: HTMLCanvasElement) => {
-    return canvas.getContext("2d")?.getImageData(48, 32, 1, 1).data[3] || 0;
-  });
+  const alphaBefore = await residentSource.evaluate(
+    (canvas: HTMLCanvasElement) => {
+      return canvas.getContext("2d")?.getImageData(48, 32, 1, 1).data[3] || 0;
+    }
+  );
 
   await page.mouse.down();
 
@@ -820,8 +894,9 @@ test("keeps Crop, selection, Brush cursor, and live painting aligned at high zoo
 
         return {
           gridCount: grids.length,
-          gridSharesVisibleCanvasHost: visibleCanvasSurfaces.some((surface) =>
-            surface.contains(gridHost)
+          gridSharesVisibleCanvasHost: visibleCanvasSurfaces.some(
+            (surface) =>
+              surface.closest("[data-raster-canvas-host]") === gridHost
           ),
           visibleCanvasCount: visibleCanvasSurfaces.length,
         };
@@ -836,7 +911,7 @@ test("keeps Crop, selection, Brush cursor, and live painting aligned at high zoo
 
   await expect
     .poll(() => {
-      return resident.evaluate((canvas: HTMLCanvasElement) => {
+      return residentSource.evaluate((canvas: HTMLCanvasElement) => {
         return canvas.getContext("2d")?.getImageData(48, 32, 1, 1).data[3] || 0;
       });
     })
@@ -846,6 +921,128 @@ test("keeps Crop, selection, Brush cursor, and live painting aligned at high zoo
       '[data-node-id="standalone-raster"] [data-raster-sampling="exact"]'
     )
   ).toBeVisible();
+
+  await page.evaluate(async () => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const brush = editor?.tools.get("brush");
+    const currentNode = editor?.getNode("standalone-raster");
+
+    if (!(editor && brush && currentNode?.type === "image")) {
+      throw new Error("Expected standalone Raster Brush target");
+    }
+
+    editor.getState().updateNodeById(currentNode.id, (node) => ({
+      ...node,
+      baseHeight: 64,
+      baseWidth: 96,
+      baseX: 12,
+      baseY: 8,
+      height: 80,
+      transform: {
+        ...node.transform,
+        x: node.transform.x - 12,
+        y: node.transform.y - 8,
+      },
+      width: 120,
+    }));
+    const node = editor.getNode("standalone-raster");
+
+    if (node?.type !== "image") {
+      throw new Error("Expected Crop-expanded Raster");
+    }
+
+    editor.setBrushSettings({
+      hardness: 1,
+      opacity: 1,
+      size: 40,
+      spacing: 0,
+    });
+    const toWorldPoint = (localPoint: { x: number; y: number }) => ({
+      x: node.transform.x + localPoint.x,
+      y: node.transform.y + localPoint.y,
+    });
+    const session = brush.beginStroke({
+      point: toWorldPoint({ x: node.width / 2, y: node.height / 2 }),
+    });
+
+    if (!session) {
+      throw new Error("Expected expanded Brush session");
+    }
+
+    (
+      window as typeof window & {
+        __PRD_129_BRUSH_SESSION__?: { cancel?: () => void };
+      }
+    ).__PRD_129_BRUSH_SESSION__ = session;
+    session.update({ point: toWorldPoint({ x: 72, y: 40 }) });
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+  });
+  await expect
+    .poll(() => {
+      return page.evaluate(() => {
+        const editor = window.__PUNCHPRESS_EDITOR__;
+        const node = editor?.getNode("standalone-raster");
+        const workingSurface =
+          editor?.getBrushWorkingSurfaceStateForNode?.("standalone-raster");
+        const grid = document.querySelector('[data-pixel-grid-kind="raster"]');
+        const pattern = grid?.querySelector("pattern");
+        const workingPlane =
+          workingSurface?.type === "canvas"
+            ? {
+                height: workingSurface.height,
+                sampleHeight: workingSurface.canvas.height,
+                sampleWidth: workingSurface.canvas.width,
+                width: workingSurface.width,
+                x: workingSurface.x ?? 0,
+                y: workingSurface.y ?? 0,
+              }
+            : null;
+
+        return {
+          gridCount: document.querySelectorAll(
+            '[data-pixel-grid-kind="raster"]'
+          ).length,
+          gridUsesWorkingPlane: Boolean(
+            pattern &&
+              workingPlane &&
+              Math.abs(Number(pattern.getAttribute("x")) - workingPlane.x) <
+                1e-6 &&
+              Math.abs(Number(pattern.getAttribute("y")) - workingPlane.y) <
+                1e-6 &&
+              Math.abs(
+                Number(pattern.getAttribute("width")) -
+                  workingPlane.width / workingPlane.sampleWidth
+              ) < 1e-6 &&
+              Math.abs(
+                Number(pattern.getAttribute("height")) -
+                  workingPlane.height / workingPlane.sampleHeight
+              ) < 1e-6
+          ),
+          workingPlaneDiffersFromNode: Boolean(
+            node &&
+              workingPlane &&
+              (workingPlane.x !== (node.baseX ?? 0) ||
+                workingPlane.y !== (node.baseY ?? 0) ||
+                workingPlane.width !== (node.baseWidth ?? node.width) ||
+                workingPlane.height !== (node.baseHeight ?? node.height))
+          ),
+        };
+      });
+    })
+    .toEqual({
+      gridCount: 1,
+      gridUsesWorkingPlane: true,
+      workingPlaneDiffersFromNode: true,
+    });
+  await page.evaluate(() => {
+    const testWindow = window as typeof window & {
+      __PRD_129_BRUSH_SESSION__?: { cancel?: () => void };
+    };
+
+    testWindow.__PRD_129_BRUSH_SESSION__?.cancel?.();
+    testWindow.__PRD_129_BRUSH_SESSION__ = undefined;
+  });
 });
 
 test.describe("transformed fractional exact Raster pixel grid", () => {
@@ -869,31 +1066,102 @@ test.describe("transformed fractional exact Raster pixel grid", () => {
       '[data-node-id="fractional-render-root"] [data-raster-sampling]'
     );
     const resident = page.locator(
-      '[data-node-id="fractional-render-root"] [data-testid="raster-resident-canvas"] canvas'
+      '[data-node-id="fractional-render-root"] [data-testid="raster-resident-canvas"] canvas:visible'
     );
     const getMinSourcePixelFootprint = () =>
       resident.evaluate((canvas: HTMLCanvasElement) => {
+        const source = canvas
+          .closest("[data-raster-canvas-host]")
+          ?.querySelector<HTMLCanvasElement>(
+            'canvas[data-raster-source-canvas="true"]'
+          );
+        const destinationHeight = Number(
+          canvas.getAttribute("data-raster-native-destination-height")
+        );
+        const destinationWidth = Number(
+          canvas.getAttribute("data-raster-native-destination-width")
+        );
+        const sourceHeight = Number(
+          canvas.getAttribute("data-raster-native-source-height")
+        );
+        const sourceWidth = Number(
+          canvas.getAttribute("data-raster-native-source-width")
+        );
+
+        if (
+          destinationHeight > 0 &&
+          destinationWidth > 0 &&
+          sourceHeight > 0 &&
+          sourceWidth > 0
+        ) {
+          return (
+            Math.min(
+              destinationHeight / sourceHeight,
+              destinationWidth / sourceWidth
+            ) / window.devicePixelRatio
+          );
+        }
+
         const rect = canvas.getBoundingClientRect();
 
-        return Math.min(rect.height / canvas.height, rect.width / canvas.width);
+        return source
+          ? Math.min(rect.height / source.height, rect.width / source.width)
+          : 0;
       });
     const getEditorPreviewSnapshot = () =>
       page.evaluate(() => {
         const editor = window.__PUNCHPRESS_EDITOR__;
         const preview = editor?.selectionDragPreview;
-        const canvas = document.querySelector<HTMLCanvasElement>(
-          '[data-node-id="fractional-render-root"] [data-testid="raster-resident-canvas"] canvas'
+        const root = document.querySelector(
+          '[data-node-id="fractional-render-root"] [data-testid="raster-resident-canvas"]'
         );
+        const canvas =
+          root?.querySelector<HTMLCanvasElement>(
+            'canvas[data-raster-exact-backing="true"]'
+          ) ||
+          root?.querySelector<HTMLCanvasElement>(
+            'canvas[data-raster-source-canvas="true"]'
+          );
+        const source = canvas
+          ?.closest("[data-raster-canvas-host]")
+          ?.querySelector<HTMLCanvasElement>(
+            'canvas[data-raster-source-canvas="true"]'
+          );
         const canvasRect = canvas?.getBoundingClientRect();
+        const destinationHeight = Number(
+          canvas?.getAttribute("data-raster-native-destination-height")
+        );
+        const destinationWidth = Number(
+          canvas?.getAttribute("data-raster-native-destination-width")
+        );
+        const sourceHeight = Number(
+          canvas?.getAttribute("data-raster-native-source-height")
+        );
+        const sourceWidth = Number(
+          canvas?.getAttribute("data-raster-native-source-width")
+        );
+        const exactFootprint =
+          destinationHeight > 0 &&
+          destinationWidth > 0 &&
+          sourceHeight > 0 &&
+          sourceWidth > 0
+            ? {
+                height:
+                  destinationHeight / sourceHeight / window.devicePixelRatio,
+                width: destinationWidth / sourceWidth / window.devicePixelRatio,
+              }
+            : null;
 
         return {
           activeLayerId: editor?.activeLayerId || null,
           activeLayerType: editor?.activeLayer?.type || null,
           actualSourcePixelFootprint: {
             height:
-              canvasRect && canvas ? canvasRect.height / canvas.height : null,
+              exactFootprint?.height ??
+              (canvasRect && source ? canvasRect.height / source.height : null),
             width:
-              canvasRect && canvas ? canvasRect.width / canvas.width : null,
+              exactFootprint?.width ??
+              (canvasRect && source ? canvasRect.width / source.width : null),
           },
           componentHostPresent: Boolean(
             canvas?.closest("[data-raster-canvas-host]")
@@ -953,6 +1221,11 @@ test.describe("transformed fractional exact Raster pixel grid", () => {
         scale: 4,
       });
     });
+    await expect(rasterPresentation).toHaveAttribute(
+      "data-raster-sampling",
+      "exact"
+    );
+    await expect(grid).toHaveCount(1);
     await expect.poll(getMinSourcePixelFootprint).toBeGreaterThan(5);
     const resizePreviewSnapshot = await getEditorPreviewSnapshot();
     const resizePreviewDiagnostics = JSON.stringify(
@@ -1051,9 +1324,12 @@ test.describe("transformed fractional exact Raster pixel grid", () => {
       const gridSurface = gridElement?.ownerSVGElement;
       const patternElement = gridElement?.querySelector("pattern");
       const canvas = document.querySelector<HTMLCanvasElement>(
-        '[data-node-id="fractional-render-root"] [data-testid="raster-resident-canvas"] canvas'
+        '[data-node-id="fractional-render-root"] [data-testid="raster-resident-canvas"] canvas[data-raster-exact-backing="true"]'
       );
       const canvasHost = canvas?.closest("[data-raster-canvas-host]");
+      const source = canvasHost?.querySelector<HTMLCanvasElement>(
+        'canvas[data-raster-source-canvas="true"]'
+      );
       const gridMatrix = gridElement?.getScreenCTM();
 
       if (
@@ -1064,6 +1340,7 @@ test.describe("transformed fractional exact Raster pixel grid", () => {
           patternElement &&
           canvas &&
           canvasHost &&
+          source &&
           gridMatrix
         )
       ) {
@@ -1085,6 +1362,35 @@ test.describe("transformed fractional exact Raster pixel grid", () => {
         originX,
         originY + cellHeight
       ).matrixTransform(gridMatrix);
+      const destinationHeight = Number(
+        canvas.getAttribute("data-raster-native-destination-height")
+      );
+      const destinationWidth = Number(
+        canvas.getAttribute("data-raster-native-destination-width")
+      );
+      const destinationX = Number(
+        canvas.getAttribute("data-raster-native-destination-x")
+      );
+      const destinationY = Number(
+        canvas.getAttribute("data-raster-native-destination-y")
+      );
+      const sourceHeight = Number(
+        canvas.getAttribute("data-raster-native-source-height")
+      );
+      const sourceWidth = Number(
+        canvas.getAttribute("data-raster-native-source-width")
+      );
+      const sourceX = Number(
+        canvas.getAttribute("data-raster-native-source-x")
+      );
+      const sourceY = Number(
+        canvas.getAttribute("data-raster-native-source-y")
+      );
+      const windowOrigin = new DOMPoint(
+        originX + cellWidth * sourceX,
+        originY + cellHeight * sourceY
+      ).matrixTransform(gridMatrix);
+      const physicalScale = window.devicePixelRatio;
 
       return {
         actualCellHeight: Math.hypot(
@@ -1095,13 +1401,13 @@ test.describe("transformed fractional exact Raster pixel grid", () => {
           nextColumn.x - origin.x,
           nextColumn.y - origin.y
         ),
-        actualOriginX: origin.x,
-        actualOriginY: origin.y,
-        devicePixelRatio: window.devicePixelRatio,
-        expectedCellHeight: canvasRect.height / canvas.height,
-        expectedCellWidth: canvasRect.width / canvas.width,
-        expectedOriginX: canvasRect.left,
-        expectedOriginY: canvasRect.top,
+        actualOriginX: windowOrigin.x,
+        actualOriginY: windowOrigin.y,
+        devicePixelRatio: physicalScale,
+        expectedCellHeight: destinationHeight / sourceHeight / physicalScale,
+        expectedCellWidth: destinationWidth / sourceWidth / physicalScale,
+        expectedOriginX: canvasRect.left + destinationX / physicalScale,
+        expectedOriginY: canvasRect.top + destinationY / physicalScale,
         gridMatrix: {
           a: gridMatrix.a,
           b: gridMatrix.b,
@@ -1122,14 +1428,20 @@ test.describe("transformed fractional exact Raster pixel grid", () => {
           width: gridSurface.viewBox.baseVal.width,
         },
         residentSamples: {
-          height: canvas.height,
-          width: canvas.width,
+          height: source.height,
+          width: source.width,
         },
         residentRect: {
           height: canvasRect.height,
           left: canvasRect.left,
           top: canvasRect.top,
           width: canvasRect.width,
+        },
+        sourceWindow: {
+          height: sourceHeight,
+          width: sourceWidth,
+          x: sourceX,
+          y: sourceY,
         },
       };
     });
@@ -1156,6 +1468,15 @@ test.describe("transformed fractional exact Raster pixel grid", () => {
         MAX_EXACT_ALIGNMENT_ERROR_PHYSICAL_PIXELS
       );
     };
+    const expectPresentationEdgeAlignment = (
+      actual?: number,
+      expected?: number
+    ) => {
+      expect(
+        physicalError(actual, expected),
+        geometryDiagnostics
+      ).toBeLessThanOrEqual(MAX_NATIVE_PRESENTATION_EDGE_ERROR_PHYSICAL_PIXELS);
+    };
 
     expectExactAlignment(
       geometry?.actualCellWidth,
@@ -1165,26 +1486,749 @@ test.describe("transformed fractional exact Raster pixel grid", () => {
       geometry?.actualCellHeight,
       geometry?.expectedCellHeight
     );
-    expectExactAlignment(geometry?.actualOriginX, geometry?.expectedOriginX);
-    expectExactAlignment(geometry?.actualOriginY, geometry?.expectedOriginY);
-    expectExactAlignment(
+    expectPresentationEdgeAlignment(
+      geometry?.actualOriginX,
+      geometry?.expectedOriginX
+    );
+    expectPresentationEdgeAlignment(
+      geometry?.actualOriginY,
+      geometry?.expectedOriginY
+    );
+    expect(
+      geometry?.sourceWindow.x,
+      geometryDiagnostics
+    ).toBeGreaterThanOrEqual(0);
+    expect(
+      geometry?.sourceWindow.y,
+      geometryDiagnostics
+    ).toBeGreaterThanOrEqual(0);
+    expect(
+      (geometry?.sourceWindow.x || 0) + (geometry?.sourceWindow.width || 0),
+      geometryDiagnostics
+    ).toBeLessThanOrEqual(geometry?.residentSamples.width || 0);
+    expect(
+      (geometry?.sourceWindow.y || 0) + (geometry?.sourceWindow.height || 0),
+      geometryDiagnostics
+    ).toBeLessThanOrEqual(geometry?.residentSamples.height || 0);
+    expect(
+      geometry?.residentRect.width || Number.POSITIVE_INFINITY,
+      geometryDiagnostics
+    ).toBeLessThanOrEqual(
+      (geometry?.gridRect.width || 0) + 1 / (geometry?.devicePixelRatio || 1)
+    );
+    expect(
+      geometry?.residentRect.height || Number.POSITIVE_INFINITY,
+      geometryDiagnostics
+    ).toBeLessThanOrEqual(
+      (geometry?.gridRect.height || 0) + 1 / (geometry?.devicePixelRatio || 1)
+    );
+
+    await page.evaluate(() => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
+      const raster = editor?.getNode("fractional-raster");
+
+      if (!(editor && raster?.type === "image")) {
+        throw new Error("Expected fractional render-tree Raster");
+      }
+
+      editor.getState().updateNodeById(raster.id, (node) => ({
+        ...node,
+        opacity: 0,
+      }));
+    });
+    await expect(rasterPresentation).toHaveAttribute(
+      "data-raster-sampling",
+      "exact"
+    );
+    await expect(
+      page.locator(
+        '[data-node-id="fractional-render-root"] canvas[data-raster-exact-backing="true"]'
+      )
+    ).toHaveCount(0);
+  });
+});
+
+test.describe("imported native JPEG pixel grid", () => {
+  test.use({ deviceScaleFactor: 2 });
+
+  test("shares decoded sample boundaries through fractional native presentation", async ({
+    page,
+  }, testInfo) => {
+    await gotoEditor(page);
+    const src = await createNativeJpegSource(page);
+
+    await page.evaluate(() => {
+      const runtime = window.__PUNCHPRESS_EDITOR__?.rasterSurface;
+
+      if (!runtime) {
+        throw new Error("Expected Raster presentation runtime");
+      }
+
+      (
+        window as typeof window & {
+          __PUNCHPRESS_ORIGINAL_ENSURE_SURFACE__?: typeof runtime.ensureSurface;
+        }
+      ).__PUNCHPRESS_ORIGINAL_ENSURE_SURFACE__ = runtime.ensureSurface;
+      runtime.ensureSurface = () => new Promise(() => undefined);
+    });
+    await loadDocument(page, createNativeJpegDocument(src));
+    await page.evaluate(() => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
+
+      editor?.select("native-jpeg");
+    });
+    await setConvergedViewport(page, {
+      x: 300,
+      y: 200,
+      zoom: 20,
+    });
+
+    const nativePlane = page.locator(
+      '[data-node-id="native-jpeg"] [data-raster-native-sample-width="16"]'
+    );
+    const grid = nativePlane.locator('[data-pixel-grid-node-id="native-jpeg"]');
+    const image = nativePlane.locator(
+      '[data-testid="raster-native-image"] canvas[data-raster-exact-backing="true"]'
+    );
+
+    await expect(nativePlane).toHaveAttribute(
+      "data-raster-native-sample-height",
+      "8"
+    );
+    await expect(grid).toHaveCount(1);
+    await expect(grid).toBeVisible();
+    await expect(image).toHaveCSS("image-rendering", "auto");
+
+    const geometry = await page.evaluate(() => {
+      const plane = document.querySelector(
+        '[data-node-id="native-jpeg"] [data-raster-native-sample-width="16"]'
+      );
+      const imageElement = document.querySelector<HTMLCanvasElement>(
+        '[data-node-id="native-jpeg"] [data-testid="raster-native-image"] canvas[data-raster-exact-backing="true"]'
+      );
+      const foreignObject = imageElement?.closest("foreignObject");
+      const gridElement = document.querySelector<SVGGElement>(
+        '[data-node-id="native-jpeg"] [data-pixel-grid-node-id="native-jpeg"]'
+      );
+      const pattern = gridElement?.querySelector("pattern");
+      const gridMatrix = gridElement?.getScreenCTM();
+
+      if (!(plane && imageElement && gridElement && pattern && gridMatrix)) {
+        return null;
+      }
+
+      const gridOrigin = new DOMPoint(
+        Number(pattern.getAttribute("x")),
+        Number(pattern.getAttribute("y"))
+      ).matrixTransform(gridMatrix);
+      const gridColumn = new DOMPoint(
+        Number(pattern.getAttribute("x")) +
+          Number(pattern.getAttribute("width")),
+        Number(pattern.getAttribute("y"))
+      ).matrixTransform(gridMatrix);
+      const imageRect = imageElement.getBoundingClientRect();
+      const gridRect = gridElement.getBoundingClientRect();
+      const sourceHeight = Number(
+        imageElement.getAttribute("data-raster-native-source-height")
+      );
+      const sourceWidth = Number(
+        imageElement.getAttribute("data-raster-native-source-width")
+      );
+      const destinationHeight = Number(
+        imageElement.getAttribute("data-raster-native-destination-height")
+      );
+      const destinationWidth = Number(
+        imageElement.getAttribute("data-raster-native-destination-width")
+      );
+      const destinationX = Number(
+        imageElement.getAttribute("data-raster-native-destination-x")
+      );
+      const destinationY = Number(
+        imageElement.getAttribute("data-raster-native-destination-y")
+      );
+      const backingScaleX = imageRect.width / imageElement.width;
+      const backingScaleY = imageRect.height / imageElement.height;
+
+      return {
+        backingSize: {
+          height: imageElement.height,
+          width: imageElement.width,
+        },
+        devicePixelRatio: window.devicePixelRatio,
+        gridCellWidth: gridColumn.x - gridOrigin.x,
+        gridOriginX: gridOrigin.x,
+        gridRect: {
+          height: gridRect.height,
+          left: gridRect.left,
+          top: gridRect.top,
+          width: gridRect.width,
+        },
+        imageOriginX: imageRect.left + destinationX * backingScaleX,
+        imageRect: {
+          height: destinationHeight * backingScaleY,
+          left: imageRect.left + destinationX * backingScaleX,
+          top: imageRect.top + destinationY * backingScaleY,
+          width: destinationWidth * backingScaleX,
+        },
+        imageSampleWidth: (destinationWidth * backingScaleX) / sourceWidth,
+        naturalSize: {
+          height: Number(
+            plane.getAttribute("data-raster-native-sample-height")
+          ),
+          width: Number(plane.getAttribute("data-raster-native-sample-width")),
+        },
+        usesClippedInlinePresentation:
+          Boolean(foreignObject?.contains(imageElement)) &&
+          foreignObject?.getAttribute("overflow") === "hidden" &&
+          plane.contains(imageElement) &&
+          plane.contains(gridElement),
+        sourceWindow: {
+          height: sourceHeight,
+          width: sourceWidth,
+        },
+      };
+    });
+
+    expect(geometry).not.toBeNull();
+    expect(geometry?.devicePixelRatio).toBe(2);
+    expect(geometry?.naturalSize).toEqual({ height: 8, width: 16 });
+    expect(geometry?.sourceWindow).toEqual({ height: 8, width: 16 });
+    expect(geometry?.usesClippedInlinePresentation).toBe(true);
+    const geometryDiagnostics = JSON.stringify(geometry, null, 2);
+    const physicalError = (actual?: number, expected?: number) => {
+      return (
+        Math.abs(
+          (actual ?? Number.POSITIVE_INFINITY) -
+            (expected ?? Number.NEGATIVE_INFINITY)
+        ) * (geometry?.devicePixelRatio || 1)
+      );
+    };
+    const expectExactAlignment = (actual?: number, expected?: number) => {
+      expect(physicalError(actual, expected), geometryDiagnostics).toBeLessThan(
+        MAX_EXACT_ALIGNMENT_ERROR_PHYSICAL_PIXELS
+      );
+    };
+    const expectPresentationExtentAlignment = (
+      actual?: number,
+      expected?: number
+    ) => {
+      expect(
+        physicalError(actual, expected),
+        geometryDiagnostics
+      ).toBeLessThanOrEqual(MAX_NATIVE_PRESENTATION_EDGE_ERROR_PHYSICAL_PIXELS);
+    };
+    const expectPresentationSampleAlignment = (
+      actual?: number,
+      expected?: number
+    ) => {
+      expect(
+        physicalError(actual, expected),
+        geometryDiagnostics
+      ).toBeLessThanOrEqual(
+        MAX_NATIVE_PRESENTATION_EDGE_ERROR_PHYSICAL_PIXELS /
+          (geometry?.sourceWindow.width || 1)
+      );
+    };
+
+    expectExactAlignment(geometry?.gridOriginX, geometry?.imageOriginX);
+    expectPresentationSampleAlignment(
+      geometry?.gridCellWidth,
+      geometry?.imageSampleWidth
+    );
+    expectExactAlignment(geometry?.gridRect.left, geometry?.imageRect.left);
+    expectExactAlignment(geometry?.gridRect.top, geometry?.imageRect.top);
+    expectPresentationExtentAlignment(
       geometry?.gridRect.width,
-      geometry?.residentRect.width
+      geometry?.imageRect.width
     );
-    expectExactAlignment(
+    expectPresentationExtentAlignment(
       geometry?.gridRect.height,
-      geometry?.residentRect.height
+      geometry?.imageRect.height
     );
-    expectExactAlignment(geometry?.gridRect.left, geometry?.residentRect.left);
-    expectExactAlignment(geometry?.gridRect.top, geometry?.residentRect.top);
-    expectExactAlignment(
-      (geometry?.actualCellWidth || 0) * (geometry?.residentSamples.width || 0),
-      geometry?.residentRect.width
+    expect(
+      Math.abs(
+        (geometry?.backingSize.width || 0) -
+          (geometry?.gridRect.width || 0) * (geometry?.devicePixelRatio || 1)
+      ),
+      geometryDiagnostics
+    ).toBeLessThanOrEqual(MAX_NATIVE_PRESENTATION_EDGE_ERROR_PHYSICAL_PIXELS);
+
+    const imageBox = await image.boundingBox();
+
+    if (!imageBox) {
+      throw new Error("Expected native JPEG bounds");
+    }
+
+    const viewport = page.viewportSize();
+
+    expect(viewport).not.toBeNull();
+    expect(imageBox.x).toBeGreaterThanOrEqual(0);
+    expect(imageBox.y).toBeGreaterThanOrEqual(0);
+    expect(imageBox.x + imageBox.width).toBeLessThanOrEqual(
+      viewport?.width || 0
     );
-    expectExactAlignment(
-      (geometry?.actualCellHeight || 0) *
-        (geometry?.residentSamples.height || 0),
-      geometry?.residentRect.height
+    expect(imageBox.y + imageBox.height).toBeLessThanOrEqual(
+      viewport?.height || 0
     );
+
+    await grid.evaluate((element) => {
+      element.style.visibility = "hidden";
+    });
+    const captureBox = {
+      height: Math.ceil(imageBox.y + imageBox.height) - Math.floor(imageBox.y),
+      width: Math.ceil(imageBox.x + imageBox.width) - Math.floor(imageBox.x),
+      x: Math.floor(imageBox.x),
+      y: Math.floor(imageBox.y),
+    };
+    const sourceSamplesPerStripe = 4;
+    const expectedBoundaries = Array.from({ length: 3 }, (_, index) => {
+      return (
+        ((geometry?.gridOriginX || 0) +
+          (geometry?.gridCellWidth || 0) *
+            sourceSamplesPerStripe *
+            (index + 1) -
+          captureBox.x) *
+        (geometry?.devicePixelRatio || 1)
+      );
+    });
+    const screenshot = await page.screenshot({
+      clip: captureBox,
+      type: "png",
+    });
+    await testInfo.attach("native-jpeg-without-grid", {
+      body: screenshot,
+      contentType: "image/png",
+    });
+    const backingCapture = await image.evaluate((canvas: HTMLCanvasElement) => {
+      const context = canvas.getContext("2d");
+
+      if (!context) {
+        throw new Error("Expected native presentation Canvas2D");
+      }
+
+      const row = context.getImageData(
+        0,
+        Math.floor(canvas.height / 2),
+        canvas.width,
+        1
+      ).data;
+      const lightness = Array.from({ length: canvas.width }, (_, x) => {
+        const offset = x * 4;
+
+        return (row[offset] + row[offset + 1] + row[offset + 2]) / (3 * 255);
+      });
+
+      return {
+        destination: {
+          height: Number(
+            canvas.getAttribute("data-raster-native-destination-height")
+          ),
+          width: Number(
+            canvas.getAttribute("data-raster-native-destination-width")
+          ),
+          x: Number(canvas.getAttribute("data-raster-native-destination-x")),
+          y: Number(canvas.getAttribute("data-raster-native-destination-y")),
+        },
+        height: canvas.height,
+        transitions: lightness.flatMap((value, x) => {
+          if (x === 0) {
+            return [];
+          }
+
+          const contrast = Math.abs(value - lightness[x - 1]);
+
+          return contrast > 1 / 1024
+            ? [{ contrast, left: lightness[x - 1], right: value, x }]
+            : [];
+        }),
+        width: canvas.width,
+      };
+    });
+    const sampledCapture = await page.evaluate(
+      async ({ encoded, expectedBoundaries, sampleY }) => {
+        const raster = new Image();
+
+        raster.src = `data:image/png;base64,${encoded}`;
+        await raster.decode();
+
+        const canvas = document.createElement("canvas");
+
+        canvas.width = raster.naturalWidth;
+        canvas.height = raster.naturalHeight;
+
+        const context = canvas.getContext("2d");
+
+        if (!context) {
+          throw new Error("Expected screenshot Canvas2D");
+        }
+
+        context.drawImage(raster, 0, 0);
+        const row = context.getImageData(
+          0,
+          Math.round(sampleY),
+          canvas.width,
+          1
+        ).data;
+        const lightness = Array.from({ length: canvas.width }, (_, x) => {
+          const offset = x * 4;
+
+          return (row[offset] + row[offset + 1] + row[offset + 2]) / (3 * 255);
+        });
+
+        const transitions = lightness.flatMap((value, x) => {
+          if (x === 0) {
+            return [];
+          }
+
+          const contrast = Math.abs(value - lightness[x - 1]);
+
+          return contrast > 1 / 1024
+            ? [{ contrast, left: lightness[x - 1], right: value, x }]
+            : [];
+        });
+
+        return {
+          boundaries: expectedBoundaries.map((expected) => {
+            const min = Math.max(1, Math.floor(expected) - 4);
+            const max = Math.min(canvas.width - 1, Math.ceil(expected) + 4);
+            let boundary = min;
+            let contrast = 0;
+
+            for (let x = min; x <= max; x += 1) {
+              const nextContrast = Math.abs(lightness[x] - lightness[x - 1]);
+
+              if (nextContrast > contrast) {
+                boundary = x;
+                contrast = nextContrast;
+              }
+            }
+
+            return { boundary, contrast };
+          }),
+          height: canvas.height,
+          transitions,
+          width: canvas.width,
+        };
+      },
+      {
+        encoded: screenshot.toString("base64"),
+        expectedBoundaries,
+        sampleY:
+          (imageBox.y + imageBox.height / 2 - captureBox.y) *
+          (geometry?.devicePixelRatio || 1),
+      }
+    );
+    const expectedBackingBoundaries = Array.from({ length: 3 }, (_, index) => {
+      return (
+        backingCapture.destination.x +
+        (backingCapture.destination.width *
+          sourceSamplesPerStripe *
+          (index + 1)) /
+          (geometry?.sourceWindow.width || 1)
+      );
+    });
+    const rendererDiagnostics = JSON.stringify(
+      {
+        backingCapture,
+        captureBox,
+        expectedBackingBoundaries,
+        expectedBoundaries,
+        geometry,
+        sampledCapture,
+      },
+      null,
+      2
+    );
+
+    await testInfo.attach("native-renderer-diagnostics", {
+      body: rendererDiagnostics,
+      contentType: "application/json",
+    });
+
+    for (const expectedBoundary of expectedBackingBoundaries) {
+      const transition = backingCapture.transitions.reduce<{
+        contrast: number;
+        x: number;
+      }>(
+        (strongest, candidate) => {
+          return Math.abs(candidate.x - expectedBoundary) <= 4 &&
+            candidate.contrast > strongest.contrast
+            ? candidate
+            : strongest;
+        },
+        { contrast: 0, x: 0 }
+      );
+
+      expect(transition.contrast, rendererDiagnostics).toBeGreaterThan(0.2);
+      expect(
+        Math.abs(transition.x - expectedBoundary),
+        rendererDiagnostics
+      ).toBeLessThan(2);
+    }
+
+    const expectedCaptureWidth =
+      captureBox.width * (geometry?.devicePixelRatio || 1);
+
+    expect(
+      Math.abs(sampledCapture.width - expectedCaptureWidth),
+      rendererDiagnostics
+    ).toBeLessThan(1);
+
+    for (const [index, sample] of sampledCapture.boundaries.entries()) {
+      const expectedBoundary = expectedBoundaries[index];
+
+      expect(sample.contrast, rendererDiagnostics).toBeGreaterThan(0.2);
+      expect(
+        Math.abs(sample.boundary - expectedBoundary),
+        rendererDiagnostics
+      ).toBeLessThan(2);
+    }
+
+    await grid.evaluate((element) => {
+      element.style.removeProperty("visibility");
+    });
+    await setConvergedViewport(page, {
+      x: 335,
+      y: 200,
+      zoom: 20,
+    });
+    const getNativeWindow = () =>
+      image.evaluate((canvas: HTMLCanvasElement) => {
+        const foreignObject = canvas.closest("foreignObject");
+
+        return {
+          backingHeight: canvas.height,
+          backingWidth: canvas.width,
+          bounds: {
+            height: Number(foreignObject?.getAttribute("height")),
+            width: Number(foreignObject?.getAttribute("width")),
+            x: Number(foreignObject?.getAttribute("x")),
+            y: Number(foreignObject?.getAttribute("y")),
+          },
+          sourceHeight: Number(
+            canvas.getAttribute("data-raster-native-source-height")
+          ),
+          sourceWidth: Number(
+            canvas.getAttribute("data-raster-native-source-width")
+          ),
+          sourceX: Number(canvas.getAttribute("data-raster-native-source-x")),
+          sourceY: Number(canvas.getAttribute("data-raster-native-source-y")),
+        };
+      });
+
+    await expect
+      .poll(async () => (await getNativeWindow()).sourceWidth)
+      .toBeLessThan(16);
+    const partialWindow = await getNativeWindow();
+    const partialSignature = JSON.stringify(partialWindow);
+
+    await page.evaluate(() => {
+      window.__PUNCHPRESS_EDITOR__
+        ?.getState()
+        .updateNodeById("native-jpeg", (node) => ({
+          ...node,
+          transform: {
+            ...node.transform,
+            rotation: 45,
+          },
+        }));
+    });
+    await expect
+      .poll(async () => JSON.stringify(await getNativeWindow()))
+      .not.toBe(partialSignature);
+    const rotatedWindow = await getNativeWindow();
+    const rotatedViewport = page.viewportSize();
+    const backingLimit =
+      Math.hypot(rotatedViewport?.width || 0, rotatedViewport?.height || 0) * 2;
+
+    expect(rotatedWindow.backingWidth).toBeLessThanOrEqual(
+      Math.ceil(backingLimit)
+    );
+    expect(rotatedWindow.backingHeight).toBeLessThanOrEqual(
+      Math.ceil(backingLimit)
+    );
+
+    await page.evaluate(() => {
+      const runtime = window.__PUNCHPRESS_EDITOR__?.rasterSurface;
+      const original = (
+        window as typeof window & {
+          __PUNCHPRESS_ORIGINAL_ENSURE_SURFACE__?: typeof runtime.ensureSurface;
+        }
+      ).__PUNCHPRESS_ORIGINAL_ENSURE_SURFACE__;
+
+      if (!(runtime && original)) {
+        throw new Error("Expected original Raster surface resolver");
+      }
+
+      runtime.ensureSurface = original;
+      window.__PUNCHPRESS_EDITOR__?.newDocument();
+    });
+    await loadDocument(page, createNativeJpegDocument(src));
+    await page.evaluate(() => {
+      window.__PUNCHPRESS_EDITOR__?.select("native-jpeg");
+    });
+    await setConvergedViewport(page, {
+      x: 300,
+      y: 200,
+      zoom: 20,
+    });
+
+    const residentGrid = page.locator(
+      '[data-node-id="native-jpeg"] [data-pixel-grid-node-id="native-jpeg"]'
+    );
+    const residentImage = page.locator(
+      '[data-node-id="native-jpeg"] [data-testid="raster-resident-canvas"] canvas[data-raster-exact-backing="true"]'
+    );
+
+    await expect(residentGrid).toHaveCount(1);
+    await expect(residentImage).toBeVisible();
+    const residentGeometry = await page.evaluate(() => {
+      const gridElement = document.querySelector<SVGGElement>(
+        '[data-node-id="native-jpeg"] [data-pixel-grid-node-id="native-jpeg"]'
+      );
+      const pattern = gridElement?.querySelector("pattern");
+      const matrix = gridElement?.getScreenCTM();
+      const canvas = document.querySelector<HTMLCanvasElement>(
+        '[data-node-id="native-jpeg"] [data-testid="raster-resident-canvas"] canvas[data-raster-exact-backing="true"]'
+      );
+
+      if (!(canvas && gridElement && matrix && pattern)) {
+        return null;
+      }
+
+      const origin = new DOMPoint(
+        Number(pattern.getAttribute("x")),
+        Number(pattern.getAttribute("y"))
+      ).matrixTransform(matrix);
+      const column = new DOMPoint(
+        Number(pattern.getAttribute("x")) +
+          Number(pattern.getAttribute("width")),
+        Number(pattern.getAttribute("y"))
+      ).matrixTransform(matrix);
+      const canvasRect = canvas.getBoundingClientRect();
+
+      return {
+        cellWidth: column.x - origin.x,
+        imageRect: {
+          height: canvasRect.height,
+          left: canvasRect.left,
+          top: canvasRect.top,
+          width: canvasRect.width,
+        },
+        originX: origin.x,
+      };
+    });
+
+    expect(residentGeometry).not.toBeNull();
+    const residentBox = await residentImage.boundingBox();
+
+    if (!residentBox) {
+      throw new Error("Expected resident JPEG bounds");
+    }
+
+    await residentGrid.evaluate((element) => {
+      element.style.visibility = "hidden";
+    });
+    const residentCaptureBox = {
+      height:
+        Math.ceil(residentBox.y + residentBox.height) -
+        Math.floor(residentBox.y),
+      width:
+        Math.ceil(residentBox.x + residentBox.width) -
+        Math.floor(residentBox.x),
+      x: Math.floor(residentBox.x),
+      y: Math.floor(residentBox.y),
+    };
+    const residentScreenshot = await page.screenshot({
+      clip: residentCaptureBox,
+      type: "png",
+    });
+    const residentExpectedBoundaries = Array.from(
+      { length: 3 },
+      (_, index) =>
+        ((residentGeometry?.originX || 0) +
+          (residentGeometry?.cellWidth || 0) *
+            sourceSamplesPerStripe *
+            (index + 1) -
+          residentCaptureBox.x) *
+        2
+    );
+    const residentBoundaries = await page.evaluate(
+      async ({ encoded, expectedBoundaries, sampleY }) => {
+        const raster = new Image();
+
+        raster.src = `data:image/png;base64,${encoded}`;
+        await raster.decode();
+        const canvas = document.createElement("canvas");
+
+        canvas.width = raster.naturalWidth;
+        canvas.height = raster.naturalHeight;
+        const context = canvas.getContext("2d");
+
+        if (!context) {
+          throw new Error("Expected resident screenshot Canvas2D");
+        }
+
+        context.drawImage(raster, 0, 0);
+        const row = context.getImageData(
+          0,
+          Math.round(sampleY),
+          canvas.width,
+          1
+        ).data;
+        const lightness = Array.from({ length: canvas.width }, (_, x) => {
+          const offset = x * 4;
+
+          return (row[offset] + row[offset + 1] + row[offset + 2]) / (3 * 255);
+        });
+
+        return expectedBoundaries.map((expected) => {
+          const min = Math.max(1, Math.floor(expected) - 4);
+          const max = Math.min(canvas.width - 1, Math.ceil(expected) + 4);
+          let boundary = min;
+          let contrast = 0;
+
+          for (let x = min; x <= max; x += 1) {
+            const nextContrast = Math.abs(lightness[x] - lightness[x - 1]);
+
+            if (nextContrast > contrast) {
+              boundary = x;
+              contrast = nextContrast;
+            }
+          }
+
+          return { boundary, contrast };
+        });
+      },
+      {
+        encoded: residentScreenshot.toString("base64"),
+        expectedBoundaries: residentExpectedBoundaries,
+        sampleY:
+          (residentBox.y + residentBox.height / 2 - residentCaptureBox.y) * 2,
+      }
+    );
+    const residentDiagnostics = JSON.stringify(
+      {
+        captureBox: residentCaptureBox,
+        expectedBoundaries: residentExpectedBoundaries,
+        geometry: residentGeometry,
+        sampledBoundaries: residentBoundaries,
+      },
+      null,
+      2
+    );
+
+    await testInfo.attach("resident-renderer-diagnostics", {
+      body: residentDiagnostics,
+      contentType: "application/json",
+    });
+
+    for (const [index, sample] of residentBoundaries.entries()) {
+      expect(sample.contrast, residentDiagnostics).toBeGreaterThan(0.2);
+      expect(
+        Math.abs(sample.boundary - residentExpectedBoundaries[index]),
+        residentDiagnostics
+      ).toBeLessThan(2);
+    }
   });
 });

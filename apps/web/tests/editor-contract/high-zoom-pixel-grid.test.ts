@@ -17,6 +17,10 @@ import {
   getPixelGridStrokeWidths,
 } from "../../src/components/canvas/canvas-pixel-grid-math";
 import {
+  getExactRasterCanvasLayout,
+  getNativeRasterViewportPresentation,
+} from "../../src/components/canvas/raster/canvas-native-raster-presentation";
+import {
   getRasterPresentationNode,
   getRasterRenderScale,
 } from "../../src/components/canvas/raster/canvas-raster-presentation";
@@ -405,5 +409,153 @@ describe("high-zoom Raster presentation", () => {
       originX: 0.4,
       originY: -0.45,
     });
+  });
+
+  test("maps native image samples and grid boundaries through one fractional transform", () => {
+    const plane = getPixelGridPlane(
+      {
+        baseHeight: 1084.63,
+        baseWidth: 1084.63,
+        baseX: 0.23,
+        baseY: -0.11,
+      },
+      {
+        height: 1085,
+        width: 1085,
+      }
+    );
+    const map = (x: number, y: number) => ({
+      x: plane.originX + x * plane.cellWidth,
+      y: plane.originY + y * plane.cellHeight,
+    });
+
+    expect(plane).toEqual({
+      cellHeight: 1084.63 / 1085,
+      cellWidth: 1084.63 / 1085,
+      originX: 0.23,
+      originY: -0.11,
+    });
+    expect(map(0, 0)).toEqual({ x: 0.23, y: -0.11 });
+    expect(map(1, 1)).toEqual({
+      x: 0.23 + 1084.63 / 1085,
+      y: -0.11 + 1084.63 / 1085,
+    });
+    const farCorner = map(1085, 1085);
+
+    expect(farCorner.x).toBeCloseTo(1084.86, 10);
+    expect(farCorner.y).toBeCloseTo(1084.52, 10);
+  });
+
+  test("rasterizes only the visible native sample window at final physical scale", () => {
+    const presentation = getNativeRasterViewportPresentation({
+      backingLimit: {
+        height: 5000,
+        width: 5000,
+      },
+      devicePixelRatio: 2,
+      display: {
+        height: 1084.63,
+        width: 1084.63,
+        x: 0.23,
+        y: -0.11,
+      },
+      sampleSize: {
+        height: 1085,
+        width: 1085,
+      },
+      screenScale: {
+        x: 65.79,
+        y: 65.79,
+      },
+      visibleBounds: {
+        maxX: 130,
+        maxY: 140,
+        minX: 100,
+        minY: 110,
+      },
+    });
+
+    expect(presentation).not.toBeNull();
+    expect(presentation?.sourceX).toBe(99);
+    expect(presentation?.sourceY).toBe(110);
+    expect(presentation?.sourceWidth).toBe(31);
+    expect(presentation?.sourceHeight).toBe(31);
+    expect(presentation?.backingWidth).toBeLessThan(4400);
+    expect(presentation?.backingHeight).toBeLessThan(4300);
+    expect(presentation?.bounds.x).toBe(100);
+    expect(presentation?.bounds.y).toBe(110);
+    expect((presentation?.bounds.width || 0) * 65.79 * 2).toBe(
+      presentation?.backingWidth
+    );
+    expect((presentation?.bounds.height || 0) * 65.79 * 2).toBe(
+      presentation?.backingHeight
+    );
+    expect(presentation?.destination.x).toBeCloseTo(
+      (0.23 + 99 * (1084.63 / 1085) - 100) * 65.79 * 2,
+      10
+    );
+    expect(presentation?.destination.x).toBeLessThan(0);
+    expect(presentation?.destination.width).toBeGreaterThan(
+      presentation?.backingWidth || Number.POSITIVE_INFINITY
+    );
+  });
+
+  test("caps a huge source pixel while preserving its boundary phase", () => {
+    const presentation = getNativeRasterViewportPresentation({
+      backingLimit: {
+        height: 2048,
+        width: 2048,
+      },
+      devicePixelRatio: 2,
+      display: {
+        height: 1,
+        width: 2,
+        x: 0,
+        y: 0,
+      },
+      sampleSize: {
+        height: 1,
+        width: 2,
+      },
+      screenScale: {
+        x: 128_000,
+        y: 128_000,
+      },
+      visibleBounds: {
+        maxX: 1.004,
+        maxY: 0.504,
+        minX: 0.996,
+        minY: 0.496,
+      },
+    });
+
+    expect(presentation?.backingWidth).toBe(2048);
+    expect(presentation?.backingHeight).toBe(2048);
+    expect(presentation?.sourceX).toBe(0);
+    expect(presentation?.sourceWidth).toBe(2);
+    expect(
+      (presentation?.destination.x || 0) +
+        (presentation?.destination.width || 0) / 2
+    ).toBeCloseTo(1024, 6);
+  });
+
+  test("rasterizes exact presentation at backing resolution before SVG scaling", () => {
+    const layout = getExactRasterCanvasLayout({
+      backingHeight: 303,
+      backingWidth: 818,
+      bounds: {
+        height: 6.06,
+        width: 16.36,
+      },
+    });
+
+    expect(layout).toEqual({
+      height: "303px",
+      transform: "scale(0.02, 0.02)",
+      transformOrigin: "0 0",
+      width: "818px",
+    });
+    expect(818 * 0.02).toBe(16.36);
+    expect(303 * 0.02).toBeCloseTo(6.06, 12);
   });
 });

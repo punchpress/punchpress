@@ -19,6 +19,12 @@ interface CanvasRasterPixelGridProps {
   baseWidth?: number;
   baseX?: number;
   baseY?: number;
+  displayPlane?: {
+    height: number;
+    width: number;
+    x: number;
+    y: number;
+  };
   height: number;
   htmlHost?: {
     height: number;
@@ -39,6 +45,7 @@ export const CanvasRasterPixelGrid = ({
   baseWidth,
   baseX,
   baseY,
+  displayPlane,
   height,
   htmlHost,
   nodeId,
@@ -93,8 +100,9 @@ export const CanvasRasterPixelGrid = ({
     height: sampleHeight || runtimeSampleSize.height,
     width: sampleWidth || runtimeSampleSize.width,
   };
-  const displayedHeight = htmlHost?.height ?? baseHeight ?? height;
-  const displayedWidth = htmlHost?.width ?? baseWidth ?? width;
+  const presentedPlane = htmlHost ?? displayPlane;
+  const displayedHeight = presentedPlane?.height ?? baseHeight ?? height;
+  const displayedWidth = presentedPlane?.width ?? baseWidth ?? width;
   const footprint = getRasterPresentationFootprint(editor, {
     displayedHeight,
     displayedWidth,
@@ -109,12 +117,12 @@ export const CanvasRasterPixelGrid = ({
     return null;
   }
 
-  const planeNode = htmlHost
+  const planeNode = presentedPlane
     ? {
-        baseHeight: htmlHost.height,
-        baseWidth: htmlHost.width,
-        baseX: htmlHost.x,
-        baseY: htmlHost.y,
+        baseHeight: presentedPlane.height,
+        baseWidth: presentedPlane.width,
+        baseX: presentedPlane.x,
+        baseY: presentedPlane.y,
       }
     : { baseHeight, baseWidth, baseX, baseY };
   const plane = getPixelGridPlane(planeNode, sampleSize);
@@ -125,7 +133,8 @@ export const CanvasRasterPixelGrid = ({
     scaleY: renderScale.y,
     zoom: state.zoom,
   });
-  const bounds = htmlHost && surface === "node" ? htmlHost : state.bounds;
+  const bounds =
+    presentedPlane && surface === "node" ? presentedPlane : state.bounds;
   const pattern = (
     <CanvasPixelGridPattern
       bounds={bounds}

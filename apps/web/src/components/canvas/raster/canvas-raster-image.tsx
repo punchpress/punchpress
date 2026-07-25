@@ -9,12 +9,18 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
 } from "react";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
+import {
+  CanvasExactRaster,
+  useExactRasterPresentation,
+} from "./canvas-exact-raster";
+import { CanvasNativeRasterImage } from "./canvas-native-raster-image";
 import { CanvasRasterPixelGrid } from "./canvas-raster-pixel-grid";
 import { getRasterPresentationFootprint } from "./canvas-raster-presentation";
 
@@ -770,13 +776,29 @@ const RasterWorkingCanvas = ({
   artworkOpacity = 1,
   canvas,
   height,
-  pixelGridProps,
+  pixelGridProps = null,
+  sampling = "smooth",
   testId,
   width,
   x,
   y,
 }) => {
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const display = useMemo(
+    () => ({ height, width, x, y }),
+    [height, width, x, y]
+  );
+  const sampleSize = useMemo(
+    () => ({ height: canvas.height, width: canvas.width }),
+    [canvas]
+  );
+  const { presentation, surfaceRef } = useExactRasterPresentation({
+    display,
+    enabled: sampling === "exact" && artworkOpacity > 0,
+    sampleSize,
+  });
+  const showsExactPresentation =
+    sampling === "exact" && artworkOpacity > 0 && presentation;
 
   useLayoutEffect(() => {
     const host = hostRef.current;
@@ -785,11 +807,12 @@ const RasterWorkingCanvas = ({
       return;
     }
 
-    canvas.style.display = "block";
+    canvas.style.display = showsExactPresentation ? "none" : "block";
     canvas.style.height = "100%";
     canvas.style.pointerEvents = "none";
     canvas.style.width = "100%";
     canvas.setAttribute("aria-hidden", "true");
+    canvas.setAttribute("data-raster-source-canvas", "true");
     const previousParent = canvas.parentElement;
     const previousNextSibling = canvas.nextSibling;
 
@@ -809,51 +832,69 @@ const RasterWorkingCanvas = ({
         );
       }
     };
-  }, [canvas]);
+  }, [canvas, showsExactPresentation]);
 
   return (
-    <foreignObject
-      data-raster-working-canvas="true"
-      data-testid={testId}
-      height={height}
-      pointerEvents="none"
-      width={width}
-      x={x}
-      y={y}
+    <g
+      data-raster-canvas-host="true"
+      data-testid={`${testId}-surface`}
+      ref={surfaceRef}
     >
-      <div
-        data-raster-canvas-host="true"
-        style={{
-          height: "100%",
-          overflow: "visible",
-          position: "relative",
-          width: "100%",
-        }}
+      <foreignObject
+        data-raster-working-canvas="true"
+        data-testid={testId}
+        height={showsExactPresentation ? presentation.bounds.height : height}
+        overflow="hidden"
+        pointerEvents="none"
+        width={showsExactPresentation ? presentation.bounds.width : width}
+        x={showsExactPresentation ? presentation.bounds.x : x}
+        y={showsExactPresentation ? presentation.bounds.y : y}
       >
         <div
-          ref={hostRef}
           style={{
             height: "100%",
-            inset: 0,
-            opacity: artworkOpacity,
-            position: "absolute",
+            overflow: "hidden",
+            position: "relative",
             width: "100%",
           }}
-        />
-        {pixelGridProps ? (
-          <CanvasRasterPixelGrid
-            {...pixelGridProps}
-            htmlHost={{ height, width, x, y }}
-            sampleHeight={canvas.height}
-            sampleWidth={canvas.width}
+        >
+          <div
+            ref={hostRef}
+            style={{
+              height: "100%",
+              inset: 0,
+              opacity: artworkOpacity,
+              position: "absolute",
+              width: "100%",
+            }}
           />
-        ) : null}
-      </div>
-    </foreignObject>
+          {showsExactPresentation ? (
+            <CanvasExactRaster
+              opacity={artworkOpacity}
+              presentation={presentation}
+              source={canvas}
+            />
+          ) : null}
+        </div>
+      </foreignObject>
+      {pixelGridProps ? (
+        <CanvasRasterPixelGrid
+          {...pixelGridProps}
+          displayPlane={display}
+          sampleHeight={canvas.height}
+          sampleWidth={canvas.width}
+        />
+      ) : null}
+    </g>
   );
 };
 
-const RasterWorkingSurface = ({ artworkOpacity, pixelGridProps, surface }) => {
+const RasterWorkingSurface = ({
+  artworkOpacity = 1,
+  pixelGridProps = null,
+  sampling,
+  surface,
+}) => {
   if (!surface) {
     return null;
   }
@@ -870,6 +911,7 @@ const RasterWorkingSurface = ({ artworkOpacity, pixelGridProps, surface }) => {
             canvas={tile.canvas}
             height={tile.height}
             key={`${surface.workingSurfaceId}:${tile.x}:${tile.y}:${index}`}
+            sampling={sampling}
             testId="raster-working-tile"
             width={tile.width}
             x={tile.x}
@@ -891,6 +933,7 @@ const RasterWorkingSurface = ({ artworkOpacity, pixelGridProps, surface }) => {
           canvas={surface.canvas}
           height={surface.height}
           pixelGridProps={pixelGridProps}
+          sampling={sampling}
           testId="raster-working-canvas"
           width={surface.width}
           x={surface.x ?? 0}
@@ -1131,7 +1174,10 @@ const CanvasTiledRasterImage = ({
           tileSources={visibleTileSources}
         />
       )}
-      <RasterWorkingSurface surface={workingSurface} />
+      <RasterWorkingSurface
+        sampling={cullState.sampling}
+        surface={workingSurface}
+      />
     </g>
   );
 };
@@ -1176,6 +1222,7 @@ export const CanvasRasterImage = (props) => {
         <RasterWorkingSurface
           artworkOpacity={props.opacity ?? 1}
           pixelGridProps={pixelGridProps}
+          sampling={sampling}
           surface={workingSurface}
         />
       </g>
@@ -1192,6 +1239,7 @@ export const CanvasRasterImage = (props) => {
           canvas={residentSurface.canvas}
           height={props.baseHeight ?? props.height}
           pixelGridProps={pixelGridProps}
+          sampling={sampling}
           testId="raster-resident-canvas"
           width={props.baseWidth ?? props.width}
           x={props.baseX ?? 0}
@@ -1201,19 +1249,18 @@ export const CanvasRasterImage = (props) => {
     );
   } else {
     artwork = (
-      <g data-raster-sampling={sampling} opacity={props.opacity ?? 1}>
-        <image
-          height={props.baseHeight ?? props.height}
-          href={props.src}
-          pointerEvents="none"
-          preserveAspectRatio="none"
-          width={props.baseWidth ?? props.width}
-          x={props.baseX ?? 0}
-          y={props.baseY ?? 0}
+      <g data-raster-sampling={sampling}>
+        <CanvasNativeRasterImage
+          {...props}
+          artworkOpacity={props.opacity ?? 1}
+          pixelGridProps={pixelGridProps}
+          renderRootNodeId={props.renderRootNodeId ?? props.nodeId}
+          sampling={sampling}
         />
-        <RasterWorkingSurface surface={workingSurface} />
+        <RasterWorkingSurface sampling={sampling} surface={workingSurface} />
       </g>
     );
+    hasHtmlPixelGrid = true;
   }
 
   return (
