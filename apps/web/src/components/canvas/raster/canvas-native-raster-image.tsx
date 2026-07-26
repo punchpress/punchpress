@@ -61,11 +61,12 @@ export const CanvasNativeRasterImage = ({
         <g
           transform={`translate(${presentation.bounds.x} ${presentation.bounds.y})`}
         >
+          {/* The canvas clips its bitmap; foreignObject clipping quantizes fractional extents. */}
           <foreignObject
             data-raster-native-node-id={nodeId}
             data-testid="raster-native-image"
             height={presentation.bounds.height}
-            overflow="hidden"
+            overflow="visible"
             pointerEvents="none"
             width={presentation.bounds.width}
             x={0}

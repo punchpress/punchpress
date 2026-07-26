@@ -165,6 +165,43 @@ describe("Canvas2D Raster surface", () => {
     expect(browser.encodes).toEqual([]);
   });
 
+  test("notifies exact presentations when resident pixels change", async () => {
+    const browser = createFakeCanvasBrowser();
+    const runtime = createCanvas2dRasterRuntime(browser.capabilities);
+
+    await runtime.ensureSurface({
+      height: target.pixelSize.height,
+      id: target.id,
+      src: "data:image/png;base64,existing",
+      width: target.pixelSize.width,
+    });
+    const surface = runtime.resolveSurface(target);
+    let presentationChanges = 0;
+    const unsubscribe = runtime.subscribePresentation(target.id, () => {
+      presentationChanges += 1;
+    });
+
+    if (!surface) {
+      throw new Error("Expected a prepared Canvas2D Raster surface");
+    }
+
+    const stroke = createRasterStroke({
+      operation: "paint",
+      point: { x: 50, y: 50 },
+      settings,
+      surface,
+      target,
+    });
+
+    stroke.append([{ x: 55, y: 50 }]);
+    expect(presentationChanges).toBe(2);
+
+    stroke.cancel();
+    expect(presentationChanges).toBe(3);
+
+    unsubscribe();
+  });
+
   test("uses destination-out for Eraser and restores only dirty pixels on cancel", async () => {
     const browser = createFakeCanvasBrowser();
     const runtime = createCanvas2dRasterRuntime(browser.capabilities);

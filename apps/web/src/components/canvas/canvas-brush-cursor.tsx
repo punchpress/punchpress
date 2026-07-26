@@ -1,4 +1,10 @@
-import { useEffect, useLayoutEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
 
@@ -43,19 +49,22 @@ export const CanvasBrushCursor = ({
   hostElement: HTMLDivElement | null;
 }) => {
   const editor = useEditor();
-  const { activeTool, settings, targetRevision, viewportX, viewportY, zoom } =
-    useEditorValue((editor, state) => {
+  const {
+    x: viewportX,
+    y: viewportY,
+    zoom,
+  } = useLiveViewportPresentation(editor);
+  const { activeTool, settings, targetRevision } = useEditorValue(
+    (editor, state) => {
       return {
         activeTool: state.activeTool,
         settings: editor.getBrushToolSettings(state.activeTool),
         targetRevision: `${state.activeLayerId || ""}:${state.selectedNodeIds.join(",")}:${state.nodes
           .map((node) => `${node.id}:${node.visible}:${node.locked ?? ""}`)
           .join("|")}`,
-        viewportX: state.viewport.x,
-        viewportY: state.viewport.y,
-        zoom: state.viewport.zoom,
       };
-    });
+    }
+  );
   const [position, setPosition] = useState<BrushCursorPosition | null>(null);
 
   useEffect(() => {
@@ -171,4 +180,17 @@ export const CanvasBrushCursor = ({
       }}
     />
   );
+};
+
+const useLiveViewportPresentation = (editor: ReturnType<typeof useEditor>) => {
+  useSyncExternalStore(
+    useCallback(
+      (listener) => editor.subscribeViewportPresentation(listener),
+      [editor]
+    ),
+    useCallback(() => editor.getViewportPresentationRevision(), [editor]),
+    () => 0
+  );
+
+  return editor.viewport;
 };

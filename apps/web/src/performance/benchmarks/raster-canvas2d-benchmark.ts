@@ -170,6 +170,79 @@ export const rasterHighZoomBenchmark: PerformanceBenchmarkDefinition = {
   usesScratchDocument: true,
 };
 
+export const rasterHighZoomBrushBenchmark: PerformanceBenchmarkDefinition = {
+  defaultOptions: {
+    frames: 120,
+    nodeCount: 1,
+    stepX: 0,
+    stepY: 0,
+    warmupFrames: 8,
+  },
+  description:
+    "Draws a continuous 24 px Hard Round curve on a resident 720×720 Raster at 1,097% with exact samples and its pixel grid visible.",
+  id: "raster-high-zoom-brush",
+  label: "Raster High Zoom Brush",
+  setup: async ({ editor, waitForFrames }) => {
+    const src = createOpaquePixelSource();
+
+    editor.loadDocument(createHighZoomBrushBenchmarkDocument(src));
+    await editor.rasterSurface.ensureSurface({
+      height: 720,
+      id: TARGET_ID,
+      src,
+      width: 720,
+    });
+    editor.select(TARGET_ID);
+    setBenchmarkViewport(editor, {
+      x: 360,
+      y: 360,
+      zoom: 10.97,
+    });
+    await waitForFrames(8);
+  },
+  run: async (context) => {
+    setBenchmarkViewport(context.editor, {
+      x: 360,
+      y: 360,
+      zoom: 10.97,
+    });
+    await context.waitForFrames(2);
+    const visible = getExactVisibleSourceBounds();
+    const center = {
+      x: visible.x + visible.width / 2,
+      y: visible.y + visible.height / 2,
+    };
+    const radius = Math.min(visible.width, visible.height) / 4;
+    const end = { x: center.x - radius, y: center.y };
+
+    await runCase(context, {
+      assertBeforeComplete: async () => {
+        await context.waitForFrames(2);
+        assertExactPixelMatchesSource({
+          localX: Math.floor(end.x),
+          localY: Math.floor(end.y),
+        });
+      },
+      counter: PERF_COUNTERS.rasterBenchmarkPixelZoom,
+      end,
+      operation: "brush",
+      pointAtProgress: (progress) => {
+        const phase = progress * Math.PI * 3;
+
+        return {
+          x: center.x + Math.cos(phase) * radius,
+          y: center.y + Math.sin(phase) * radius,
+        };
+      },
+      preserveViewport: true,
+      size: 24,
+      start: { x: center.x + radius, y: center.y },
+      zoom: 10.97,
+    });
+  },
+  usesScratchDocument: true,
+};
+
 const setBenchmarkViewport = (
   editor: PerformanceBenchmarkContext["editor"],
   viewport: { x: number; y: number; zoom: number }
@@ -209,23 +282,31 @@ const assertHighZoomPresentation = (
 const runCase = async (
   { editor, options, waitForFrame, waitForFrames }: PerformanceBenchmarkContext,
   {
+    assertBeforeComplete,
     counter,
     end,
     operation,
+    pointAtProgress,
+    preserveViewport = false,
     size,
     start,
     zoom,
   }: {
+    assertBeforeComplete?: () => Promise<void> | void;
     counter: string;
     end: { x: number; y: number };
     operation: "brush" | "eraser";
+    pointAtProgress?: (progress: number) => { x: number; y: number };
+    preserveViewport?: boolean;
     size: number;
     start: { x: number; y: number };
     zoom: number;
   }
 ) => {
-  editor.setViewport({ x: 0, y: 0, zoom });
-  editor.onViewportChange?.();
+  if (!preserveViewport) {
+    editor.setViewport({ x: 0, y: 0, zoom });
+    editor.onViewportChange?.();
+  }
   editor.setActiveTool(operation);
   editor.setBrushSettings(
     {
@@ -255,15 +336,82 @@ const runCase = async (
     const progress = index / options.frames;
 
     session.update({
-      point: {
+      point: pointAtProgress?.(progress) ?? {
         x: start.x + (end.x - start.x) * progress,
         y: start.y + (end.y - start.y) * progress,
       },
     });
   }
 
+  await assertBeforeComplete?.();
   await session.complete({ point: end });
   await waitForFrames(2);
+};
+
+const getExactVisibleSourceBounds = () => {
+  const exact = document.querySelector<HTMLCanvasElement>(
+    `[data-node-id="${TARGET_ID}"] canvas[data-raster-exact-backing="true"]`
+  );
+
+  if (!exact) {
+    const node = document.querySelector(`[data-node-id="${TARGET_ID}"]`);
+    const debugEditor = window.__PUNCHPRESS_EDITOR__;
+
+    throw new Error(
+      `Expected exact Raster canvas: node=${Boolean(node)} sampling=${node?.querySelector("[data-raster-sampling]")?.getAttribute("data-raster-sampling") || "missing"} resident=${Boolean(node?.querySelector("[data-raster-source-canvas]"))} zoom=${debugEditor?.zoom} storeZoom=${debugEditor?.getState().viewport.zoom}`
+    );
+  }
+
+  return {
+    height: Number(exact.dataset.rasterNativeSourceHeight),
+    width: Number(exact.dataset.rasterNativeSourceWidth),
+    x: Number(exact.dataset.rasterNativeSourceX),
+    y: Number(exact.dataset.rasterNativeSourceY),
+  };
+};
+
+const assertExactPixelMatchesSource = ({
+  localX,
+  localY,
+}: {
+  localX: number;
+  localY: number;
+}) => {
+  const source = document.querySelector<HTMLCanvasElement>(
+    `[data-node-id="${TARGET_ID}"] canvas[data-raster-source-canvas="true"]`
+  );
+  const exact = document.querySelector<HTMLCanvasElement>(
+    `[data-node-id="${TARGET_ID}"] canvas[data-raster-exact-backing="true"]`
+  );
+  const sourceContext = source?.getContext("2d");
+  const exactContext = exact?.getContext("2d");
+
+  if (!(source && exact && sourceContext && exactContext)) {
+    throw new Error("Expected resident and exact Raster canvases");
+  }
+
+  const sourceX = Number(exact.dataset.rasterNativeSourceX);
+  const sourceY = Number(exact.dataset.rasterNativeSourceY);
+  const sourceWidth = Number(exact.dataset.rasterNativeSourceWidth);
+  const sourceHeight = Number(exact.dataset.rasterNativeSourceHeight);
+  const destinationX = Number(exact.dataset.rasterNativeDestinationX);
+  const destinationY = Number(exact.dataset.rasterNativeDestinationY);
+  const destinationWidth = Number(exact.dataset.rasterNativeDestinationWidth);
+  const destinationHeight = Number(exact.dataset.rasterNativeDestinationHeight);
+  const exactX = Math.floor(
+    destinationX + ((localX - sourceX) / sourceWidth) * destinationWidth
+  );
+  const exactY = Math.floor(
+    destinationY + ((localY - sourceY) / sourceHeight) * destinationHeight
+  );
+  const sourcePixel = sourceContext.getImageData(localX, localY, 1, 1).data;
+  const exactPixel = exactContext.getImageData(exactX, exactY, 1, 1).data;
+
+  if (sourcePixel.some((channel, index) => channel !== exactPixel[index])) {
+    throw new Error(
+      `High-zoom Brush presentation lagged its resident surface: source=${[...sourcePixel].join(",")} exact=${[...exactPixel].join(",")}`
+    );
+  }
 };
 
 const createOpaquePixelSource = () => {
@@ -350,6 +498,33 @@ const createHighZoomBenchmarkDocument = (src: string) =>
         type: "image",
         visible: true,
         width: TARGET_WIDTH,
+      },
+    ],
+    version: "1.8",
+  });
+
+const createHighZoomBrushBenchmarkDocument = (src: string) =>
+  JSON.stringify({
+    nodes: [
+      {
+        assetId: "asset-raster-high-zoom-brush",
+        height: 720,
+        id: TARGET_ID,
+        mimeType: "image/png",
+        name: "Raster High Zoom Brush",
+        opacity: 1,
+        parentId: "root",
+        src,
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 0,
+          y: 0,
+        },
+        type: "image",
+        visible: true,
+        width: 720,
       },
     ],
     version: "1.8",

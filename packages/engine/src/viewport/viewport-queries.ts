@@ -42,8 +42,16 @@ export const setViewport = (editor, viewport) => {
     y: viewport.y ?? previousViewport.y,
     zoom: viewport.zoom ?? previousViewport.zoom,
   };
+  const didChange =
+    nextViewport.x !== previousViewport.x ||
+    nextViewport.y !== previousViewport.y ||
+    nextViewport.zoom !== previousViewport.zoom;
 
   editor.viewportState = nextViewport;
+
+  if (didChange) {
+    editor.notifyViewportPresentationChanged();
+  }
 
   const storeViewport = editor.getState().viewport;
 

@@ -1,4 +1,10 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorSelectionDragPreviewValue } from "../../../editor-react/use-editor-selection-drag-preview-value";
 import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
@@ -11,45 +17,41 @@ export const CanvasExactRaster = ({
   opacity = 1,
   presentation,
   source,
+  subscribeToSource,
 }: {
   opacity?: number;
   presentation: NonNullable<
     ReturnType<typeof getNativeRasterViewportPresentation>
   >;
   source: CanvasImageSource;
+  subscribeToSource?: (listener: () => void) => () => void;
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useLayoutEffect(() => {
-    const canvas = canvasRef.current;
-
-    if (!canvas) {
-      return;
-    }
-
-    canvas.height = presentation.backingHeight;
-    canvas.width = presentation.backingWidth;
-    const context = canvas.getContext("2d");
-
-    if (!context) {
-      return;
-    }
-
-    context.resetTransform();
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    context.imageSmoothingEnabled = false;
-    context.drawImage(
-      source,
-      presentation.sourceX,
-      presentation.sourceY,
-      presentation.sourceWidth,
-      presentation.sourceHeight,
-      presentation.destination.x,
-      presentation.destination.y,
-      presentation.destination.width,
-      presentation.destination.height
-    );
+    drawExactRaster(canvasRef.current, presentation, source);
   });
+  useLayoutEffect(() => {
+    if (!subscribeToSource) {
+      return;
+    }
+
+    let frameId = 0;
+    const redraw = () => {
+      frameId = 0;
+      drawExactRaster(canvasRef.current, presentation, source);
+    };
+    const unsubscribe = subscribeToSource(() => {
+      if (!frameId) {
+        frameId = requestAnimationFrame(redraw);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      cancelAnimationFrame(frameId);
+    };
+  }, [presentation, source, subscribeToSource]);
 
   return (
     <canvas
@@ -76,6 +78,45 @@ export const CanvasExactRaster = ({
   );
 };
 
+const drawExactRaster = (
+  canvas: HTMLCanvasElement | null,
+  presentation: NonNullable<
+    ReturnType<typeof getNativeRasterViewportPresentation>
+  >,
+  source: CanvasImageSource
+) => {
+  if (!canvas) {
+    return;
+  }
+
+  if (canvas.height !== presentation.backingHeight) {
+    canvas.height = presentation.backingHeight;
+  }
+  if (canvas.width !== presentation.backingWidth) {
+    canvas.width = presentation.backingWidth;
+  }
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    return;
+  }
+
+  context.resetTransform();
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.imageSmoothingEnabled = false;
+  context.drawImage(
+    source,
+    presentation.sourceX,
+    presentation.sourceY,
+    presentation.sourceWidth,
+    presentation.sourceHeight,
+    presentation.destination.x,
+    presentation.destination.y,
+    presentation.destination.width,
+    presentation.destination.height
+  );
+};
+
 export const useExactRasterPresentation = ({
   display,
   enabled,
@@ -98,6 +139,20 @@ export const useExactRasterPresentation = ({
     viewport: state.viewport,
   }));
   useEditorSelectionDragPreviewValue((editor) => editor.selectionDragPreview);
+  useSyncExternalStore(
+    useCallback(
+      (listener) =>
+        enabled
+          ? editor.subscribeViewportPresentation(listener)
+          : () => undefined,
+      [editor, enabled]
+    ),
+    useCallback(
+      () => (enabled ? editor.getViewportPresentationRevision() : 0),
+      [editor, enabled]
+    ),
+    () => 0
+  );
   useLayoutEffect(() => {
     return editor.subscribePlacementSurface(() => {
       setPlacementRevision((revision) => revision + 1);

@@ -778,6 +778,7 @@ const RasterWorkingCanvas = ({
   height,
   pixelGridProps = null,
   sampling = "smooth",
+  subscribeToSource = undefined,
   testId,
   width,
   x,
@@ -846,11 +847,12 @@ const RasterWorkingCanvas = ({
           showsExactPresentation ? presentation.bounds.x : x
         } ${showsExactPresentation ? presentation.bounds.y : y})`}
       >
+        {/* The canvas clips its bitmap; foreignObject clipping quantizes fractional extents. */}
         <foreignObject
           data-raster-working-canvas="true"
           data-testid={testId}
           height={showsExactPresentation ? presentation.bounds.height : height}
-          overflow="hidden"
+          overflow="visible"
           pointerEvents="none"
           width={showsExactPresentation ? presentation.bounds.width : width}
           x={0}
@@ -859,7 +861,6 @@ const RasterWorkingCanvas = ({
           <div
             style={{
               height: "100%",
-              overflow: "hidden",
               position: "relative",
               width: "100%",
             }}
@@ -879,6 +880,7 @@ const RasterWorkingCanvas = ({
                 opacity={artworkOpacity}
                 presentation={presentation}
                 source={canvas}
+                subscribeToSource={subscribeToSource}
               />
             ) : null}
           </div>
@@ -1203,6 +1205,12 @@ export const CanvasRasterImage = (props) => {
     workingSurface,
     zoom,
   });
+  const subscribeToResidentSource = useCallback(
+    (listener: () => void) =>
+      editor.rasterSurface?.subscribePresentation?.(props.nodeId, listener) ??
+      (() => undefined),
+    [editor, props.nodeId]
+  );
   const pixelGridProps = {
     baseHeight: props.baseHeight,
     baseWidth: props.baseWidth,
@@ -1247,6 +1255,7 @@ export const CanvasRasterImage = (props) => {
           height={props.baseHeight ?? props.height}
           pixelGridProps={pixelGridProps}
           sampling={sampling}
+          subscribeToSource={subscribeToResidentSource}
           testId="raster-resident-canvas"
           width={props.baseWidth ?? props.width}
           x={props.baseX ?? 0}

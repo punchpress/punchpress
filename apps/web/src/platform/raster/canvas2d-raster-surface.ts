@@ -18,16 +18,23 @@ import {
 
 export const createCanvas2dRasterSurface = (
   canvas: HTMLCanvasElement,
-  capabilities: Canvas2dRasterCapabilities
+  capabilities: Canvas2dRasterCapabilities,
+  notifyPresentationChanged: () => void = () => undefined
 ): RasterSurface => ({
   beginStroke: (context) =>
-    createCanvas2dRasterSurfaceSession(canvas, context, capabilities),
+    createCanvas2dRasterSurfaceSession(
+      canvas,
+      context,
+      capabilities,
+      notifyPresentationChanged
+    ),
 });
 
 const createCanvas2dRasterSurfaceSession = (
   canvas: HTMLCanvasElement,
   strokeContext: Readonly<RasterStrokeContext>,
-  capabilities: Canvas2dRasterCapabilities
+  capabilities: Canvas2dRasterCapabilities,
+  notifyPresentationChanged: () => void
 ): RasterSurfaceSession => {
   const context = requireCanvas2dContext(canvas);
   let dirtyRegion: RasterDirtyRegion | null = null;
@@ -75,6 +82,7 @@ const createCanvas2dRasterSurfaceSession = (
         );
         paintDabs(context, dabs, strokeContext);
         context.restore();
+        notifyPresentationChanged();
         incrementPerfCounter(PERF_COUNTERS.rasterStrokeDabs, dabs.length);
         incrementPerfCounter(PERF_COUNTERS.rasterStrokeDirectPresentation);
         incrementPerfCounter(PERF_COUNTERS.rasterStrokeVisualLagFrames, 0);
@@ -106,6 +114,7 @@ const createCanvas2dRasterSurfaceSession = (
           );
           context.drawImage(patch.canvas, patch.region.x, patch.region.y);
         }
+        notifyPresentationChanged();
       });
     },
     commit: () => {

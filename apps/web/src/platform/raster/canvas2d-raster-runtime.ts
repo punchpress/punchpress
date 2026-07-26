@@ -33,6 +33,7 @@ export interface Canvas2dRasterRuntime extends RasterSurfaceResolver {
     targetId: string
   ) => { height: number; src: string; width: number } | null;
   subscribe: (listener: () => void) => () => void;
+  subscribePresentation: (targetId: string, listener: () => void) => () => void;
 }
 
 export const createCanvas2dRasterRuntime = (
@@ -54,8 +55,14 @@ export const createCanvas2dRasterRuntime = (
     }
   >();
   const listeners = new Set<() => void>();
+  const presentationListeners = new Map<string, Set<() => void>>();
   const notify = () => {
     for (const listener of listeners) {
+      listener();
+    }
+  };
+  const notifyPresentation = (targetId: string) => {
+    for (const listener of presentationListeners.get(targetId) ?? []) {
       listener();
     }
   };
@@ -85,7 +92,9 @@ export const createCanvas2dRasterRuntime = (
         return await pendingSurface.promise;
       }
 
-      const preparation = prepareSurface(input, capabilities).then((record) => {
+      const preparation = prepareSurface(input, capabilities, () => {
+        notifyPresentation(input.id);
+      }).then((record) => {
         if (pending.get(input.id)?.key === key) {
           records.set(input.id, record);
           notify();
@@ -158,6 +167,21 @@ export const createCanvas2dRasterRuntime = (
         listeners.delete(listener);
       };
     },
+    subscribePresentation: (targetId, listener) => {
+      const targetListeners =
+        presentationListeners.get(targetId) ?? new Set<() => void>();
+
+      targetListeners.add(listener);
+      presentationListeners.set(targetId, targetListeners);
+
+      return () => {
+        targetListeners.delete(listener);
+
+        if (targetListeners.size === 0) {
+          presentationListeners.delete(targetId);
+        }
+      };
+    },
   };
 };
 
@@ -169,7 +193,8 @@ const getSurfaceKey = ({
 
 const prepareSurface = async (
   input: EnsureCanvas2dRasterSurfaceInput,
-  capabilities: Canvas2dRasterCapabilities
+  capabilities: Canvas2dRasterCapabilities,
+  notifyPresentationChanged: () => void
 ) => {
   const canvas = capabilities.createCanvas(input.width, input.height);
   const context = requireCanvas2dContext(canvas);
@@ -195,7 +220,11 @@ const prepareSurface = async (
       width: input.width,
     },
     source: input.src,
-    surface: createCanvas2dRasterSurface(canvas, capabilities),
+    surface: createCanvas2dRasterSurface(
+      canvas,
+      capabilities,
+      notifyPresentationChanged
+    ),
   };
 };
 

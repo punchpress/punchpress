@@ -1298,6 +1298,95 @@ test("keeps Crop, selection, Brush cursor, and live painting aligned at high zoo
   });
 });
 
+test("keeps the Brush footprint scaled to live zoom during a viewport gesture", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  const src = await createRasterSource(page);
+
+  await loadDocument(page, createStandaloneRasterDocument(src));
+  await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    editor?.select("standalone-raster");
+    editor?.setActiveTool("brush");
+    editor?.setBrushSettings(
+      {
+        hardness: 1,
+        opacity: 1,
+        size: 24,
+        spacing: 0,
+      },
+      "brush"
+    );
+  });
+  await setConvergedViewport(page, { x: 300, y: 200, zoom: 8.62 });
+
+  const hostBox = await page.locator(".canvas-host").boundingBox();
+
+  if (!hostBox) {
+    throw new Error("Expected canvas host bounds");
+  }
+
+  await page.mouse.move(
+    hostBox.x + hostBox.width / 2,
+    hostBox.y + hostBox.height / 2
+  );
+  await expect(page.getByTestId("brush-cursor")).toBeVisible();
+
+  const liveGesture = await page.evaluate(
+    async ({ x, y }) => {
+      const target = document.elementFromPoint(x, y);
+
+      target?.dispatchEvent(
+        new WheelEvent("wheel", {
+          bubbles: true,
+          cancelable: true,
+          clientX: x,
+          clientY: y,
+          ctrlKey: true,
+          deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+          deltaY: -10,
+        })
+      );
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
+
+      const editor = window.__PUNCHPRESS_EDITOR__;
+      const cursor = document.querySelector<HTMLElement>(
+        '[data-testid="brush-cursor"]'
+      );
+      const grid = document.querySelector<SVGGElement>(
+        '[data-pixel-grid-kind="raster"]'
+      );
+      const matrix = grid?.getScreenCTM();
+
+      if (!(cursor && editor && matrix)) {
+        throw new Error("Expected live Brush cursor and pixel grid");
+      }
+
+      const start = new DOMPoint(0, 0).matrixTransform(matrix);
+      const end = new DOMPoint(1, 0).matrixTransform(matrix);
+
+      return {
+        cursorWidth: cursor.getBoundingClientRect().width,
+        liveZoom: editor.zoom,
+        pixelWidth: Math.hypot(end.x - start.x, end.y - start.y),
+        storedZoom: editor.getState().viewport.zoom,
+      };
+    },
+    {
+      x: hostBox.x + hostBox.width / 2,
+      y: hostBox.y + hostBox.height / 2,
+    }
+  );
+
+  expect(liveGesture.liveZoom).toBeGreaterThan(liveGesture.storedZoom);
+  expect(liveGesture.pixelWidth).toBeCloseTo(liveGesture.liveZoom, 1);
+  expect(liveGesture.cursorWidth / liveGesture.pixelWidth).toBeCloseTo(24, 1);
+});
+
 test.describe("transformed fractional exact Raster pixel grid", () => {
   test.use({ deviceScaleFactor: 1.5 });
 
@@ -1922,9 +2011,8 @@ test.describe("high-zoom Raster pixel alignment", () => {
           ),
           width: Number(plane.getAttribute("data-raster-native-sample-width")),
         },
-        usesClippedInlinePresentation:
+        usesInlinePresentation:
           Boolean(foreignObject?.contains(imageElement)) &&
-          foreignObject?.getAttribute("overflow") === "hidden" &&
           plane.contains(imageElement),
         usesScreenGridOverlay:
           gridElement.ownerSVGElement?.parentElement === editor?.hostRef,
@@ -1939,7 +2027,7 @@ test.describe("high-zoom Raster pixel alignment", () => {
     expect(geometry?.devicePixelRatio).toBe(2);
     expect(geometry?.naturalSize).toEqual({ height: 8, width: 16 });
     expect(geometry?.sourceWindow).toEqual({ height: 8, width: 16 });
-    expect(geometry?.usesClippedInlinePresentation).toBe(true);
+    expect(geometry?.usesInlinePresentation).toBe(true);
     expect(geometry?.usesScreenGridOverlay).toBe(true);
     const geometryDiagnostics = JSON.stringify(geometry, null, 2);
     const physicalError = (actual?: number, expected?: number) => {
@@ -2708,5 +2796,251 @@ test.describe("high-zoom Raster pixel alignment", () => {
         expect(sample.error, diagnostics).toBeLessThan(2);
       }
     }
+  });
+});
+
+test("keeps the exact Raster window filled during an active high-zoom pan", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  const src = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+
+    canvas.width = 1024;
+    canvas.height = 1024;
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      throw new Error("Expected Canvas2D");
+    }
+
+    context.fillStyle = "#c026d3";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/png");
+  });
+  await page.evaluate(() => {
+    const runtime = window.__PUNCHPRESS_EDITOR__?.rasterSurface;
+
+    if (!runtime) {
+      throw new Error("Expected Raster presentation runtime");
+    }
+
+    runtime.ensureSurface = () => new Promise(() => undefined);
+  });
+
+  await loadDocument(
+    page,
+    JSON.stringify({
+      nodes: [
+        {
+          assetId: "asset-active-pan",
+          baseHeight: 1024,
+          baseWidth: 1024,
+          baseX: 0,
+          baseY: 0,
+          height: 1024,
+          id: "active-pan-raster",
+          mimeType: "image/png",
+          name: "Active pan Raster",
+          opacity: 1,
+          parentId: "root",
+          src,
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: 0,
+            y: 0,
+          },
+          type: "image",
+          visible: true,
+          width: 1024,
+        },
+      ],
+      version: "1.8",
+    })
+  );
+  await page.evaluate(() => {
+    window.__PUNCHPRESS_EDITOR__?.select("active-pan-raster");
+  });
+  await setConvergedViewport(page, {
+    x: 300,
+    y: 300,
+    zoom: 20,
+  });
+
+  const image = page.locator(
+    '[data-node-id="active-pan-raster"] canvas[data-raster-exact-backing="true"]'
+  );
+
+  await expect(image).toBeVisible();
+  await page.waitForTimeout(200);
+  const initialSourceX = Number(
+    await image.getAttribute("data-raster-native-source-x")
+  );
+
+  await page.evaluate(async () => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    if (!editor?.viewerRef) {
+      throw new Error("Expected active editor viewport");
+    }
+
+    editor.setViewportInteracting(true);
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => resolve());
+      });
+    });
+  });
+  await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const viewport = { x: 500, y: 300, zoom: 20 };
+
+    if (!editor?.viewerRef) {
+      throw new Error("Expected active editor viewport");
+    }
+
+    editor.viewerRef.setTo?.(viewport);
+    editor.setViewport(viewport);
+    editor.onViewportChange?.();
+  });
+  const activePanPresentation = await page.evaluate(async () => {
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => resolve());
+      });
+    });
+
+    const canvas = document.querySelector<HTMLCanvasElement>(
+      '[data-node-id="active-pan-raster"] canvas[data-raster-exact-backing="true"]'
+    );
+    const context = canvas?.getContext("2d");
+
+    if (!(canvas && context)) {
+      throw new Error("Expected exact Raster backing");
+    }
+
+    const destination = {
+      height: Number(
+        canvas.getAttribute("data-raster-native-destination-height")
+      ),
+      width: Number(
+        canvas.getAttribute("data-raster-native-destination-width")
+      ),
+      x: Number(canvas.getAttribute("data-raster-native-destination-x")),
+      y: Number(canvas.getAttribute("data-raster-native-destination-y")),
+    };
+    const sample = context.getImageData(
+      Math.floor(destination.x + destination.width / 2),
+      Math.floor(destination.y + destination.height / 2),
+      1,
+      1
+    ).data;
+
+    return {
+      sample: [...sample],
+      sourceX: Number(canvas.getAttribute("data-raster-native-source-x")),
+    };
+  });
+
+  expect(activePanPresentation.sourceX).toBeGreaterThan(initialSourceX + 100);
+  expect(activePanPresentation.sample).toEqual([192, 38, 211, 255]);
+
+  await page.evaluate(() => {
+    window.__PUNCHPRESS_EDITOR__?.setViewportInteracting(false);
+  });
+});
+
+test.describe("resident exact Raster viewport coverage", () => {
+  test.use({
+    deviceScaleFactor: 2,
+    viewport: { height: 1045, width: 907 },
+  });
+
+  test("covers fractional right and bottom viewport edges", async ({
+    page,
+  }) => {
+    await gotoEditor(page);
+    const src = await page.evaluate(() => {
+      const canvas = document.createElement("canvas");
+
+      canvas.width = 720;
+      canvas.height = 720;
+      const context = canvas.getContext("2d");
+
+      if (!context) {
+        throw new Error("Expected Canvas2D");
+      }
+
+      context.fillStyle = "#c026d3";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL("image/png");
+    });
+
+    await loadDocument(
+      page,
+      JSON.stringify({
+        nodes: [
+          {
+            assetId: "asset-fractional-viewport-coverage",
+            baseHeight: 720,
+            baseWidth: 720,
+            baseX: 0,
+            baseY: 0,
+            height: 720,
+            id: "fractional-viewport-coverage",
+            mimeType: "image/png",
+            name: "Fractional viewport coverage",
+            opacity: 1,
+            parentId: "root",
+            src,
+            transform: {
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+              x: 0,
+              y: 0,
+            },
+            type: "image",
+            visible: true,
+            width: 720,
+          },
+        ],
+        version: "1.8",
+      })
+    );
+    await page.evaluate(() => {
+      window.__PUNCHPRESS_EDITOR__?.select("fractional-viewport-coverage");
+    });
+    await setConvergedViewport(page, {
+      x: 235.83,
+      y: 408.89,
+      zoom: 128,
+    });
+
+    const image = page.locator(
+      '[data-node-id="fractional-viewport-coverage"] [data-testid="raster-resident-canvas"] canvas[data-raster-exact-backing="true"]'
+    );
+
+    await expect(image).toBeVisible();
+    await page.evaluate(() => {
+      for (const grid of document.querySelectorAll("[data-pixel-grid-kind]")) {
+        const svg = grid.closest("svg");
+
+        if (svg) {
+          svg.style.visibility = "hidden";
+        }
+      }
+    });
+    const screenshot = decodePng(await page.screenshot({ type: "png" }));
+    const getPixel = (x: number, y: number) => {
+      const offset = (y * screenshot.width + x) * 4;
+
+      return [...screenshot.data.subarray(offset, offset + 4)];
+    };
+
+    expect(getPixel(screenshot.width - 5, 1000)).toEqual([192, 38, 211, 255]);
+    expect(getPixel(200, screenshot.height - 5)).toEqual([192, 38, 211, 255]);
   });
 });

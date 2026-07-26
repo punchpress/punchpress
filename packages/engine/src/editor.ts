@@ -334,6 +334,8 @@ export interface Editor {
   viewerRef: any;
   viewportFocusRequest: any;
   viewportInteracting: any;
+  viewportPresentationListeners: any;
+  viewportPresentationRevision: any;
   viewportState: any;
 }
 
@@ -389,6 +391,8 @@ export class Editor {
     this.selectionColorPreviewState = null;
     this.placementSurfaceListeners = new Set();
     this.viewportInteracting = false;
+    this.viewportPresentationListeners = new Set();
+    this.viewportPresentationRevision = 0;
     this.history = new HistoryManager({
       applyChange: applyDocumentChange,
       applyState: (nodes) => {
@@ -1412,6 +1416,26 @@ export class Editor {
     }
 
     this.notifyInteractionPreviewChanged();
+  }
+
+  notifyViewportPresentationChanged() {
+    this.viewportPresentationRevision += 1;
+
+    for (const listener of this.viewportPresentationListeners) {
+      listener();
+    }
+  }
+
+  getViewportPresentationRevision() {
+    return this.viewportPresentationRevision;
+  }
+
+  subscribeViewportPresentation(listener) {
+    this.viewportPresentationListeners.add(listener);
+
+    return () => {
+      this.viewportPresentationListeners.delete(listener);
+    };
   }
 
   notifyInteractionPreviewChanged() {

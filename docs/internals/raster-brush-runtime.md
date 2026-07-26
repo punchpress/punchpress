@@ -27,6 +27,8 @@ surface across Stroke begin, pointer movement, commit, and cancel.
   node source.
 - Pointer movement does not use JavaScript pixel loops, `getImageData`,
   `putImageData`, or encoded-image handoff.
+- Magnified exact-sample projections subscribe directly to resident surface
+  mutations and coalesce backing refreshes to one per animation frame.
 
 Target creation, empty-layer materialization, tiled Raster behavior, history
 deltas, persistence, and export remain outside this resident-surface path.
