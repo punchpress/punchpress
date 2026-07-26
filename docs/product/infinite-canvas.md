@@ -22,6 +22,7 @@ product meaning.
 - One zoom update is capped so large device deltas do not runaway.
 - Zoom focuses on the pointer so content under the cursor stays under it.
 - A keyless trackpad pinch zooms around the pointer; two-finger scrolling pans.
+- Command-Option and Control-Option wheel gestures remain pans, not zooms.
 - The browser's internal pinch signal keeps its zoom mode through the trackpad
   momentum tail and cannot turn that tail into a pan.
 - Users can fit selected content or an artboard on demand.

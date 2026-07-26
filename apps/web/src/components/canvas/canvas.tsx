@@ -446,7 +446,7 @@ export const Canvas = () => {
         return;
       }
 
-      const isPinchZoom = event.ctrlKey;
+      const isPinchZoom = event.ctrlKey && !event.altKey && !event.metaKey;
       const isZoomWheel = isPinchZoom || wheelGestureModeRef.current === "zoom";
 
       wheelGestureModeRef.current = isZoomWheel ? "zoom" : "pan";

@@ -252,34 +252,38 @@ test("wheel pan keeps the same screen-space speed at high zoom", async ({
   expect(pan.y).toBeCloseTo(wheelDelta.deltaY / 16, 0);
 });
 
-test("command-option wheel remains a pan gesture", async ({ page }) => {
-  await gotoEditor(page);
-  await loadDocument(page, ARTBOARD_DOCUMENT);
-  await resetViewport(page);
-  await setViewport(page, { x: 260, y: 180, zoom: 6 });
+for (const modifier of [
+  { altKey: true, label: "command-option", metaKey: true },
+  { altKey: true, ctrlKey: true, label: "control-option" },
+]) {
+  test(`${modifier.label} wheel remains a pan gesture`, async ({ page }) => {
+    await gotoEditor(page);
+    await loadDocument(page, ARTBOARD_DOCUMENT);
+    await resetViewport(page);
+    await setViewport(page, { x: 260, y: 180, zoom: 6 });
 
-  const hostBox = await page.locator(".canvas-host").boundingBox();
+    const hostBox = await page.locator(".canvas-host").boundingBox();
 
-  if (!hostBox) {
-    throw new Error("Missing canvas host");
-  }
+    if (!hostBox) {
+      throw new Error("Missing canvas host");
+    }
 
-  const wheelPoint = {
-    x: Math.round(hostBox.x + hostBox.width * 0.72),
-    y: Math.round(hostBox.y + hostBox.height * 0.38),
-  };
-  const initialScroll = await getViewerScroll(page);
+    const wheelPoint = {
+      x: Math.round(hostBox.x + hostBox.width * 0.72),
+      y: Math.round(hostBox.y + hostBox.height * 0.38),
+    };
+    const initialScroll = await getViewerScroll(page);
 
-  await dispatchWheelAtPoint(page, wheelPoint, {
-    altKey: true,
-    deltaX: 96,
-    deltaY: 64,
-    metaKey: true,
+    await dispatchWheelAtPoint(page, wheelPoint, {
+      ...modifier,
+      deltaX: 96,
+      deltaY: 64,
+    });
+
+    await expect.poll(() => getViewportZoom(page)).toBe(6);
+    await expect.poll(() => getViewerScroll(page)).not.toEqual(initialScroll);
   });
-
-  await expect.poll(() => getViewportZoom(page)).toBe(6);
-  await expect.poll(() => getViewerScroll(page)).not.toEqual(initialScroll);
-});
+}
 
 test("space-drag pan keeps the same screen-space speed at high zoom", async ({
   page,
