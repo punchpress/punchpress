@@ -7,16 +7,18 @@ import {
   clipRasterSegmentToTarget,
   createRasterStroke,
 } from "../raster/stroke";
+import { createRasterDabGenerator } from "../raster/dab-generator";
+import { getRasterStrokeReach } from "../raster/settings";
 import {
   getNodeTransformForPinnedWorldPoint,
   getNodeWorldPoint,
 } from "../primitives/rotation";
 import {
-  getBrushDabCoverage,
+  getBrushDabRenderBounds,
   getBrushDabRenderRadius,
-  getBrushDabSpacing,
   getErasedAlpha,
   getPaintedAlpha,
+  getRasterDabCoverageAtPoint,
 } from "./brush-mask";
 import {
   cancelRasterFrame,
@@ -49,6 +51,7 @@ const BRUSH_STROKE_POINT_FLUSH_BUDGET_MS = 5;
 const BRUSH_TILE_ASYNC_COMMIT_THRESHOLD = 64;
 const BRUSH_TILE_COMMIT_BUDGET_MS = 8;
 const RASTER_NODE_RENDER_READY_EVENT = "punchpress:raster-node-render-ready";
+const RESIDENT_RASTER_MAX_EDGE = 2048;
 const TILED_BRUSH_SURFACE_AREA_THRESHOLD = 4096 * 4096;
 const TILED_BRUSH_SURFACE_DENSITY_THRESHOLD = 8;
 let brushWorkingSurfaceRevision = 0;
@@ -231,7 +234,17 @@ const getBrushLayerExpansionPadding = (settings) => {
 
 const shouldUseNativeStroke = (settings) => {
   return (
-    settings.hardness >= 1 && settings.opacity >= 1 && settings.spacing <= 0
+    settings.angle === 0 &&
+    settings.angleJitter === 0 &&
+    settings.flow === 1 &&
+    settings.hardness >= 1 &&
+    settings.opacity >= 1 &&
+    settings.roundness === 1 &&
+    settings.scatter === 0 &&
+    settings.sizeJitter === 0 &&
+    settings.smoothing === 0 &&
+    settings.spacing <= 0 &&
+    settings.tip.kind === "round"
   );
 };
 
@@ -512,6 +525,7 @@ class BrushStrokeSession {
     this.commitStarted = false;
     this.commitHandoffCancel = null;
     this.dirtyBounds = null;
+    this.dabGenerator = null;
     this.editor = editor;
     this.historyMark = editor.markHistoryStep(
       operation === "erase" ? "erase brush stroke" : "paint brush stroke"
@@ -549,6 +563,9 @@ class BrushStrokeSession {
     );
     this.usesNativeStroke = shouldUseNativeStroke(settings);
     this.settings = settings;
+    this.dabGenerator = this.usesNativeStroke
+      ? null
+      : createRasterDabGenerator(settings);
     this.tileSurface = shouldUseTiledPaintSurface({
       editor,
       node,
@@ -651,6 +668,10 @@ class BrushStrokeSession {
 
         this.pointReadIndex += 1;
         if (queuedPoint.breakBefore) {
+          this.finishDabGenerator();
+          this.dabGenerator = this.usesNativeStroke
+            ? null
+            : createRasterDabGenerator(this.settings);
           this.lastPoint = null;
         }
         this.applyPoint(queuedPoint.point);
@@ -721,9 +742,9 @@ class BrushStrokeSession {
       return;
     }
 
-    const adjustedPoint = this.ensureCanvasIncludesDab(point);
-
     if (this.usesNativeStroke) {
+      const adjustedPoint = this.ensureCanvasIncludesDab(point);
+
       if (!this.lastPoint) {
         this.applyNativeStroke(adjustedPoint, adjustedPoint);
         this.lastPoint = adjustedPoint;
@@ -735,33 +756,7 @@ class BrushStrokeSession {
       return;
     }
 
-    if (!this.lastPoint) {
-      this.applyDab(adjustedPoint);
-      this.lastPoint = adjustedPoint;
-      return;
-    }
-
-    const distance = Math.hypot(
-      adjustedPoint.x - this.lastPoint.x,
-      adjustedPoint.y - this.lastPoint.y
-    );
-    const spacing = getBrushDabSpacing(
-      this.settings.size,
-      this.settings.spacing,
-      this.settings.hardness
-    );
-    const steps = Math.max(1, Math.ceil(distance / spacing));
-
-    for (let index = 1; index <= steps; index += 1) {
-      const progress = index / steps;
-      this.applyDab({
-        x: this.lastPoint.x + (adjustedPoint.x - this.lastPoint.x) * progress,
-        y: this.lastPoint.y + (adjustedPoint.y - this.lastPoint.y) * progress,
-      });
-    }
-
-    incrementPerfCounter("brush.dab", steps);
-    this.lastPoint = adjustedPoint;
+    this.applyRasterDabs(this.dabGenerator.append([point]));
   }
 
   applyTiledPoint(point) {
@@ -777,33 +772,51 @@ class BrushStrokeSession {
       return;
     }
 
-    if (!this.lastPoint) {
-      this.applyTiledDab(point);
-      this.lastPoint = point;
-      return;
+    this.applyRasterDabs(this.dabGenerator.append([point]));
+  }
+
+  applyRasterDabs(dabs) {
+    let offsetX = 0;
+    let offsetY = 0;
+
+    for (const sourceDab of dabs) {
+      let dab = {
+        ...sourceDab,
+        center: {
+          x: sourceDab.center.x + offsetX,
+          y: sourceDab.center.y + offsetY,
+        },
+      };
+
+      if (!this.tileSurface) {
+        const adjustedCenter = this.ensureCanvasIncludesDab(dab.center);
+        const deltaX = adjustedCenter.x - dab.center.x;
+        const deltaY = adjustedCenter.y - dab.center.y;
+
+        if (deltaX || deltaY) {
+          offsetX += deltaX;
+          offsetY += deltaY;
+          this.dabGenerator?.translate({ x: deltaX, y: deltaY });
+          dab = { ...dab, center: adjustedCenter };
+        }
+      }
+
+      if (this.tileSurface) {
+        this.applyTiledDab(dab);
+      } else {
+        this.applyDab(dab);
+      }
     }
 
-    const distance = Math.hypot(
-      point.x - this.lastPoint.x,
-      point.y - this.lastPoint.y
-    );
-    const spacing = getBrushDabSpacing(
-      this.settings.size,
-      this.settings.spacing,
-      this.settings.hardness
-    );
-    const steps = Math.max(1, Math.ceil(distance / spacing));
-
-    for (let index = 1; index <= steps; index += 1) {
-      const progress = index / steps;
-      this.applyTiledDab({
-        x: this.lastPoint.x + (point.x - this.lastPoint.x) * progress,
-        y: this.lastPoint.y + (point.y - this.lastPoint.y) * progress,
-      });
+    if (dabs.length > 0) {
+      incrementPerfCounter("brush.dab", dabs.length);
     }
+  }
 
-    incrementPerfCounter("brush.dab", steps);
-    this.lastPoint = point;
+  finishDabGenerator() {
+    if (this.dabGenerator) {
+      this.applyRasterDabs(this.dabGenerator.finish());
+    }
   }
 
   applyNativeStroke(startPoint, endPoint) {
@@ -912,54 +925,39 @@ class BrushStrokeSession {
     this.scheduleLivePreview();
   }
 
-  applyTiledDab(point) {
-    const radius = this.settings.size / 2;
-    const hardness = clamp(this.settings.hardness, 0, 1);
-    const renderRadius = getBrushDabRenderRadius(this.settings.size, hardness);
-    const bounds = {
-      maxX: Math.ceil(point.x + renderRadius),
-      maxY: Math.ceil(point.y + renderRadius),
-      minX: Math.floor(point.x - renderRadius),
-      minY: Math.floor(point.y - renderRadius),
-    };
+  applyTiledDab(dab) {
+    const bounds = getBrushDabRenderBounds(dab);
 
     this.tileSurface.drawPaintDab({
       bounds,
-      color: getBrushColorRgb(this.settings.color),
-      getCoverage: (x, y, centerPoint) => {
+      color: getBrushColorRgb(dab.color),
+      getCoverage: (x, y) => {
         if (!this.isCanvasPointWritable({ x, y })) {
           return 0;
         }
 
-        const dx = x - centerPoint.x;
-        const dy = y - centerPoint.y;
-        const normalizedDistanceSquared =
-          (dx * dx + dy * dy) / (radius * radius);
-
-        return getBrushDabCoverage(normalizedDistanceSquared, hardness, radius);
+        return getRasterDabCoverageAtPoint(dab, { x, y });
       },
-      opacity: this.settings.opacity,
-      point,
+      opacity: dab.opacity * dab.flow,
+      point: dab.center,
     });
 
     this.recordDirtyBounds(bounds);
     this.scheduleLivePreview();
   }
 
-  applyDab(point) {
+  applyDab(dab) {
     const { canvas, context } = this.canvasState;
 
     if (!this.floatPixels) {
       this.floatPixels = createFloatPixelState(this.canvasState);
     }
 
-    const radius = this.settings.size / 2;
-    const hardness = clamp(this.settings.hardness, 0, 1);
-    const renderRadius = getBrushDabRenderRadius(this.settings.size, hardness);
-    const minX = Math.max(0, Math.floor(point.x - renderRadius));
-    const minY = Math.max(0, Math.floor(point.y - renderRadius));
-    const maxX = Math.min(canvas.width - 1, Math.ceil(point.x + renderRadius));
-    const maxY = Math.min(canvas.height - 1, Math.ceil(point.y + renderRadius));
+    const bounds = getBrushDabRenderBounds(dab);
+    const minX = Math.max(0, bounds.minX);
+    const minY = Math.max(0, bounds.minY);
+    const maxX = Math.min(canvas.width - 1, bounds.maxX);
+    const maxY = Math.min(canvas.height - 1, bounds.maxY);
 
     if (maxX < minX || maxY < minY) {
       return;
@@ -969,7 +967,7 @@ class BrushStrokeSession {
     const height = maxY - minY + 1;
     const imageData = context.getImageData(minX, minY, width, height);
     const data = imageData.data;
-    const color = getBrushColorRgb(this.settings.color);
+    const color = getBrushColorRgb(dab.color);
 
     for (let localY = 0; localY < height; localY += 1) {
       for (let localX = 0; localX < width; localX += 1) {
@@ -980,21 +978,16 @@ class BrushStrokeSession {
           continue;
         }
 
-        const dx = x + 0.5 - point.x;
-        const dy = y + 0.5 - point.y;
-        const normalizedDistanceSquared =
-          (dx * dx + dy * dy) / (radius * radius);
-        const falloff = getBrushDabCoverage(
-          normalizedDistanceSquared,
-          hardness,
-          radius
-        );
+        const falloff = getRasterDabCoverageAtPoint(dab, {
+          x: x + 0.5,
+          y: y + 0.5,
+        });
 
         if (falloff <= 0) {
           continue;
         }
 
-        const alpha = clamp(falloff * this.settings.opacity, 0, 1);
+        const alpha = clamp(falloff * dab.opacity * dab.flow, 0, 1);
         const offset = (localY * width + localX) * 4;
         const floatOffset = (y * canvas.width + x) * 4;
 
@@ -1348,6 +1341,7 @@ class BrushStrokeSession {
 
     if (this.canvasState || this.tileSurface) {
       this.flushPoints();
+      this.finishDabGenerator();
       recordRasterDebugEvent("session.complete.flushed", {
         dirtyBounds: this.dirtyBounds,
         dirtyTileCount: this.tileSurface?.getDirtyTiles().length || 0,
@@ -2096,7 +2090,7 @@ class DeferredBrushStrokeSession {
 
     const clipped = clipRasterSegmentToTarget({
       end: this.projection.toTargetPoint(endPoint),
-      radius: this.settings.size / 2,
+      radius: getRasterStrokeReach(this.settings),
       start: this.projection.toTargetPoint(startPoint),
       target: this.projection.target,
     });
@@ -2188,7 +2182,7 @@ class DeferredBrushStrokeSession {
 
     const clipped = clipRasterSegmentToTarget({
       end: this.projection.toTargetPoint(endPoint),
-      radius: this.settings.size / 2,
+      radius: getRasterStrokeReach(this.settings),
       start: this.projection.toTargetPoint(startPoint),
       target: this.projection.target,
     });
@@ -2391,11 +2385,18 @@ export class BrushTool extends Tool {
       !(
         targetNode?.type === "image" &&
         !(targetNode.tileSources || []).length &&
-        settings.hardness === 1 &&
         (targetNode.baseX ?? 0) === 0 &&
         (targetNode.baseY ?? 0) === 0 &&
         (targetNode.baseWidth ?? targetNode.width) === targetNode.width &&
         (targetNode.baseHeight ?? targetNode.height) === targetNode.height &&
+        Math.max(targetNode.width, targetNode.height) <=
+          RESIDENT_RASTER_MAX_EDGE &&
+        !shouldUseTiledPaintSurface({
+          editor: this.editor,
+          node: targetNode,
+          operation: this.operation,
+          sourceRect: null,
+        }) &&
         this.editor.getNode(targetNode.id)?.type === "image"
       )
     ) {
@@ -2413,11 +2414,7 @@ export class BrushTool extends Tool {
       createRasterStroke({
         operation: this.operation,
         point: getImageLocalPoint(targetNode, point),
-        settings: {
-          ...settings,
-          smoothing: 0,
-          tip: { kind: "round" },
-        },
+        settings,
         surface,
         target,
       })

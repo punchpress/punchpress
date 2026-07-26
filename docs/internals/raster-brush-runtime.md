@@ -19,7 +19,12 @@ surface across Stroke begin, pointer movement, commit, and cancel.
 - Canvas-entry strokes reuse the single selected eligible Raster target, so
   placement-preserved selection and explicit reselection share the same finite
   resident surface.
-- Hard Round uses native Canvas2D paths with `source-over`.
+- Hard Round uses native Canvas2D paths when its settings preserve continuous
+  path semantics.
+- Soft, transformed, sampled, scattered, and jittered tips use cached Canvas2D
+  tip canvases and deterministic Dab stamping.
+- Large, tiled, cropped, and not-yet-resident Rasters consume the same Dabs
+  through their working canvas or tile surface.
 - Eraser uses the same Dabs with `destination-out`.
 - Each Dab batch captures its affected pixel rectangle through native
   `drawImage`; cancel replays those patches in reverse.
@@ -74,6 +79,8 @@ belong to raster surfaces, while cursor chrome belongs to the tool overlay.
 
 - Brush content is always raster pixels. Brush and Eraser never author vector
   path data.
+- Native built-ins are immutable data. Each tool owns an independent temporary
+  settings copy and deterministic seed.
 - Pointer moves mutate the working raster surface directly.
 - Paint strokes use tiled working surfaces when the raster is large or visually
   over-dense. Density is based on raster pixels per visible screen pixel, not a

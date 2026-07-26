@@ -140,8 +140,12 @@ export {
 } from "./primitives/dom";
 export {
   defineRasterBrushPreset,
+  getRasterBrushPreset,
   PUNCHPRESS_RASTER_BRUSH_PRESET_VERSION,
+  RASTER_BRUSH_PRESETS,
 } from "./raster/brush-preset";
+export { getSampledBrushTipAsset } from "./raster/brush-tip-assets";
+export type { SampledBrushTipAsset } from "./raster/brush-tip-assets";
 export type {
   RasterBrushPreset,
   RasterBrushPresetSettings,

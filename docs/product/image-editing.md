@@ -68,14 +68,25 @@ not action bar items and not selected-layer properties.
 
 | Option | Behavior |
 | --- | --- |
+| Preset | Loads one immutable built-in into a temporary working copy. |
 | Brush color | Controls painted pixel color. |
-| Brush size | Controls brush radius. |
+| Brush size | Controls Dab diameter in document pixels. |
 | Brush opacity | Controls painted pixel opacity. |
+| Flow | Controls opacity applied by each Dab. |
 | Hardness | Controls brush edge falloff. |
 | Spacing | Controls the distance between brush dabs. |
+| Angle | Rotates the generated or sampled tip. |
+| Roundness | Scales the tip's minor axis. |
+| Smoothing | Smooths the document-space input path. |
+| Scatter | Offsets Dabs around the sampled path. |
+| Size jitter | Seeded variation in Dab size. |
+| Angle jitter | Seeded variation in Dab angle. |
 
-Eraser uses the same Size, Opacity, Hardness, and Spacing controls as Brush.
-Brush color is hidden for Eraser.
+PunchPress ships Hard Round, Soft Round, Ink, Pencil, Marker, Chalk, Grain, and
+Pixel. Selecting a built-in replaces that tool's temporary working copy with
+the preset defaults. Editing a control never mutates the built-in. Brush and
+Eraser remember independent preset choices and working settings; Brush color is
+hidden for Eraser.
 
 ## Tool Rules
 
@@ -144,7 +155,9 @@ Crop is an isolated modal interaction for one selected Raster.
 - Rect Select, Lasso, Magic Wand, and selection delete.
 - Masks.
 - Rasterize prompts for existing vector, text, group, or artboard content.
-- Imported brush presets, textured brushes, and Photoshop-style brush packs.
+- Imported brush presets, custom tip images, and Photoshop-style brush packs.
+- Saving, duplicating, renaming, deleting, or organizing custom presets.
+- Stylus pressure, tilt, twist, and rotation mappings.
 
 ## Related
 

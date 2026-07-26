@@ -62,6 +62,13 @@ const compareRasterDabs = (
     const expectedDab = expected[index];
     const path = `dab[${index}]`;
 
+    compareOptionalNumber(
+      `${path}.angle`,
+      actualDab.angle,
+      expectedDab.angle,
+      tolerance,
+      differences
+    );
     compareNumber(
       `${path}.center.x`,
       actualDab.center.x,
@@ -82,10 +89,24 @@ const compareRasterDabs = (
       expectedDab.color,
       differences
     );
+    compareOptionalNumber(
+      `${path}.flow`,
+      actualDab.flow,
+      expectedDab.flow,
+      tolerance,
+      differences
+    );
     compareNumber(
       `${path}.hardness`,
       actualDab.hardness,
       expectedDab.hardness,
+      tolerance,
+      differences
+    );
+    compareOptionalNumber(
+      `${path}.roundness`,
+      actualDab.roundness,
+      expectedDab.roundness,
       tolerance,
       differences
     );
@@ -124,6 +145,18 @@ const compareRasterDabs = (
     differences,
     matches: differences.length === 0,
   };
+};
+
+const compareOptionalNumber = (
+  path: string,
+  actual: number,
+  expected: number | undefined,
+  tolerance: number | null,
+  differences: string[]
+) => {
+  if (expected !== undefined) {
+    compareNumber(path, actual, expected, tolerance, differences);
+  }
 };
 
 const compareNumber = (

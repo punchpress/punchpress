@@ -11,12 +11,14 @@ const RESAMPLE_EPSILON = 1e-9;
 export type RasterDabGenerator = {
   append: (points: readonly RasterPoint[]) => RasterDab[];
   finish: () => RasterDab[];
+  translate: (delta: RasterPoint) => void;
 };
 
 export const createRasterDabGenerator = (
   settings: RasterStrokeSettings
 ): RasterDabGenerator => {
   const fixedSettings = cloneSettings(settings);
+  const random = createSeededRandom(fixedSettings.seed);
 
   assertValidRasterDynamics(fixedSettings);
 
@@ -36,7 +38,7 @@ export const createRasterDabGenerator = (
   const appendDabPathPoint = (point: RasterPoint, dabs: RasterDab[]) => {
     if (!lastDabPathPoint) {
       lastDabPathPoint = clonePoint(point);
-      dabs.push(createDab(point, fixedSettings));
+      dabs.push(createDab(point, fixedSettings, random));
       return;
     }
 
@@ -48,7 +50,9 @@ export const createRasterDabGenerator = (
     });
 
     dabs.push(
-      ...resampled.points.map((center) => createDab(center, fixedSettings))
+      ...resampled.points.map((center) =>
+        createDab(center, fixedSettings, random)
+      )
     );
     distanceToNextDab = resampled.distanceToNext;
     lastDabPathPoint = clonePoint(point);
@@ -135,8 +139,24 @@ export const createRasterDabGenerator = (
       appendDabPathPoint(lastInputPoint, dabs);
       return dabs;
     },
+    translate: ({ x, y }) => {
+      if (!(Number.isFinite(x) && Number.isFinite(y))) {
+        throw new Error("Raster Dab translation must be finite");
+      }
+
+      lastDabPathPoint = translatePoint(lastDabPathPoint, x, y);
+      lastInputPoint = translatePoint(lastInputPoint, x, y);
+      smoothedPoint = translatePoint(smoothedPoint, x, y);
+    },
   };
 };
+
+const translatePoint = (
+  point: RasterPoint | null,
+  deltaX: number,
+  deltaY: number
+): RasterPoint | null =>
+  point ? { x: point.x + deltaX, y: point.y + deltaY } : null;
 
 type SegmentResampleInput = {
   distanceToNext: number;
@@ -179,15 +199,32 @@ const resampleSegment = ({
 
 const createDab = (
   center: RasterPoint,
-  settings: RasterStrokeSettings
-): RasterDab => ({
-  center: clonePoint(center),
-  color: settings.color,
-  hardness: settings.hardness,
-  opacity: settings.opacity,
-  size: settings.size,
-  tip: { ...settings.tip },
-});
+  settings: RasterStrokeSettings,
+  random: () => number
+): RasterDab => {
+  const scatterAngle = random() * Math.PI * 2;
+  const scatterDistance =
+    random() * settings.scatter * settings.size * 0.5;
+  const size =
+    settings.size * (1 - settings.sizeJitter * random());
+  const angle =
+    settings.angle + (random() * 2 - 1) * settings.angleJitter * 180;
+
+  return {
+    angle: roundCoordinate(angle),
+    center: {
+      x: roundCoordinate(center.x + Math.cos(scatterAngle) * scatterDistance),
+      y: roundCoordinate(center.y + Math.sin(scatterAngle) * scatterDistance),
+    },
+    color: settings.color,
+    flow: settings.flow,
+    hardness: settings.hardness,
+    opacity: settings.opacity,
+    roundness: settings.roundness,
+    size: roundCoordinate(size),
+    tip: { ...settings.tip },
+  };
+};
 
 const interpolatePoint = (
   start: RasterPoint,
@@ -238,7 +275,35 @@ const assertValidRasterPoints = (
   }
 };
 
-const cloneSettings = (settings: RasterStrokeSettings): RasterStrokeSettings => ({
-  ...settings,
+const cloneSettings = (
+  settings: RasterStrokeSettings
+): RasterStrokeSettings => ({
+  angle: settings.angle ?? 0,
+  angleJitter: settings.angleJitter ?? 0,
+  color: settings.color,
+  flow: settings.flow ?? 1,
+  hardness: settings.hardness,
+  opacity: settings.opacity,
+  roundness: settings.roundness ?? 1,
+  scatter: settings.scatter ?? 0,
+  seed: settings.seed ?? 1,
+  size: settings.size,
+  sizeJitter: settings.sizeJitter ?? 0,
+  smoothing: settings.smoothing,
+  spacing: settings.spacing,
   tip: { ...settings.tip },
 });
+
+const createSeededRandom = (seed: number) => {
+  let state = seed >>> 0;
+
+  return () => {
+    state = (state + 0x6d2b_79f5) >>> 0;
+    let value = state;
+
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+
+    return ((value ^ (value >>> 14)) >>> 0) / 4_294_967_296;
+  };
+};

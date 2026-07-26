@@ -1242,6 +1242,19 @@ export const CanvasRasterImage = (props) => {
         />
       </g>
     );
+  } else if (workingSurface?.type === "tiles") {
+    artwork = (
+      <g data-raster-sampling={sampling}>
+        <CanvasNativeRasterImage
+          {...props}
+          artworkOpacity={props.opacity ?? 1}
+          pixelGridProps={pixelGridProps}
+          renderRootNodeId={props.renderRootNodeId ?? props.nodeId}
+          sampling={sampling}
+        />
+        <RasterWorkingSurface sampling={sampling} surface={workingSurface} />
+      </g>
+    );
   } else if (residentSurface) {
     hasHtmlPixelGrid = true;
     artwork = (

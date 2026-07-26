@@ -8,6 +8,7 @@ import type {
   RasterTarget,
 } from "./contracts";
 import { createRasterDabGenerator } from "./dab-generator";
+import { getRasterStrokeReach } from "./settings";
 
 type CreateRasterStrokeInput = {
   operation: RasterOperation;
@@ -122,7 +123,7 @@ const createBoundedDabGenerator = (
   context: Readonly<RasterStrokeContext>
 ) => {
   const writableBounds = context.target.writableBounds || context.target.bounds;
-  const radius = context.settings.size / 2;
+  const radius = getRasterStrokeReach(context.settings);
   const clipBounds = {
     maxX: writableBounds.x + writableBounds.width + radius,
     maxY: writableBounds.y + writableBounds.height + radius,

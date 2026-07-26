@@ -4,6 +4,7 @@ import {
   type RasterSurfaceResolver,
   recordPerfSpan,
 } from "@punchpress/engine";
+import { createCanvas2dBrushTipCache } from "./brush-tip-cache";
 import {
   browserCanvas2dCapabilities,
   type Canvas2dRasterCapabilities,
@@ -39,6 +40,7 @@ export interface Canvas2dRasterRuntime extends RasterSurfaceResolver {
 export const createCanvas2dRasterRuntime = (
   capabilities: Canvas2dRasterCapabilities = browserCanvas2dCapabilities
 ): Canvas2dRasterRuntime => {
+  const brushTipCache = createCanvas2dBrushTipCache(capabilities);
   const records = new Map<
     string,
     {
@@ -92,9 +94,14 @@ export const createCanvas2dRasterRuntime = (
         return await pendingSurface.promise;
       }
 
-      const preparation = prepareSurface(input, capabilities, () => {
-        notifyPresentation(input.id);
-      }).then((record) => {
+      const preparation = prepareSurface(
+        input,
+        capabilities,
+        brushTipCache,
+        () => {
+          notifyPresentation(input.id);
+        }
+      ).then((record) => {
         if (pending.get(input.id)?.key === key) {
           records.set(input.id, record);
           notify();
@@ -194,6 +201,7 @@ const getSurfaceKey = ({
 const prepareSurface = async (
   input: EnsureCanvas2dRasterSurfaceInput,
   capabilities: Canvas2dRasterCapabilities,
+  brushTipCache: ReturnType<typeof createCanvas2dBrushTipCache>,
   notifyPresentationChanged: () => void
 ) => {
   const canvas = capabilities.createCanvas(input.width, input.height);
@@ -223,7 +231,8 @@ const prepareSurface = async (
     surface: createCanvas2dRasterSurface(
       canvas,
       capabilities,
-      notifyPresentationChanged
+      notifyPresentationChanged,
+      brushTipCache
     ),
   };
 };

@@ -1063,6 +1063,18 @@ export class Editor {
     return this.tools.get(toolId)?.getSettings?.() || null;
   }
 
+  getBrushToolPresetId(toolId = this.activeTool) {
+    if (!(toolId === "brush" || toolId === "eraser")) {
+      return null;
+    }
+
+    const state = this.getState();
+
+    return toolId === "eraser"
+      ? state.eraserPresetId
+      : state.brushPresetId;
+  }
+
   getRasterTargetState(input) {
     return getEditorRasterTargetState(this, input);
   }
@@ -1093,6 +1105,10 @@ export class Editor {
 
   setBrushSettings(patch, toolId) {
     this.getState().setBrushSettings(patch, toolId);
+  }
+
+  selectBrushPreset(presetId, toolId) {
+    this.getState().selectBrushPreset(presetId, toolId);
   }
 
   getBrushWorkingSurfaceStates() {

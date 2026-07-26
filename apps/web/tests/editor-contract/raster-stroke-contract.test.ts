@@ -74,4 +74,27 @@ describe("raster stroke contract", () => {
     expect(recorder.commits).toEqual([]);
     expect(() => stroke.commit()).toThrow("already cancelled");
   });
+
+  test("keeps scattered edge Dabs whose tips can reach the target", () => {
+    const recorder = createRasterOperationRecorder();
+    const stroke = createRasterStroke({
+      operation: "paint",
+      point: { x: -15, y: 50 },
+      settings: {
+        ...settings,
+        scatter: 1,
+        seed: 36,
+      },
+      surface: recorder,
+      target: {
+        ...target,
+        bounds: { height: 100, width: 100, x: 0, y: 0 },
+      },
+    });
+
+    stroke.commit();
+
+    expect(recorder.commits[0]?.dabs).toHaveLength(1);
+    expect(recorder.commits[0]?.dabs[0]?.center.x).toBeGreaterThan(-10);
+  });
 });

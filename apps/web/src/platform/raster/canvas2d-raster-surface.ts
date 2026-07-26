@@ -12,6 +12,10 @@ import {
   type RasterTarget,
 } from "@punchpress/engine";
 import {
+  type Canvas2dBrushTipCache,
+  createCanvas2dBrushTipCache,
+} from "./brush-tip-cache";
+import {
   type Canvas2dRasterCapabilities,
   requireCanvas2dContext,
 } from "./canvas2d-raster-capabilities";
@@ -19,14 +23,18 @@ import {
 export const createCanvas2dRasterSurface = (
   canvas: HTMLCanvasElement,
   capabilities: Canvas2dRasterCapabilities,
-  notifyPresentationChanged: () => void = () => undefined
+  notifyPresentationChanged: () => void = () => undefined,
+  brushTipCache: Canvas2dBrushTipCache = createCanvas2dBrushTipCache(
+    capabilities
+  )
 ): RasterSurface => ({
   beginStroke: (context) =>
     createCanvas2dRasterSurfaceSession(
       canvas,
       context,
       capabilities,
-      notifyPresentationChanged
+      notifyPresentationChanged,
+      brushTipCache
     ),
 });
 
@@ -34,7 +42,8 @@ const createCanvas2dRasterSurfaceSession = (
   canvas: HTMLCanvasElement,
   strokeContext: Readonly<RasterStrokeContext>,
   capabilities: Canvas2dRasterCapabilities,
-  notifyPresentationChanged: () => void
+  notifyPresentationChanged: () => void,
+  brushTipCache: Canvas2dBrushTipCache
 ): RasterSurfaceSession => {
   const context = requireCanvas2dContext(canvas);
   let dirtyRegion: RasterDirtyRegion | null = null;
@@ -54,8 +63,6 @@ const createCanvas2dRasterSurfaceSession = (
   return {
     applyDabs: (dabs) => {
       requireActive();
-      assertHardRoundDabs(dabs);
-
       if (dabs.length === 0) {
         return;
       }
@@ -80,7 +87,7 @@ const createCanvas2dRasterSurfaceSession = (
           context,
           strokeContext.target.writablePolygon
         );
-        paintDabs(context, dabs, strokeContext);
+        paintDabs(context, dabs, strokeContext, brushTipCache);
         context.restore();
         notifyPresentationChanged();
         incrementPerfCounter(PERF_COUNTERS.rasterStrokeDabs, dabs.length);
@@ -184,7 +191,8 @@ const captureRollbackPatch = ({
 const paintDabs = (
   context: CanvasRenderingContext2D,
   dabs: readonly RasterDab[],
-  strokeContext: Readonly<RasterStrokeContext>
+  strokeContext: Readonly<RasterStrokeContext>,
+  brushTipCache: Canvas2dBrushTipCache
 ) => {
   const scaleX =
     strokeContext.target.pixelSize.width / strokeContext.target.bounds.width;
@@ -204,52 +212,97 @@ const paintDabs = (
     );
     context.clip();
   }
-  context.globalAlpha = strokeContext.settings.opacity;
   context.globalCompositeOperation =
     strokeContext.operation === "erase" ? "destination-out" : "source-over";
-  context.fillStyle =
-    strokeContext.operation === "erase"
-      ? "#000000"
-      : strokeContext.settings.color;
 
-  if (strokeContext.settings.opacity === 1) {
-    context.beginPath();
-
-    for (const dab of dabs) {
-      appendDabPath(context, dab, strokeContext.target, scaleX, scaleY);
-    }
-
-    context.fill();
+  if (canUseNativeRoundPath(strokeContext, scaleX, scaleY)) {
+    paintNativeRoundPath(context, dabs, strokeContext.target, scaleX);
   } else {
     for (const dab of dabs) {
-      context.beginPath();
-      appendDabPath(context, dab, strokeContext.target, scaleX, scaleY);
-      context.fill();
+      stampDab(
+        context,
+        dab,
+        strokeContext.target,
+        scaleX,
+        scaleY,
+        brushTipCache
+      );
     }
   }
 
   context.restore();
 };
 
-const appendDabPath = (
-  context: CanvasRenderingContext2D,
-  dab: RasterDab,
-  target: Readonly<RasterTarget>,
+const canUseNativeRoundPath = (
+  strokeContext: Readonly<RasterStrokeContext>,
   scaleX: number,
   scaleY: number
+) =>
+  Math.abs(scaleX - scaleY) < 1e-9 &&
+  strokeContext.settings.tip.kind === "round" &&
+  strokeContext.settings.hardness === 1 &&
+  strokeContext.settings.flow === 1 &&
+  strokeContext.settings.opacity === 1 &&
+  strokeContext.settings.roundness === 1 &&
+  strokeContext.settings.angle === 0 &&
+  strokeContext.settings.angleJitter === 0 &&
+  strokeContext.settings.scatter === 0 &&
+  strokeContext.settings.sizeJitter === 0 &&
+  strokeContext.settings.spacing === 0;
+
+const paintNativeRoundPath = (
+  context: CanvasRenderingContext2D,
+  dabs: readonly RasterDab[],
+  target: Readonly<RasterTarget>,
+  scale: number
 ) => {
+  const first = dabs[0];
+
+  context.globalAlpha = first.opacity;
+  context.fillStyle = first.color;
+  context.beginPath();
+
+  for (const dab of dabs) {
+    context.moveTo(
+      (dab.center.x - target.bounds.x + dab.size * 0.5) * scale,
+      (dab.center.y - target.bounds.y) * scale
+    );
+    context.arc(
+      (dab.center.x - target.bounds.x) * scale,
+      (dab.center.y - target.bounds.y) * scale,
+      dab.size * scale * 0.5,
+      0,
+      Math.PI * 2
+    );
+  }
+
+  context.fill();
+};
+
+const stampDab = (
+  context: CanvasRenderingContext2D,
+  dab: Readonly<RasterDab>,
+  target: Readonly<RasterTarget>,
+  scaleX: number,
+  scaleY: number,
+  brushTipCache: Canvas2dBrushTipCache
+) => {
+  const tip = brushTipCache.get(dab);
   const x = (dab.center.x - target.bounds.x) * scaleX;
   const y = (dab.center.y - target.bounds.y) * scaleY;
-  const radiusX = (dab.size * scaleX) / 2;
-  const radiusY = (dab.size * scaleY) / 2;
+  const width = dab.size * scaleX;
+  const height = dab.size * dab.roundness * scaleY;
 
-  context.moveTo(x + radiusX, y);
-
-  if (Math.abs(radiusX - radiusY) < 1e-9) {
-    context.arc(x, y, radiusX, 0, Math.PI * 2);
-  } else {
-    context.ellipse(x, y, radiusX, radiusY, 0, 0, Math.PI * 2);
-  }
+  context.save();
+  context.globalAlpha = dab.opacity * dab.flow;
+  context.imageSmoothingEnabled = !(
+    dab.tip.kind === "sampled" && dab.tip.sampleId === "pixel"
+  );
+  context.translate(x, y);
+  context.rotate((dab.angle * Math.PI) / 180);
+  context.scale(width, height);
+  context.drawImage(tip, -0.5, -0.5, 1, 1);
+  context.restore();
 };
 
 const getDabsDirtyRegion = (
@@ -325,10 +378,4 @@ const unionRects = (
     x,
     y,
   };
-};
-
-const assertHardRoundDabs = (dabs: readonly RasterDab[]) => {
-  if (dabs.some((dab) => dab.tip.kind !== "round" || dab.hardness !== 1)) {
-    throw new Error("Canvas2D vertical slice supports Hard Round dabs only");
-  }
 };

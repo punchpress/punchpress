@@ -75,26 +75,30 @@ single-payload Raster:
 - one stable canvas is both authoritative working memory and the presented node
   surface;
 - Hard Round paints with native paths and Eraser uses `destination-out`;
+- generated and sampled presets paint through cached tips;
 - transient rollback is captured as native dirty-rectangle canvas copies and
   restored in reverse on cancel;
 - commit returns the clipped union dirty region without readback or encoding.
 
-The adapter rejects non-round or non-hard Dabs in this vertical surface. It
-never calls `getImageData`, `putImageData`, or PNG encoding while a Stroke is
-active.
+The adapter never calls `getImageData`, `putImageData`, or PNG encoding while a
+Stroke is active. Large, tiled, cropped, and not-yet-resident Rasters consume
+the same generated Dabs through the existing working canvas or tile surface.
 
 ## Brush Settings And Presets
 
-Stroke settings contain color, size, opacity, hardness, spacing, smoothing, and
-a round or sampled tip descriptor. Sampled tips use an opaque native `sampleId`;
-the engine contract does not carry sample bytes or encoded image types.
-Size must be positive; spacing and smoothing must be non-negative; opacity and
-hardness stay between zero and one. Invalid numeric settings fail before input
-processing begins.
+Stroke settings contain color, size, opacity, flow, hardness, spacing, angle,
+roundness, smoothing, scatter, size jitter, angle jitter, an unsigned 32-bit
+seed, and a round or sampled tip descriptor. Sampled tips use an opaque native
+`sampleId`; the engine contract does not carry sample bytes or encoded image
+types. Size is `1–500`; angle is `-180–180`; spacing is `0–2`; roundness is
+`0.01–1`; opacity, flow, hardness, smoothing, scatter, and jitter values are
+`0–1`. Invalid numeric settings fail before input processing begins.
 
 Native presets use format `punchpress-raster-brush` and version `1`. Presets
-store default settings except color so choosing a preset does not replace the
-active paint color.
+store default settings except color and seed so choosing a preset does not
+replace the active paint color or deterministic sequence. The immutable
+built-ins are Hard Round, Soft Round, Ink, Pencil, Marker, Chalk, Grain, and
+Pixel. Selecting one creates a temporary per-tool working copy.
 
 ## Fidelity Fixtures
 

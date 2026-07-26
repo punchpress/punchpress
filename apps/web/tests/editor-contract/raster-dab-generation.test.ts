@@ -5,10 +5,17 @@ import {
 } from "@punchpress/engine";
 
 const hardRoundSettings: RasterStrokeSettings = {
+  angle: 0,
+  angleJitter: 0,
   color: "#112233",
+  flow: 1,
   hardness: 1,
   opacity: 0.75,
+  roundness: 1,
+  scatter: 0,
+  seed: 1,
   size: 20,
+  sizeJitter: 0,
   smoothing: 0,
   spacing: 0.25,
   tip: { kind: "round" },
@@ -20,10 +27,13 @@ describe("raster dab generation", () => {
 
     expect(generator.append([{ x: 12, y: 34 }])).toEqual([
       {
+        angle: 0,
         center: { x: 12, y: 34 },
         color: "#112233",
+        flow: 1,
         hardness: 1,
         opacity: 0.75,
+        roundness: 1,
         size: 20,
         tip: { kind: "round" },
       },
@@ -205,5 +215,48 @@ describe("raster dab generation", () => {
     expect(
       overflowGenerator.append([{ x: Number.MAX_VALUE, y: 0 }])[0]?.center
     ).toEqual({ x: Number.MAX_VALUE, y: 0 });
+  });
+
+  test("seeded jitter is deterministic across event batching", () => {
+    const settings = {
+      ...hardRoundSettings,
+      angle: 25,
+      angleJitter: 0.5,
+      scatter: 0.75,
+      seed: 8_675_309,
+      sizeJitter: 0.4,
+    };
+    const sparse = createRasterDabGenerator(settings);
+    const dense = createRasterDabGenerator(settings);
+    const sparseDabs = sparse.append([
+      { x: 0, y: 0 },
+      { x: 20, y: 0 },
+    ]);
+    const denseDabs = [
+      ...dense.append([
+        { x: 0, y: 0 },
+        { x: 6, y: 0 },
+      ]),
+      ...dense.append([
+        { x: 12, y: 0 },
+        { x: 20, y: 0 },
+      ]),
+    ];
+
+    expect(denseDabs).toEqual(sparseDabs);
+    expect(sparseDabs[0]).toMatchObject({
+      angle: -44.372_020_163_573,
+      center: { x: -2.748_220_088_16, y: -2.670_433_692_525 },
+      size: 13.661_787_088_96,
+    });
+
+    const differentSeed = createRasterDabGenerator({
+      ...settings,
+      seed: settings.seed + 1,
+    });
+
+    expect(differentSeed.append([{ x: 0, y: 0 }])[0]).not.toEqual(
+      sparseDabs[0]
+    );
   });
 });

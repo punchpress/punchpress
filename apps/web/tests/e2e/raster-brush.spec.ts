@@ -1164,7 +1164,7 @@ const getCommittedTileSamples = (page, points) => {
 };
 
 const setBrushSliderValue = async (page, name, value) => {
-  const slider = page.getByRole("slider", { name });
+  const slider = page.getByRole("slider", { exact: true, name });
 
   await slider.focus();
   await page.keyboard.press("Enter");
@@ -1256,7 +1256,7 @@ test("brush properties update settings and the brush cursor", async ({
 
   await expect
     .poll(() => getRasterToolSettings(page, "brush"))
-    .toEqual({
+    .toMatchObject({
       color: "#FF0033",
       hardness: 0.25,
       opacity: 0.5,
@@ -1693,14 +1693,17 @@ test("huge tiled live paint uses touched working tiles at zoom-out", async ({
 
     editor?.select("huge-image-1");
     editor?.setViewport({ x: 0, y: 0, zoom: 0.2 });
-    editor?.setBrushSettings({
-      hardness: 1,
-      opacity: 1,
-      size: 24,
-      spacing: 0,
-    });
+    editor?.setBrushSettings(
+      {
+        hardness: 1,
+        opacity: 1,
+        size: 24,
+        smoothing: 0,
+        spacing: 0,
+      },
+      "brush"
+    );
   });
-  await page.keyboard.press("b");
   await installBrushPerfCapture(page);
 
   await page.evaluate(async () => {
@@ -1737,8 +1740,10 @@ test("huge tiled live paint uses touched working tiles at zoom-out", async ({
 
   expect(await getBrushPreviewState(page)).toBeNull();
   expect(workingSurface.tileSurfaceCount).toBe(1);
-  expect(workingSurface.totalTileCount).toBeGreaterThan(70);
-  expect(workingSurface.totalTileCount).toBeLessThan(130);
+  expect(perf.counters["brush.nativeStroke.segment"] || 0).toBeGreaterThan(0);
+  expect(perf.counters["brush.dab"] || 0).toBe(0);
+  expect(workingSurface.totalTileCount).toBeGreaterThan(10);
+  expect(workingSurface.totalTileCount).toBeLessThan(30);
   expect(perf.spans["brush.tile.working.tiles"] || []).not.toHaveLength(0);
 
   await page.evaluate(() => {
@@ -4881,6 +4886,9 @@ test("rapid brush strokes on a large artboard paint through a working surface", 
     window.__PUNCHPRESS_EDITOR__?.select("artboard-1");
   });
   await page.keyboard.press("b");
+  await page.evaluate(() => {
+    window.__PUNCHPRESS_EDITOR__?.setBrushSettings({ smoothing: 0 }, "brush");
+  });
   await installBrushPerfCapture(page);
 
   const points = await Promise.all([

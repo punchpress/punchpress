@@ -64,11 +64,13 @@ finite target id, pixel dimensions, and optional writable bounds; it does not
 import DOM or Canvas types. The resident presentation stays mounted when Crop
 changes the visible frame around its base pixels.
 
-The initial resident path supports Hard Round paint and alpha-subtractive
-Eraser only. Stroke commit reports dirty pixels synchronously and releases the
-tool without PNG encoding. Source replacement, dirty-region history,
-autosave/package persistence, presets, and tiled-runtime cutover belong to
-their owning follow-up layers.
+The resident path supports the native preset catalog with cached generated and
+sampled tips. Hard Round keeps the native Canvas2D path fast path when its
+settings preserve those semantics; transformed, textured, spaced, scattered,
+or jittered presets stamp cached tips. Stroke commit reports dirty pixels
+synchronously and releases the tool without PNG encoding. Source replacement,
+dirty-region history, autosave/package persistence, and tiled-runtime cutover
+belong to their owning follow-up layers.
 
 ## Durable Model
 
@@ -95,11 +97,19 @@ resolution, and commit target.
 ```ts
 type BrushToolState = {
   tool: "brush";
+  presetId: string;
   brushColor: string;
   brushOpacity: number;
+  flow: number;
   brushSize: number;
   hardness: number;
   spacing: number;
+  angle: number;
+  roundness: number;
+  smoothing: number;
+  scatter: number;
+  sizeJitter: number;
+  angleJitter: number;
 };
 
 type BrushInteraction = {
@@ -114,9 +124,9 @@ Pointer movement mutates the working surface directly. Active strokes do not
 rewrite durable node geometry. Pointerup finalizes dirty working pixels into
 assets and creates one history entry.
 
-Brush and Eraser remember separate option sets. Switching between `b` and `e`
-restores each tool's own size, opacity, hardness, and spacing. Brush color is
-stored with Brush settings; Eraser ignores color.
+Brush and Eraser remember separate preset working copies. Switching between `b`
+and `e` restores each tool's complete preset choice and settings. Brush color
+is stored with Brush settings; Eraser ignores color.
 
 ## Brush Engine
 
@@ -128,10 +138,10 @@ Brush paints the active color into covered pixels using brush opacity and
 hardness. Eraser uses the same sampled dabs and coverage math, but reduces
 pixel alpha instead of adding color.
 
-Hardness uses a smooth radial dab mask. `100%` hardness is a solid circle with
-a one-pixel antialias edge. Lower hardness values reduce the solid center,
-soften the edge, lower peak dab coverage, and sample the stroke more densely so
-soft brushes do not reveal individual stamp rings.
+Hardness controls generated-tip falloff. Sampled-tip softness comes from the
+owned tip mask. Roundness and angle transform the tip; seeded scatter, size
+jitter, and angle jitter are evaluated per Dab. Flow controls per-Dab alpha,
+while opacity controls the Stroke's paint strength.
 
 Paint and erase compositing accumulates in float RGBA during the active stroke.
 The canvas byte buffer is the output projection. Repeated low-alpha soft dabs

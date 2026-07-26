@@ -4,17 +4,26 @@ import {
   createRasterOperationRecorder,
   createRasterStroke,
   Editor,
+  RASTER_BRUSH_PRESETS,
   type RasterStrokeContext,
   type RasterStrokeSettings,
   type RasterTarget,
 } from "@punchpress/engine";
+import { createCanvas2dBrushTipCache } from "../../src/platform/raster/brush-tip-cache";
 import { createCanvas2dRasterRuntime } from "../../src/platform/raster/canvas2d-raster-runtime";
 
 const settings: RasterStrokeSettings = {
+  angle: 0,
+  angleJitter: 0,
   color: "#3366FF",
+  flow: 1,
   hardness: 1,
   opacity: 0.75,
+  roundness: 1,
+  scatter: 0,
+  seed: 1,
   size: 20,
+  sizeJitter: 0,
   smoothing: 0,
   spacing: 0,
   tip: { kind: "round" },
@@ -140,7 +149,7 @@ describe("Canvas2D Raster surface", () => {
     const stroke = createRasterStroke({
       operation: "paint",
       point: { x: 50, y: 50 },
-      settings,
+      settings: { ...settings, opacity: 1 },
       surface,
       target,
     });
@@ -156,13 +165,89 @@ describe("Canvas2D Raster surface", () => {
       x: 100,
       y: 100,
     });
-    expect(presentedContext?.fillCount).toBe(presentedContext?.arcs.length);
+    expect(presentedContext?.fillCount).toBeGreaterThan(0);
+    expect(presentedContext?.fillCount).toBeLessThanOrEqual(
+      presentedContext?.arcs.length ?? 0
+    );
     expect(commit).toEqual({
       dirtyRegion: { height: 40, width: 50, x: 80, y: 80 },
       targetId: target.id,
     });
     expect(browser.hotPathReadbacks).toEqual([]);
     expect(browser.encodes).toEqual([]);
+  });
+
+  test("composites translucent Hard Round dabs separately", async () => {
+    const browser = createFakeCanvasBrowser();
+    const runtime = createCanvas2dRasterRuntime(browser.capabilities);
+
+    await runtime.ensureSurface({
+      height: target.pixelSize.height,
+      id: target.id,
+      src: "data:image/png;base64,existing",
+      width: target.pixelSize.width,
+    });
+    const surface = runtime.resolveSurface(target);
+
+    if (!surface) {
+      throw new Error("Expected a prepared Canvas2D Raster surface");
+    }
+
+    const stroke = createRasterStroke({
+      operation: "paint",
+      point: { x: 50, y: 50 },
+      settings,
+      surface,
+      target,
+    });
+
+    stroke.append([{ x: 55, y: 50 }]);
+    stroke.commit();
+
+    const context = browser.contexts.get(
+      runtime.getPresentation(target.id)?.canvas
+    );
+
+    expect(context?.arcs).toEqual([]);
+    expect(context?.drawImageCalls.length).toBeGreaterThan(1);
+  });
+
+  test("does not connect native Hard Round runs separated outside the target", async () => {
+    const browser = createFakeCanvasBrowser();
+    const runtime = createCanvas2dRasterRuntime(browser.capabilities);
+
+    await runtime.ensureSurface({
+      height: target.pixelSize.height,
+      id: target.id,
+      src: "data:image/png;base64,existing",
+      width: target.pixelSize.width,
+    });
+    const surface = runtime.resolveSurface(target);
+
+    if (!surface) {
+      throw new Error("Expected a prepared Canvas2D Raster surface");
+    }
+
+    const stroke = createRasterStroke({
+      operation: "paint",
+      point: { x: 10, y: 50 },
+      settings: { ...settings, opacity: 1 },
+      surface,
+      target,
+    });
+
+    stroke.append([
+      { x: -30, y: 50 },
+      { x: 10, y: 70 },
+    ]);
+    stroke.commit();
+
+    const context = browser.contexts.get(
+      runtime.getPresentation(target.id)?.canvas
+    );
+
+    expect(context?.lineToCalls).toEqual([]);
+    expect(context?.arcs.length).toBeGreaterThan(1);
   });
 
   test("notifies exact presentations when resident pixels change", async () => {
@@ -240,10 +325,86 @@ describe("Canvas2D Raster surface", () => {
     expect(browser.hotPathReadbacks).toEqual([]);
     expect(browser.encodes).toEqual([]);
   });
+
+  test("renders every built-in through cached generated and sampled tips", async () => {
+    const browser = createFakeCanvasBrowser();
+    const runtime = createCanvas2dRasterRuntime(browser.capabilities);
+
+    await runtime.ensureSurface({
+      height: target.pixelSize.height,
+      id: target.id,
+      src: "data:image/png;base64,existing",
+      width: target.pixelSize.width,
+    });
+    const surface = runtime.resolveSurface(target);
+
+    if (!surface) {
+      throw new Error("Expected a prepared Canvas2D Raster surface");
+    }
+
+    for (const [index, preset] of RASTER_BRUSH_PRESETS.entries()) {
+      const stroke = createRasterStroke({
+        operation: "paint",
+        point: { x: 20 + index * 5, y: 50 },
+        settings: {
+          ...preset.settings,
+          color: "#3366FF",
+          seed: 100 + index,
+          tip: { ...preset.settings.tip },
+        },
+        surface,
+        target,
+      });
+
+      stroke.append([{ x: 25 + index * 5, y: 50 }]);
+      stroke.commit();
+    }
+
+    const presentedContext = browser.contexts.get(
+      runtime.getPresentation(target.id)?.canvas
+    );
+    const tipCanvases = browser.createdCanvasSizes.filter(
+      ({ height, width }) => height <= 64 && width <= 64
+    );
+
+    expect(presentedContext?.drawImageCalls.length).toBeGreaterThan(0);
+    expect(presentedContext?.rotations.length).toBeGreaterThan(0);
+    expect(tipCanvases.length).toBeLessThan(40);
+    expect(browser.hotPathReadbacks).toEqual([]);
+    expect(browser.encodes).toEqual([]);
+  });
+
+  test("caches generated and sampled tips by rendering inputs", () => {
+    const browser = createFakeCanvasBrowser();
+    const cache = createCanvas2dBrushTipCache(browser.capabilities);
+    const generatedDab = {
+      angle: 0,
+      center: { x: 0, y: 0 },
+      color: "#3366FF",
+      flow: 1,
+      hardness: 0.5,
+      opacity: 1,
+      roundness: 1,
+      size: 24,
+      tip: { kind: "round" as const },
+    };
+    const sampledDab = {
+      ...generatedDab,
+      tip: { kind: "sampled" as const, sampleId: "chalk" },
+    };
+
+    expect(cache.get(generatedDab)).toBe(cache.get(generatedDab));
+    expect(cache.get(sampledDab)).toBe(cache.get(sampledDab));
+    expect(cache.get(sampledDab)).not.toBe(cache.get(generatedDab));
+    expect(browser.createdCanvasSizes).toEqual([
+      { height: 64, width: 64 },
+      { height: 12, width: 12 },
+    ]);
+  });
 });
 
 describe("Editor Raster surface injection", () => {
-  test("leaves soft strokes on legacy and routes translucent Hard Round", () => {
+  test("routes soft and translucent strokes through the injected surface", () => {
     let resolveCount = 0;
     const editor = new Editor({
       rasterSurface: {
@@ -276,7 +437,7 @@ describe("Editor Raster surface injection", () => {
       point: { x: 2275, y: 2730 },
     });
 
-    expect(resolveCount).toBe(1);
+    expect(resolveCount).toBe(2);
     session?.cancel();
   });
 
@@ -382,10 +543,12 @@ describe("Editor Raster surface injection", () => {
 
 const createFakeCanvasBrowser = () => {
   const contexts = new Map<object, ReturnType<typeof createFakeContext>>();
+  const createdCanvasSizes: Array<{ height: number; width: number }> = [];
   const encodes: string[] = [];
   const hotPathReadbacks: string[] = [];
 
   const createCanvas = (width: number, height: number) => {
+    createdCanvasSizes.push({ height, width });
     const canvas = {
       height,
       width,
@@ -425,7 +588,11 @@ const createFakeCanvasBrowser = () => {
       this.fillCount += 1;
     },
     fillStyle: "",
+    fillRect: () => undefined,
     ellipse: () => undefined,
+    createRadialGradient: () => ({
+      addColorStop: () => undefined,
+    }),
     get globalCompositeOperation() {
       return this.compositeModes.at(-1) || "source-over";
     },
@@ -433,6 +600,11 @@ const createFakeCanvasBrowser = () => {
       this.compositeModes.push(value);
     },
     globalAlpha: 1,
+    imageSmoothingEnabled: true,
+    lineTo(x: number, y: number) {
+      this.lineToCalls.push({ x, y });
+    },
+    lineToCalls: [] as Array<{ x: number; y: number }>,
     arc(
       x: number,
       y: number,
@@ -455,7 +627,14 @@ const createFakeCanvasBrowser = () => {
       throw new Error("putImageData must stay off the Raster stroke path");
     },
     restore: () => undefined,
+    rotate(value: number) {
+      this.rotations.push(value);
+    },
+    rotations: [] as number[],
     save: () => undefined,
+    scale: () => undefined,
+    stroke: () => undefined,
+    translate: () => undefined,
   });
 
   return {
@@ -464,6 +643,7 @@ const createFakeCanvasBrowser = () => {
       decodeImage: async () => ({ decoded: true }),
     },
     contexts,
+    createdCanvasSizes,
     encodes,
     hotPathReadbacks,
   };

@@ -8,20 +8,30 @@ export type RasterBrushTip =
   | { kind: "sampled"; sampleId: string };
 
 export type RasterStrokeSettings = {
+  angle: number;
+  angleJitter: number;
   color: string;
+  flow: number;
   hardness: number;
   opacity: number;
+  roundness: number;
+  scatter: number;
+  seed: number;
   size: number;
+  sizeJitter: number;
   smoothing: number;
   spacing: number;
   tip: RasterBrushTip;
 };
 
 export type RasterDab = {
+  angle: number;
   center: RasterPoint;
   color: string;
+  flow: number;
   hardness: number;
   opacity: number;
+  roundness: number;
   size: number;
   tip: RasterBrushTip;
 };

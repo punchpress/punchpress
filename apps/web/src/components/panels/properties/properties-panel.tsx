@@ -35,6 +35,7 @@ export const PropertiesPanel = () => {
     const settings = editor.getBrushToolSettings(state.activeTool);
 
     return {
+      presetId: editor.getBrushToolPresetId(state.activeTool),
       settings,
       tool: settings ? state.activeTool : null,
     };
@@ -86,6 +87,7 @@ export const PropertiesPanel = () => {
 
         {hasRasterToolFields ? (
           <BrushFields
+            presetId={rasterToolState.presetId}
             settings={rasterToolState.settings}
             tool={rasterToolState.tool}
           />
