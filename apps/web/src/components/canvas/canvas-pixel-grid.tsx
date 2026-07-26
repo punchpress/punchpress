@@ -9,11 +9,11 @@ import {
   shouldShowPixelGrid,
 } from "@punchpress/engine";
 import { useEditorSelectionDragSurfaceValue } from "../../editor-react/use-editor-selection-drag-surface-value";
+import { CanvasPixelGridLines } from "./canvas-pixel-grid-lines";
 import {
   getPixelGridPreviewNode,
   getPixelGridStrokeWidths,
 } from "./canvas-pixel-grid-math";
-import { CanvasPixelGridPattern } from "./canvas-pixel-grid-pattern";
 
 export const CanvasPixelGrid = () => {
   const state = useEditorSelectionDragSurfaceValue((editor, store) => {
@@ -87,7 +87,7 @@ export const CanvasPixelGrid = () => {
           viewBox={`0 0 ${node.width} ${node.height}`}
           width={node.width}
         >
-          <CanvasPixelGridPattern
+          <CanvasPixelGridLines
             bounds={{ height: node.height, width: node.width, x: 0, y: 0 }}
             kind={kind}
             nodeId={node.id}

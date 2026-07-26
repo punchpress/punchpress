@@ -5,6 +5,7 @@ import {
   resetViewport,
   setViewport,
 } from "./helpers/editor";
+import { decodePng } from "./helpers/png";
 
 const MAX_EXACT_ALIGNMENT_ERROR_PHYSICAL_PIXELS = 0.01;
 const MAX_NATIVE_PRESENTATION_EDGE_ERROR_PHYSICAL_PIXELS = 1;
@@ -50,6 +51,16 @@ const createContrastRasterSource = (page: Page) => {
     context.fillRect(0, 0, 1, 1);
     context.fillStyle = "#fff";
     context.fillRect(1, 0, 1, 1);
+    return canvas.toDataURL("image/png");
+  });
+};
+
+const createTransparentRasterSource = (page: Page) => {
+  return page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+
+    canvas.width = 1;
+    canvas.height = 1;
     return canvas.toDataURL("image/png");
   });
 };
@@ -256,6 +267,55 @@ const createStandaloneRasterDocument = (src: string) =>
         type: "image",
         visible: true,
         width: 96,
+      },
+    ],
+    version: "1.8",
+  });
+
+const createSolidFrameDocument = (src: string) =>
+  JSON.stringify({
+    nodes: [
+      {
+        background: "#808080",
+        height: 8,
+        id: "solid-frame",
+        locked: false,
+        name: "Solid Frame",
+        parentId: "root",
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 320,
+          y: 220,
+        },
+        type: "artboard",
+        visible: true,
+        width: 8,
+      },
+      {
+        assetId: "asset-solid-raster",
+        baseHeight: 1,
+        baseWidth: 1,
+        baseX: 0,
+        baseY: 0,
+        height: 1,
+        id: "solid-raster",
+        mimeType: "image/png",
+        name: "Solid Raster",
+        opacity: 1,
+        parentId: "solid-frame",
+        src,
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 320,
+          y: 220,
+        },
+        type: "image",
+        visible: true,
+        width: 1,
       },
     ],
     version: "1.8",
@@ -649,32 +709,64 @@ test("rapid wheel zoom keeps pixel-grid strokes screen-constant", async ({
     throw new Error("Missing canvas host");
   }
 
-  await page.evaluate(
-    ({ point }) => {
-      const target = document.elementFromPoint(point.x, point.y);
+  const wheelPoint = {
+    x: Math.round(hostBox.x + hostBox.width * 0.72),
+    y: Math.round(hostBox.y + hostBox.height * 0.38),
+  };
+  const readTransformError = () =>
+    page.evaluate(() => {
+      const host = document.querySelector(".canvas-host");
+      const source = document.querySelector<SVGGElement>(
+        '[data-pixel-grid-transform-source="frame"]'
+      );
+      const grid = document.querySelector<SVGGElement>(
+        '[data-pixel-grid-kind="frame"]'
+      );
+      const sourceMatrix = source?.getScreenCTM();
+      const gridMatrix = grid?.getScreenCTM();
+      const hostRect = host?.getBoundingClientRect();
 
-      for (let index = 0; index < 12; index += 1) {
+      if (!(gridMatrix && hostRect && sourceMatrix)) {
+        return null;
+      }
+
+      return Math.max(
+        Math.abs(gridMatrix.a - sourceMatrix.a),
+        Math.abs(gridMatrix.b - sourceMatrix.b),
+        Math.abs(gridMatrix.c - sourceMatrix.c),
+        Math.abs(gridMatrix.d - sourceMatrix.d),
+        Math.abs(gridMatrix.e - sourceMatrix.e),
+        Math.abs(gridMatrix.f - sourceMatrix.f)
+      );
+    });
+
+  for (let index = 0; index < 12; index += 1) {
+    await page.evaluate(
+      ({ point }) => {
+        const target = document.elementFromPoint(point.x, point.y);
+
         target?.dispatchEvent(
           new WheelEvent("wheel", {
-            altKey: true,
             bubbles: true,
             cancelable: true,
             clientX: point.x,
             clientY: point.y,
+            ctrlKey: true,
             deltaMode: WheelEvent.DOM_DELTA_PIXEL,
             deltaY: -12,
-            metaKey: true,
           })
         );
-      }
-    },
-    {
-      point: {
-        x: Math.round(hostBox.x + hostBox.width * 0.72),
-        y: Math.round(hostBox.y + hostBox.height * 0.38),
       },
-    }
-  );
+      { point: wheelPoint }
+    );
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => resolve());
+        })
+    );
+    expect(await readTransformError()).toBeLessThan(0.01);
+  }
 
   const burstStrokeWidth = await readLightStrokeWidth();
 
@@ -687,6 +779,80 @@ test("rapid wheel zoom keeps pixel-grid strokes screen-constant", async ({
   expect(settledStrokeWidth).not.toBeNull();
   expect(burstStrokeWidth).toBeCloseTo(initialStrokeWidth || 0, 1);
   expect(settledStrokeWidth).toBeCloseTo(initialStrokeWidth || 0, 1);
+});
+
+test("renders high-zoom pixel-grid lines no wider than a screen pixel", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  const src = await createTransparentRasterSource(page);
+
+  await loadDocument(page, createSolidFrameDocument(src));
+  await resetViewport(page);
+  await page.evaluate(() => {
+    window.__PUNCHPRESS_EDITOR__?.select("solid-raster");
+  });
+  await setConvergedViewport(page, {
+    x: 310,
+    y: 215,
+    zoom: 40,
+  });
+
+  const gridPlane = page.getByTestId("pixel-grid-plane");
+
+  await expect(gridPlane).toBeVisible();
+  const planeBox = await gridPlane.boundingBox();
+
+  if (!planeBox) {
+    throw new Error("Missing pixel-grid plane");
+  }
+
+  const clip = {
+    height: 1,
+    width: 120,
+    x: Math.round(planeBox.x) + 60,
+    y: Math.round(planeBox.y) + 20,
+  };
+  const screenshot = await page.screenshot({ clip });
+  const png = decodePng(screenshot);
+  const colorCounts = new Map<string, number>();
+
+  for (let x = 0; x < png.width; x += 1) {
+    const offset = x * 4;
+    const key = `${png.data[offset]}:${png.data[offset + 1]}:${
+      png.data[offset + 2]
+    }`;
+
+    colorCounts.set(key, (colorCounts.get(key) || 0) + 1);
+  }
+
+  const baseline = [...colorCounts.entries()]
+    .sort(([, countA], [, countB]) => countB - countA)[0]?.[0]
+    .split(":")
+    .map(Number);
+
+  if (!baseline) {
+    throw new Error("Missing screenshot baseline color");
+  }
+
+  let longestGridRun = 0;
+  let currentGridRun = 0;
+
+  for (let x = 0; x < png.width; x += 1) {
+    const offset = x * 4;
+    const differsFromSource =
+      Math.abs(png.data[offset] - baseline[0]) > 1 ||
+      Math.abs(png.data[offset + 1] - baseline[1]) > 1 ||
+      Math.abs(png.data[offset + 2] - baseline[2]) > 1;
+
+    currentGridRun = differsFromSource ? currentGridRun + 1 : 0;
+    longestGridRun = Math.max(longestGridRun, currentGridRun);
+  }
+
+  const devicePixelRatio = await page.evaluate(() => window.devicePixelRatio);
+
+  expect(longestGridRun).toBeGreaterThan(0);
+  expect(longestGridRun / devicePixelRatio).toBeLessThanOrEqual(2);
 });
 
 test("uses effective source pixels across resident and tiled Raster paths", async ({
@@ -883,19 +1049,17 @@ test("keeps Crop, selection, Brush cursor, and live painting aligned at high zoo
   );
   expect(
     await cropGrid.evaluate((element) => {
-      const canvasHost = element.closest("[data-raster-canvas-host]");
-      const cropPreview = element.closest(
-        'svg[aria-label="Raster Crop preview"]'
-      );
+      const overlay = element.ownerSVGElement;
 
       return {
-        cropPreviewLabel: cropPreview?.getAttribute("aria-label") || null,
-        sharesCanvasHost: Boolean(canvasHost?.querySelector("canvas")),
+        screenOverlay:
+          overlay?.parentElement?.classList.contains("canvas-host"),
+        zIndex: overlay ? getComputedStyle(overlay).zIndex : null,
       };
     })
   ).toEqual({
-    cropPreviewLabel: "Raster Crop preview",
-    sharesCanvasHost: true,
+    screenOverlay: true,
+    zIndex: "55",
   });
 
   const cropHandle = page.locator('[data-raster-crop-handle="se"]');
@@ -978,21 +1142,19 @@ test("keeps Crop, selection, Brush cursor, and live painting aligned at high zoo
 
           return rect.height > 0 && rect.width > 0;
         });
-        const gridHost = grids[0]?.closest("[data-raster-canvas-host]");
+        const gridOverlay = grids[0]?.ownerSVGElement;
 
         return {
           gridCount: grids.length,
-          gridSharesVisibleCanvasHost: visibleCanvasSurfaces.some(
-            (surface) =>
-              surface.closest("[data-raster-canvas-host]") === gridHost
-          ),
+          gridIsScreenOverlay:
+            gridOverlay?.parentElement?.classList.contains("canvas-host"),
           visibleCanvasCount: visibleCanvasSurfaces.length,
         };
       });
     })
     .toEqual({
       gridCount: 1,
-      gridSharesVisibleCanvasHost: true,
+      gridIsScreenOverlay: true,
       visibleCanvasCount: 1,
     });
   await page.mouse.up();
@@ -1074,7 +1236,6 @@ test("keeps Crop, selection, Brush cursor, and live painting aligned at high zoo
         const workingSurface =
           editor?.getBrushWorkingSurfaceStateForNode?.("standalone-raster");
         const grid = document.querySelector('[data-pixel-grid-kind="raster"]');
-        const pattern = grid?.querySelector("pattern");
         const workingPlane =
           workingSurface?.type === "canvas"
             ? {
@@ -1092,18 +1253,22 @@ test("keeps Crop, selection, Brush cursor, and live painting aligned at high zoo
             '[data-pixel-grid-kind="raster"]'
           ).length,
           gridUsesWorkingPlane: Boolean(
-            pattern &&
+            grid &&
               workingPlane &&
-              Math.abs(Number(pattern.getAttribute("x")) - workingPlane.x) <
-                1e-6 &&
-              Math.abs(Number(pattern.getAttribute("y")) - workingPlane.y) <
-                1e-6 &&
               Math.abs(
-                Number(pattern.getAttribute("width")) -
+                Number(grid.getAttribute("data-pixel-grid-origin-x")) -
+                  workingPlane.x
+              ) < 1e-6 &&
+              Math.abs(
+                Number(grid.getAttribute("data-pixel-grid-origin-y")) -
+                  workingPlane.y
+              ) < 1e-6 &&
+              Math.abs(
+                Number(grid.getAttribute("data-pixel-grid-cell-width")) -
                   workingPlane.width / workingPlane.sampleWidth
               ) < 1e-6 &&
               Math.abs(
-                Number(pattern.getAttribute("height")) -
+                Number(grid.getAttribute("data-pixel-grid-cell-height")) -
                   workingPlane.height / workingPlane.sampleHeight
               ) < 1e-6
           ),
@@ -1395,10 +1560,8 @@ test.describe("transformed fractional exact Raster pixel grid", () => {
     expect(aboveGridCount).toBe(1);
     expect(stablePresentationAboveGrid).toEqual(stablePresentationBelowGrid);
 
-    const pattern = grid.getByTestId("pixel-grid-pattern");
     await expect(grid).toHaveCount(1);
     await expect(grid).toBeVisible();
-    await expect(pattern).toBeAttached();
     await expect(resident).toBeVisible();
     await expect(grid.locator('[data-pixel-grid-tone="dark"]')).toHaveCount(2);
     await expect(grid.locator('[data-pixel-grid-tone="light"]')).toHaveCount(2);
@@ -1410,7 +1573,6 @@ test.describe("transformed fractional exact Raster pixel grid", () => {
         '[data-pixel-grid-node-id="fractional-raster"]'
       );
       const gridSurface = gridElement?.ownerSVGElement;
-      const patternElement = gridElement?.querySelector("pattern");
       const canvas = document.querySelector<HTMLCanvasElement>(
         '[data-node-id="fractional-render-root"] [data-testid="raster-resident-canvas"] canvas[data-raster-exact-backing="true"]'
       );
@@ -1425,7 +1587,6 @@ test.describe("transformed fractional exact Raster pixel grid", () => {
           node &&
           gridElement &&
           gridSurface &&
-          patternElement &&
           canvas &&
           canvasHost &&
           source &&
@@ -1437,10 +1598,10 @@ test.describe("transformed fractional exact Raster pixel grid", () => {
 
       const gridRect = gridElement.getBoundingClientRect();
       const canvasRect = canvas.getBoundingClientRect();
-      const cellWidth = Number(patternElement.getAttribute("width"));
-      const cellHeight = Number(patternElement.getAttribute("height"));
-      const originX = Number(patternElement.getAttribute("x"));
-      const originY = Number(patternElement.getAttribute("y"));
+      const cellWidth = Number(gridElement.dataset.pixelGridCellWidth);
+      const cellHeight = Number(gridElement.dataset.pixelGridCellHeight);
+      const originX = Number(gridElement.dataset.pixelGridOriginX);
+      const originY = Number(gridElement.dataset.pixelGridOriginY);
       const origin = new DOMPoint(originX, originY).matrixTransform(gridMatrix);
       const nextColumn = new DOMPoint(
         originX + cellWidth,
@@ -1510,11 +1671,7 @@ test.describe("transformed fractional exact Raster pixel grid", () => {
           top: gridRect.top,
           width: gridRect.width,
         },
-        gridSharesCanvasHost: canvasHost.contains(gridElement),
-        gridViewBox: {
-          height: gridSurface.viewBox.baseVal.height,
-          width: gridSurface.viewBox.baseVal.width,
-        },
+        gridIsScreenOverlay: gridSurface.parentElement === editor.hostRef,
         residentSamples: {
           height: source.height,
           width: source.width,
@@ -1538,7 +1695,7 @@ test.describe("transformed fractional exact Raster pixel grid", () => {
     expect(geometry?.devicePixelRatio).toBe(1.5);
     const geometryDiagnostics = JSON.stringify(geometry, null, 2);
 
-    expect(geometry?.gridSharesCanvasHost, geometryDiagnostics).toBe(true);
+    expect(geometry?.gridIsScreenOverlay, geometryDiagnostics).toBe(true);
     expect(geometry?.residentSamples, geometryDiagnostics).toEqual({
       height: 4,
       width: 7,
@@ -1674,7 +1831,7 @@ test.describe("high-zoom Raster pixel alignment", () => {
     const nativePlane = page.locator(
       '[data-node-id="native-jpeg"] [data-raster-native-sample-width="16"]'
     );
-    const grid = nativePlane.locator('[data-pixel-grid-node-id="native-jpeg"]');
+    const grid = page.locator('[data-pixel-grid-node-id="native-jpeg"]');
     const image = nativePlane.locator(
       '[data-testid="raster-native-image"] canvas[data-raster-exact-backing="true"]'
     );
@@ -1688,6 +1845,7 @@ test.describe("high-zoom Raster pixel alignment", () => {
     await expect(image).toHaveCSS("image-rendering", "auto");
 
     const geometry = await page.evaluate(() => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
       const plane = document.querySelector(
         '[data-node-id="native-jpeg"] [data-raster-native-sample-width="16"]'
       );
@@ -1696,23 +1854,22 @@ test.describe("high-zoom Raster pixel alignment", () => {
       );
       const foreignObject = imageElement?.closest("foreignObject");
       const gridElement = document.querySelector<SVGGElement>(
-        '[data-node-id="native-jpeg"] [data-pixel-grid-node-id="native-jpeg"]'
+        '[data-pixel-grid-node-id="native-jpeg"]'
       );
-      const pattern = gridElement?.querySelector("pattern");
       const gridMatrix = gridElement?.getScreenCTM();
 
-      if (!(plane && imageElement && gridElement && pattern && gridMatrix)) {
+      if (!(plane && imageElement && gridElement && gridMatrix)) {
         return null;
       }
 
       const gridOrigin = new DOMPoint(
-        Number(pattern.getAttribute("x")),
-        Number(pattern.getAttribute("y"))
+        Number(gridElement.dataset.pixelGridOriginX),
+        Number(gridElement.dataset.pixelGridOriginY)
       ).matrixTransform(gridMatrix);
       const gridColumn = new DOMPoint(
-        Number(pattern.getAttribute("x")) +
-          Number(pattern.getAttribute("width")),
-        Number(pattern.getAttribute("y"))
+        Number(gridElement.dataset.pixelGridOriginX) +
+          Number(gridElement.dataset.pixelGridCellWidth),
+        Number(gridElement.dataset.pixelGridOriginY)
       ).matrixTransform(gridMatrix);
       const imageRect = imageElement.getBoundingClientRect();
       const gridRect = gridElement.getBoundingClientRect();
@@ -1768,8 +1925,9 @@ test.describe("high-zoom Raster pixel alignment", () => {
         usesClippedInlinePresentation:
           Boolean(foreignObject?.contains(imageElement)) &&
           foreignObject?.getAttribute("overflow") === "hidden" &&
-          plane.contains(imageElement) &&
-          plane.contains(gridElement),
+          plane.contains(imageElement),
+        usesScreenGridOverlay:
+          gridElement.ownerSVGElement?.parentElement === editor?.hostRef,
         sourceWindow: {
           height: sourceHeight,
           width: sourceWidth,
@@ -1782,6 +1940,7 @@ test.describe("high-zoom Raster pixel alignment", () => {
     expect(geometry?.naturalSize).toEqual({ height: 8, width: 16 });
     expect(geometry?.sourceWindow).toEqual({ height: 8, width: 16 });
     expect(geometry?.usesClippedInlinePresentation).toBe(true);
+    expect(geometry?.usesScreenGridOverlay).toBe(true);
     const geometryDiagnostics = JSON.stringify(geometry, null, 2);
     const physicalError = (actual?: number, expected?: number) => {
       return (
@@ -2162,7 +2321,7 @@ test.describe("high-zoom Raster pixel alignment", () => {
     });
 
     const residentGrid = page.locator(
-      '[data-node-id="native-jpeg"] [data-pixel-grid-node-id="native-jpeg"]'
+      '[data-pixel-grid-node-id="native-jpeg"]'
     );
     const residentImage = page.locator(
       '[data-node-id="native-jpeg"] [data-testid="raster-resident-canvas"] canvas[data-raster-exact-backing="true"]'
@@ -2172,26 +2331,25 @@ test.describe("high-zoom Raster pixel alignment", () => {
     await expect(residentImage).toBeVisible();
     const residentGeometry = await page.evaluate(() => {
       const gridElement = document.querySelector<SVGGElement>(
-        '[data-node-id="native-jpeg"] [data-pixel-grid-node-id="native-jpeg"]'
+        '[data-pixel-grid-node-id="native-jpeg"]'
       );
-      const pattern = gridElement?.querySelector("pattern");
       const matrix = gridElement?.getScreenCTM();
       const canvas = document.querySelector<HTMLCanvasElement>(
         '[data-node-id="native-jpeg"] [data-testid="raster-resident-canvas"] canvas[data-raster-exact-backing="true"]'
       );
 
-      if (!(canvas && gridElement && matrix && pattern)) {
+      if (!(canvas && gridElement && matrix)) {
         return null;
       }
 
       const origin = new DOMPoint(
-        Number(pattern.getAttribute("x")),
-        Number(pattern.getAttribute("y"))
+        Number(gridElement.dataset.pixelGridOriginX),
+        Number(gridElement.dataset.pixelGridOriginY)
       ).matrixTransform(matrix);
       const column = new DOMPoint(
-        Number(pattern.getAttribute("x")) +
-          Number(pattern.getAttribute("width")),
-        Number(pattern.getAttribute("y"))
+        Number(gridElement.dataset.pixelGridOriginX) +
+          Number(gridElement.dataset.pixelGridCellWidth),
+        Number(gridElement.dataset.pixelGridOriginY)
       ).matrixTransform(matrix);
       const canvasRect = canvas.getBoundingClientRect();
 
@@ -2379,9 +2537,7 @@ test.describe("high-zoom Raster pixel alignment", () => {
       window.__PUNCHPRESS_EDITOR__?.select("zoom-phase");
     });
 
-    const grid = page.locator(
-      '[data-node-id="zoom-phase"] [data-pixel-grid-node-id="zoom-phase"]'
-    );
+    const grid = page.locator('[data-pixel-grid-node-id="zoom-phase"]');
     const image = page.locator(
       '[data-node-id="zoom-phase"] [data-testid="raster-resident-canvas"] canvas[data-raster-exact-backing="true"]'
     );
@@ -2396,26 +2552,25 @@ test.describe("high-zoom Raster pixel alignment", () => {
       await expect(image).toBeVisible();
       const geometry = await page.evaluate(() => {
         const gridElement = document.querySelector<SVGGElement>(
-          '[data-node-id="zoom-phase"] [data-pixel-grid-node-id="zoom-phase"]'
+          '[data-pixel-grid-node-id="zoom-phase"]'
         );
-        const pattern = gridElement?.querySelector("pattern");
         const matrix = gridElement?.getScreenCTM();
         const canvas = document.querySelector<HTMLCanvasElement>(
           '[data-node-id="zoom-phase"] [data-testid="raster-resident-canvas"] canvas[data-raster-exact-backing="true"]'
         );
 
-        if (!(canvas && gridElement && matrix && pattern)) {
+        if (!(canvas && gridElement && matrix)) {
           return null;
         }
 
         const origin = new DOMPoint(
-          Number(pattern.getAttribute("x")),
-          Number(pattern.getAttribute("y"))
+          Number(gridElement.dataset.pixelGridOriginX),
+          Number(gridElement.dataset.pixelGridOriginY)
         ).matrixTransform(matrix);
         const nextColumn = new DOMPoint(
-          Number(pattern.getAttribute("x")) +
-            Number(pattern.getAttribute("width")),
-          Number(pattern.getAttribute("y"))
+          Number(gridElement.dataset.pixelGridOriginX) +
+            Number(gridElement.dataset.pixelGridCellWidth),
+          Number(gridElement.dataset.pixelGridOriginY)
         ).matrixTransform(matrix);
         const rect = canvas.getBoundingClientRect();
 

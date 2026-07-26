@@ -70,6 +70,8 @@ const dispatchWheelAtPoint = (page, point, eventInit) => {
         new WheelEvent("wheel", {
           bubbles: true,
           cancelable: true,
+          clientX: targetPoint.x,
+          clientY: targetPoint.y,
           deltaMode: WheelEvent.DOM_DELTA_PIXEL,
           ...init,
         })
@@ -140,8 +142,8 @@ test("wheel pan works over a selected artboard after trackpad zoom", async ({
   };
 
   const zoomTarget = await dispatchWheelAtPoint(page, wheelPoint, {
+    ctrlKey: true,
     deltaY: 180,
-    metaKey: true,
   });
 
   expect(zoomTarget?.className).toContain("canvas-single-selection");
@@ -189,8 +191,8 @@ test("wheel pan over selected artboard chrome respects viewport zoom", async ({
   };
 
   await dispatchWheelAtPoint(page, wheelPoint, {
+    ctrlKey: true,
     deltaY: 180,
-    metaKey: true,
   });
 
   await expect.poll(() => getViewportZoom(page)).toBeLessThan(1);
@@ -250,6 +252,35 @@ test("wheel pan keeps the same screen-space speed at high zoom", async ({
   expect(pan.y).toBeCloseTo(wheelDelta.deltaY / 16, 0);
 });
 
+test("command-option wheel remains a pan gesture", async ({ page }) => {
+  await gotoEditor(page);
+  await loadDocument(page, ARTBOARD_DOCUMENT);
+  await resetViewport(page);
+  await setViewport(page, { x: 260, y: 180, zoom: 6 });
+
+  const hostBox = await page.locator(".canvas-host").boundingBox();
+
+  if (!hostBox) {
+    throw new Error("Missing canvas host");
+  }
+
+  const wheelPoint = {
+    x: Math.round(hostBox.x + hostBox.width * 0.72),
+    y: Math.round(hostBox.y + hostBox.height * 0.38),
+  };
+  const initialScroll = await getViewerScroll(page);
+
+  await dispatchWheelAtPoint(page, wheelPoint, {
+    altKey: true,
+    deltaX: 96,
+    deltaY: 64,
+    metaKey: true,
+  });
+
+  await expect.poll(() => getViewportZoom(page)).toBe(6);
+  await expect.poll(() => getViewerScroll(page)).not.toEqual(initialScroll);
+});
+
 test("space-drag pan keeps the same screen-space speed at high zoom", async ({
   page,
 }) => {
@@ -295,7 +326,7 @@ test("space-drag pan keeps the same screen-space speed at high zoom", async ({
   );
 });
 
-test("repeated control-wheel zoom keeps the cursor world point anchored", async ({
+test("repeated trackpad pinch zoom keeps the cursor world point anchored", async ({
   page,
 }) => {
   await gotoEditor(page);
@@ -331,19 +362,18 @@ test("repeated control-wheel zoom keeps the cursor world point anchored", async 
     }, wheelPoint);
   const before = await getWorldPoint();
 
-  await page.keyboard.down("Control");
-
   for (let index = 0; index < 20; index += 1) {
     const previousZoom = (await getWorldPoint())?.zoom;
 
-    await page.mouse.move(wheelPoint.x, wheelPoint.y);
-    await page.mouse.wheel(0, -12);
+    await dispatchWheelAtPoint(page, wheelPoint, {
+      ctrlKey: true,
+      deltaY: -12,
+    });
     await expect
       .poll(async () => (await getWorldPoint())?.zoom)
       .not.toBe(previousZoom);
   }
 
-  await page.keyboard.up("Control");
   const after = await getWorldPoint();
 
   expect(before).not.toBeNull();
@@ -356,7 +386,7 @@ test("repeated control-wheel zoom keeps the cursor world point anchored", async 
   ).toBeLessThan(1);
 });
 
-test("rapid command-option zoom keeps its mode through the momentum tail", async ({
+test("rapid trackpad pinch keeps its mode through the momentum tail", async ({
   page,
 }) => {
   await gotoEditor(page);
@@ -400,14 +430,13 @@ test("rapid command-option zoom keeps its mode through the momentum tail", async
     for (let index = 0; index < 24; index += 1) {
       target?.dispatchEvent(
         new WheelEvent("wheel", {
-          altKey: true,
           bubbles: true,
           cancelable: true,
           clientX: point.x,
+          ctrlKey: true,
           clientY: point.y,
           deltaMode: WheelEvent.DOM_DELTA_PIXEL,
           deltaY: -12,
-          metaKey: true,
         })
       );
     }

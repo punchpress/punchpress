@@ -3,12 +3,12 @@ import { useCallback, useSyncExternalStore } from "react";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorSelectionDragPreviewValue } from "../../../editor-react/use-editor-selection-drag-preview-value";
 import { useEditorSelectionDragSurfaceValue } from "../../../editor-react/use-editor-selection-drag-surface-value";
+import { CanvasPixelGridLines } from "../canvas-pixel-grid-lines";
 import {
   getPixelGridPlane,
   getPixelGridPreviewNode,
   getPixelGridStrokeWidths,
 } from "../canvas-pixel-grid-math";
-import { CanvasPixelGridPattern } from "../canvas-pixel-grid-pattern";
 import { getRasterPresentationFootprint } from "./canvas-raster-presentation";
 
 interface CanvasRasterPixelGridProps {
@@ -129,9 +129,10 @@ export const CanvasRasterPixelGrid = ({
   const bounds =
     presentedPlane && surface === "node" ? presentedPlane : state.bounds;
   const pattern = (
-    <CanvasPixelGridPattern
+    <CanvasPixelGridLines
       bounds={bounds}
       kind="raster"
+      layer={surface === "crop" ? 55 : 5}
       nodeId={nodeId}
       plane={plane}
       sourceNodeId={nodeId}

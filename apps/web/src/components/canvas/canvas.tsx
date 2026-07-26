@@ -446,9 +446,8 @@ export const Canvas = () => {
         return;
       }
 
-      const isModifiedZoom = event.metaKey || event.ctrlKey;
-      const isZoomWheel =
-        isModifiedZoom || wheelGestureModeRef.current === "zoom";
+      const isPinchZoom = event.ctrlKey;
+      const isZoomWheel = isPinchZoom || wheelGestureModeRef.current === "zoom";
 
       wheelGestureModeRef.current = isZoomWheel ? "zoom" : "pan";
       markViewportInteraction(
@@ -484,7 +483,7 @@ export const Canvas = () => {
       event.preventDefault();
       event.stopPropagation();
 
-      if (!isModifiedZoom) {
+      if (!isPinchZoom) {
         return;
       }
 
@@ -704,7 +703,6 @@ export const Canvas = () => {
           useMouseDrag={spacePressed || activeTool === "hand"}
           useWheelPinch={false}
           useWheelScroll
-          wheelPinchKey="meta"
           zoom={zoom}
           zoomRange={[MIN_ZOOM, MAX_ZOOM]}
         >

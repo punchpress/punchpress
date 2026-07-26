@@ -21,8 +21,9 @@ product meaning.
 - Wheel, trackpad, and pinch zoom should feel steady.
 - One zoom update is capped so large device deltas do not runaway.
 - Zoom focuses on the pointer so content under the cursor stays under it.
-- A modifier-started zoom gesture keeps its mode through the trackpad momentum
-  tail; releasing the modifier cannot turn that tail into a pan.
+- A keyless trackpad pinch zooms around the pointer; two-finger scrolling pans.
+- The browser's internal pinch signal keeps its zoom mode through the trackpad
+  momentum tail and cannot turn that tail into a pan.
 - Users can fit selected content or an artboard on demand.
 - The active finite Frame or standalone Raster shows a subtle pixel grid once
   both target pixel axes exceed `5` logical screen pixels. That is above `500%`
