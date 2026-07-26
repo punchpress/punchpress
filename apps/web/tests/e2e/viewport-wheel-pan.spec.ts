@@ -51,6 +51,16 @@ const getViewportZoom = (page) => {
   });
 };
 
+const waitForViewportSettle = (page) => {
+  return expect
+    .poll(() =>
+      page.evaluate(() => {
+        return Boolean(window.__PUNCHPRESS_EDITOR__?.viewportInteracting);
+      })
+    )
+    .toBe(false);
+};
+
 const dispatchWheelAtPoint = (page, point, eventInit) => {
   return page.evaluate(
     ({ init, targetPoint }) => {
@@ -137,6 +147,7 @@ test("wheel pan works over a selected artboard after trackpad zoom", async ({
   expect(zoomTarget?.className).toContain("canvas-single-selection");
 
   await expect.poll(() => getViewportZoom(page)).toBeLessThan(1);
+  await waitForViewportSettle(page);
 
   const initialScroll = await getViewerScroll(page);
 
@@ -183,6 +194,7 @@ test("wheel pan over selected artboard chrome respects viewport zoom", async ({
   });
 
   await expect.poll(() => getViewportZoom(page)).toBeLessThan(1);
+  await waitForViewportSettle(page);
 
   const zoomedScroll = await getViewerScroll(page);
   const zoomedViewport = {
@@ -342,4 +354,88 @@ test("repeated control-wheel zoom keeps the cursor world point anchored", async 
   expect(
     Math.abs((after?.y || 0) - (before?.y || 0)) * (after?.zoom || 1)
   ).toBeLessThan(1);
+});
+
+test("rapid command-option zoom keeps its mode through the momentum tail", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(page, ARTBOARD_DOCUMENT);
+  await resetViewport(page);
+  await setViewport(page, { x: 260, y: 180, zoom: 6 });
+
+  const hostBox = await page.locator(".canvas-host").boundingBox();
+
+  if (!hostBox) {
+    throw new Error("Missing canvas host");
+  }
+
+  const wheelPoint = {
+    x: Math.round(hostBox.x + hostBox.width * 0.72),
+    y: Math.round(hostBox.y + hostBox.height * 0.38),
+  };
+  const readViewport = () =>
+    page.evaluate((point) => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
+      const hostRect = editor?.hostRef?.getBoundingClientRect();
+
+      if (!(editor && hostRect)) {
+        return null;
+      }
+
+      return {
+        anchorX:
+          editor.viewport.x + (point.x - hostRect.left) / editor.viewport.zoom,
+        anchorY:
+          editor.viewport.y + (point.y - hostRect.top) / editor.viewport.zoom,
+        x: editor.viewport.x,
+        y: editor.viewport.y,
+        zoom: editor.viewport.zoom,
+      };
+    }, wheelPoint);
+
+  await page.evaluate((point) => {
+    const target = document.elementFromPoint(point.x, point.y);
+
+    for (let index = 0; index < 24; index += 1) {
+      target?.dispatchEvent(
+        new WheelEvent("wheel", {
+          altKey: true,
+          bubbles: true,
+          cancelable: true,
+          clientX: point.x,
+          clientY: point.y,
+          deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+          deltaY: -12,
+          metaKey: true,
+        })
+      );
+    }
+  }, wheelPoint);
+
+  const burstViewport = await readViewport();
+
+  await page.evaluate((point) => {
+    const target = document.elementFromPoint(point.x, point.y);
+
+    for (let index = 0; index < 12; index += 1) {
+      target?.dispatchEvent(
+        new WheelEvent("wheel", {
+          bubbles: true,
+          cancelable: true,
+          clientX: point.x,
+          clientY: point.y,
+          deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+          deltaY: -12,
+        })
+      );
+    }
+  }, wheelPoint);
+
+  await page.waitForTimeout(300);
+
+  const settledViewport = await readViewport();
+
+  expect(burstViewport?.zoom).toBeGreaterThan(6);
+  expect(settledViewport).toEqual(burstViewport);
 });

@@ -379,13 +379,10 @@ describe("high-zoom Raster presentation", () => {
     expect(
       getPixelGridStrokeWidths({
         devicePixelRatio: 0.75,
-        scaleX: 1.25,
-        scaleY: 0.8,
-        zoom: 7.25,
       })
     ).toEqual({
-      horizontal: 1 / (0.75 * 7.25 * 0.8),
-      vertical: 1 / (0.75 * 7.25 * 1.25),
+      horizontal: 1 / 0.75,
+      vertical: 1 / 0.75,
     });
   });
 

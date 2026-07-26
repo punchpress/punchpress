@@ -1,8 +1,5 @@
 interface PixelGridStrokeWidthOptions {
   devicePixelRatio: number;
-  scaleX: number;
-  scaleY: number;
-  zoom: number;
 }
 
 interface PixelGridSampleSize {
@@ -86,15 +83,11 @@ export const getPixelGridPreviewNode = (node, preview) => {
 
 export const getPixelGridStrokeWidths = ({
   devicePixelRatio,
-  scaleX,
-  scaleY,
-  zoom,
 }: PixelGridStrokeWidthOptions) => {
-  const physicalScale =
-    Math.max(devicePixelRatio, 0.001) * Math.max(zoom, 0.001);
+  const physicalScale = Math.max(devicePixelRatio, 0.001);
 
   return {
-    horizontal: 1 / (physicalScale * Math.max(Math.abs(scaleY), 0.001)),
-    vertical: 1 / (physicalScale * Math.max(Math.abs(scaleX), 0.001)),
+    horizontal: 1 / physicalScale,
+    vertical: 1 / physicalScale,
   };
 };

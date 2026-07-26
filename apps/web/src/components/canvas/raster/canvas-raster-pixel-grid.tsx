@@ -9,10 +9,7 @@ import {
   getPixelGridStrokeWidths,
 } from "../canvas-pixel-grid-math";
 import { CanvasPixelGridPattern } from "../canvas-pixel-grid-pattern";
-import {
-  getRasterPresentationFootprint,
-  getRasterRenderScale,
-} from "./canvas-raster-presentation";
+import { getRasterPresentationFootprint } from "./canvas-raster-presentation";
 
 interface CanvasRasterPixelGridProps {
   baseHeight?: number;
@@ -126,12 +123,8 @@ export const CanvasRasterPixelGrid = ({
       }
     : { baseHeight, baseWidth, baseX, baseY };
   const plane = getPixelGridPlane(planeNode, sampleSize);
-  const renderScale = getRasterRenderScale(editor, nodeId, renderRootNodeId);
   const strokeWidths = getPixelGridStrokeWidths({
     devicePixelRatio: state.devicePixelRatio,
-    scaleX: renderScale.x,
-    scaleY: renderScale.y,
-    zoom: state.zoom,
   });
   const bounds =
     presentedPlane && surface === "node" ? presentedPlane : state.bounds;

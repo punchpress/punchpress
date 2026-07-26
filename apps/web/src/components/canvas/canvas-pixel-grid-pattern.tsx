@@ -61,6 +61,7 @@ export const CanvasPixelGridPattern = ({
             stroke="#000"
             strokeOpacity="0.52"
             strokeWidth={strokeWidths.vertical * 2}
+            vectorEffect="non-scaling-stroke"
           />
           <path
             d={`M0 0H${plane.cellWidth}`}
@@ -68,6 +69,7 @@ export const CanvasPixelGridPattern = ({
             stroke="#000"
             strokeOpacity="0.52"
             strokeWidth={strokeWidths.horizontal * 2}
+            vectorEffect="non-scaling-stroke"
           />
           <path
             d={`M0 0V${plane.cellHeight}`}
@@ -75,6 +77,7 @@ export const CanvasPixelGridPattern = ({
             stroke="#fff"
             strokeOpacity="0.72"
             strokeWidth={strokeWidths.vertical}
+            vectorEffect="non-scaling-stroke"
           />
           <path
             d={`M0 0H${plane.cellWidth}`}
@@ -82,6 +85,7 @@ export const CanvasPixelGridPattern = ({
             stroke="#fff"
             strokeOpacity="0.72"
             strokeWidth={strokeWidths.horizontal}
+            vectorEffect="non-scaling-stroke"
           />
         </pattern>
       </defs>

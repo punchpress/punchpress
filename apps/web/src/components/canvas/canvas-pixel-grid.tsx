@@ -56,13 +56,8 @@ export const CanvasPixelGrid = () => {
   }
 
   const { kind, node, sourceNodeId } = state.target;
-  const scaleX = getNodeScaleX(node) ?? 1;
-  const scaleY = getNodeScaleY(node) ?? 1;
   const strokeWidths = getPixelGridStrokeWidths({
     devicePixelRatio: state.devicePixelRatio,
-    scaleX,
-    scaleY,
-    zoom: state.zoom,
   });
 
   return (

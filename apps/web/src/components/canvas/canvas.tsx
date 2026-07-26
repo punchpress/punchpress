@@ -221,7 +221,7 @@ const getWheelScrollDelta = (event, zoom) => {
   };
 };
 
-const markViewportInteraction = (editor, timeoutRef) => {
+const markViewportInteraction = (editor, timeoutRef, wheelGestureModeRef) => {
   editor.setViewportInteracting(true);
 
   if (timeoutRef.current !== null) {
@@ -230,6 +230,7 @@ const markViewportInteraction = (editor, timeoutRef) => {
 
   timeoutRef.current = window.setTimeout(() => {
     timeoutRef.current = null;
+    wheelGestureModeRef.current = null;
     editor.setViewportInteracting(false);
   }, 120);
 };
@@ -296,6 +297,7 @@ export const Canvas = () => {
   const viewerRef = useRef(null);
   const hostRef = useRef(null);
   const viewportInteractionTimeoutRef = useRef<number | null>(null);
+  const wheelGestureModeRef = useRef<"pan" | "zoom" | null>(null);
   const lastPenHoverClientPointRef = useRef<{ x: number; y: number } | null>(
     null
   );
@@ -333,6 +335,7 @@ export const Canvas = () => {
         window.clearTimeout(viewportInteractionTimeoutRef.current);
         viewportInteractionTimeoutRef.current = null;
       }
+      wheelGestureModeRef.current = null;
       editor.setViewportInteracting(false);
       editor.viewerRef = null;
       editor.hostRef = null;
@@ -398,7 +401,11 @@ export const Canvas = () => {
   const handleScroll = useCallback(
     (event) => {
       const viewer = viewerRef.current;
-      markViewportInteraction(editor, viewportInteractionTimeoutRef);
+      markViewportInteraction(
+        editor,
+        viewportInteractionTimeoutRef,
+        wheelGestureModeRef
+      );
 
       editor.setViewport({
         x: viewer?.getScrollLeft?.() ?? editor.viewport.x ?? 0,
@@ -433,22 +440,30 @@ export const Canvas = () => {
   });
   const handleCanvasWheel = useCallback(
     (event) => {
-      const isZoomWheel = event.metaKey || event.ctrlKey;
+      const viewer = viewerRef.current;
+
+      if (!viewer) {
+        return;
+      }
+
+      const isModifiedZoom = event.metaKey || event.ctrlKey;
+      const isZoomWheel =
+        isModifiedZoom || wheelGestureModeRef.current === "zoom";
+
+      wheelGestureModeRef.current = isZoomWheel ? "zoom" : "pan";
+      markViewportInteraction(
+        editor,
+        viewportInteractionTimeoutRef,
+        wheelGestureModeRef
+      );
 
       if (!isZoomWheel) {
         if (!isTransformOverlayWheelTarget(event.target)) {
           return;
         }
 
-        const viewer = viewerRef.current;
-
-        if (!viewer) {
-          return;
-        }
-
         event.preventDefault();
         event.stopPropagation();
-        markViewportInteraction(editor, viewportInteractionTimeoutRef);
 
         const delta = getWheelScrollDelta(event, editor.viewport.zoom);
         viewer.scrollBy?.(delta.x, delta.y);
@@ -461,15 +476,17 @@ export const Canvas = () => {
         return;
       }
 
-      const viewer = viewerRef.current;
       const host = hostRef.current;
-      if (!(viewer && host)) {
+      if (!host) {
         return;
       }
 
       event.preventDefault();
       event.stopPropagation();
-      markViewportInteraction(editor, viewportInteractionTimeoutRef);
+
+      if (!isModifiedZoom) {
+        return;
+      }
 
       editor.zoomViewportFromWheel({
         clientX: event.clientX,

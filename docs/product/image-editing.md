@@ -44,8 +44,9 @@ undoable action.
 - **Pixel grid.** A non-exporting grid appears once both target pixel axes
   exceed `5` logical screen pixels. This is above `500%` for an untransformed
   Frame; standalone Raster transforms and intrinsic sample density affect the
-  threshold. Crossing it changes only the overlay. Frame-owned Raster growth
-  never moves the Frame-local grid.
+  threshold. Crossing it changes only the overlay. Grid strokes keep a thin,
+  screen-constant weight while zooming. Frame-owned Raster growth never moves
+  the Frame-local grid.
 - **Export.** Export preserves transparency when the chosen format supports it
   and flattens against a chosen background when it does not.
 

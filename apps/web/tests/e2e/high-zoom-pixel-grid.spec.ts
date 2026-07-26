@@ -601,6 +601,94 @@ test("shows only the active finite pixel grid above 500 percent", async ({
   await expect(page.locator("[data-pixel-grid-kind]")).toHaveCount(0);
 });
 
+test("rapid wheel zoom keeps pixel-grid strokes screen-constant", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  const src = await createRasterSource(page);
+
+  await loadDocument(page, createFrameDocument(src));
+  await resetViewport(page);
+  await page.evaluate(() => {
+    window.__PUNCHPRESS_EDITOR__?.select("frame-raster");
+  });
+  await setConvergedViewport(page, {
+    x: 180,
+    y: 160,
+    zoom: 6,
+  });
+
+  const grid = page.locator('[data-pixel-grid-kind="frame"]');
+
+  await expect(grid).toBeVisible();
+  const readLightStrokeWidth = () =>
+    page.evaluate(() => {
+      const gridElement = document.querySelector<SVGGElement>(
+        '[data-pixel-grid-kind="frame"]'
+      );
+      const lightStroke = gridElement?.querySelector<SVGPathElement>(
+        '[data-pixel-grid-tone="light"]'
+      );
+      const matrix = gridElement?.getScreenCTM();
+
+      if (!(lightStroke && matrix)) {
+        return null;
+      }
+
+      const screenScale =
+        lightStroke.getAttribute("vector-effect") === "non-scaling-stroke"
+          ? 1
+          : Math.hypot(matrix.a, matrix.b);
+
+      return Number(lightStroke.getAttribute("stroke-width")) * screenScale;
+    });
+  const initialStrokeWidth = await readLightStrokeWidth();
+  const hostBox = await page.locator(".canvas-host").boundingBox();
+
+  if (!hostBox) {
+    throw new Error("Missing canvas host");
+  }
+
+  await page.evaluate(
+    ({ point }) => {
+      const target = document.elementFromPoint(point.x, point.y);
+
+      for (let index = 0; index < 12; index += 1) {
+        target?.dispatchEvent(
+          new WheelEvent("wheel", {
+            altKey: true,
+            bubbles: true,
+            cancelable: true,
+            clientX: point.x,
+            clientY: point.y,
+            deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+            deltaY: -12,
+            metaKey: true,
+          })
+        );
+      }
+    },
+    {
+      point: {
+        x: Math.round(hostBox.x + hostBox.width * 0.72),
+        y: Math.round(hostBox.y + hostBox.height * 0.38),
+      },
+    }
+  );
+
+  const burstStrokeWidth = await readLightStrokeWidth();
+
+  await page.waitForTimeout(300);
+
+  const settledStrokeWidth = await readLightStrokeWidth();
+
+  expect(initialStrokeWidth).not.toBeNull();
+  expect(burstStrokeWidth).not.toBeNull();
+  expect(settledStrokeWidth).not.toBeNull();
+  expect(burstStrokeWidth).toBeCloseTo(initialStrokeWidth || 0, 1);
+  expect(settledStrokeWidth).toBeCloseTo(initialStrokeWidth || 0, 1);
+});
+
 test("uses effective source pixels across resident and tiled Raster paths", async ({
   page,
 }) => {
