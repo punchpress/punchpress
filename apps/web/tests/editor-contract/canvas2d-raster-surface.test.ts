@@ -532,6 +532,13 @@ describe("Editor Raster surface injection", () => {
       bounds: { height: 100, width: 100, x: 0, y: 0 },
       id: target.id,
       pixelSize: { height: 100, width: 100 },
+      writableBounds: { height: 100, width: 100, x: 0, y: 0 },
+      writablePolygon: [
+        { x: 0, y: 0 },
+        { x: 100, y: 0 },
+        { x: 100, y: 100 },
+        { x: 0, y: 100 },
+      ],
     });
     expect(recorder.commits).toHaveLength(1);
     expect(recorder.commits[0]?.context).toMatchObject({

@@ -1,6 +1,7 @@
 import { duplicateClipboardContent } from "../clipboard/clipboard-actions";
 import { finishEditingIfNeeded } from "../editing/editing-actions";
 import { isSelected } from "../selection/selection-actions";
+import { getImageLocalClipBounds } from "../tools/brush-target";
 
 export const deleteSelected = (editor) => {
   finishEditingIfNeeded(editor);
@@ -88,7 +89,41 @@ export const setNodeOrder = (editor, nodeIds, parentId) => {
 export const moveNodeToParent = (editor, nodeId, parentId, beforeNodeId) => {
   finishEditingIfNeeded(editor);
   editor.run(() => {
+    const node = editor.getNode(nodeId);
+    const previousFrameBounds =
+      node?.type === "image" ? getImageLocalClipBounds(editor, node) : null;
+
     editor.getState().moveNodeToParent(nodeId, parentId, beforeNodeId);
+
+    const movedNode = editor.getNode(nodeId);
+    const remainsFrameOwned =
+      movedNode?.type === "image"
+        ? getImageLocalClipBounds(editor, movedNode)
+        : null;
+
+    if (
+      !(
+        movedNode?.type === "image" &&
+        previousFrameBounds &&
+        !remainsFrameOwned
+      )
+    ) {
+      return;
+    }
+
+    editor.getState().updateNodeById(nodeId, (currentNode) =>
+      currentNode.type === "image"
+        ? {
+            ...currentNode,
+            writableHeight:
+              previousFrameBounds.maxY - previousFrameBounds.minY,
+            writableWidth:
+              previousFrameBounds.maxX - previousFrameBounds.minX,
+            writableX: previousFrameBounds.minX,
+            writableY: previousFrameBounds.minY,
+          }
+        : currentNode
+    );
   });
 };
 

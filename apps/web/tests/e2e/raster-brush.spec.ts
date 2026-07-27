@@ -1511,6 +1511,78 @@ test("brush can start on an artboard body", async ({ page }) => {
   expect(sample?.a).toBe(255);
 });
 
+test("Frame Raster accepts a later stroke beyond its initial content bounds", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await page.getByRole("button", { name: "Add artboard" }).click();
+  await page.keyboard.press("b");
+
+  await setBrushSliderValue(page, "Brush size", 40);
+  await setBrushSliderValue(page, "Brush opacity", 100);
+  await setBrushSliderValue(page, "Brush hardness", 100);
+
+  const getFrameClientPoint = (xRatio, yRatio) =>
+    page.evaluate(
+      ({ xRatio: nextXRatio, yRatio: nextYRatio }) => {
+        const editor = window.__PUNCHPRESS_EDITOR__;
+        const frame = editor?.nodes.find((node) => node.type === "artboard");
+        const hostRect = editor?.hostRef?.getBoundingClientRect();
+
+        if (!(editor?.viewerRef && frame && hostRect)) {
+          throw new Error("Expected a rendered Frame");
+        }
+
+        return {
+          x:
+            hostRect.left +
+            (frame.transform.x +
+              frame.width * nextXRatio -
+              editor.viewerRef.getScrollLeft()) *
+              editor.zoom,
+          y:
+            hostRect.top +
+            (frame.transform.y +
+              frame.height * nextYRatio -
+              editor.viewerRef.getScrollTop()) *
+              editor.zoom,
+        };
+      },
+      { xRatio, yRatio }
+    );
+  const firstPoint = await getFrameClientPoint(0.2, 0.2);
+  const secondPoint = await getFrameClientPoint(0.78, 0.72);
+
+  await dragBrush(page, [firstPoint, firstPoint]);
+
+  const firstState = await getCommittedImageState(page);
+
+  expect(firstState?.parentId).not.toBe("root");
+  expect(firstState?.width).toBeLessThan(300);
+  expect(firstState?.height).toBeLessThan(300);
+
+  await dragBrush(page, [secondPoint, secondPoint]);
+
+  const secondState = await getCommittedImageState(page);
+  const firstSample = await getCommittedImageSampleAtClientPoint(
+    page,
+    firstPoint
+  );
+  const secondSample = await getCommittedImageSampleAtClientPoint(
+    page,
+    secondPoint
+  );
+  const state = await getStateSnapshot(page);
+
+  expect(secondState?.id).toBe(firstState?.id);
+  expect(state.nodes.filter((node) => node.type === "image")).toHaveLength(1);
+  expect(secondState?.width).toBeGreaterThan(firstState?.width || 0);
+  expect(secondState?.height).toBeGreaterThan(firstState?.height || 0);
+  expect(secondState?.tileSourceCount).toBeGreaterThan(0);
+  expect(firstSample?.a).toBe(255);
+  expect(secondSample?.a).toBe(255);
+});
+
 test("artboard brush strokes do not grow raster payloads outside the frame", async ({
   page,
 }) => {

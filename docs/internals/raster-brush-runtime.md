@@ -85,10 +85,14 @@ belong to raster surfaces, while cursor chrome belongs to the tool overlay.
 - Paint strokes use tiled working surfaces when the raster is large or visually
   over-dense. Density is based on raster pixels per visible screen pixel, not a
   fixed zoom number.
-- Existing unclipped raster planes keep their intrinsic width, height,
-  transform, rotation, and base frame when a stroke commits.
+- Existing Raster payloads stay anchored when a stroke commits. Content bounds
+  expand only when paint reaches writable transparent space.
 - Brush-created layers can start bounded around their first stroke.
-- Artboard-child rasters clip to the artboard.
+- Frame-child Rasters derive writable bounds from the Frame, independent of
+  content bounds and backing allocation. Frame clipping remains authoritative
+  when child content or transforms overflow.
+- Standalone Rasters use a finite persisted writable canvas; only Crop changes
+  its extent.
 - Eraser uses the same brush engine and clips to the existing raster plane. It
   does not expand a layer by erasing transparent space outside the current
   pixels.

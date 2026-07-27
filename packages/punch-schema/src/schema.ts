@@ -174,6 +174,10 @@ export const imageNodeSchema = baseNodeSchema
     transform: transformSchema,
     type: z.literal("image"),
     width: finiteNumber,
+    writableHeight: finiteNumber.optional(),
+    writableWidth: finiteNumber.optional(),
+    writableX: finiteNumber.optional(),
+    writableY: finiteNumber.optional(),
   })
   .strict();
 

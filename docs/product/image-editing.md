@@ -26,16 +26,23 @@ undoable action.
   layer as raster content.
 - **Bounded new raster layers.** Brush-created layers start with the rectangle
   that contains painted pixels. Strokes expand the layer when needed.
-- **Stable existing raster planes.** Existing image layers keep their width,
-  height, transform, rotation, and base raster plane while Brush and Eraser
-  update pixels.
+- **Distinct Raster bounds.** Content bounds describe the visible layer,
+  writable bounds describe where Brush may add pixels, and pixel allocation
+  describes only the backing payload. Tight content and sparse allocation do
+  not reduce writable bounds.
+- **Frame-owned writable canvas.** A Raster nested anywhere in a Frame can
+  paint throughout that Frame. Strokes outside the Frame are no-ops, and
+  transformed child overflow remains clipped to the Frame.
+- **Finite standalone canvas.** Detaching a Raster from a Frame retains the
+  former Frame-sized writable canvas. Imported standalone images use their
+  image canvas. Neither standalone canvas grows from Brush input.
 - **Ordinary resize.** Selection handles scale retained Raster content and its
   visible bounds together. Crop is the only bounds-only image resize.
 - **Finite auto creation.** An active visible, writable Frame is a finite
   insertion target. Brush creates a Raster only when a gesture first intersects
   that Frame.
-- **Crop.** Crop changes a Raster's visible bounds without deleting hidden
-  pixels. Expansion adds transparent paintable area.
+- **Crop.** Crop changes a Raster's visible and writable canvas without
+  deleting retained pixels. Expansion adds transparent paintable area.
 - **Pixel presentation.** Raster zoom is presentation-only. Browser
   interpolation stays smooth while either source-pixel axis is small or
   minified. Once both axes reach `2` logical screen pixels per source pixel,
@@ -104,6 +111,12 @@ hidden for Eraser.
   only after the gesture intersects its writable parent Frame.
 - **Active Frame.** Brush creates one Raster child at first intersection. The
   Frame remains a container and insertion target, never a pixel buffer.
+- **Later Frame strokes.** Pointer-up does not replace the target. A later
+  Stroke elsewhere inside the Frame expands the same Raster's content even
+  when it starts outside that Raster's current visible bounds.
+- **Standalone bounds.** Brush clips a root Raster to its retained finite
+  writable canvas. Crop is the explicit operation for enlarging or reducing
+  that canvas.
 - **Outside-only gesture.** A gesture that never intersects the active finite
   target creates no layer, pixels, allocation, or history step.
 - **Invalid target.** Empty documents and active vector, text, hidden, or

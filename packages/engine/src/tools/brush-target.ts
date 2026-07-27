@@ -349,25 +349,51 @@ export const getRasterWritableBounds = (editor, node) => {
 
   const clipBounds = getImageLocalClipBounds(editor, node);
 
-  if (!clipBounds) {
-    return null;
+  if (clipBounds) {
+    return {
+      height: Math.max(0, clipBounds.maxY - clipBounds.minY),
+      width: Math.max(0, clipBounds.maxX - clipBounds.minX),
+      x: clipBounds.minX,
+      y: clipBounds.minY,
+    };
   }
 
-  const minX = Math.max(0, clipBounds.minX);
-  const minY = Math.max(0, clipBounds.minY);
-  const maxX = Math.min(node.width, clipBounds.maxX);
-  const maxY = Math.min(node.height, clipBounds.maxY);
+  const hasStoredWritableBounds =
+    Number.isFinite(node.writableX) &&
+    Number.isFinite(node.writableY) &&
+    Number.isFinite(node.writableWidth) &&
+    Number.isFinite(node.writableHeight) &&
+    node.writableWidth > 0 &&
+    node.writableHeight > 0;
 
   return {
-    height: Math.max(0, maxY - minY),
-    width: Math.max(0, maxX - minX),
-    x: minX,
-    y: minY,
+    height: hasStoredWritableBounds ? node.writableHeight : node.height,
+    width: hasStoredWritableBounds ? node.writableWidth : node.width,
+    x: hasStoredWritableBounds ? node.writableX : 0,
+    y: hasStoredWritableBounds ? node.writableY : 0,
   };
 };
 
-export const getRasterWritablePolygon = (editor, node) =>
-  node?.type === "image" ? getImageLocalClipPolygon(editor, node) : null;
+export const getRasterWritablePolygon = (editor, node) => {
+  if (node?.type !== "image") {
+    return null;
+  }
+
+  const framePolygon = getImageLocalClipPolygon(editor, node);
+
+  if (framePolygon) {
+    return framePolygon;
+  }
+
+  const bounds = getRasterWritableBounds(editor, node);
+
+  return [
+    { x: bounds.x, y: bounds.y },
+    { x: bounds.x + bounds.width, y: bounds.y },
+    { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
+    { x: bounds.x, y: bounds.y + bounds.height },
+  ];
+};
 
 export const materializeBrushTarget = (editor, targetNode) => {
   const existingNode = editor.getNode(targetNode.id);

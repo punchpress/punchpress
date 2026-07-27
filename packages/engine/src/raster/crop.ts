@@ -158,6 +158,10 @@ export const getCroppedImageNode = (node, inputRect: RasterCropRect) => {
         }
       : {}),
     width: rect.width,
+    writableHeight: rect.height,
+    writableWidth: rect.width,
+    writableX: 0,
+    writableY: 0,
   };
   const transform = getNodeTransformForPinnedWorldPoint(
     nextNode,

@@ -456,6 +456,10 @@ describe(".punch layer persistence", () => {
           type: "image",
           visible: true,
           width: 1200,
+          writableHeight: 1400,
+          writableWidth: 1600,
+          writableX: -200,
+          writableY: -100,
         },
       ],
       version: PUNCH_DOCUMENT_VERSION,
@@ -497,6 +501,10 @@ describe(".punch layer persistence", () => {
       baseY: 32,
       height: 1100,
       width: 1200,
+      writableHeight: 1400,
+      writableWidth: 1600,
+      writableX: -200,
+      writableY: -100,
     });
     expect(entries.has("assets/raster/asset_sparse_tile_image/base.png")).toBe(
       true
@@ -522,6 +530,10 @@ describe(".punch layer persistence", () => {
       baseY: 32,
       height: 1100,
       width: 1200,
+      writableHeight: 1400,
+      writableWidth: 1600,
+      writableX: -200,
+      writableY: -100,
     });
     expect(hydratedNode.tileSources?.[0].src).toBe(
       "data:image/png;base64,ZGlydHktdGlsZQ=="

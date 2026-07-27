@@ -61,6 +61,10 @@ type ImageNode = {
   baseY?: number;
   baseWidth?: number;
   baseHeight?: number;
+  writableX?: number;
+  writableY?: number;
+  writableWidth?: number;
+  writableHeight?: number;
   transform: Transform;
 };
 ```
@@ -68,7 +72,12 @@ type ImageNode = {
 `width` and `height` define the node's logical render, hit, selection, and
 transform bounds. `baseX`, `baseY`, `baseWidth`, and `baseHeight` place the base
 raster payload inside those logical bounds when sparse tiled edits grow the node
-left or upward.
+left or upward. `writableX`, `writableY`, `writableWidth`, and
+`writableHeight` store a standalone Raster's finite paintable rectangle when it
+differs from the logical content bounds. They are omitted for imported images
+whose own rectangle is writable. While an image remains Frame-owned, its
+writable domain is derived from the Frame; detaching it snapshots that domain
+into these fields.
 
 ## Common Fields
 

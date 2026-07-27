@@ -82,12 +82,21 @@ type ImageNode = {
   assetId: string;
   width: number;
   height: number;
+  writableX?: number;
+  writableY?: number;
+  writableWidth?: number;
+  writableHeight?: number;
 };
 ```
 
 Pixel content belongs to a raster asset. A raster asset may be a single image
 payload or a tiled payload. Active working surfaces are runtime buffers and are
-not saved directly.
+not saved directly. `width` and `height` are visible content bounds.
+Frame-owned writable bounds are derived from the owning Frame in image-local
+coordinates. The optional `writable*` rectangle persists the finite canvas of a
+standalone Raster when it differs from content bounds; missing fields default
+to the image's own rectangle. Backing canvas and tile allocation may remain
+tight or sparse within that writable domain.
 
 ## Tool Interaction
 

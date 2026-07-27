@@ -228,6 +228,231 @@ describe("Raster targeting", () => {
     expect(editor.activeLayerId).toBe(frame.id);
   });
 
+  test("a second Frame stroke expands the same Raster beyond its initial content bounds", async () => {
+    const recorder = createRasterOperationRecorder();
+    const resolvedTargets: RasterTarget[] = [];
+    const editor = new Editor({
+      rasterSurface: {
+        resolveSurface: (target: RasterTarget) => {
+          resolvedTargets.push(structuredClone(target));
+          return recorder;
+        },
+      },
+    });
+    const frame = createFrame("frame", { height: 300, width: 400 });
+
+    editor.insertNodes([frame]);
+    editor.select(frame.id);
+    editor.setActiveTool("brush");
+
+    await editor
+      .dispatchCanvasPointerDown({ point: { x: 40, y: 40 } })
+      ?.complete({ point: { x: 50, y: 50 } });
+
+    const raster = editor.nodes.find((node) => node.type === "image");
+
+    expect(raster).toBeDefined();
+    expect(raster?.width).toBeLessThan(200);
+    expect(raster?.height).toBeLessThan(200);
+    expect(
+      editor.getRasterTargetState({
+        point: { x: 320, y: 240 },
+        tool: "brush",
+      })
+    ).toMatchObject({
+      enabled: true,
+      kind: "existing",
+      nodeId: raster?.id,
+    });
+
+    await editor
+      .dispatchCanvasPointerDown({ point: { x: 320, y: 240 } })
+      ?.complete({ point: { x: 330, y: 250 } });
+
+    expect(editor.nodes.filter((node) => node.type === "image")).toHaveLength(
+      1
+    );
+    expect(editor.activeLayerId).toBe(raster?.id);
+    expect(resolvedTargets).toHaveLength(2);
+    expect(recorder.commits).toHaveLength(2);
+    expect(recorder.commits[1]?.context.target.id).toBe(raster?.id);
+  });
+
+  test("a Frame remains the writable domain when child content moves beyond it", async () => {
+    const recorder = createRasterOperationRecorder();
+    const targets: RasterTarget[] = [];
+    const editor = new Editor({
+      rasterSurface: {
+        resolveSurface: (target: RasterTarget) => {
+          targets.push(structuredClone(target));
+          return recorder;
+        },
+      },
+    });
+    const frame = createFrame("frame");
+    const raster = createImage("raster", {
+      parentId: frame.id,
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: 600,
+        y: 100,
+      },
+    });
+
+    editor.insertNodes([frame, raster]);
+    editor.select(raster.id);
+    editor.setActiveTool("brush");
+
+    await editor
+      .dispatchCanvasPointerDown({ point: { x: 40, y: 40 } })
+      ?.complete({ point: { x: 50, y: 50 } });
+
+    expect(targets).toHaveLength(1);
+    expect(targets[0]).toMatchObject({
+      bounds: {
+        height: 400,
+        width: 500,
+        x: -600,
+        y: -100,
+      },
+      id: raster.id,
+      writableBounds: {
+        height: 400,
+        width: 500,
+        x: -600,
+        y: -100,
+      },
+    });
+    expect(recorder.commits).toHaveLength(1);
+
+    await editor
+      .dispatchCanvasPointerDown({ point: { x: 700, y: 40 } })
+      ?.complete({ point: { x: 710, y: 50 } });
+
+    expect(targets).toHaveLength(1);
+    expect(recorder.commits).toHaveLength(1);
+  });
+
+  test("detaching a Frame Raster retains a finite Frame-sized writable canvas", async () => {
+    const recorder = createRasterOperationRecorder();
+    const targets: RasterTarget[] = [];
+    const editor = new Editor({
+      rasterSurface: {
+        resolveSurface: (target: RasterTarget) => {
+          targets.push(structuredClone(target));
+          return recorder;
+        },
+      },
+    });
+    const frame = createFrame("frame");
+    const raster = createImage("raster", {
+      baseHeight: 60,
+      baseWidth: 80,
+      height: 60,
+      parentId: frame.id,
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: 100,
+        y: 80,
+      },
+      width: 80,
+    });
+
+    editor.insertNodes([frame, raster]);
+    editor.select(raster.id);
+    editor.moveNodeToParent(raster.id, "root", null);
+
+    expect(editor.getNode(raster.id)).toMatchObject({
+      parentId: "root",
+      writableHeight: 400,
+      writableWidth: 500,
+      writableX: -100,
+      writableY: -80,
+    });
+
+    editor.select(raster.id);
+    editor.setActiveTool("brush");
+    await editor
+      .dispatchCanvasPointerDown({ point: { x: 20, y: 20 } })
+      ?.complete({ point: { x: 30, y: 30 } });
+
+    expect(targets[0]).toMatchObject({
+      bounds: {
+        height: 400,
+        width: 500,
+        x: -100,
+        y: -80,
+      },
+      id: raster.id,
+      writableBounds: {
+        height: 400,
+        width: 500,
+        x: -100,
+        y: -80,
+      },
+      writablePolygon: [
+        { x: -100, y: -80 },
+        { x: 400, y: -80 },
+        { x: 400, y: 320 },
+        { x: -100, y: 320 },
+      ],
+    });
+    expect(recorder.commits).toHaveLength(1);
+
+    await editor
+      .dispatchCanvasPointerDown({ point: { x: 700, y: 20 } })
+      ?.complete({ point: { x: 710, y: 30 } });
+
+    expect(targets).toHaveLength(1);
+    expect(recorder.commits).toHaveLength(1);
+  });
+
+  test("an imported standalone Raster uses its image canvas as writable bounds", async () => {
+    const recorder = createRasterOperationRecorder();
+    const targets: RasterTarget[] = [];
+    const editor = new Editor({
+      rasterSurface: {
+        resolveSurface: (target: RasterTarget) => {
+          targets.push(structuredClone(target));
+          return recorder;
+        },
+      },
+    });
+    const raster = createImage("raster");
+
+    editor.insertNodes([raster]);
+    editor.select(raster.id);
+    editor.setActiveTool("brush");
+
+    await editor
+      .dispatchCanvasPointerDown({ point: { x: 120, y: 120 } })
+      ?.complete({ point: { x: 130, y: 130 } });
+
+    expect(targets[0]).toMatchObject({
+      bounds: { height: 100, width: 100, x: 0, y: 0 },
+      id: raster.id,
+      writableBounds: { height: 100, width: 100, x: 0, y: 0 },
+      writablePolygon: [
+        { x: 0, y: 0 },
+        { x: 100, y: 0 },
+        { x: 100, y: 100 },
+        { x: 0, y: 100 },
+      ],
+    });
+    expect(recorder.commits).toHaveLength(1);
+
+    await editor
+      .dispatchCanvasPointerDown({ point: { x: 300, y: 120 } })
+      ?.complete({ point: { x: 310, y: 130 } });
+
+    expect(targets).toHaveLength(1);
+    expect(recorder.commits).toHaveLength(1);
+  });
+
   test("canceling headless Frame materialization restores state and retires the session", () => {
     const recorder = createRasterOperationRecorder();
     const editor = new Editor({
@@ -536,8 +761,8 @@ describe("Raster targeting", () => {
       ?.cancel();
     expect(target?.writableBounds).toEqual({
       height: 100,
-      width: 50,
-      x: 0,
+      width: 100,
+      x: -50,
       y: 0,
     });
 
@@ -551,7 +776,7 @@ describe("Raster targeting", () => {
     ).toEqual({ enabled: false, kind: "invalid" });
   });
 
-  test("clips a Frame child target before Dab work", async () => {
+  test("clips a Frame child target to its Frame before Dab work", async () => {
     const recorder = createRasterOperationRecorder();
     let target: RasterTarget | null = null;
     const editor = new Editor({
@@ -588,13 +813,13 @@ describe("Raster targeting", () => {
     await session?.complete({ point: { x: 1_000_000, y: 50 } });
 
     expect(target).toMatchObject({
-      bounds: { height: 100, width: 100, x: 0, y: 0 },
-      writableBounds: { height: 100, width: 50, x: 0, y: 0 },
+      bounds: { height: 100, width: 100, x: -50, y: 0 },
+      writableBounds: { height: 100, width: 100, x: -50, y: 0 },
     });
     const dabs = recorder.commits[0]?.dabs || [];
     expect(dabs.length).toBeGreaterThan(0);
     expect(dabs.length).toBeLessThan(200);
-    expect(dabs.every((dab) => dab.center.x >= -12 && dab.center.x <= 62)).toBe(
+    expect(dabs.every((dab) => dab.center.x >= -62 && dab.center.x <= 62)).toBe(
       true
     );
   });
@@ -713,7 +938,36 @@ describe("Raster Crop", () => {
       baseX: 20,
       baseY: 15,
       height: 100,
+      writableHeight: 100,
+      writableWidth: 120,
+      writableX: 0,
+      writableY: 0,
       width: 120,
+    });
+  });
+
+  test("Crop replaces a detached Raster's retained writable canvas", () => {
+    const editor = new Editor();
+    const image = createImage("raster", {
+      writableHeight: 400,
+      writableWidth: 500,
+      writableX: -100,
+      writableY: -80,
+    });
+
+    editor.insertNodes([image]);
+    editor.select(image.id);
+    editor.startCrop();
+    editor.updateCrop({ height: 70, width: 90, x: -20, y: -10 });
+    editor.commitCrop();
+
+    expect(editor.getNode(image.id)).toMatchObject({
+      height: 70,
+      writableHeight: 70,
+      writableWidth: 90,
+      writableX: 0,
+      writableY: 0,
+      width: 90,
     });
   });
 

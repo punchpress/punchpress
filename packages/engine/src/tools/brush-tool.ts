@@ -385,7 +385,6 @@ const getTiledBaseFrame = (node) => {
 
 const getNextTiledImageNodeState = ({
   node,
-  preserveRasterPlane,
   tileSources,
 }) => {
   const nextTileSourcesByRef = new Map(
@@ -398,15 +397,6 @@ const getNextTiledImageNodeState = ({
 
   const existingTileSources = [...nextTileSourcesByRef.values()];
   const baseFrame = getTiledBaseFrame(node);
-
-  if (preserveRasterPlane) {
-    return {
-      ...node,
-      ...baseFrame,
-      mimeType: "image/png",
-      tileSources: existingTileSources,
-    };
-  }
 
   const currentNode = {
     ...node,
@@ -461,6 +451,13 @@ const getNextTiledImageNodeState = ({
       ...transform,
     },
     width,
+    ...(Number.isFinite(node.writableX) &&
+    Number.isFinite(node.writableY)
+      ? {
+          writableX: node.writableX + offsetX,
+          writableY: node.writableY + offsetY,
+        }
+      : {}),
   };
 };
 
@@ -1149,12 +1146,12 @@ class BrushStrokeSession {
   }
 
   ensureCanvasIncludesDab(point) {
-    if (this.operation === "erase" || this.preserveRasterPlane) {
+    if (this.operation === "erase") {
       return point;
     }
 
     const { canvas } = this.canvasState;
-    const clipBounds = getImageLocalClipBounds(
+    const writableBounds = getRasterWritableBounds(
       this.editor,
       this.previewNode || this.editor.getNode(this.nodeId)
     );
@@ -1178,18 +1175,16 @@ class BrushStrokeSession {
     }
 
     const expansionPadding = getBrushLayerExpansionPadding(this.settings);
-    const maxLeft = clipBounds
-      ? Math.max(0, Math.ceil(-clipBounds.minX))
-      : Number.POSITIVE_INFINITY;
-    const maxTop = clipBounds
-      ? Math.max(0, Math.ceil(-clipBounds.minY))
-      : Number.POSITIVE_INFINITY;
-    const maxRight = clipBounds
-      ? Math.max(0, Math.ceil(clipBounds.maxX - canvas.width))
-      : Number.POSITIVE_INFINITY;
-    const maxBottom = clipBounds
-      ? Math.max(0, Math.ceil(clipBounds.maxY - canvas.height))
-      : Number.POSITIVE_INFINITY;
+    const writableMinX = writableBounds.x - this.canvasOffset.x;
+    const writableMinY = writableBounds.y - this.canvasOffset.y;
+    const writableMaxX =
+      writableMinX + writableBounds.width;
+    const writableMaxY =
+      writableMinY + writableBounds.height;
+    const maxLeft = Math.max(0, Math.ceil(-writableMinX));
+    const maxTop = Math.max(0, Math.ceil(-writableMinY));
+    const maxRight = Math.max(0, Math.ceil(writableMaxX - canvas.width));
+    const maxBottom = Math.max(0, Math.ceil(writableMaxY - canvas.height));
     const left = requiredLeft
       ? Math.min(requiredLeft + expansionPadding, maxLeft)
       : 0;
@@ -1226,10 +1221,17 @@ class BrushStrokeSession {
         canvas: nextCanvas,
         context: nextContext,
       };
-      this.canvasOffset = {
-        x: this.canvasOffset.x - left,
-        y: this.canvasOffset.y - top,
-      };
+      if (this.preserveRasterPlane) {
+        this.writablePolygon = this.writablePolygon?.map((polygonPoint) => ({
+          x: polygonPoint.x + left,
+          y: polygonPoint.y + top,
+        }));
+      } else {
+        this.canvasOffset = {
+          x: this.canvasOffset.x - left,
+          y: this.canvasOffset.y - top,
+        };
+      }
       this.expandFloatPixels({ bottom, left, right, top });
 
       if (this.lastPoint) {
@@ -1302,6 +1304,13 @@ class BrushStrokeSession {
         ...nextTransform,
       },
       width: nextNode.width,
+      ...(Number.isFinite(currentNode.writableX) &&
+      Number.isFinite(currentNode.writableY)
+        ? {
+            writableX: currentNode.writableX + left,
+            writableY: currentNode.writableY + top,
+          }
+        : {}),
     };
   }
 
@@ -1421,6 +1430,14 @@ class BrushStrokeSession {
               ...committedCanvas.transform,
             },
             width: committedCanvas.visibleWidth ?? committedCanvas.width,
+            ...(this.previewNode &&
+            Number.isFinite(this.previewNode.writableX) &&
+            Number.isFinite(this.previewNode.writableY)
+              ? {
+                  writableX: this.previewNode.writableX,
+                  writableY: this.previewNode.writableY,
+                }
+              : {}),
           };
         });
       })
@@ -1561,7 +1578,6 @@ class BrushStrokeSession {
 
           committedNode = getNextTiledImageNodeState({
             node,
-            preserveRasterPlane: this.preserveRasterPlane,
             tileSources,
           });
           return committedNode;
@@ -1835,8 +1851,12 @@ class BrushStrokeSession {
       canvas: this.canvasState.canvas,
       height: this.canvasState.canvas.height,
       transform: this.previewNode?.transform || node?.transform || {},
-      visibleHeight: node?.height ?? this.canvasState.canvas.height,
-      visibleWidth: node?.width ?? this.canvasState.canvas.width,
+      visibleHeight:
+        this.previewNode?.height ??
+        node?.height ??
+        this.canvasState.canvas.height,
+      visibleWidth:
+        this.previewNode?.width ?? node?.width ?? this.canvasState.canvas.width,
       width: this.canvasState.canvas.width,
     };
   }
@@ -1951,18 +1971,19 @@ class BrushStrokeSession {
 const getRasterStrokeTarget = (editor, node) => {
   const writableBounds = getRasterWritableBounds(editor, node);
   const writablePolygon = getRasterWritablePolygon(editor, node);
+  const bounds = writableBounds || {
+    height: node.height,
+    width: node.width,
+    x: 0,
+    y: 0,
+  };
 
   return {
-    bounds: {
-      height: node.height,
-      width: node.width,
-      x: 0,
-      y: 0,
-    },
+    bounds,
     id: node.id,
     pixelSize: {
-      height: node.height,
-      width: node.width,
+      height: Math.max(1, Math.ceil(bounds.height)),
+      width: Math.max(1, Math.ceil(bounds.width)),
     },
     ...(writableBounds ? { writableBounds } : {}),
     ...(writablePolygon ? { writablePolygon } : {}),

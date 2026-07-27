@@ -53,4 +53,6 @@ Layer rows expose node source kind through the node type.
 
 Brush targets the active layer. It acts directly on a writable image node, or
 materializes an active empty layer after a Stroke first intersects its writable
-Frame. Frames are active insertion targets, not pixel buffers.
+Frame. Frames are active insertion targets, not pixel buffers. Reparenting a
+Raster from a Frame to the root snapshots the former Frame-sized writable
+canvas so the detached layer stays finite without shrinking to painted content.

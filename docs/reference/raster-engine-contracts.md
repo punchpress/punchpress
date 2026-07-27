@@ -25,6 +25,11 @@ WebGPU, encoded images, package storage, or Workspace dimensions.
 - A `RasterTarget` locks one finite target id, document bounds, pixel
   dimensions, and optional writable bounds and transformed Frame polygon for
   the full Stroke.
+- Content bounds, writable bounds, and surface pixel allocation are independent.
+  A Frame-child target uses the complete owning Frame in image-local
+  coordinates even when content and allocation are tight. A standalone target
+  uses its saved finite writable rectangle, or its image rectangle when no
+  separate rectangle is saved.
 - Tool pointer-down may hold a deferred target lock without opening a
   `RasterSurface`. Surface resolution and Stroke creation begin only when the
   input path first intersects the finite target expanded by the Dab radius.
