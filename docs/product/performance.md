@@ -21,9 +21,19 @@ move through real design work.
 - The app and automation share benchmark definitions.
 - Flame charts should use product and architecture labels rather than benchmark
   fixture labels.
-- Resident Raster strokes target 60 FPS, first visible feedback within 16.7 ms,
-  no more than two frames of visual lag, no Brush-owned main-thread stall over
-  50 ms, and pointer release within 50 ms.
+- Resident and Frame-created Raster strokes target 60 FPS, first visible
+  feedback within 16.7 ms, no more than two frames of visual lag, no
+  Brush-owned main-thread stall over 50 ms, and pointer release within 50 ms.
+- A first stroke on an empty Frame should have the same ongoing drag latency as
+  later strokes after the Raster content bounds have expanded. Layer
+  materialization may add bounded one-time work, but content-bound growth must
+  not move or resize the live drawing plane.
+- Sustained curved brush input on a 5000 px Raster must retain its sampled path;
+  frame pressure must not collapse the curve into sparse straight chords.
+- Touching or crossing a Raster boundary must not replay the held stroke or
+  permanently degrade subsequent interior brush latency. The work for an edge
+  crossing is bounded by the painted path and boundary, not by the distance to
+  an out-of-bounds pointer coordinate.
 
 See [Performance HUD](performance-hud.md), [Benchmarks](benchmarks.md), and
 [Performance operations](../operations/performance.md).

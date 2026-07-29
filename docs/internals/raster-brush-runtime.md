@@ -20,11 +20,23 @@ surface across Stroke begin, pointer movement, commit, and cancel.
   placement-preserved selection and explicit reselection share the same finite
   resident surface.
 - Hard Round uses native Canvas2D paths when its settings preserve continuous
-  path semantics.
+  path semantics. Smoothing changes path geometry; it does not force the
+  standard opaque round brush through per-pixel Dab compositing. Native
+  smoothing emits bounded geometry per input segment, independent of Dab
+  spacing, so an extreme low-zoom pointer move cannot create tens of thousands
+  of path vertices.
 - Soft, transformed, sampled, scattered, and jittered tips use cached Canvas2D
   tip canvases and deterministic Dab stamping.
-- Large, tiled, cropped, and not-yet-resident Rasters consume the same Dabs
-  through their working canvas or tile surface.
+- Large, tiled, cropped, and not-yet-resident Rasters use the same path-or-Dab
+  decision through their working canvas or tile surface. A Hard Round path
+  clipped by its finite Raster plane stays entirely native; the surface owns
+  the edge and no boundary Dabs are generated. Other writable polygons clip
+  native runs to their safe interior and advance a canonical Dab generator
+  alongside the path, rejecting interior centers before materializing Dabs.
+  Only Dabs whose tips intersect the writable boundary reach the pixel
+  compositor. Touching an edge never drops the valid interior segment, replays
+  prior points, or permanently changes the rest of the held stroke to Dab
+  compositing.
 - Eraser uses the same Dabs with `destination-out`.
 - Each Dab batch captures its affected pixel rectangle through native
   `drawImage`; cancel replays those patches in reverse.
@@ -32,8 +44,12 @@ surface across Stroke begin, pointer movement, commit, and cancel.
   node source.
 - Pointer movement does not use JavaScript pixel loops, `getImageData`,
   `putImageData`, or encoded-image handoff.
-- Magnified exact-sample projections subscribe directly to resident surface
-  mutations and coalesce backing refreshes to one per animation frame.
+- Magnified exact-sample projections subscribe directly to resident canvases
+  and working-tile mutations, then coalesce backing refreshes to one per
+  animation frame.
+- Connected working-tile canvases mutate without React notification. A newly
+  touched tile publishes one structural update synchronously so its canvas is
+  mounted for the same presentation frame.
 
 Target creation, empty-layer materialization, tiled Raster behavior, history
 deltas, persistence, and export remain outside this resident-surface path.
@@ -47,11 +63,13 @@ The raster brush runtime is a working-surface system:
 | Raster renderer | Committed image/tile rendering, active working-surface rendering, viewport culling, LOD projection, and render-ready acknowledgement. |
 | Brush cursor | Tool footprint chrome only. It does not own stroke pixels. |
 
-Pointer moves write into the authoritative in-memory raster surface immediately.
-The renderer draws that same surface while the stroke is active and while async
-persistence is catching up. Pointerup finalizes the dirty surface into document
-assets and creates one history entry. There is no SVG/vector live-stroke overlay
-and no live-preview-to-raster handoff.
+Pointer moves retain the browser's coalesced samples and write them into the
+authoritative in-memory raster surface in order. The renderer draws that same
+surface while the stroke is active and while async persistence is catching up.
+Pointerup finalizes the dirty surface into document assets and creates one
+history entry. There is no SVG/vector live-stroke overlay or path replay. Tiled
+persistence stages its encoded images behind the working surface and swaps
+representations only after the new images are ready.
 
 ## Reference Findings
 
@@ -82,26 +100,43 @@ belong to raster surfaces, while cursor chrome belongs to the tool overlay.
 - Native built-ins are immutable data. Each tool owns an independent temporary
   settings copy and deterministic seed.
 - Pointer moves mutate the working raster surface directly.
+- Brush placement retains coalesced pointer samples instead of replacing a
+  curved input run with its last event for the presentation frame.
 - Paint strokes use tiled working surfaces when the raster is large or visually
   over-dense. Density is based on raster pixels per visible screen pixel, not a
   fixed zoom number.
 - Existing Raster payloads stay anchored when a stroke commits. Content bounds
   expand only when paint reaches writable transparent space.
-- Brush-created layers can start bounded around their first stroke.
+- Brush-created layers keep tight content bounds around painted pixels for
+  selection, hit testing, and layer export.
 - Frame-child Rasters derive writable bounds from the Frame, independent of
-  content bounds and backing allocation. Frame clipping remains authoritative
-  when child content or transforms overflow.
+  content bounds and backing allocation. Their DOM presentation plane stays
+  Frame-sized across strokes, so painting never resizes or repositions the
+  live surface. The transparent part of that plane is not a selection hit
+  target. Frame clipping remains authoritative when child content or
+  transforms overflow.
 - Standalone Rasters use a finite persisted writable canvas; only Crop changes
-  its extent.
+  its extent. Brush tips are clipped to that canvas before plane-expansion
+  policy is evaluated, so an edge stroke cannot turn a standalone Raster into
+  an expanding layer. Leaving and re-entering that canvas preserves canonical
+  edge coverage without degrading later interior input.
 - Eraser uses the same brush engine and clips to the existing raster plane. It
   does not expand a layer by erasing transparent space outside the current
   pixels.
-- Completed working surfaces remain mounted until the document has received
-  updated tile sources and the raster renderer acknowledges that the matching
-  committed render key has painted. The renderer waits for a short stable
-  paint window after committed tile images load, because image `load` does not
+- Completed working-surface state remains retained until the document has
+  received updated tile sources and the raster renderer acknowledges that the
+  matching committed render key has painted. Existing committed tiles remain
+  visible while newly encoded tiles decode invisibly. The renderer then swaps
+  the new tiles for the working surface in one render: the two representations
+  never overlap, and neither may be absent. It waits for a short stable paint
+  window before acknowledging the commit because image `load` does not
   guarantee that a large SVG tile set is composited on screen. A time fallback
   only protects offscreen or unmounted renderer cases.
+- A follow-up Stroke locks its pointer-down Raster, then waits for the earlier
+  tiled commit's full renderer handoff and retirement before resolving that
+  Raster's current local coordinate plane. Pointer samples received during the
+  wait are retained and replayed in order. Additional rapid Strokes queue
+  behind the same handoff chain.
 - Tile gutters are part of the tile surface contract. They prevent visual gaps
   between adjacent committed tile images and working tile canvases.
 - Raster LOD previews are derived from committed raster/tile data. They do not
@@ -119,15 +154,17 @@ belong to raster surfaces, while cursor chrome belongs to the tool overlay.
 1. Pointer down locks the active finite Raster or Frame in a deferred gesture.
 2. Pointer movement outside that target performs no surface resolution or
    allocation.
-3. First intersection opens one Stroke session and appends clipped points into
-   the working canvas or touched working tiles.
+3. First intersection opens one Stroke session and appends clipped, coalesced
+   points into the working canvas or touched working tiles.
 4. The raster renderer mounts the working canvas or working tiles inside the
    image node's normal render tree.
 5. Pointerup flushes remaining points and starts commit.
 6. Commit encodes dirty PNG tile sources or the dirty single raster payload.
-7. The completed working surface stays visible until committed raster rendering
-   acknowledges the matching render key.
-8. The session retires and undo/redo treats the stroke as one history step.
+7. Existing committed tiles remain visible and new tiles decode invisibly
+   behind the completed working surface.
+8. Once the new tiles are ready, the renderer atomically replaces the working
+   surface and later acknowledges the matching render key.
+9. The session retires and undo/redo treats the stroke as one history step.
 
 ## Debug Capture
 

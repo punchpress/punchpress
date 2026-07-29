@@ -164,12 +164,22 @@ Raster adapter gates:
 | --- | --- |
 | `raster-canvas2d-strokes` | Runs pixel zoom, common Hard Round, large Eraser, and extreme zoom-out on one resident `4500 × 5400` Raster. |
 | `raster-canvas2d-extreme-diagonal` | Runs the full-target 4%-zoom diagonal alone for flame and browser-trace capture. |
+| `raster-frame-brush` | Draws one rapid default Hard Round stroke through the canvas pointer-event path across an initially empty `4500 × 5400` Frame at 12% zoom. |
+| `raster-frame-brush-stable-plane` | Repeats `raster-frame-brush` after corner marks have expanded the Raster content bounds. Compare the pair to detect latency caused by content-bound growth rather than brush work. |
 | `raster-high-zoom` | Pans a resident `4500 × 5400` Frame/Raster at 12,800% with exact samples and the Frame-local pixel grid visible. |
 | `raster-high-zoom-brush` | Draws a continuous 24 px Hard Round curve on a resident `720 × 720` Raster at 1,097% and verifies exact displayed pixels track the working surface. |
 
 Raster spans cover surface decode, Stroke begin, first Dab, Dab application,
 commit, cancel, and pointer release. Counters report Dabs, dirty pixel area,
 direct-presentation updates, and visual-lag frames.
+
+`raster-large-image-held-brush.spec.ts` is the browser budget gate for a
+sustained 106 px Hard Round stroke on a `5000 × 5000` Raster at 15% zoom. It
+also measures edge crossing, re-entry, and subsequent interior input to prevent
+boundary-triggered stroke replay or a permanent renderer downgrade. Its long
+diagonal excursion verifies both bounded edge work and a painted interior
+sample, so skipping the crossing cannot satisfy the latency gate. The same file
+verifies that the canvas placement boundary retains coalesced brush samples.
 
 Benchmarks are scenarios, not namespaces. If a scenario exposes missing
 instrumentation, fix the product boundary instead of inventing a benchmark-only
