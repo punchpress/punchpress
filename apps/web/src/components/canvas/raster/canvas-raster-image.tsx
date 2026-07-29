@@ -772,6 +772,180 @@ const RasterTileImages = ({ onTileLoad, tileSources }) => {
   ));
 };
 
+const getAtomicCommitHandoff = ({
+  loadedTileRefs,
+  tileSources,
+  workingSurface,
+}) => {
+  const commitTileRefs = new Set(workingSurface?.commitTileRefs || []);
+
+  if (!(workingSurface?.completed === true && commitTileRefs.size > 0)) {
+    return {
+      isActive: false,
+      isPendingReady: true,
+      pendingTileSources: [],
+      stableTileSources: tileSources,
+    };
+  }
+
+  const stableTileSources = tileSources.filter(
+    (tile) => !commitTileRefs.has(tile.ref)
+  );
+  const pendingTileSources = tileSources.filter((tile) =>
+    commitTileRefs.has(tile.ref)
+  );
+
+  return {
+    isActive: true,
+    isPendingReady: pendingTileSources.every((tile) =>
+      loadedTileRefs.has(tile.ref)
+    ),
+    pendingTileSources,
+    stableTileSources,
+  };
+};
+
+const useRasterTileHandoff = ({ nodeId, tileSources, workingSurface }) => {
+  const [loadedTileRefs, setLoadedTileRefs] = useState(() => new Set<string>());
+  const areExactTilesReady =
+    tileSources.length === 0 ||
+    tileSources.every((tile) => loadedTileRefs.has(tile.ref));
+  const handoff = getAtomicCommitHandoff({
+    loadedTileRefs,
+    tileSources,
+    workingSurface,
+  });
+  const arePresentedTilesReady = handoff.isActive
+    ? handoff.isPendingReady
+    : areExactTilesReady;
+  const handleTileLoad = useCallback(
+    (tileRef) => {
+      setLoadedTileRefs((current) => {
+        if (current.has(tileRef)) {
+          return current;
+        }
+
+        const refs = new Set(current);
+
+        refs.add(tileRef);
+        recordRasterDebugEvent("renderer.exactTiles.load", {
+          loadedExactTileCount: refs.size,
+          nodeId,
+          tileRef,
+          visibleTileCount: tileSources.length,
+        });
+        return refs;
+      });
+    },
+    [nodeId, tileSources.length]
+  );
+
+  useLayoutEffect(() => {
+    recordRasterDebugEvent("renderer.exactTiles.readyState", {
+      areExactTilesReady,
+      loadedExactTileCount: loadedTileRefs.size,
+      nodeId,
+      visibleTileCount: tileSources.length,
+    });
+  }, [areExactTilesReady, loadedTileRefs.size, nodeId, tileSources.length]);
+
+  return {
+    areExactTilesReady,
+    arePresentedTilesReady,
+    handleTileLoad,
+    handoff,
+    loadedTileCount: loadedTileRefs.size,
+  };
+};
+
+const useRasterRenderReady = ({
+  areExactTilesReady,
+  arePendingTilesReady,
+  arePresentedTilesReady,
+  isRasterPreviewReady,
+  nodeId,
+  rasterRenderKey,
+  shouldBuildPreview,
+  shouldUsePreview,
+}) => {
+  useLayoutEffect(() => {
+    if (!rasterRenderKey) {
+      return;
+    }
+
+    if (shouldBuildPreview && !isRasterPreviewReady) {
+      return;
+    }
+
+    if (!(shouldUsePreview || arePresentedTilesReady)) {
+      return;
+    }
+
+    const mode = shouldUsePreview ? "preview" : "tiles";
+    let frameId = 0;
+    let isCancelled = false;
+    let stableFrameCount = 0;
+    const stableStartTime = performance.now();
+
+    recordRasterDebugEvent("renderer.renderReady.schedule", {
+      areExactTilesReady,
+      arePendingTilesReady,
+      isRasterPreviewReady,
+      mode,
+      nodeId,
+      renderKeyLength: rasterRenderKey.length,
+      shouldBuildPreview,
+      shouldUsePreview,
+    });
+
+    const waitForStablePaint = (timestamp: number) => {
+      if (isCancelled) {
+        return;
+      }
+
+      stableFrameCount += 1;
+      const elapsedMs = timestamp - stableStartTime;
+
+      if (
+        stableFrameCount >= RASTER_RENDER_READY_STABLE_FRAME_COUNT &&
+        elapsedMs >= RASTER_RENDER_READY_MIN_STABLE_MS
+      ) {
+        recordRasterDebugEvent("renderer.renderReady.stable", {
+          elapsedMs,
+          mode,
+          nodeId,
+          renderKeyLength: rasterRenderKey.length,
+          stableFrameCount,
+        });
+        dispatchRasterNodeRenderReady({
+          mode,
+          nodeId,
+          renderKey: rasterRenderKey,
+        });
+        return;
+      }
+
+      frameId = requestAnimationFrame(waitForStablePaint);
+    };
+
+    frameId = requestAnimationFrame(waitForStablePaint);
+
+    return () => {
+      isCancelled = true;
+      cancelAnimationFrame(frameId);
+    };
+  }, [
+    areExactTilesReady,
+    arePendingTilesReady,
+    arePresentedTilesReady,
+    isRasterPreviewReady,
+    nodeId,
+    rasterRenderKey,
+    shouldBuildPreview,
+    shouldUsePreview,
+  ]);
+};
+
 const RasterWorkingCanvas = ({
   artworkOpacity = 1,
   canvas,
@@ -921,6 +1095,7 @@ const RasterWorkingSurface = ({
             height={tile.height}
             key={`${surface.workingSurfaceId}:${tile.x}:${tile.y}:${index}`}
             sampling={sampling}
+            subscribeToSource={tile.subscribeToSource}
             testId="raster-working-tile"
             width={tile.width}
             x={tile.x}
@@ -954,6 +1129,60 @@ const RasterWorkingSurface = ({
 
   return null;
 };
+
+const RasterTiledArtwork = ({
+  baseHeight,
+  baseWidth,
+  baseX,
+  baseY,
+  handleTileLoad,
+  handoff,
+  height,
+  sampling,
+  shouldHideExactTiles,
+  shouldShowWorkingSurface,
+  src,
+  width,
+  workingSurface,
+}) => (
+  <>
+    {src ? (
+      <image
+        height={baseHeight ?? height}
+        href={src}
+        pointerEvents="none"
+        preserveAspectRatio="none"
+        width={baseWidth ?? width}
+        x={baseX ?? 0}
+        y={baseY ?? 0}
+      />
+    ) : null}
+    {shouldHideExactTiles ? null : (
+      <>
+        <RasterTileImages
+          onTileLoad={handleTileLoad}
+          tileSources={handoff.stableTileSources}
+        />
+        <g
+          data-raster-pending-tile-count={handoff.pendingTileSources.length}
+          data-raster-pending-tiles-ready={
+            handoff.isPendingReady ? "true" : "false"
+          }
+          opacity={handoff.isActive && !handoff.isPendingReady ? 0 : 1}
+        >
+          <RasterTileImages
+            onTileLoad={handleTileLoad}
+            tileSources={handoff.pendingTileSources}
+          />
+        </g>
+      </>
+    )}
+    <RasterWorkingSurface
+      sampling={sampling}
+      surface={shouldShowWorkingSurface ? workingSurface : null}
+    />
+  </>
+);
 
 const CanvasTiledRasterImage = ({
   baseHeight,
@@ -995,155 +1224,41 @@ const CanvasTiledRasterImage = ({
   );
   const visibleTileSources = cullState.tileSources;
   const rasterRenderKey = getRasterTileSourcesKey(tileSources);
-  const visibleTileSourcesKey = getRasterTileSourcesKey(visibleTileSources);
   const isRasterPreviewReady =
     cullState.previewKey && readyRasterPreviewKey === cullState.previewKey;
-  const [loadedExactTiles, setLoadedExactTiles] = useState<{
-    key: string;
-    refs: Set<string>;
-  }>({
-    key: "",
-    refs: new Set(),
+  const {
+    areExactTilesReady,
+    arePresentedTilesReady,
+    handleTileLoad: handleExactTileLoad,
+    handoff,
+    loadedTileCount,
+  } = useRasterTileHandoff({
+    nodeId,
+    tileSources: visibleTileSources,
+    workingSurface,
   });
-  const areExactTilesReady =
-    visibleTileSources.length === 0 ||
-    (loadedExactTiles.key === visibleTileSourcesKey &&
-      visibleTileSources.every((tile) => loadedExactTiles.refs.has(tile.ref)));
+  const shouldShowWorkingSurface = !(
+    handoff.isActive && handoff.isPendingReady
+  );
   const shouldHideExactTiles =
     cullState.shouldUsePreview && isRasterPreviewReady;
 
-  useLayoutEffect(() => {
-    setLoadedExactTiles({
-      key: visibleTileSourcesKey,
-      refs: new Set(),
-    });
-    recordRasterDebugEvent("renderer.exactTiles.reset", {
-      nodeId,
-      visibleTileCount: visibleTileSources.length,
-      visibleTileSourcesKeyLength: visibleTileSourcesKey.length,
-    });
-  }, [nodeId, visibleTileSources.length, visibleTileSourcesKey]);
-  const handleExactTileLoad = useCallback(
-    (tileRef) => {
-      setLoadedExactTiles((current) => {
-        if (current.key !== visibleTileSourcesKey) {
-          return current;
-        }
-
-        if (current.refs.has(tileRef)) {
-          return current;
-        }
-
-        const refs = new Set(current.refs);
-
-        refs.add(tileRef);
-        recordRasterDebugEvent("renderer.exactTiles.load", {
-          loadedExactTileCount: refs.size,
-          nodeId,
-          tileRef,
-          visibleTileCount: visibleTileSources.length,
-        });
-        return {
-          key: current.key,
-          refs,
-        };
-      });
-    },
-    [nodeId, visibleTileSources.length, visibleTileSourcesKey]
-  );
-
-  useLayoutEffect(() => {
-    recordRasterDebugEvent("renderer.exactTiles.readyState", {
-      areExactTilesReady,
-      loadedExactTileCount: loadedExactTiles.refs.size,
-      nodeId,
-      visibleTileCount: visibleTileSources.length,
-    });
-  }, [
+  useRasterRenderReady({
     areExactTilesReady,
-    loadedExactTiles.refs.size,
-    nodeId,
-    visibleTileSources.length,
-  ]);
-
-  useLayoutEffect(() => {
-    if (!rasterRenderKey) {
-      return;
-    }
-
-    if (cullState.shouldBuildPreview && !isRasterPreviewReady) {
-      return;
-    }
-
-    if (!(cullState.shouldUsePreview || areExactTilesReady)) {
-      return;
-    }
-
-    const mode = cullState.shouldUsePreview ? "preview" : "tiles";
-    let frameId = 0;
-    let isCancelled = false;
-    let stableFrameCount = 0;
-    const stableStartTime = performance.now();
-
-    recordRasterDebugEvent("renderer.renderReady.schedule", {
-      areExactTilesReady,
-      isRasterPreviewReady,
-      mode,
-      nodeId,
-      renderKeyLength: rasterRenderKey.length,
-      shouldBuildPreview: cullState.shouldBuildPreview,
-      shouldUsePreview: cullState.shouldUsePreview,
-    });
-
-    const waitForStablePaint = (timestamp: number) => {
-      if (isCancelled) {
-        return;
-      }
-
-      stableFrameCount += 1;
-      const elapsedMs = timestamp - stableStartTime;
-
-      if (
-        stableFrameCount >= RASTER_RENDER_READY_STABLE_FRAME_COUNT &&
-        elapsedMs >= RASTER_RENDER_READY_MIN_STABLE_MS
-      ) {
-        recordRasterDebugEvent("renderer.renderReady.stable", {
-          elapsedMs,
-          mode,
-          nodeId,
-          renderKeyLength: rasterRenderKey.length,
-          stableFrameCount,
-        });
-        dispatchRasterNodeRenderReady({
-          mode,
-          nodeId,
-          renderKey: rasterRenderKey,
-        });
-        return;
-      }
-
-      frameId = requestAnimationFrame(waitForStablePaint);
-    };
-
-    frameId = requestAnimationFrame(waitForStablePaint);
-
-    return () => {
-      isCancelled = true;
-      cancelAnimationFrame(frameId);
-    };
-  }, [
-    cullState.shouldBuildPreview,
-    cullState.shouldUsePreview,
-    areExactTilesReady,
+    arePendingTilesReady: handoff.isPendingReady,
+    arePresentedTilesReady,
     isRasterPreviewReady,
     nodeId,
     rasterRenderKey,
-  ]);
+    shouldBuildPreview: cullState.shouldBuildPreview,
+    shouldUsePreview: cullState.shouldUsePreview,
+  });
 
   return (
     <g
-      data-raster-exact-tiles-ready={areExactTilesReady ? "true" : "false"}
-      data-raster-loaded-exact-tile-count={loadedExactTiles.refs.size}
+      data-raster-atomic-handoff={handoff.isActive ? "true" : "false"}
+      data-raster-exact-tiles-ready={arePresentedTilesReady ? "true" : "false"}
+      data-raster-loaded-exact-tile-count={loadedTileCount}
       data-raster-node-id={nodeId}
       data-raster-preview-active={cullState.shouldUsePreview ? "true" : "false"}
       data-raster-preview-eligible={
@@ -1166,26 +1281,20 @@ const CanvasTiledRasterImage = ({
           zoom={cullState.zoom}
         />
       ) : null}
-      {src ? (
-        <image
-          height={baseHeight ?? height}
-          href={src}
-          pointerEvents="none"
-          preserveAspectRatio="none"
-          width={baseWidth ?? width}
-          x={baseX ?? 0}
-          y={baseY ?? 0}
-        />
-      ) : null}
-      {shouldHideExactTiles ? null : (
-        <RasterTileImages
-          onTileLoad={handleExactTileLoad}
-          tileSources={visibleTileSources}
-        />
-      )}
-      <RasterWorkingSurface
+      <RasterTiledArtwork
+        baseHeight={baseHeight}
+        baseWidth={baseWidth}
+        baseX={baseX}
+        baseY={baseY}
+        handleTileLoad={handleExactTileLoad}
+        handoff={handoff}
+        height={height}
         sampling={cullState.sampling}
-        surface={workingSurface}
+        shouldHideExactTiles={shouldHideExactTiles}
+        shouldShowWorkingSurface={shouldShowWorkingSurface}
+        src={src}
+        width={width}
+        workingSurface={workingSurface}
       />
     </g>
   );

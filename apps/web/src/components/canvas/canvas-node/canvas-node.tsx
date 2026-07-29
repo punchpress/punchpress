@@ -53,6 +53,21 @@ const CanvasNodeShell = ({ children, isReady, nodeId }) => {
 
     return editor.isSelected(targetNodeId);
   });
+  const rasterHitArea = useEditorValue((editor) => {
+    const node = editor.getNode(nodeId);
+    const writableBounds = editor.getRasterWritableBounds(nodeId);
+
+    if (!(node?.type === "image" && writableBounds)) {
+      return null;
+    }
+
+    return {
+      height: node.height,
+      left: -writableBounds.x,
+      top: -writableBounds.y,
+      width: node.width,
+    };
+  });
   const cursorClassName = "canvas-cursor-default";
 
   return (
@@ -307,7 +322,7 @@ const CanvasNodeShell = ({ children, isReady, nodeId }) => {
 
                   editor.setHoveredNode(hoverTargetNodeId);
                 }}
-                style={{ left: 0, top: 0 }}
+                style={rasterHitArea || { left: 0, top: 0 }}
                 type="button"
               />
             }
@@ -329,10 +344,8 @@ const CanvasStandardNodeArt = ({ nodeId }) => {
   const paintPreview = useEditorSurfaceValue((editor) =>
     editor.getSelectionColorPreviewForNode(nodeId)
   );
-  const allowsRasterWorkingSurfaceOverflow = useEditorSurfaceValue(
-    (editor) =>
-      editor.getBrushWorkingSurfaceStateForNode?.(nodeId)?.allowOverflow ===
-      true
+  const rasterWorkingSurface = useEditorSurfaceValue((editor) =>
+    editor.getBrushWorkingSurfaceStateForNode?.(nodeId)
   );
   const editor = useEditor();
   const artState = useMemo(
@@ -341,13 +354,32 @@ const CanvasStandardNodeArt = ({ nodeId }) => {
     [artInputs, editor, nodeId, resizePreviewNode]
   );
 
-  return artState ? (
+  if (!artState) {
+    return null;
+  }
+
+  const writableBounds = editor.getRasterWritableBounds(nodeId);
+  const durablePresentationBounds = writableBounds
+    ? {
+        height: writableBounds.height,
+        maxX: writableBounds.x + writableBounds.width,
+        maxY: writableBounds.y + writableBounds.height,
+        minX: writableBounds.x,
+        minY: writableBounds.y,
+        width: writableBounds.width,
+      }
+    : null;
+  const presentationBounds =
+    durablePresentationBounds ||
+    rasterWorkingSurface?.presentationBounds ||
+    artState.bbox;
+
+  return (
     <CanvasNodeArt
-      allowImageOverflow={allowsRasterWorkingSurfaceOverflow}
-      bbox={artState.bbox}
+      bbox={presentationBounds}
       fill={artState.fill}
       fillRule={artState.fillRule}
-      height={Math.max(1, artState.bbox.height)}
+      height={Math.max(1, presentationBounds.height)}
       image={artState.image}
       isEditing={artState.isEditing}
       isInteractionProxy={artState.isInteractionProxy}
@@ -362,9 +394,9 @@ const CanvasStandardNodeArt = ({ nodeId }) => {
       strokeLineJoin={artState.strokeLineJoin}
       strokeMiterLimit={artState.strokeMiterLimit}
       strokeWidth={artState.strokeWidth}
-      width={Math.max(1, artState.bbox.width)}
+      width={Math.max(1, presentationBounds.width)}
     />
-  ) : null;
+  );
 };
 
 const CanvasVectorNodeArt = ({ nodeId }) => {

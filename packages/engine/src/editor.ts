@@ -245,7 +245,10 @@ import { getSelectionBounds as getEditorSelectionBounds } from "./selection/sele
 import { createEditorStore } from "./state/store/create-editor-store";
 import { HandTool } from "./tools/hand-tool";
 import { BrushTool } from "./tools/brush-tool";
-import { getRasterTargetState as getEditorRasterTargetState } from "./tools/brush-target";
+import {
+  getRasterTargetState as getEditorRasterTargetState,
+  getRasterWritableBounds as getEditorRasterWritableBounds,
+} from "./tools/brush-target";
 import { NodeTool } from "./tools/node-tool";
 import { PenTool } from "./tools/pen-tool";
 import { PointerTool } from "./tools/pointer-tool";
@@ -1077,6 +1080,10 @@ export class Editor {
 
   getRasterTargetState(input) {
     return getEditorRasterTargetState(this, input);
+  }
+
+  getRasterWritableBounds(nodeId) {
+    return getEditorRasterWritableBounds(this, this.getNode(nodeId));
   }
 
   get rasterCropSession() {

@@ -9,8 +9,13 @@ import { assertValidRasterDynamics } from "./settings";
 const RESAMPLE_EPSILON = 1e-9;
 
 export type RasterDabGenerator = {
-  append: (points: readonly RasterPoint[]) => RasterDab[];
-  finish: () => RasterDab[];
+  append: (
+    points: readonly RasterPoint[],
+    shouldEmit?: (center: Readonly<RasterPoint>) => boolean
+  ) => RasterDab[];
+  finish: (
+    shouldEmit?: (center: Readonly<RasterPoint>) => boolean
+  ) => RasterDab[];
   translate: (delta: RasterPoint) => void;
 };
 
@@ -35,10 +40,27 @@ export const createRasterDabGenerator = (
   let lastInputPoint: RasterPoint | null = null;
   let smoothedPoint: RasterPoint | null = null;
 
-  const appendDabPathPoint = (point: RasterPoint, dabs: RasterDab[]) => {
+  const emitDab = (
+    center: RasterPoint,
+    dabs: RasterDab[],
+    shouldEmit?: (center: Readonly<RasterPoint>) => boolean
+  ) => {
+    if (!shouldEmit || shouldEmit(center)) {
+      dabs.push(createDab(center, fixedSettings, random));
+      return;
+    }
+
+    advanceDabRandom(random);
+  };
+
+  const appendDabPathPoint = (
+    point: RasterPoint,
+    dabs: RasterDab[],
+    shouldEmit?: (center: Readonly<RasterPoint>) => boolean
+  ) => {
     if (!lastDabPathPoint) {
       lastDabPathPoint = clonePoint(point);
-      dabs.push(createDab(point, fixedSettings, random));
+      emitDab(point, dabs, shouldEmit);
       return;
     }
 
@@ -49,16 +71,18 @@ export const createRasterDabGenerator = (
       start: lastDabPathPoint,
     });
 
-    dabs.push(
-      ...resampled.points.map((center) =>
-        createDab(center, fixedSettings, random)
-      )
-    );
+    for (const center of resampled.points) {
+      emitDab(center, dabs, shouldEmit);
+    }
     distanceToNextDab = resampled.distanceToNext;
     lastDabPathPoint = clonePoint(point);
   };
 
-  const appendSmoothingGuide = (guide: RasterPoint, dabs: RasterDab[]) => {
+  const appendSmoothingGuide = (
+    guide: RasterPoint,
+    dabs: RasterDab[],
+    shouldEmit?: (center: Readonly<RasterPoint>) => boolean
+  ) => {
     if (!smoothedPoint) {
       smoothedPoint = clonePoint(guide);
     } else {
@@ -68,13 +92,17 @@ export const createRasterDabGenerator = (
       smoothedPoint = interpolatePoint(smoothedPoint, guide, alpha);
     }
 
-    appendDabPathPoint(smoothedPoint, dabs);
+    appendDabPathPoint(smoothedPoint, dabs, shouldEmit);
   };
 
-  const appendInputPoint = (point: RasterPoint, dabs: RasterDab[]) => {
+  const appendInputPoint = (
+    point: RasterPoint,
+    dabs: RasterDab[],
+    shouldEmit?: (center: Readonly<RasterPoint>) => boolean
+  ) => {
     if (!lastInputPoint) {
       lastInputPoint = clonePoint(point);
-      appendDabPathPoint(point, dabs);
+      appendDabPathPoint(point, dabs, shouldEmit);
 
       if (smoothingDistance > 0) {
         smoothedPoint = clonePoint(point);
@@ -83,7 +111,7 @@ export const createRasterDabGenerator = (
     }
 
     if (smoothingDistance === 0) {
-      appendDabPathPoint(point, dabs);
+      appendDabPathPoint(point, dabs, shouldEmit);
       lastInputPoint = clonePoint(point);
       return;
     }
@@ -96,7 +124,7 @@ export const createRasterDabGenerator = (
     });
 
     for (const guide of guides.points) {
-      appendSmoothingGuide(guide, dabs);
+      appendSmoothingGuide(guide, dabs, shouldEmit);
     }
 
     distanceToNextSmoothingSample = guides.distanceToNext;
@@ -104,7 +132,7 @@ export const createRasterDabGenerator = (
   };
 
   return {
-    append: (points) => {
+    append: (points, shouldEmit) => {
       if (finished) {
         throw new Error("Cannot append points to a finished Raster stroke");
       }
@@ -114,12 +142,12 @@ export const createRasterDabGenerator = (
       const dabs: RasterDab[] = [];
 
       for (const point of points) {
-        appendInputPoint(point, dabs);
+        appendInputPoint(point, dabs, shouldEmit);
       }
 
       return dabs;
     },
-    finish: () => {
+    finish: (shouldEmit) => {
       if (finished) {
         return [];
       }
@@ -136,7 +164,7 @@ export const createRasterDabGenerator = (
 
       const dabs: RasterDab[] = [];
 
-      appendDabPathPoint(lastInputPoint, dabs);
+      appendDabPathPoint(lastInputPoint, dabs, shouldEmit);
       return dabs;
     },
     translate: ({ x, y }) => {
@@ -149,6 +177,13 @@ export const createRasterDabGenerator = (
       smoothedPoint = translatePoint(smoothedPoint, x, y);
     },
   };
+};
+
+const advanceDabRandom = (random: () => number) => {
+  random();
+  random();
+  random();
+  random();
 };
 
 const translatePoint = (

@@ -13,6 +13,7 @@ import {
   getNodeTransformForPinnedWorldPoint,
   getNodeWorldPoint,
 } from "../primitives/rotation";
+import { createRasterPathSmoother } from "../raster/path-smoother";
 import {
   getBrushDabRenderBounds,
   getBrushDabRenderRadius,
@@ -48,12 +49,14 @@ import { selectToolFromShortcut, Tool } from "./tool";
 
 const BRUSH_LAYER_EXPANSION_PADDING_MULTIPLIER = 8;
 const BRUSH_STROKE_POINT_FLUSH_BUDGET_MS = 5;
-const BRUSH_TILE_ASYNC_COMMIT_THRESHOLD = 64;
+const BRUSH_TILE_ASYNC_COMMIT_THRESHOLD = 16;
 const BRUSH_TILE_COMMIT_BUDGET_MS = 8;
 const RASTER_NODE_RENDER_READY_EVENT = "punchpress:raster-node-render-ready";
+const RASTER_RENDER_HANDOFF_TIMEOUT_MS = 2000;
 const RESIDENT_RASTER_MAX_EDGE = 2048;
 const TILED_BRUSH_SURFACE_AREA_THRESHOLD = 4096 * 4096;
 const TILED_BRUSH_SURFACE_DENSITY_THRESHOLD = 8;
+const NATIVE_PATH_EPSILON = 1e-6;
 let brushWorkingSurfaceRevision = 0;
 let brushTileCommitRevision = 0;
 
@@ -92,137 +95,19 @@ const clamp = (value, min, max) => {
   return Math.min(max, Math.max(min, value));
 };
 
-const getPointToSegmentDistanceSquared = (point, startPoint, endPoint) => {
-  const deltaX = endPoint.x - startPoint.x;
-  const deltaY = endPoint.y - startPoint.y;
-  const lengthSquared = deltaX * deltaX + deltaY * deltaY;
+const pointsEqual = (first, second) =>
+  Math.abs(first.x - second.x) <= NATIVE_PATH_EPSILON &&
+  Math.abs(first.y - second.y) <= NATIVE_PATH_EPSILON;
 
-  if (lengthSquared === 0) {
-    return (
-      (point.x - startPoint.x) ** 2 + (point.y - startPoint.y) ** 2
-    );
-  }
+const getNativePathBounds = (points, settings) => {
+  const radius = getBrushDabRenderRadius(settings.size, settings.hardness);
 
-  const progress = clamp(
-    ((point.x - startPoint.x) * deltaX +
-      (point.y - startPoint.y) * deltaY) /
-      lengthSquared,
-    0,
-    1
-  );
-  const closestX = startPoint.x + progress * deltaX;
-  const closestY = startPoint.y + progress * deltaY;
-
-  return (point.x - closestX) ** 2 + (point.y - closestY) ** 2;
-};
-
-const getSegmentCrossProduct = (startPoint, endPoint, point) =>
-  (endPoint.x - startPoint.x) * (point.y - startPoint.y) -
-  (endPoint.y - startPoint.y) * (point.x - startPoint.x);
-
-const isPointOnSegment = (point, startPoint, endPoint) =>
-  Math.abs(getSegmentCrossProduct(startPoint, endPoint, point)) <=
-    Number.EPSILON &&
-  point.x >= Math.min(startPoint.x, endPoint.x) &&
-  point.x <= Math.max(startPoint.x, endPoint.x) &&
-  point.y >= Math.min(startPoint.y, endPoint.y) &&
-  point.y <= Math.max(startPoint.y, endPoint.y);
-
-const doSegmentsIntersect = (firstStart, firstEnd, secondStart, secondEnd) => {
-  const firstStartSide = getSegmentCrossProduct(
-    secondStart,
-    secondEnd,
-    firstStart
-  );
-  const firstEndSide = getSegmentCrossProduct(
-    secondStart,
-    secondEnd,
-    firstEnd
-  );
-  const secondStartSide = getSegmentCrossProduct(
-    firstStart,
-    firstEnd,
-    secondStart
-  );
-  const secondEndSide = getSegmentCrossProduct(
-    firstStart,
-    firstEnd,
-    secondEnd
-  );
-
-  if (
-    firstStartSide * firstEndSide < 0 &&
-    secondStartSide * secondEndSide < 0
-  ) {
-    return true;
-  }
-
-  return (
-    (firstStartSide === 0 &&
-      isPointOnSegment(firstStart, secondStart, secondEnd)) ||
-    (firstEndSide === 0 &&
-      isPointOnSegment(firstEnd, secondStart, secondEnd)) ||
-    (secondStartSide === 0 &&
-      isPointOnSegment(secondStart, firstStart, firstEnd)) ||
-    (secondEndSide === 0 &&
-      isPointOnSegment(secondEnd, firstStart, firstEnd))
-  );
-};
-
-const getSegmentDistanceSquared = (
-  firstStart,
-  firstEnd,
-  secondStart,
-  secondEnd
-) => {
-  if (doSegmentsIntersect(firstStart, firstEnd, secondStart, secondEnd)) {
-    return 0;
-  }
-
-  return Math.min(
-    getPointToSegmentDistanceSquared(firstStart, secondStart, secondEnd),
-    getPointToSegmentDistanceSquared(firstEnd, secondStart, secondEnd),
-    getPointToSegmentDistanceSquared(secondStart, firstStart, firstEnd),
-    getPointToSegmentDistanceSquared(secondEnd, firstStart, firstEnd)
-  );
-};
-
-const doesRoundStrokeIntersectCanvas = ({
-  canvas,
-  endPoint,
-  radius,
-  startPoint,
-}) => {
-  const isInside = (point) =>
-    point.x >= 0 &&
-    point.x <= canvas.width &&
-    point.y >= 0 &&
-    point.y <= canvas.height;
-
-  if (isInside(startPoint) || isInside(endPoint)) {
-    return true;
-  }
-
-  const topLeft = { x: 0, y: 0 };
-  const topRight = { x: canvas.width, y: 0 };
-  const bottomRight = { x: canvas.width, y: canvas.height };
-  const bottomLeft = { x: 0, y: canvas.height };
-  const radiusSquared = radius * radius;
-
-  return [
-    [topLeft, topRight],
-    [topRight, bottomRight],
-    [bottomRight, bottomLeft],
-    [bottomLeft, topLeft],
-  ].some(
-    ([edgeStart, edgeEnd]) =>
-      getSegmentDistanceSquared(
-        startPoint,
-        endPoint,
-        edgeStart,
-        edgeEnd
-      ) <= radiusSquared
-  );
+  return {
+    maxX: Math.ceil(Math.max(...points.map((point) => point.x)) + radius),
+    maxY: Math.ceil(Math.max(...points.map((point) => point.y)) + radius),
+    minX: Math.floor(Math.min(...points.map((point) => point.x)) - radius),
+    minY: Math.floor(Math.min(...points.map((point) => point.y)) - radius),
+  };
 };
 
 const getBrushLayerExpansionPadding = (settings) => {
@@ -242,7 +127,6 @@ const shouldUseNativeStroke = (settings) => {
     settings.roundness === 1 &&
     settings.scatter === 0 &&
     settings.sizeJitter === 0 &&
-    settings.smoothing === 0 &&
     settings.spacing <= 0 &&
     settings.tip.kind === "round"
   );
@@ -385,6 +269,7 @@ const getTiledBaseFrame = (node) => {
 
 const getNextTiledImageNodeState = ({
   node,
+  preserveRasterPlane,
   tileSources,
 }) => {
   const nextTileSourcesByRef = new Map(
@@ -396,6 +281,15 @@ const getNextTiledImageNodeState = ({
   }
 
   const existingTileSources = [...nextTileSourcesByRef.values()];
+
+  if (preserveRasterPlane) {
+    return {
+      ...node,
+      mimeType: "image/png",
+      tileSources: existingTileSources,
+    };
+  }
+
   const baseFrame = getTiledBaseFrame(node);
 
   const currentNode = {
@@ -518,9 +412,12 @@ class BrushStrokeSession {
   constructor({ editor, node, operation, settings, startPoint, tool }) {
     this.canvasState = null;
     this.canvasOffset = { x: 0, y: 0 };
+    this.canvasInputOffset = { x: 0, y: 0 };
     this.completed = false;
     this.commitStarted = false;
     this.commitHandoffCancel = null;
+    this.handoffReady = Promise.resolve();
+    this.resolveHandoffReady = null;
     this.dirtyBounds = null;
     this.dabGenerator = null;
     this.editor = editor;
@@ -539,12 +436,18 @@ class BrushStrokeSession {
       x: initialCanvasBounds.x,
       y: initialCanvasBounds.y,
     };
+    this.canvasInputOffset = { ...this.canvasOffset };
     this.preserveRasterPlane = targetsExistingRaster;
-    this.writablePolygon = getImageLocalClipPolygon(editor, node);
+    this.usesCanvasOffset =
+      targetsExistingRaster || Boolean(this.initialSourceRect);
+    this.writablePolygon = getRasterWritablePolygon(editor, node);
     this.commitReady = Promise.resolve();
     this.commitRenderKey = null;
+    this.commitTileRefs = [];
     this.floatPixels = null;
     this.lastPoint = null;
+    this.nativeBoundaryDabGenerator = null;
+    this.pathSmoother = null;
     this.nodeId = node.id;
     this.operation = operation;
     this.pointFlushFrameId = 0;
@@ -563,6 +466,14 @@ class BrushStrokeSession {
     this.dabGenerator = this.usesNativeStroke
       ? null
       : createRasterDabGenerator(settings);
+    this.pathSmoother =
+      this.usesNativeStroke && settings.smoothing > 0
+        ? createRasterPathSmoother(settings)
+        : null;
+    this.nativeBoundaryDabGenerator =
+      this.usesNativeStroke && this.writablePolygon?.length
+        ? createRasterDabGenerator(settings)
+        : null;
     this.tileSurface = shouldUseTiledPaintSurface({
       editor,
       node,
@@ -603,6 +514,7 @@ class BrushStrokeSession {
             x: canvasState?.offset?.x ?? this.canvasOffset.x,
             y: canvasState?.offset?.y ?? this.canvasOffset.y,
           };
+          this.canvasInputOffset = { ...this.canvasOffset };
           this.floatPixels =
             canvasState && !this.usesNativeStroke
               ? measurePerf("brush.stroke.createFloatPixels", () =>
@@ -631,16 +543,13 @@ class BrushStrokeSession {
   }
 
   getInitialLocalPoint(point) {
-    if (
-      this.tileSurface ||
-      !(this.initialSourceRect || this.preserveRasterPlane)
-    ) {
+    if (this.tileSurface || !this.usesCanvasOffset) {
       return point;
     }
 
     return {
-      x: point.x - this.canvasOffset.x,
-      y: point.y - this.canvasOffset.y,
+      x: point.x - this.canvasInputOffset.x,
+      y: point.y - this.canvasInputOffset.y,
     };
   }
 
@@ -669,6 +578,14 @@ class BrushStrokeSession {
           this.dabGenerator = this.usesNativeStroke
             ? null
             : createRasterDabGenerator(this.settings);
+          this.pathSmoother =
+            this.usesNativeStroke && this.settings.smoothing > 0
+              ? createRasterPathSmoother(this.settings)
+              : null;
+          this.nativeBoundaryDabGenerator =
+            this.usesNativeStroke && this.writablePolygon?.length
+              ? createRasterDabGenerator(this.settings)
+              : null;
           this.lastPoint = null;
         }
         this.applyPoint(queuedPoint.point);
@@ -740,16 +657,7 @@ class BrushStrokeSession {
     }
 
     if (this.usesNativeStroke) {
-      const adjustedPoint = this.ensureCanvasIncludesDab(point);
-
-      if (!this.lastPoint) {
-        this.applyNativeStroke(adjustedPoint, adjustedPoint);
-        this.lastPoint = adjustedPoint;
-        return;
-      }
-
-      this.applyNativeStroke(this.lastPoint, adjustedPoint);
-      this.lastPoint = adjustedPoint;
+      this.applyNativeInputPoint(point);
       return;
     }
 
@@ -758,14 +666,7 @@ class BrushStrokeSession {
 
   applyTiledPoint(point) {
     if (this.usesNativeStroke) {
-      if (!this.lastPoint) {
-        this.applyTiledNativeStroke(point, point);
-        this.lastPoint = point;
-        return;
-      }
-
-      this.applyTiledNativeStroke(this.lastPoint, point);
-      this.lastPoint = point;
+      this.applyNativeInputPoint(point);
       return;
     }
 
@@ -773,8 +674,40 @@ class BrushStrokeSession {
   }
 
   applyRasterDabs(dabs) {
+    if (
+      this.tileSurface &&
+      this.operation === "paint" &&
+      dabs.length > 0 &&
+      dabs.every(
+        (dab) =>
+          dab.flow >= 1 &&
+          dab.hardness >= 1 &&
+          dab.opacity >= 1 &&
+          dab.roundness === 1 &&
+          dab.tip.kind === "round"
+      )
+    ) {
+      const initialTileCount = this.tileSurface.tiles.size;
+
+      for (const dab of dabs) {
+        this.expandRasterPlaneForBounds(getBrushDabRenderBounds(dab));
+      }
+      this.tileSurface.drawHardRoundDabs({
+        color: getBrushColorRgb(dabs[0].color),
+        dabs,
+        writablePolygon: this.getCanvasWritablePolygon(),
+      });
+      for (const dab of dabs) {
+        this.recordDirtyBounds(getBrushDabRenderBounds(dab));
+      }
+      incrementPerfCounter("brush.dab", dabs.length);
+      this.publishTiledPreviewIfStructureChanged(initialTileCount);
+      return;
+    }
+
     let offsetX = 0;
     let offsetY = 0;
+    const initialTileCount = this.tileSurface?.tiles.size || 0;
 
     for (const sourceDab of dabs) {
       let dab = {
@@ -786,6 +719,7 @@ class BrushStrokeSession {
       };
 
       if (!this.tileSurface) {
+        this.expandRasterPlaneForBounds(getBrushDabRenderBounds(dab));
         const adjustedCenter = this.ensureCanvasIncludesDab(dab.center);
         const deltaX = adjustedCenter.x - dab.center.x;
         const deltaY = adjustedCenter.y - dab.center.y;
@@ -794,6 +728,11 @@ class BrushStrokeSession {
           offsetX += deltaX;
           offsetY += deltaY;
           this.dabGenerator?.translate({ x: deltaX, y: deltaY });
+          this.nativeBoundaryDabGenerator?.translate({
+            x: deltaX,
+            y: deltaY,
+          });
+          this.pathSmoother?.translate({ x: deltaX, y: deltaY });
           dab = { ...dab, center: adjustedCenter };
         }
       }
@@ -808,49 +747,262 @@ class BrushStrokeSession {
     if (dabs.length > 0) {
       incrementPerfCounter("brush.dab", dabs.length);
     }
+
+    if (this.tileSurface) {
+      this.publishTiledPreviewIfStructureChanged(initialTileCount);
+    }
   }
 
   finishDabGenerator() {
+    if (this.pathSmoother) {
+      this.applyNativePath(this.pathSmoother.finish());
+    }
+
+    if (
+      this.nativeBoundaryDabGenerator &&
+      !this.isWritableAreaOwnedByTileSurface()
+    ) {
+      this.applyRasterDabs(
+        this.nativeBoundaryDabGenerator.finish(
+          this.shouldEmitNativeBoundaryDab
+        )
+      );
+    }
+
     if (this.dabGenerator) {
       this.applyRasterDabs(this.dabGenerator.finish());
     }
   }
 
-  applyNativeStroke(startPoint, endPoint) {
-    const { canvas, context } = this.canvasState;
-    const renderRadius = getBrushDabRenderRadius(
+  applyNativeInputPoint(point) {
+    const canvasRebase = this.applyNativePath(
+      this.pathSmoother ? this.pathSmoother.append([point]) : [point]
+    );
+
+    if (!this.isWritableAreaOwnedByTileSurface()) {
+      this.applyRasterDabs(
+        this.nativeBoundaryDabGenerator?.append(
+          [
+            {
+              x: point.x + canvasRebase.x,
+              y: point.y + canvasRebase.y,
+            },
+          ],
+          this.shouldEmitNativeBoundaryDab
+        ) || []
+      );
+    }
+  }
+
+  applyNativePath(points) {
+    if (points.length === 0) {
+      return { x: 0, y: 0 };
+    }
+
+    const pathPoints = [...points];
+
+    if (
+      this.lastPoint &&
+      (this.lastPoint.x !== pathPoints[0].x ||
+        this.lastPoint.y !== pathPoints[0].y)
+    ) {
+      pathPoints.unshift(this.lastPoint);
+    }
+
+    const nativeRuns = this.getNativeInteriorRuns(pathPoints);
+    const canvasRebase = { x: 0, y: 0 };
+
+    for (const nativeRun of nativeRuns) {
+      const adjustedRun =
+        canvasRebase.x || canvasRebase.y
+          ? nativeRun.map((point) => ({
+              x: point.x + canvasRebase.x,
+              y: point.y + canvasRebase.y,
+            }))
+          : nativeRun;
+      const initialCanvasInputOffset = { ...this.canvasInputOffset };
+
+      this.applyClassifiedNativePath(adjustedRun);
+      canvasRebase.x +=
+        initialCanvasInputOffset.x - this.canvasInputOffset.x;
+      canvasRebase.y +=
+        initialCanvasInputOffset.y - this.canvasInputOffset.y;
+    }
+
+    const lastPathPoint = pathPoints.at(-1);
+
+    if (lastPathPoint) {
+      this.lastPoint = {
+        x: lastPathPoint.x + canvasRebase.x,
+        y: lastPathPoint.y + canvasRebase.y,
+      };
+    }
+
+    if (canvasRebase.x || canvasRebase.y) {
+      this.nativeBoundaryDabGenerator?.translate(canvasRebase);
+    }
+
+    return canvasRebase;
+  }
+
+  getNativeInteriorRuns(pathPoints) {
+    if (this.isWritableAreaOwnedByTileSurface()) {
+      return [pathPoints];
+    }
+
+    const target = this.getCanvasWritableTarget();
+
+    if (!target) {
+      return [pathPoints];
+    }
+
+    const radius = getBrushDabRenderRadius(
       this.settings.size,
       this.settings.hardness
     );
+
+    if (pathPoints.length === 1) {
+      return this.isRenderBoundsInsideWritableArea(
+        getNativePathBounds(pathPoints, this.settings)
+      )
+        ? [pathPoints]
+        : [];
+    }
+
+    const runs = [];
+
+    for (let index = 1; index < pathPoints.length; index += 1) {
+      const clipped = clipRasterSegmentToTarget({
+        end: pathPoints[index],
+        radius: -radius,
+        start: pathPoints[index - 1],
+        target,
+      });
+
+      if (!clipped || pointsEqual(clipped.start, clipped.end)) {
+        continue;
+      }
+
+      const currentRun = runs.at(-1);
+
+      if (currentRun && pointsEqual(currentRun.at(-1), clipped.start)) {
+        currentRun.push(clipped.end);
+      } else {
+        runs.push([clipped.start, clipped.end]);
+      }
+    }
+
+    return runs;
+  }
+
+  applyClassifiedNativePath(pathPoints) {
+    if (this.tileSurface) {
+      this.applyTiledNativePath(pathPoints);
+      this.lastPoint = pathPoints.at(-1);
+      return;
+    }
+
+    const adjustedPoints = this.ensureCanvasIncludesNativePath(pathPoints);
+
+    this.applyNativeCanvasPath(adjustedPoints);
+    this.lastPoint = adjustedPoints.at(-1);
+  }
+
+  shouldEmitNativeBoundaryDab = (center) => {
+    if (this.isWritableAreaOwnedByTileSurface()) {
+      return false;
+    }
+
+    const radius = getBrushDabRenderRadius(
+      this.settings.size,
+      this.settings.hardness
+    );
+
+    return !this.isRenderBoundsInsideWritableArea({
+      maxX: Math.ceil(center.x + radius),
+      maxY: Math.ceil(center.y + radius),
+      minX: Math.floor(center.x - radius),
+      minY: Math.floor(center.y - radius),
+    });
+  };
+
+  isWritableAreaOwnedByTileSurface() {
+    const writablePolygon = this.getCanvasWritablePolygon();
+
+    if (!(this.tileSurface && writablePolygon?.length === 4)) {
+      return false;
+    }
+
+    const matchesX = (value) =>
+      Math.abs(value) <= NATIVE_PATH_EPSILON ||
+      Math.abs(value - this.tileSurface.width) <= NATIVE_PATH_EPSILON;
+    const matchesY = (value) =>
+      Math.abs(value) <= NATIVE_PATH_EPSILON ||
+      Math.abs(value - this.tileSurface.height) <= NATIVE_PATH_EPSILON;
+    const hasCorner = (x, y) =>
+      writablePolygon.some(
+        (point) =>
+          Math.abs(point.x - x) <= NATIVE_PATH_EPSILON &&
+          Math.abs(point.y - y) <= NATIVE_PATH_EPSILON
+      );
+
+    return (
+      writablePolygon.every(
+        (point) => matchesX(point.x) && matchesY(point.y)
+      ) &&
+      hasCorner(0, 0) &&
+      hasCorner(this.tileSurface.width, 0) &&
+      hasCorner(this.tileSurface.width, this.tileSurface.height) &&
+      hasCorner(0, this.tileSurface.height)
+    );
+  }
+
+  getCanvasWritableTarget() {
+    const writablePolygon = this.getCanvasWritablePolygon();
+
+    if (!writablePolygon?.length) {
+      return null;
+    }
+
+    const minX = Math.min(...writablePolygon.map((point) => point.x));
+    const minY = Math.min(...writablePolygon.map((point) => point.y));
+    const maxX = Math.max(...writablePolygon.map((point) => point.x));
+    const maxY = Math.max(...writablePolygon.map((point) => point.y));
     const bounds = {
-      maxX: Math.min(
-        canvas.width,
-        Math.ceil(Math.max(startPoint.x, endPoint.x) + renderRadius)
-      ),
-      maxY: Math.min(
-        canvas.height,
-        Math.ceil(Math.max(startPoint.y, endPoint.y) + renderRadius)
-      ),
-      minX: Math.max(
-        0,
-        Math.floor(Math.min(startPoint.x, endPoint.x) - renderRadius)
-      ),
-      minY: Math.max(
-        0,
-        Math.floor(Math.min(startPoint.y, endPoint.y) - renderRadius)
-      ),
+      height: maxY - minY,
+      width: maxX - minX,
+      x: minX,
+      y: minY,
     };
 
-    if (
-      bounds.minX >= bounds.maxX ||
-      bounds.minY >= bounds.maxY ||
-      !doesRoundStrokeIntersectCanvas({
-        canvas,
-        endPoint,
-        radius: this.settings.size / 2,
-        startPoint,
-      })
-    ) {
+    return {
+      bounds,
+      pixelSize: { height: 1, width: 1 },
+      writableBounds: bounds,
+      writablePolygon,
+    };
+  }
+
+  isRenderBoundsInsideWritableArea(bounds) {
+    return [
+      { x: bounds.minX, y: bounds.minY },
+      { x: bounds.maxX, y: bounds.minY },
+      { x: bounds.maxX, y: bounds.maxY },
+      { x: bounds.minX, y: bounds.maxY },
+    ].every((point) => this.isCanvasPointWritable(point));
+  }
+
+  applyNativeCanvasPath(points) {
+    const { canvas, context } = this.canvasState;
+    const pathBounds = getNativePathBounds(points, this.settings);
+    const bounds = {
+      maxX: Math.min(canvas.width, pathBounds.maxX),
+      maxY: Math.min(canvas.height, pathBounds.maxY),
+      minX: Math.max(0, pathBounds.minX),
+      minY: Math.max(0, pathBounds.minY),
+    };
+
+    if (bounds.minX >= bounds.maxX || bounds.minY >= bounds.maxY) {
       return;
     }
 
@@ -871,11 +1023,13 @@ class BrushStrokeSession {
       context.lineJoin = "round";
       context.lineWidth = this.settings.size;
 
-      if (startPoint.x === endPoint.x && startPoint.y === endPoint.y) {
+      if (points.length === 1) {
+        const point = points[0];
+
         context.beginPath();
         context.arc(
-          endPoint.x,
-          endPoint.y,
+          point.x,
+          point.y,
           this.settings.size / 2,
           0,
           Math.PI * 2
@@ -883,48 +1037,70 @@ class BrushStrokeSession {
         context.fill();
       } else {
         context.beginPath();
-        context.moveTo(startPoint.x, startPoint.y);
-        context.lineTo(endPoint.x, endPoint.y);
+        context.moveTo(points[0].x, points[0].y);
+        for (const point of points.slice(1)) {
+          context.lineTo(point.x, point.y);
+        }
         context.stroke();
       }
 
       context.restore();
     });
+    this.floatPixels = null;
 
-    incrementPerfCounter("brush.nativeStroke.segment");
+    incrementPerfCounter(
+      "brush.nativeStroke.segment",
+      Math.max(1, points.length - 1)
+    );
     this.recordDirtyBounds(bounds);
     this.scheduleLivePreview();
   }
 
-  applyTiledNativeStroke(startPoint, endPoint) {
+  applyTiledNativePath(points) {
+    if (points.length === 0) {
+      return;
+    }
+
+    const initialTileCount = this.tileSurface.tiles.size;
     const renderRadius = getBrushDabRenderRadius(
       this.settings.size,
       this.settings.hardness
     );
     const bounds = {
-      maxX: Math.ceil(Math.max(startPoint.x, endPoint.x) + renderRadius),
-      maxY: Math.ceil(Math.max(startPoint.y, endPoint.y) + renderRadius),
-      minX: Math.floor(Math.min(startPoint.x, endPoint.x) - renderRadius),
-      minY: Math.floor(Math.min(startPoint.y, endPoint.y) - renderRadius),
+      maxX: Math.ceil(
+        Math.max(...points.map((point) => point.x)) + renderRadius
+      ),
+      maxY: Math.ceil(
+        Math.max(...points.map((point) => point.y)) + renderRadius
+      ),
+      minX: Math.floor(
+        Math.min(...points.map((point) => point.x)) - renderRadius
+      ),
+      minY: Math.floor(
+        Math.min(...points.map((point) => point.y)) - renderRadius
+      ),
     };
 
-    this.tileSurface.drawNativeStroke({
-      bounds,
+    this.expandRasterPlaneForBounds(bounds);
+    this.tileSurface.drawNativePath({
       color: getBrushColorRgb(this.settings.color),
-      endPoint,
       lineWidth: this.settings.size,
-      startPoint,
+      points,
       writablePolygon: this.getCanvasWritablePolygon(),
     });
 
-    incrementPerfCounter("brush.nativeStroke.segment");
+    incrementPerfCounter(
+      "brush.nativeStroke.segment",
+      Math.max(1, points.length - 1)
+    );
     this.recordDirtyBounds(bounds);
-    this.scheduleLivePreview();
+    this.publishTiledPreviewIfStructureChanged(initialTileCount);
   }
 
   applyTiledDab(dab) {
     const bounds = getBrushDabRenderBounds(dab);
 
+    this.expandRasterPlaneForBounds(bounds);
     this.tileSurface.drawPaintDab({
       bounds,
       color: getBrushColorRgb(dab.color),
@@ -940,7 +1116,6 @@ class BrushStrokeSession {
     });
 
     this.recordDirtyBounds(bounds);
-    this.scheduleLivePreview();
   }
 
   applyDab(dab) {
@@ -1145,6 +1320,36 @@ class BrushStrokeSession {
     };
   }
 
+  ensureCanvasIncludesNativePath(points) {
+    const minimumPoint = {
+      x: Math.min(...points.map((point) => point.x)),
+      y: Math.min(...points.map((point) => point.y)),
+    };
+    const adjustedMinimumPoint = this.ensureCanvasIncludesDab(minimumPoint);
+    const delta = {
+      x: adjustedMinimumPoint.x - minimumPoint.x,
+      y: adjustedMinimumPoint.y - minimumPoint.y,
+    };
+    const adjustedPoints =
+      delta.x || delta.y
+        ? points.map((point) => ({
+            x: point.x + delta.x,
+            y: point.y + delta.y,
+          }))
+        : points;
+
+    if (delta.x || delta.y) {
+      this.pathSmoother?.translate(delta);
+    }
+
+    this.ensureCanvasIncludesDab({
+      x: Math.max(...adjustedPoints.map((point) => point.x)),
+      y: Math.max(...adjustedPoints.map((point) => point.y)),
+    });
+
+    return adjustedPoints;
+  }
+
   ensureCanvasIncludesDab(point) {
     if (this.operation === "erase") {
       return point;
@@ -1220,6 +1425,10 @@ class BrushStrokeSession {
       this.canvasState = {
         canvas: nextCanvas,
         context: nextContext,
+      };
+      this.canvasInputOffset = {
+        x: this.canvasInputOffset.x - left,
+        y: this.canvasInputOffset.y - top,
       };
       if (this.preserveRasterPlane) {
         this.writablePolygon = this.writablePolygon?.map((polygonPoint) => ({
@@ -1325,6 +1534,39 @@ class BrushStrokeSession {
       : bounds;
   }
 
+  expandRasterPlaneForBounds(bounds) {
+    if (!this.preserveRasterPlane || this.operation === "erase") {
+      return;
+    }
+
+    const node = this.editor.getNode(this.nodeId);
+
+    if (node?.type !== "image") {
+      return;
+    }
+
+    const offset = this.tileSurface ? { x: 0, y: 0 } : this.canvasOffset;
+    const writableBounds = getRasterWritableBounds(this.editor, node);
+    const paintedBounds = {
+      maxX: Math.min(bounds.maxX + offset.x, writableBounds.x + writableBounds.width),
+      maxY: Math.min(bounds.maxY + offset.y, writableBounds.y + writableBounds.height),
+      minX: Math.max(bounds.minX + offset.x, writableBounds.x),
+      minY: Math.max(bounds.minY + offset.y, writableBounds.y),
+    };
+
+    if (
+      paintedBounds.minX < paintedBounds.maxX &&
+      paintedBounds.minY < paintedBounds.maxY &&
+      (paintedBounds.minX < 0 ||
+        paintedBounds.minY < 0 ||
+        paintedBounds.maxX > node.width ||
+        paintedBounds.maxY > node.height)
+    ) {
+      this.preserveRasterPlane = false;
+      this.editor.notifyInteractionPreviewChanged();
+    }
+  }
+
   update({ point }) {
     this.addPoint(this.getLocalPoint(point));
   }
@@ -1349,6 +1591,11 @@ class BrushStrokeSession {
     this.cancelQueuedPointFlush();
 
     if (this.canvasState || this.tileSurface) {
+      if (this.tileSurface && !this.commitStarted) {
+        this.handoffReady = new Promise((resolve) => {
+          this.resolveHandoffReady = resolve;
+        });
+      }
       this.flushPoints();
       this.finishDabGenerator();
       recordRasterDebugEvent("session.complete.flushed", {
@@ -1358,6 +1605,7 @@ class BrushStrokeSession {
         workingSurfaceId: this.workingSurfaceId,
       });
       this.commitReady = this.commit();
+      this.commitReady.catch(() => this.resolveCommitHandoff());
     }
 
     return this.commitReady;
@@ -1368,6 +1616,7 @@ class BrushStrokeSession {
     this.cancelQueuedPointFlush();
     this.cancelLivePreview();
     this.editor.revertToMark(this.historyMark);
+    this.resolveCommitHandoff();
     this.tool.clearPendingPreview(this);
     this.tool.clearActiveSession(this);
   }
@@ -1392,6 +1641,7 @@ class BrushStrokeSession {
         workingSurfaceId: this.workingSurfaceId,
       });
       this.editor.revertToMark(this.historyMark);
+      this.resolveCommitHandoff();
       this.tool.clearActiveSession(this);
       return Promise.resolve();
     }
@@ -1467,6 +1717,7 @@ class BrushStrokeSession {
         workingSurfaceId: this.workingSurfaceId,
       });
       this.editor.revertToMark(this.historyMark);
+      this.resolveCommitHandoff();
       this.tool.clearPendingPreview(this);
       this.tool.clearActiveSession(this);
       return Promise.resolve();
@@ -1562,12 +1813,15 @@ class BrushStrokeSession {
         workingSurfaceId: this.workingSurfaceId,
       });
       this.editor.revertToMark(this.historyMark);
+      this.resolveCommitHandoff();
       this.tool.clearPendingPreview(this);
       this.tool.clearActiveSession(this);
       return;
     }
 
     let committedNode = null;
+
+    this.commitTileRefs = tileSources.map((tileSource) => tileSource.ref);
 
     measurePerf("brush.tile.commit.updateNode", () =>
       this.editor.run(() => {
@@ -1578,6 +1832,7 @@ class BrushStrokeSession {
 
           committedNode = getNextTiledImageNodeState({
             node,
+            preserveRasterPlane: this.preserveRasterPlane,
             tileSources,
           });
           return committedNode;
@@ -1624,6 +1879,12 @@ class BrushStrokeSession {
     });
   }
 
+  publishTiledPreviewIfStructureChanged(initialTileCount) {
+    if (this.tileSurface.tiles.size > initialTileCount) {
+      this.editor.notifyInteractionPreviewChanged();
+    }
+  }
+
   cancelLivePreview() {
     if (!this.previewFrameId) {
       this.previewFrameId = 0;
@@ -1643,6 +1904,13 @@ class BrushStrokeSession {
     this.commitHandoffCancel = null;
   }
 
+  resolveCommitHandoff() {
+    const resolve = this.resolveHandoffReady;
+
+    this.resolveHandoffReady = null;
+    resolve?.();
+  }
+
   scheduleCommitWorkingSurfaceClear() {
     const clear = () => {
       recordRasterDebugEvent("handoff.clear", {
@@ -1652,6 +1920,7 @@ class BrushStrokeSession {
       });
       this.clearCommitHandoffWait();
       this.completed = false;
+      this.resolveCommitHandoff();
       this.tool.clearPendingPreview(this);
       this.tool.clearActiveSession(this);
     };
@@ -1692,8 +1961,37 @@ class BrushStrokeSession {
     };
 
     window.addEventListener(RASTER_NODE_RENDER_READY_EVENT, onRenderReady);
+    let timeoutId = 0;
+    const clearIfRendererUnmounted = () => {
+      const rendererMounted = [
+        ...document.querySelectorAll("[data-raster-node-id]"),
+      ].some(
+        (element) =>
+          element.getAttribute("data-raster-node-id") === this.nodeId
+      );
+
+      if (!rendererMounted) {
+        recordRasterDebugEvent("handoff.rendererUnmounted", {
+          nodeId: this.nodeId,
+          workingSurfaceId: this.workingSurfaceId,
+        });
+        clear();
+        return;
+      }
+
+      timeoutId = window.setTimeout(
+        clearIfRendererUnmounted,
+        RASTER_RENDER_HANDOFF_TIMEOUT_MS
+      );
+    };
+
+    timeoutId = window.setTimeout(
+      clearIfRendererUnmounted,
+      RASTER_RENDER_HANDOFF_TIMEOUT_MS
+    );
     this.commitHandoffCancel = () => {
       window.removeEventListener(RASTER_NODE_RENDER_READY_EVENT, onRenderReady);
+      window.clearTimeout(timeoutId);
     };
   }
 
@@ -1701,12 +1999,35 @@ class BrushStrokeSession {
     return this.completed && Boolean(this.getWorkingSurfaceState());
   }
 
+  getCommitReady() {
+    return this.commitReady;
+  }
+
+  getHandoffReady() {
+    return this.handoffReady;
+  }
+
   getWorkingSurfaceState() {
-    const node = this.previewNode || this.editor.getNode(this.nodeId);
+    const durableNode = this.editor.getNode(this.nodeId);
+    const node = this.previewNode || durableNode;
 
     if (!node) {
       return null;
     }
+    const writableBounds = getRasterWritableBounds(
+      this.editor,
+      durableNode || node
+    );
+    const presentationBounds = writableBounds
+      ? {
+          height: writableBounds.height,
+          maxX: writableBounds.x + writableBounds.width,
+          maxY: writableBounds.y + writableBounds.height,
+          minX: writableBounds.x,
+          minY: writableBounds.y,
+          width: writableBounds.width,
+        }
+      : getImageNodeBounds(node);
 
     if (this.tileSurface) {
       const workingSurface = this.tileSurface.createDirtyWorkingTiles();
@@ -1716,9 +2037,12 @@ class BrushStrokeSession {
       }
 
       return {
+        allowOverflow: !this.preserveRasterPlane,
+        commitTileRefs: this.commitTileRefs,
         completed: this.completed,
         height: node.height,
         nodeId: this.nodeId,
+        presentationBounds,
         tiles: workingSurface.tiles,
         transform: node.transform || {},
         type: "tiles",
@@ -1737,6 +2061,7 @@ class BrushStrokeSession {
       completed: this.completed,
       height: this.canvasState.canvas.height,
       nodeId: this.nodeId,
+      presentationBounds,
       replacesNode: true,
       transform: this.previewNode?.transform || node.transform || {},
       type: "canvas",
@@ -1951,7 +2276,10 @@ class BrushStrokeSession {
   }
 
   getLocalPoint(point) {
-    const node = this.previewNode || this.editor.getNode(this.nodeId);
+    const durableNode = this.editor.getNode(this.nodeId);
+    const node = this.usesCanvasOffset
+      ? durableNode || this.previewNode
+      : this.previewNode || durableNode;
 
     if (!node) {
       return point;
@@ -1959,10 +2287,10 @@ class BrushStrokeSession {
 
     const localPoint = getImageLocalPoint(node, point);
 
-    return this.preserveRasterPlane && !this.tileSurface
+    return this.usesCanvasOffset && !this.tileSurface
       ? {
-          x: localPoint.x - this.canvasOffset.x,
-          y: localPoint.y - this.canvasOffset.y,
+          x: localPoint.x - this.canvasInputOffset.x,
+          y: localPoint.y - this.canvasInputOffset.y,
         }
       : localPoint;
   }
@@ -2039,6 +2367,7 @@ class DeferredBrushStrokeSession {
     this.delegateDisconnected = false;
     this.lastDelegatePoint = null;
     this.previousPoint = point;
+    this.preservePointerSamples = true;
     this.projection = getLockedTargetProjection(tool.editor, targetState);
     this.settings = settings;
     this.targetState = targetState;
@@ -2053,6 +2382,14 @@ class DeferredBrushStrokeSession {
 
   hasPendingWorkingSurface() {
     return Boolean(this.delegate?.hasPendingWorkingSurface?.());
+  }
+
+  getCommitReady() {
+    return this.delegate?.getCommitReady?.() || Promise.resolve();
+  }
+
+  getHandoffReady() {
+    return this.delegate?.getHandoffReady?.() || Promise.resolve();
   }
 
   update({ point }) {
@@ -2217,6 +2554,99 @@ class DeferredBrushStrokeSession {
   }
 }
 
+class CommitQueuedBrushStrokeSession {
+  constructor({ point, settings, targetState, tool, waitFor }) {
+    this.canceled = false;
+    this.completePoint = null;
+    this.completed = false;
+    this.delegate = null;
+    this.pendingPoints = [];
+    this.point = point;
+    this.preservePointerSamples = true;
+    this.settings = settings;
+    this.targetState = targetState;
+    this.tool = tool;
+    this.workingSurfaceId = null;
+    this.ready = Promise.resolve(waitFor).then(() => this.activate());
+  }
+
+  getWorkingSurfaceState() {
+    return this.delegate?.getWorkingSurfaceState?.() || null;
+  }
+
+  hasPendingWorkingSurface() {
+    return (
+      !this.delegate || Boolean(this.delegate.hasPendingWorkingSurface?.())
+    );
+  }
+
+  getCommitReady() {
+    return this.delegate?.getCommitReady?.() || this.ready;
+  }
+
+  getHandoffReady() {
+    return this.ready.then(
+      () => this.delegate?.getHandoffReady?.() || Promise.resolve()
+    );
+  }
+
+  update({ point }) {
+    if (this.delegate) {
+      this.delegate.update({ point });
+      return;
+    }
+
+    this.pendingPoints.push(point);
+  }
+
+  complete({ point }) {
+    if (this.delegate) {
+      return this.delegate.complete({ point });
+    }
+
+    this.completePoint = point;
+    this.completed = true;
+    return this.ready;
+  }
+
+  cancel() {
+    this.canceled = true;
+    this.pendingPoints = [];
+    this.delegate?.cancel();
+    this.tool.clearActiveSession(this);
+  }
+
+  async activate() {
+    if (this.canceled) {
+      return;
+    }
+
+    this.delegate = new DeferredBrushStrokeSession({
+      point: this.point,
+      settings: this.settings,
+      targetState: this.targetState,
+      tool: this.tool,
+    });
+    this.workingSurfaceId = this.delegate.workingSurfaceId || null;
+
+    for (const point of this.pendingPoints) {
+      this.delegate.update({ point });
+    }
+    this.pendingPoints = [];
+
+    if (this.completed && this.completePoint) {
+      await this.delegate.complete({ point: this.completePoint });
+    }
+  }
+}
+
+const sessionContains = (session, candidate) => {
+  return Boolean(
+    session &&
+      (session === candidate || sessionContains(session.delegate, candidate))
+  );
+};
+
 export class BrushTool extends Tool {
   constructor(editor, operation = "paint") {
     super(editor);
@@ -2284,21 +2714,6 @@ export class BrushTool extends Tool {
 
   beginStroke({ point }) {
     return measurePerf("brush.stroke.begin", () => {
-      if (this.activeSession?.hasPendingWorkingSurface()) {
-        recordRasterDebugEvent("tool.promotePendingWorkingSurface", {
-          activeWorkingSurfaceId: this.activeSession.workingSurfaceId,
-          pendingSurfaceCount: this.pendingWorkingSurfaces.length,
-        });
-        this.pendingWorkingSurfaces = [
-          ...this.pendingWorkingSurfaces.filter(
-            (entry) => entry.session !== this.activeSession
-          ),
-          {
-            session: this.activeSession,
-          },
-        ];
-      }
-
       const settings = this.getSettings();
       const targetState = getRasterTargetState(this.editor, {
         point,
@@ -2311,6 +2726,34 @@ export class BrushTool extends Tool {
           activeTool: this.editor.activeTool,
         });
         return null;
+      }
+
+      if (this.activeSession?.hasPendingWorkingSurface()) {
+        const pendingSession = this.activeSession;
+
+        recordRasterDebugEvent("tool.promotePendingWorkingSurface", {
+          activeWorkingSurfaceId: pendingSession.workingSurfaceId,
+          pendingSurfaceCount: this.pendingWorkingSurfaces.length,
+        });
+        this.pendingWorkingSurfaces = [
+          ...this.pendingWorkingSurfaces.filter(
+            (entry) => entry.session !== pendingSession
+          ),
+          {
+            session: pendingSession,
+          },
+        ];
+        const session = new CommitQueuedBrushStrokeSession({
+          point,
+          settings,
+          targetState,
+          tool: this,
+          waitFor: pendingSession.getHandoffReady?.(),
+        });
+
+        this.activeSession = session;
+        this.editor.notifyInteractionPreviewChanged();
+        return session;
       }
 
       const session = new DeferredBrushStrokeSession({
@@ -2474,9 +2917,7 @@ export class BrushTool extends Tool {
 
   clearPendingPreview(session) {
     const nextWorkingSurfaces = this.pendingWorkingSurfaces.filter((entry) => {
-      return !(
-        entry.session === session || entry.session?.delegate === session
-      );
+      return !sessionContains(entry.session, session);
     });
 
     if (nextWorkingSurfaces.length === this.pendingWorkingSurfaces.length) {
@@ -2492,10 +2933,7 @@ export class BrushTool extends Tool {
   }
 
   clearActiveSession(session) {
-    if (
-      this.activeSession === session ||
-      this.activeSession?.delegate === session
-    ) {
+    if (sessionContains(this.activeSession, session)) {
       this.activeSession = null;
       recordRasterDebugEvent("tool.clearActiveSession", {
         workingSurfaceId: session.workingSurfaceId,

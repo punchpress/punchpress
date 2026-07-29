@@ -53,29 +53,36 @@ export const startCanvasToolPlacementSession = ({
     x: event.clientX,
     y: event.clientY,
   };
-  let pendingUpdate: PlacementSessionUpdate | null = null;
+  let pendingUpdates: PlacementSessionUpdate[] = [];
   let updateFrameId = 0;
 
-  const flushPendingUpdate = () => {
+  const flushPendingUpdates = () => {
     updateFrameId = 0;
 
-    if (!pendingUpdate) {
+    if (pendingUpdates.length === 0) {
       return;
     }
 
-    const nextUpdate = pendingUpdate;
-    pendingUpdate = null;
-    session.update(nextUpdate);
+    const nextUpdates = pendingUpdates;
+    pendingUpdates = [];
+
+    for (const nextUpdate of nextUpdates) {
+      session.update(nextUpdate);
+    }
   };
 
   const scheduleUpdate = (nextUpdate) => {
-    pendingUpdate = nextUpdate;
+    if (session.preservePointerSamples) {
+      pendingUpdates.push(nextUpdate);
+    } else {
+      pendingUpdates = [nextUpdate];
+    }
 
     if (updateFrameId) {
       return;
     }
 
-    updateFrameId = window.requestAnimationFrame(flushPendingUpdate);
+    updateFrameId = window.requestAnimationFrame(flushPendingUpdates);
   };
 
   const cleanup = () => {
@@ -88,7 +95,7 @@ export const startCanvasToolPlacementSession = ({
 
     window.cancelAnimationFrame(updateFrameId);
     updateFrameId = 0;
-    pendingUpdate = null;
+    pendingUpdates = [];
   };
 
   const getDragDistancePx = (nextEvent) => {
@@ -98,18 +105,27 @@ export const startCanvasToolPlacementSession = ({
     });
   };
 
+  const getSessionUpdate = (moveEvent) => ({
+    altKey: moveEvent.altKey,
+    dragDistancePx: getDragDistancePx(moveEvent),
+    metaKey: moveEvent.metaKey,
+    point: getCanvasPoint(moveEvent.clientX, moveEvent.clientY),
+    preserveAspectRatio: moveEvent.shiftKey,
+    spaceKey:
+      editor.getState().spacePressed ||
+      moveEvent.code === "Space" ||
+      moveEvent.getModifierState?.("Space"),
+  });
+
   const handlePointerMove = (moveEvent) => {
-    scheduleUpdate({
-      altKey: moveEvent.altKey,
-      dragDistancePx: getDragDistancePx(moveEvent),
-      metaKey: moveEvent.metaKey,
-      point: getCanvasPoint(moveEvent.clientX, moveEvent.clientY),
-      preserveAspectRatio: moveEvent.shiftKey,
-      spaceKey:
-        editor.getState().spacePressed ||
-        moveEvent.code === "Space" ||
-        moveEvent.getModifierState?.("Space"),
-    });
+    const coalescedEvents = session.preservePointerSamples
+      ? moveEvent.getCoalescedEvents?.() || []
+      : [];
+    const samples = coalescedEvents.length > 0 ? coalescedEvents : [moveEvent];
+
+    for (const sample of samples) {
+      scheduleUpdate(getSessionUpdate(sample));
+    }
   };
 
   const handlePointerCancel = () => {
@@ -118,7 +134,7 @@ export const startCanvasToolPlacementSession = ({
   };
 
   const handlePointerUp = (upEvent) => {
-    flushPendingUpdate();
+    flushPendingUpdates();
     cleanup();
     session.complete({
       altKey: upEvent.altKey,
