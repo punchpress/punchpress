@@ -624,12 +624,14 @@ test("clipped legacy pointer-up applies its endpoint once", async ({
       throw new Error("Expected Raster");
     }
 
+    Object.assign(editor, { rasterSurface: null });
     editor.clearSelection();
     editor.setBrushSettings(
       {
         hardness: 0.5,
         opacity: 0.5,
         size: 8,
+        smoothing: 0,
         spacing: 2,
       },
       "brush"
@@ -868,13 +870,25 @@ test("tiled painting preserves a cropped Raster plane and local coordinates", as
     JSON.stringify({
       nodes: [
         {
+          background: "#ffffff",
+          height: 500,
+          id: "frame",
+          locked: false,
+          name: "Frame",
+          parentId: "root",
+          transform: transform(0, 0),
+          type: "artboard",
+          visible: true,
+          width: 500,
+        },
+        {
           assetId: "asset-raster",
           height: 80,
           id: "raster",
           mimeType: "image/png",
           name: "Raster",
           opacity: 1,
-          parentId: "root",
+          parentId: "frame",
           src,
           transform: transform(320, 240),
           type: "image",
@@ -917,14 +931,20 @@ test("tiled painting preserves a cropped Raster plane and local coordinates", as
 
     const session = editor.dispatchNodePointerDown({
       node: raster,
-      point: { x: 342, y: 255 },
+      point: { x: 350, y: 260 },
     });
 
-    await session?.complete({ point: { x: 346, y: 255 } });
+    const workingSurface =
+      editor.getBrushWorkingSurfaceStateForNode?.("raster");
+    const activeClip = {
+      allowsOverflow: workingSurface?.allowOverflow === true,
+    };
+    await session?.complete({ point: { x: 354, y: 260 } });
     const committed = editor.getNode("raster");
 
     return committed?.type === "image"
       ? {
+          activeClip,
           baseHeight: committed.baseHeight,
           baseWidth: committed.baseWidth,
           baseX: committed.baseX,
@@ -940,6 +960,9 @@ test("tiled painting preserves a cropped Raster plane and local coordinates", as
   });
 
   expect(result).toMatchObject({
+    activeClip: {
+      allowsOverflow: false,
+    },
     baseHeight: 80,
     baseWidth: 100,
     baseX: -20,
@@ -950,4 +973,152 @@ test("tiled painting preserves a cropped Raster plane and local coordinates", as
   });
   expect(result?.tileSourceCount).toBeGreaterThan(0);
   expect(result?.tileMinX).toBeLessThan(20);
+});
+
+test("erasing a cropped Frame Raster preserves its plane and local coordinates", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  const src = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+
+    canvas.width = 100;
+    canvas.height = 80;
+    if (!context) {
+      throw new Error("Expected Canvas2D context");
+    }
+    context.fillStyle = "#3355ff";
+    context.fillRect(0, 0, 100, 80);
+    return canvas.toDataURL("image/png");
+  });
+
+  await loadDocument(
+    page,
+    JSON.stringify({
+      nodes: [
+        {
+          background: "#ffffff",
+          height: 500,
+          id: "frame",
+          locked: false,
+          name: "Frame",
+          parentId: "root",
+          transform: transform(0, 0),
+          type: "artboard",
+          visible: true,
+          width: 500,
+        },
+        {
+          assetId: "asset-raster",
+          height: 80,
+          id: "raster",
+          mimeType: "image/png",
+          name: "Raster",
+          opacity: 1,
+          parentId: "frame",
+          src,
+          transform: transform(320, 240),
+          type: "image",
+          visible: true,
+          width: 100,
+        },
+      ],
+      version: "1.8",
+    })
+  );
+  await resetViewport(page);
+
+  const result = await page.evaluate(async () => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    if (!editor) {
+      throw new Error("Expected editor");
+    }
+
+    editor.select("raster");
+    editor.startCrop();
+    editor.updateCrop({ height: 70, width: 80, x: 20, y: 10 });
+    editor.commitCrop();
+    Object.assign(editor, { rasterSurface: null });
+    editor.setBrushSettings(
+      {
+        hardness: 1,
+        opacity: 1,
+        size: 4,
+        smoothing: 0,
+        spacing: 0,
+      },
+      "eraser"
+    );
+    editor.setActiveTool("eraser");
+    const raster = editor.getNode("raster");
+
+    if (raster?.type !== "image") {
+      throw new Error("Expected Raster");
+    }
+    const bounds = editor.getNodeRenderFrame(raster.id)?.bounds;
+
+    if (!bounds) {
+      throw new Error("Expected Raster bounds");
+    }
+    const point = {
+      x: bounds.minX + 2,
+      y: bounds.minY + 5,
+    };
+
+    const session = editor.dispatchNodePointerDown({
+      node: raster,
+      point,
+    });
+
+    await session?.delegate?.ready;
+    const workingSurface =
+      editor.getBrushWorkingSurfaceStateForNode?.("raster");
+
+    await session?.complete({ point });
+    const committed = editor.getNode("raster");
+
+    if (committed?.type !== "image" || !committed.src) {
+      throw new Error("Expected committed Raster");
+    }
+
+    const image = new Image();
+
+    image.src = committed.src;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+
+    canvas.width = image.width;
+    canvas.height = image.height;
+    if (!context) {
+      throw new Error("Expected Canvas2D context");
+    }
+    context.drawImage(image, 0, 0);
+
+    return {
+      alpha: context.getImageData(22, 15, 1, 1).data[3],
+      sessionStarted: Boolean(session),
+      workingSurfaceType: workingSurface?.type ?? null,
+      baseHeight: committed.baseHeight,
+      baseWidth: committed.baseWidth,
+      baseX: committed.baseX,
+      baseY: committed.baseY,
+      height: committed.height,
+      width: committed.width,
+    };
+  });
+
+  expect(result).toEqual({
+    alpha: 0,
+    sessionStarted: true,
+    workingSurfaceType: "canvas",
+    baseHeight: 80,
+    baseWidth: 100,
+    baseX: -20,
+    baseY: -10,
+    height: 70,
+    width: 80,
+  });
 });

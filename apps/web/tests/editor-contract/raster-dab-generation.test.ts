@@ -259,4 +259,25 @@ describe("raster dab generation", () => {
       sparseDabs[0]
     );
   });
+
+  test("filtered emission preserves spacing and seeded dynamics", () => {
+    const settings = {
+      ...hardRoundSettings,
+      angleJitter: 0.5,
+      scatter: 0.75,
+      seed: 8_675_309,
+      sizeJitter: 0.4,
+    };
+    const points = [
+      { x: 0, y: 0 },
+      { x: 20, y: 0 },
+    ];
+    const complete = createRasterDabGenerator(settings).append(points);
+    const filtered = createRasterDabGenerator(settings).append(
+      points,
+      (center) => center.x >= 10
+    );
+
+    expect(filtered).toEqual(complete.slice(2));
+  });
 });
