@@ -251,9 +251,19 @@ const setFrameBrushTestZoom = (page) =>
       throw new Error("Expected an editor");
     }
 
+    const frame = editor.nodes.find((node) => node.type === "artboard");
+    const bounds = frame ? editor.getNodeRenderFrame(frame.id)?.bounds : null;
+    const hostRect = editor.hostRef?.getBoundingClientRect();
+    const zoom = 0.1;
     const viewport = {
       ...editor.getState().viewport,
-      zoom: 0.1,
+      ...(bounds && hostRect
+        ? {
+            x: bounds.minX + bounds.width / 2 - hostRect.width / (2 * zoom),
+            y: bounds.minY + bounds.height / 2 - hostRect.height / (2 * zoom),
+          }
+        : {}),
+      zoom,
     };
 
     editor.viewerRef?.setTo?.(viewport);
@@ -1654,6 +1664,25 @@ test("Frame Raster accepts a later stroke beyond its initial content bounds", as
 }) => {
   await gotoEditor(page);
   await page.getByRole("button", { name: "Add artboard" }).click();
+  await setFrameBrushTestZoom(page);
+  await expect
+    .poll(async () => {
+      const box = await page
+        .locator("[data-artboard-body]")
+        .first()
+        .boundingBox();
+      const viewport = page.viewportSize();
+
+      return Boolean(
+        box &&
+          viewport &&
+          box.x >= 0 &&
+          box.y >= 0 &&
+          box.x + box.width <= viewport.width &&
+          box.y + box.height <= viewport.height
+      );
+    })
+    .toBe(true);
   await page.keyboard.press("b");
 
   await setBrushSliderValue(page, "Brush size", 40);
@@ -1664,6 +1693,7 @@ test("Frame Raster accepts a later stroke beyond its initial content bounds", as
   const secondPoint = await getFrameClientPoint(page, 0.78, 0.72);
 
   await dragBrush(page, [firstPoint, firstPoint]);
+  await expect.poll(() => getCommittedImageState(page)).not.toBeNull();
 
   const firstState = await getCommittedImageState(page);
 
@@ -1672,6 +1702,9 @@ test("Frame Raster accepts a later stroke beyond its initial content bounds", as
   expect(firstState?.height).toBeLessThan(300);
 
   await dragBrush(page, [secondPoint, secondPoint]);
+  await expect
+    .poll(async () => (await getCommittedImageState(page))?.width)
+    .toBeGreaterThan(firstState?.width || 0);
 
   const secondState = await getCommittedImageState(page);
   const firstSample = await getCommittedImageSampleAtClientPoint(
@@ -2073,6 +2106,14 @@ test("rapid Frame strokes queue on their pointer-down Raster target", async ({
       .find((surface) => surface.type === "tiles");
     const firstTileCount =
       firstSurface?.type === "tiles" ? firstSurface.tiles.length : 0;
+    const blockRenderReady = (event) => {
+      event.stopImmediatePropagation();
+    };
+
+    window.addEventListener(
+      "punchpress:raster-node-render-ready",
+      blockRenderReady
+    );
     const firstCommit = first.complete({
       point: toWorldPoint(firstRatios.at(-1)),
     });
@@ -2122,9 +2163,38 @@ test("rapid Frame strokes queue on their pointer-down Raster target", async ({
       throw new Error("Expected the committed Frame Raster");
     }
 
+    const pendingSurfaces = brush
+      .getWorkingSurfaceStates()
+      .filter((surface) => surface.nodeId === raster.id);
+    const combinedSurface = brush.getWorkingSurfaceStateForNode(raster.id);
+    const pendingCommitTileRefs = new Set(
+      pendingSurfaces.flatMap((surface) => surface.commitTileRefs || [])
+    );
+
+    window.removeEventListener(
+      "punchpress:raster-node-render-ready",
+      blockRenderReady
+    );
+    window.dispatchEvent(
+      new CustomEvent("punchpress:raster-node-render-ready", {
+        detail: {
+          mode: "tiles",
+          nodeId: raster.id,
+          renderKey: (raster.tileSources || [])
+            .map((tile) => tile.ref)
+            .join("|"),
+        },
+      })
+    );
+
     return {
       activatedBeforeFirstCommit,
+      combinedCommitTileRefCount:
+        combinedSurface?.type === "tiles"
+          ? new Set(combinedSurface.commitTileRefs || []).size
+          : 0,
       firstTileCount,
+      pendingCommitTileRefCount: pendingCommitTileRefs.size,
       rasterCount: rasters.length,
       thirdActivatedBeforeSecondCommit,
       localPoints: [firstRatios.at(-1), secondEnd, thirdEnd].map((ratio) => ({
@@ -2148,10 +2218,515 @@ test("rapid Frame strokes queue on their pointer-down Raster target", async ({
   expect(result.thirdActivatedBeforeSecondCommit, JSON.stringify(result)).toBe(
     false
   );
+  expect(result.combinedCommitTileRefCount).toBe(
+    result.pendingCommitTileRefCount
+  );
+  expect(result.combinedCommitTileRefCount).toBeGreaterThan(0);
   expect(result.rasterCount).toBe(1);
   expect(samples?.[0]?.a).toBeGreaterThan(240);
   expect(samples?.[1]?.a).toBeGreaterThan(240);
   expect(samples?.[2]?.a).toBeGreaterThan(240);
+});
+
+test("a completed Frame handoff keeps the held follow-up stroke visible", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(
+    page,
+    JSON.stringify({
+      nodes: [
+        {
+          background: "#ffffff",
+          height: 5400,
+          id: "handoff-frame",
+          locked: false,
+          name: "Handoff Frame",
+          parentId: "root",
+          transform: transform(0, 0),
+          type: "artboard",
+          visible: true,
+          width: 4500,
+        },
+      ],
+      version: DOCUMENT_VERSION,
+    })
+  );
+  await setFrameBrushTestZoom(page);
+
+  const result = await page.evaluate(async () => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const brush = editor?.tools.get("brush");
+    const frame = editor?.getNode("handoff-frame");
+    const bounds = editor?.getNodeRenderFrame("handoff-frame")?.bounds;
+
+    if (!(editor && brush && frame?.type === "artboard" && bounds)) {
+      throw new Error("Expected a large Frame brush target");
+    }
+
+    editor.select(frame.id);
+    editor.setActiveTool("brush");
+    editor.setBrushSettings(
+      {
+        hardness: 1,
+        opacity: 1,
+        size: 100,
+        smoothing: 0,
+        spacing: 0,
+      },
+      "brush"
+    );
+    window.addEventListener("punchpress:raster-node-render-ready", (event) => {
+      if (!event.detail?.testBypass) {
+        event.stopImmediatePropagation();
+      }
+    });
+
+    const toWorldPoint = (ratio) => ({
+      x: bounds.minX + bounds.width * ratio.x,
+      y: bounds.minY + bounds.height * ratio.y,
+    });
+    const firstEnd = toWorldPoint({ x: 0.08, y: 0.08 });
+    const first = brush.beginStroke({
+      point: toWorldPoint({ x: 0.4, y: 0.4 }),
+    });
+
+    if (!first) {
+      throw new Error("Expected the first Frame stroke");
+    }
+
+    first.update({ point: firstEnd });
+    await first.complete({ point: firstEnd });
+
+    const secondEnd = toWorldPoint({ x: 0.8, y: 0.8 });
+    const second = brush.beginStroke({
+      point: toWorldPoint({ x: 0.75, y: 0.75 }),
+    });
+
+    if (!second) {
+      throw new Error("Expected the held follow-up stroke");
+    }
+
+    second.update({ point: secondEnd });
+    await second.ready;
+
+    const raster = editor.nodes.find(
+      (node) => node.type === "image" && node.parentId === frame.id
+    );
+
+    if (raster?.type !== "image") {
+      throw new Error("Expected the committed Frame Raster");
+    }
+
+    const combinedSurface = brush.getWorkingSurfaceStateForNode(raster.id);
+
+    return {
+      combinedSurface:
+        combinedSurface?.type === "tiles"
+          ? {
+              completed: combinedSurface.completed,
+              inProgressTileCount: combinedSurface.inProgressTiles?.length || 0,
+              type: combinedSurface.type,
+            }
+          : null,
+      firstTileSourceCount: raster.tileSources?.length || 0,
+      nodeId: raster.id,
+      surfaces: brush.getWorkingSurfaceStates().map((surface) => ({
+        commitTileRefCount: surface.commitTileRefs?.length || 0,
+        completed: surface.completed,
+        nodeId: surface.nodeId,
+        tileCount: surface.type === "tiles" ? surface.tiles.length : 0,
+        transform: surface.transform,
+        type: surface.type,
+      })),
+    };
+  });
+  const raster = page.locator(`[data-raster-node-id="${result.nodeId}"]`);
+
+  await expect(
+    raster.locator('[data-raster-pending-tiles-ready="true"]')
+  ).toHaveCount(1);
+  expect(result.combinedSurface, JSON.stringify(result.surfaces)).toMatchObject(
+    {
+      completed: false,
+      inProgressTileCount: expect.any(Number),
+      type: "tiles",
+    }
+  );
+  expect(result.combinedSurface?.inProgressTileCount).toBeGreaterThan(0);
+  expect(
+    new Set(result.surfaces.map((surface) => JSON.stringify(surface.transform)))
+      .size
+  ).toBeGreaterThan(1);
+  const workingSurface = raster.locator(
+    '[data-raster-working-surface="tiles"]'
+  );
+
+  await expect(workingSurface).toHaveAttribute(
+    "data-raster-working-tile-count",
+    String(result.combinedSurface?.inProgressTileCount),
+    { timeout: 5000 }
+  );
+  const secondPoint = await getFrameClientPoint(page, 0.8, 0.8);
+  const workingTileBoxes = await raster
+    .getByTestId("raster-working-tile")
+    .evaluateAll((tiles) =>
+      tiles.map((tile) => {
+        const rect = tile.getBoundingClientRect();
+
+        return {
+          maxX: rect.right,
+          maxY: rect.bottom,
+          minX: rect.left,
+          minY: rect.top,
+        };
+      })
+    );
+
+  expect(
+    workingTileBoxes.some(
+      (box) =>
+        secondPoint.x >= box.minX &&
+        secondPoint.x <= box.maxX &&
+        secondPoint.y >= box.minY &&
+        secondPoint.y <= box.maxY
+    )
+  ).toBe(true);
+  const presentedAlpha = await workingSurface.evaluate((surface) => {
+    return [...surface.querySelectorAll("canvas")].reduce(
+      (maxAlpha, canvas) => {
+        const context = canvas.getContext("2d");
+
+        if (!context) {
+          return maxAlpha;
+        }
+
+        const data = context.getImageData(
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        ).data;
+        let canvasMaxAlpha = maxAlpha;
+
+        for (let index = 3; index < data.length; index += 4) {
+          if (data[index] > canvasMaxAlpha) {
+            canvasMaxAlpha = data[index];
+          }
+        }
+
+        return canvasMaxAlpha;
+      },
+      0
+    );
+  });
+
+  expect(presentedAlpha).toBeGreaterThan(240);
+
+  const asyncCommitState = await page.evaluate(({ nodeId }) => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const brush = editor?.tools.get("brush");
+    const frame = editor?.getNode("handoff-frame");
+    const bounds = editor?.getNodeRenderFrame("handoff-frame")?.bounds;
+    const session = brush?.activeSession;
+
+    if (!(editor && brush && frame?.type === "artboard" && bounds && session)) {
+      throw new Error("Expected the held follow-up Frame stroke");
+    }
+
+    const toWorldPoint = (ratio) => ({
+      x: bounds.minX + bounds.width * ratio.x,
+      y: bounds.minY + bounds.height * ratio.y,
+    });
+    const ratios = Array.from({ length: 6 }, (_, row) => {
+      const y = 0.08 + row * 0.16;
+
+      return row % 2 === 0
+        ? [
+            { x: 0.08, y },
+            { x: 0.92, y },
+          ]
+        : [
+            { x: 0.92, y },
+            { x: 0.08, y },
+          ];
+    }).flat();
+    const points = ratios.map(toWorldPoint);
+
+    for (const point of points) {
+      session.update({ point });
+    }
+
+    const originalRequestAnimationFrame = window.requestAnimationFrame;
+    let heldEncodeFrame: FrameRequestCallback | null = null;
+
+    window.requestAnimationFrame = (callback) => {
+      heldEncodeFrame = callback;
+      return 1_000_000;
+    };
+    session.complete({ point: points.at(-1) });
+    window.requestAnimationFrame = originalRequestAnimationFrame;
+
+    if (!heldEncodeFrame) {
+      throw new Error("Expected an async tiled commit frame");
+    }
+
+    Reflect.set(
+      window,
+      "__PUNCHPRESS_TEST_HELD_RASTER_FRAME__",
+      heldEncodeFrame
+    );
+    editor.notifyInteractionPreviewChanged();
+
+    const combinedSurface = brush.getWorkingSurfaceStateForNode(nodeId);
+
+    return combinedSurface?.type === "tiles"
+      ? {
+          commitTileRefCount: combinedSurface.commitTileRefs?.length || 0,
+          completed: combinedSurface.completed,
+          inProgressTileCount: combinedSurface.inProgressTiles?.length || 0,
+        }
+      : null;
+  }, result);
+
+  expect(asyncCommitState).toMatchObject({
+    completed: true,
+    inProgressTileCount: expect.any(Number),
+  });
+  expect(asyncCommitState?.commitTileRefCount).toBeGreaterThan(0);
+  expect(asyncCommitState?.inProgressTileCount).toBeGreaterThan(16);
+  await expect(workingSurface).toHaveAttribute(
+    "data-raster-working-tile-count",
+    String(asyncCommitState?.inProgressTileCount)
+  );
+  const releasedAlpha = await workingSurface.evaluate((surface) => {
+    return [...surface.querySelectorAll("canvas")].reduce(
+      (maxAlpha, canvas) => {
+        const context = canvas.getContext("2d");
+
+        if (!context) {
+          return maxAlpha;
+        }
+
+        const data = context.getImageData(
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        ).data;
+        let canvasMaxAlpha = maxAlpha;
+
+        for (let index = 3; index < data.length; index += 4) {
+          if (data[index] > canvasMaxAlpha) {
+            canvasMaxAlpha = data[index];
+          }
+        }
+
+        return canvasMaxAlpha;
+      },
+      0
+    );
+  });
+
+  expect(releasedAlpha).toBeGreaterThan(240);
+
+  await page.evaluate(() => {
+    const heldEncodeFrame = Reflect.get(
+      window,
+      "__PUNCHPRESS_TEST_HELD_RASTER_FRAME__"
+    );
+
+    Reflect.deleteProperty(window, "__PUNCHPRESS_TEST_HELD_RASTER_FRAME__");
+    heldEncodeFrame(performance.now());
+  });
+  await expect
+    .poll(async () => (await getCommittedImageState(page))?.tileSourceCount)
+    .toBeGreaterThan(result.firstTileSourceCount);
+  await page.evaluate(({ nodeId }) => {
+    const raster = window.__PUNCHPRESS_EDITOR__?.getNode(nodeId);
+
+    if (raster?.type !== "image") {
+      throw new Error("Expected the committed Frame Raster");
+    }
+
+    window.dispatchEvent(
+      new CustomEvent("punchpress:raster-node-render-ready", {
+        detail: {
+          mode: "tiles",
+          nodeId,
+          renderKey: (raster.tileSources || [])
+            .map((tile) => tile.ref)
+            .join("|"),
+          testBypass: true,
+        },
+      })
+    );
+  }, result);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__PUNCHPRESS_EDITOR__?.getBrushWorkingSurfaceStates?.()
+            .length || 0
+      )
+    )
+    .toBe(0);
+});
+
+test("a first Frame stroke stays visible and stationary through pointer release", async ({
+  page,
+}, testInfo) => {
+  await gotoEditor(page);
+  await loadDocument(
+    page,
+    JSON.stringify({
+      nodes: [
+        {
+          background: "#ffffff",
+          height: 5400,
+          id: "release-frame",
+          locked: false,
+          name: "Release Frame",
+          parentId: "root",
+          transform: transform(0, 0),
+          type: "artboard",
+          visible: true,
+          width: 4500,
+        },
+      ],
+      version: DOCUMENT_VERSION,
+    })
+  );
+  await setFrameBrushTestZoom(page);
+  await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    editor?.select("release-frame");
+    editor?.setBrushSettings(
+      {
+        hardness: 1,
+        opacity: 1,
+        size: 145,
+        smoothing: 0.1,
+        spacing: 0,
+      },
+      "brush"
+    );
+  });
+  await page.keyboard.press("b");
+
+  const frameBox = await page
+    .locator("[data-artboard-body]")
+    .first()
+    .boundingBox();
+
+  if (!frameBox) {
+    throw new Error("Expected the Frame body");
+  }
+
+  const clip = {
+    height: Math.min(frameBox.height, page.viewportSize()?.height || 720),
+    width: Math.min(frameBox.width, page.viewportSize()?.width || 1280),
+    x: Math.max(0, frameBox.x),
+    y: Math.max(0, frameBox.y),
+  };
+  const ratios = [
+    { x: 0.48, y: 0.68 },
+    { x: 0.5, y: 0.38 },
+    { x: 0.62, y: 0.35 },
+    { x: 0.64, y: 0.48 },
+    { x: 0.57, y: 0.51 },
+    { x: 0.42, y: 0.54 },
+    { x: 0.4, y: 0.65 },
+    { x: 0.52, y: 0.73 },
+    { x: 0.67, y: 0.61 },
+  ];
+  const controlPoints = ratios.map((ratio) => ({
+    x: frameBox.x + frameBox.width * ratio.x,
+    y: frameBox.y + frameBox.height * ratio.y,
+  }));
+  const points = controlPoints.flatMap((point, index) => {
+    if (index === 0) {
+      return [point];
+    }
+
+    const previousPoint = controlPoints[index - 1];
+
+    return Array.from({ length: 8 }, (_, segmentIndex) => {
+      const progress = (segmentIndex + 1) / 8;
+
+      return {
+        x: previousPoint.x + (point.x - previousPoint.x) * progress,
+        y: previousPoint.y + (point.y - previousPoint.y) * progress,
+      };
+    });
+  });
+  const baseline = await getScreenshotInkPixelStats(page, clip);
+  const [startPoint, ...strokePoints] = points;
+  const screencastFrames = await captureScreencastFrames(
+    page,
+    async () => {
+      await page.mouse.move(startPoint.x, startPoint.y);
+      await page.mouse.down();
+
+      for (const point of strokePoints) {
+        await page.mouse.move(point.x, point.y);
+        await page.waitForTimeout(8);
+      }
+
+      await page.waitForTimeout(120);
+      await page.mouse.up();
+    },
+    { postRollMs: 900, preRollMs: 100 }
+  );
+  const frames = await getScreencastInkFrameStats(page, screencastFrames, clip);
+  const baselineInkWeight = Math.min(
+    baseline.inkWeight,
+    ...frames.slice(0, 3).map((frame) => frame.inkWeight)
+  );
+  const visibleWeights = frames.map(
+    (frame) => frame.inkWeight - baselineInkWeight
+  );
+  const maxVisibleInkWeight = Math.max(...visibleWeights);
+  const firstHighFrameIndex = visibleWeights.findIndex(
+    (visibleInkWeight) => visibleInkWeight >= maxVisibleInkWeight * 0.8
+  );
+  const dips = frames.flatMap((frame, index) => {
+    if (index <= firstHighFrameIndex) {
+      return [];
+    }
+
+    const visibleInkWeight = visibleWeights[index];
+    const laterHighFrame = visibleWeights
+      .slice(index + 1)
+      .some((candidate) => candidate >= maxVisibleInkWeight * 0.7);
+
+    return visibleInkWeight < maxVisibleInkWeight * 0.35 && laterHighFrame
+      ? [
+          {
+            frameIndex: frame.index,
+            timestamp: frame.timestamp,
+            visibleInkWeight,
+          },
+        ]
+      : [];
+  });
+  await testInfo.attach("first-frame-stroke-release", {
+    body: JSON.stringify(
+      {
+        baselineInkWeight,
+        dips,
+        frames,
+        maxVisibleInkWeight,
+        screencastFrameCount: screencastFrames.length,
+      },
+      null,
+      2
+    ),
+    contentType: "application/json",
+  });
+  expect(maxVisibleInkWeight).toBeGreaterThan(300);
+  expect(dips).toEqual([]);
 });
 
 test("default Frame Hard Round uses the native tiled path", async ({

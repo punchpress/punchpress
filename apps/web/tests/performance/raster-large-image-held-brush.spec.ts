@@ -2,6 +2,8 @@ import { expect, type Page, test } from "@playwright/test";
 import { gotoEditor, loadDocument, setViewport } from "../e2e/helpers/editor";
 
 const IMAGE_EDGE = 5000;
+const FRAME_HEIGHT = 5400;
+const FRAME_WIDTH = 4500;
 const STROKE_UPDATES = 360;
 const UPDATE_BUDGET_MS = 8;
 const EDGE_TRANSITION_BUDGET_MS = 32;
@@ -386,6 +388,207 @@ test("a long edge-crossing update does bounded work on a 5000px Raster", async (
     UPDATE_BUDGET_MS
   );
   expect(result.centerRed, JSON.stringify(result)).toBeGreaterThan(200);
+});
+
+test("leaving a large Frame keeps its held Raster stroke responsive and stationary", async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(120_000);
+  await gotoEditor(page);
+  await loadDocument(
+    page,
+    JSON.stringify({
+      nodes: [
+        {
+          background: "#ffffff",
+          height: FRAME_HEIGHT,
+          id: "large-frame",
+          locked: false,
+          name: "Large Frame",
+          parentId: "root",
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: 0,
+            y: 0,
+          },
+          type: "artboard",
+          visible: true,
+          width: FRAME_WIDTH,
+        },
+      ],
+      version: "1.8",
+    })
+  );
+  await setViewport(page, {
+    x: 0,
+    y: 0,
+    zoom: 0.12,
+  });
+
+  const result = await page.evaluate(
+    async ({ frameHeight, frameWidth }) => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
+      const brush = editor?.tools.get("brush");
+
+      if (!(editor && brush)) {
+        throw new Error("Expected the browser Editor brush");
+      }
+
+      editor.select("large-frame");
+      editor.setActiveTool("brush");
+      editor.setBrushSettings(
+        {
+          hardness: 1,
+          opacity: 1,
+          size: 151,
+          smoothing: 0.1,
+          spacing: 0,
+        },
+        "brush"
+      );
+
+      const center = { x: frameWidth / 2, y: frameHeight / 2 };
+      const first = brush.beginStroke({ point: center });
+
+      if (!first) {
+        throw new Error("Expected the first Frame stroke");
+      }
+
+      for (let index = 1; index <= 80; index += 1) {
+        const angle = (index / 80) * Math.PI * 10;
+
+        first.update({
+          point: {
+            x: center.x + Math.cos(angle) * 700,
+            y: center.y + Math.sin(angle) * 700,
+          },
+        });
+      }
+      const firstCommitStartedAt = performance.now();
+
+      await first.complete({ point: center });
+      const firstCommitMs = performance.now() - firstCommitStartedAt;
+
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+
+      const raster = editor.nodes.find(
+        (node) => node.type === "image" && node.parentId === "large-frame"
+      );
+
+      if (raster?.type !== "image") {
+        throw new Error("Expected the Frame Raster");
+      }
+
+      const frameElement = document.querySelector(
+        '[data-artboard-body="large-frame"]'
+      );
+      const rasterElement = document.querySelector(
+        `[data-node-id="${raster.id}"]`
+      )?.parentElement;
+
+      if (!(frameElement instanceof HTMLElement && rasterElement)) {
+        throw new Error("Expected Frame and Raster presentation elements");
+      }
+
+      const readPresentation = () => {
+        const frameRect = frameElement.getBoundingClientRect();
+        const rasterRect = rasterElement.getBoundingClientRect();
+
+        return {
+          frameX: frameRect.x,
+          frameY: frameRect.y,
+          rasterHeight: rasterRect.height,
+          rasterWidth: rasterRect.width,
+          rasterX: rasterRect.x,
+          rasterY: rasterRect.y,
+        };
+      };
+      const before = readPresentation();
+      const followupStartedAt = performance.now();
+      const second = brush.beginStroke({
+        point: { x: 700, y: center.y },
+      });
+
+      if (!second) {
+        throw new Error("Expected the second Frame stroke");
+      }
+
+      for (let index = 1; index <= 40; index += 1) {
+        second.update({
+          point: {
+            x: 700 - index * 40,
+            y: center.y + Math.sin(index / 3) * 500,
+          },
+        });
+      }
+      await second.ready;
+      const followupReadyMs = performance.now() - followupStartedAt;
+      const edgeStartedAt = performance.now();
+
+      second.update({ point: { x: -900, y: center.y } });
+      const edgeUpdateMs = performance.now() - edgeStartedAt;
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      );
+      const edgePaintMs = performance.now() - edgeStartedAt;
+      const during = readPresentation();
+      const updateDurations: number[] = [];
+
+      for (let index = 1; index <= 120; index += 1) {
+        const angle = (index / 120) * Math.PI * 8;
+        const startedAt = performance.now();
+
+        second.update({
+          point: {
+            x: center.x + Math.cos(angle) * 900,
+            y: center.y + Math.sin(angle) * 900,
+          },
+        });
+        updateDurations.push(performance.now() - startedAt);
+      }
+
+      second.cancel();
+      const sorted = [...updateDurations].sort((left, right) => left - right);
+
+      return {
+        before,
+        during,
+        edgePaintMs,
+        edgeUpdateMs,
+        firstCommitMs,
+        followupReadyMs,
+        maxUpdateMs: sorted.at(-1) || 0,
+        meanUpdateMs:
+          updateDurations.reduce((total, duration) => total + duration, 0) /
+          updateDurations.length,
+        p95UpdateMs: sorted[Math.floor((sorted.length - 1) * 0.95)] || 0,
+      };
+    },
+    { frameHeight: FRAME_HEIGHT, frameWidth: FRAME_WIDTH }
+  );
+
+  await testInfo.attach("large-frame-edge-excursion-timing", {
+    body: JSON.stringify(result, null, 2),
+    contentType: "application/json",
+  });
+  console.log(`large-frame-edge-excursion ${JSON.stringify(result)}`);
+
+  expect(result.edgeUpdateMs, JSON.stringify(result)).toBeLessThanOrEqual(
+    EDGE_TRANSITION_BUDGET_MS
+  );
+  expect(result.edgePaintMs, JSON.stringify(result)).toBeLessThanOrEqual(64);
+  expect(result.firstCommitMs, JSON.stringify(result)).toBeLessThanOrEqual(96);
+  expect(result.followupReadyMs, JSON.stringify(result)).toBeLessThanOrEqual(
+    64
+  );
+  expect(result.p95UpdateMs, JSON.stringify(result)).toBeLessThanOrEqual(
+    UPDATE_BUDGET_MS
+  );
+  expect(result.during, JSON.stringify(result)).toEqual(result.before);
 });
 
 test("the canvas placement boundary retains coalesced brush samples", async ({
