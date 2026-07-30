@@ -237,5 +237,6 @@ export type { PixelGridTarget } from "./viewport/pixel-grid-target";
 export {
   getNodeLocalMatrix,
   getNodeLocalTransformBounds,
+  invertMatrix,
   multiplyMatrix,
 } from "./transform/node-transform-matrix";

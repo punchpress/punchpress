@@ -38,6 +38,7 @@ import {
   getImageLocalClipPolygon,
   getImageLocalPoint,
   getImageNodeCroppedToSourceRect,
+  getNodeArtboardClipBounds,
   getRasterTargetState,
   getRasterWritableBounds,
   getRasterWritablePolygon,
@@ -933,12 +934,10 @@ class BrushStrokeSession {
       return false;
     }
 
-    const matchesX = (value) =>
-      Math.abs(value) <= NATIVE_PATH_EPSILON ||
-      Math.abs(value - this.tileSurface.width) <= NATIVE_PATH_EPSILON;
-    const matchesY = (value) =>
-      Math.abs(value) <= NATIVE_PATH_EPSILON ||
-      Math.abs(value - this.tileSurface.height) <= NATIVE_PATH_EPSILON;
+    const minX = Math.min(...writablePolygon.map((point) => point.x));
+    const maxX = Math.max(...writablePolygon.map((point) => point.x));
+    const minY = Math.min(...writablePolygon.map((point) => point.y));
+    const maxY = Math.max(...writablePolygon.map((point) => point.y));
     const hasCorner = (x, y) =>
       writablePolygon.some(
         (point) =>
@@ -948,12 +947,16 @@ class BrushStrokeSession {
 
     return (
       writablePolygon.every(
-        (point) => matchesX(point.x) && matchesY(point.y)
+        (point) =>
+          (Math.abs(point.x - minX) <= NATIVE_PATH_EPSILON ||
+            Math.abs(point.x - maxX) <= NATIVE_PATH_EPSILON) &&
+          (Math.abs(point.y - minY) <= NATIVE_PATH_EPSILON ||
+            Math.abs(point.y - maxY) <= NATIVE_PATH_EPSILON)
       ) &&
-      hasCorner(0, 0) &&
-      hasCorner(this.tileSurface.width, 0) &&
-      hasCorner(this.tileSurface.width, this.tileSurface.height) &&
-      hasCorner(0, this.tileSurface.height)
+      hasCorner(minX, minY) &&
+      hasCorner(maxX, minY) &&
+      hasCorner(maxX, maxY) &&
+      hasCorner(minX, maxY)
     );
   }
 
@@ -1945,10 +1948,20 @@ class BrushStrokeSession {
 
     const onRenderReady = (event) => {
       const detail = event?.detail || {};
+      const renderedTileRefs = new Set(
+        typeof detail.renderKey === "string"
+          ? detail.renderKey.split("|").filter(Boolean)
+          : []
+      );
+      const includesCommittedTiles =
+        this.commitTileRefs.length > 0 &&
+        this.commitTileRefs.every((tileRef) =>
+          renderedTileRefs.has(tileRef)
+        );
 
       if (
         detail.nodeId === this.nodeId &&
-        detail.renderKey === expectedRenderKey
+        (detail.renderKey === expectedRenderKey || includesCommittedTiles)
       ) {
         recordRasterDebugEvent("handoff.renderReady", {
           mode: detail.mode || null,
@@ -2005,6 +2018,14 @@ class BrushStrokeSession {
 
   getHandoffReady() {
     return this.handoffReady;
+  }
+
+  getFollowupReady() {
+    const node = this.editor.getNode(this.nodeId);
+
+    return getNodeArtboardClipBounds(this.editor, node)
+      ? this.commitReady
+      : this.handoffReady;
   }
 
   getWorkingSurfaceState() {
@@ -2392,6 +2413,10 @@ class DeferredBrushStrokeSession {
     return this.delegate?.getHandoffReady?.() || Promise.resolve();
   }
 
+  getFollowupReady() {
+    return this.delegate?.getFollowupReady?.() || this.getHandoffReady();
+  }
+
   update({ point }) {
     if (this.delegate) {
       if (this.delegate.requiresFiniteInputClipping) {
@@ -2590,6 +2615,12 @@ class CommitQueuedBrushStrokeSession {
     );
   }
 
+  getFollowupReady() {
+    return this.ready.then(
+      () => this.delegate?.getFollowupReady?.() || Promise.resolve()
+    );
+  }
+
   update({ point }) {
     if (this.delegate) {
       this.delegate.update({ point });
@@ -2694,6 +2725,17 @@ export class BrushTool extends Tool {
 
       return {
         ...firstSurface,
+        completed: surfaces.every((surface) => surface.completed),
+        commitTileRefs: surfaces.flatMap(
+          (surface) => surface.commitTileRefs || []
+        ),
+        groups: surfaces,
+        inProgressTiles: surfaces
+          .filter(
+            (surface) =>
+              !surface.completed || surface.commitTileRefs?.length === 0
+          )
+          .flatMap((surface) => surface.tiles),
         workingSurfaceId: surfaces
           .map((surface) => surface.workingSurfaceId)
           .join(":"),
@@ -2748,7 +2790,9 @@ export class BrushTool extends Tool {
           settings,
           targetState,
           tool: this,
-          waitFor: pendingSession.getHandoffReady?.(),
+          waitFor:
+            pendingSession.getFollowupReady?.() ||
+            pendingSession.getHandoffReady?.(),
         });
 
         this.activeSession = session;
