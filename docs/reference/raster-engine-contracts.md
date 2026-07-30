@@ -40,6 +40,9 @@ WebGPU, encoded images, package storage, or Workspace dimensions.
   distances therefore emits work only near the finite target.
 - Pixel allocation belongs to the surface adapter and is bounded by the target
   and dirty region, never by the Workspace.
+- A tiled Frame surface owns its complete axis-aligned writable rectangle even
+  when tight content bounds and allocated tile coordinates cover only a
+  subset. Native paths clip to that rectangle without boundary-Dab fallback.
 - Viewport zoom does not enter the Raster API. Clients convert pointer input to
   document points before starting or appending a Stroke.
 

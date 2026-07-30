@@ -113,7 +113,10 @@ hidden for Eraser.
   Frame remains a container and insertion target, never a pixel buffer.
 - **Later Frame strokes.** Pointer-up does not replace the target. A later
   Stroke elsewhere inside the Frame expands the same Raster's content even
-  when it starts outside that Raster's current visible bounds.
+  when it starts outside that Raster's current visible bounds. Once the earlier
+  Stroke is durably committed, the later Stroke paints immediately in the
+  stable Frame-local plane; it does not wait for image decode or renderer
+  handoff.
 - **Standalone bounds.** Brush clips a root Raster to its retained finite
   writable canvas. Crop is the explicit operation for enlarging or reducing
   that canvas.

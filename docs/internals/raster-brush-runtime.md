@@ -132,11 +132,13 @@ belong to raster surfaces, while cursor chrome belongs to the tool overlay.
   window before acknowledging the commit because image `load` does not
   guarantee that a large SVG tile set is composited on screen. A time fallback
   only protects offscreen or unmounted renderer cases.
-- A follow-up Stroke locks its pointer-down Raster, then waits for the earlier
-  tiled commit's full renderer handoff and retirement before resolving that
-  Raster's current local coordinate plane. Pointer samples received during the
-  wait are retained and replayed in order. Additional rapid Strokes queue
-  behind the same handoff chain.
+- A follow-up Stroke locks its pointer-down Raster. Standalone Rasters that may
+  rebase still wait for the earlier tiled commit's full renderer handoff before
+  resolving the next local coordinate plane.
+- Frame-child Rasters use the stable Frame-local writable plane. Their
+  follow-up Stroke waits only for the earlier durable commit, then paints while
+  the earlier working surface finishes its renderer handoff. Pointer samples
+  received during a required wait are retained and replayed in order.
 - Tile gutters are part of the tile surface contract. They prevent visual gaps
   between adjacent committed tile images and working tile canvases.
 - Raster LOD previews are derived from committed raster/tile data. They do not

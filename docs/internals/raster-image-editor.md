@@ -215,6 +215,11 @@ payload is a small single PNG. Each working tile stores a 2 px pixel gutter past
 the logical tile edge, so anti-aliased brush pixels overlap adjacent tiles
 instead of baking visible tile gaps into committed PNG data.
 
+Frame-child tiles stay in one Frame-local writable coordinate plane even while
+their tight content bounds change. An earlier completed working surface may
+remain mounted for renderer handoff while the next Stroke paints into a second
+surface; the next Stroke does not wait for that presentation-only handoff.
+
 Hard, opaque strokes use the browser canvas stroke shortcut per tile
 intersecting the stroke path. Soft, translucent, or spaced strokes use the same
 dab coverage math as the normal Brush path, but with float RGBA buffers scoped

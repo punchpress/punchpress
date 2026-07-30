@@ -28,6 +28,9 @@ move through real design work.
   later strokes after the Raster content bounds have expanded. Layer
   materialization may add bounded one-time work, but content-bound growth must
   not move or resize the live drawing plane.
+- A follow-up Frame stroke may overlap the preceding stroke's renderer
+  handoff. Presentation readiness must not block input once the preceding
+  pixels and content bounds are durably committed.
 - Sustained curved brush input on a 5000 px Raster must retain its sampled path;
   frame pressure must not collapse the curve into sparse straight chords.
 - Touching or crossing a Raster boundary must not replay the held stroke or
