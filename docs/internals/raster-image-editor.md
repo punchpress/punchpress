@@ -17,8 +17,8 @@ canvas buffers render through the raster renderer.
 | Layer | Owns |
 | --- | --- |
 | Schema | Image node fields, empty layer source kind, document asset records, and package references. |
-| Engine | Active raster tool state, target resolution, working-surface mutation, history boundaries, and asset reference updates. |
-| React renderer | Brush cursor chrome plus committed and active raster working-surface rendering. |
+| Engine | Active raster tool state, target resolution, working-surface mutation, ordered working-presentation lifecycle, history boundaries, and asset reference updates. |
+| React renderer | Brush cursor chrome plus atomic committed/working Raster presentation and typed readiness acknowledgement. |
 | Raster worker | Decode, encode, and brush stroke application when work moves off the main thread. |
 | Export | Format-specific compositing, alpha preservation, and flattening. |
 
@@ -43,9 +43,9 @@ presented canvas is also the live editing surface.
   threshold, before the `5` px pixel-grid threshold. Crossing the grid
   threshold therefore changes only the overlay, and a visible grid never uses
   a low-resolution Raster preview.
-- Browser raster primitives live behind the brush runtime seam. Canvas creation,
-  image decode, frame scheduling, and render-ready events are runtime services;
-  brush policy calls the seam instead of reaching directly for DOM globals.
+- Browser raster primitives live behind the brush runtime seam. Canvas
+  creation, image decode, and frame scheduling are runtime services; brush
+  policy calls the seam instead of reaching directly for DOM globals.
 - Brush target selection lives in the brush target resolver. It reads the
   persistent active layer, asks node capabilities for source kind, then locks a
   finite Raster or Frame without inspecting pixels under the pointer.
@@ -54,6 +54,12 @@ presented canvas is also the live editing surface.
   gesture first intersects the locked finite target.
 - The stroke session owns sampled points, dirty bounds, working-surface
   mutation, commit scheduling, and history completion for one active stroke.
+- The engine exposes each Raster's typed working presentation as ordered,
+  independently retiring groups. React reports drawable replacement readiness
+  through `Editor.acknowledgeRasterPresentation`; engine code never queries the
+  DOM or listens for global browser events. Readiness includes the exact
+  viewport-selected committed representation, so low-zoom handoff waits for
+  the matching keyed LOD preview while high zoom waits for exact tiles.
 
 ### Resident Canvas2D Surface
 
@@ -219,6 +225,9 @@ Frame-child tiles stay in one Frame-local writable coordinate plane even while
 their tight content bounds change. An earlier completed working surface may
 remain mounted for renderer handoff while the next Stroke paints into a second
 surface; the next Stroke does not wait for that presentation-only handoff.
+Each surface retains its own group id, order, matrix, lifecycle phase, content,
+and replacement resource ids. Groups are never flattened into one aggregate
+surface.
 
 Hard, opaque strokes use the browser canvas stroke shortcut per tile
 intersecting the stroke path. Soft, translucent, or spaced strokes use the same

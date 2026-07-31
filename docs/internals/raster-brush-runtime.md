@@ -1,5 +1,5 @@
 ---
-summary: Captures the finite resident Canvas2D Raster path, legacy brush runtime boundary, and direct working-surface invariants.
+summary: Captures the finite resident Canvas2D Raster path, brush runtime boundary, and typed working-presentation invariants.
 read_when:
   - changing resident Raster canvases, Canvas2D Stroke application, dirty regions, or cancel rollback
   - changing raster brush working surfaces, tiled stroke commit, dirty-tile scheduling, or raster LOD behavior
@@ -60,7 +60,8 @@ The raster brush runtime is a working-surface system:
 | --- | --- |
 | Stroke session | Sampled points, brush settings, target node, dirty region, history mark, and commit lifetime. |
 | Working surface | Pixel mutation, dirty tile ownership, tile gutters, visible tile/canvas buffers, and commit payloads. |
-| Raster renderer | Committed image/tile rendering, active working-surface rendering, viewport culling, LOD projection, and render-ready acknowledgement. |
+| Working presentation | Per-node ordered groups, stable identity, lifecycle phase, node-local matrix, visible content, and durable replacement identity. |
+| Raster renderer | Committed image/tile rendering, working-presentation rendering, viewport culling, LOD projection, and typed replacement acknowledgement. |
 | Brush cursor | Tool footprint chrome only. It does not own stroke pixels. |
 
 Pointer moves retain the browser's coalesced samples and write them into the
@@ -68,8 +69,9 @@ authoritative in-memory raster surface in order. The renderer draws that same
 surface while the stroke is active and while async persistence is catching up.
 Pointerup finalizes the dirty surface into document assets and creates one
 history entry. There is no SVG/vector live-stroke overlay or path replay. Tiled
-persistence stages its encoded images behind the working surface and swaps
-representations only after the new images are ready.
+persistence records the exact replacement resources on the working group. The
+renderer derives one atomic choice per group: keep its working pixels, or show
+all drawable replacement resources and acknowledge that exact commit.
 
 ## Reference Findings
 
@@ -105,6 +107,10 @@ belong to raster surfaces, while cursor chrome belongs to the tool overlay.
 - Paint strokes use tiled working surfaces when the raster is large or visually
   over-dense. Density is based on raster pixels per visible screen pixel, not a
   fixed zoom number.
+- Frame-child surface selection measures the stable Frame-local writable plane,
+  not the Raster's current tight content bounds. A large writable plane starts
+  on sparse working tiles so distant same-stroke input does not reallocate and
+  copy a growing monolithic canvas.
 - Existing Raster payloads stay anchored when a stroke commits. Content bounds
   expand only when paint reaches writable transparent space.
 - Brush-created layers keep tight content bounds around painted pixels for
@@ -123,18 +129,33 @@ belong to raster surfaces, while cursor chrome belongs to the tool overlay.
 - Eraser uses the same brush engine and clips to the existing raster plane. It
   does not expand a layer by erasing transparent space outside the current
   pixels.
-- Completed working-surface state remains retained until the document has
-  received updated tile sources and the raster renderer acknowledges that the
-  matching committed render key has painted. Existing committed tiles remain
-  visible while newly encoded tiles decode invisibly. The renderer then swaps
-  the new tiles for the working surface in one render: the two representations
-  never overlap, and neither may be absent. It waits for a short stable paint
-  window before acknowledging the commit because image `load` does not
-  guarantee that a large SVG tile set is composited on screen. A time fallback
-  only protects offscreen or unmounted renderer cases.
+- Input lifetime, durable commit readiness, and presentation readiness are
+  separate. Each working group advances through `active`, `committing`, and
+  `awaiting-presentation`; a typed `presentation-failed` state preserves
+  working authority after bounded resource-decode failure.
+- Every group keeps one stable id and sequence. Multiple groups for one Raster
+  remain ordered and retire independently; no aggregate surface or synthetic
+  joined id reconstructs their state. A newer full-node Canvas snapshot
+  visually supersedes earlier layers because it already contains them. Once
+  accepted as visual authority, it atomically retires its sequence prefix so a
+  slower older group cannot reappear.
+- A completed group remains retained until the renderer reports the exact
+  `{ nodeId, groupId, commitId }`. Wrong, stale, duplicate, or out-of-order
+  acknowledgements are harmless.
+- Tiled replacement becomes presentable only when every resource id recorded
+  for that commit is drawable and the viewport-selected representation for the
+  exact committed revision is ready. At low zoom, the matching LOD preview
+  builds invisibly and the renderer swaps directly from working pixels to that
+  preview. At high zoom, exact tiles remain the replacement. The two
+  representations never overlap, and neither may be absent.
+- Presentation readiness is resource-driven. Timers, global DOM events,
+  render-key parsing, and DOM inspection do not determine correctness.
 - A follow-up Stroke locks its pointer-down Raster. Standalone Rasters that may
-  rebase still wait for the earlier tiled commit's full renderer handoff before
-  resolving the next local coordinate plane.
+  rebase still wait for the earlier tiled commit's renderer handoff before
+  resolving the next local coordinate plane. If replacement decode exhausts
+  its bounded retries, the exact handoff enters `presentation-failed`; working
+  pixels remain authoritative and queued input settles without painting from
+  the undecodable durable source.
 - Frame-child Rasters use the stable Frame-local writable plane. Their
   follow-up Stroke waits only for the earlier durable commit, then paints while
   the earlier working surface finishes its renderer handoff. Pointer samples
@@ -147,9 +168,10 @@ belong to raster surfaces, while cursor chrome belongs to the tool overlay.
   threshold, before the automatic grid appears above `5` px. Crossing the grid
   threshold changes only the overlay; full-resolution committed samples remain
   mounted while it is visible.
-- When a working surface exists for a raster node, that node's raster LOD
-  preview yields and exact committed tiles remain mounted. The normal
-  low-resolution projection resumes after the working surface retires.
+- A Raster LOD preview may replace stable exact committed tiles. Its readiness
+  is bound to the current preview key; stale preview completion cannot retire a
+  working group. Newer active working groups remain mounted above the ready
+  committed preview.
 
 ## Runtime Flow
 
@@ -158,21 +180,27 @@ belong to raster surfaces, while cursor chrome belongs to the tool overlay.
    allocation.
 3. First intersection opens one Stroke session and appends clipped, coalesced
    points into the working canvas or touched working tiles.
-4. The raster renderer mounts the working canvas or working tiles inside the
-   image node's normal render tree.
-5. Pointerup flushes remaining points and starts commit.
-6. Commit encodes dirty PNG tile sources or the dirty single raster payload.
-7. Existing committed tiles remain visible and new tiles decode invisibly
-   behind the completed working surface.
-8. Once the new tiles are ready, the renderer atomically replaces the working
-   surface and later acknowledges the matching render key.
-9. The session retires and undo/redo treats the stroke as one history step.
+4. The engine publishes an ordered per-node working group with explicit
+   matrix, bounds, canvas-or-tile content, phase, and stable identity.
+5. Pointerup flushes remaining points, changes the group to `committing`, and
+   starts durable commit.
+6. Commit encodes dirty PNG tile sources or the dirty single raster payload,
+   allocates the exact replacement commit and resource ids, publishes that
+   handoff metadata, then publishes the durable node resources.
+7. The renderer preloads those resources and derives the atomic working-or-
+   replacement layer for every group without inspecting browser DOM.
+8. Once every resource for one commit is drawable, React renders its
+   replacement and sends `acknowledgeRasterPresentation` with the typed
+   identity.
+9. The engine retires that matching group, or its superseded sequence prefix
+   when the match is a full-node authority. Undo/redo treats the durable Stroke
+   as one history step and invalidates obsolete working presentations.
 
 ## Debug Capture
 
 In development, raster brush activity records a bounded timeline on
 `window.__PUNCHPRESS_RASTER_DEBUG__`. The capture includes brush session
-events, tile commit transitions, render-ready handoff events, raster DOM state,
+events, tile commit transitions, typed presentation acknowledgements, raster DOM state,
 and frame samples while a stroke or handoff is active. Use
 `window.__PUNCHPRESS_RASTER_DEBUG__.clear()` before a repro and
 `window.__PUNCHPRESS_RASTER_DEBUG__.snapshot()` after the repro to inspect the

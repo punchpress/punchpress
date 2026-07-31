@@ -181,6 +181,21 @@ diagonal excursion verifies both bounded edge work and a painted interior
 sample, so skipping the crossing cannot satisfy the latency gate. The same file
 verifies that the canvas placement boundary retains coalesced brush samples.
 
+`raster-frame-edge-input.spec.ts` reproduces a 149 px Hard Round gesture on a
+Brush-created Raster inside a `4500 × 5400` Frame at 15% zoom. It compares a
+dense center control with repeated held-pointer exits and re-entries at the
+Frame edge, measuring event-to-frame and direct working-pixel visibility. The
+gate also verifies sample continuity, round-cap re-entry coverage, and bounded
+working-canvas expansion.
+
+`raster-frame-edge-spatial-lag.spec.ts` reproduces a 204 px Hard Round gesture
+at 17% zoom that creates a small Frame-child Raster, exits the Frame, and
+re-enters far across the writable plane during the same held stroke. With
+`PUNCHPRESS_NATIVE_POINTER=1`, its compositor screencast gate measures the worst
+consecutive visible ink-frontier jump and verifies that the working
+presentation uses sparse tiles from the first dab without monolithic canvas
+expansion or replacement.
+
 Benchmarks are scenarios, not namespaces. If a scenario exposes missing
 instrumentation, fix the product boundary instead of inventing a benchmark-only
 span name.

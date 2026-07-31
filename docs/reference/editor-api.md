@@ -29,6 +29,7 @@ and future clients should converge here instead of inventing parallel behavior.
 | Inspection | debug dump, selection properties, overlay state, node geometry, layer rows. |
 | Raster host | Constructor-injected `RasterSurfaceResolver` for finite browser or headless Raster targets. |
 | Raster editing | `getRasterTargetState`, `startCrop`, `updateCrop`, `commitCrop`, `cancelCrop`, `getRasterCropPreviewNode`. |
+| Raster presentation | `getRasterWorkingPresentations`, `getRasterWorkingPresentation`, `acknowledgeRasterPresentation`, `failRasterPresentation`. |
 
 ## Rules
 
@@ -39,3 +40,9 @@ and future clients should converge here instead of inventing parallel behavior.
   outside the engine facade.
 - Browser Raster canvas allocation, decode, and presentation stay behind the
   injected surface resolver; the engine sees only finite Raster contracts.
+- `acknowledgeRasterPresentation({ nodeId, groupId, commitId })` retires the
+  exact awaiting group. A full-node authority also retires its superseded
+  sequence prefix. Stale, duplicate, wrong-node, wrong-group, and wrong-commit
+  acknowledgements do nothing.
+- `failRasterPresentation({ nodeId, groupId, commitId, reason })` marks only
+  the exact handoff failed. It does not undo accepted durable history.

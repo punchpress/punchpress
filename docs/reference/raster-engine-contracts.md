@@ -92,6 +92,34 @@ The adapter never calls `getImageData`, `putImageData`, or PNG encoding while a
 Stroke is active. Large, tiled, cropped, and not-yet-resident Rasters consume
 the same generated Dabs through the existing working canvas or tile surface.
 
+## Working Presentation
+
+The engine publishes Raster-specific working presentations for the browser
+host. One node presentation contains ordered groups; every group carries a
+stable `groupId` and sequence, an explicit node-local matrix and bounds,
+`HTMLCanvasElement` canvas-or-tile content, a lifecycle phase, and optional
+durable replacement identity. This is a typed browser-host transport, not a
+browser-neutral pixel protocol; PRD-157 may deepen that boundary without
+changing this lifecycle.
+
+`deriveRasterAtomicHandoff` is pure. Given a presentation and the set of
+drawable replacement resource ids, it chooses working or replacement content
+and emits typed acknowledgements. When a newer full-node Canvas snapshot becomes
+visual authority, its acknowledgement atomically retires its superseded
+sequence prefix so an older slower group cannot reappear. A tiled group chooses
+its replacement only when every resource for that commit is drawable. The
+browser renderer additionally gates acknowledgement on the exact
+viewport-selected representation: a matching keyed LOD preview at low zoom or
+the mounted exact tiles at high zoom.
+
+The browser acknowledges `{ nodeId, groupId, commitId }` through the `Editor`.
+The engine owns retirement and invalidation. A durable encode or publication
+failure reverts only that Stroke's pending history mark. A replacement decode
+failure reports the exact typed commit, keeps working pixels authoritative, and
+releases blocked input without rolling back accepted durable history. DOM
+queries, global events, render-key parsing, and elapsed timers are not part of
+this contract.
+
 ## Brush Settings And Presets
 
 Stroke settings contain color, size, opacity, flow, hardness, spacing, angle,
