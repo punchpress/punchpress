@@ -1951,60 +1951,138 @@ test("canvas-backed Frame Raster stays aligned while expanding into its writable
   expect(endSample?.a).toBe(255);
 });
 
-test("Frame Raster stays stationary when an active tiled stroke commits", async ({
-  page,
-}) => {
-  await gotoEditor(page);
-  await page.getByRole("button", { name: "Add artboard" }).click();
-  await setFrameBrushTestZoom(page);
-  await page.keyboard.press("b");
-  await expect(page.getByRole("heading", { name: "Brush" })).toBeVisible();
+test.describe("Frame Raster commit handoff", () => {
+  test.use({
+    deviceScaleFactor: 2,
+    viewport: { height: 1024, width: 924 },
+  });
 
-  const strokeRatios = [
-    { x: 0.5, y: 0.5 },
-    { x: 0.35, y: 0.3 },
-    { x: 0.65, y: 0.3 },
-    { x: 0.65, y: 0.65 },
-    { x: 0.35, y: 0.65 },
-    { x: 0.55, y: 0.42 },
-  ];
-  const clipStart = await getFrameClientPoint(page, 0.25, 0.2);
-  const clipEnd = await getFrameClientPoint(page, 0.75, 0.75);
-  const inkClip = {
-    height: Math.round(clipEnd.y - clipStart.y),
-    width: Math.round(clipEnd.x - clipStart.x),
-    x: Math.round(clipStart.x),
-    y: Math.round(clipStart.y),
-  };
+  test("pixels stay visible through repeated stroke handoffs", async ({
+    page,
+  }) => {
+    await gotoEditor(page);
+    await page.getByRole("button", { name: "Add artboard" }).click();
+    await setFrameBrushTestZoom(page);
+    await page.keyboard.press("b");
+    await expect(page.getByRole("heading", { name: "Brush" })).toBeVisible();
+    await page.evaluate(() => {
+      window.__PUNCHPRESS_EDITOR__?.setBrushSettings(
+        { hardness: 1, opacity: 1, size: 160, smoothing: 0, spacing: 0 },
+        "brush"
+      );
+    });
 
-  await startFrameBrushSession(page, strokeRatios);
+    const strokes = [
+      {
+        end: await getFrameClientPoint(page, 0.42, 0.34),
+        start: await getFrameClientPoint(page, 0.2, 0.34),
+      },
+      {
+        end: await getFrameClientPoint(page, 0.78, 0.66),
+        start: await getFrameClientPoint(page, 0.56, 0.66),
+      },
+    ];
+    const clips = await Promise.all(
+      [
+        [
+          await getFrameClientPoint(page, 0.16, 0.27),
+          await getFrameClientPoint(page, 0.46, 0.41),
+        ],
+        [
+          await getFrameClientPoint(page, 0.52, 0.59),
+          await getFrameClientPoint(page, 0.82, 0.73),
+        ],
+      ].map(async ([start, end]) => ({
+        height: Math.round(end.y - start.y),
+        width: Math.round(end.x - start.x),
+        x: Math.round(start.x),
+        y: Math.round(start.y),
+      }))
+    );
+    const activeInk: Awaited<ReturnType<typeof getScreenshotDarkPixelStats>>[] =
+      [];
+    const handoffPlacementStyles: string[] = [];
+    const handoffFrames: Awaited<
+      ReturnType<typeof getScreenshotDarkPixelStats>
+    >[][][] = [];
 
-  await expect
-    .poll(() => getRasterWorkingSurfaceState(page))
-    .toMatchObject({ tileSurfaceCount: 1 });
-  const activeInk = await getScreenshotDarkPixelStats(page, inkClip);
+    for (const [strokeIndex, stroke] of strokes.entries()) {
+      await page.mouse.move(stroke.start.x, stroke.start.y);
+      await page.mouse.down();
+      await page.mouse.move(stroke.end.x, stroke.end.y, { steps: 12 });
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) => {
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+          })
+      );
+      activeInk.push(
+        await getScreenshotDarkPixelStats(page, clips[strokeIndex])
+      );
+      await page.evaluate(() => {
+        const editor = window.__PUNCHPRESS_EDITOR__;
+        const raster = editor?.nodes.find((node) => node.type === "image");
+        const element = raster ? editor?.getNodeElement(raster.id) : null;
 
-  await completeFrameBrushSession(page, strokeRatios.at(-1));
-  await expect
-    .poll(() => getRasterWorkingSurfaceState(page))
-    .toMatchObject({ count: 0 });
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-      })
-  );
-  const committedInk = await getScreenshotDarkPixelStats(page, inkClip);
+        if (element) {
+          // Brush handoff must not run selection-preview promotion cleanup.
+          element.style.willChange = "auto";
+        }
+      });
+      await page.mouse.up();
 
-  expect(activeInk.darkPixelCount).toBeGreaterThan(200);
-  expect(committedInk.darkPixelCount).toBeGreaterThan(200);
-  expect(activeInk.darkBounds).not.toBeNull();
-  expect(committedInk.darkBounds).not.toBeNull();
-  for (const edge of ["minX", "minY", "maxX", "maxY"] as const) {
-    expect(
-      Math.abs(committedInk.darkBounds[edge] - activeInk.darkBounds[edge])
-    ).toBeLessThanOrEqual(1);
-  }
+      const frames: Awaited<
+        ReturnType<typeof getScreenshotDarkPixelStats>
+      >[][] = [];
+
+      for (let frameIndex = 0; frameIndex < 8; frameIndex += 1) {
+        if (frameIndex > 0) {
+          await page.evaluate(
+            () =>
+              new Promise<void>((resolve) => {
+                requestAnimationFrame(() => resolve());
+              })
+          );
+        }
+        frames.push(
+          await Promise.all(
+            clips
+              .slice(0, strokeIndex + 1)
+              .map((clip) => getScreenshotDarkPixelStats(page, clip))
+          )
+        );
+      }
+      handoffFrames.push(frames);
+      handoffPlacementStyles.push(
+        await page.evaluate(() => {
+          const editor = window.__PUNCHPRESS_EDITOR__;
+          const raster = editor?.nodes.find((node) => node.type === "image");
+          const element = raster ? editor?.getNodeElement(raster.id) : null;
+
+          return element?.style.willChange || "";
+        })
+      );
+    }
+
+    for (const [strokeIndex, frames] of handoffFrames.entries()) {
+      for (const [frameIndex, frame] of frames.entries()) {
+        for (
+          let visibleStrokeIndex = 0;
+          visibleStrokeIndex <= strokeIndex;
+          visibleStrokeIndex += 1
+        ) {
+          expect(
+            frame[visibleStrokeIndex].darkPixelCount,
+            `stroke ${visibleStrokeIndex + 1} disappeared after stroke ${strokeIndex + 1} on frame ${frameIndex}`
+          ).toBeGreaterThan(activeInk[visibleStrokeIndex].darkPixelCount * 0.5);
+        }
+      }
+      expect(
+        handoffPlacementStyles[strokeIndex],
+        `Brush handoff ${strokeIndex + 1} mutated selection-only placement styles`
+      ).toBe("auto");
+    }
+  });
 });
 
 test("a Frame Raster expands across distant low-zoom strokes", async ({

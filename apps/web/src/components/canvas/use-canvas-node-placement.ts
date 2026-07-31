@@ -6,6 +6,7 @@ import { resolvePreviewPlacementNodeIds } from "./canvas-node-preview-placement"
 interface NodeShellState {
   clipPath: string;
   height: number;
+  stationaryClipAncestorId: string | null;
   transform: string;
   transformOrigin: string;
   width: number;
@@ -58,10 +59,15 @@ const getNodeShellState = (editor, nodeId): NodeShellState | null => {
         node.height / 2 - presentationBounds.minY
       }px`
     : "center center";
+  const parentNode = editor.getNode(node.parentId);
 
   return {
     clipPath: getArtboardClipPath(editor, nodeId, bounds),
     height: Math.max(1, bounds.height),
+    stationaryClipAncestorId:
+      presentationBounds && parentNode?.type === "artboard"
+        ? parentNode.id
+        : null,
     transform: frame.transform || "",
     transformOrigin,
     width: Math.max(1, bounds.width),
@@ -80,6 +86,7 @@ const getShellKey = (shellState, delta) => {
     shellState.height,
     shellState.x,
     shellState.y,
+    shellState.stationaryClipAncestorId,
     shellState.transform,
     shellState.transformOrigin,
     shellState.clipPath,
@@ -246,6 +253,23 @@ const applyPreviewTransform = (editor, previewEntry: PreviewEntry, preview) => {
   };
   const rotateTransform = getRotatePreviewTransform(previewBounds, preview);
 
+  if (
+    shellState.stationaryClipAncestorId &&
+    !preview.nodeIds?.includes(shellState.stationaryClipAncestorId) &&
+    !(resizeBounds || rotateTransform)
+  ) {
+    shellElement.style.clipPath = shellState.clipPath;
+    shellElement.style.width = `${shellState.width}px`;
+    shellElement.style.height = `${shellState.height}px`;
+    shellElement.style.willChange = "";
+    shellElement.style.transformOrigin = "";
+    shellElement.style.transform = `translate3d(${shellState.x}px, ${shellState.y}px, 0)`;
+    transformElement.style.transform =
+      `translate3d(${delta.x || 0}px, ${delta.y || 0}px, 0) ${shellState.transform}`.trim();
+    transformElement.style.transformOrigin = shellState.transformOrigin;
+    return;
+  }
+
   shellElement.style.clipPath = getArtboardClipPath(
     editor,
     previewEntry.nodeId,
@@ -263,6 +287,7 @@ const applyPreviewTransform = (editor, previewEntry: PreviewEntry, preview) => {
     : `translate3d(${previewBounds.minX}px, ${previewBounds.minY}px, 0)`;
   transformElement.style.transform =
     resizeFrame?.transform || shellState.transform || "";
+  transformElement.style.transformOrigin = shellState.transformOrigin;
 };
 
 const sameNodeIds = (left = [], right = []) => {
