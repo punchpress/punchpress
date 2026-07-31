@@ -54,6 +54,9 @@ presented canvas is also the live editing surface.
   gesture first intersects the locked finite target.
 - The stroke session owns sampled points, dirty bounds, working-surface
   mutation, commit scheduling, and history completion for one active stroke.
+- Brush and Eraser forward immutable operation and settings snapshots into one
+  editor-owned Raster Stroke runtime. That runtime owns the shared active and
+  pending session queue, so same-target ordering survives rapid tool switches.
 - The engine exposes each Raster's typed working presentation as ordered,
   independently retiring groups. React reports drawable replacement readiness
   through `Editor.acknowledgeRasterPresentation`; engine code never queries the

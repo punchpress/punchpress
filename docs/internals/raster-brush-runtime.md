@@ -64,6 +64,15 @@ The raster brush runtime is a working-surface system:
 | Raster renderer | Committed image/tile rendering, working-presentation rendering, viewport culling, LOD projection, and typed replacement acknowledgement. |
 | Brush cursor | Tool footprint chrome only. It does not own stroke pixels. |
 
+`Editor` owns one Raster Stroke runtime shared by Brush and Eraser. The two
+tool objects keep only operation intent, settings lookup, pointer forwarding,
+shortcuts, and activation behavior. The shared runtime locks targets, defers
+materialization until finite intersection, schedules samples, chooses the
+resident Canvas, transient Canvas, or tiled execution path, commits durable
+state, groups history, and publishes typed working presentations. Because
+commit ordering belongs to that one runtime, switching between Brush and
+Eraser cannot bypass an earlier Stroke on the same Raster.
+
 Pointer moves retain the browser's coalesced samples and write them into the
 authoritative in-memory raster surface in order. The renderer draws that same
 surface while the stroke is active and while async persistence is catching up.
