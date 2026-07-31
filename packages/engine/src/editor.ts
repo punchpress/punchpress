@@ -252,6 +252,7 @@ import { getSelectionBounds as getEditorSelectionBounds } from "./selection/sele
 import { createEditorStore } from "./state/store/create-editor-store";
 import { HandTool } from "./tools/hand-tool";
 import { BrushTool } from "./tools/brush-tool";
+import { RasterStrokeRuntime } from "./tools/raster-stroke-runtime";
 import {
   getRasterTargetState as getEditorRasterTargetState,
   getRasterWritableBounds as getEditorRasterWritableBounds,
@@ -341,6 +342,7 @@ export interface Editor {
   unsubscribe: any;
   vectorRenderSurfaces: any;
   rasterSurface: any;
+  rasterStrokeRuntime: RasterStrokeRuntime;
   viewerRef: any;
   viewportFocusRequest: any;
   viewportInteracting: any;
@@ -376,11 +378,12 @@ export class Editor {
     this.nodeTree = new NodeTreeManager();
     this.vectorRenderSurfaces = new VectorRenderSurfaceManager();
     this.rasterSurface = rasterSurface;
+    this.rasterStrokeRuntime = new RasterStrokeRuntime(this);
     // @ts-expect-error TODO(typecheck-baseline): Map infers narrowest tool overload; union is correct at runtime
     this.tools = new Map([
       ["pointer", new PointerTool(this)],
-      ["brush", new BrushTool(this, "paint")],
-      ["eraser", new BrushTool(this, "erase")],
+      ["brush", new BrushTool(this, this.rasterStrokeRuntime, "paint")],
+      ["eraser", new BrushTool(this, this.rasterStrokeRuntime, "erase")],
       ["node", new NodeTool(this)],
       ["hand", new HandTool(this)],
       ["pen", new PenTool(this)],
@@ -1126,10 +1129,9 @@ export class Editor {
   }
 
   getRasterWorkingPresentations(): RasterWorkingPresentation[] {
-    const groups = [
-      ...(this.tools.get("brush")?.getWorkingGroups?.() || []),
-      ...(this.tools.get("eraser")?.getWorkingGroups?.() || []),
-    ].sort((left, right) => left.sequence - right.sequence);
+    const groups = this.rasterStrokeRuntime
+      .getWorkingGroups()
+      .sort((left, right) => left.sequence - right.sequence);
     const groupsByNode = new Map<string, RasterWorkingGroup[]>();
 
     for (const group of groups) {
@@ -1176,29 +1178,21 @@ export class Editor {
         .map((group) => group.groupId)
     );
 
-    for (const toolId of ["brush", "eraser"]) {
-      this.tools.get(toolId)?.retireWorkingPresentations?.(retiredGroupIds);
-    }
+    this.rasterStrokeRuntime.retireWorkingPresentations(retiredGroupIds);
 
     return true;
   }
 
   failRasterPresentation(failure: RasterPresentationFailure) {
-    return ["brush", "eraser"].some((toolId) =>
-      this.tools.get(toolId)?.failWorkingPresentation?.(failure)
-    );
+    return this.rasterStrokeRuntime.failWorkingPresentation(failure);
   }
 
   invalidateRasterWorkingPresentations(nodeId = null) {
-    for (const toolId of ["brush", "eraser"]) {
-      this.tools.get(toolId)?.invalidateWorkingPresentations?.(nodeId);
-    }
+    this.rasterStrokeRuntime.invalidateWorkingPresentations(nodeId);
   }
 
   invalidateMissingRasterWorkingPresentations() {
-    for (const toolId of ["brush", "eraser"]) {
-      this.tools.get(toolId)?.invalidateMissingWorkingPresentations?.();
-    }
+    this.rasterStrokeRuntime.invalidateMissingWorkingPresentations();
   }
 
   getSelectionFrameKey(nodeIds = this.selectedNodeIds) {
