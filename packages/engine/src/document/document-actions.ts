@@ -64,6 +64,7 @@ export const loadDocument = (editor, contents) => {
     editor.getDefaultFont()
   );
 
+  editor.invalidateRasterWorkingPresentations();
   editor.getState().loadNodes(resolution.nodes);
   editor.resetHistory();
   editor.resetPasteSequence();

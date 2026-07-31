@@ -1,7 +1,11 @@
 import {
+  deriveRasterAtomicHandoff,
   getNodeLocalPoint,
   getPixelGridTarget,
   getRasterSampling,
+  type RasterAtomicHandoff,
+  type RasterWorkingGroup,
+  type RasterWorkingPresentation,
   shouldUseFullResolutionRasterSource,
 } from "@punchpress/engine";
 import {
@@ -23,7 +27,6 @@ import {
 import { CanvasNativeRasterImage } from "./canvas-native-raster-image";
 import { CanvasRasterPixelGrid } from "./canvas-raster-pixel-grid";
 import { getRasterPresentationFootprint } from "./canvas-raster-presentation";
-import { getRasterWorkingSurfaceRelativeMatrix } from "./raster-working-surface-transform";
 
 interface RasterDebugRecord {
   event: string;
@@ -55,12 +58,8 @@ declare global {
 const RASTER_TILE_CULL_PADDING = 1024;
 const RASTER_TILE_CULL_THRESHOLD = 128;
 const RASTER_TILE_PREVIEW_DENSITY_THRESHOLD = 8;
-const RASTER_TILE_PREVIEW_TILE_THRESHOLD = RASTER_TILE_CULL_THRESHOLD;
 const RASTER_TILE_PREVIEW_MAX_PIXELS = 4_000_000;
 const RASTER_TILE_PREVIEW_OVERSAMPLE = 2;
-const RASTER_NODE_RENDER_READY_EVENT = "punchpress:raster-node-render-ready";
-const RASTER_RENDER_READY_STABLE_FRAME_COUNT = 8;
-const RASTER_RENDER_READY_MIN_STABLE_MS = 96;
 const RASTER_DEBUG_MAX_RECORDS = 5000;
 const RASTER_DEBUG_SNAPSHOT_ELEMENT_ID = "punchpress-raster-debug-json";
 
@@ -87,7 +86,6 @@ const getRasterDomDebugSnapshot = () => {
         root.getAttribute("data-raster-preview-eligible") === "true",
       previewReady:
         root.querySelector("[data-raster-preview-ready='true']") !== null,
-      renderKeyLength: root.getAttribute("data-raster-render-key")?.length || 0,
       totalTileCount: Number(
         root.getAttribute("data-raster-total-tile-count") || 0
       ),
@@ -133,13 +131,19 @@ const getRasterEditorDebugSnapshot = () => {
       })),
     selectedNodeIds: editor.selectedNodeIds,
     viewport: editor.viewport,
-    workingSurfaces: editor.getBrushWorkingSurfaceStates?.().map((surface) => ({
-      completed: surface.completed,
-      nodeId: surface.nodeId,
-      tileCount: surface.type === "tiles" ? surface.tiles.length : null,
-      type: surface.type,
-      workingSurfaceId: surface.workingSurfaceId,
-    })),
+    workingPresentations: editor
+      .getRasterWorkingPresentations?.()
+      .map((presentation) => ({
+        groups: presentation.groups.map((group) => ({
+          groupId: group.groupId,
+          nodeId: group.nodeId,
+          phase: group.phase,
+          tileCount:
+            group.content.kind === "tiles" ? group.content.tiles.length : null,
+          type: group.content.kind,
+        })),
+        nodeId: presentation.nodeId,
+      })),
   };
 };
 
@@ -234,7 +238,7 @@ const installRasterDebugCapture = () => {
 
       if (
         event.startsWith("brush.") ||
-        event.startsWith("renderer.renderReady") ||
+        event.startsWith("renderer.presentation") ||
         event.startsWith("renderer.preview") ||
         event.startsWith("renderer.exactTiles")
       ) {
@@ -279,33 +283,6 @@ installRasterDebugCapture();
 
 const getRasterTileSourcesKey = (tileSources) =>
   tileSources.map((tile) => tile.ref).join("|");
-
-const dispatchRasterNodeRenderReady = ({ mode, nodeId, renderKey }) => {
-  if (!(renderKey && typeof window !== "undefined")) {
-    return;
-  }
-
-  window.dispatchEvent(
-    new CustomEvent(RASTER_NODE_RENDER_READY_EVENT, {
-      detail: {
-        mode,
-        nodeId,
-        renderKey,
-      },
-    })
-  );
-  recordRasterDebugEvent("renderer.renderReady.dispatch", {
-    mode,
-    nodeId,
-    renderKeyLength: renderKey.length,
-  });
-};
-
-const hasBrushWorkingSurfaceForNode = (editor, nodeId) => {
-  const surfaces = editor.getBrushWorkingSurfaceStates?.() || [];
-
-  return surfaces.some((surface) => surface?.nodeId === nodeId);
-};
 
 const getImageLocalBounds = (node) => ({
   height: node.height,
@@ -496,10 +473,7 @@ const getRasterTileCullState = (
     zoom,
   };
 
-  if (
-    !Array.isArray(tileSources) ||
-    tileSources.length <= RASTER_TILE_CULL_THRESHOLD
-  ) {
+  if (!Array.isArray(tileSources) || tileSources.length === 0) {
     return fallbackState;
   }
 
@@ -507,27 +481,28 @@ const getRasterTileCullState = (
     return fallbackState;
   }
 
-  const bounds = getNodeLocalViewportBounds(editor, state, node);
+  const viewportBounds = getNodeLocalViewportBounds(editor, state, node);
 
-  if (!bounds) {
+  if (!viewportBounds) {
     return fallbackState;
   }
 
-  const visibleTileSources = tileSources.filter((tile) => {
-    return !(
-      tile.x + tile.width < bounds.minX ||
-      tile.y + tile.height < bounds.minY ||
-      tile.x > bounds.maxX ||
-      tile.y > bounds.maxY
-    );
-  });
+  const visibleTileSources =
+    tileSources.length > RASTER_TILE_CULL_THRESHOLD
+      ? tileSources.filter((tile) => {
+          return !(
+            tile.x + tile.width < viewportBounds.minX ||
+            tile.y + tile.height < viewportBounds.minY ||
+            tile.x > viewportBounds.maxX ||
+            tile.y > viewportBounds.maxY
+          );
+        })
+      : tileSources;
   const pixelDensity =
     1 /
     Math.max(0.0001, Math.min(sourceFootprint.height, sourceFootprint.width));
-  const hasBrushWorkingSurface = hasBrushWorkingSurfaceForNode(editor, nodeId);
   const shouldBuildPreview =
-    !(hasBrushWorkingSurface || useFullResolutionSource) &&
-    visibleTileSources.length > RASTER_TILE_PREVIEW_TILE_THRESHOLD &&
+    !useFullResolutionSource &&
     pixelDensity >= RASTER_TILE_PREVIEW_DENSITY_THRESHOLD;
   const previewBounds = {
     height: node.height,
@@ -546,9 +521,9 @@ const getRasterTileCullState = (
     bounds: shouldBuildPreview
       ? previewBounds
       : {
-          ...bounds,
-          height: bounds.maxY - bounds.minY,
-          width: bounds.maxX - bounds.minX,
+          ...viewportBounds,
+          height: viewportBounds.maxY - viewportBounds.minY,
+          width: viewportBounds.maxX - viewportBounds.minX,
         },
     previewKey: shouldBuildPreview
       ? [
@@ -559,10 +534,10 @@ const getRasterTileCullState = (
           previewSourcesKey,
         ].join(":")
       : [
-          bounds.minX,
-          bounds.minY,
-          bounds.maxX,
-          bounds.maxY,
+          viewportBounds.minX,
+          viewportBounds.minY,
+          viewportBounds.maxX,
+          viewportBounds.maxY,
           previewSourcesKey,
         ].join(":"),
     sampling,
@@ -756,11 +731,7 @@ const RasterTilePreviewCanvas = ({
   );
 };
 
-const RasterTileImages = ({
-  hiddenTileRefs = null,
-  onTileLoad,
-  tileSources,
-}) => {
+const RasterTileImages = ({ onTileLoad, opacity = 1, tileSources }) => {
   return tileSources.map((tile) => (
     <image
       data-raster-tile-ref={tile.ref}
@@ -768,7 +739,7 @@ const RasterTileImages = ({
       href={tile.src}
       key={tile.ref}
       onLoad={() => onTileLoad?.(tile.ref)}
-      opacity={hiddenTileRefs?.has(tile.ref) ? 0 : 1}
+      opacity={opacity}
       pointerEvents="none"
       preserveAspectRatio="none"
       width={tile.width}
@@ -778,222 +749,228 @@ const RasterTileImages = ({
   ));
 };
 
-const getAtomicCommitHandoff = ({
-  loadedTileRefs,
+const RASTER_REPLACEMENT_DECODE_ATTEMPTS = 2;
+
+const useRasterAtomicHandoff = ({
+  mountedDrawableResourceIds,
+  onBeforeAcknowledge,
+  presentation,
+  src,
   tileSources,
-  workingSurfaces,
-}) => {
-  const completedGroups = workingSurfaces.filter(
-    (surface) =>
-      surface.type === "tiles" &&
-      surface.completed &&
-      surface.commitTileRefs?.length
+}: {
+  mountedDrawableResourceIds?: ReadonlySet<string>;
+  onBeforeAcknowledge?: (group: RasterWorkingGroup) => void;
+  presentation: RasterWorkingPresentation | null;
+  src?: string;
+  tileSources: readonly { ref: string; src: string }[];
+}): RasterAtomicHandoff => {
+  const editor = useEditor();
+  const failRasterPresentation = useCallback(
+    (failure) => editor.failRasterPresentation(failure),
+    [editor]
   );
-  const pendingTileRefs = new Set(
-    completedGroups.flatMap((surface) => surface.commitTileRefs)
+  const [decodedResourceIds, setDecodedResourceIds] = useState(
+    () => new Set<string>()
   );
-  const pendingTileSources = tileSources.filter((tile) =>
-    pendingTileRefs.has(tile.ref)
+  const discoveredReplacementSourceGroups = useMemo(
+    () => getRasterReplacementSourceGroups(presentation, src, tileSources),
+    [presentation, src, tileSources]
   );
-  const hiddenTileRefs = new Set<string>();
-  const presentedWorkingSurfaceIds = new Set(
-    workingSurfaces.map((surface) => surface.workingSurfaceId)
+  const replacementSourceGroups = useStableRasterReplacementSourceGroups(
+    discoveredReplacementSourceGroups
   );
 
-  for (const surface of completedGroups) {
-    const commitTileRefs = new Set(surface.commitTileRefs);
-    const visibleCommitTiles = tileSources.filter((tile) =>
-      commitTileRefs.has(tile.ref)
+  useEffect(() => {
+    let active = true;
+    const activeResourceIds = new Set(
+      replacementSourceGroups.flatMap(({ resourceIds }) => resourceIds)
     );
-    const isGroupReady = visibleCommitTiles.every((tile) =>
-      loadedTileRefs.has(tile.ref)
-    );
 
-    if (isGroupReady) {
-      presentedWorkingSurfaceIds.delete(surface.workingSurfaceId);
-      continue;
-    }
+    setDecodedResourceIds((current) => {
+      const retained = new Set(
+        [...current].filter((resourceId) => activeResourceIds.has(resourceId))
+      );
 
-    for (const tile of visibleCommitTiles) {
-      hiddenTileRefs.add(tile.ref);
-    }
-  }
+      return retained.size === current.size ? current : retained;
+    });
 
-  const isPendingReady = completedGroups.every((surface) => {
-    const commitTileRefs = new Set(surface.commitTileRefs);
-
-    return tileSources
-      .filter((tile) => commitTileRefs.has(tile.ref))
-      .every((tile) => loadedTileRefs.has(tile.ref));
-  });
-
-  return {
-    hiddenTileRefs,
-    isActive: completedGroups.length > 0,
-    isPendingReady,
-    pendingTileSources,
-    presentedWorkingSurfaceIds,
-    stableTileSources: tileSources.filter(
-      (tile) => !pendingTileRefs.has(tile.ref)
-    ),
-  };
-};
-
-const getWorkingSurfaceGroups = (workingSurface) => {
-  if (!workingSurface) {
-    return [];
-  }
-
-  return workingSurface.type === "tiles" && Array.isArray(workingSurface.groups)
-    ? workingSurface.groups
-    : [workingSurface];
-};
-
-const useRasterTileHandoff = ({ nodeId, tileSources, workingSurface }) => {
-  const [loadedTileRefs, setLoadedTileRefs] = useState(() => new Set<string>());
-  const workingSurfaces = getWorkingSurfaceGroups(workingSurface);
-  const areExactTilesReady =
-    tileSources.length === 0 ||
-    tileSources.every((tile) => loadedTileRefs.has(tile.ref));
-  const handoff = getAtomicCommitHandoff({
-    loadedTileRefs,
-    tileSources,
-    workingSurfaces,
-  });
-  const arePresentedTilesReady = handoff.isActive
-    ? handoff.isPendingReady
-    : areExactTilesReady;
-  const presentedWorkingSurfaces = workingSurfaces.filter((surface) =>
-    handoff.presentedWorkingSurfaceIds.has(surface.workingSurfaceId)
-  );
-  const handleTileLoad = useCallback(
-    (tileRef) => {
-      setLoadedTileRefs((current) => {
-        if (current.has(tileRef)) {
-          return current;
+    for (const group of replacementSourceGroups) {
+      loadRasterReplacementGroup(group).then((isDrawable) => {
+        if (!active) {
+          return;
         }
 
-        const refs = new Set(current);
+        if (isDrawable) {
+          setDecodedResourceIds((current) =>
+            addRasterDrawableResources(current, group.resourceIds)
+          );
+          return;
+        }
 
-        refs.add(tileRef);
-        recordRasterDebugEvent("renderer.exactTiles.load", {
-          loadedExactTileCount: refs.size,
-          nodeId,
-          tileRef,
-          visibleTileCount: tileSources.length,
+        recordRasterDebugEvent("renderer.presentation.fail", {
+          commitId: group.commitId,
+          groupId: group.groupId,
+          nodeId: group.nodeId,
+          reason: "decode-failed",
         });
-        return refs;
+        failRasterPresentation({
+          commitId: group.commitId,
+          groupId: group.groupId,
+          nodeId: group.nodeId,
+          reason: "decode-failed",
+        });
       });
-    },
-    [nodeId, tileSources.length]
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [failRasterPresentation, replacementSourceGroups]);
+  const drawableResourceIds = mountedDrawableResourceIds
+    ? new Set(
+        [...decodedResourceIds].filter((resourceId) =>
+          mountedDrawableResourceIds.has(resourceId)
+        )
+      )
+    : decodedResourceIds;
+
+  const handoff = deriveRasterAtomicHandoff(
+    presentation ?? { groups: [], nodeId: "" },
+    drawableResourceIds
   );
 
   useLayoutEffect(() => {
-    recordRasterDebugEvent("renderer.exactTiles.readyState", {
-      areExactTilesReady,
-      loadedExactTileCount: loadedTileRefs.size,
-      nodeId,
-      visibleTileCount: tileSources.length,
-    });
-  }, [areExactTilesReady, loadedTileRefs.size, nodeId, tileSources.length]);
+    for (const acknowledgement of handoff.acknowledgements) {
+      const group = handoff.layers.find(
+        (layer) => layer.groupId === acknowledgement.groupId
+      )?.group;
 
-  return {
-    areExactTilesReady,
-    arePresentedTilesReady,
-    handleTileLoad,
-    handoff,
-    loadedTileCount: loadedTileRefs.size,
-    presentedWorkingSurfaces,
-  };
+      if (group) {
+        onBeforeAcknowledge?.(group);
+      }
+      recordRasterDebugEvent("renderer.presentation.acknowledge", {
+        commitId: acknowledgement.commitId,
+        groupId: acknowledgement.groupId,
+        nodeId: acknowledgement.nodeId,
+      });
+      editor.acknowledgeRasterPresentation(acknowledgement);
+    }
+  }, [editor, handoff.acknowledgements, handoff.layers, onBeforeAcknowledge]);
+
+  return handoff;
 };
 
-const useRasterRenderReady = ({
-  areExactTilesReady,
-  arePendingTilesReady,
-  arePresentedTilesReady,
-  isRasterPreviewReady,
-  nodeId,
-  rasterRenderKey,
-  shouldBuildPreview,
-  shouldUsePreview,
-}) => {
-  useLayoutEffect(() => {
-    if (!rasterRenderKey) {
-      return;
+const getRasterReplacementSourceGroups = (
+  presentation: RasterWorkingPresentation | null,
+  src: string | undefined,
+  tileSources: readonly { ref: string; src: string }[]
+) => {
+  const tileSourcesByRef = new Map(
+    tileSources.map((tile) => [tile.ref, tile.src])
+  );
+  return (presentation?.groups ?? []).flatMap((group) => {
+    const replacement = group.replacement;
+
+    if (!(replacement && group.phase === "awaiting-presentation")) {
+      return [];
     }
 
-    if (shouldBuildPreview && !isRasterPreviewReady) {
-      return;
-    }
+    const sources = replacement.resourceIds.flatMap((resourceId) => {
+      let resourceSource: string | undefined;
 
-    if (!(shouldUsePreview || arePresentedTilesReady)) {
-      return;
-    }
+      if (replacement.kind === "canvas") {
+        resourceSource = resourceId === src ? src : undefined;
+      } else {
+        resourceSource = tileSourcesByRef.get(resourceId);
+      }
 
-    const mode = shouldUsePreview ? "preview" : "tiles";
-    let frameId = 0;
-    let isCancelled = false;
-    let stableFrameCount = 0;
-    const stableStartTime = performance.now();
-
-    recordRasterDebugEvent("renderer.renderReady.schedule", {
-      areExactTilesReady,
-      arePendingTilesReady,
-      isRasterPreviewReady,
-      mode,
-      nodeId,
-      renderKeyLength: rasterRenderKey.length,
-      shouldBuildPreview,
-      shouldUsePreview,
+      return resourceSource ? [resourceSource] : [];
     });
 
-    const waitForStablePaint = (timestamp: number) => {
-      if (isCancelled) {
-        return;
-      }
-
-      stableFrameCount += 1;
-      const elapsedMs = timestamp - stableStartTime;
-
-      if (
-        stableFrameCount >= RASTER_RENDER_READY_STABLE_FRAME_COUNT &&
-        elapsedMs >= RASTER_RENDER_READY_MIN_STABLE_MS
-      ) {
-        recordRasterDebugEvent("renderer.renderReady.stable", {
-          elapsedMs,
-          mode,
-          nodeId,
-          renderKeyLength: rasterRenderKey.length,
-          stableFrameCount,
-        });
-        dispatchRasterNodeRenderReady({
-          mode,
-          nodeId,
-          renderKey: rasterRenderKey,
-        });
-        return;
-      }
-
-      frameId = requestAnimationFrame(waitForStablePaint);
-    };
-
-    frameId = requestAnimationFrame(waitForStablePaint);
-
-    return () => {
-      isCancelled = true;
-      cancelAnimationFrame(frameId);
-    };
-  }, [
-    areExactTilesReady,
-    arePendingTilesReady,
-    arePresentedTilesReady,
-    isRasterPreviewReady,
-    nodeId,
-    rasterRenderKey,
-    shouldBuildPreview,
-    shouldUsePreview,
-  ]);
+    return sources.length === replacement.resourceIds.length
+      ? [
+          {
+            commitId: replacement.commitId,
+            groupId: group.groupId,
+            nodeId: group.nodeId,
+            resourceIds: replacement.resourceIds,
+            sources,
+          },
+        ]
+      : [];
+  });
 };
+
+const loadRasterReplacementGroup = async (group) => {
+  for (
+    let attempt = 1;
+    attempt <= RASTER_REPLACEMENT_DECODE_ATTEMPTS;
+    attempt += 1
+  ) {
+    try {
+      await Promise.all(group.sources.map(loadRasterReplacementImage));
+      return true;
+    } catch {
+      if (attempt === RASTER_REPLACEMENT_DECODE_ATTEMPTS) {
+        return false;
+      }
+    }
+  }
+
+  return false;
+};
+
+const addRasterDrawableResources = (current, resourceIds) => {
+  if (resourceIds.every((resourceId) => current.has(resourceId))) {
+    return current;
+  }
+
+  const next = new Set(current);
+
+  for (const resourceId of resourceIds) {
+    next.add(resourceId);
+  }
+  return next;
+};
+
+const useStableRasterReplacementSourceGroups = (sourceGroups) => {
+  const stableGroups = useRef(sourceGroups);
+
+  if (
+    !areRasterReplacementSourceGroupsEqual(stableGroups.current, sourceGroups)
+  ) {
+    stableGroups.current = sourceGroups;
+  }
+
+  return stableGroups.current;
+};
+
+const areRasterReplacementSourceGroupsEqual = (left, right) =>
+  left.length === right.length &&
+  left.every(
+    (group, index) =>
+      group.commitId === right[index].commitId &&
+      group.groupId === right[index].groupId &&
+      group.nodeId === right[index].nodeId &&
+      areStringArraysEqual(group.resourceIds, right[index].resourceIds) &&
+      areStringArraysEqual(group.sources, right[index].sources)
+  );
+
+const areStringArraysEqual = (
+  left: readonly string[],
+  right: readonly string[]
+) =>
+  left.length === right.length &&
+  left.every((value, index) => value === right[index]);
+
+const loadRasterReplacementImage = (src: string) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = src;
+  });
 
 const RasterWorkingCanvas = ({
   artworkOpacity = 1,
@@ -1121,28 +1098,33 @@ const RasterWorkingCanvas = ({
   );
 };
 
-const RasterWorkingSurface = ({
+const RasterWorkingGroupLayer = ({
   artworkOpacity = 1,
+  group,
   pixelGridProps = null,
   sampling,
-  surface,
+}: {
+  artworkOpacity?: number;
+  group: RasterWorkingGroup;
+  pixelGridProps?: Record<string, unknown> | null;
+  sampling: string;
 }) => {
-  if (!surface) {
-    return null;
-  }
-
-  if (surface.type === "tiles") {
+  if (group.content.kind === "tiles") {
     return (
       <g
-        data-raster-working-completed={surface.completed ? "true" : "false"}
+        data-raster-working-completed={
+          group.phase === "active" ? "false" : "true"
+        }
+        data-raster-working-group-id={group.groupId}
+        data-raster-working-phase={group.phase}
         data-raster-working-surface="tiles"
-        data-raster-working-tile-count={surface.tiles.length}
+        data-raster-working-tile-count={group.content.tiles.length}
       >
-        {surface.tiles.map((tile, index) => (
+        {group.content.tiles.map((tile, index) => (
           <RasterWorkingCanvas
             canvas={tile.canvas}
             height={tile.height}
-            key={`${surface.workingSurfaceId}:${tile.x}:${tile.y}:${index}`}
+            key={`${group.groupId}:${tile.x}:${tile.y}:${index}`}
             sampling={sampling}
             subscribeToSource={tile.subscribeToSource}
             testId="raster-working-tile"
@@ -1155,22 +1137,26 @@ const RasterWorkingSurface = ({
     );
   }
 
-  if (surface.type === "canvas") {
+  if (group.content.kind === "canvas") {
     return (
       <g
-        data-raster-working-completed={surface.completed ? "true" : "false"}
+        data-raster-working-completed={
+          group.phase === "active" ? "false" : "true"
+        }
+        data-raster-working-group-id={group.groupId}
+        data-raster-working-phase={group.phase}
         data-raster-working-surface="canvas"
       >
         <RasterWorkingCanvas
           artworkOpacity={artworkOpacity}
-          canvas={surface.canvas}
-          height={surface.height}
+          canvas={group.content.canvas}
+          height={group.content.height}
           pixelGridProps={pixelGridProps}
           sampling={sampling}
           testId="raster-working-canvas"
-          width={surface.width}
-          x={surface.x ?? 0}
-          y={surface.y ?? 0}
+          width={group.content.width}
+          x={group.content.x}
+          y={group.content.y}
         />
       </g>
     );
@@ -1184,55 +1170,98 @@ const RasterTiledArtwork = ({
   baseWidth,
   baseX,
   baseY,
-  durableNode,
   handleTileLoad,
   handoff,
   height,
-  presentedWorkingSurfaces,
+  replacementTileSources,
   sampling,
   shouldHideExactTiles,
   src,
+  tileSources,
   width,
-}) => (
-  <>
-    {src ? (
+}) => {
+  const replacementResourceIds = new Set(
+    handoff.layers.flatMap(({ group }) => [
+      ...(group.replacement?.resourceIds ?? []),
+    ])
+  );
+  const stableTileSources = tileSources.filter(
+    (tile) =>
+      !(
+        replacementResourceIds.has(tile.ref) ||
+        handoff.hiddenReplacementResourceIds.has(tile.ref)
+      )
+  );
+  const nodeReplacementLayer = handoff.layers.find(
+    ({ group }) => group.replacesNode
+  );
+  const renderBaseImage = (key?: string) =>
+    src ? (
       <image
         height={baseHeight ?? height}
         href={src}
+        key={key}
         pointerEvents="none"
         preserveAspectRatio="none"
         width={baseWidth ?? width}
         x={baseX ?? 0}
         y={baseY ?? 0}
       />
-    ) : null}
-    {shouldHideExactTiles ? null : (
-      <g
-        data-raster-pending-tile-count={handoff.pendingTileSources.length}
-        data-raster-pending-tiles-ready={
-          handoff.isPendingReady ? "true" : "false"
-        }
-      >
+    ) : null;
+  const renderHandoffLayer = (layer) => {
+    const { group } = layer;
+
+    if (group.replacement?.kind === "tiles") {
+      const resourceIds = new Set(group.replacement.resourceIds);
+
+      return (
+        <g key={group.groupId}>
+          <RasterTileImages
+            onTileLoad={handleTileLoad}
+            opacity={
+              layer.kind === "replacement" && !shouldHideExactTiles ? 1 : 0
+            }
+            tileSources={replacementTileSources.filter((tile) =>
+              resourceIds.has(tile.ref)
+            )}
+          />
+          {layer.kind === "working" ? (
+            <g transform={getRasterWorkingGroupTransform(group)}>
+              <RasterWorkingGroupLayer group={group} sampling={sampling} />
+            </g>
+          ) : null}
+        </g>
+      );
+    }
+
+    if (layer.kind === "replacement" && group.replacement?.kind === "canvas") {
+      return renderBaseImage(group.groupId);
+    }
+
+    return (
+      <g key={group.groupId} transform={getRasterWorkingGroupTransform(group)}>
+        <RasterWorkingGroupLayer group={group} sampling={sampling} />
+      </g>
+    );
+  };
+
+  return (
+    <>
+      {nodeReplacementLayer
+        ? renderHandoffLayer(nodeReplacementLayer)
+        : renderBaseImage()}
+      {shouldHideExactTiles ? null : (
         <RasterTileImages
-          hiddenTileRefs={handoff.hiddenTileRefs}
           onTileLoad={handleTileLoad}
-          tileSources={[
-            ...handoff.stableTileSources,
-            ...handoff.pendingTileSources,
-          ]}
+          tileSources={stableTileSources}
         />
-      </g>
-    )}
-    {presentedWorkingSurfaces.map((surface) => (
-      <g
-        key={surface.workingSurfaceId}
-        transform={getWorkingSurfaceCorrectionTransform(durableNode, surface)}
-      >
-        <RasterWorkingSurface sampling={sampling} surface={surface} />
-      </g>
-    ))}
-  </>
-);
+      )}
+      {handoff.layers
+        .filter((layer) => layer !== nodeReplacementLayer)
+        .map(renderHandoffLayer)}
+    </>
+  );
+};
 
 const CanvasTiledRasterImage = ({
   baseHeight,
@@ -1248,14 +1277,42 @@ const CanvasTiledRasterImage = ({
   transform,
   width,
 }) => {
-  const editor = useEditor();
   const cullState = useEditorSurfaceValue((editor, state) =>
     getRasterTileCullState(editor, state, nodeId, renderRootNodeId, tileSources)
   );
-  const workingSurface = useEditorSurfaceValue((editor) =>
-    editor.getBrushWorkingSurfaceStateForNode?.(nodeId)
+  const workingPresentation = useEditorSurfaceValue((editor) =>
+    editor.getRasterWorkingPresentation?.(nodeId)
   );
+  const acknowledgedReplacementGroups = useRef(
+    new Map<string, RasterWorkingGroup>()
+  );
+  const previousWorkingGroups = useRef<readonly RasterWorkingGroup[]>([]);
+  const currentWorkingGroups = workingPresentation?.groups ?? [];
+  const currentWorkingGroupIds = new Set(
+    currentWorkingGroups.map((group) => group.groupId)
+  );
+
+  for (const previousGroup of previousWorkingGroups.current) {
+    if (
+      previousGroup.phase === "awaiting-presentation" &&
+      previousGroup.replacement &&
+      !currentWorkingGroupIds.has(previousGroup.groupId)
+    ) {
+      acknowledgedReplacementGroups.current.set(
+        previousGroup.groupId,
+        previousGroup
+      );
+    }
+  }
+  previousWorkingGroups.current = currentWorkingGroups;
+  const [loadedTileRefs, setLoadedTileRefs] = useState(() => new Set<string>());
   const [readyRasterPreviewKey, setReadyRasterPreviewKey] = useState(null);
+  const retainAcknowledgedReplacement = useCallback(
+    (group: RasterWorkingGroup) => {
+      acknowledgedReplacementGroups.current.set(group.groupId, group);
+    },
+    []
+  );
   const handleRasterPreviewReadyChange = useCallback(
     (previewKey, isReady) => {
       recordRasterDebugEvent("renderer.preview.readyChange", {
@@ -1274,47 +1331,100 @@ const CanvasTiledRasterImage = ({
     [nodeId]
   );
   const visibleTileSources = cullState.tileSources;
-  const rasterRenderKey = getRasterTileSourcesKey(tileSources);
   const isRasterPreviewReady =
-    cullState.previewKey && readyRasterPreviewKey === cullState.previewKey;
-  const {
-    areExactTilesReady,
-    arePresentedTilesReady,
-    handleTileLoad: handleExactTileLoad,
-    handoff,
-    loadedTileCount,
-    presentedWorkingSurfaces,
-  } = useRasterTileHandoff({
-    nodeId,
-    tileSources: visibleTileSources,
-    workingSurface,
+    Boolean(cullState.previewKey) &&
+    readyRasterPreviewKey === cullState.previewKey;
+  const shouldUsePreview = cullState.shouldUsePreview;
+  const handoff = useRasterAtomicHandoff({
+    mountedDrawableResourceIds:
+      shouldUsePreview && !isRasterPreviewReady
+        ? new Set<string>()
+        : loadedTileRefs,
+    onBeforeAcknowledge: retainAcknowledgedReplacement,
+    presentation: workingPresentation,
+    src,
+    tileSources,
   });
-  const durableNode = editor.getNode(nodeId);
-  const shouldHideExactTiles =
-    cullState.shouldUsePreview && isRasterPreviewReady;
+  const liveGroupIds = new Set(
+    handoff.layers.map((layer) => layer.group.groupId)
+  );
+  const retainedReplacementLayers = [
+    ...acknowledgedReplacementGroups.current.values(),
+  ]
+    .filter(
+      (retainedGroup) =>
+        !liveGroupIds.has(retainedGroup.groupId) &&
+        handoff.layers.some(
+          ({ group }) => group.sequence < retainedGroup.sequence
+        )
+    )
+    .map((group) => ({
+      group,
+      groupId: group.groupId,
+      kind: "replacement" as const,
+    }));
+  const orderedHandoff = {
+    ...handoff,
+    layers: [...handoff.layers, ...retainedReplacementLayers].sort(
+      (left, right) => left.group.sequence - right.group.sequence
+    ),
+  };
+  useLayoutEffect(() => {
+    for (const [
+      groupId,
+      retainedGroup,
+    ] of acknowledgedReplacementGroups.current) {
+      const hasEarlierVisibleGroup = handoff.layers.some(
+        ({ group }) => group.sequence < retainedGroup.sequence
+      );
 
-  useRasterRenderReady({
-    areExactTilesReady,
-    arePendingTilesReady: handoff.isPendingReady,
-    arePresentedTilesReady,
-    isRasterPreviewReady,
-    nodeId,
-    rasterRenderKey,
-    shouldBuildPreview: cullState.shouldBuildPreview,
-    shouldUsePreview: cullState.shouldUsePreview,
-  });
+      if (!hasEarlierVisibleGroup) {
+        acknowledgedReplacementGroups.current.delete(groupId);
+      }
+    }
+  }, [handoff.layers]);
+  const handleExactTileLoad = useCallback((tileRef) => {
+    setLoadedTileRefs((current) => {
+      if (current.has(tileRef)) {
+        return current;
+      }
+
+      const next = new Set(current);
+
+      next.add(tileRef);
+      return next;
+    });
+  }, []);
+  const awaitingGroupCount =
+    workingPresentation?.groups.filter(
+      (group) => group.phase === "awaiting-presentation"
+    ).length ?? 0;
+  const arePresentedTilesReady =
+    awaitingGroupCount === handoff.acknowledgements.length;
+  const shouldHideExactTiles = shouldUsePreview && isRasterPreviewReady;
+  const hasWorkingLayer = orderedHandoff.layers.some(
+    (layer) => layer.kind === "working"
+  );
+  let presentationOwner = "exact";
+
+  if (shouldHideExactTiles) {
+    presentationOwner = "preview";
+  }
+  if (hasWorkingLayer) {
+    presentationOwner = "working";
+  }
 
   return (
     <g
-      data-raster-atomic-handoff={handoff.isActive ? "true" : "false"}
+      data-raster-atomic-handoff={awaitingGroupCount > 0 ? "true" : "false"}
       data-raster-exact-tiles-ready={arePresentedTilesReady ? "true" : "false"}
-      data-raster-loaded-exact-tile-count={loadedTileCount}
+      data-raster-loaded-exact-tile-count={loadedTileRefs.size}
       data-raster-node-id={nodeId}
-      data-raster-preview-active={cullState.shouldUsePreview ? "true" : "false"}
+      data-raster-presentation-owner={presentationOwner}
+      data-raster-preview-active={shouldUsePreview ? "true" : "false"}
       data-raster-preview-eligible={
         cullState.shouldBuildPreview ? "true" : "false"
       }
-      data-raster-render-key={rasterRenderKey}
       data-raster-sampling={cullState.sampling}
       data-raster-total-tile-count={tileSources.length}
       data-raster-visible-tile-count={visibleTileSources.length}
@@ -1326,7 +1436,7 @@ const CanvasTiledRasterImage = ({
           bounds={cullState.bounds}
           onReadyChange={handleRasterPreviewReadyChange}
           previewKey={cullState.previewKey}
-          shouldShow={cullState.shouldUsePreview}
+          shouldShow={shouldHideExactTiles}
           tileSources={visibleTileSources}
           zoom={cullState.zoom}
         />
@@ -1336,45 +1446,35 @@ const CanvasTiledRasterImage = ({
         baseWidth={baseWidth}
         baseX={baseX}
         baseY={baseY}
-        durableNode={durableNode}
         handleTileLoad={handleExactTileLoad}
-        handoff={handoff}
+        handoff={orderedHandoff}
         height={height}
-        presentedWorkingSurfaces={presentedWorkingSurfaces}
+        replacementTileSources={tileSources}
         sampling={cullState.sampling}
         shouldHideExactTiles={shouldHideExactTiles}
         src={src}
+        tileSources={visibleTileSources}
         width={width}
       />
     </g>
   );
 };
 
-const getWorkingSurfaceCorrectionTransform = (durableNode, workingSurface) => {
-  const relativeMatrix = getRasterWorkingSurfaceRelativeMatrix(
-    durableNode,
-    workingSurface
-  );
-
-  if (!relativeMatrix) {
-    return undefined;
-  }
-
-  return `matrix(${relativeMatrix.a} ${relativeMatrix.b} ${relativeMatrix.c} ${relativeMatrix.d} ${relativeMatrix.e} ${relativeMatrix.f})`;
-};
+const getRasterWorkingGroupTransform = ({ matrix }) =>
+  `matrix(${matrix.a} ${matrix.b} ${matrix.c} ${matrix.d} ${matrix.e} ${matrix.f})`;
 
 export const CanvasRasterImage = (props) => {
   const editor = useEditor();
   const residentSurface = useResidentRasterSurface(props);
-  const workingSurface = useEditorSurfaceValue((editor) =>
-    editor.getBrushWorkingSurfaceStateForNode?.(props.nodeId)
+  const workingPresentation = useEditorSurfaceValue((editor) =>
+    editor.getRasterWorkingPresentation?.(props.nodeId)
   );
   const zoom = useEditorSurfaceValue((_, state) => state.viewport.zoom);
   const sampling = getCanvasRasterSampling({
     editor,
     props,
     residentSurface,
-    workingSurface,
+    workingPresentation,
     zoom,
   });
   const subscribeToResidentSource = useCallback(
@@ -1394,45 +1494,57 @@ export const CanvasRasterImage = (props) => {
     surface: props.pixelGridSurface,
     width: props.width,
   };
-  let hasHtmlPixelGrid = false;
   let artwork: ReactNode;
 
   if (Array.isArray(props.tileSources) && props.tileSources.length > 0) {
-    artwork = <CanvasTiledRasterImage {...props} transform={undefined} />;
-  } else if (workingSurface?.type === "canvas") {
-    hasHtmlPixelGrid = true;
     artwork = (
-      <g
-        data-raster-sampling={sampling}
-        data-raster-working-replaces-node="true"
-      >
-        <RasterWorkingSurface
-          artworkOpacity={props.opacity ?? 1}
-          pixelGridProps={pixelGridProps}
-          sampling={sampling}
-          surface={workingSurface}
-        />
-      </g>
+      <>
+        <CanvasTiledRasterImage {...props} transform={undefined} />
+        <CanvasRasterPixelGrid {...pixelGridProps} />
+      </>
     );
-  } else if (workingSurface?.type === "tiles") {
+  } else {
     artwork = (
-      <g data-raster-sampling={sampling}>
-        <CanvasNativeRasterImage
-          {...props}
-          artworkOpacity={props.opacity ?? 1}
-          pixelGridProps={pixelGridProps}
-          renderRootNodeId={props.renderRootNodeId ?? props.nodeId}
-          sampling={sampling}
-        />
-        <RasterWorkingSurface sampling={sampling} surface={workingSurface} />
-      </g>
+      <CanvasRasterWorkingPresentation
+        pixelGridProps={pixelGridProps}
+        presentation={workingPresentation}
+        props={props}
+        residentSurface={residentSurface}
+        sampling={sampling}
+        subscribeToResidentSource={subscribeToResidentSource}
+      />
     );
-  } else if (residentSurface) {
-    hasHtmlPixelGrid = true;
-    artwork = (
+  }
+
+  return <g transform={props.transform || undefined}>{artwork}</g>;
+};
+
+const CanvasRasterWorkingPresentation = ({
+  pixelGridProps,
+  presentation,
+  props,
+  residentSurface,
+  sampling,
+  subscribeToResidentSource,
+}) => {
+  const handoff = useRasterAtomicHandoff({
+    presentation,
+    src: props.src,
+    tileSources: [],
+  });
+  const awaitingGroupCount =
+    presentation?.groups.filter(
+      (group) => group.phase === "awaiting-presentation"
+    ).length ?? 0;
+  const hasNodeReplacement = Boolean(
+    presentation?.groups.some((group) => group.replacesNode)
+  );
+  const renderCommitted = (key?: string) =>
+    residentSurface ? (
       <g
         data-raster-resident-surface="canvas2d"
         data-raster-sampling={sampling}
+        key={key}
       >
         <RasterWorkingCanvas
           artworkOpacity={props.opacity ?? 1}
@@ -1447,27 +1559,45 @@ export const CanvasRasterImage = (props) => {
           y={props.baseY ?? 0}
         />
       </g>
+    ) : (
+      <CanvasNativeRasterImage
+        {...props}
+        artworkOpacity={props.opacity ?? 1}
+        key={key}
+        pixelGridProps={pixelGridProps}
+        renderRootNodeId={props.renderRootNodeId ?? props.nodeId}
+        sampling={sampling}
+      />
     );
-  } else {
-    artwork = (
-      <g data-raster-sampling={sampling}>
-        <CanvasNativeRasterImage
-          {...props}
-          artworkOpacity={props.opacity ?? 1}
-          pixelGridProps={pixelGridProps}
-          renderRootNodeId={props.renderRootNodeId ?? props.nodeId}
-          sampling={sampling}
-        />
-        <RasterWorkingSurface sampling={sampling} surface={workingSurface} />
-      </g>
-    );
-    hasHtmlPixelGrid = true;
-  }
 
   return (
-    <g transform={props.transform || undefined}>
-      {artwork}
-      {hasHtmlPixelGrid ? null : <CanvasRasterPixelGrid {...pixelGridProps} />}
+    <g
+      data-raster-atomic-handoff={awaitingGroupCount > 0 ? "true" : "false"}
+      data-raster-node-id={props.nodeId}
+    >
+      {hasNodeReplacement ? null : renderCommitted()}
+      {handoff.layers.map((layer) => {
+        if (layer.kind === "replacement") {
+          return renderCommitted(layer.groupId);
+        }
+
+        return (
+          <g
+            data-raster-working-replaces-node={
+              layer.group.replacesNode ? "true" : "false"
+            }
+            key={layer.groupId}
+            transform={getRasterWorkingGroupTransform(layer.group)}
+          >
+            <RasterWorkingGroupLayer
+              artworkOpacity={props.opacity ?? 1}
+              group={layer.group}
+              pixelGridProps={layer.group.replacesNode ? pixelGridProps : null}
+              sampling={sampling}
+            />
+          </g>
+        );
+      })}
     </g>
   );
 };
@@ -1476,11 +1606,16 @@ const getCanvasRasterSampling = ({
   editor,
   props,
   residentSurface,
-  workingSurface,
+  workingPresentation,
   zoom,
 }) => {
+  const workingCanvasGroup = workingPresentation?.groups.find(
+    (group) => group.content.kind === "canvas"
+  );
   const workingCanvas =
-    workingSurface?.type === "canvas" ? workingSurface : null;
+    workingCanvasGroup?.content.kind === "canvas"
+      ? workingCanvasGroup.content
+      : null;
   const displayedHeight =
     workingCanvas?.height ?? props.baseHeight ?? props.height;
   const displayedWidth = workingCanvas?.width ?? props.baseWidth ?? props.width;

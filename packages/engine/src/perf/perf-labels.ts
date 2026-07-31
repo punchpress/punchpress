@@ -63,6 +63,10 @@ export const PERF_SPANS = {
   rasterStrokeFirstDab: "raster.stroke.firstDab",
   rasterStrokePointerRelease: "raster.stroke.pointerRelease",
   rasterSurfaceDecode: "raster.surface.decode",
+  brushNativeBoundaryApply: "brush.nativeBoundary.apply",
+  brushNativeBoundaryGenerate: "brush.nativeBoundary.generate",
+  brushNativeStrokeClassify: "brush.nativeStroke.classify",
+  brushNativeStrokeSmooth: "brush.nativeStroke.smooth",
 
   layersSelectorDragging: "layers.selector.dragging",
   layersSelectorNodeIds: "layers.selector.nodeIds",

@@ -344,8 +344,8 @@ const CanvasStandardNodeArt = ({ nodeId }) => {
   const paintPreview = useEditorSurfaceValue((editor) =>
     editor.getSelectionColorPreviewForNode(nodeId)
   );
-  const rasterWorkingSurface = useEditorSurfaceValue((editor) =>
-    editor.getBrushWorkingSurfaceStateForNode?.(nodeId)
+  const rasterWorkingPresentation = useEditorSurfaceValue((editor) =>
+    editor.getRasterWorkingPresentation?.(nodeId)
   );
   const editor = useEditor();
   const artState = useMemo(
@@ -371,7 +371,7 @@ const CanvasStandardNodeArt = ({ nodeId }) => {
     : null;
   const presentationBounds =
     durablePresentationBounds ||
-    rasterWorkingSurface?.presentationBounds ||
+    rasterWorkingPresentation?.groups[0]?.bounds ||
     artState.bbox;
 
   return (

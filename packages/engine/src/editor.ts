@@ -133,6 +133,13 @@ import {
   startRasterCrop as startEditorRasterCrop,
   updateRasterCrop as updateEditorRasterCrop,
 } from "./raster/crop";
+import type {
+  RasterPresentationAcknowledgement,
+  RasterPresentationFailure,
+  RasterWorkingGroup,
+  RasterWorkingPresentation,
+} from "./raster/working-presentation";
+import { retireAcknowledgedRasterWorkingGroups } from "./raster/working-presentation";
 import {
   handleCanvasShortcutKeyDown as handleEditorCanvasShortcutKeyDown,
   handleEditingShortcutKeyDown as handleEditorEditingShortcutKeyDown,
@@ -1118,19 +1125,80 @@ export class Editor {
     this.getState().selectBrushPreset(presetId, toolId);
   }
 
-  getBrushWorkingSurfaceStates() {
-    return [
-      ...(this.tools.get("brush")?.getWorkingSurfaceStates?.() || []),
-      ...(this.tools.get("eraser")?.getWorkingSurfaceStates?.() || []),
-    ];
+  getRasterWorkingPresentations(): RasterWorkingPresentation[] {
+    const groups = [
+      ...(this.tools.get("brush")?.getWorkingGroups?.() || []),
+      ...(this.tools.get("eraser")?.getWorkingGroups?.() || []),
+    ].sort((left, right) => left.sequence - right.sequence);
+    const groupsByNode = new Map<string, RasterWorkingGroup[]>();
+
+    for (const group of groups) {
+      const nodeGroups = groupsByNode.get(group.nodeId) || [];
+
+      nodeGroups.push(group);
+      groupsByNode.set(group.nodeId, nodeGroups);
+    }
+
+    return [...groupsByNode].map(([nodeId, nodeGroups]) => ({
+      groups: nodeGroups,
+      nodeId,
+    }));
   }
 
-  getBrushWorkingSurfaceStateForNode(nodeId) {
+  getRasterWorkingPresentation(nodeId): RasterWorkingPresentation | null {
     return (
-      this.tools.get("brush")?.getWorkingSurfaceStateForNode?.(nodeId) ||
-      this.tools.get("eraser")?.getWorkingSurfaceStateForNode?.(nodeId) ||
-      null
+      this.getRasterWorkingPresentations().find(
+        (presentation) => presentation.nodeId === nodeId
+      ) || null
     );
+  }
+
+  acknowledgeRasterPresentation(
+    acknowledgement: RasterPresentationAcknowledgement
+  ) {
+    const presentation = this.getRasterWorkingPresentation(
+      acknowledgement.nodeId
+    );
+    const retiredPresentation = presentation
+      ? retireAcknowledgedRasterWorkingGroups(presentation, acknowledgement)
+      : null;
+
+    if (!(presentation && retiredPresentation !== presentation)) {
+      return false;
+    }
+
+    const retainedGroupIds = new Set(
+      retiredPresentation.groups.map((group) => group.groupId)
+    );
+    const retiredGroupIds = new Set(
+      presentation.groups
+        .filter((group) => !retainedGroupIds.has(group.groupId))
+        .map((group) => group.groupId)
+    );
+
+    for (const toolId of ["brush", "eraser"]) {
+      this.tools.get(toolId)?.retireWorkingPresentations?.(retiredGroupIds);
+    }
+
+    return true;
+  }
+
+  failRasterPresentation(failure: RasterPresentationFailure) {
+    return ["brush", "eraser"].some((toolId) =>
+      this.tools.get(toolId)?.failWorkingPresentation?.(failure)
+    );
+  }
+
+  invalidateRasterWorkingPresentations(nodeId = null) {
+    for (const toolId of ["brush", "eraser"]) {
+      this.tools.get(toolId)?.invalidateWorkingPresentations?.(nodeId);
+    }
+  }
+
+  invalidateMissingRasterWorkingPresentations() {
+    for (const toolId of ["brush", "eraser"]) {
+      this.tools.get(toolId)?.invalidateMissingWorkingPresentations?.();
+    }
   }
 
   getSelectionFrameKey(nodeIds = this.selectedNodeIds) {
@@ -1209,6 +1277,7 @@ export class Editor {
 
   deleteSelected() {
     deleteEditorSelected(this);
+    this.invalidateMissingRasterWorkingPresentations();
   }
 
   deleteVectorPoint(
@@ -1246,6 +1315,7 @@ export class Editor {
 
   deleteNode(nodeId) {
     deleteEditorNode(this, nodeId);
+    this.invalidateMissingRasterWorkingPresentations();
   }
 
   dispatchCanvasPointerDown(info) {
@@ -2023,6 +2093,7 @@ export class Editor {
   }
 
   newDocument() {
+    this.invalidateRasterWorkingPresentations();
     createNewEditorDocument(this);
   }
 
@@ -2076,6 +2147,7 @@ export class Editor {
 
     if (didRedo) {
       historyTool.onHistoryChanged?.("redo");
+      this.invalidateRasterWorkingPresentations();
     }
 
     return didRedo;
@@ -2087,6 +2159,7 @@ export class Editor {
 
     if (didUndo) {
       historyTool.onHistoryChanged?.("undo");
+      this.invalidateRasterWorkingPresentations();
     }
 
     return didUndo;

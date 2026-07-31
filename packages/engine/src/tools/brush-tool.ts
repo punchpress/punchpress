@@ -15,6 +15,15 @@ import {
 } from "../primitives/rotation";
 import { createRasterPathSmoother } from "../raster/path-smoother";
 import {
+  acknowledgeRasterWorkingGroup,
+  createRasterWorkingGroupLifecycle,
+  getRasterWorkingToNodeMatrix,
+  invalidateRasterWorkingGroup,
+  markRasterWorkingGroupAwaitingReplacement,
+  markRasterWorkingGroupCommitting,
+  markRasterWorkingGroupPresentationFailed,
+} from "../raster/working-presentation";
+import {
   getBrushDabRenderBounds,
   getBrushDabRenderRadius,
   getErasedAlpha,
@@ -52,14 +61,13 @@ const BRUSH_LAYER_EXPANSION_PADDING_MULTIPLIER = 8;
 const BRUSH_STROKE_POINT_FLUSH_BUDGET_MS = 5;
 const BRUSH_TILE_ASYNC_COMMIT_THRESHOLD = 16;
 const BRUSH_TILE_COMMIT_BUDGET_MS = 8;
-const RASTER_NODE_RENDER_READY_EVENT = "punchpress:raster-node-render-ready";
-const RASTER_RENDER_HANDOFF_TIMEOUT_MS = 2000;
 const RESIDENT_RASTER_MAX_EDGE = 2048;
 const TILED_BRUSH_SURFACE_AREA_THRESHOLD = 4096 * 4096;
 const TILED_BRUSH_SURFACE_DENSITY_THRESHOLD = 8;
 const NATIVE_PATH_EPSILON = 1e-6;
 let brushWorkingSurfaceRevision = 0;
 let brushTileCommitRevision = 0;
+let brushPresentationCommitRevision = 0;
 
 const recordRasterDebugEvent = (event, payload = {}) => {
   const capture = (
@@ -143,13 +151,17 @@ const shouldUseTiledPaintSurface = ({
   const zoom = Math.max(0.0001, editor?.viewport?.zoom || editor?.zoom || 1);
   const nodeScale = Math.max(0.0001, Math.abs(getNodeScaleX(node) || 1));
   const pixelDensity = 1 / (zoom * nodeScale);
+  const writableBounds = getRasterWritableBounds(editor, node);
+  const surfaceArea =
+    (writableBounds?.width ?? node.width) *
+    (writableBounds?.height ?? node.height);
 
   return (
     operation === "paint" &&
     !sourceRect &&
     ((node.tileSources || []).length > 0 ||
       forceTiled ||
-      node.width * node.height >= TILED_BRUSH_SURFACE_AREA_THRESHOLD ||
+      surfaceArea >= TILED_BRUSH_SURFACE_AREA_THRESHOLD ||
       pixelDensity >= TILED_BRUSH_SURFACE_DENSITY_THRESHOLD)
   );
 };
@@ -255,9 +267,6 @@ const getTileSourceWithOffset = (tileSource, offsetX, offsetY) => {
     y,
   };
 };
-
-const getTileSourcesRenderKey = (tileSources = []) =>
-  tileSources.map((tileSource) => tileSource.ref).join("|");
 
 const getTiledBaseFrame = (node) => {
   return {
@@ -416,7 +425,6 @@ class BrushStrokeSession {
     this.canvasInputOffset = { x: 0, y: 0 };
     this.completed = false;
     this.commitStarted = false;
-    this.commitHandoffCancel = null;
     this.handoffReady = Promise.resolve();
     this.resolveHandoffReady = null;
     this.dirtyBounds = null;
@@ -425,6 +433,8 @@ class BrushStrokeSession {
     this.historyMark = editor.markHistoryStep(
       operation === "erase" ? "erase brush stroke" : "paint brush stroke"
     );
+    this.historyResolution = "pending";
+    this.invalidated = false;
     const targetsExistingRaster = editor.getNode(node.id)?.type === "image";
     this.initialSourceRect = targetsExistingRaster
       ? null
@@ -443,8 +453,6 @@ class BrushStrokeSession {
       targetsExistingRaster || Boolean(this.initialSourceRect);
     this.writablePolygon = getRasterWritablePolygon(editor, node);
     this.commitReady = Promise.resolve();
-    this.commitRenderKey = null;
-    this.commitTileRefs = [];
     this.floatPixels = null;
     this.lastPoint = null;
     this.nativeBoundaryDabGenerator = null;
@@ -457,6 +465,11 @@ class BrushStrokeSession {
     this.previewFrameId = 0;
     brushWorkingSurfaceRevision += 1;
     this.workingSurfaceId = `brush-working-${brushWorkingSurfaceRevision}`;
+    this.presentationLifecycle = createRasterWorkingGroupLifecycle({
+      groupId: this.workingSurfaceId,
+      nodeId: this.nodeId,
+      sequence: brushWorkingSurfaceRevision,
+    });
     this.previewNeedsNotify = false;
     this.previewNode = getImageNodeCroppedToSourceRect(
       node,
@@ -506,7 +519,7 @@ class BrushStrokeSession {
           this.flushPoints();
 
           if (this.completed) {
-            this.commit();
+            this.startCommit();
           }
         })
       : loadImageToCanvas(node, this.initialSourceRect).then((canvasState) => {
@@ -525,7 +538,7 @@ class BrushStrokeSession {
           this.flushPoints();
 
           if (this.completed) {
-            this.commit();
+            this.startCommit();
           }
         });
     this.tool = tool;
@@ -761,7 +774,7 @@ class BrushStrokeSession {
 
     if (
       this.nativeBoundaryDabGenerator &&
-      !this.isWritableAreaOwnedByTileSurface()
+      !this.canRenderNativePathWithSurfaceClip()
     ) {
       this.applyRasterDabs(
         this.nativeBoundaryDabGenerator.finish(
@@ -776,21 +789,28 @@ class BrushStrokeSession {
   }
 
   applyNativeInputPoint(point) {
-    const canvasRebase = this.applyNativePath(
+    const smoothedPoints = measurePerf(PERF_SPANS.brushNativeStrokeSmooth, () =>
       this.pathSmoother ? this.pathSmoother.append([point]) : [point]
     );
+    const canvasRebase = this.applyNativePath(smoothedPoints);
 
-    if (!this.isWritableAreaOwnedByTileSurface()) {
-      this.applyRasterDabs(
-        this.nativeBoundaryDabGenerator?.append(
-          [
-            {
-              x: point.x + canvasRebase.x,
-              y: point.y + canvasRebase.y,
-            },
-          ],
-          this.shouldEmitNativeBoundaryDab
-        ) || []
+    if (!this.canRenderNativePathWithSurfaceClip()) {
+      const boundaryDabs = measurePerf(
+        PERF_SPANS.brushNativeBoundaryGenerate,
+        () =>
+          this.nativeBoundaryDabGenerator?.append(
+            [
+              {
+                x: point.x + canvasRebase.x,
+                y: point.y + canvasRebase.y,
+              },
+            ],
+            this.shouldEmitNativeBoundaryDab
+          ) || []
+      );
+
+      measurePerf(PERF_SPANS.brushNativeBoundaryApply, () =>
+        this.applyRasterDabs(boundaryDabs)
       );
     }
   }
@@ -810,7 +830,9 @@ class BrushStrokeSession {
       pathPoints.unshift(this.lastPoint);
     }
 
-    const nativeRuns = this.getNativeInteriorRuns(pathPoints);
+    const nativeRuns = measurePerf(PERF_SPANS.brushNativeStrokeClassify, () =>
+      this.getNativeInteriorRuns(pathPoints)
+    );
     const canvasRebase = { x: 0, y: 0 };
 
     for (const nativeRun of nativeRuns) {
@@ -847,7 +869,7 @@ class BrushStrokeSession {
   }
 
   getNativeInteriorRuns(pathPoints) {
-    if (this.isWritableAreaOwnedByTileSurface()) {
+    if (this.canRenderNativePathWithSurfaceClip()) {
       return [pathPoints];
     }
 
@@ -910,7 +932,7 @@ class BrushStrokeSession {
   }
 
   shouldEmitNativeBoundaryDab = (center) => {
-    if (this.isWritableAreaOwnedByTileSurface()) {
+    if (this.canRenderNativePathWithSurfaceClip()) {
       return false;
     }
 
@@ -927,10 +949,23 @@ class BrushStrokeSession {
     });
   };
 
-  isWritableAreaOwnedByTileSurface() {
+  canRenderNativePathWithSurfaceClip() {
     const writablePolygon = this.getCanvasWritablePolygon();
 
-    if (!(this.tileSurface && writablePolygon?.length === 4)) {
+    return Boolean(
+      this.isWritableAreaAxisAlignedRectangle() &&
+        writablePolygon?.every(
+          (point) =>
+            Math.abs(point.x - Math.round(point.x)) <= NATIVE_PATH_EPSILON &&
+            Math.abs(point.y - Math.round(point.y)) <= NATIVE_PATH_EPSILON
+        )
+    );
+  }
+
+  isWritableAreaAxisAlignedRectangle() {
+    const writablePolygon = this.getCanvasWritablePolygon();
+
+    if (writablePolygon?.length !== 4) {
       return false;
     }
 
@@ -1363,6 +1398,7 @@ class BrushStrokeSession {
       this.editor,
       this.previewNode || this.editor.getNode(this.nodeId)
     );
+    const canvasWritableBounds = this.getCanvasWritableTarget()?.bounds;
     const radius = getBrushDabRenderRadius(
       this.settings.size,
       this.settings.hardness
@@ -1383,12 +1419,14 @@ class BrushStrokeSession {
     }
 
     const expansionPadding = getBrushLayerExpansionPadding(this.settings);
-    const writableMinX = writableBounds.x - this.canvasOffset.x;
-    const writableMinY = writableBounds.y - this.canvasOffset.y;
+    const writableMinX =
+      canvasWritableBounds?.x ?? writableBounds.x - this.canvasOffset.x;
+    const writableMinY =
+      canvasWritableBounds?.y ?? writableBounds.y - this.canvasOffset.y;
     const writableMaxX =
-      writableMinX + writableBounds.width;
+      writableMinX + (canvasWritableBounds?.width ?? writableBounds.width);
     const writableMaxY =
-      writableMinY + writableBounds.height;
+      writableMinY + (canvasWritableBounds?.height ?? writableBounds.height);
     const maxLeft = Math.max(0, Math.ceil(-writableMinX));
     const maxTop = Math.max(0, Math.ceil(-writableMinY));
     const maxRight = Math.max(0, Math.ceil(writableMaxX - canvas.width));
@@ -1591,14 +1629,19 @@ class BrushStrokeSession {
       workingSurfaceId: this.workingSurfaceId,
     });
     this.completed = true;
+    this.presentationLifecycle = markRasterWorkingGroupCommitting(
+      this.presentationLifecycle
+    );
+    this.editor.notifyInteractionPreviewChanged();
     this.cancelQueuedPointFlush();
 
+    if (!this.commitStarted) {
+      this.handoffReady = new Promise((resolve) => {
+        this.resolveHandoffReady = resolve;
+      });
+    }
+
     if (this.canvasState || this.tileSurface) {
-      if (this.tileSurface && !this.commitStarted) {
-        this.handoffReady = new Promise((resolve) => {
-          this.resolveHandoffReady = resolve;
-        });
-      }
       this.flushPoints();
       this.finishDabGenerator();
       recordRasterDebugEvent("session.complete.flushed", {
@@ -1607,21 +1650,36 @@ class BrushStrokeSession {
         nodeId: this.nodeId,
         workingSurfaceId: this.workingSurfaceId,
       });
-      this.commitReady = this.commit();
-      this.commitReady.catch(() => this.resolveCommitHandoff());
+      this.startCommit();
     }
 
     return this.commitReady;
   }
 
   cancel() {
-    this.clearCommitHandoffWait();
     this.cancelQueuedPointFlush();
     this.cancelLivePreview();
-    this.editor.revertToMark(this.historyMark);
-    this.resolveCommitHandoff();
-    this.tool.clearPendingPreview(this);
-    this.tool.clearActiveSession(this);
+    this.rollbackHistory();
+    this.invalidateWorkingPresentation();
+  }
+
+  startCommit() {
+    if (this.commitStarted) {
+      return this.commitReady;
+    }
+
+    try {
+      this.commitReady = Promise.resolve(this.commit());
+    } catch (error) {
+      this.commitReady = Promise.reject(error);
+    }
+
+    this.commitReady = this.commitReady.catch((error) => {
+      this.rollbackHistory();
+      this.invalidateWorkingPresentation();
+      throw error;
+    });
+    return this.commitReady;
   }
 
   commit() {
@@ -1643,9 +1701,8 @@ class BrushStrokeSession {
         nodeId: this.nodeId,
         workingSurfaceId: this.workingSurfaceId,
       });
-      this.editor.revertToMark(this.historyMark);
-      this.resolveCommitHandoff();
-      this.tool.clearActiveSession(this);
+      this.rollbackHistory();
+      this.invalidateWorkingPresentation();
       return Promise.resolve();
     }
 
@@ -1661,7 +1718,15 @@ class BrushStrokeSession {
     const src = measurePerf("brush.commit.encode", () =>
       committedCanvas.canvas.toDataURL("image/png")
     );
+    brushPresentationCommitRevision += 1;
+    const replacement = {
+      commitId: `raster-commit-${brushPresentationCommitRevision}`,
+      kind: "canvas",
+      resourceIds: [src],
+    };
+    let committedNode = null;
 
+    this.awaitWorkingPresentationReplacement(replacement);
     measurePerf("brush.commit.updateNode", () =>
       this.editor.run(() => {
         this.editor.getState().updateNodeById(this.nodeId, (node) => {
@@ -1669,7 +1734,7 @@ class BrushStrokeSession {
             return node;
           }
 
-          return {
+          committedNode = {
             ...node,
             baseHeight: committedCanvas.height,
             baseWidth: committedCanvas.width,
@@ -1692,17 +1757,20 @@ class BrushStrokeSession {
                 }
               : {}),
           };
+          return committedNode;
         });
       })
     );
-    this.editor.commitHistoryStep(this.historyMark);
-    this.completed = false;
+
+    if (!committedNode) {
+      throw new Error("Raster canvas commit target is unavailable");
+    }
+
+    this.commitHistory();
     recordRasterDebugEvent("commit.canvas.finish", {
       node: getRasterDebugNodePayload(this.editor.getNode(this.nodeId)),
       workingSurfaceId: this.workingSurfaceId,
     });
-    this.tool.clearPendingPreview(this);
-    this.tool.clearActiveSession(this);
     return Promise.resolve();
   }
 
@@ -1719,10 +1787,8 @@ class BrushStrokeSession {
         nodeId: this.nodeId,
         workingSurfaceId: this.workingSurfaceId,
       });
-      this.editor.revertToMark(this.historyMark);
-      this.resolveCommitHandoff();
-      this.tool.clearPendingPreview(this);
-      this.tool.clearActiveSession(this);
+      this.rollbackHistory();
+      this.invalidateWorkingPresentation();
       return Promise.resolve();
     }
 
@@ -1761,34 +1827,35 @@ class BrushStrokeSession {
   }
 
   commitTileSurfaceAsync({ commitRevision, dirtyTiles }) {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const tileSources: NonNullable<
         ReturnType<typeof createTileSourceFromDirtyTile>
       >[] = [];
       let tileIndex = 0;
       const encodeChunk = () => {
-        measurePerf("brush.tile.commit.encode.chunk", () => {
-          const startedAt = getNow();
+        try {
+          measurePerf("brush.tile.commit.encode.chunk", () => {
+            const startedAt = getNow();
 
-          while (tileIndex < dirtyTiles.length) {
-            const tileSource = createTileSourceFromDirtyTile({
-              commitRevision,
-              nodeId: this.nodeId,
-              tile: dirtyTiles[tileIndex],
-            });
+            while (tileIndex < dirtyTiles.length) {
+              const tileSource = createTileSourceFromDirtyTile({
+                commitRevision,
+                nodeId: this.nodeId,
+                tile: dirtyTiles[tileIndex],
+              });
 
-            tileIndex += 1;
+              tileIndex += 1;
 
-            if (tileSource) {
-              tileSources.push(tileSource);
+              if (tileSource) {
+                tileSources.push(tileSource);
+              }
+
+              if (getNow() - startedAt >= BRUSH_TILE_COMMIT_BUDGET_MS) {
+                break;
+              }
             }
-
-            if (getNow() - startedAt >= BRUSH_TILE_COMMIT_BUDGET_MS) {
-              break;
-            }
-          }
-        });
-        incrementPerfCounter("brush.tile.commit.encodeChunk");
+          });
+          incrementPerfCounter("brush.tile.commit.encodeChunk");
 
           if (tileIndex < dirtyTiles.length) {
             requestRasterFrame(encodeChunk);
@@ -1803,28 +1870,39 @@ class BrushStrokeSession {
           });
           this.finishTileSurfaceCommit(tileSources);
           resolve();
-        };
+        } catch (error) {
+          reject(error);
+        }
+      };
 
       requestRasterFrame(encodeChunk);
     });
   }
 
   finishTileSurfaceCommit(tileSources) {
+    if (this.invalidated || !this.editor.getNode(this.nodeId)) {
+      return;
+    }
+
     if (tileSources.length === 0) {
       recordRasterDebugEvent("tileCommit.emptyEncodedTiles", {
         nodeId: this.nodeId,
         workingSurfaceId: this.workingSurfaceId,
       });
-      this.editor.revertToMark(this.historyMark);
-      this.resolveCommitHandoff();
-      this.tool.clearPendingPreview(this);
-      this.tool.clearActiveSession(this);
+      this.rollbackHistory();
+      this.invalidateWorkingPresentation();
       return;
     }
 
     let committedNode = null;
 
-    this.commitTileRefs = tileSources.map((tileSource) => tileSource.ref);
+    const commitTileRefs = tileSources.map((tileSource) => tileSource.ref);
+    brushPresentationCommitRevision += 1;
+    this.awaitWorkingPresentationReplacement({
+      commitId: `raster-commit-${brushPresentationCommitRevision}`,
+      kind: "tiles",
+      resourceIds: commitTileRefs,
+    });
 
     measurePerf("brush.tile.commit.updateNode", () =>
       this.editor.run(() => {
@@ -1842,19 +1920,18 @@ class BrushStrokeSession {
         });
       })
     );
-    this.commitRenderKey =
-      committedNode?.type === "image"
-        ? getTileSourcesRenderKey(committedNode.tileSources || [])
-        : null;
-    this.editor.commitHistoryStep(this.historyMark);
+
+    if (!committedNode) {
+      throw new Error("Raster tile commit target is unavailable");
+    }
+
+    this.commitHistory();
     recordRasterDebugEvent("tileCommit.finish", {
       committedNode: getRasterDebugNodePayload(committedNode),
-      commitRenderKeyLength: this.commitRenderKey?.length || 0,
       encodedTileCount: tileSources.length,
       nodeId: this.nodeId,
       workingSurfaceId: this.workingSurfaceId,
     });
-    this.scheduleCommitWorkingSurfaceClear();
   }
 
   scheduleLivePreview({ notify = true } = {}) {
@@ -1898,118 +1975,117 @@ class BrushStrokeSession {
     this.previewFrameId = 0;
   }
 
-  clearCommitHandoffWait() {
-    if (!this.commitHandoffCancel) {
-      return;
-    }
-
-    this.commitHandoffCancel();
-    this.commitHandoffCancel = null;
-  }
-
-  resolveCommitHandoff() {
+  resolveCommitHandoff(status = "presented") {
     const resolve = this.resolveHandoffReady;
 
     this.resolveHandoffReady = null;
-    resolve?.();
+    resolve?.({ status });
   }
 
-  scheduleCommitWorkingSurfaceClear() {
-    const clear = () => {
-      recordRasterDebugEvent("handoff.clear", {
-        commitRenderKeyLength: this.commitRenderKey?.length || 0,
-        nodeId: this.nodeId,
-        workingSurfaceId: this.workingSurfaceId,
-      });
-      this.clearCommitHandoffWait();
-      this.completed = false;
-      this.resolveCommitHandoff();
-      this.tool.clearPendingPreview(this);
-      this.tool.clearActiveSession(this);
-    };
-
-    if (!canScheduleRasterFrame() || !this.commitRenderKey) {
-      recordRasterDebugEvent("handoff.clearImmediate", {
-        canScheduleRasterFrame: canScheduleRasterFrame(),
-        commitRenderKeyLength: this.commitRenderKey?.length || 0,
-        nodeId: this.nodeId,
-        workingSurfaceId: this.workingSurfaceId,
-      });
-      clear();
+  awaitWorkingPresentationReplacement(replacement) {
+    if (!this.presentationLifecycle) {
       return;
     }
 
-    const expectedRenderKey = this.commitRenderKey;
+    this.presentationLifecycle = markRasterWorkingGroupAwaitingReplacement(
+      this.presentationLifecycle,
+      replacement
+    );
     recordRasterDebugEvent("handoff.wait", {
-      expectedRenderKeyLength: expectedRenderKey.length,
+      commitId: replacement.commitId,
+      nodeId: this.nodeId,
+      replacementKind: replacement.kind,
+      resourceCount: replacement.resourceIds.length,
+      workingSurfaceId: this.workingSurfaceId,
+    });
+    this.editor.notifyInteractionPreviewChanged();
+  }
+
+  acknowledgeWorkingPresentation(acknowledgement) {
+    const nextLifecycle = acknowledgeRasterWorkingGroup(
+      this.presentationLifecycle,
+      acknowledgement
+    );
+
+    if (nextLifecycle === this.presentationLifecycle) {
+      return false;
+    }
+
+    recordRasterDebugEvent("handoff.acknowledge", {
+      commitId: acknowledgement.commitId,
       nodeId: this.nodeId,
       workingSurfaceId: this.workingSurfaceId,
     });
+    this.presentationLifecycle = nextLifecycle;
+    this.clearWorkingPresentation();
+    return true;
+  }
 
-    const onRenderReady = (event) => {
-      const detail = event?.detail || {};
-      const renderedTileRefs = new Set(
-        typeof detail.renderKey === "string"
-          ? detail.renderKey.split("|").filter(Boolean)
-          : []
-      );
-      const includesCommittedTiles =
-        this.commitTileRefs.length > 0 &&
-        this.commitTileRefs.every((tileRef) =>
-          renderedTileRefs.has(tileRef)
-        );
+  failWorkingPresentation(failure) {
+    if (
+      acknowledgeRasterWorkingGroup(this.presentationLifecycle, failure) ===
+      this.presentationLifecycle
+    ) {
+      return false;
+    }
 
-      if (
-        detail.nodeId === this.nodeId &&
-        (detail.renderKey === expectedRenderKey || includesCommittedTiles)
-      ) {
-        recordRasterDebugEvent("handoff.renderReady", {
-          mode: detail.mode || null,
-          nodeId: this.nodeId,
-          renderKeyLength: detail.renderKey?.length || 0,
-          workingSurfaceId: this.workingSurfaceId,
-        });
-        clear();
-      }
-    };
-
-    window.addEventListener(RASTER_NODE_RENDER_READY_EVENT, onRenderReady);
-    let timeoutId = 0;
-    const clearIfRendererUnmounted = () => {
-      const rendererMounted = [
-        ...document.querySelectorAll("[data-raster-node-id]"),
-      ].some(
-        (element) =>
-          element.getAttribute("data-raster-node-id") === this.nodeId
-      );
-
-      if (!rendererMounted) {
-        recordRasterDebugEvent("handoff.rendererUnmounted", {
-          nodeId: this.nodeId,
-          workingSurfaceId: this.workingSurfaceId,
-        });
-        clear();
-        return;
-      }
-
-      timeoutId = window.setTimeout(
-        clearIfRendererUnmounted,
-        RASTER_RENDER_HANDOFF_TIMEOUT_MS
-      );
-    };
-
-    timeoutId = window.setTimeout(
-      clearIfRendererUnmounted,
-      RASTER_RENDER_HANDOFF_TIMEOUT_MS
+    recordRasterDebugEvent("handoff.fail", {
+      commitId: failure.commitId,
+      nodeId: this.nodeId,
+      reason: failure.reason,
+      workingSurfaceId: this.workingSurfaceId,
+    });
+    this.presentationLifecycle = markRasterWorkingGroupPresentationFailed(
+      this.presentationLifecycle
     );
-    this.commitHandoffCancel = () => {
-      window.removeEventListener(RASTER_NODE_RENDER_READY_EVENT, onRenderReady);
-      window.clearTimeout(timeoutId);
-    };
+    this.resolveCommitHandoff("failed");
+    this.editor.notifyInteractionPreviewChanged();
+    return true;
+  }
+
+  invalidateWorkingPresentation() {
+    this.invalidated = true;
+    this.presentationLifecycle = invalidateRasterWorkingGroup(
+      this.presentationLifecycle
+    );
+    this.clearWorkingPresentation();
+  }
+
+  resolveHistoryForInvalidation() {
+    this.commitHistory();
+  }
+
+  commitHistory() {
+    if (this.historyResolution !== "pending") {
+      return false;
+    }
+
+    this.historyResolution = "committed";
+    return this.editor.commitHistoryStep(this.historyMark);
+  }
+
+  rollbackHistory() {
+    if (this.historyResolution !== "pending") {
+      return false;
+    }
+
+    this.historyResolution = "reverted";
+    return this.editor.revertToMark(this.historyMark);
+  }
+
+  clearWorkingPresentation() {
+    recordRasterDebugEvent("handoff.clear", {
+      nodeId: this.nodeId,
+      workingSurfaceId: this.workingSurfaceId,
+    });
+    this.completed = false;
+    this.resolveCommitHandoff();
+    this.tool.clearPendingPreview(this);
+    this.tool.clearActiveSession(this);
   }
 
   hasPendingWorkingSurface() {
-    return this.completed && Boolean(this.getWorkingSurfaceState());
+    return this.completed && Boolean(this.getWorkingGroup());
   }
 
   getCommitReady() {
@@ -2028,11 +2104,11 @@ class BrushStrokeSession {
       : this.handoffReady;
   }
 
-  getWorkingSurfaceState() {
+  getWorkingGroup() {
     const durableNode = this.editor.getNode(this.nodeId);
     const node = this.previewNode || durableNode;
 
-    if (!node) {
+    if (!(durableNode?.type === "image" && node && this.presentationLifecycle)) {
       return null;
     }
     const writableBounds = getRasterWritableBounds(
@@ -2058,17 +2134,20 @@ class BrushStrokeSession {
       }
 
       return {
+        ...this.presentationLifecycle,
         allowOverflow: !this.preserveRasterPlane,
-        commitTileRefs: this.commitTileRefs,
-        completed: this.completed,
-        height: node.height,
-        nodeId: this.nodeId,
-        presentationBounds,
-        tiles: workingSurface.tiles,
-        transform: node.transform || {},
-        type: "tiles",
-        width: node.width,
-        workingSurfaceId: this.workingSurfaceId,
+        bounds: presentationBounds,
+        content: {
+          kind: "tiles",
+          tiles: workingSurface.tiles,
+        },
+        matrix:
+          getRasterWorkingToNodeMatrix(durableNode, {
+            height: node.height,
+            transform: node.transform || {},
+            width: node.width,
+          }) || { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
+        replacesNode: false,
       };
     }
 
@@ -2077,20 +2156,29 @@ class BrushStrokeSession {
     }
 
     return {
+      ...this.presentationLifecycle,
       allowOverflow: !this.preserveRasterPlane,
-      canvas: this.canvasState.canvas,
-      completed: this.completed,
-      height: this.canvasState.canvas.height,
-      nodeId: this.nodeId,
-      presentationBounds,
+      bounds: presentationBounds,
+      content: {
+        canvas: this.canvasState.canvas,
+        height: this.canvasState.canvas.height,
+        kind: "canvas",
+        width: this.canvasState.canvas.width,
+        x: this.preserveRasterPlane ? this.canvasOffset.x : 0,
+        y: this.preserveRasterPlane ? this.canvasOffset.y : 0,
+      },
+      matrix:
+        getRasterWorkingToNodeMatrix(durableNode, {
+          height: this.canvasState.canvas.height,
+          transform: this.previewNode?.transform || node.transform || {},
+          width: this.canvasState.canvas.width,
+        }) || { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
       replacesNode: true,
-      transform: this.previewNode?.transform || node.transform || {},
-      type: "canvas",
-      width: this.canvasState.canvas.width,
-      workingSurfaceId: this.workingSurfaceId,
-      x: this.canvasOffset.x,
-      y: this.canvasOffset.y,
     };
+  }
+
+  getWorkingNodeId() {
+    return this.nodeId;
   }
 
   getTrimmedCanvas() {
@@ -2382,6 +2470,13 @@ const getLockedTargetProjection = (editor, targetState) => {
   };
 };
 
+const getLockedTargetNodeId = (targetState) => {
+  return targetState.kind === "existing" ||
+    targetState.kind === "materialize"
+    ? targetState.nodeId
+    : null;
+};
+
 class DeferredBrushStrokeSession {
   constructor({ point, settings, targetState, tool }) {
     this.delegate = null;
@@ -2397,8 +2492,42 @@ class DeferredBrushStrokeSession {
     this.activate(point, point);
   }
 
-  getWorkingSurfaceState() {
-    return this.delegate?.getWorkingSurfaceState?.() || null;
+  get ready() {
+    return this.delegate?.ready || Promise.resolve();
+  }
+
+  getWorkingGroup() {
+    return this.delegate?.getWorkingGroup?.() || null;
+  }
+
+  getWorkingNodeId() {
+    return (
+      this.delegate?.getWorkingNodeId?.() ||
+      getLockedTargetNodeId(this.targetState)
+    );
+  }
+
+  acknowledgeWorkingPresentation(acknowledgement) {
+    return Boolean(
+      this.delegate?.acknowledgeWorkingPresentation?.(acknowledgement)
+    );
+  }
+
+  failWorkingPresentation(failure) {
+    return Boolean(this.delegate?.failWorkingPresentation?.(failure));
+  }
+
+  invalidateWorkingPresentation() {
+    if (this.delegate) {
+      this.delegate.invalidateWorkingPresentation?.();
+      return;
+    }
+
+    this.tool.clearActiveSession(this);
+  }
+
+  resolveHistoryForInvalidation() {
+    this.delegate?.resolveHistoryForInvalidation?.();
   }
 
   hasPendingWorkingSurface() {
@@ -2592,11 +2721,59 @@ class CommitQueuedBrushStrokeSession {
     this.targetState = targetState;
     this.tool = tool;
     this.workingSurfaceId = null;
-    this.ready = Promise.resolve(waitFor).then(() => this.activate());
+    this.ready = Promise.resolve(waitFor)
+      .then((handoff) => {
+        if (handoff?.status === "failed") {
+          this.canceled = true;
+          this.tool.clearActiveSession(this);
+          return;
+        }
+
+        return this.activate();
+      })
+      .catch((error) => {
+        this.canceled = true;
+        this.pendingPoints = [];
+        this.tool.clearPendingPreview(this);
+        this.tool.clearActiveSession(this);
+        throw error;
+      });
   }
 
-  getWorkingSurfaceState() {
-    return this.delegate?.getWorkingSurfaceState?.() || null;
+  getWorkingGroup() {
+    return this.delegate?.getWorkingGroup?.() || null;
+  }
+
+  getWorkingNodeId() {
+    return (
+      this.delegate?.getWorkingNodeId?.() ||
+      getLockedTargetNodeId(this.targetState)
+    );
+  }
+
+  acknowledgeWorkingPresentation(acknowledgement) {
+    return Boolean(
+      this.delegate?.acknowledgeWorkingPresentation?.(acknowledgement)
+    );
+  }
+
+  failWorkingPresentation(failure) {
+    return Boolean(this.delegate?.failWorkingPresentation?.(failure));
+  }
+
+  invalidateWorkingPresentation() {
+    this.canceled = true;
+    this.pendingPoints = [];
+    if (this.delegate) {
+      this.delegate.invalidateWorkingPresentation?.();
+      return;
+    }
+
+    this.tool.clearActiveSession(this);
+  }
+
+  resolveHistoryForInvalidation() {
+    this.delegate?.resolveHistoryForInvalidation?.();
   }
 
   hasPendingWorkingSurface() {
@@ -2700,50 +2877,72 @@ export class BrushTool extends Tool {
     return Boolean(this.activeSession);
   }
 
-  getWorkingSurfaceStates() {
-    const activeSurface = this.activeSession?.getWorkingSurfaceState();
+  getWorkingGroups() {
+    const activeGroup = this.activeSession?.getWorkingGroup?.();
 
     return [
       ...this.pendingWorkingSurfaces
-        .map((entry) => entry.session.getWorkingSurfaceState())
+        .map((entry) => entry.session.getWorkingGroup?.())
         .filter(Boolean),
-      ...(activeSurface ? [activeSurface] : []),
-    ];
+      ...(activeGroup ? [activeGroup] : []),
+    ].sort((left, right) => left.sequence - right.sequence);
   }
 
-  getWorkingSurfaceStateForNode(nodeId) {
-    const surfaces = this.getWorkingSurfaceStates().filter(
-      (surface) => surface?.nodeId === nodeId
+  getWorkingPresentationForNode(nodeId) {
+    const groups = this.getWorkingGroups().filter(
+      (group) => group.nodeId === nodeId
     );
 
-    if (surfaces.length <= 1) {
-      return surfaces[0] || null;
+    return groups.length > 0 ? { groups, nodeId } : null;
+  }
+
+  acknowledgeWorkingPresentation(acknowledgement) {
+    return this.getSessions().some((session) =>
+      session.acknowledgeWorkingPresentation?.(acknowledgement)
+    );
+  }
+
+  failWorkingPresentation(failure) {
+    return this.getSessions().some((session) =>
+      session.failWorkingPresentation?.(failure)
+    );
+  }
+
+  retireWorkingPresentations(groupIds) {
+    for (const session of this.getSessions()) {
+      const group = session.getWorkingGroup?.();
+
+      if (group && groupIds.has(group.groupId)) {
+        session.invalidateWorkingPresentation?.();
+      }
     }
+  }
 
-    if (surfaces.every((surface) => surface.type === "tiles")) {
-      const [firstSurface] = surfaces;
-
-      return {
-        ...firstSurface,
-        completed: surfaces.every((surface) => surface.completed),
-        commitTileRefs: surfaces.flatMap(
-          (surface) => surface.commitTileRefs || []
-        ),
-        groups: surfaces,
-        inProgressTiles: surfaces
-          .filter(
-            (surface) =>
-              !surface.completed || surface.commitTileRefs?.length === 0
-          )
-          .flatMap((surface) => surface.tiles),
-        workingSurfaceId: surfaces
-          .map((surface) => surface.workingSurfaceId)
-          .join(":"),
-        tiles: surfaces.flatMap((surface) => surface.tiles),
-      };
+  invalidateWorkingPresentations(nodeId = null) {
+    for (const session of this.getSessions()) {
+      if (!nodeId || session.getWorkingNodeId?.() === nodeId) {
+        session.resolveHistoryForInvalidation?.();
+        session.invalidateWorkingPresentation?.();
+      }
     }
+  }
 
-    return surfaces.at(-1) || null;
+  invalidateMissingWorkingPresentations() {
+    for (const session of this.getSessions()) {
+      const nodeId = session.getWorkingNodeId?.();
+
+      if (nodeId && !this.editor.getNode(nodeId)) {
+        session.resolveHistoryForInvalidation?.();
+        session.invalidateWorkingPresentation?.();
+      }
+    }
+  }
+
+  getSessions() {
+    return [
+      ...this.pendingWorkingSurfaces.map((entry) => entry.session),
+      ...(this.activeSession ? [this.activeSession] : []),
+    ];
   }
 
   onCanvasPointerDown({ point }) {
@@ -2785,15 +2984,26 @@ export class BrushTool extends Tool {
             session: pendingSession,
           },
         ];
-        const session = new CommitQueuedBrushStrokeSession({
-          point,
-          settings,
-          targetState,
-          tool: this,
-          waitFor:
-            pendingSession.getFollowupReady?.() ||
-            pendingSession.getHandoffReady?.(),
-        });
+        const targetNodeId = getLockedTargetNodeId(targetState);
+        const followsPendingNode =
+          Boolean(targetNodeId) &&
+          pendingSession.getWorkingNodeId?.() === targetNodeId;
+        const session = followsPendingNode
+          ? new CommitQueuedBrushStrokeSession({
+              point,
+              settings,
+              targetState,
+              tool: this,
+              waitFor:
+                pendingSession.getFollowupReady?.() ||
+                pendingSession.getHandoffReady?.(),
+            })
+          : new DeferredBrushStrokeSession({
+              point,
+              settings,
+              targetState,
+              tool: this,
+            });
 
         this.activeSession = session;
         this.editor.notifyInteractionPreviewChanged();
@@ -2860,7 +3070,7 @@ export class BrushTool extends Tool {
             this.clearActiveSession(materializedSession);
           }
         },
-        getWorkingSurfaceState: () => null,
+        getWorkingGroup: () => null,
         hasPendingWorkingSurface: () => false,
         update: (info) => residentSession.update(info),
       };
@@ -2949,7 +3159,7 @@ export class BrushTool extends Tool {
         finish();
         return Promise.resolve(commit);
       },
-      getWorkingSurfaceState: () => null,
+      getWorkingGroup: () => null,
       hasPendingWorkingSurface: () => false,
       update: ({ point: nextPoint }) => {
         stroke.append([getImageLocalPoint(targetNode, nextPoint)]);
