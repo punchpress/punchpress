@@ -266,8 +266,8 @@ const placeAndStroke = async (
       );
       const strokePoints = {
         corner: {
-          endPoint: { x: 310, y: 210 },
-          startPoint: { x: 310, y: 210 },
+          endPoint: { x: 300, y: 200 },
+          startPoint: { x: 300, y: 200 },
         },
         crossing: {
           endPoint: { x: 440, y: 340 },
@@ -298,8 +298,8 @@ const placeAndStroke = async (
       session.update({ point: endPoint });
       await session.ready;
 
-      const workingSurface =
-        editor.getBrushWorkingSurfaceStateForNode("placed-raster");
+      const workingGroup =
+        editor.getRasterWorkingPresentation("placed-raster")?.groups[0];
 
       await session.complete({ point: endPoint });
 
@@ -316,11 +316,17 @@ const placeAndStroke = async (
         sourceChanged: result.src !== imageSource,
         transform: result.transform,
         width: result.width,
-        workingSurface: workingSurface
+        workingSurface: workingGroup
           ? {
-              height: workingSurface.height,
-              type: workingSurface.type,
-              width: workingSurface.width,
+              height:
+                workingGroup.content.kind === "canvas"
+                  ? workingGroup.content.height
+                  : 0,
+              type: workingGroup.content.kind,
+              width:
+                workingGroup.content.kind === "canvas"
+                  ? workingGroup.content.width
+                  : 0,
             }
           : null,
       };

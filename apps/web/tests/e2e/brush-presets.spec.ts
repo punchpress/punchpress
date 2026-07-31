@@ -153,9 +153,9 @@ test("renders preset Dabs through the non-resident raster fallback", async ({
     await page.evaluate(() => ({
       settings: window.__PUNCHPRESS_EDITOR__?.getBrushToolSettings("brush"),
       surface:
-        window.__PUNCHPRESS_EDITOR__?.getBrushWorkingSurfaceStateForNode?.(
+        window.__PUNCHPRESS_EDITOR__?.getRasterWorkingPresentation?.(
           "large-raster"
-        )?.type,
+        )?.groups[0]?.content.kind,
     }))
   ).toMatchObject({
     settings: { tip: { kind: "sampled", sampleId: "pixel" } },

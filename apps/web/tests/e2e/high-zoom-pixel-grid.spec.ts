@@ -148,8 +148,6 @@ const captureRasterPresentation = (page: Page, nodeId: string) => {
             previewEligible:
               tiledSurface?.getAttribute("data-raster-preview-eligible") ||
               null,
-            renderKey:
-              tiledSurface?.getAttribute("data-raster-render-key") || null,
             visibleTileCount:
               tiledSurface?.getAttribute("data-raster-visible-tile-count") ||
               null,
@@ -1233,18 +1231,19 @@ test("keeps Crop, selection, Brush cursor, and live painting aligned at high zoo
       return page.evaluate(() => {
         const editor = window.__PUNCHPRESS_EDITOR__;
         const node = editor?.getNode("standalone-raster");
-        const workingSurface =
-          editor?.getBrushWorkingSurfaceStateForNode?.("standalone-raster");
+        const workingGroup =
+          editor?.getRasterWorkingPresentation?.("standalone-raster")
+            ?.groups[0];
         const grid = document.querySelector('[data-pixel-grid-kind="raster"]');
         const workingPlane =
-          workingSurface?.type === "canvas"
+          workingGroup?.content.kind === "canvas"
             ? {
-                height: workingSurface.height,
-                sampleHeight: workingSurface.canvas.height,
-                sampleWidth: workingSurface.canvas.width,
-                width: workingSurface.width,
-                x: workingSurface.x ?? 0,
-                y: workingSurface.y ?? 0,
+                height: workingGroup.content.height,
+                sampleHeight: workingGroup.content.canvas.height,
+                sampleWidth: workingGroup.content.canvas.width,
+                width: workingGroup.content.width,
+                x: workingGroup.content.x,
+                y: workingGroup.content.y,
               }
             : null;
 

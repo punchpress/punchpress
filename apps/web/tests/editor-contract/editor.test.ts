@@ -212,6 +212,34 @@ describe("Editor.loadDocument", () => {
     expect(editor.selectedNodeId).toBeNull();
   });
 
+  test("failed document validation preserves active Raster presentations", () => {
+    const editor = new Editor();
+    const brush = editor.tools.get("brush");
+    let invalidationCount = 0;
+
+    if (!brush) {
+      throw new Error("Expected Brush tool");
+    }
+
+    editor.loadDocument(createDocument("first-node", "FIRST", AVAILABLE_FONT));
+    brush.invalidateWorkingPresentations = () => {
+      invalidationCount += 1;
+    };
+
+    expect(() => editor.loadDocument("{not valid JSON")).toThrow(
+      "Document is not valid JSON."
+    );
+    expect(editor.getNode("first-node")?.type).toBe("text");
+    expect(invalidationCount).toBe(0);
+
+    editor.loadDocument(
+      createDocument("second-node", "SECOND", AVAILABLE_FONT)
+    );
+
+    expect(editor.getNode("second-node")?.type).toBe("text");
+    expect(invalidationCount).toBe(1);
+  });
+
   test("replaces missing fonts with the resolved default font on import", () => {
     const editor = new Editor();
     editor.applyLocalFontCatalog({

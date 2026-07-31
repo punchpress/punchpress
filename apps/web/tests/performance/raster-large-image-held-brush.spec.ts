@@ -335,13 +335,13 @@ test("a long edge-crossing update does bounded work on a 5000px Raster", async (
         const startedAt = performance.now();
 
         session.update({ point: { x: -1_000_000, y: -1_000_000 } });
-        const workingSurface = session.delegate?.getWorkingSurfaceState?.();
+        const workingGroup = session.delegate?.getWorkingGroup?.();
         const center = imageEdge / 2;
         const centerRed =
-          workingSurface?.type === "tiles"
+          workingGroup?.content.kind === "tiles"
             ? Math.max(
                 0,
-                ...workingSurface.tiles
+                ...workingGroup.content.tiles
                   .filter(
                     (tile) =>
                       center >= tile.x &&

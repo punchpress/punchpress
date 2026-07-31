@@ -582,6 +582,346 @@ test("outside excursion re-entry does not paint a chord across the Frame", async
   expect(result.height).toBe(300);
 });
 
+test("native Hard Round restarts with a clipped round cap after a Frame excursion", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(
+    page,
+    JSON.stringify({
+      nodes: [
+        {
+          background: "#ffffff",
+          height: 300,
+          id: "frame",
+          locked: false,
+          name: "Frame",
+          parentId: "root",
+          transform: transform(220, 160),
+          type: "artboard",
+          visible: true,
+          width: 400,
+        },
+      ],
+      version: "1.8",
+    })
+  );
+  await resetViewport(page);
+  await setViewport(page, { x: 0, y: 0, zoom: 1 });
+
+  const result = await page.evaluate(async () => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    if (!editor) {
+      throw new Error("Expected editor");
+    }
+
+    editor.select("frame");
+    editor.setBrushSettings(
+      {
+        flow: 1,
+        hardness: 1,
+        opacity: 1,
+        size: 24,
+        smoothing: 0.1,
+        spacing: 0,
+      },
+      "brush"
+    );
+    editor.setActiveTool("brush");
+    const session = editor.dispatchCanvasPointerDown({
+      point: { x: 240, y: 310 },
+    });
+
+    session?.update({ point: { x: 180, y: 100 } });
+    session?.update({ point: { x: 660, y: 100 } });
+    session?.update({ point: { x: 600, y: 310 } });
+    await session?.delegate?.ready;
+    const workingGroup = editor
+      .getRasterWorkingPresentations()
+      .flatMap((presentation) => presentation.groups)
+      .find((group) => group.phase === "active");
+    await session?.complete({ point: { x: 590, y: 330 } });
+
+    const raster = editor.nodes.find((node) => node.type === "image");
+
+    if (!(raster?.type === "image" && raster.src)) {
+      throw new Error("Expected committed Raster");
+    }
+
+    const image = new Image();
+
+    image.src = raster.src;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+
+    canvas.width = raster.width;
+    canvas.height = raster.height;
+    if (!context) {
+      throw new Error("Expected Canvas2D context");
+    }
+    context.drawImage(image, 0, 0);
+    const readWorldAlpha = (point) => {
+      const x = Math.floor(point.x - raster.transform.x);
+      const y = Math.floor(point.y - raster.transform.y);
+
+      if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) {
+        return 0;
+      }
+
+      return context.getImageData(x, y, 1, 1).data[3];
+    };
+
+    return {
+      chordAlpha: readWorldAlpha({ x: 420, y: 240 }),
+      frameBounds: editor.getNodeRenderFrame("frame")?.bounds,
+      rasterBounds: editor.getNodeRenderFrame(raster.id)?.bounds,
+      reentryCapAlpha: readWorldAlpha({ x: 618, y: 240 }),
+      workingSize:
+        workingGroup?.content.kind === "canvas"
+          ? {
+              height: workingGroup.content.canvas.height,
+              width: workingGroup.content.canvas.width,
+            }
+          : null,
+    };
+  });
+
+  expect(result.chordAlpha).toBe(0);
+  expect(result.reentryCapAlpha).toBe(255);
+  expect(result.workingSize?.width).toBeLessThanOrEqual(400);
+  expect(result.workingSize?.height).toBeLessThanOrEqual(300);
+  expect(result.rasterBounds?.minX).toBeGreaterThanOrEqual(
+    result.frameBounds?.minX || 0
+  );
+  expect(result.rasterBounds?.minY).toBeGreaterThanOrEqual(
+    result.frameBounds?.minY || 0
+  );
+  expect(result.rasterBounds?.maxX).toBeLessThanOrEqual(
+    result.frameBounds?.maxX || 0
+  );
+  expect(result.rasterBounds?.maxY).toBeLessThanOrEqual(
+    result.frameBounds?.maxY || 0
+  );
+});
+
+test("rotated Frame clipping retains the native boundary fallback", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  const transparentSrc = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+
+    canvas.width = 200;
+    canvas.height = 200;
+    return canvas.toDataURL("image/png");
+  });
+  await loadDocument(
+    page,
+    JSON.stringify({
+      nodes: [
+        {
+          background: "#ffffff",
+          height: 300,
+          id: "frame",
+          locked: false,
+          name: "Frame",
+          parentId: "root",
+          transform: transform(220, 160),
+          type: "artboard",
+          visible: true,
+          width: 400,
+        },
+        {
+          assetId: "rotated-raster-asset",
+          height: 200,
+          id: "rotated-raster",
+          mimeType: "image/png",
+          name: "Rotated Raster",
+          opacity: 1,
+          parentId: "frame",
+          src: transparentSrc,
+          transform: { ...transform(320, 210), rotation: 45 },
+          type: "image",
+          visible: true,
+          width: 200,
+        },
+      ],
+      version: "1.8",
+    })
+  );
+
+  const result = await page.evaluate(async () => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const raster = editor?.getNode("rotated-raster");
+    const frame = editor?.getNodeRenderFrame("frame")?.bounds;
+
+    if (!(editor && raster?.type === "image" && frame)) {
+      throw new Error("Expected rotated Frame Raster");
+    }
+
+    Object.assign(editor, { rasterSurface: null });
+    const spans: Record<string, number[]> = {};
+
+    window.__PUNCHPRESS_PERF_SINK__ = {
+      incrementCounter() {
+        // This contract records only the boundary fallback duration.
+      },
+      recordDuration(label, durationMs) {
+        spans[label] ||= [];
+        spans[label].push(durationMs);
+      },
+    };
+    editor.select(raster.id);
+    editor.setBrushSettings(
+      {
+        flow: 1,
+        hardness: 1,
+        opacity: 1,
+        size: 24,
+        smoothing: 0.1,
+        spacing: 0,
+      },
+      "brush"
+    );
+    editor.setActiveTool("brush");
+    const rasterBounds = editor.getNodeRenderFrame(raster.id)?.bounds;
+    const start = {
+      x: ((rasterBounds?.minX || 0) + (rasterBounds?.maxX || 0)) / 2,
+      y: ((rasterBounds?.minY || 0) + (rasterBounds?.maxY || 0)) / 2,
+    };
+    const session = editor.dispatchNodePointerDown({
+      node: raster,
+      point: start,
+    });
+
+    await session?.delegate?.ready;
+    session?.update({
+      point: { x: frame.minX - 2, y: (frame.minY + frame.maxY) / 2 },
+    });
+    session?.cancel();
+    window.__PUNCHPRESS_PERF_SINK__ = undefined;
+
+    return {
+      boundaryApplyCount: spans["brush.nativeBoundary.apply"]?.length || 0,
+      usedSurfaceClipFastPath: Boolean(
+        session?.delegate?.canRenderNativePathWithSurfaceClip?.()
+      ),
+    };
+  });
+
+  expect(result.usedSurfaceClipFastPath).toBe(false);
+  expect(result.boundaryApplyCount).toBeGreaterThan(0);
+});
+
+test("fractional Frame clipping retains the native boundary fallback", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  const transparentSrc = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+
+    canvas.width = 200;
+    canvas.height = 200;
+    return canvas.toDataURL("image/png");
+  });
+  await loadDocument(
+    page,
+    JSON.stringify({
+      nodes: [
+        {
+          background: "#ffffff",
+          height: 300,
+          id: "frame",
+          locked: false,
+          name: "Frame",
+          parentId: "root",
+          transform: transform(220, 160),
+          type: "artboard",
+          visible: true,
+          width: 399.5,
+        },
+        {
+          assetId: "fractional-raster-asset",
+          height: 200,
+          id: "fractional-raster",
+          mimeType: "image/png",
+          name: "Fractional Raster",
+          opacity: 1,
+          parentId: "frame",
+          src: transparentSrc,
+          transform: transform(500, 210),
+          type: "image",
+          visible: true,
+          width: 200,
+        },
+      ],
+      version: "1.8",
+    })
+  );
+
+  const result = await page.evaluate(async () => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const raster = editor?.getNode("fractional-raster");
+    const frame = editor?.getNodeRenderFrame("frame")?.bounds;
+
+    if (!(editor && raster?.type === "image" && frame)) {
+      throw new Error("Expected fractionally clipped Frame Raster");
+    }
+
+    Object.assign(editor, { rasterSurface: null });
+    const spans: Record<string, number[]> = {};
+
+    window.__PUNCHPRESS_PERF_SINK__ = {
+      incrementCounter() {
+        // This contract records only the boundary fallback duration.
+      },
+      recordDuration(label, durationMs) {
+        spans[label] ||= [];
+        spans[label].push(durationMs);
+      },
+    };
+    editor.select(raster.id);
+    editor.setBrushSettings(
+      {
+        flow: 1,
+        hardness: 1,
+        opacity: 1,
+        size: 24,
+        smoothing: 0.1,
+        spacing: 0,
+      },
+      "brush"
+    );
+    editor.setActiveTool("brush");
+    const session = editor.dispatchNodePointerDown({
+      node: raster,
+      point: {
+        x: frame.maxX - 40,
+        y: (frame.minY + frame.maxY) / 2,
+      },
+    });
+
+    await session?.delegate?.ready;
+    session?.update({
+      point: { x: frame.maxX + 2, y: (frame.minY + frame.maxY) / 2 },
+    });
+    session?.cancel();
+    window.__PUNCHPRESS_PERF_SINK__ = undefined;
+
+    return {
+      boundaryApplyCount: spans["brush.nativeBoundary.apply"]?.length || 0,
+      usedSurfaceClipFastPath: Boolean(
+        session?.delegate?.canRenderNativePathWithSurfaceClip?.()
+      ),
+    };
+  });
+
+  expect(result.usedSurfaceClipFastPath).toBe(false);
+  expect(result.boundaryApplyCount).toBeGreaterThan(0);
+});
+
 test("clipped legacy pointer-up applies its endpoint once", async ({
   page,
 }) => {
@@ -816,6 +1156,22 @@ test("Crop changes bounds with stationary retained pixels and supports cancel", 
   await page.mouse.move(paintPoint.x, paintPoint.y);
   await page.mouse.down();
   await page.mouse.move(paintPoint.x + 12, paintPoint.y, { steps: 3 });
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const group = window.__PUNCHPRESS_EDITOR__
+          ?.getRasterWorkingPresentation("raster")
+          ?.groups.find(({ phase }) => phase === "active");
+
+        return group?.content.kind === "canvas"
+          ? {
+              x: group.content.x,
+              y: group.content.y,
+            }
+          : null;
+      })
+    )
+    .toEqual({ x: -20, y: -10 });
   await page.mouse.up();
 
   await expect
@@ -934,10 +1290,10 @@ test("tiled painting preserves a cropped Raster plane and local coordinates", as
       point: { x: 350, y: 260 },
     });
 
-    const workingSurface =
-      editor.getBrushWorkingSurfaceStateForNode?.("raster");
+    const workingGroup =
+      editor.getRasterWorkingPresentation?.("raster")?.groups[0];
     const activeClip = {
-      allowsOverflow: workingSurface?.allowOverflow === true,
+      allowsOverflow: workingGroup?.allowOverflow === true,
     };
     await session?.complete({ point: { x: 354, y: 260 } });
     const committed = editor.getNode("raster");
@@ -1073,8 +1429,8 @@ test("erasing a cropped Frame Raster preserves its plane and local coordinates",
     });
 
     await session?.delegate?.ready;
-    const workingSurface =
-      editor.getBrushWorkingSurfaceStateForNode?.("raster");
+    const workingGroup =
+      editor.getRasterWorkingPresentation?.("raster")?.groups[0];
 
     await session?.complete({ point });
     const committed = editor.getNode("raster");
@@ -1100,7 +1456,7 @@ test("erasing a cropped Frame Raster preserves its plane and local coordinates",
     return {
       alpha: context.getImageData(22, 15, 1, 1).data[3],
       sessionStarted: Boolean(session),
-      workingSurfaceType: workingSurface?.type ?? null,
+      workingSurfaceType: workingGroup?.content.kind ?? null,
       baseHeight: committed.baseHeight,
       baseWidth: committed.baseWidth,
       baseX: committed.baseX,
