@@ -145,6 +145,56 @@ describe("Raster targeting", () => {
     ).toBe(true);
   });
 
+  test("completed Raster sessions are idempotent", async () => {
+    const recorder = createRasterOperationRecorder();
+    const editor = new Editor({
+      rasterSurface: {
+        resolveSurface: () => recorder,
+      },
+    });
+    const raster = createImage("raster");
+
+    editor.insertNodes([raster]);
+    editor.select(raster.id);
+    editor.setActiveTool("brush");
+    const session = editor.dispatchCanvasPointerDown({
+      point: { x: 125, y: 125 },
+    });
+
+    expect(session).not.toBeNull();
+    const firstCommit = session?.complete({ point: { x: 150, y: 150 } });
+    const repeatedCommit = session?.complete({ point: { x: 175, y: 175 } });
+
+    await Promise.all([firstCommit, repeatedCommit]);
+    expect(() => session?.cancel()).not.toThrow();
+    expect(recorder.commits).toHaveLength(1);
+  });
+
+  test("cancelled Raster sessions are idempotent", () => {
+    const recorder = createRasterOperationRecorder();
+    const editor = new Editor({
+      rasterSurface: {
+        resolveSurface: () => recorder,
+      },
+    });
+    const raster = createImage("raster");
+
+    editor.insertNodes([raster]);
+    editor.select(raster.id);
+    editor.setActiveTool("brush");
+    const session = editor.dispatchCanvasPointerDown({
+      point: { x: 125, y: 125 },
+    });
+
+    expect(session).not.toBeNull();
+    session?.cancel();
+    expect(() => session?.cancel()).not.toThrow();
+    expect(() =>
+      session?.complete({ point: { x: 150, y: 150 } })
+    ).not.toThrow();
+    expect(recorder.commits).toHaveLength(0);
+  });
+
   test("outside-only Raster gesture is allocation-free and leaves no history", async () => {
     const recorder = createRasterOperationRecorder();
     let resolveCount = 0;

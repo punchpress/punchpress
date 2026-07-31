@@ -214,15 +214,10 @@ describe("Editor.loadDocument", () => {
 
   test("failed document validation preserves active Raster presentations", () => {
     const editor = new Editor();
-    const brush = editor.tools.get("brush");
     let invalidationCount = 0;
 
-    if (!brush) {
-      throw new Error("Expected Brush tool");
-    }
-
     editor.loadDocument(createDocument("first-node", "FIRST", AVAILABLE_FONT));
-    brush.invalidateWorkingPresentations = () => {
+    editor.rasterStrokeRuntime.invalidateWorkingPresentations = () => {
       invalidationCount += 1;
     };
 

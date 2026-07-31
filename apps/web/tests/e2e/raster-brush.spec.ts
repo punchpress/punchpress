@@ -2292,6 +2292,132 @@ test("rapid Frame strokes queue on their pointer-down Raster target", async ({
   expect(samples?.[2]?.a).toBeGreaterThan(240);
 });
 
+test("rapid Brush to Eraser switching waits for the shared Raster commit", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(
+    page,
+    JSON.stringify({
+      nodes: [
+        {
+          background: "#ffffff",
+          height: 5400,
+          id: "shared-runtime-frame",
+          locked: false,
+          name: "Shared Runtime Frame",
+          parentId: "root",
+          transform: transform(0, 0),
+          type: "artboard",
+          visible: true,
+          width: 4500,
+        },
+      ],
+      version: DOCUMENT_VERSION,
+    })
+  );
+  await setFrameBrushTestZoom(page);
+
+  const result = await page.evaluate(async () => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const brush = editor?.tools.get("brush");
+    const eraser = editor?.tools.get("eraser");
+    const frame = editor?.getNode("shared-runtime-frame");
+    const bounds = editor?.getNodeRenderFrame(frame?.id)?.bounds;
+
+    if (!(editor && brush && eraser && frame?.type === "artboard" && bounds)) {
+      throw new Error("Expected shared Raster runtime tools and Frame");
+    }
+
+    editor.select(frame.id);
+    editor.setActiveTool("brush");
+    editor.setBrushSettings(
+      {
+        hardness: 1,
+        opacity: 1,
+        size: 100,
+        smoothing: 0,
+        spacing: 0,
+      },
+      "brush"
+    );
+    const toWorldPoint = (ratio) => ({
+      x: bounds.minX + bounds.width * ratio.x,
+      y: bounds.minY + bounds.height * ratio.y,
+    });
+    const firstPoints = [
+      { x: 0.5, y: 0.5 },
+      { x: 0.02, y: 0.02 },
+      { x: 0.98, y: 0.02 },
+      { x: 0.98, y: 0.98 },
+      { x: 0.02, y: 0.98 },
+    ];
+    const first = brush.beginStroke({
+      point: toWorldPoint(firstPoints[0]),
+    });
+
+    if (!first) {
+      throw new Error("Expected first Brush stroke");
+    }
+
+    for (const point of firstPoints.slice(1)) {
+      first.update({ point: toWorldPoint(point) });
+    }
+
+    const firstCommit = first.complete({
+      point: toWorldPoint(firstPoints.at(-1)),
+    });
+    const raster = editor.nodes.find(
+      (node) =>
+        node.type === "image" && node.parentId === "shared-runtime-frame"
+    );
+
+    if (raster?.type !== "image") {
+      throw new Error("Expected materialized Raster");
+    }
+
+    editor.select(raster.id);
+    editor.setActiveTool("eraser");
+    const second = eraser.beginStroke({
+      point: toWorldPoint({ x: 0.48, y: 0.48 }),
+    });
+
+    if (!second) {
+      throw new Error("Expected queued Eraser stroke");
+    }
+
+    const secondActivatedBeforeCommit = Boolean(second.delegate);
+    second.cancel();
+    const third = eraser.beginStroke({
+      point: toWorldPoint({ x: 0.52, y: 0.52 }),
+    });
+
+    if (!third) {
+      throw new Error("Expected replacement queued Eraser stroke");
+    }
+
+    const thirdActivatedBeforeCommit = Boolean(third.delegate);
+
+    await firstCommit;
+    await third.ready;
+    const thirdActivatedAfterCommit = Boolean(third.delegate);
+
+    third.cancel();
+
+    return {
+      secondActivatedBeforeCommit,
+      thirdActivatedAfterCommit,
+      thirdActivatedBeforeCommit,
+    };
+  });
+
+  expect(result).toEqual({
+    secondActivatedBeforeCommit: false,
+    thirdActivatedAfterCommit: true,
+    thirdActivatedBeforeCommit: false,
+  });
+});
+
 test("a completed Frame handoff keeps the held follow-up stroke visible", async ({
   page,
 }) => {
