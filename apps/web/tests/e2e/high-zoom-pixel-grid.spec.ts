@@ -202,39 +202,6 @@ const createFrameDocument = (src: string) =>
         visible: true,
         width: 48,
       },
-      {
-        assetId: "asset-frame-tiled-raster",
-        baseHeight: 1,
-        baseWidth: 129,
-        baseX: 0,
-        baseY: 0,
-        height: 1,
-        id: "frame-tiled-raster",
-        mimeType: "image/png",
-        name: "Frame Tiled Raster",
-        opacity: 1,
-        parentId: "frame",
-        tileSources: Array.from({ length: 129 }, (_, index) => ({
-          col: index,
-          height: 1,
-          ref: `assets/raster/frame-tile-${index}.png`,
-          row: 0,
-          src,
-          width: 1,
-          x: index,
-          y: 0,
-        })),
-        transform: {
-          rotation: 0,
-          scaleX: 0.01,
-          scaleY: 0.01,
-          x: 220,
-          y: 200,
-        },
-        type: "image",
-        visible: true,
-        width: 129,
-      },
     ],
     version: "1.8",
   });
@@ -350,46 +317,6 @@ const createNativeJpegDocument = (src: string) =>
     version: "1.8",
   });
 
-const createDenseTiledDocument = (src: string) =>
-  JSON.stringify({
-    nodes: [
-      {
-        assetId: "asset-tiled-raster",
-        baseHeight: 1,
-        baseWidth: 129,
-        baseX: 0,
-        baseY: 0,
-        height: 1,
-        id: "tiled-raster",
-        mimeType: "image/png",
-        name: "Tiled Raster",
-        opacity: 1,
-        parentId: "root",
-        tileSources: Array.from({ length: 129 }, (_, index) => ({
-          col: index,
-          height: 1,
-          ref: `assets/raster/tile-${index}.png`,
-          row: 0,
-          src,
-          width: 1,
-          x: index,
-          y: 0,
-        })),
-        transform: {
-          rotation: 0,
-          scaleX: 0.01,
-          scaleY: 0.01,
-          x: 320,
-          y: 220,
-        },
-        type: "image",
-        visible: true,
-        width: 129,
-      },
-    ],
-    version: "1.8",
-  });
-
 const createFractionalRasterDocument = (src: string) =>
   JSON.stringify({
     nodes: [
@@ -495,21 +422,9 @@ test("shows only the active finite pixel grid above 500 percent", async ({
         '[data-raster-exact-backing="true"]'
     )
   ).toBeVisible();
-  const frameTiledRaster = page.locator(
-    '[data-node-id="frame-tiled-raster"] [data-raster-node-id="frame-tiled-raster"]'
-  );
-
-  await expect(frameTiledRaster).toHaveAttribute(
-    "data-raster-preview-active",
-    "false"
-  );
   const presentationBelowGrid = await captureRasterPresentation(
     page,
     "frame-raster"
-  );
-  const tiledPresentationBelowGrid = await captureRasterPresentation(
-    page,
-    "frame-tiled-raster"
   );
 
   expect(presentationBelowGrid.gridCount).toBe(0);
@@ -520,17 +435,9 @@ test("shows only the active finite pixel grid above 500 percent", async ({
     zoom: aboveGridZoom,
   });
   await expect(page.locator("[data-pixel-grid-kind]")).toHaveCount(1);
-  await expect(frameTiledRaster).toHaveAttribute(
-    "data-raster-preview-active",
-    "false"
-  );
   const presentationAboveGrid = await captureRasterPresentation(
     page,
     "frame-raster"
-  );
-  const tiledPresentationAboveGrid = await captureRasterPresentation(
-    page,
-    "frame-tiled-raster"
   );
   const { gridCount: belowGridCount, ...stablePresentationBelowGrid } =
     presentationBelowGrid;
@@ -549,19 +456,6 @@ test("shows only the active finite pixel grid above 500 percent", async ({
     sampling: "exact",
   });
   expect(stablePresentationAboveGrid).toEqual(stablePresentationBelowGrid);
-  expect(tiledPresentationBelowGrid).toMatchObject({
-    gridCount: 0,
-    renderedSource: {
-      kind: "svg-source",
-      previewActive: "false",
-      previewEligible: "false",
-    },
-    sampling: "smooth",
-  });
-  expect(tiledPresentationAboveGrid).toEqual({
-    ...tiledPresentationBelowGrid,
-    gridCount: 1,
-  });
 
   const grid = page.locator("[data-pixel-grid-kind]");
 
@@ -853,9 +747,7 @@ test("renders high-zoom pixel-grid lines no wider than a screen pixel", async ({
   expect(longestGridRun / devicePixelRatio).toBeLessThanOrEqual(2);
 });
 
-test("uses effective source pixels across resident and tiled Raster paths", async ({
-  page,
-}) => {
+test("uses effective source pixels for a resident Raster", async ({ page }) => {
   await gotoEditor(page);
   const src = await createRasterSource(page);
 
@@ -896,48 +788,6 @@ test("uses effective source pixels across resident and tiled Raster paths", asyn
       (node) => getComputedStyle(node).imageRendering
     )
   ).toBe("auto");
-
-  await loadDocument(page, createDenseTiledDocument(src));
-  await resetViewport(page);
-  await setConvergedViewport(page, { x: 0, y: 0, zoom: 1 });
-  await page.evaluate(() => {
-    window.__PUNCHPRESS_EDITOR__?.select("tiled-raster");
-  });
-
-  const tiledRaster = page.locator(
-    '[data-node-id="tiled-raster"] [data-raster-node-id="tiled-raster"]'
-  );
-
-  await expect(tiledRaster).toHaveAttribute(
-    "data-raster-preview-eligible",
-    "true"
-  );
-  await expect(tiledRaster).toHaveAttribute(
-    "data-raster-preview-active",
-    "true"
-  );
-  const tiledPresentationAtOne = await captureRasterPresentation(
-    page,
-    "tiled-raster"
-  );
-
-  await setConvergedViewport(page, { x: 300, y: 200, zoom: 6.25 });
-
-  await expect(tiledRaster).toHaveAttribute("data-raster-sampling", "smooth");
-  await expect(tiledRaster).toHaveAttribute(
-    "data-raster-preview-eligible",
-    "true"
-  );
-  await expect(tiledRaster).toHaveAttribute(
-    "data-raster-preview-active",
-    "true"
-  );
-  const tiledPresentationAtHighViewportZoom = await captureRasterPresentation(
-    page,
-    "tiled-raster"
-  );
-
-  expect(tiledPresentationAtHighViewportZoom).toEqual(tiledPresentationAtOne);
 });
 
 test("keeps Crop, selection, Brush cursor, and live painting aligned at high zoom", async ({
@@ -1231,21 +1081,19 @@ test("keeps Crop, selection, Brush cursor, and live painting aligned at high zoo
       return page.evaluate(() => {
         const editor = window.__PUNCHPRESS_EDITOR__;
         const node = editor?.getNode("standalone-raster");
-        const workingGroup =
-          editor?.getRasterWorkingPresentation?.("standalone-raster")
-            ?.groups[0];
+        const presentation =
+          editor?.rasterSurface?.getPresentation?.("standalone-raster");
         const grid = document.querySelector('[data-pixel-grid-kind="raster"]');
-        const workingPlane =
-          workingGroup?.content.kind === "canvas"
-            ? {
-                height: workingGroup.content.height,
-                sampleHeight: workingGroup.content.canvas.height,
-                sampleWidth: workingGroup.content.canvas.width,
-                width: workingGroup.content.width,
-                x: workingGroup.content.x,
-                y: workingGroup.content.y,
-              }
-            : null;
+        const workingPlane = presentation
+          ? {
+              height: presentation.height,
+              sampleHeight: presentation.canvas.height,
+              sampleWidth: presentation.canvas.width,
+              width: presentation.width,
+              x: presentation.x,
+              y: presentation.y,
+            }
+          : null;
 
         return {
           gridCount: document.querySelectorAll(

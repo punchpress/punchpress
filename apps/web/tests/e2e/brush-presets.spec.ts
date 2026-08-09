@@ -148,14 +148,15 @@ test("renders preset Dabs through the non-resident raster fallback", async ({
   await page.mouse.move(stage.x + 360, stage.y + 260);
   await page.mouse.down();
 
-  await expect(page.getByTestId("raster-working-canvas")).toBeVisible();
+  await expect(page.getByTestId("raster-resident-canvas")).toBeVisible();
   expect(
     await page.evaluate(() => ({
       settings: window.__PUNCHPRESS_EDITOR__?.getBrushToolSettings("brush"),
-      surface:
-        window.__PUNCHPRESS_EDITOR__?.getRasterWorkingPresentation?.(
-          "large-raster"
-        )?.groups[0]?.content.kind,
+      surface: window.__PUNCHPRESS_EDITOR__?.rasterSurface?.getPresentation?.(
+        "large-raster"
+      )?.canvas
+        ? "canvas"
+        : null,
     }))
   ).toMatchObject({
     settings: { tip: { kind: "sampled", sampleId: "pixel" } },

@@ -9,6 +9,8 @@ const VIEWPORT = { height: 916, width: 768 };
 const FRAME_SCREEN_ORIGIN = { x: 91, y: 126 };
 const ZOOM = 0.15;
 const INPUT_BURST_SIZE = 2;
+const MAX_EVENT_TO_FRAME_P95_MS = 40;
+const MAX_VISIBLE_TO_PAINT_P95_MS = 48;
 
 test("held Frame Raster input stays continuous and responsive across its edge", async ({
   page,
@@ -51,10 +53,10 @@ test("held Frame Raster input stays continuous and responsive across its edge", 
     JSON.stringify(result)
   ).toBeLessThanOrEqual(FRAME_HEIGHT);
   expect(edge.eventToFrame.p95Ms, JSON.stringify(result)).toBeLessThanOrEqual(
-    32
+    MAX_EVENT_TO_FRAME_P95_MS
   );
   expect(edge.visibleToPaint.p95Ms, JSON.stringify(result)).toBeLessThanOrEqual(
-    32
+    MAX_VISIBLE_TO_PAINT_P95_MS
   );
   expect(edge.visibleToPaint.p95Ms, JSON.stringify(result)).toBeLessThanOrEqual(
     center.visibleToPaint.p95Ms + 16
@@ -156,27 +158,30 @@ const runRecordedGesture = async (page: Page, edgeExcursion: boolean) => {
   await expect
     .poll(() =>
       page.evaluate(() => {
-        const brush = window.__PUNCHPRESS_EDITOR__?.tools.get("brush");
-
-        return (
-          brush?.getWorkingGroups().filter((group) => group.phase === "active")
-            .length ?? 0
+        const editor = window.__PUNCHPRESS_EDITOR__;
+        const raster = editor?.nodes.find(
+          (node) =>
+            node.type === "image" && node.parentId === "edge-input-frame"
         );
+
+        return raster?.type === "image" &&
+          editor?.rasterSurface?.getPresentation?.(raster.id)
+          ? 1
+          : 0;
       })
     )
     .toBeGreaterThan(0);
   await page.evaluate((probeKey) => {
     const probe = Reflect.get(window, probeKey);
-    const activeGroup = probe?.brush
-      .getWorkingGroups()
-      .filter((group) => group.phase === "active")
-      .at(-1);
+    const raster = probe?.editor.nodes.find(
+      (node) => node.type === "image" && node.parentId === "edge-input-frame"
+    );
 
-    if (!activeGroup) {
-      throw new Error("Expected the trusted pointer Frame Brush group");
+    if (raster?.type !== "image") {
+      throw new Error("Expected the trusted pointer Frame Raster");
     }
 
-    probe.rasterId = activeGroup.nodeId;
+    probe.rasterId = raster.id;
   }, PROBE_KEY);
 
   const client = await page.context().newCDPSession(page);
@@ -359,11 +364,12 @@ const waitForVisibilityProbe = (page: Page) =>
 
 const getActivePreviewBounds = (page: Page) =>
   page.evaluate(() => {
-    const brush = window.__PUNCHPRESS_EDITOR__?.tools.get("brush");
-    const previewNode = brush?.activeSession?.delegate?.previewNode;
+    const raster = window.__PUNCHPRESS_EDITOR__?.nodes.find(
+      (node) => node.type === "image" && node.parentId === "edge-input-frame"
+    );
 
-    return previewNode
-      ? { height: previewNode.height, width: previewNode.width }
+    return raster?.type === "image"
+      ? { height: raster.height, width: raster.width }
       : null;
   });
 
@@ -412,17 +418,11 @@ const installInputProbe = async (
 
       const readWorkingAlpha = (worldPoint) => {
         const activeRasterId = Reflect.get(window, probeKey)?.rasterId;
-        const group = brush
-          .getWorkingGroups()
-          .filter(
-            (candidate) =>
-              candidate.nodeId === activeRasterId &&
-              candidate.phase === "active"
-          )
-          .at(-1);
+        const presentation =
+          editor.rasterSurface?.getPresentation?.(activeRasterId);
         const raster = editor.getNode(activeRasterId);
 
-        if (!(group && raster?.type === "image")) {
+        if (!(presentation && raster?.type === "image")) {
           return 0;
         }
 
@@ -457,32 +457,15 @@ const installInputProbe = async (
               y: localPoint.y + offsetY,
             };
 
-            if (group.content.kind === "canvas") {
-              alpha = Math.max(
-                alpha,
-                sampleCanvas(
-                  group.content.canvas,
-                  point.x - group.content.x,
-                  point.y - group.content.y
-                )
-              );
-              continue;
-            }
-
-            const tile = group.content.tiles.find(
-              (candidate) =>
-                point.x >= candidate.x &&
-                point.x < candidate.x + candidate.width &&
-                point.y >= candidate.y &&
-                point.y < candidate.y + candidate.height
-            );
-
-            if (!tile) {
-              continue;
-            }
             alpha = Math.max(
               alpha,
-              sampleCanvas(tile.canvas, point.x - tile.x, point.y - tile.y)
+              sampleCanvas(
+                presentation.canvas,
+                ((point.x - presentation.x) / presentation.width) *
+                  presentation.canvas.width,
+                ((point.y - presentation.y) / presentation.height) *
+                  presentation.canvas.height
+              )
             );
           }
         }

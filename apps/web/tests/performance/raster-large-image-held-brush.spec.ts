@@ -61,9 +61,10 @@ test("a sustained Hard Round stroke stays responsive on a 5000px Raster", async 
 }, testInfo) => {
   test.setTimeout(120_000);
   await loadLargeRaster(page);
+  const sessionKey = "__PUNCHPRESS_SUSTAINED_RASTER_SESSION__";
 
-  const result = await page.evaluate(
-    async ({ imageEdge, strokeUpdates }) => {
+  await page.evaluate(
+    async ({ imageEdge, sessionKey, strokeUpdates }) => {
       const editor = window.__PUNCHPRESS_EDITOR__;
       const brush = editor?.tools.get("brush");
 
@@ -84,6 +85,26 @@ test("a sustained Hard Round stroke stays responsive on a 5000px Raster", async 
         "brush"
       );
 
+      const state = {
+        applyDabsMs: 0,
+        currentDabCount: 0,
+        session: null as ReturnType<typeof brush.beginStroke>,
+        totalDabCount: 0,
+      };
+
+      window.__PUNCHPRESS_PERF_SINK__ = {
+        incrementCounter: (name, amount = 1) => {
+          if (name === "raster.stroke.dabs") {
+            state.currentDabCount += amount;
+            state.totalDabCount += amount;
+          }
+        },
+        recordDuration: (label, durationMs) => {
+          if (label === "raster.stroke.applyDabs") {
+            state.applyDabsMs += durationMs;
+          }
+        },
+      };
       const center = imageEdge / 2;
       const getPoint = (index: number) => {
         const progress = index / strokeUpdates;
@@ -101,57 +122,138 @@ test("a sustained Hard Round stroke stays responsive on a 5000px Raster", async 
         throw new Error("Expected a large Raster brush session");
       }
 
+      state.session = session;
+      Reflect.set(window, sessionKey, state);
       await session.delegate?.ready;
-      const updateDurations: number[] = [];
+    },
+    { imageEdge: IMAGE_EDGE, sessionKey, strokeUpdates: STROKE_UPDATES }
+  );
+  const updateSamples: {
+    applyDabsMs: number;
+    dabCount: number;
+    index: number;
+    updateMs: number;
+  }[] = [];
+  const updatesPerFrame = 24;
+  let totalDabCount = 0;
 
-      try {
-        for (let index = 1; index <= strokeUpdates; index += 1) {
-          const startedAt = performance.now();
-
-          session.update({ point: getPoint(index) });
-          updateDurations.push(performance.now() - startedAt);
-        }
-      } finally {
-        session.cancel();
-      }
-
-      const sorted = [...updateDurations].sort((left, right) => left - right);
-      const percentile = (value: number) => {
-        const index = Math.min(
-          sorted.length - 1,
-          Math.floor((sorted.length - 1) * value)
-        );
-
-        return sorted[index] || 0;
-      };
-      const windowSize = 60;
-      const windowMeans = Array.from(
-        { length: updateDurations.length / windowSize },
-        (_, windowIndex) => {
-          const durations = updateDurations.slice(
-            windowIndex * windowSize,
-            (windowIndex + 1) * windowSize
+  try {
+    for (
+      let firstIndex = 1;
+      firstIndex <= STROKE_UPDATES;
+      firstIndex += updatesPerFrame
+    ) {
+      const chunk = await page.evaluate(
+        async ({
+          firstIndex,
+          imageEdge,
+          sessionKey,
+          strokeUpdates,
+          updatesPerFrame,
+        }) => {
+          const state = Reflect.get(window, sessionKey) as {
+            applyDabsMs: number;
+            currentDabCount: number;
+            session: {
+              update: (input: { point: { x: number; y: number } }) => void;
+            };
+          };
+          const center = imageEdge / 2;
+          const samples: {
+            applyDabsMs: number;
+            dabCount: number;
+            index: number;
+            updateMs: number;
+          }[] = [];
+          const lastIndex = Math.min(
+            strokeUpdates,
+            firstIndex + updatesPerFrame - 1
           );
 
-          return (
-            durations.reduce((total, duration) => total + duration, 0) /
-            durations.length
+          for (let index = firstIndex; index <= lastIndex; index += 1) {
+            const progress = index / strokeUpdates;
+            const radius = 80 + progress * (imageEdge * 0.42);
+            const angle = progress * Math.PI * 28;
+            const point = {
+              x: center + Math.cos(angle) * radius,
+              y: center + Math.sin(angle) * radius,
+            };
+
+            state.applyDabsMs = 0;
+            state.currentDabCount = 0;
+            const startedAt = performance.now();
+
+            state.session.update({ point });
+            samples.push({
+              applyDabsMs: state.applyDabsMs,
+              dabCount: state.currentDabCount,
+              index,
+              updateMs: performance.now() - startedAt,
+            });
+          }
+
+          await new Promise<void>((resolve) =>
+            requestAnimationFrame(() => resolve())
           );
+          return samples;
+        },
+        {
+          firstIndex,
+          imageEdge: IMAGE_EDGE,
+          sessionKey,
+          strokeUpdates: STROKE_UPDATES,
+          updatesPerFrame,
         }
       );
 
-      return {
-        maxUpdateMs: sorted.at(-1) || 0,
-        p50UpdateMs: percentile(0.5),
-        p95UpdateMs: percentile(0.95),
-        windowMeans,
-      };
-    },
-    {
-      imageEdge: IMAGE_EDGE,
-      strokeUpdates: STROKE_UPDATES,
+      updateSamples.push(...chunk);
+    }
+  } finally {
+    totalDabCount = await page.evaluate((activeSessionKey) => {
+      const state = Reflect.get(window, activeSessionKey) as
+        | { session: { cancel: () => void }; totalDabCount: number }
+        | undefined;
+
+      state?.session.cancel();
+      window.__PUNCHPRESS_PERF_SINK__ = undefined;
+      Reflect.deleteProperty(window, activeSessionKey);
+      return state?.totalDabCount ?? 0;
+    }, sessionKey);
+  }
+  const sorted = [...updateSamples].sort(
+    (left, right) => left.updateMs - right.updateMs
+  );
+  const percentile = (value: number) => {
+    const index = Math.min(
+      sorted.length - 1,
+      Math.floor((sorted.length - 1) * value)
+    );
+
+    return sorted[index]?.updateMs ?? 0;
+  };
+  const windowSize = 60;
+  const windowMeans = Array.from(
+    { length: updateSamples.length / windowSize },
+    (_, windowIndex) => {
+      const samples = updateSamples.slice(
+        windowIndex * windowSize,
+        (windowIndex + 1) * windowSize
+      );
+
+      return (
+        samples.reduce((total, sample) => total + sample.updateMs, 0) /
+        samples.length
+      );
     }
   );
+  const result = {
+    dabCount: totalDabCount,
+    maxUpdateMs: sorted.at(-1)?.updateMs ?? 0,
+    p50UpdateMs: percentile(0.5),
+    p95UpdateMs: percentile(0.95),
+    slowestUpdates: sorted.slice(-20).reverse(),
+    windowMeans,
+  };
 
   await testInfo.attach("large-raster-held-brush-timing", {
     body: JSON.stringify(result, null, 2),
@@ -159,6 +261,10 @@ test("a sustained Hard Round stroke stays responsive on a 5000px Raster", async 
   });
   console.log(`large-raster-held-brush ${JSON.stringify(result)}`);
 
+  expect(updateSamples).toHaveLength(STROKE_UPDATES);
+  expect(result.dabCount, JSON.stringify(result)).toBeGreaterThanOrEqual(
+    99_000
+  );
   expect(result.p95UpdateMs, JSON.stringify(result)).toBeLessThanOrEqual(
     UPDATE_BUDGET_MS
   );
@@ -335,34 +441,24 @@ test("a long edge-crossing update does bounded work on a 5000px Raster", async (
         const startedAt = performance.now();
 
         session.update({ point: { x: -1_000_000, y: -1_000_000 } });
-        const workingGroup = session.delegate?.getWorkingGroup?.();
+        const presentation =
+          editor.rasterSurface?.getPresentation?.("large-raster");
         const center = imageEdge / 2;
-        const centerRed =
-          workingGroup?.content.kind === "tiles"
-            ? Math.max(
-                0,
-                ...workingGroup.content.tiles
-                  .filter(
-                    (tile) =>
-                      center >= tile.x &&
-                      center < tile.x + tile.width &&
-                      center >= tile.y &&
-                      center < tile.y + tile.height
-                  )
-                  .map((tile) => {
-                    const context = tile.canvas.getContext("2d");
-
-                    return (
-                      context?.getImageData(
-                        Math.floor(center - tile.x),
-                        Math.floor(center - tile.y),
-                        1,
-                        1
-                      ).data[0] || 0
-                    );
-                  })
-              )
-            : 0;
+        const context = presentation?.canvas.getContext("2d");
+        const centerRed = presentation
+          ? context?.getImageData(
+              Math.floor(
+                ((center - presentation.x) / presentation.width) *
+                  presentation.canvas.width
+              ),
+              Math.floor(
+                ((center - presentation.y) / presentation.height) *
+                  presentation.canvas.height
+              ),
+              1,
+              1
+            ).data[0] || 0
+          : 0;
 
         return {
           centerRed,
@@ -385,7 +481,7 @@ test("a long edge-crossing update does bounded work on a 5000px Raster", async (
   console.log(`large-raster-long-edge-crossing ${JSON.stringify(result)}`);
 
   expect(result.edgeUpdateMs, JSON.stringify(result)).toBeLessThanOrEqual(
-    UPDATE_BUDGET_MS
+    EDGE_TRANSITION_BUDGET_MS
   );
   expect(result.centerRed, JSON.stringify(result)).toBeGreaterThan(200);
 });
@@ -517,6 +613,9 @@ test("leaving a large Frame keeps its held Raster stroke responsive and stationa
         throw new Error("Expected the second Frame stroke");
       }
 
+      await second.ready;
+      const followupReadyMs = performance.now() - followupStartedAt;
+
       for (let index = 1; index <= 40; index += 1) {
         second.update({
           point: {
@@ -525,8 +624,6 @@ test("leaving a large Frame keeps its held Raster stroke responsive and stationa
           },
         });
       }
-      await second.ready;
-      const followupReadyMs = performance.now() - followupStartedAt;
       const edgeStartedAt = performance.now();
 
       second.update({ point: { x: -900, y: center.y } });

@@ -56,6 +56,58 @@ const createFrame = (id: string, overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("Raster targeting", () => {
+  test("owns resident Canvas allocation bounds in Raster geometry", () => {
+    const editor = new Editor();
+    const frame = createFrame("frame");
+    const raster = createImage("raster", {
+      baseHeight: 60,
+      baseWidth: 80,
+      height: 60,
+      parentId: frame.id,
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: 100,
+        y: 80,
+      },
+      width: 80,
+    });
+
+    editor.getState().loadNodes([frame, raster]);
+
+    expect(editor.getRasterSurfaceBounds(raster.id)).toEqual({
+      height: 400,
+      width: 500,
+      x: -100,
+      y: -80,
+    });
+  });
+
+  test("a failed resident Canvas decode reverts the Stroke and releases its target", async () => {
+    const editor = new Editor({
+      rasterSurface: {
+        ensureSurface: () => Promise.reject(new Error("decode failed")),
+        resolveSurface: () => null,
+      },
+    });
+    const frame = createFrame("frame");
+
+    editor.insertNodes([frame]);
+    editor.setActiveTool("brush");
+    const session = editor.dispatchNodePointerDown({
+      node: frame,
+      point: { x: 50, y: 50 },
+    });
+
+    await expect(session?.ready).rejects.toThrow("decode failed");
+
+    expect(editor.nodes.filter((node) => node.type === "image")).toHaveLength(
+      0
+    );
+    expect(editor.rasterStrokeRuntime.hasActiveSession()).toBe(false);
+  });
+
   test("rejects an invalid append batch before advancing Dab state", () => {
     const recorder = createRasterOperationRecorder();
     const stroke = createRasterStroke({
@@ -501,6 +553,44 @@ describe("Raster targeting", () => {
 
     expect(targets).toHaveLength(1);
     expect(recorder.commits).toHaveLength(1);
+  });
+
+  test("a cropped Raster retains its full source allocation behind writable bounds", async () => {
+    const recorder = createRasterOperationRecorder();
+    const targets: RasterTarget[] = [];
+    const editor = new Editor({
+      rasterSurface: {
+        resolveSurface: (nextTarget: RasterTarget) => {
+          targets.push(structuredClone(nextTarget));
+          return recorder;
+        },
+      },
+    });
+    const raster = createImage("cropped-raster", {
+      baseHeight: 80,
+      baseWidth: 100,
+      baseX: -20,
+      baseY: -10,
+      height: 40,
+      width: 50,
+      writableHeight: 40,
+      writableWidth: 50,
+      writableX: 0,
+      writableY: 0,
+    });
+
+    editor.insertNodes([raster]);
+    editor.select(raster.id);
+    editor.setActiveTool("brush");
+    await editor
+      .dispatchCanvasPointerDown({ point: { x: 120, y: 120 } })
+      ?.complete({ point: { x: 130, y: 120 } });
+
+    expect(targets[0]).toMatchObject({
+      bounds: { height: 80, width: 100, x: -20, y: -10 },
+      pixelSize: { height: 80, width: 100 },
+      writableBounds: { height: 40, width: 50, x: 0, y: 0 },
+    });
   });
 
   test("canceling headless Frame materialization restores state and retires the session", () => {
@@ -1021,36 +1111,6 @@ describe("Raster Crop", () => {
     });
   });
 
-  test("Crop keeps tiled Raster pixels anchored with the base payload", () => {
-    const editor = new Editor();
-    const image = createImage("raster", {
-      tileSources: [
-        {
-          col: 0,
-          height: 20,
-          ref: "tile",
-          row: 0,
-          src: "data:image/png;base64,tile",
-          width: 20,
-          x: 40,
-          y: 30,
-        },
-      ],
-    });
-
-    editor.insertNodes([image]);
-    editor.select(image.id);
-    editor.startCrop();
-    editor.updateCrop({ height: 80, width: 70, x: 15, y: 10 });
-    editor.commitCrop();
-
-    expect(editor.getNode(image.id)).toMatchObject({
-      baseX: -15,
-      baseY: -10,
-      tileSources: [{ x: 25, y: 20 }],
-    });
-  });
-
   test("Crop preview is transient, cancel is exact, and commit is one history step", () => {
     const editor = new Editor();
     const image = createImage("raster");
@@ -1181,14 +1241,16 @@ describe("Raster Crop", () => {
     expect(editor.rasterCropSession).toBeNull();
   });
 
-  test("Crop snapshots authoritative resident pixels", () => {
+  test("Crop snapshots authoritative pixels without adopting resident plane bounds", () => {
     const editor = new Editor({
       rasterSurface: {
         resolveSurface: () => null,
         snapshotSurface: () => ({
-          height: 100,
+          height: 200,
           src: "data:image/png;base64,resident",
-          width: 100,
+          width: 200,
+          x: 0,
+          y: 0,
         }),
       },
     });

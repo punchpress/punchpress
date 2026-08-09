@@ -1,26 +1,19 @@
 import { describe, expect, test } from "bun:test";
 import { Editor } from "@punchpress/engine";
-import type { DesignDocument } from "@punchpress/punch-schema";
 import {
   createPunchPackage,
   DEFAULT_LOCAL_FONT,
   loadPunchPackageContents,
-  PUNCH_DOCUMENT_MIME_TYPE,
   PUNCH_DOCUMENT_VERSION,
   parseDesignDocument,
-  serializeDesignDocument,
 } from "@punchpress/punch-schema";
-import {
-  createZipArchive,
-  readZipArchive,
-} from "../../../../../packages/punch-schema/src/zip";
+import { readZipArchive } from "../../../../../packages/punch-schema/src/zip";
 
 const PNG_SRC =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR42mP8z8BQDwAFgwJ/lhL1WQAAAABJRU5ErkJggg==";
 const CURRENT_RASTER_SRC = "data:image/png,current-raster-state";
 const UNDONE_RASTER_SRC = "data:image/png,undone-raster-state";
 const textDecoder = new TextDecoder();
-const textEncoder = new TextEncoder();
 
 const transform = (x: number, y: number, rotation = 0) => ({
   rotation,
@@ -282,193 +275,31 @@ describe(".punch layer persistence", () => {
     expect(entries.has("assets/raster/asset_image_layer.png")).toBe(true);
   });
 
-  test("hydrates tiled raster package assets as image tile sources", () => {
-    const tileRefs = [
-      "assets/raster/asset_tiled_image/tiles/0_0.png",
-      "assets/raster/asset_tiled_image/tiles/1_0.png",
-    ];
-    const packagedDocument = {
-      assets: {
-        asset_tiled_image: {
-          colorSpace: "srgb",
-          currentMimeType: "image/png",
-          hasAlpha: true,
-          height: 64,
-          id: "asset_tiled_image",
-          kind: "raster",
-          name: "Tiled Image",
-          originalMimeType: "image/png",
-          preferredExportMimeType: "image/png",
-          storage: "tiled",
-          tileSize: 32,
-          tiles: [
-            {
-              col: 0,
-              height: 64,
-              ref: tileRefs[0],
-              row: 0,
-              width: 32,
-              x: 0,
-              y: 0,
-            },
-            {
-              col: 1,
-              height: 64,
-              ref: tileRefs[1],
-              row: 0,
-              width: 32,
-              x: 32,
-              y: 0,
-            },
-          ],
-          width: 64,
-        },
-      },
-      nodes: [
-        {
-          assetId: "asset_tiled_image",
-          height: 64,
-          id: "tiled-image-layer",
-          name: "Tiled Image",
-          opacity: 1,
-          parentId: "root",
-          transform: transform(0, 0),
-          type: "image",
-          visible: true,
-          width: 64,
-        },
-      ],
-      version: PUNCH_DOCUMENT_VERSION,
-    };
-    const packageBytes = createZipArchive([
+  test("stores encoded Raster sample dimensions independently from resized geometry", () => {
+    const editor = new Editor();
+    const image = createLayerRoundTripNodes().find(
+      (node) => node.id === "image-layer"
+    );
+
+    if (image?.type !== "image") {
+      throw new Error("Expected image layer");
+    }
+
+    editor.getState().loadNodes([
       {
-        data: textEncoder.encode(PUNCH_DOCUMENT_MIME_TYPE),
-        path: "mimetype",
-      },
-      {
-        data: textEncoder.encode(
-          serializeDesignDocument(packagedDocument as DesignDocument)
-        ),
-        path: "document.json",
-      },
-      {
-        data: textEncoder.encode("left-tile"),
-        path: tileRefs[0],
-      },
-      {
-        data: textEncoder.encode("right-tile"),
-        path: tileRefs[1],
+        ...image,
+        baseHeight: 120,
+        baseWidth: 160,
+        height: 120,
+        pixelHeight: 1,
+        pixelWidth: 1,
+        src: PNG_SRC,
+        width: 160,
       },
     ]);
-
-    const hydratedDocument = parseDesignDocument(
-      loadPunchPackageContents(packageBytes)
+    const entries = readZipArchive(
+      createPunchPackage(editor.serializeDocument())
     );
-    const hydratedNode = hydratedDocument.nodes[0];
-
-    expect(hydratedNode.type).toBe("image");
-    if (hydratedNode.type !== "image") {
-      throw new Error("Expected hydrated image node");
-    }
-    expect(hydratedNode.src).toBeUndefined();
-    expect(hydratedNode.tileSources?.map((tile) => tile.ref)).toEqual(tileRefs);
-    expect(hydratedNode.tileSources?.[0].src).toBe(
-      "data:image/png;base64,bGVmdC10aWxl"
-    );
-
-    const roundTripPackageBytes = createPunchPackage(
-      serializeDesignDocument(hydratedDocument)
-    );
-    const roundTripEntries = readZipArchive(roundTripPackageBytes);
-    const roundTripDocumentBytes = roundTripEntries.get("document.json");
-
-    if (!roundTripDocumentBytes) {
-      throw new Error("Expected round-tripped package document");
-    }
-
-    const roundTripDocument = parseDesignDocument(
-      textDecoder.decode(roundTripDocumentBytes)
-    );
-    const roundTripNode = roundTripDocument.nodes[0];
-
-    expect(roundTripNode.type).toBe("image");
-    expect(
-      roundTripNode.type === "image" ? roundTripNode.tileSources : null
-    ).toBeUndefined();
-    expect(roundTripDocument.assets.asset_tiled_image).toMatchObject({
-      storage: "tiled",
-      tileSize: 32,
-      tiles: [
-        expect.objectContaining({ ref: tileRefs[0] }),
-        expect.objectContaining({ ref: tileRefs[1] }),
-      ],
-    });
-    expect(textDecoder.decode(roundTripEntries.get(tileRefs[1]))).toBe(
-      "right-tile"
-    );
-  });
-
-  test("packages sparse tiled edits with a base raster payload", () => {
-    const document = {
-      assets: {
-        asset_sparse_tile_image: {
-          colorSpace: "srgb",
-          currentMimeType: "image/png",
-          hasAlpha: true,
-          height: 1024,
-          id: "asset_sparse_tile_image",
-          kind: "raster",
-          name: "Sparse Tile Image",
-          originalMimeType: "image/png",
-          preferredExportMimeType: "image/png",
-          ref: "assets/raster/asset_sparse_tile_image.png",
-          storage: "single",
-          width: 1024,
-        },
-      },
-      nodes: [
-        {
-          assetId: "asset_sparse_tile_image",
-          baseHeight: 1024,
-          baseWidth: 1024,
-          baseX: 64,
-          baseY: 32,
-          height: 1100,
-          id: "sparse-tile-image-layer",
-          mimeType: "image/png",
-          name: "Sparse Tile Image",
-          opacity: 1,
-          parentId: "root",
-          src: PNG_SRC,
-          tileSources: [
-            {
-              col: 1,
-              height: 512,
-              ref: "assets/raster/sparse-tile-image-layer/tiles/1_0.png",
-              row: 0,
-              src: "data:image/png;base64,ZGlydHktdGlsZQ==",
-              width: 88,
-              x: 1088,
-              y: 96,
-            },
-          ],
-          transform: transform(0, 0),
-          type: "image",
-          visible: true,
-          width: 1200,
-          writableHeight: 1400,
-          writableWidth: 1600,
-          writableX: -200,
-          writableY: -100,
-        },
-      ],
-      version: PUNCH_DOCUMENT_VERSION,
-    };
-
-    const packageBytes = createPunchPackage(
-      serializeDesignDocument(document as DesignDocument)
-    );
-    const entries = readZipArchive(packageBytes);
     const packagedDocumentBytes = entries.get("document.json");
 
     if (!packagedDocumentBytes) {
@@ -478,72 +309,60 @@ describe(".punch layer persistence", () => {
     const packagedDocument = parseDesignDocument(
       textDecoder.decode(packagedDocumentBytes)
     );
-    const packagedAsset = packagedDocument.assets.asset_sparse_tile_image;
-    const packagedNode = packagedDocument.nodes[0];
 
-    expect(packagedAsset).toMatchObject({
-      baseRef: "assets/raster/asset_sparse_tile_image/base.png",
-      storage: "tiled",
-      tileSize: 512,
-      tiles: [
-        expect.objectContaining({
-          ref: "assets/raster/sparse-tile-image-layer/tiles/1_0.png",
-          width: 88,
-          x: 1088,
-          y: 96,
-        }),
+    expect(packagedDocument.assets.asset_image_layer).toMatchObject({
+      height: 1,
+      width: 1,
+    });
+  });
+
+  test("rejects unsupported tiled prototype Raster assets", () => {
+    const tiledPrototype = {
+      assets: {
+        asset_tiled_prototype: {
+          colorSpace: "srgb",
+          currentMimeType: "image/png",
+          hasAlpha: true,
+          height: 64,
+          id: "asset_tiled_prototype",
+          kind: "raster",
+          name: "Tiled prototype",
+          originalMimeType: "image/png",
+          preferredExportMimeType: "image/png",
+          storage: "tiled",
+          tileSize: 32,
+          tiles: [
+            {
+              col: 0,
+              height: 32,
+              ref: "assets/raster/tile.png",
+              row: 0,
+              width: 32,
+              x: 0,
+              y: 0,
+            },
+          ],
+          width: 64,
+        },
+      },
+      nodes: [
+        {
+          assetId: "asset_tiled_prototype",
+          height: 64,
+          id: "tiled-prototype",
+          name: "Tiled prototype",
+          opacity: 1,
+          parentId: "root",
+          transform: transform(0, 0),
+          type: "image",
+          visible: true,
+          width: 64,
+        },
       ],
-    });
-    expect(packagedNode).toMatchObject({
-      baseHeight: 1024,
-      baseWidth: 1024,
-      baseX: 64,
-      baseY: 32,
-      height: 1100,
-      width: 1200,
-      writableHeight: 1400,
-      writableWidth: 1600,
-      writableX: -200,
-      writableY: -100,
-    });
-    expect(entries.has("assets/raster/asset_sparse_tile_image/base.png")).toBe(
-      true
-    );
-    expect(
-      entries.has("assets/raster/sparse-tile-image-layer/tiles/1_0.png")
-    ).toBe(true);
+      version: PUNCH_DOCUMENT_VERSION,
+    };
 
-    const hydratedDocument = parseDesignDocument(
-      loadPunchPackageContents(packageBytes)
-    );
-    const hydratedNode = hydratedDocument.nodes[0];
-
-    expect(hydratedNode.type).toBe("image");
-    if (hydratedNode.type !== "image") {
-      throw new Error("Expected hydrated image node");
-    }
-    expect(hydratedNode.src).toBe(PNG_SRC);
-    expect(hydratedNode).toMatchObject({
-      baseHeight: 1024,
-      baseWidth: 1024,
-      baseX: 64,
-      baseY: 32,
-      height: 1100,
-      width: 1200,
-      writableHeight: 1400,
-      writableWidth: 1600,
-      writableX: -200,
-      writableY: -100,
-    });
-    expect(hydratedNode.tileSources?.[0].src).toBe(
-      "data:image/png;base64,ZGlydHktdGlsZQ=="
-    );
-    expect(hydratedNode.tileSources?.[0]).toMatchObject({
-      height: 512,
-      width: 88,
-      x: 1088,
-      y: 96,
-    });
+    expect(() => parseDesignDocument(JSON.stringify(tiledPrototype))).toThrow();
   });
 
   test("packages only the current raster payload after undo and redo", () => {

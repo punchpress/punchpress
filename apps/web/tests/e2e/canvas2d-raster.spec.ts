@@ -5,6 +5,9 @@ import {
   resetViewport,
   setViewport,
 } from "./helpers/editor";
+import { decodePng } from "./helpers/png";
+
+const CLIP_PATH_REFERENCE = /url\(#.+\)/;
 
 const createImageDocument = (src: string) =>
   JSON.stringify({
@@ -71,11 +74,13 @@ test("existing Raster paints, erases, and cancels on one resident Canvas2D surfa
     const calls = {
       getImageData: 0,
       putImageData: 0,
+      toBlob: 0,
       toDataURL: 0,
     };
     const contextPrototype = CanvasRenderingContext2D.prototype;
     const originalGetImageData = contextPrototype.getImageData;
     const originalPutImageData = contextPrototype.putImageData;
+    const originalToBlob = HTMLCanvasElement.prototype.toBlob;
     const originalToDataUrl = HTMLCanvasElement.prototype.toDataURL;
 
     contextPrototype.getImageData = function (...args) {
@@ -85,6 +90,10 @@ test("existing Raster paints, erases, and cancels on one resident Canvas2D surfa
     contextPrototype.putImageData = function (...args) {
       calls.putImageData += 1;
       return originalPutImageData.apply(this, args);
+    };
+    HTMLCanvasElement.prototype.toBlob = function (...args) {
+      calls.toBlob += 1;
+      return originalToBlob.apply(this, args);
     };
     HTMLCanvasElement.prototype.toDataURL = function (...args) {
       calls.toDataURL += 1;
@@ -103,6 +112,16 @@ test("existing Raster paints, erases, and cancels on one resident Canvas2D surfa
   await expect
     .poll(() => sampleAlpha(canvas, { x: 80, y: 80 }))
     .toBeGreaterThan(0);
+  const paintedAlpha = await sampleAlpha(canvas, { x: 80, y: 80 });
+
+  expect(await page.evaluate(() => window.__PUNCHPRESS_EDITOR__?.undo())).toBe(
+    true
+  );
+  expect(await sampleAlpha(canvas, { x: 80, y: 80 })).toBe(0);
+  expect(await page.evaluate(() => window.__PUNCHPRESS_EDITOR__?.redo())).toBe(
+    true
+  );
+  expect(await sampleAlpha(canvas, { x: 80, y: 80 })).toBe(paintedAlpha);
   await resetCanvasCalls(page);
 
   await page.keyboard.press("e");
@@ -112,6 +131,14 @@ test("existing Raster paints, erases, and cancels on one resident Canvas2D surfa
 
   expect(await getCanvasCalls(page)).toEqual(zeroCanvasCalls);
   await expect.poll(() => sampleAlpha(canvas, { x: 80, y: 80 })).toBe(0);
+  expect(await page.evaluate(() => window.__PUNCHPRESS_EDITOR__?.undo())).toBe(
+    true
+  );
+  expect(await sampleAlpha(canvas, { x: 80, y: 80 })).toBe(paintedAlpha);
+  expect(await page.evaluate(() => window.__PUNCHPRESS_EDITOR__?.redo())).toBe(
+    true
+  );
+  expect(await sampleAlpha(canvas, { x: 80, y: 80 })).toBe(0);
 
   const alphaBeforeCancel = await sampleAlpha(canvas, { x: 160, y: 160 });
 
@@ -145,6 +172,72 @@ test("existing Raster paints, erases, and cancels on one resident Canvas2D surfa
 
   expect(result.sourceStillSinglePayload).toBe(src);
   expect(result.surfaceIdentity).toBeTruthy();
+});
+
+test("async persistence excludes an uncommitted active Stroke", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  const src = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+
+    canvas.width = 1;
+    canvas.height = 1;
+    return canvas.toDataURL("image/png");
+  });
+
+  await loadDocument(page, createImageDocument(src));
+
+  const result = await page.evaluate(async () => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const brush = editor?.tools.get("brush");
+
+    if (!(editor && brush)) {
+      throw new Error("Expected Raster Brush");
+    }
+
+    editor.select("canvas2d-raster");
+    editor.setActiveTool("brush");
+    editor.setBrushSettings(
+      { hardness: 1, opacity: 1, size: 24, spacing: 0 },
+      "brush"
+    );
+    const session = brush.beginStroke({ point: { x: 400, y: 300 } });
+
+    if (!session) {
+      throw new Error("Expected active Stroke");
+    }
+
+    await session.ready;
+    session.update({ point: { x: 430, y: 300 } });
+    const presentation =
+      editor.rasterSurface.getPresentation("canvas2d-raster");
+    const liveAlpha =
+      presentation?.canvas.getContext("2d")?.getImageData(80, 80, 1, 1)
+        .data[3] || 0;
+    const serialized = JSON.parse(await editor.serializeDocumentAsync());
+    const serializedSource = serialized.nodes.find(
+      (node) => node.id === "canvas2d-raster"
+    )?.src;
+    const image = new Image();
+
+    image.src = serializedSource;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+
+    canvas.width = 256;
+    canvas.height = 256;
+    const context = canvas.getContext("2d");
+
+    context?.drawImage(image, 0, 0, 256, 256);
+    const persistedAlpha = context?.getImageData(80, 80, 1, 1).data[3] || 0;
+
+    session.cancel();
+    return { liveAlpha, persistedAlpha };
+  });
+
+  expect(result.liveAlpha).toBeGreaterThan(0);
+  expect(result.persistedAlpha).toBe(0);
 });
 
 test("placed Raster stays clipped before and after reselection", async ({
@@ -192,19 +285,613 @@ test("placed Raster stays clipped before and after reselection", async ({
   expect(decoding).toMatchObject({
     height: 64,
     historyRevisionDelta: 1,
+    residentSurface: true,
     selectedNodeIds: ["placed-raster"],
-    sourceChanged: true,
+    sourceChanged: false,
     transform: { x: 320, y: 220 },
     width: 64,
-    workingSurface: { height: 64, type: "canvas", width: 64 },
   });
   expect(immediate).toMatchObject({
     height: 64,
-    workingSurface: null,
+    residentSurface: true,
     selectedNodeIds: ["placed-raster"],
     transform: { x: 320, y: 220 },
     width: 64,
   });
+});
+
+test("Crop clips retained resident pixels and later reveals them on expansion", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  const src = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+
+    canvas.width = 100;
+    canvas.height = 100;
+    if (!context) {
+      throw new Error("Expected Canvas2D");
+    }
+
+    context.fillStyle = "#0066ff";
+    context.fillRect(0, 0, 100, 50);
+    context.fillStyle = "#ff0033";
+    context.fillRect(0, 50, 100, 50);
+    return canvas.toDataURL("image/png");
+  });
+
+  await loadDocument(
+    page,
+    JSON.stringify({
+      nodes: [
+        {
+          background: "#ffffff",
+          height: 200,
+          id: "crop-frame",
+          locked: false,
+          name: "Crop Frame",
+          parentId: "root",
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: 320,
+            y: 220,
+          },
+          type: "artboard",
+          visible: true,
+          width: 200,
+        },
+        {
+          assetId: "asset-crop-render",
+          height: 100,
+          id: "crop-render",
+          mimeType: "image/png",
+          name: "Crop Render",
+          opacity: 1,
+          parentId: "crop-frame",
+          src,
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: 320,
+            y: 220,
+          },
+          type: "image",
+          visible: true,
+          width: 100,
+        },
+      ],
+      version: "1.8",
+    })
+  );
+  await resetViewport(page);
+  await setViewport(page, { x: 0, y: 0, zoom: 1 });
+  const residentCanvas = page.locator(
+    '[data-node-id="crop-render"] [data-testid="raster-resident-canvas"] canvas[data-raster-source-canvas="true"]'
+  );
+
+  await expect(residentCanvas).toBeVisible();
+  await residentCanvas.evaluate((canvas) => {
+    canvas.dataset.surfaceIdentity = "crop-stable-canvas";
+  });
+  await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    editor?.select("crop-render");
+    editor?.startCrop("crop-render");
+    editor?.updateCrop({ height: 50, width: 100, x: 0, y: 0 });
+    editor?.commitCrop();
+    editor?.clearSelection();
+  });
+
+  const retainedPoint = await getRasterScreenPoint(page, "crop-render", {
+    x: 50,
+    y: 75,
+  });
+
+  expect(await sampleScreenshotPixel(page, retainedPoint)).not.toEqual({
+    blue: 51,
+    green: 0,
+    red: 255,
+  });
+  await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    editor?.select("crop-render");
+    editor?.setActiveTool("brush");
+    editor?.setBrushSettings(
+      {
+        color: "#000000",
+        hardness: 1,
+        opacity: 1,
+        size: 12,
+        smoothing: 0,
+        spacing: 0,
+      },
+      "brush"
+    );
+  });
+  const strokeStart = await getRasterScreenPoint(page, "crop-render", {
+    x: 20,
+    y: 25,
+  });
+  const strokeEnd = await getRasterScreenPoint(page, "crop-render", {
+    x: 150,
+    y: 25,
+  });
+
+  await page.mouse.move(strokeStart.x, strokeStart.y);
+  await page.mouse.down();
+  await page.mouse.move(strokeEnd.x, strokeEnd.y, { steps: 12 });
+
+  const activeViewport = page
+    .locator(
+      '[data-raster-node-id="crop-render"] [data-raster-visible-viewport="true"]'
+    )
+    .first();
+  const committedVisibleClip = activeViewport.locator("clipPath rect").first();
+  const activeResidentGroup = activeViewport.locator(
+    '[data-raster-resident-surface="canvas2d"]'
+  );
+
+  await expect(activeViewport).toHaveAttribute("height", "200");
+  await expect(activeViewport).toHaveAttribute("width", "200");
+  await expect(committedVisibleClip).toHaveAttribute("height", "50");
+  await expect(committedVisibleClip).toHaveAttribute("width", "100");
+  await expect(committedVisibleClip).toHaveAttribute("x", "0");
+  await expect(committedVisibleClip).toHaveAttribute("y", "0");
+  await expect(activeResidentGroup).toHaveAttribute(
+    "clip-path",
+    CLIP_PATH_REFERENCE
+  );
+  expect(await sampleScreenshotPixel(page, retainedPoint)).not.toEqual({
+    blue: 51,
+    green: 0,
+    red: 255,
+  });
+  await page.evaluate(() => {
+    window.dispatchEvent(new PointerEvent("pointercancel"));
+  });
+  await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    editor?.select("crop-render");
+    editor?.startCrop("crop-render");
+    editor?.updateCrop({ height: 100, width: 100, x: 0, y: 0 });
+    editor?.commitCrop();
+    editor?.clearSelection();
+  });
+
+  expect(await sampleScreenshotPixel(page, retainedPoint)).toEqual({
+    blue: 51,
+    green: 0,
+    red: 255,
+  });
+  expect(
+    await residentCanvas.evaluate((canvas) => canvas.dataset.surfaceIdentity)
+  ).toBe("crop-stable-canvas");
+
+  const persistedCrop = await page.evaluate(async () => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    editor?.select("crop-render");
+    editor?.startCrop("crop-render");
+    editor?.updateCrop({ height: 50, width: 100, x: 0, y: 0 });
+    editor?.commitCrop();
+    const serialized = await editor?.serializeDocumentAsync();
+
+    if (!serialized) {
+      throw new Error("Expected serialized Crop document");
+    }
+    const savedDocument = JSON.parse(serialized);
+    const node = savedDocument.nodes.find(
+      (candidate) => candidate.id === "crop-render"
+    );
+    const image = new Image();
+
+    image.src = node.src;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d");
+
+    context?.drawImage(image, 0, 0);
+    const retained = context?.getImageData(50, 75, 1, 1).data;
+
+    editor.loadDocument(serialized);
+    return {
+      baseHeight: node.baseHeight,
+      baseWidth: node.baseWidth,
+      naturalHeight: image.naturalHeight,
+      naturalWidth: image.naturalWidth,
+      pixelHeight: node.pixelHeight,
+      pixelWidth: node.pixelWidth,
+      retained: retained
+        ? { blue: retained[2], green: retained[1], red: retained[0] }
+        : null,
+    };
+  });
+
+  expect(persistedCrop).toEqual({
+    baseHeight: 200,
+    baseWidth: 200,
+    naturalHeight: 200,
+    naturalWidth: 200,
+    pixelHeight: 200,
+    pixelWidth: 200,
+    retained: { blue: 51, green: 0, red: 255 },
+  });
+  await expect(residentCanvas).toHaveCount(1);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const presentation =
+          window.__PUNCHPRESS_EDITOR__?.rasterSurface?.getPresentation?.(
+            "crop-render"
+          );
+
+        return presentation
+          ? {
+              height: presentation.canvas.height,
+              width: presentation.canvas.width,
+            }
+          : null;
+      })
+    )
+    .toEqual({ height: 200, width: 200 });
+  await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    editor.select("crop-render");
+    const started = editor.startCrop("crop-render");
+    const updated = editor.updateCrop({
+      height: 100,
+      width: 100,
+      x: 0,
+      y: 0,
+    });
+    const committed = editor.commitCrop();
+    editor.clearSelection();
+
+    if (!(started && updated && committed)) {
+      throw new Error("Expected reopened Crop expansion to commit");
+    }
+  });
+
+  const reopenedRetainedPoint = await getRasterScreenPoint(
+    page,
+    "crop-render",
+    { x: 50, y: 75 }
+  );
+
+  expect(await sampleScreenshotPixel(page, reopenedRetainedPoint)).toEqual({
+    blue: 51,
+    green: 0,
+    red: 255,
+  });
+});
+
+test("held Frame Brush stroke is visible beyond committed tight Raster bounds", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  const src = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+
+    canvas.width = 40;
+    canvas.height = 40;
+    if (!context) {
+      throw new Error("Expected Canvas2D");
+    }
+
+    context.fillStyle = "#0066ff";
+    context.fillRect(0, 0, 40, 40);
+    return canvas.toDataURL("image/png");
+  });
+
+  await loadDocument(
+    page,
+    JSON.stringify({
+      nodes: [
+        {
+          background: "#ffffff",
+          height: 200,
+          id: "live-frame",
+          locked: false,
+          name: "Live Frame",
+          parentId: "root",
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: 320,
+            y: 220,
+          },
+          type: "artboard",
+          visible: true,
+          width: 200,
+        },
+        {
+          assetId: "asset-live-frame-raster",
+          height: 40,
+          id: "live-frame-raster",
+          mimeType: "image/png",
+          name: "Live Frame Raster",
+          opacity: 1,
+          parentId: "live-frame",
+          src,
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: 320,
+            y: 220,
+          },
+          type: "image",
+          visible: true,
+          width: 40,
+        },
+      ],
+      version: "1.8",
+    })
+  );
+  await resetViewport(page);
+  await setViewport(page, { x: 0, y: 0, zoom: 1 });
+  const residentCanvas = page.locator(
+    '[data-node-id="live-frame-raster"] [data-testid="raster-resident-canvas"] canvas[data-raster-source-canvas="true"]'
+  );
+
+  await expect(residentCanvas).toBeVisible();
+  await residentCanvas.evaluate((canvas) => {
+    canvas.dataset.surfaceIdentity = "live-frame-stable-canvas";
+  });
+  await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    editor?.select("live-frame-raster");
+    editor?.setActiveTool("brush");
+    editor?.setBrushSettings(
+      {
+        color: "#000000",
+        hardness: 1,
+        opacity: 1,
+        size: 12,
+        smoothing: 0,
+        spacing: 0,
+      },
+      "brush"
+    );
+  });
+  const start = await getRasterScreenPoint(page, "live-frame-raster", {
+    x: 20,
+    y: 20,
+  });
+  const end = await getRasterScreenPoint(page, "live-frame-raster", {
+    x: 100,
+    y: 20,
+  });
+  const sample = await getRasterScreenPoint(page, "live-frame-raster", {
+    x: 90,
+    y: 20,
+  });
+
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(end.x, end.y, { steps: 12 });
+  await page.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  );
+
+  expect(await sampleScreenshotPixel(page, sample)).toEqual({
+    blue: 0,
+    green: 0,
+    red: 0,
+  });
+  expect(
+    await page.evaluate(
+      () => window.__PUNCHPRESS_EDITOR__?.getNode("live-frame-raster")?.width
+    )
+  ).toBe(40);
+
+  await page.mouse.up();
+
+  expect(await sampleScreenshotPixel(page, sample)).toEqual({
+    blue: 0,
+    green: 0,
+    red: 0,
+  });
+  expect(
+    await residentCanvas.evaluate((canvas) => canvas.dataset.surfaceIdentity)
+  ).toBe("live-frame-stable-canvas");
+});
+
+test("imported Raster landmarks scale live and remain scaled after resize", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  const src = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+
+    canvas.width = 80;
+    canvas.height = 60;
+    if (!context) {
+      throw new Error("Expected Canvas2D");
+    }
+
+    context.fillStyle = "#ff0000";
+    context.fillRect(0, 0, 40, 30);
+    context.fillStyle = "#00ff00";
+    context.fillRect(40, 0, 40, 30);
+    context.fillStyle = "#0000ff";
+    context.fillRect(0, 30, 40, 30);
+    context.fillStyle = "#ffff00";
+    context.fillRect(40, 30, 40, 30);
+    return canvas.toDataURL("image/png");
+  });
+
+  await loadDocument(page, createImageDocumentWithSize(src, 80, 60));
+  await resetViewport(page);
+  await setViewport(page, { x: 0, y: 0, zoom: 1 });
+  await page.evaluate(() => {
+    window.__PUNCHPRESS_EDITOR__?.select("canvas2d-raster");
+  });
+  const residentCanvas = page.locator(
+    '[data-node-id="canvas2d-raster"] [data-testid="raster-resident-canvas"] canvas[data-raster-source-canvas="true"]'
+  );
+
+  await expect(residentCanvas).toBeVisible();
+  await residentCanvas.evaluate((canvas) => {
+    canvas.dataset.surfaceIdentity = "resize-stable-canvas";
+  });
+  const handle = page.locator(".canvas-moveable .moveable-control.moveable-se");
+
+  await expect(handle).toBeVisible();
+  const handleBox = await handle.boundingBox();
+
+  if (!handleBox) {
+    throw new Error("Expected southeast resize handle");
+  }
+
+  await handle.hover();
+  await page.mouse.down();
+  await page.mouse.move(
+    handleBox.x + handleBox.width / 2 + 80,
+    handleBox.y + handleBox.height / 2 + 60,
+    { steps: 24 }
+  );
+
+  expect(await sampleSelectionFraction(page, { x: 0.75, y: 0.25 })).toEqual({
+    blue: 0,
+    green: 255,
+    red: 0,
+  });
+
+  await page.mouse.up();
+
+  expect(await sampleSelectionFraction(page, { x: 0.75, y: 0.25 })).toEqual({
+    blue: 0,
+    green: 255,
+    red: 0,
+  });
+  expect(await sampleSelectionFraction(page, { x: 0.75, y: 0.75 })).toEqual({
+    blue: 0,
+    green: 255,
+    red: 255,
+  });
+  expect(
+    await residentCanvas.evaluate((canvas) => canvas.dataset.surfaceIdentity)
+  ).toBe("resize-stable-canvas");
+
+  const persistedResize = await page.evaluate(async () => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const serialized = await editor?.serializeDocumentAsync();
+
+    if (!serialized) {
+      throw new Error("Expected serialized resized Raster document");
+    }
+    const savedDocument = JSON.parse(serialized);
+    const node = savedDocument.nodes.find(
+      (candidate) => candidate.id === "canvas2d-raster"
+    );
+    const image = new Image();
+
+    image.src = node.src;
+    await image.decode();
+    editor.loadDocument(serialized);
+    editor.select("canvas2d-raster");
+    return {
+      naturalHeight: image.naturalHeight,
+      naturalWidth: image.naturalWidth,
+      pixelHeight: node.pixelHeight,
+      pixelWidth: node.pixelWidth,
+    };
+  });
+
+  expect(persistedResize).toEqual({
+    naturalHeight: 60,
+    naturalWidth: 80,
+    pixelHeight: 60,
+    pixelWidth: 80,
+  });
+  await expect(residentCanvas).toHaveCount(1);
+  await expect
+    .poll(() =>
+      residentCanvas.evaluate((canvas) => ({
+        height: canvas.height,
+        width: canvas.width,
+      }))
+    )
+    .toEqual({ height: 60, width: 80 });
+  expect(
+    await residentCanvas.evaluate((canvas) => ({
+      height: canvas.height,
+      width: canvas.width,
+    }))
+  ).toEqual({ height: 60, width: 80 });
+  expect(await sampleSelectionFraction(page, { x: 0.75, y: 0.25 })).toEqual({
+    blue: 0,
+    green: 255,
+    red: 0,
+  });
+});
+
+test("Scratchpad autosave snapshots the latest committed resident pixels", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  const src = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+
+    canvas.width = 1;
+    canvas.height = 1;
+    return canvas.toDataURL("image/png");
+  });
+
+  await loadDocument(page, createImageDocument(src));
+  await resetViewport(page);
+  const canvas = page.locator(
+    '[data-node-id="canvas2d-raster"] [data-testid="raster-resident-canvas"] canvas'
+  );
+
+  await expect(canvas).toBeVisible();
+  const box = await canvas.boundingBox();
+
+  if (!box) {
+    throw new Error("Expected resident Raster canvas bounds");
+  }
+
+  await page.keyboard.press("b");
+  await page.mouse.click(box.x + 80, box.y + 80);
+
+  await expect
+    .poll(
+      () =>
+        page.evaluate(async (previousSource) => {
+          const { loadScratchpadDocument } = await import(
+            "/src/workspace/scratchpad-storage.ts"
+          );
+          const contents = await loadScratchpadDocument();
+
+          if (!contents) {
+            return false;
+          }
+
+          const node = JSON.parse(contents).nodes?.find(
+            (candidate) => candidate.id === "canvas2d-raster"
+          );
+
+          return node?.src !== previousSource;
+        }, src),
+      { timeout: 5000 }
+    )
+    .toBe(true);
 });
 
 const placeAndStroke = async (
@@ -298,9 +985,6 @@ const placeAndStroke = async (
       session.update({ point: endPoint });
       await session.ready;
 
-      const workingGroup =
-        editor.getRasterWorkingPresentation("placed-raster")?.groups[0];
-
       await session.complete({ point: endPoint });
 
       const result = editor.getNode("placed-raster");
@@ -312,27 +996,110 @@ const placeAndStroke = async (
       return {
         height: result.height,
         historyRevisionDelta: editor.history.currentRevision - historyRevision,
+        residentSurface: Boolean(
+          editor.rasterSurface.getPresentation("placed-raster")
+        ),
         selectedNodeIds: editor.selectedNodeIds,
         sourceChanged: result.src !== imageSource,
         transform: result.transform,
         width: result.width,
-        workingSurface: workingGroup
-          ? {
-              height:
-                workingGroup.content.kind === "canvas"
-                  ? workingGroup.content.height
-                  : 0,
-              type: workingGroup.content.kind,
-              width:
-                workingGroup.content.kind === "canvas"
-                  ? workingGroup.content.width
-                  : 0,
-            }
-          : null,
       };
     },
     { imageSource: src, placementMode: mode, strokeMode: stroke }
   );
+};
+
+const getRasterScreenPoint = async (
+  page: Page,
+  nodeId: string,
+  point: { x: number; y: number }
+) =>
+  await page.evaluate(
+    ({ id, localPoint }) => {
+      const node = document.querySelector(`[data-raster-node-id="${id}"]`);
+      const matrix = (node as SVGGraphicsElement | null)?.getScreenCTM();
+
+      if (!matrix) {
+        throw new Error(`Expected screen transform for ${id}`);
+      }
+
+      const screenPoint = new DOMPoint(
+        localPoint.x,
+        localPoint.y
+      ).matrixTransform(matrix);
+
+      return { x: screenPoint.x, y: screenPoint.y };
+    },
+    { id: nodeId, localPoint: point }
+  );
+
+const createImageDocumentWithSize = (
+  src: string,
+  width: number,
+  height: number
+) =>
+  JSON.stringify({
+    nodes: [
+      {
+        assetId: "asset-canvas2d-raster",
+        height,
+        id: "canvas2d-raster",
+        mimeType: "image/png",
+        name: "Canvas2D Raster",
+        opacity: 1,
+        parentId: "root",
+        src,
+        transform: {
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          x: 320,
+          y: 220,
+        },
+        type: "image",
+        visible: true,
+        width,
+      },
+    ],
+    version: "1.8",
+  });
+
+const sampleSelectionFraction = async (
+  page: Page,
+  fraction: { x: number; y: number }
+) => {
+  const selection = page.locator(".canvas-moveable");
+  const box = await selection.boundingBox();
+
+  if (!box) {
+    throw new Error("Expected selection bounds");
+  }
+
+  return await sampleScreenshotPixel(page, {
+    x: box.x + box.width * fraction.x,
+    y: box.y + box.height * fraction.y,
+  });
+};
+
+const sampleScreenshotPixel = async (
+  page: Page,
+  point: { x: number; y: number }
+) => {
+  const screenshot = await page.screenshot({
+    clip: {
+      height: 1,
+      width: 1,
+      x: Math.round(point.x),
+      y: Math.round(point.y),
+    },
+  });
+  const png = decodePng(screenshot);
+
+  return {
+    blue: png.data[2],
+    green: png.data[1],
+    red: png.data[0],
+  };
 };
 
 const sampleAlpha = (canvas: Locator, point: { x: number; y: number }) =>
@@ -348,6 +1115,7 @@ const sampleAlpha = (canvas: Locator, point: { x: number; y: number }) =>
 const zeroCanvasCalls = {
   getImageData: 0,
   putImageData: 0,
+  toBlob: 0,
   toDataURL: 0,
 };
 
@@ -364,5 +1132,6 @@ const resetCanvasCalls = (page: Page) =>
 
     calls.getImageData = 0;
     calls.putImageData = 0;
+    calls.toBlob = 0;
     calls.toDataURL = 0;
   });

@@ -9,6 +9,20 @@ const ARIAL_FONT = {
 } as const;
 
 describe("Editor history", () => {
+  test("marks the serialized checkpoint saved without clearing a newer edit", () => {
+    const editor = createEditor();
+
+    createTextNode(editor, { text: "before save", x: 10, y: 10 });
+    const checkpoint = editor.createDocumentSaveCheckpoint();
+    editor.moveSelectionBy({ x: 20, y: 0 });
+
+    editor.markDocumentSaved(checkpoint);
+
+    expect(editor.isDirty).toBe(true);
+    expect(editor.undo()).toBe(true);
+    expect(editor.isDirty).toBe(false);
+  });
+
   test("undo and redo restore a created node", () => {
     const editor = createEditor();
 

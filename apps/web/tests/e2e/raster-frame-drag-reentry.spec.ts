@@ -108,12 +108,19 @@ test("Frame reveals Raster pixels that re-enter during one held drag", async ({
   for (const point of remainingStrokePoints) {
     await page.mouse.move(point.x, point.y, { steps: 4 });
   }
-  const rasterId = await page.evaluate(
-    () =>
-      window.__PUNCHPRESS_EDITOR__?.nodes.find(
-        (node) => node.type === "image" && node.parentId === "frame"
-      )?.id ?? null
-  );
+  let rasterId: string | null = null;
+
+  await expect
+    .poll(async () => {
+      rasterId = await page.evaluate(
+        () =>
+          window.__PUNCHPRESS_EDITOR__?.nodes.find(
+            (node) => node.type === "image" && node.parentId === "frame"
+          )?.id ?? null
+      );
+      return rasterId;
+    })
+    .not.toBeNull();
 
   if (!rasterId) {
     throw new Error("Expected Brush-created Raster");
@@ -129,17 +136,6 @@ test("Frame reveals Raster pixels that re-enter during one held drag", async ({
       requestAnimationFrame(() => resolve())
     );
   }, rasterId);
-  await expect
-    .poll(() =>
-      page.evaluate(
-        (nodeId) =>
-          window.__PUNCHPRESS_EDITOR__?.getRasterWorkingPresentation(nodeId)
-            ?.groups.length ?? 0,
-        rasterId
-      )
-    )
-    .toBe(0);
-
   const moveable = page.locator(".canvas-single-selection");
   await expect(moveable).toBeVisible();
   const moveableBox = await moveable.boundingBox();
@@ -210,7 +206,10 @@ test("Frame reveals Raster pixels that re-enter during one held drag", async ({
       );
     }
 
-    expect(reenteredPixels.every(isRasterColor)).toBe(true);
+    expect(
+      reenteredPixels.every(isRasterColor),
+      JSON.stringify(reenteredPixels)
+    ).toBe(true);
   } finally {
     await page.mouse.up();
   }

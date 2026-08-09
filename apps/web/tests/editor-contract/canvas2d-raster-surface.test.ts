@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  createDefaultArtboardNode,
   createDefaultImageNode,
   createRasterOperationRecorder,
   createRasterStroke,
@@ -70,7 +71,7 @@ describe("Canvas2D Raster surface", () => {
     expect(runtime.getPresentation(target.id)).not.toBeNull();
   });
 
-  test("releases surfaces that leave the mounted editor lifecycle", async () => {
+  test("retains removed surfaces for history until the document resets", async () => {
     const browser = createFakeCanvasBrowser();
     const runtime = createCanvas2dRasterRuntime(browser.capabilities);
 
@@ -92,6 +93,11 @@ describe("Canvas2D Raster surface", () => {
     runtime.retainTargets?.([target.id]);
 
     expect(runtime.getPresentation(target.id)).not.toBeNull();
+    expect(runtime.getPresentation("removed-raster")).not.toBeNull();
+
+    runtime.resetSurfaces();
+
+    expect(runtime.getPresentation(target.id)).toBeNull();
     expect(runtime.getPresentation("removed-raster")).toBeNull();
   });
 
@@ -122,6 +128,74 @@ describe("Canvas2D Raster surface", () => {
 
     expect(decodeCount).toBe(2);
     expect(runtime.getPresentation(target.id)).not.toBeNull();
+  });
+
+  test("maps one stable Canvas through resized source geometry", async () => {
+    const browser = createFakeCanvasBrowser();
+    const runtime = createCanvas2dRasterRuntime(browser.capabilities);
+    const presentation = await runtime.ensureSurface({
+      bounds: { height: 100, width: 120, x: -20, y: -10 },
+      height: 100,
+      id: target.id,
+      sourceBounds: { height: 60, width: 80, x: 0, y: 0 },
+      src: "data:image/png;base64,existing",
+      width: 120,
+    });
+
+    expect(
+      runtime.getSurfaceGeometry(target.id, {
+        height: 120,
+        width: 160,
+        x: 0,
+        y: 0,
+      })
+    ).toEqual({
+      bounds: { height: 200, width: 240, x: -40, y: -20 },
+      pixelSize: { height: 100, width: 120 },
+    });
+    expect(
+      runtime.snapshotSurface(target.id, {
+        height: 120,
+        width: 160,
+        x: 0,
+        y: 0,
+      })
+    ).toMatchObject({ height: 200, width: 240, x: -40, y: -20 });
+    expect(runtime.getPresentation(target.id)?.canvas).toBe(
+      presentation.canvas
+    );
+  });
+
+  test("lazy decode allocates persisted samples behind resized geometry", async () => {
+    const browser = createFakeCanvasBrowser();
+    const runtime = createCanvas2dRasterRuntime({
+      ...browser.capabilities,
+      decodeImage: async () => ({ decoded: true }),
+    });
+    const presentation = await runtime.ensureSurface({
+      bounds: { height: 120, width: 160, x: 0, y: 0 },
+      height: 60,
+      id: target.id,
+      sourceBounds: { height: 120, width: 160, x: 0, y: 0 },
+      src: "data:image/png;base64,resized",
+      width: 80,
+    });
+
+    expect({
+      height: presentation.canvas.height,
+      width: presentation.canvas.width,
+    }).toEqual({ height: 60, width: 80 });
+    expect(
+      runtime.getSurfaceGeometry(target.id, {
+        height: 120,
+        width: 160,
+        x: 0,
+        y: 0,
+      })
+    ).toEqual({
+      bounds: { height: 120, width: 160, x: 0, y: 0 },
+      pixelSize: { height: 60, width: 80 },
+    });
   });
 
   test("paints Hard Round dabs on the stable presented surface and reports dirty pixels", async () => {
@@ -169,11 +243,57 @@ describe("Canvas2D Raster surface", () => {
     expect(presentedContext?.fillCount).toBeLessThanOrEqual(
       presentedContext?.arcs.length ?? 0
     );
-    expect(commit).toEqual({
+    expect(commit).toMatchObject({
       dirtyRegion: { height: 40, width: 50, x: 80, y: 80 },
       targetId: target.id,
     });
     expect(browser.hotPathReadbacks).toEqual([]);
+    expect(browser.encodes).toEqual([]);
+  });
+
+  test("commits an exact reversible patch without replacing or encoding the presented canvas", async () => {
+    const browser = createFakeCanvasBrowser();
+    const runtime = createCanvas2dRasterRuntime(browser.capabilities);
+
+    await runtime.ensureSurface({
+      height: target.pixelSize.height,
+      id: target.id,
+      src: "data:image/png;base64,existing",
+      width: target.pixelSize.width,
+    });
+
+    const presentation = runtime.getPresentation(target.id);
+    const surface = runtime.resolveSurface(target);
+
+    if (!surface) {
+      throw new Error("Expected a prepared Canvas2D Raster surface");
+    }
+
+    const stroke = createRasterStroke({
+      operation: "paint",
+      point: { x: 50, y: 50 },
+      settings: { ...settings, opacity: 1 },
+      surface,
+      target,
+    });
+    stroke.append([{ x: 55, y: 50 }]);
+
+    const commit = stroke.commit();
+    const presentedContext = browser.contexts.get(presentation?.canvas);
+    const drawCountAfterCommit = presentedContext?.drawImageCalls.length ?? 0;
+
+    commit.patch?.undo();
+    const drawCountAfterUndo = presentedContext?.drawImageCalls.length ?? 0;
+    commit.patch?.redo();
+
+    expect(commit.patch).toBeDefined();
+    expect(drawCountAfterUndo).toBeGreaterThan(drawCountAfterCommit);
+    expect(presentedContext?.drawImageCalls.length).toBeGreaterThan(
+      drawCountAfterUndo
+    );
+    expect(runtime.getPresentation(target.id)?.canvas).toBe(
+      presentation?.canvas
+    );
     expect(browser.encodes).toEqual([]);
   });
 
@@ -212,6 +332,43 @@ describe("Canvas2D Raster surface", () => {
     expect(context?.drawImageCalls.length).toBeGreaterThan(1);
   });
 
+  test("captures the complete rotated sampled-tip dirty patch", async () => {
+    const browser = createFakeCanvasBrowser();
+    const runtime = createCanvas2dRasterRuntime(browser.capabilities);
+
+    await runtime.ensureSurface({
+      height: target.pixelSize.height,
+      id: target.id,
+      src: "data:image/png;base64,existing",
+      width: target.pixelSize.width,
+    });
+    const surface = runtime.resolveSurface(target);
+
+    if (!surface) {
+      throw new Error("Expected a prepared Canvas2D Raster surface");
+    }
+
+    const commit = createRasterStroke({
+      operation: "paint",
+      point: { x: 50, y: 50 },
+      settings: {
+        ...settings,
+        angle: 45,
+        opacity: 1,
+        tip: { kind: "sampled", sampleId: "pixel" },
+      },
+      surface,
+      target,
+    }).commit();
+
+    expect(commit.dirtyRegion).toEqual({
+      height: 58,
+      width: 58,
+      x: 71,
+      y: 71,
+    });
+  });
+
   test("does not connect native Hard Round runs separated outside the target", async () => {
     const browser = createFakeCanvasBrowser();
     const runtime = createCanvas2dRasterRuntime(browser.capabilities);
@@ -246,8 +403,7 @@ describe("Canvas2D Raster surface", () => {
       runtime.getPresentation(target.id)?.canvas
     );
 
-    expect(context?.lineToCalls).toEqual([]);
-    expect(context?.arcs.length).toBeGreaterThan(1);
+    expect(context?.strokeCount).toBe(2);
   });
 
   test("notifies exact presentations when resident pixels change", async () => {
@@ -498,7 +654,7 @@ describe("Editor Raster surface injection", () => {
     editor.dispose();
   });
 
-  test("routes an existing single-payload image stroke through the injected surface", () => {
+  test("routes an existing single-payload image stroke through the injected surface", async () => {
     const recorder = createRasterOperationRecorder();
     let resolvedTarget: RasterTarget | null = null;
     const editor = new Editor({
@@ -520,13 +676,14 @@ describe("Editor Raster surface injection", () => {
 
     editor.insertNodes([node]);
     editor.setActiveTool("brush");
+    editor.markDocumentSaved();
     const session = editor.currentTool.onNodePointerDown({
       node,
       point: { x: 2275, y: 2730 },
     });
 
     expect(session).not.toBeNull();
-    session?.complete({ point: { x: 2285, y: 2730 } });
+    await session?.complete({ point: { x: 2285, y: 2730 } });
 
     expect(resolvedTarget).toEqual({
       bounds: { height: 100, width: 100, x: 0, y: 0 },
@@ -545,6 +702,269 @@ describe("Editor Raster surface injection", () => {
       operation: "paint",
       target: { id: target.id },
     } satisfies Partial<RasterStrokeContext>);
+  });
+
+  test("records one Brush dirty patch that Undo and Redo apply exactly", async () => {
+    const patchActions: string[] = [];
+    const editor = new Editor({
+      rasterSurface: {
+        resolveSurface: () => ({
+          beginStroke: (context: RasterStrokeContext) => ({
+            applyDabs: () => undefined,
+            cancel: () => undefined,
+            commit: () => ({
+              dirtyRegion: { height: 12, width: 18, x: 20, y: 24 },
+              patch: {
+                redo: () => patchActions.push("redo"),
+                undo: () => patchActions.push("undo"),
+              },
+              targetId: context.target.id,
+            }),
+          }),
+        }),
+      },
+    });
+    const node = {
+      ...createDefaultImageNode({
+        height: 100,
+        src: "data:image/png;base64,existing",
+        width: 100,
+      }),
+      id: target.id,
+    };
+
+    editor.insertNodes([node]);
+    editor.setActiveTool("brush");
+    editor.markDocumentSaved();
+    const revisionBeforeStroke = editor.history.currentRevision;
+    const session = editor.currentTool.onNodePointerDown({
+      node,
+      point: { x: 2275, y: 2730 },
+    });
+
+    await session?.complete({ point: { x: 2285, y: 2730 } });
+
+    expect(editor.history.currentRevision).toBe(revisionBeforeStroke + 1);
+    expect(editor.isDirty).toBe(true);
+    expect(patchActions).toEqual([]);
+    expect(editor.undo()).toBe(true);
+    expect(editor.isDirty).toBe(false);
+    expect(patchActions).toEqual(["undo"]);
+    expect(editor.redo()).toBe(true);
+    expect(editor.isDirty).toBe(true);
+    expect(patchActions).toEqual(["undo", "redo"]);
+  });
+
+  test("restores a Frame-created Raster on the same resident Canvas after Undo and Redo", async () => {
+    const browser = createFakeCanvasBrowser();
+    const runtime = createCanvas2dRasterRuntime(browser.capabilities);
+    const editor = new Editor({ rasterSurface: runtime });
+    const frame = {
+      ...createDefaultArtboardNode(),
+      height: 100,
+      id: "frame",
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: 0,
+        y: 0,
+      },
+      width: 100,
+    };
+
+    editor.mount();
+    editor.insertNodes([frame]);
+    editor.select(frame.id);
+    editor.setActiveTool("brush");
+    await editor
+      .dispatchCanvasPointerDown({ point: { x: 40, y: 40 } })
+      ?.complete({ point: { x: 60, y: 40 } });
+
+    const raster = editor.nodes.find((node) => node.type === "image");
+    const canvas = raster
+      ? runtime.getPresentation(raster.id)?.canvas
+      : undefined;
+
+    expect(canvas).toBeDefined();
+    expect(editor.undo()).toBe(true);
+    expect(editor.redo()).toBe(true);
+    expect(runtime.getPresentation(raster?.id || "missing")?.canvas).toBe(
+      canvas
+    );
+
+    editor.dispose();
+  });
+
+  test("Undo cancels an active Frame-created Raster before reading history", async () => {
+    const browser = createFakeCanvasBrowser();
+    const runtime = createCanvas2dRasterRuntime(browser.capabilities);
+    const editor = new Editor({ rasterSurface: runtime });
+    const frame = {
+      ...createDefaultArtboardNode(),
+      height: 100,
+      id: "frame",
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: 0,
+        y: 0,
+      },
+      width: 100,
+    };
+
+    editor.getState().loadNodes([frame]);
+    editor.resetHistory();
+    editor.select(frame.id);
+    editor.setActiveTool("brush");
+    const session = editor.dispatchCanvasPointerDown({
+      point: { x: 40, y: 40 },
+    });
+
+    await session?.ready;
+    expect(editor.nodes.some((node) => node.type === "image")).toBe(true);
+
+    expect(editor.undo()).toBe(false);
+    expect(editor.nodes).toEqual([frame]);
+
+    editor.dispose();
+  });
+
+  test("async persistence excludes an uncommitted Frame-created Raster", async () => {
+    const browser = createFakeCanvasBrowser();
+    const runtime = createCanvas2dRasterRuntime(browser.capabilities);
+    const editor = new Editor({ rasterSurface: runtime });
+    const frame = {
+      ...createDefaultArtboardNode(),
+      height: 100,
+      id: "frame",
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: 0,
+        y: 0,
+      },
+      width: 100,
+    };
+
+    editor.getState().loadNodes([frame]);
+    editor.resetHistory();
+    editor.select(frame.id);
+    editor.setActiveTool("brush");
+    const session = editor.dispatchCanvasPointerDown({
+      point: { x: 40, y: 40 },
+    });
+
+    await session?.ready;
+    expect(editor.nodes.some((node) => node.type === "image")).toBe(true);
+
+    const serialized = JSON.parse(await editor.serializeDocumentAsync());
+
+    expect(serialized.nodes).toEqual([frame]);
+    session?.cancel();
+    editor.dispose();
+  });
+
+  test("asynchronously serializes the latest committed resident Raster revision", async () => {
+    const latestSource = "data:image/png;base64,bGF0ZXN0LXBpeGVscw==";
+    const editor = new Editor({
+      rasterSurface: {
+        resolveSurface: () => ({
+          beginStroke: (context: RasterStrokeContext) => ({
+            applyDabs: () => undefined,
+            cancel: () => undefined,
+            commit: () => ({
+              dirtyRegion: { height: 8, width: 8, x: 20, y: 20 },
+              targetId: context.target.id,
+            }),
+          }),
+        }),
+        snapshotSurfaceAsync: async () => ({
+          height: 100,
+          src: latestSource,
+          width: 100,
+        }),
+      },
+    });
+    const node = {
+      ...createDefaultImageNode({
+        height: 100,
+        src: "data:image/png;base64,c3RhbGU=",
+        width: 100,
+      }),
+      id: target.id,
+    };
+
+    editor.insertNodes([node]);
+    editor.setActiveTool("brush");
+    const session = editor.currentTool.onNodePointerDown({
+      node,
+      point: { x: 2275, y: 2730 },
+    });
+    await session?.complete({ point: { x: 2285, y: 2730 } });
+
+    const serialized = JSON.parse(await editor.serializeDocumentAsync());
+    const reopened = new Editor();
+
+    reopened.loadDocument(JSON.stringify(serialized));
+
+    expect(serialized.nodes[0].src).toBe(latestSource);
+    expect(reopened.getNode(target.id)?.src).toBe(latestSource);
+    expect(await editor.exportDocument()).toContain(latestSource);
+  });
+
+  test("durable serialization preserves the retained Canvas behind Crop", async () => {
+    const snapshotRegions: Array<{
+      height: number;
+      width: number;
+      x: number;
+      y: number;
+    }> = [];
+    const editor = new Editor({
+      rasterSurface: {
+        getSurfaceGeometry: () => ({
+          bounds: { height: 100, width: 100, x: 0, y: 0 },
+          pixelSize: { height: 100, width: 100 },
+        }),
+        resolveSurface: () => null,
+        snapshotSurfaceAsync: (_targetId, region) => {
+          snapshotRegions.push(region);
+          return Promise.resolve({
+            height: region.height,
+            src: "data:image/png;base64,cmV0YWluZWQ=",
+            width: region.width,
+          });
+        },
+      },
+    });
+    const cropped = {
+      ...createDefaultImageNode({
+        height: 50,
+        src: "data:image/png;base64,c3RhbGU=",
+        width: 100,
+      }),
+      baseHeight: 100,
+      baseWidth: 100,
+      height: 50,
+      id: target.id,
+      width: 100,
+    };
+
+    editor.getState().loadNodes([cropped]);
+
+    const serialized = JSON.parse(await editor.serializeDocumentAsync());
+
+    expect(snapshotRegions).toEqual([{ height: 100, width: 100, x: 0, y: 0 }]);
+    expect(serialized.nodes[0]).toMatchObject({
+      baseHeight: 100,
+      baseWidth: 100,
+      baseX: 0,
+      baseY: 0,
+      height: 50,
+      width: 100,
+    });
   });
 });
 
@@ -587,6 +1007,8 @@ const createFakeCanvasBrowser = () => {
       y: number;
     }>,
     beginPath: () => undefined,
+    clip: () => undefined,
+    closePath: () => undefined,
     clearRect: () => undefined,
     compositeModes: [] as string[],
     drawImageCalls: [] as unknown[][],
@@ -612,6 +1034,10 @@ const createFakeCanvasBrowser = () => {
       this.lineToCalls.push({ x, y });
     },
     lineToCalls: [] as Array<{ x: number; y: number }>,
+    stroke() {
+      this.strokeCount += 1;
+    },
+    strokeCount: 0,
     arc(
       x: number,
       y: number,
@@ -637,10 +1063,10 @@ const createFakeCanvasBrowser = () => {
     rotate(value: number) {
       this.rotations.push(value);
     },
+    rect: () => undefined,
     rotations: [] as number[],
     save: () => undefined,
     scale: () => undefined,
-    stroke: () => undefined,
     translate: () => undefined,
   });
 
@@ -648,6 +1074,7 @@ const createFakeCanvasBrowser = () => {
     capabilities: {
       createCanvas,
       decodeImage: async () => ({ decoded: true }),
+      encodeCanvas: async (canvas) => canvas.toDataURL("image/png"),
     },
     contexts,
     createdCanvasSizes,

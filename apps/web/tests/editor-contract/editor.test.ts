@@ -212,12 +212,12 @@ describe("Editor.loadDocument", () => {
     expect(editor.selectedNodeId).toBeNull();
   });
 
-  test("failed document validation preserves active Raster presentations", () => {
+  test("failed document validation preserves the active Raster Stroke", () => {
     const editor = new Editor();
     let invalidationCount = 0;
 
     editor.loadDocument(createDocument("first-node", "FIRST", AVAILABLE_FONT));
-    editor.rasterStrokeRuntime.invalidateWorkingPresentations = () => {
+    editor.rasterStrokeRuntime.cancelActiveStroke = () => {
       invalidationCount += 1;
     };
 

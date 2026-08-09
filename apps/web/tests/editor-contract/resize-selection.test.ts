@@ -135,6 +135,72 @@ describe("Editor.resizeSelectionFromCorner", () => {
     });
   });
 
+  test("Undo and Redo restore ordinary Raster resize independently from Crop", () => {
+    const editor = new Editor();
+    const imageNode = {
+      ...createDefaultImageNode({
+        height: 60,
+        name: "Landmark image",
+        src: "data:image/png;base64,test",
+        width: 80,
+      }),
+      id: "resize-history-image",
+      transform: {
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        x: 320,
+        y: 240,
+      },
+    };
+
+    editor.getState().loadNodes([imageNode]);
+    editor.select(imageNode.id);
+    editor.resizeSelectionFromCorner({ corner: "se", scale: 2 });
+
+    expect(editor.getNode(imageNode.id)).toMatchObject({
+      baseHeight: 120,
+      baseWidth: 160,
+      height: 120,
+      width: 160,
+    });
+    expect(editor.undo()).toBe(true);
+    expect(editor.getNode(imageNode.id)).toMatchObject({
+      baseHeight: 60,
+      baseWidth: 80,
+      height: 60,
+      width: 80,
+    });
+    expect(editor.redo()).toBe(true);
+    expect(editor.getNode(imageNode.id)).toMatchObject({
+      baseHeight: 120,
+      baseWidth: 160,
+      height: 120,
+      width: 160,
+    });
+
+    expect(editor.startCrop()).toBe(true);
+    editor.updateCrop({ height: 90, width: 120, x: 20, y: 10 });
+    expect(editor.commitCrop()).toBe(true);
+    expect(editor.getNode(imageNode.id)).toMatchObject({
+      baseHeight: 120,
+      baseWidth: 160,
+      baseX: -20,
+      baseY: -10,
+      height: 90,
+      width: 120,
+    });
+    expect(editor.undo()).toBe(true);
+    expect(editor.getNode(imageNode.id)).toMatchObject({
+      baseHeight: 120,
+      baseWidth: 160,
+      baseX: 0,
+      baseY: 0,
+      height: 120,
+      width: 160,
+    });
+  });
+
   test("previews shape box resize without rewriting width and height until commit", () => {
     const editor = new Editor();
 
