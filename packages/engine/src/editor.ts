@@ -20,6 +20,7 @@ import {
   getDocument as getEditorDocument,
   loadDocument as loadEditorDocument,
   serializeDocument as serializeEditorDocument,
+  serializeDocumentAsync as serializeEditorDocumentAsync,
 } from "./document/document-actions";
 import {
   bringToFront as bringEditorToFront,
@@ -133,13 +134,6 @@ import {
   startRasterCrop as startEditorRasterCrop,
   updateRasterCrop as updateEditorRasterCrop,
 } from "./raster/crop";
-import type {
-  RasterPresentationAcknowledgement,
-  RasterPresentationFailure,
-  RasterWorkingGroup,
-  RasterWorkingPresentation,
-} from "./raster/working-presentation";
-import { retireAcknowledgedRasterWorkingGroups } from "./raster/working-presentation";
 import {
   handleCanvasShortcutKeyDown as handleEditorCanvasShortcutKeyDown,
   handleEditingShortcutKeyDown as handleEditorEditingShortcutKeyDown,
@@ -254,6 +248,8 @@ import { HandTool } from "./tools/hand-tool";
 import { BrushTool } from "./tools/brush-tool";
 import { RasterStrokeRuntime } from "./tools/raster-stroke-runtime";
 import {
+  getRasterSurfaceBounds as getEditorRasterSurfaceBounds,
+  getRasterSurfacePixelSize as getEditorRasterSurfacePixelSize,
   getRasterTargetState as getEditorRasterTargetState,
   getRasterWritableBounds as getEditorRasterWritableBounds,
 } from "./tools/brush-target";
@@ -1096,6 +1092,14 @@ export class Editor {
     return getEditorRasterWritableBounds(this, this.getNode(nodeId));
   }
 
+  getRasterSurfaceBounds(nodeId) {
+    return getEditorRasterSurfaceBounds(this, this.getNode(nodeId));
+  }
+
+  getRasterSurfacePixelSize(nodeId) {
+    return getEditorRasterSurfacePixelSize(this, this.getNode(nodeId));
+  }
+
   get rasterCropSession() {
     return this.getState().rasterCropSession;
   }
@@ -1128,71 +1132,8 @@ export class Editor {
     this.getState().selectBrushPreset(presetId, toolId);
   }
 
-  getRasterWorkingPresentations(): RasterWorkingPresentation[] {
-    const groups = this.rasterStrokeRuntime
-      .getWorkingGroups()
-      .sort((left, right) => left.sequence - right.sequence);
-    const groupsByNode = new Map<string, RasterWorkingGroup[]>();
-
-    for (const group of groups) {
-      const nodeGroups = groupsByNode.get(group.nodeId) || [];
-
-      nodeGroups.push(group);
-      groupsByNode.set(group.nodeId, nodeGroups);
-    }
-
-    return [...groupsByNode].map(([nodeId, nodeGroups]) => ({
-      groups: nodeGroups,
-      nodeId,
-    }));
-  }
-
-  getRasterWorkingPresentation(nodeId): RasterWorkingPresentation | null {
-    return (
-      this.getRasterWorkingPresentations().find(
-        (presentation) => presentation.nodeId === nodeId
-      ) || null
-    );
-  }
-
-  acknowledgeRasterPresentation(
-    acknowledgement: RasterPresentationAcknowledgement
-  ) {
-    const presentation = this.getRasterWorkingPresentation(
-      acknowledgement.nodeId
-    );
-    const retiredPresentation = presentation
-      ? retireAcknowledgedRasterWorkingGroups(presentation, acknowledgement)
-      : null;
-
-    if (!(presentation && retiredPresentation !== presentation)) {
-      return false;
-    }
-
-    const retainedGroupIds = new Set(
-      retiredPresentation.groups.map((group) => group.groupId)
-    );
-    const retiredGroupIds = new Set(
-      presentation.groups
-        .filter((group) => !retainedGroupIds.has(group.groupId))
-        .map((group) => group.groupId)
-    );
-
-    this.rasterStrokeRuntime.retireWorkingPresentations(retiredGroupIds);
-
-    return true;
-  }
-
-  failRasterPresentation(failure: RasterPresentationFailure) {
-    return this.rasterStrokeRuntime.failWorkingPresentation(failure);
-  }
-
-  invalidateRasterWorkingPresentations(nodeId = null) {
-    this.rasterStrokeRuntime.invalidateWorkingPresentations(nodeId);
-  }
-
-  invalidateMissingRasterWorkingPresentations() {
-    this.rasterStrokeRuntime.invalidateMissingWorkingPresentations();
+  cancelRasterStroke() {
+    this.rasterStrokeRuntime.cancelActiveStroke();
   }
 
   getSelectionFrameKey(nodeIds = this.selectedNodeIds) {
@@ -1271,7 +1212,6 @@ export class Editor {
 
   deleteSelected() {
     deleteEditorSelected(this);
-    this.invalidateMissingRasterWorkingPresentations();
   }
 
   deleteVectorPoint(
@@ -1309,7 +1249,6 @@ export class Editor {
 
   deleteNode(nodeId) {
     deleteEditorNode(this, nodeId);
-    this.invalidateMissingRasterWorkingPresentations();
   }
 
   dispatchCanvasPointerDown(info) {
@@ -2087,7 +2026,7 @@ export class Editor {
   }
 
   newDocument() {
-    this.invalidateRasterWorkingPresentations();
+    this.cancelRasterStroke();
     createNewEditorDocument(this);
   }
 
@@ -2119,16 +2058,24 @@ export class Editor {
     return serializeEditorDocument(this);
   }
 
-  markDocumentSaved() {
-    this.history.markSaved();
+  async serializeDocumentAsync() {
+    return await serializeEditorDocumentAsync(this);
+  }
+
+  createDocumentSaveCheckpoint() {
+    return this.history.captureSaveCheckpoint();
+  }
+
+  markDocumentSaved(checkpoint?) {
+    this.history.markSaved(checkpoint);
   }
 
   markHistoryStep(name) {
     return this.history.mark(name);
   }
 
-  commitHistoryStep(mark) {
-    return this.history.commitMark(mark);
+  commitHistoryStep(mark, effect = null) {
+    return this.history.commitMark(mark, effect);
   }
 
   revertToMark(mark) {
@@ -2137,11 +2084,11 @@ export class Editor {
 
   redo() {
     const historyTool = this.currentTool;
+    this.cancelRasterStroke();
     const didRedo = this.history.redo();
 
     if (didRedo) {
       historyTool.onHistoryChanged?.("redo");
-      this.invalidateRasterWorkingPresentations();
     }
 
     return didRedo;
@@ -2149,11 +2096,11 @@ export class Editor {
 
   undo() {
     const historyTool = this.currentTool;
+    this.cancelRasterStroke();
     const didUndo = this.history.undo();
 
     if (didUndo) {
       historyTool.onHistoryChanged?.("undo");
-      this.invalidateRasterWorkingPresentations();
     }
 
     return didUndo;

@@ -231,16 +231,5 @@ export const getScaledImageNodeUpdate = (
   baseX: round((node.baseX ?? 0) * scaleX, 2),
   baseY: round((node.baseY ?? 0) * scaleY, 2),
   height: round(Math.max(1, node.height * scaleY), 2),
-  ...(node.tileSources
-    ? {
-        tileSources: node.tileSources.map((tile) => ({
-          ...tile,
-          height: round(Math.max(1, tile.height * scaleY), 2),
-          width: round(Math.max(1, tile.width * scaleX), 2),
-          x: round(tile.x * scaleX, 2),
-          y: round(tile.y * scaleY, 2),
-        })),
-      }
-    : {}),
   width: round(Math.max(1, node.width * scaleX), 2),
 });

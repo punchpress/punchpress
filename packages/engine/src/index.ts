@@ -215,14 +215,6 @@ export type {
   RasterPixelFootprintOptions,
   RasterSampling,
 } from "./raster/presentation";
-export { deriveRasterAtomicHandoff } from "./raster/working-presentation";
-export type {
-  RasterAtomicHandoff,
-  RasterPresentationAcknowledgement,
-  RasterPresentationFailure,
-  RasterWorkingGroup,
-  RasterWorkingPresentation,
-} from "./raster/working-presentation";
 export type {
   RasterBrushTip,
   RasterCommit,

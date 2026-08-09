@@ -1,6 +1,5 @@
 import {
   PERF_SPANS,
-  type RasterSurface,
   type RasterSurfaceResolver,
   recordPerfSpan,
 } from "@punchpress/engine";
@@ -10,19 +9,28 @@ import {
   type Canvas2dRasterCapabilities,
   requireCanvas2dContext,
 } from "./canvas2d-raster-capabilities";
-import { createCanvas2dRasterSurface } from "./canvas2d-raster-surface";
+import {
+  type Canvas2dRasterSurface,
+  createCanvas2dRasterSurface,
+} from "./canvas2d-raster-surface";
 
 interface EnsureCanvas2dRasterSurfaceInput {
+  authoritative?: boolean;
+  bounds?: { height: number; width: number; x: number; y: number };
   height: number;
   id: string;
+  sourceBounds?: { height: number; width: number; x: number; y: number };
   src: string;
   width: number;
 }
 
-interface Canvas2dRasterPresentation {
+export interface Canvas2dRasterPresentation {
   canvas: HTMLCanvasElement;
   height: number;
+  sourceBounds: { height: number; width: number; x: number; y: number };
   width: number;
+  x: number;
+  y: number;
 }
 
 export interface Canvas2dRasterRuntime extends RasterSurfaceResolver {
@@ -30,9 +38,29 @@ export interface Canvas2dRasterRuntime extends RasterSurfaceResolver {
     input: EnsureCanvas2dRasterSurfaceInput
   ) => Promise<Canvas2dRasterPresentation>;
   getPresentation: (targetId: string) => Canvas2dRasterPresentation | null;
+  resetSurfaces: () => void;
+  shiftSurfaceBounds: (targetId: string, x: number, y: number) => void;
   snapshotSurface: (
-    targetId: string
-  ) => { height: number; src: string; width: number } | null;
+    targetId: string,
+    sourceBounds?: { height: number; width: number; x: number; y: number }
+  ) => {
+    height: number;
+    src: string;
+    width: number;
+    x: number;
+    y: number;
+  } | null;
+  snapshotSurfaceAsync: (
+    targetId: string,
+    region: { height: number; width: number; x: number; y: number },
+    sourceBounds?: { height: number; width: number; x: number; y: number }
+  ) => Promise<{
+    height: number;
+    pixelHeight: number;
+    pixelWidth: number;
+    src: string;
+    width: number;
+  } | null>;
   subscribe: (listener: () => void) => () => void;
   subscribePresentation: (targetId: string, listener: () => void) => () => void;
 }
@@ -44,14 +72,16 @@ export const createCanvas2dRasterRuntime = (
   const records = new Map<
     string,
     {
+      key: string;
       presentation: Canvas2dRasterPresentation;
       source: string;
-      surface: RasterSurface;
+      surface: Canvas2dRasterSurface;
     }
   >();
   const pending = new Map<
     string,
     {
+      authoritative: boolean;
       key: string;
       promise: Promise<Canvas2dRasterPresentation>;
     }
@@ -72,13 +102,13 @@ export const createCanvas2dRasterRuntime = (
   return {
     ensureSurface: async (input) => {
       const current = records.get(input.id);
+      const pendingSurface = pending.get(input.id);
 
-      if (
-        current &&
-        current.source === input.src &&
-        current.presentation.width === input.width &&
-        current.presentation.height === input.height
-      ) {
+      if (pendingSurface?.authoritative && !input.authoritative) {
+        return await pendingSurface.promise;
+      }
+
+      if (current && current.key === getSurfaceKey(input)) {
         return current.presentation;
       }
 
@@ -88,8 +118,6 @@ export const createCanvas2dRasterRuntime = (
       }
 
       const key = getSurfaceKey(input);
-      const pendingSurface = pending.get(input.id);
-
       if (pendingSurface?.key === key) {
         return await pendingSurface.promise;
       }
@@ -110,7 +138,11 @@ export const createCanvas2dRasterRuntime = (
         return record.presentation;
       });
 
-      pending.set(input.id, { key, promise: preparation });
+      pending.set(input.id, {
+        authoritative: Boolean(input.authoritative),
+        key,
+        promise: preparation,
+      });
 
       try {
         return await preparation;
@@ -121,26 +153,32 @@ export const createCanvas2dRasterRuntime = (
       }
     },
     getPresentation: (targetId) => records.get(targetId)?.presentation || null,
+    getSurfaceGeometry: (targetId, sourceBounds) => {
+      const presentation = records.get(targetId)?.presentation;
+
+      return presentation
+        ? {
+            bounds: getCanvas2dRasterDisplay(presentation, sourceBounds),
+            pixelSize: {
+              height: presentation.canvas.height,
+              width: presentation.canvas.width,
+            },
+          }
+        : null;
+    },
     retainTargets: (targetIds) => {
       const retainedIds = new Set(targetIds);
-      let didChange = false;
-
-      for (const targetId of records.keys()) {
-        if (!retainedIds.has(targetId)) {
-          records.delete(targetId);
-          didChange = true;
-        }
-      }
 
       for (const targetId of pending.keys()) {
         if (!retainedIds.has(targetId)) {
           pending.delete(targetId);
         }
       }
-
-      if (didChange) {
-        notify();
-      }
+    },
+    resetSurfaces: () => {
+      records.clear();
+      pending.clear();
+      notify();
     },
     resolveSurface: (target) => {
       const record = records.get(target.id);
@@ -148,8 +186,8 @@ export const createCanvas2dRasterRuntime = (
       if (
         !(
           record &&
-          record.presentation.width === target.pixelSize.width &&
-          record.presentation.height === target.pixelSize.height
+          record.presentation.canvas.width === target.pixelSize.width &&
+          record.presentation.canvas.height === target.pixelSize.height
         )
       ) {
         return null;
@@ -157,16 +195,100 @@ export const createCanvas2dRasterRuntime = (
 
       return record.surface;
     },
-    snapshotSurface: (targetId) => {
+    snapshotSurface: (targetId, sourceBounds) => {
+      const record = records.get(targetId);
+      const presentation = record?.presentation;
+
+      if (!presentation) {
+        return null;
+      }
+
+      const display = getCanvas2dRasterDisplay(presentation, sourceBounds);
+
+      return {
+        ...display,
+        src: presentation.canvas.toDataURL("image/png"),
+      };
+    },
+    snapshotSurfaceAsync: async (targetId, region, sourceBounds) => {
+      const record = records.get(targetId);
+      const presentation = record?.presentation;
+
+      if (!(record && presentation)) {
+        return null;
+      }
+
+      const display = getCanvas2dRasterDisplay(presentation, sourceBounds);
+      const scaleX = presentation.canvas.width / display.width;
+      const scaleY = presentation.canvas.height / display.height;
+      const width = Math.max(1, Math.ceil(region.width * scaleX));
+      const height = Math.max(1, Math.ceil(region.height * scaleY));
+      const sourceX = (region.x - display.x) * scaleX;
+      const sourceY = (region.y - display.y) * scaleY;
+      const isFullSurface =
+        sourceX === 0 &&
+        sourceY === 0 &&
+        width === presentation.canvas.width &&
+        height === presentation.canvas.height;
+      const uncommittedPatches = record.surface.getUncommittedPatches();
+      const canvas =
+        isFullSurface && uncommittedPatches.length === 0
+          ? presentation.canvas
+          : capabilities.createCanvas(width, height);
+
+      if (canvas !== presentation.canvas) {
+        const context = requireCanvas2dContext(canvas);
+
+        context.drawImage(
+          presentation.canvas,
+          sourceX,
+          sourceY,
+          width,
+          height,
+          0,
+          0,
+          width,
+          height
+        );
+        restoreCommittedPixels({
+          context,
+          height,
+          patches: uncommittedPatches,
+          source: { height, width, x: sourceX, y: sourceY },
+          width,
+        });
+      }
+
+      const encodeStartedAt = getNow();
+      const src = await capabilities.encodeCanvas(canvas);
+      const encodeEndedAt = getNow();
+
+      recordPerfSpan({
+        depth: 0,
+        durationMs: encodeEndedAt - encodeStartedAt,
+        endMs: encodeEndedAt,
+        label: PERF_SPANS.rasterSurfaceEncode,
+        startMs: encodeStartedAt,
+      });
+
+      return {
+        height: region.height,
+        pixelHeight: height,
+        pixelWidth: width,
+        src,
+        width: region.width,
+      };
+    },
+    shiftSurfaceBounds: (targetId, x, y) => {
       const presentation = records.get(targetId)?.presentation;
 
-      return presentation
-        ? {
-            height: presentation.canvas.height,
-            src: presentation.canvas.toDataURL("image/png"),
-            width: presentation.canvas.width,
-          }
-        : null;
+      if (!(presentation && (x || y))) {
+        return;
+      }
+
+      presentation.x += x;
+      presentation.y += y;
+      notify();
     },
     subscribe: (listener) => {
       listeners.add(listener);
@@ -192,11 +314,73 @@ export const createCanvas2dRasterRuntime = (
   };
 };
 
+const restoreCommittedPixels = ({
+  context,
+  height,
+  patches,
+  source,
+  width,
+}: {
+  context: CanvasRenderingContext2D;
+  height: number;
+  patches: readonly {
+    canvas: HTMLCanvasElement;
+    region: { height: number; width: number; x: number; y: number };
+  }[];
+  source: { height: number; width: number; x: number; y: number };
+  width: number;
+}) => {
+  const scaleX = width / source.width;
+  const scaleY = height / source.height;
+
+  for (const patch of patches) {
+    const left = Math.max(source.x, patch.region.x);
+    const top = Math.max(source.y, patch.region.y);
+    const right = Math.min(
+      source.x + source.width,
+      patch.region.x + patch.region.width
+    );
+    const bottom = Math.min(
+      source.y + source.height,
+      patch.region.y + patch.region.height
+    );
+
+    if (right <= left || bottom <= top) {
+      continue;
+    }
+
+    const destinationX = (left - source.x) * scaleX;
+    const destinationY = (top - source.y) * scaleY;
+    const destinationWidth = (right - left) * scaleX;
+    const destinationHeight = (bottom - top) * scaleY;
+
+    context.clearRect(
+      destinationX,
+      destinationY,
+      destinationWidth,
+      destinationHeight
+    );
+    context.drawImage(
+      patch.canvas,
+      left - patch.region.x,
+      top - patch.region.y,
+      right - left,
+      bottom - top,
+      destinationX,
+      destinationY,
+      destinationWidth,
+      destinationHeight
+    );
+  }
+};
+
 const getSurfaceKey = ({
+  bounds,
   height,
   src,
   width,
-}: EnsureCanvas2dRasterSurfaceInput) => `${width}:${height}:${src}`;
+}: EnsureCanvas2dRasterSurfaceInput) =>
+  `${width}:${height}:${bounds?.x ?? 0}:${bounds?.y ?? 0}:${src}`;
 
 const prepareSurface = async (
   input: EnsureCanvas2dRasterSurfaceInput,
@@ -218,14 +402,38 @@ const prepareSurface = async (
     startMs: decodeStartedAt,
   });
 
-  context.clearRect(0, 0, input.width, input.height);
-  context.drawImage(image, 0, 0, input.width, input.height);
+  const bounds = input.bounds ?? {
+    height: input.height,
+    width: input.width,
+    x: 0,
+    y: 0,
+  };
+  const sourceBounds = input.sourceBounds ?? {
+    height: bounds.height,
+    width: bounds.width,
+    x: bounds.x,
+    y: bounds.y,
+  };
+  const scaleX = input.width / bounds.width;
+  const scaleY = input.height / bounds.height;
+
+  context.drawImage(
+    image,
+    (sourceBounds.x - bounds.x) * scaleX,
+    (sourceBounds.y - bounds.y) * scaleY,
+    sourceBounds.width * scaleX,
+    sourceBounds.height * scaleY
+  );
 
   return {
+    key: getSurfaceKey(input),
     presentation: {
       canvas,
-      height: input.height,
-      width: input.width,
+      height: bounds.height,
+      sourceBounds: { ...sourceBounds },
+      width: bounds.width,
+      x: bounds.x,
+      y: bounds.y,
     },
     source: input.src,
     surface: createCanvas2dRasterSurface(
@@ -234,6 +442,21 @@ const prepareSurface = async (
       notifyPresentationChanged,
       brushTipCache
     ),
+  };
+};
+
+export const getCanvas2dRasterDisplay = (
+  presentation: Canvas2dRasterPresentation,
+  sourceBounds = presentation.sourceBounds
+) => {
+  const scaleX = sourceBounds.width / presentation.sourceBounds.width;
+  const scaleY = sourceBounds.height / presentation.sourceBounds.height;
+
+  return {
+    height: presentation.height * scaleY,
+    width: presentation.width * scaleX,
+    x: sourceBounds.x + (presentation.x - presentation.sourceBounds.x) * scaleX,
+    y: sourceBounds.y + (presentation.y - presentation.sourceBounds.y) * scaleY,
   };
 };
 

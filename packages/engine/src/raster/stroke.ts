@@ -170,7 +170,12 @@ const createBoundedDabGenerator = (
 
         if (!(generator && segmentWasInside)) {
           generator = createRasterDabGenerator(context.settings);
+          const runStartIndex = dabs.length;
+
           dabs.push(...generator.append([clipped.start]));
+          if (dabs[runStartIndex]) {
+            dabs[runStartIndex].startsRun = true;
+          }
         }
 
         if (

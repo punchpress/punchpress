@@ -160,8 +160,9 @@ export const useDocumentCommands = () => {
         return false;
       }
 
+      const checkpoint = tab.editor.createDocumentSaveCheckpoint();
       const result = await savePunchDocumentFile(
-        tab.editor.serializeDocument(),
+        await tab.editor.serializeDocumentAsync(),
         tab.baseName,
         tab.fileHandle,
         forceDialog
@@ -175,7 +176,7 @@ export const useDocumentCommands = () => {
         baseName: result.fileName ? getDocumentBaseName(result.fileName) : null,
         fileHandle: result.fileHandle || tab.fileHandle,
       });
-      tab.editor.markDocumentSaved();
+      tab.editor.markDocumentSaved(checkpoint);
 
       showToast({
         message: `Saved ${result.fileName || `${tab.baseName}.punch`}`,

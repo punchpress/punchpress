@@ -111,8 +111,15 @@ function createRasterFrameBrushBenchmark({
 
       const raster = editor.nodes.find((node) => node.parentId === FRAME_ID);
 
-      if (!(raster?.type === "image" && raster.tileSources?.length)) {
-        throw new Error("Frame Brush benchmark did not commit tiled pixels");
+      if (
+        !(
+          raster?.type === "image" &&
+          editor.rasterSurface?.getPresentation?.(raster.id)
+        )
+      ) {
+        throw new Error(
+          "Frame Brush benchmark did not retain its Canvas surface"
+        );
       }
     },
     usesScratchDocument: true,
@@ -158,14 +165,16 @@ const preExpandFrameRaster = async (editor) => {
     session.update({ point });
   }
   await session.complete({ point: points.at(-1) });
-  await session.getHandoffReady?.();
 };
 
 const waitForCommittedRaster = async (editor, waitForFrame) => {
   for (let frame = 0; frame < 120; frame += 1) {
     const raster = editor.nodes.find((node) => node.parentId === FRAME_ID);
 
-    if (raster?.type === "image" && raster.tileSources?.length) {
+    if (
+      raster?.type === "image" &&
+      editor.rasterSurface?.getPresentation?.(raster.id)
+    ) {
       return;
     }
 

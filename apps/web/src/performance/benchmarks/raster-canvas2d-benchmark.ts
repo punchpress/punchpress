@@ -7,6 +7,7 @@ import type {
 const TARGET_ID = "raster-canvas2d-benchmark";
 const TARGET_WIDTH = 4500;
 const TARGET_HEIGHT = 5400;
+const EXPLORATORY_PLANE_SIZE = 10_000;
 
 export const rasterCanvas2dBenchmark: PerformanceBenchmarkDefinition = {
   defaultOptions: {
@@ -66,9 +67,58 @@ export const rasterCanvas2dBenchmark: PerformanceBenchmarkDefinition = {
       start: { x: 12, y: 12 },
       zoom: 0.04,
     });
+    await context.editor.serializeDocumentAsync();
+    await context.editor.exportDocument();
   },
   usesScratchDocument: true,
 };
+
+export const rasterLargestSupportedPlaneBenchmark: PerformanceBenchmarkDefinition =
+  {
+    defaultOptions: {
+      frames: 30,
+      nodeCount: 1,
+      stepX: 0,
+      stepY: 0,
+      warmupFrames: 4,
+    },
+    description:
+      "Exploratory first-dab, held-stroke, release, encode, and export case on a 10000×10000 resident Raster at the current 100M-pixel area cap; not a product size promise.",
+    id: "raster-largest-supported-plane-exploratory",
+    label: "Raster Largest Supported Plane — Exploratory",
+    setup: async ({ editor, waitForFrames }) => {
+      const src = createOpaquePixelSource();
+
+      editor.loadDocument(
+        createBenchmarkDocument(
+          src,
+          EXPLORATORY_PLANE_SIZE,
+          EXPLORATORY_PLANE_SIZE
+        )
+      );
+      await editor.rasterSurface.ensureSurface({
+        height: EXPLORATORY_PLANE_SIZE,
+        id: TARGET_ID,
+        src,
+        width: EXPLORATORY_PLANE_SIZE,
+      });
+      editor.select(TARGET_ID);
+      await waitForFrames(2);
+    },
+    run: async (context) => {
+      await runCase(context, {
+        counter: PERF_COUNTERS.rasterBenchmarkCommonHardRound,
+        end: { x: 5600, y: 5200 },
+        operation: "brush",
+        size: 106,
+        start: { x: 4400, y: 4800 },
+        zoom: 0.12,
+      });
+      await context.editor.serializeDocumentAsync();
+      await context.editor.exportDocument();
+    },
+    usesScratchDocument: true,
+  };
 
 export const rasterCanvas2dExtremeDiagonalBenchmark: PerformanceBenchmarkDefinition =
   {
@@ -108,6 +158,78 @@ export const rasterCanvas2dExtremeDiagonalBenchmark: PerformanceBenchmarkDefinit
     },
     usesScratchDocument: true,
   };
+
+export const rasterCanvas2dSquareBenchmark: PerformanceBenchmarkDefinition = {
+  defaultOptions: {
+    frames: 60,
+    nodeCount: 1,
+    stepX: 0,
+    stepY: 0,
+    warmupFrames: 8,
+  },
+  description:
+    "Measures first Dab, held-stroke p95, edge re-entry, release, activation/decode, save, export, and memory on a resident 5000×5000 Raster at normal, 15%, and high pixel zoom.",
+  id: "raster-canvas2d-square",
+  label: "Raster Canvas2D Square",
+  setup: async ({ editor, waitForFrames }) => {
+    const src = createOpaquePixelSource();
+
+    editor.loadDocument(createBenchmarkDocument(src, 5000, 5000));
+    await editor.rasterSurface.ensureSurface({
+      height: 5000,
+      id: TARGET_ID,
+      src,
+      width: 5000,
+    });
+    editor.select(TARGET_ID);
+    await waitForFrames(2);
+  },
+  run: async (context) => {
+    await runCase(context, {
+      counter: PERF_COUNTERS.rasterBenchmarkCommonHardRound,
+      end: { x: 4200, y: 2600 },
+      operation: "brush",
+      size: 106,
+      start: { x: 800, y: 2400 },
+      zoom: 1,
+    });
+    await runCase(context, {
+      counter: PERF_COUNTERS.rasterBenchmarkExtremeZoomOut,
+      end: { x: 4950, y: 3400 },
+      operation: "brush",
+      pointAtProgress: (progress) => {
+        const points = [
+          { x: 50, y: 1600 },
+          { x: -500, y: 2000 },
+          { x: 5500, y: 2800 },
+          { x: 4950, y: 3400 },
+        ];
+        const segmentProgress = progress * (points.length - 1);
+        const index = Math.min(points.length - 2, Math.floor(segmentProgress));
+        const local = segmentProgress - index;
+
+        return {
+          x: points[index].x + (points[index + 1].x - points[index].x) * local,
+          y: points[index].y + (points[index + 1].y - points[index].y) * local,
+        };
+      },
+      size: 106,
+      start: { x: 50, y: 1600 },
+      zoom: 0.15,
+    });
+    await runCase(context, {
+      counter: PERF_COUNTERS.rasterBenchmarkPixelZoom,
+      end: { x: 120, y: 100 },
+      operation: "brush",
+      size: 4,
+      start: { x: 40, y: 40 },
+      zoom: 16,
+    });
+    await context.editor.serializeDocumentAsync();
+    await context.editor.exportDocument();
+  },
+  usesScratchDocument: true,
+};
 
 export const rasterHighZoomBenchmark: PerformanceBenchmarkDefinition = {
   defaultOptions: {
@@ -431,12 +553,16 @@ const createOpaquePixelSource = () => {
   return canvas.toDataURL("image/png");
 };
 
-const createBenchmarkDocument = (src: string) =>
+const createBenchmarkDocument = (
+  src: string,
+  width = TARGET_WIDTH,
+  height = TARGET_HEIGHT
+) =>
   JSON.stringify({
     nodes: [
       {
         assetId: "asset-raster-canvas2d-benchmark",
-        height: TARGET_HEIGHT,
+        height,
         id: TARGET_ID,
         mimeType: "image/png",
         name: "Raster Canvas2D Benchmark",
@@ -452,7 +578,7 @@ const createBenchmarkDocument = (src: string) =>
         },
         type: "image",
         visible: true,
-        width: TARGET_WIDTH,
+        width,
       },
     ],
     version: "1.8",

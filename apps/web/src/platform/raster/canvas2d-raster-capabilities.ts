@@ -1,6 +1,7 @@
 export interface Canvas2dRasterCapabilities {
   createCanvas: (width: number, height: number) => HTMLCanvasElement;
   decodeImage: (src: string) => Promise<CanvasImageSource>;
+  encodeCanvas: (canvas: HTMLCanvasElement) => Promise<string>;
 }
 
 export const browserCanvas2dCapabilities: Canvas2dRasterCapabilities = {
@@ -18,6 +19,21 @@ export const browserCanvas2dCapabilities: Canvas2dRasterCapabilities = {
     await image.decode();
     return image;
   },
+  encodeCanvas: (canvas) =>
+    new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error("Could not encode Raster Canvas."));
+          return;
+        }
+
+        const reader = new FileReader();
+
+        reader.addEventListener("error", () => reject(reader.error));
+        reader.addEventListener("load", () => resolve(String(reader.result)));
+        reader.readAsDataURL(blob);
+      }, "image/png");
+    }),
 };
 
 export const requireCanvas2dContext = (canvas: HTMLCanvasElement) => {

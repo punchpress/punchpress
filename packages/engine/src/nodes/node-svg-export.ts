@@ -99,21 +99,11 @@ const buildSvgImageMarkup = (node, geometry, inheritedOpacity, offsetX, offsetY)
         node.baseHeight ?? node.height
       )}" preserveAspectRatio="none"${opacity}/>`
     : "";
-  const tileMarkup = (node.tileSources || [])
-    .map(
-      (tile) =>
-        `<image href="${tile.src}" x="${format(tile.x)}" y="${format(
-          tile.y
-        )}" width="${format(tile.width)}" height="${format(
-          tile.height
-        )}" preserveAspectRatio="none"${opacity}/>`
-    )
-    .join("");
   const clippedRasterMarkup = `<svg x="0" y="0" width="${format(
     node.width
   )}" height="${format(
     node.height
-  )}" overflow="hidden">${baseMarkup}${tileMarkup}</svg>`;
+  )}" overflow="hidden">${baseMarkup}</svg>`;
 
   return `<g transform="translate(${format(getNodeX(node) - offsetX)} ${format(
     getNodeY(node) - offsetY

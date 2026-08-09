@@ -33,6 +33,7 @@ export type RasterDab = {
   opacity: number;
   roundness: number;
   size: number;
+  startsRun?: boolean;
   tip: RasterBrushTip;
 };
 
@@ -75,7 +76,13 @@ export type RasterDirtyRegion = RasterRect;
 
 export type RasterCommit = {
   dirtyRegion: RasterDirtyRegion | null;
+  patch?: RasterHistoryPatch;
   targetId: string;
+};
+
+export type RasterHistoryPatch = {
+  redo: () => void;
+  undo: () => void;
 };
 
 export type RasterSurfaceSession = {
@@ -89,9 +96,15 @@ export type RasterSurface = {
 };
 
 export type RasterSurfaceResolver = {
+  getSurfaceGeometry?: (
+    targetId: string,
+    sourceBounds: Readonly<RasterRect>
+  ) => { bounds: RasterRect; pixelSize: RasterPixelSize } | null;
+  resetSurfaces?: () => void;
   snapshotSurface?: (
-    targetId: string
-  ) => { height: number; src: string; width: number } | null;
+    targetId: string,
+    sourceBounds?: Readonly<RasterRect>
+  ) => (RasterRect & { src: string }) | null;
   retainTargets?: (targetIds: readonly string[]) => void;
   resolveSurface: (target: Readonly<RasterTarget>) => RasterSurface | null;
 };

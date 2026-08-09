@@ -213,7 +213,6 @@ export const getGroupNodeRenderTree = (
           nodeId: childNode.id,
           opacity: getNodeOpacity(childNode),
           src: childNode.src,
-          tileSources: childNode.tileSources,
           transform: getSvgNodeTransform(childNode, geometry.bbox),
           type: "image",
           width: childNode.width,
@@ -365,7 +364,6 @@ export const CanvasNodeRenderTree = ({
               opacity={isEditing ? 0 : (item.opacity ?? 1)}
               renderRootNodeId={renderRootNodeId}
               src={item.src}
-              tileSources={item.tileSources}
               width={item.width}
             />
           </svg>

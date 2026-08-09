@@ -44,7 +44,12 @@ export const createRasterAssetRecord = (
     colorSpace: "srgb",
     currentMimeType: mimeType,
     hasAlpha: mimeType !== "image/jpeg",
-    height: typeof node.height === "number" ? node.height : 1,
+    height:
+      typeof node.pixelHeight === "number"
+        ? node.pixelHeight
+        : typeof node.height === "number"
+          ? node.height
+          : 1,
     id: assetId,
     kind: "raster",
     name:
@@ -55,7 +60,12 @@ export const createRasterAssetRecord = (
     preferredExportMimeType: mimeType,
     ref: `assets/raster/${assetId}.${getRasterAssetExtension(mimeType)}`,
     storage: "single",
-    width: typeof node.width === "number" ? node.width : 1,
+    width:
+      typeof node.pixelWidth === "number"
+        ? node.pixelWidth
+        : typeof node.width === "number"
+          ? node.width
+          : 1,
   };
 };
 

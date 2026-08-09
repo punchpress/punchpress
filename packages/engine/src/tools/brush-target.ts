@@ -374,6 +374,59 @@ export const getRasterWritableBounds = (editor, node) => {
   };
 };
 
+export const getRasterSurfaceBounds = (editor, node) => {
+  if (node?.type !== "image") {
+    return null;
+  }
+
+  const sourceBounds = {
+    height: node.baseHeight ?? node.height,
+    width: node.baseWidth ?? node.width,
+    x: node.baseX ?? 0,
+    y: node.baseY ?? 0,
+  };
+  const writableBounds = getRasterWritableBounds(editor, node);
+
+  if (!writableBounds) {
+    return sourceBounds;
+  }
+
+  if (getOwningFrame(editor, node)) {
+    return writableBounds;
+  }
+
+  const x = Math.min(sourceBounds.x, writableBounds.x);
+  const y = Math.min(sourceBounds.y, writableBounds.y);
+  const maxX = Math.max(
+    sourceBounds.x + sourceBounds.width,
+    writableBounds.x + writableBounds.width
+  );
+  const maxY = Math.max(
+    sourceBounds.y + sourceBounds.height,
+    writableBounds.y + writableBounds.height
+  );
+
+  return { height: maxY - y, width: maxX - x, x, y };
+};
+
+export const getRasterSurfacePixelSize = (editor, node) => {
+  const bounds = getRasterSurfaceBounds(editor, node);
+
+  if (!(bounds && node?.type === "image")) {
+    return null;
+  }
+
+  const sourceWidth = node.baseWidth ?? node.width;
+  const sourceHeight = node.baseHeight ?? node.height;
+  const scaleX = (node.pixelWidth ?? sourceWidth) / sourceWidth;
+  const scaleY = (node.pixelHeight ?? sourceHeight) / sourceHeight;
+
+  return {
+    height: Math.max(1, Math.ceil(bounds.height * scaleY)),
+    width: Math.max(1, Math.ceil(bounds.width * scaleX)),
+  };
+};
+
 export const getRasterWritablePolygon = (editor, node) => {
   if (node?.type !== "image") {
     return null;

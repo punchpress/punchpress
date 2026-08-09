@@ -20,6 +20,15 @@ import {
   requireCanvas2dContext,
 } from "./canvas2d-raster-capabilities";
 
+export interface Canvas2dRasterSurface extends RasterSurface {
+  getUncommittedPatches: () => readonly Canvas2dRasterPatch[];
+}
+
+export interface Canvas2dRasterPatch {
+  canvas: HTMLCanvasElement;
+  region: RasterDirtyRegion;
+}
+
 export const createCanvas2dRasterSurface = (
   canvas: HTMLCanvasElement,
   capabilities: Canvas2dRasterCapabilities,
@@ -27,30 +36,39 @@ export const createCanvas2dRasterSurface = (
   brushTipCache: Canvas2dBrushTipCache = createCanvas2dBrushTipCache(
     capabilities
   )
-): RasterSurface => ({
-  beginStroke: (context) =>
-    createCanvas2dRasterSurfaceSession(
-      canvas,
-      context,
-      capabilities,
-      notifyPresentationChanged,
-      brushTipCache
-    ),
-});
+): Canvas2dRasterSurface => {
+  let uncommittedPatches: readonly Canvas2dRasterPatch[] = [];
+
+  return {
+    beginStroke: (context) => {
+      const session = createCanvas2dRasterSurfaceSession(
+        canvas,
+        context,
+        capabilities,
+        notifyPresentationChanged,
+        brushTipCache,
+        (patches) => {
+          uncommittedPatches = patches;
+        }
+      );
+
+      return session;
+    },
+    getUncommittedPatches: () => uncommittedPatches,
+  };
+};
 
 const createCanvas2dRasterSurfaceSession = (
   canvas: HTMLCanvasElement,
   strokeContext: Readonly<RasterStrokeContext>,
   capabilities: Canvas2dRasterCapabilities,
   notifyPresentationChanged: () => void,
-  brushTipCache: Canvas2dBrushTipCache
+  brushTipCache: Canvas2dBrushTipCache,
+  setUncommittedPatches: (patches: readonly Canvas2dRasterPatch[]) => void
 ): RasterSurfaceSession => {
   const context = requireCanvas2dContext(canvas);
   let dirtyRegion: RasterDirtyRegion | null = null;
-  const rollbackPatches: Array<{
-    canvas: HTMLCanvasElement;
-    region: RasterDirtyRegion;
-  }> = [];
+  const rollbackPatches: Canvas2dRasterPatch[] = [];
   let isFirstDab = true;
   let state: "active" | "cancelled" | "committed" = "active";
 
@@ -74,19 +92,17 @@ const createCanvas2dRasterSurfaceSession = (
       }
 
       const apply = () => {
-        rollbackPatches.push(
-          captureRollbackPatch({
-            capabilities,
-            region: nextDirtyRegion,
-            source: canvas,
-          })
-        );
-        dirtyRegion = unionRects(dirtyRegion, nextDirtyRegion);
+        const nextUnion = unionRects(dirtyRegion, nextDirtyRegion);
+
+        for (const region of subtractContainedRect(nextUnion, dirtyRegion)) {
+          rollbackPatches.push(
+            captureRasterPatch({ capabilities, region, source: canvas })
+          );
+        }
+        setUncommittedPatches(rollbackPatches);
+        dirtyRegion = nextUnion;
         context.save();
-        clipContextToWritablePolygon(
-          context,
-          strokeContext.target.writablePolygon
-        );
+        clipContextToWritablePolygon(context, strokeContext.target);
         paintDabs(context, dabs, strokeContext, brushTipCache);
         context.restore();
         notifyPresentationChanged();
@@ -108,18 +124,17 @@ const createCanvas2dRasterSurfaceSession = (
     cancel: () => {
       requireActive();
       state = "cancelled";
+      setUncommittedPatches([]);
 
       measurePerf(PERF_SPANS.rasterStrokeCancel, () => {
-        for (let index = rollbackPatches.length - 1; index >= 0; index -= 1) {
-          const patch = rollbackPatches[index];
+        const beforePatch = createCombinedBeforePatch({
+          capabilities,
+          dirtyRegion,
+          patches: rollbackPatches,
+        });
 
-          context.clearRect(
-            patch.region.x,
-            patch.region.y,
-            patch.region.width,
-            patch.region.height
-          );
-          context.drawImage(patch.canvas, patch.region.x, patch.region.y);
+        if (beforePatch) {
+          applyRasterPatches(context, [beforePatch]);
         }
         notifyPresentationChanged();
       });
@@ -127,6 +142,7 @@ const createCanvas2dRasterSurfaceSession = (
     commit: () => {
       requireActive();
       state = "committed";
+      setUncommittedPatches([]);
       return measurePerf(PERF_SPANS.rasterStrokeCommit, () => {
         if (dirtyRegion) {
           incrementPerfCounter(
@@ -135,8 +151,39 @@ const createCanvas2dRasterSurfaceSession = (
           );
         }
 
+        const afterPatch = dirtyRegion
+          ? captureRasterPatch({
+              capabilities,
+              region: dirtyRegion,
+              source: canvas,
+            })
+          : null;
+        const beforePatch = createCombinedBeforePatch({
+          capabilities,
+          dirtyRegion,
+          patches: rollbackPatches,
+        });
+
         return {
           dirtyRegion,
+          ...(dirtyRegion
+            ? {
+                patch: {
+                  redo: () => {
+                    if (afterPatch) {
+                      applyRasterPatches(context, [afterPatch]);
+                    }
+                    notifyPresentationChanged();
+                  },
+                  undo: () => {
+                    if (beforePatch) {
+                      applyRasterPatches(context, [beforePatch]);
+                    }
+                    notifyPresentationChanged();
+                  },
+                },
+              }
+            : {}),
           targetId: strokeContext.target.id,
         };
       });
@@ -146,22 +193,34 @@ const createCanvas2dRasterSurfaceSession = (
 
 const clipContextToWritablePolygon = (
   context: CanvasRenderingContext2D,
-  polygon: readonly Readonly<RasterPoint>[] | undefined
+  target: Readonly<RasterTarget>
 ) => {
+  const polygon = target.writablePolygon;
+
   if (!polygon?.length) {
     return;
   }
 
+  const scaleX = target.pixelSize.width / target.bounds.width;
+  const scaleY = target.pixelSize.height / target.bounds.height;
+  const toPixelPoint = (point: Readonly<RasterPoint>) => ({
+    x: (point.x - target.bounds.x) * scaleX,
+    y: (point.y - target.bounds.y) * scaleY,
+  });
+  const firstPoint = toPixelPoint(polygon[0]);
+
   context.beginPath();
-  context.moveTo(polygon[0].x, polygon[0].y);
+  context.moveTo(firstPoint.x, firstPoint.y);
   for (const point of polygon.slice(1)) {
-    context.lineTo(point.x, point.y);
+    const pixelPoint = toPixelPoint(point);
+
+    context.lineTo(pixelPoint.x, pixelPoint.y);
   }
   context.closePath();
   context.clip();
 };
 
-const captureRollbackPatch = ({
+const captureRasterPatch = ({
   capabilities,
   region,
   source,
@@ -186,6 +245,90 @@ const captureRollbackPatch = ({
   );
 
   return { canvas, region };
+};
+
+const applyRasterPatches = (
+  context: CanvasRenderingContext2D,
+  patches: readonly {
+    canvas: HTMLCanvasElement;
+    region: RasterDirtyRegion;
+  }[]
+) => {
+  for (const patch of patches) {
+    context.clearRect(
+      patch.region.x,
+      patch.region.y,
+      patch.region.width,
+      patch.region.height
+    );
+    context.drawImage(patch.canvas, patch.region.x, patch.region.y);
+  }
+};
+
+const createCombinedBeforePatch = ({
+  capabilities,
+  dirtyRegion,
+  patches,
+}: {
+  capabilities: Canvas2dRasterCapabilities;
+  dirtyRegion: RasterDirtyRegion | null;
+  patches: readonly { canvas: HTMLCanvasElement; region: RasterDirtyRegion }[];
+}) => {
+  if (!dirtyRegion) {
+    return null;
+  }
+
+  const combined = {
+    canvas: capabilities.createCanvas(dirtyRegion.width, dirtyRegion.height),
+    region: dirtyRegion,
+  };
+  const context = requireCanvas2dContext(combined.canvas);
+
+  for (const patch of patches) {
+    const x = patch.region.x - dirtyRegion.x;
+    const y = patch.region.y - dirtyRegion.y;
+
+    context.drawImage(patch.canvas, x, y);
+  }
+
+  return combined;
+};
+
+const subtractContainedRect = (
+  outer: RasterDirtyRegion,
+  inner: RasterDirtyRegion | null
+): RasterDirtyRegion[] => {
+  if (!inner) {
+    return [outer];
+  }
+
+  const outerMaxX = outer.x + outer.width;
+  const outerMaxY = outer.y + outer.height;
+  const innerMaxX = inner.x + inner.width;
+  const innerMaxY = inner.y + inner.height;
+  const regions = [
+    { height: inner.y - outer.y, width: outer.width, x: outer.x, y: outer.y },
+    {
+      height: outerMaxY - innerMaxY,
+      width: outer.width,
+      x: outer.x,
+      y: innerMaxY,
+    },
+    {
+      height: inner.height,
+      width: inner.x - outer.x,
+      x: outer.x,
+      y: inner.y,
+    },
+    {
+      height: inner.height,
+      width: outerMaxX - innerMaxX,
+      x: innerMaxX,
+      y: inner.y,
+    },
+  ];
+
+  return regions.filter(({ height, width }) => height > 0 && width > 0);
 };
 
 const paintDabs = (
@@ -260,23 +403,40 @@ const paintNativeRoundPath = (
 
   context.globalAlpha = first.opacity;
   context.fillStyle = first.color;
-  context.beginPath();
+  context.strokeStyle = first.color;
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  context.lineWidth = first.size * scale;
+  const runs: RasterDab[][] = [];
 
   for (const dab of dabs) {
-    context.moveTo(
-      (dab.center.x - target.bounds.x + dab.size * 0.5) * scale,
-      (dab.center.y - target.bounds.y) * scale
-    );
-    context.arc(
-      (dab.center.x - target.bounds.x) * scale,
-      (dab.center.y - target.bounds.y) * scale,
-      dab.size * scale * 0.5,
-      0,
-      Math.PI * 2
-    );
+    if (runs.length === 0 || dab.startsRun) {
+      runs.push([]);
+    }
+    runs.at(-1)?.push(dab);
   }
 
-  context.fill();
+  for (const run of runs) {
+    const runStart = run[0];
+    const x = (runStart.center.x - target.bounds.x) * scale;
+    const y = (runStart.center.y - target.bounds.y) * scale;
+
+    context.beginPath();
+    if (run.length === 1) {
+      context.arc(x, y, runStart.size * scale * 0.5, 0, Math.PI * 2);
+      context.fill();
+      continue;
+    }
+
+    context.moveTo(x, y);
+    for (const dab of run.slice(1)) {
+      context.lineTo(
+        (dab.center.x - target.bounds.x) * scale,
+        (dab.center.y - target.bounds.y) * scale
+      );
+    }
+    context.stroke();
+  }
 };
 
 const stampDab = (
@@ -337,8 +497,13 @@ const getDabsDirtyRegion = (
   for (const dab of dabs) {
     const centerX = (dab.center.x - target.bounds.x) * scaleX;
     const centerY = (dab.center.y - target.bounds.y) * scaleY;
-    const radiusX = (dab.size * scaleX) / 2;
-    const radiusY = (dab.size * scaleY) / 2;
+    const angle = (dab.angle * Math.PI) / 180;
+    const cosine = Math.abs(Math.cos(angle));
+    const sine = Math.abs(Math.sin(angle));
+    const width = dab.size * scaleX;
+    const height = dab.size * dab.roundness * scaleY;
+    const radiusX = (cosine * width + sine * height) / 2;
+    const radiusY = (sine * width + cosine * height) / 2;
     const minX = Math.max(writableMinX, Math.floor(centerX - radiusX));
     const minY = Math.max(writableMinY, Math.floor(centerY - radiusY));
     const maxX = Math.min(writableMaxX, Math.ceil(centerX + radiusX));

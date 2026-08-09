@@ -8,11 +8,14 @@ export interface HistoryManager {
   captureState: any;
   createChange: any;
   currentRevision: any;
+  currentStateId: any;
   isApplying: any;
   limit: any;
   nextMarkId: any;
+  nextStateId: any;
   redoStack: any;
   savedSnapshot: any;
+  savedStateId: any;
   undoStack: any;
 }
 
@@ -32,11 +35,14 @@ export class HistoryManager {
     this.captureSnapshot = captureSnapshot;
     this.createChange = createChange;
     this.currentRevision = 0;
+    this.currentStateId = 0;
     this.isApplying = false;
     this.limit = limit;
     this.nextMarkId = 0;
+    this.nextStateId = 1;
     this.redoStack = [];
     this.savedSnapshot = captureSnapshot();
+    this.savedStateId = this.currentStateId;
     this.undoStack = [];
   }
 
@@ -49,11 +55,22 @@ export class HistoryManager {
   }
 
   get isDirty() {
-    return this.captureSnapshot() !== this.savedSnapshot;
+    return (
+      this.currentStateId !== this.savedStateId ||
+      this.captureSnapshot() !== this.savedSnapshot
+    );
   }
 
-  markSaved() {
-    this.savedSnapshot = this.captureSnapshot();
+  captureSaveCheckpoint() {
+    return {
+      snapshot: this.captureSnapshot(),
+      stateId: this.currentStateId,
+    };
+  }
+
+  markSaved(checkpoint = this.captureSaveCheckpoint()) {
+    this.savedSnapshot = checkpoint.snapshot;
+    this.savedStateId = checkpoint.stateId;
   }
 
   mark(name) {
@@ -63,6 +80,7 @@ export class HistoryManager {
 
     const mark = {
       beforeState: this.captureState(),
+      beforeStateId: this.currentStateId,
       id: this.nextMarkId,
       name: name || null,
       revision: this.currentRevision,
@@ -73,12 +91,12 @@ export class HistoryManager {
     return mark;
   }
 
-  commitMark(mark) {
+  commitMark(mark, effect = null) {
     if (!this.releaseMark(mark) || this.isApplying) {
       return false;
     }
 
-    return this.pushChange(mark.beforeState);
+    return this.pushChange(mark.beforeState, effect);
   }
 
   revertToMark(mark) {
@@ -90,17 +108,26 @@ export class HistoryManager {
     return true;
   }
 
-  pushChange(beforeState) {
+  pushChange(beforeState, effect = null) {
     if (this.isApplying) {
       return false;
     }
 
-    const change = this.createChange(beforeState, this.captureState());
+    const stateChange = this.createChange(beforeState, this.captureState());
 
-    if (!change) {
+    if (!(stateChange || effect)) {
       return false;
     }
 
+    const change = {
+      afterStateId: this.nextStateId,
+      beforeStateId: this.currentStateId,
+      effect,
+      stateChange,
+    };
+
+    this.currentStateId = this.nextStateId;
+    this.nextStateId += 1;
     this.currentRevision += 1;
     this.undoStack.push(change);
     this.trimStack(this.undoStack);
@@ -125,8 +152,11 @@ export class HistoryManager {
   reset() {
     this.activeMarks.clear();
     this.currentRevision = 0;
+    this.currentStateId = 0;
+    this.nextStateId = 1;
     this.redoStack = [];
     this.savedSnapshot = this.captureSnapshot();
+    this.savedStateId = this.currentStateId;
     this.undoStack = [];
   }
 
@@ -160,16 +190,28 @@ export class HistoryManager {
     this.activeMarks.clear();
 
     try {
-      const nextState = this.applyChange(
-        this.captureState(),
-        change,
-        direction
-      );
-      this.applyState(nextState);
+      if (direction === "undo") {
+        change.effect?.undo();
+      }
+
+      if (change.stateChange) {
+        const nextState = this.applyChange(
+          this.captureState(),
+          change.stateChange,
+          direction
+        );
+        this.applyState(nextState);
+      }
+
+      if (direction === "redo") {
+        change.effect?.redo();
+      }
       if (direction === "undo") {
         this.currentRevision -= 1;
+        this.currentStateId = change.beforeStateId;
       } else {
         this.currentRevision += 1;
+        this.currentStateId = change.afterStateId;
       }
 
       targetStack.push(change);

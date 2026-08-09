@@ -323,7 +323,6 @@ const RasterCropArtwork = ({ node }: { node: ImageNodeDocument }) => (
     nodeId={node.id}
     pixelGridSurface="crop"
     src={node.src}
-    tileSources={node.tileSources}
     width={node.width}
   />
 );

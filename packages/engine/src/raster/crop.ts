@@ -86,15 +86,18 @@ export const commitRasterCrop = (editor) => {
 
   const rect = normalizeRasterCropRect(session.rect);
   const residentSnapshot =
-    editor.rasterSurface?.snapshotSurface?.(node.id) || null;
+    editor.rasterSurface?.snapshotSurface?.(node.id, {
+      height: node.baseHeight ?? node.height,
+      width: node.baseWidth ?? node.width,
+      x: node.baseX ?? 0,
+      y: node.baseY ?? 0,
+    }) || null;
 
   if (residentSnapshot) {
     editor.getState().updateNodeById(node.id, (currentNode) =>
       currentNode.type === "image"
         ? {
             ...currentNode,
-            baseHeight: residentSnapshot.height,
-            baseWidth: residentSnapshot.width,
             src: residentSnapshot.src,
           }
         : currentNode
@@ -148,15 +151,6 @@ export const getCroppedImageNode = (node, inputRect: RasterCropRect) => {
     baseX: (node.baseX ?? 0) - rect.x,
     baseY: (node.baseY ?? 0) - rect.y,
     height: rect.height,
-    ...(node.tileSources
-      ? {
-          tileSources: node.tileSources.map((tile) => ({
-            ...tile,
-            x: tile.x - rect.x,
-            y: tile.y - rect.y,
-          })),
-        }
-      : {}),
     width: rect.width,
     writableHeight: rect.height,
     writableWidth: rect.width,

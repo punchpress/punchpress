@@ -4,6 +4,7 @@ import { createConfiguredEditor } from "@/editor-react/create-configured-editor"
 import { EditorContext } from "@/editor-react/editor-context";
 import { useEditorClipboardEvents } from "@/editor-react/use-editor-clipboard-events";
 import { getDocumentBaseName } from "@/platform/web-document-files";
+import { createScratchpadPersistenceQueue } from "./scratchpad-persistence-queue";
 import {
   loadScratchpadDocument,
   saveScratchpadDocument,
@@ -140,23 +141,20 @@ export const WorkspaceProvider = ({ children }) => {
       return;
     }
 
+    const persist = createScratchpadPersistenceQueue({
+      save: saveScratchpadDocument,
+      serialize: () => activeEditor.serializeDocumentAsync(),
+    });
     let timeoutId = window.setTimeout(() => {
-      saveScratchpadDocument(activeEditor.serializeDocument()).catch(
-        (error) => {
-          console.error(error);
-        }
-      );
+      persist().catch((error) => console.error(error));
     }, 400);
 
     const unsubscribe = activeEditor.store.subscribe(() => {
       window.clearTimeout(timeoutId);
-      timeoutId = window.setTimeout(() => {
-        saveScratchpadDocument(activeEditor.serializeDocument()).catch(
-          (error) => {
-            console.error(error);
-          }
-        );
-      }, 400);
+      timeoutId = window.setTimeout(
+        () => persist().catch((error) => console.error(error)),
+        400
+      );
     });
 
     return () => {

@@ -43,10 +43,6 @@ export class BrushTool extends Tool {
     return this.runtime.hasActiveSession();
   }
 
-  getWorkingGroups() {
-    return this.runtime.getWorkingGroups();
-  }
-
   onCanvasPointerDown({ point }: BrushPointerInput) {
     return this.beginStroke({ point });
   }

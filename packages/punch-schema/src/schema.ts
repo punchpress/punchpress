@@ -8,6 +8,9 @@ import {
 const finiteNumber = z.number().refine(Number.isFinite, {
   message: "Expected a finite number.",
 });
+const positiveFiniteNumber = finiteNumber.refine((value) => value > 0, {
+  message: "Expected a positive number.",
+});
 const opacityNumber = z.number().refine((value) => {
   return Number.isFinite(value) && value >= 0 && value <= 1;
 }, {
@@ -154,23 +157,9 @@ export const imageNodeSchema = baseNodeSchema
     height: finiteNumber,
     mimeType: imageMimeTypeSchema.optional(),
     name: z.string().min(1),
+    pixelHeight: positiveFiniteNumber.optional(),
+    pixelWidth: positiveFiniteNumber.optional(),
     src: z.string().min(1).optional(),
-    tileSources: z
-      .array(
-        z
-          .object({
-            col: z.number().int(),
-            height: finiteNumber,
-            ref: z.string().min(1),
-            row: z.number().int(),
-            src: z.string().min(1),
-            width: finiteNumber,
-            x: finiteNumber,
-            y: finiteNumber,
-          })
-          .strict()
-      )
-      .optional(),
     transform: transformSchema,
     type: z.literal("image"),
     width: finiteNumber,
@@ -178,19 +167,6 @@ export const imageNodeSchema = baseNodeSchema
     writableWidth: finiteNumber.optional(),
     writableX: finiteNumber.optional(),
     writableY: finiteNumber.optional(),
-  })
-  .strict();
-
-export const rasterAssetTileSchema = z
-  .object({
-    col: z.number().int(),
-    height: finiteNumber,
-    mimeType: imageMimeTypeSchema.optional(),
-    ref: z.string().min(1),
-    row: z.number().int(),
-    width: finiteNumber,
-    x: finiteNumber,
-    y: finiteNumber,
   })
   .strict();
 
@@ -216,19 +192,7 @@ export const singleRasterAssetSchema = baseRasterAssetSchema
   })
   .strict();
 
-export const tiledRasterAssetSchema = baseRasterAssetSchema
-  .extend({
-    baseRef: z.string().min(1).optional(),
-    storage: z.literal("tiled"),
-    tileSize: finiteNumber,
-    tiles: z.array(rasterAssetTileSchema).min(1),
-  })
-  .strict();
-
-export const rasterAssetSchema = z.discriminatedUnion("storage", [
-  singleRasterAssetSchema,
-  tiledRasterAssetSchema,
-]);
+export const rasterAssetSchema = singleRasterAssetSchema;
 
 export const documentAssetSchema = rasterAssetSchema;
 
@@ -422,7 +386,6 @@ export type ImageNodeDocument = z.infer<typeof imageNodeSchema>;
 export type ImageMimeTypeDocument = z.infer<typeof imageMimeTypeSchema>;
 export type NodeDocument = z.infer<typeof nodeSchema>;
 export type RasterAssetDocument = z.infer<typeof rasterAssetSchema>;
-export type RasterAssetTileDocument = z.infer<typeof rasterAssetTileSchema>;
 export type ShapeKindDocument = z.infer<typeof shapeKindSchema>;
 export type ShapePointDocument = z.infer<typeof shapePointSchema>;
 export type ShapeNodeDocument = z.infer<typeof shapeNodeSchema>;

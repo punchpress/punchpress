@@ -66,8 +66,12 @@ export const startCanvasToolPlacementSession = ({
     const nextUpdates = pendingUpdates;
     pendingUpdates = [];
 
-    for (const nextUpdate of nextUpdates) {
-      session.update(nextUpdate);
+    if (session.updateBatch && nextUpdates.length > 1) {
+      session.updateBatch(nextUpdates);
+    } else {
+      for (const nextUpdate of nextUpdates) {
+        session.update(nextUpdate);
+      }
     }
   };
 
@@ -122,9 +126,21 @@ export const startCanvasToolPlacementSession = ({
       ? moveEvent.getCoalescedEvents?.() || []
       : [];
     const samples = coalescedEvents.length > 0 ? coalescedEvents : [moveEvent];
+    const updates = samples.map(getSessionUpdate);
 
-    for (const sample of samples) {
-      scheduleUpdate(getSessionUpdate(sample));
+    if (session.preservePointerSamples) {
+      if (session.updateBatch && updates.length > 1) {
+        session.updateBatch(updates);
+      } else {
+        for (const update of updates) {
+          session.update(update);
+        }
+      }
+      return;
+    }
+
+    for (const update of updates) {
+      scheduleUpdate(update);
     }
   };
 
