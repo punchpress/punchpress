@@ -47,8 +47,8 @@ editor-owned overlays.
 
 When a node moves inside a fixed ancestor clip, keep the clip layer stationary
 and apply the shared preview transform to the stable inner presentation.
-Keep that presentation split selection-preview-only: Raster Brush
-working-to-durable handoff must not alter placement styles or render resources.
+Keep that presentation split selection-preview-only. Raster Brush retains the
+same resident Canvas and must not alter placement styles at pointer release.
 
 Avoid rerendering node content during drag or using DOM-target-driven
 third-party transform overlays on the hot path.

@@ -162,16 +162,20 @@ Raster adapter gates:
 
 | Scenario | Contract |
 | --- | --- |
-| `raster-canvas2d-strokes` | Runs pixel zoom, common Hard Round, large Eraser, and extreme zoom-out on one resident `4500 × 5400` Raster. |
+| `raster-canvas2d-strokes` | Runs high pixel zoom, normal zoom, large Eraser, low zoom, asynchronous save snapshot, and export on one resident `4500 × 5400` Raster. |
 | `raster-canvas2d-extreme-diagonal` | Runs the full-target 4%-zoom diagonal alone for flame and browser-trace capture. |
+| `raster-canvas2d-square` | Runs normal, 15%, and high pixel zoom plus async save/export on a resident `5000 × 5000` Raster. |
 | `raster-frame-brush` | Draws one rapid default Hard Round stroke through the canvas pointer-event path across an initially empty `4500 × 5400` Frame at 12% zoom. |
 | `raster-frame-brush-stable-plane` | Repeats `raster-frame-brush` after corner marks have expanded the Raster content bounds. Compare the pair to detect latency caused by content-bound growth rather than brush work. |
 | `raster-high-zoom` | Pans a resident `4500 × 5400` Frame/Raster at 12,800% with exact samples and the Frame-local pixel grid visible. |
 | `raster-high-zoom-brush` | Draws a continuous 24 px Hard Round curve on a resident `720 × 720` Raster at 1,097% and verifies exact displayed pixels track the working surface. |
+| `raster-largest-supported-plane-exploratory` | Exercises first Dab, held input, release, encode, export, and memory on a `10000 × 10000` resident plane at the current `100,000,000`-pixel area cap. Exploratory only; not a product size promise. |
 
 Raster spans cover surface decode, Stroke begin, first Dab, Dab application,
-commit, cancel, and pointer release. Counters report Dabs, dirty pixel area,
-direct-presentation updates, and visual-lag frames.
+commit, cancel, pointer release, surface decode/encode, and document snapshot.
+Counters report Dabs, dirty pixel area, direct-presentation updates, and
+visual-lag frames. The runner records task latency and memory for activation,
+held-stroke p95, release, save, and export work.
 
 `raster-large-image-held-brush.spec.ts` is the browser budget gate for a
 sustained 106 px Hard Round stroke on a `5000 × 5000` Raster at 15% zoom. It
@@ -188,13 +192,10 @@ Frame edge, measuring event-to-frame and direct working-pixel visibility. The
 gate also verifies sample continuity, round-cap re-entry coverage, and bounded
 working-canvas expansion.
 
-`raster-frame-edge-spatial-lag.spec.ts` reproduces a 204 px Hard Round gesture
-at 17% zoom that creates a small Frame-child Raster, exits the Frame, and
-re-enters far across the writable plane during the same held stroke. With
-`PUNCHPRESS_NATIVE_POINTER=1`, its compositor screencast gate measures the worst
-consecutive visible ink-frontier jump and verifies that the working
-presentation uses sparse tiles from the first dab without monolithic canvas
-expansion or replacement.
+Together, the `4500 × 5400` Frame scenarios at 12% and the `5000 × 5000`
+held-brush gates at 15% cover normal low-zoom activation, progressively larger
+strokes, edge exit/re-entry, pointer release, and follow-up input. High pixel
+zoom scenarios cover crisp exact sampling and the pixel grid.
 
 Benchmarks are scenarios, not namespaces. If a scenario exposes missing
 instrumentation, fix the product boundary instead of inventing a benchmark-only

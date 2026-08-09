@@ -18,5 +18,6 @@ plans, task lists, or implementation diaries.
 | Canvas interaction | [Interaction ownership boundary](interaction-ownership-boundary.md) |
 | Rendering | [Node render contract](node-render-contract.md) |
 | Rendering | [Interaction render hot path](interaction-render-hot-path.md) |
+| Raster editing | [Resident Canvas2D Raster surface](raster-resident-canvas-surface.md) |
 | Vector rendering | [Vector render surface pipeline](vector-render-surface-pipeline.md) |
 | Groups and vectors | [Group rotation overlay](group-rotation-overlay.md) |

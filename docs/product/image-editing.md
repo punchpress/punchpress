@@ -28,8 +28,8 @@ undoable action.
   that contains painted pixels. Strokes expand the layer when needed.
 - **Distinct Raster bounds.** Content bounds describe the visible layer,
   writable bounds describe where Brush may add pixels, and pixel allocation
-  describes only the backing payload. Tight content and sparse allocation do
-  not reduce writable bounds.
+  describes the full resident Canvas plane. Tight content does not reduce
+  writable bounds.
 - **Frame-owned writable canvas.** A Raster nested anywhere in a Frame can
   paint throughout that Frame. Strokes outside the Frame are no-ops, and
   transformed child overflow remains clipped to the Frame.
@@ -46,8 +46,7 @@ undoable action.
 - **Pixel presentation.** Raster zoom is presentation-only. Browser
   interpolation stays smooth while either source-pixel axis is small or
   minified. Once both axes reach `2` logical screen pixels per source pixel,
-  imported, resident, tiled, and live Brush surfaces use pixel-preserving
-  sampling.
+  imported and resident Brush surfaces use pixel-preserving sampling.
 - **Pixel grid.** A non-exporting grid appears once both target pixel axes
   exceed `5` logical screen pixels. This is above `500%` for an untransformed
   Frame; standalone Raster transforms and intrinsic sample density affect the
@@ -115,7 +114,7 @@ hidden for Eraser.
   Stroke elsewhere inside the Frame expands the same Raster's content even
   when it starts outside that Raster's current visible bounds. Once the earlier
   Stroke is durably committed, the later Stroke paints immediately in the
-  stable Frame-local plane; it does not wait for image decode or renderer
+  stable Frame-local plane; it does not wait for image encoding or renderer
   handoff.
 - **Standalone bounds.** Brush clips a root Raster to its retained finite
   writable canvas. Crop is the explicit operation for enlarging or reducing

@@ -23,9 +23,8 @@ Image nodes represent raster artwork in a PunchPress document.
 - Image node natural pixel dimensions belong to the raster asset.
 - Brush-authored image nodes use the current non-transparent pixel bounds as
   their stored raster rectangle.
-- Tiled image nodes may place base and tile payloads at local offsets inside the
-  image bounds. Selection, properties, hit testing, rendering, and export use
-  the logical image bounds, not the individual tile files.
+- Each image node resolves one current Raster payload. While resident, one
+  stable full-resolution Canvas is its editing and presentation authority.
 - The properties panel exposes width and height controls for selected image
   nodes.
 - Image nodes can be moved, resized, rotated, hidden, deleted, copied, and
@@ -40,7 +39,8 @@ Image nodes represent raster artwork in a PunchPress document.
   area without moving or resampling existing pixels.
 - Imported-image bounds remain fixed during Brush and Eraser. Only Crop changes
   their visible raster plane.
-- Pixel edits write a new current raster asset for the image node.
+- Pixel edits commit immediately in the resident Canvas; save and export
+  asynchronously write or consume the new current Raster payload.
 - Masks are explicit image-node modifiers, not the default result of normal
   eraser or selection-delete tools.
 - Users resize images through object transform handles or the image dimensions

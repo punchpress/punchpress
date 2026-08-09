@@ -48,8 +48,8 @@ not store image bytes inline.
 | `vector` | Vector object with optional child paths and path composition. |
 | `path` | Editable contours, fill rule, stroke style, appearance, transform. |
 
-Image nodes store logical raster bounds with optional base-plane placement for
-tiled edits:
+Image nodes store logical Raster bounds and an optional finite standalone
+writable plane:
 
 ```ts
 type ImageNode = {
@@ -61,6 +61,8 @@ type ImageNode = {
   baseY?: number;
   baseWidth?: number;
   baseHeight?: number;
+  pixelWidth?: number;
+  pixelHeight?: number;
   writableX?: number;
   writableY?: number;
   writableWidth?: number;
@@ -70,9 +72,13 @@ type ImageNode = {
 ```
 
 `width` and `height` define the node's logical render, hit, selection, and
-transform bounds. `baseX`, `baseY`, `baseWidth`, and `baseHeight` place the base
-raster payload inside those logical bounds when sparse tiled edits grow the node
-left or upward. `writableX`, `writableY`, `writableWidth`, and
+transform bounds. `baseX`, `baseY`, `baseWidth`, and `baseHeight` place the
+single persisted payload behind those bounds when Crop retains source pixels
+outside the visible rectangle. They are not tile coordinates or extra payloads.
+`pixelWidth` and `pixelHeight` preserve that payload's intrinsic sample plane
+when ordinary resize changes its document geometry. They are independent from
+Crop-visible and Frame-writable bounds.
+`writableX`, `writableY`, `writableWidth`, and
 `writableHeight` store a standalone Raster's finite paintable rectangle when it
 differs from the logical content bounds. They are omitted for imported images
 whose own rectangle is writable. While an image remains Frame-owned, its

@@ -32,7 +32,7 @@ lives and what boundaries code must preserve.
 | Tool state machines | [Tools](tools.md) |
 | Paper-backed vector editing boundary | [Vector editor](vector-editor.md) |
 | Raster image editing overlay, assets, buffers, and history | [Raster image editor](raster-image-editor.md) |
-| Raster brush tiled preview, commit, and reference findings | [Raster brush runtime](raster-brush-runtime.md) |
+| Raster stable Canvas, direct Stroke mutation, and patch history | [Raster brush runtime](raster-brush-runtime.md) |
 | Dense SVG and vector render performance plan | [Vector render performance plan](vector-render-performance-plan.md) |
 | Text metrics, editing, warps, and font use | [Text system](text-system.md) |
 | Shape creation and shape-to-path behavior | [Shape system](shape-system.md) |
