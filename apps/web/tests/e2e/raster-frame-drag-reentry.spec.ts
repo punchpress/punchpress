@@ -215,6 +215,270 @@ test("Frame reveals Raster pixels that re-enter during one held drag", async ({
   }
 });
 
+test("Frame reveals a mostly occluded Raster as it enters during a held drag", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(
+    page,
+    JSON.stringify({
+      nodes: [
+        {
+          background: "#ffffff",
+          height: 260,
+          id: "frame",
+          locked: false,
+          name: "Frame",
+          parentId: "root",
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: 220,
+            y: 160,
+          },
+          type: "artboard",
+          visible: true,
+          width: 340,
+        },
+        {
+          height: 180,
+          id: "raster",
+          name: "Raster",
+          parentId: "frame",
+          src: SOLID_IMAGE_SOURCE,
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: 500,
+            y: 200,
+          },
+          type: "image",
+          visible: true,
+          width: 200,
+        },
+      ],
+      version: "1.8",
+    })
+  );
+  await resetViewport(page);
+  await page.evaluate(() => window.__PUNCHPRESS_EDITOR__?.select("raster"));
+
+  const rasterCanvas = page.locator(
+    '[data-node-id="raster"] [data-testid="raster-resident-canvas"] canvas'
+  );
+  await expect(page.locator(".canvas-single-selection")).toBeVisible();
+  await expect(rasterCanvas).toBeVisible();
+  await rasterCanvas.evaluate((canvas) => {
+    canvas.dataset.surfaceIdentity = "occluded-frame-raster";
+  });
+
+  const expectedRasterPixel = await samplePixel(page, { x: 520, y: 280 });
+  const initiallyOccludedPixel = await samplePixel(page, { x: 620, y: 280 });
+  const originalTransform = await getRasterTransform(page, "raster");
+
+  expect(initiallyOccludedPixel).not.toEqual(expectedRasterPixel);
+
+  await page.mouse.move(520, 280);
+  await page.mouse.down();
+
+  try {
+    await page.mouse.move(370, 280, { steps: 8 });
+    await waitForPaint(page);
+
+    expect(await samplePixel(page, { x: 470, y: 280 })).toEqual(
+      expectedRasterPixel
+    );
+    expect(await getRasterParentId(page, "raster")).toBe("frame");
+    await expect(rasterCanvas).toHaveAttribute(
+      "data-surface-identity",
+      "occluded-frame-raster"
+    );
+
+    await page.mouse.move(520, 280, { steps: 8 });
+    await waitForPaint(page);
+
+    expect(await samplePixel(page, { x: 620, y: 280 })).not.toEqual(
+      expectedRasterPixel
+    );
+
+    await page.mouse.move(370, 280, { steps: 8 });
+    await waitForPaint(page);
+
+    expect(await samplePixel(page, { x: 470, y: 280 })).toEqual(
+      expectedRasterPixel
+    );
+  } finally {
+    await page.mouse.up();
+  }
+
+  await waitForPaint(page);
+
+  const committedTransform = await getRasterTransform(page, "raster");
+
+  expect(committedTransform).toEqual({ ...originalTransform, x: 350 });
+  expect(await samplePixel(page, { x: 470, y: 280 })).toEqual(
+    expectedRasterPixel
+  );
+  expect(await getRasterParentId(page, "raster")).toBe("frame");
+  expect(
+    await page.evaluate(
+      () => window.__PUNCHPRESS_EDITOR__?.getDebugDump().selection.primaryId
+    )
+  ).toBe("raster");
+  await expect(page.locator('[data-layer-row-id="raster"]')).toHaveCSS(
+    "padding-left",
+    "24px"
+  );
+  await expect(rasterCanvas).toHaveAttribute(
+    "data-surface-identity",
+    "occluded-frame-raster"
+  );
+
+  expect(await page.evaluate(() => window.__PUNCHPRESS_EDITOR__?.undo())).toBe(
+    true
+  );
+  await waitForPaint(page);
+  expect(await getRasterTransform(page, "raster")).toEqual(originalTransform);
+  expect(await getRasterParentId(page, "raster")).toBe("frame");
+  await expect(rasterCanvas).toHaveAttribute(
+    "data-surface-identity",
+    "occluded-frame-raster"
+  );
+
+  expect(await page.evaluate(() => window.__PUNCHPRESS_EDITOR__?.redo())).toBe(
+    true
+  );
+  await waitForPaint(page);
+  expect(await getRasterTransform(page, "raster")).toEqual(committedTransform);
+  expect(await getRasterParentId(page, "raster")).toBe("frame");
+  await expect(rasterCanvas).toHaveAttribute(
+    "data-surface-identity",
+    "occluded-frame-raster"
+  );
+});
+
+test("canvas drag keeps a Raster nested and clipped by its Frame", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(
+    page,
+    JSON.stringify({
+      nodes: [
+        {
+          background: "#ffffff",
+          height: 260,
+          id: "frame",
+          locked: false,
+          name: "Frame",
+          parentId: "root",
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: 220,
+            y: 160,
+          },
+          type: "artboard",
+          visible: true,
+          width: 340,
+        },
+        {
+          height: 180,
+          id: "raster",
+          name: "Raster",
+          parentId: "frame",
+          src: SOLID_IMAGE_SOURCE,
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: 260,
+            y: 200,
+          },
+          type: "image",
+          visible: true,
+          width: 200,
+        },
+      ],
+      version: "1.8",
+    })
+  );
+  await resetViewport(page);
+  await page.evaluate(() => window.__PUNCHPRESS_EDITOR__?.select("raster"));
+
+  const moveable = page.locator(".canvas-single-selection");
+  const rasterCanvas = page.locator(
+    '[data-node-id="raster"] [data-testid="raster-resident-canvas"] canvas'
+  );
+  const rasterLayerRow = page.locator('[data-layer-row-id="raster"]');
+  await expect(moveable).toBeVisible();
+  await expect(rasterCanvas).toBeVisible();
+  await expect(rasterLayerRow).toHaveCSS("padding-left", "24px");
+  await rasterCanvas.evaluate((canvas) => {
+    canvas.dataset.surfaceIdentity = "frame-child-resident-canvas";
+  });
+
+  const moveableBox = await moveable.boundingBox();
+
+  if (!moveableBox) {
+    throw new Error("Expected Raster selection bounds");
+  }
+
+  const start = {
+    x: moveableBox.x + moveableBox.width / 2,
+    y: moveableBox.y + moveableBox.height / 2,
+  };
+  const deltaX = 260;
+  const outsidePoint = { x: start.x + deltaX, y: start.y };
+
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(outsidePoint.x, outsidePoint.y, { steps: 8 });
+  await waitForPaint(page);
+
+  expect(
+    await page.evaluate(
+      () => window.__PUNCHPRESS_EDITOR__?.getNode("raster")?.parentId
+    )
+  ).toBe("frame");
+  await expect(rasterLayerRow).toHaveCSS("padding-left", "24px");
+  await expect(rasterCanvas).toHaveAttribute(
+    "data-surface-identity",
+    "frame-child-resident-canvas"
+  );
+  const previewClipPath = await rasterCanvas.evaluate(
+    (canvas) =>
+      canvas.closest<HTMLElement>("[data-node-shell='true']")?.style.clipPath
+  );
+  const previewOutsidePixel = await samplePixel(page, outsidePoint);
+
+  expect(previewClipPath).toContain("inset(");
+
+  await page.mouse.up();
+  await waitForPaint(page);
+
+  expect(
+    await page.evaluate(
+      () => window.__PUNCHPRESS_EDITOR__?.getNode("raster")?.parentId
+    )
+  ).toBe("frame");
+  await expect(rasterLayerRow).toHaveCSS("padding-left", "24px");
+  await expect(rasterCanvas).toHaveAttribute(
+    "data-surface-identity",
+    "frame-child-resident-canvas"
+  );
+  const committedClipPath = await rasterCanvas.evaluate(
+    (canvas) =>
+      canvas.closest<HTMLElement>("[data-node-shell='true']")?.style.clipPath
+  );
+
+  expect(committedClipPath).toContain("inset(");
+  expect(await samplePixel(page, outsidePoint)).toEqual(previewOutsidePixel);
+});
+
 test("Frame drag moves its child Raster clip shell with it", async ({
   page,
 }) => {
@@ -308,6 +572,12 @@ const getRasterTransform = (page, rasterId: string) =>
 
     return node?.type === "image" ? node.transform : null;
   }, rasterId);
+
+const getRasterParentId = (page, rasterId: string) =>
+  page.evaluate(
+    (nodeId) => window.__PUNCHPRESS_EDITOR__?.getNode(nodeId)?.parentId,
+    rasterId
+  );
 
 const getRasterRenderState = (page, rasterId: string) =>
   page.evaluate((nodeId) => {

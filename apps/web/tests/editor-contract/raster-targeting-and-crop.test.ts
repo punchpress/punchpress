@@ -56,7 +56,7 @@ const createFrame = (id: string, overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("Raster targeting", () => {
-  test("owns resident Canvas allocation bounds in Raster geometry", () => {
+  test("resident Canvas retains Frame bounds and occluded source pixels", () => {
     const editor = new Editor();
     const frame = createFrame("frame");
     const raster = createImage("raster", {
@@ -68,8 +68,8 @@ describe("Raster targeting", () => {
         rotation: 0,
         scaleX: 1,
         scaleY: 1,
-        x: 100,
-        y: 80,
+        x: 450,
+        y: 380,
       },
       width: 80,
     });
@@ -77,10 +77,10 @@ describe("Raster targeting", () => {
     editor.getState().loadNodes([frame, raster]);
 
     expect(editor.getRasterSurfaceBounds(raster.id)).toEqual({
-      height: 400,
-      width: 500,
-      x: -100,
-      y: -80,
+      height: 440,
+      width: 530,
+      x: -450,
+      y: -380,
     });
   });
 
@@ -415,7 +415,7 @@ describe("Raster targeting", () => {
     expect(targets[0]).toMatchObject({
       bounds: {
         height: 400,
-        width: 500,
+        width: 700,
         x: -600,
         y: -100,
       },
@@ -953,7 +953,7 @@ describe("Raster targeting", () => {
     await session?.complete({ point: { x: 1_000_000, y: 50 } });
 
     expect(target).toMatchObject({
-      bounds: { height: 100, width: 100, x: -50, y: 0 },
+      bounds: { height: 100, width: 150, x: -50, y: 0 },
       writableBounds: { height: 100, width: 100, x: -50, y: 0 },
     });
     const dabs = recorder.commits[0]?.dabs || [];
