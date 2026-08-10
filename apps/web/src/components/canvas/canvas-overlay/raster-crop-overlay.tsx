@@ -13,6 +13,13 @@ import { CanvasRasterImage } from "../raster/canvas-raster-image";
 
 type CropHandle = "move" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "nw";
 
+const CORNER_HANDLE_BORDER_CLASSES = {
+  ne: "border-t-2 border-r-2",
+  nw: "border-t-2 border-l-2",
+  se: "border-b-2 border-r-2",
+  sw: "border-b-2 border-l-2",
+} as const;
+
 const getImageBounds = (node) => ({
   height: node.height,
   maxX: node.width,
@@ -277,7 +284,11 @@ export const CanvasRasterCropOverlay = () => {
               className={
                 isSide
                   ? "absolute rounded-sm border border-white bg-[var(--canvas-selected)] shadow-sm"
-                  : "absolute border-[var(--canvas-selected)] border-t-2 border-l-2 bg-transparent"
+                  : `absolute border-[var(--canvas-selected)] ${
+                      CORNER_HANDLE_BORDER_CLASSES[
+                        handle as keyof typeof CORNER_HANDLE_BORDER_CLASSES
+                      ]
+                    } bg-transparent`
               }
               data-raster-crop-handle={handle}
               data-raster-crop-overlay="true"
