@@ -397,6 +397,73 @@ test("Crop clips retained resident pixels and later reveals them on expansion", 
     green: 0,
     red: 255,
   });
+  const cropStateBeforePreview = await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const node = editor?.getNode("crop-render");
+    const residentCanvas = document.querySelector(
+      '[data-node-id="crop-render"] [data-raster-source-canvas="true"]'
+    );
+
+    return {
+      historyRevision: editor?.history.currentRevision,
+      node: node ? structuredClone(node) : null,
+      surfaceIdentity:
+        residentCanvas instanceof HTMLCanvasElement
+          ? residentCanvas.dataset.surfaceIdentity
+          : null,
+    };
+  });
+  await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    editor?.select("crop-render");
+    editor?.startCrop("crop-render");
+    editor?.updateCrop({ height: 200, width: 200, x: 0, y: 0 });
+  });
+  await expect(page.getByTestId("raster-crop-overlay")).toBeVisible();
+  const activeCropRetainedPoint = await getRasterCropScreenPoint(page, {
+    x: 50,
+    y: 75,
+  });
+  const activeCropBeyondSourcePoint = await getRasterCropScreenPoint(page, {
+    x: 160,
+    y: 160,
+  });
+
+  expect(await sampleScreenshotPixel(page, activeCropRetainedPoint)).toEqual({
+    blue: 51,
+    green: 0,
+    red: 255,
+  });
+  expect(
+    await sampleScreenshotPixel(page, activeCropBeyondSourcePoint)
+  ).toEqual({
+    blue: 217,
+    green: 217,
+    red: 217,
+  });
+  const cropStateAfterCancel = await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    editor?.cancelCrop();
+    const node = editor?.getNode("crop-render");
+
+    return {
+      cropActive: Boolean(editor?.rasterCropSession),
+      historyRevision: editor?.history.currentRevision,
+      node: node ? structuredClone(node) : null,
+    };
+  });
+
+  expect(cropStateAfterCancel).toEqual({
+    cropActive: false,
+    historyRevision: cropStateBeforePreview.historyRevision,
+    node: cropStateBeforePreview.node,
+  });
+  await expect(residentCanvas).toHaveAttribute(
+    "data-surface-identity",
+    cropStateBeforePreview.surfaceIdentity
+  );
   await page.evaluate(() => {
     const editor = window.__PUNCHPRESS_EDITOR__;
 
@@ -455,6 +522,15 @@ test("Crop clips retained resident pixels and later reveals them on expansion", 
   await page.evaluate(() => {
     window.dispatchEvent(new PointerEvent("pointercancel"));
   });
+  const cropStateBeforeDone = await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const node = editor?.getNode("crop-render");
+
+    return {
+      historyRevision: editor?.history.currentRevision,
+      node: node ? structuredClone(node) : null,
+    };
+  });
   await page.evaluate(() => {
     const editor = window.__PUNCHPRESS_EDITOR__;
 
@@ -469,6 +545,39 @@ test("Crop clips retained resident pixels and later reveals them on expansion", 
     blue: 51,
     green: 0,
     red: 255,
+  });
+  const cropHistory = await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const node = editor?.getNode("crop-render");
+
+    return {
+      historyRevision: editor?.history.currentRevision,
+      node: node ? structuredClone(node) : null,
+    };
+  });
+  expect(cropHistory.historyRevision).toBe(
+    (cropStateBeforeDone.historyRevision ?? 0) + 1
+  );
+  const cropHistoryRoundTrip = await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    const undone = editor?.undo() ?? false;
+    const undoNode = editor?.getNode("crop-render");
+    const redone = editor?.redo() ?? false;
+    const redoNode = editor?.getNode("crop-render");
+
+    return {
+      redoNode: redoNode ? structuredClone(redoNode) : null,
+      redone,
+      undoNode: undoNode ? structuredClone(undoNode) : null,
+      undone,
+    };
+  });
+  expect(cropHistoryRoundTrip).toEqual({
+    redoNode: cropHistory.node,
+    redone: true,
+    undoNode: cropStateBeforeDone.node,
+    undone: true,
   });
   expect(
     await residentCanvas.evaluate((canvas) => canvas.dataset.surfaceIdentity)
@@ -574,6 +683,153 @@ test("Crop clips retained resident pixels and later reveals them on expansion", 
     green: 0,
     red: 255,
   });
+});
+
+test("standalone Raster Crop preview reveals retained pixels before Done", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  const src = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+
+    canvas.width = 100;
+    canvas.height = 100;
+    if (!context) {
+      throw new Error("Expected Canvas2D");
+    }
+
+    context.fillStyle = "#0066ff";
+    context.fillRect(0, 0, 100, 50);
+    context.fillStyle = "#ff0033";
+    context.fillRect(0, 50, 100, 50);
+    return canvas.toDataURL("image/png");
+  });
+
+  await loadDocument(
+    page,
+    JSON.stringify({
+      nodes: [
+        {
+          assetId: "asset-standalone-crop",
+          height: 100,
+          id: "standalone-crop",
+          mimeType: "image/png",
+          name: "Standalone Crop",
+          opacity: 1,
+          parentId: "root",
+          src,
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: 320,
+            y: 220,
+          },
+          type: "image",
+          visible: true,
+          width: 100,
+        },
+      ],
+      version: "1.8",
+    })
+  );
+  await resetViewport(page);
+  await setViewport(page, { x: 0, y: 0, zoom: 1 });
+  const residentCanvas = page.locator(
+    '[data-node-id="standalone-crop"] [data-testid="raster-resident-canvas"] canvas[data-raster-source-canvas="true"]'
+  );
+
+  await expect(residentCanvas).toBeVisible();
+  await residentCanvas.evaluate((canvas) => {
+    canvas.dataset.surfaceIdentity = "standalone-crop-canvas";
+  });
+  await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    editor?.select("standalone-crop");
+    editor?.startCrop("standalone-crop");
+    editor?.updateCrop({ height: 50, width: 100, x: 0, y: 0 });
+    editor?.commitCrop();
+    editor?.clearSelection();
+  });
+  await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    editor?.select("standalone-crop");
+    editor?.startCrop("standalone-crop");
+  });
+  await expect(page.getByTestId("raster-crop-overlay")).toBeVisible();
+  const southHandle = page.locator(
+    '[data-testid="raster-crop-overlay"] [data-raster-crop-handle="s"]'
+  );
+  const southHandleBox = await southHandle.boundingBox();
+
+  if (!southHandleBox) {
+    throw new Error("Expected standalone Crop south handle bounds");
+  }
+
+  const southHandlePoint = {
+    x: southHandleBox.x + southHandleBox.width / 2,
+    y: southHandleBox.y + southHandleBox.height / 2,
+  };
+
+  await southHandle.hover();
+  await page.mouse.down();
+  await page.mouse.move(southHandlePoint.x, southHandlePoint.y + 45, {
+    steps: 4,
+  });
+  await expect(
+    page.getByTestId("raster-crop-overlay").locator(":scope > svg")
+  ).toHaveAttribute("height", "95");
+  await page.mouse.move(southHandlePoint.x, southHandlePoint.y + 90, {
+    steps: 4,
+  });
+  await expect(
+    page.getByTestId("raster-crop-overlay").locator(":scope > svg")
+  ).toHaveAttribute("height", "140");
+
+  const retainedPoint = await getRasterCropScreenPoint(page, {
+    x: 50,
+    y: 75,
+  });
+  const beyondSourcePoint = await getRasterCropScreenPoint(page, {
+    x: 50,
+    y: 120,
+  });
+
+  expect(await sampleScreenshotPixel(page, retainedPoint)).toEqual({
+    blue: 51,
+    green: 0,
+    red: 255,
+  });
+  expect(await sampleScreenshotPixel(page, beyondSourcePoint)).toEqual({
+    blue: 217,
+    green: 217,
+    red: 217,
+  });
+  expect(
+    await page.evaluate(() =>
+      Boolean(window.__PUNCHPRESS_EDITOR__?.rasterCropSession)
+    )
+  ).toBe(true);
+
+  await page.mouse.up();
+  await page.getByTestId("raster-crop-done").click();
+  await expect(page.getByTestId("raster-crop-overlay")).toHaveCount(0);
+  expect(
+    await page.evaluate(() => {
+      const node = window.__PUNCHPRESS_EDITOR__?.getNode("standalone-crop");
+
+      return node?.type === "image"
+        ? { height: node.height, width: node.width }
+        : null;
+    })
+  ).toEqual({ height: 140, width: 100 });
+  await expect(residentCanvas).toHaveAttribute(
+    "data-surface-identity",
+    "standalone-crop-canvas"
+  );
 });
 
 test("held Frame Brush stroke is visible beyond committed tight Raster bounds", async ({
@@ -1032,6 +1288,28 @@ const getRasterScreenPoint = async (
     },
     { id: nodeId, localPoint: point }
   );
+
+const getRasterCropScreenPoint = async (
+  page: Page,
+  point: { x: number; y: number }
+) =>
+  await page
+    .getByTestId("raster-crop-overlay")
+    .locator(":scope > svg")
+    .evaluate((svg, localPoint) => {
+      const matrix = svg.getScreenCTM();
+
+      if (!matrix) {
+        throw new Error("Expected Crop preview screen transform");
+      }
+
+      const screenPoint = new DOMPoint(
+        localPoint.x,
+        localPoint.y
+      ).matrixTransform(matrix);
+
+      return { x: screenPoint.x, y: screenPoint.y };
+    }, point);
 
 const createImageDocumentWithSize = (
   src: string,

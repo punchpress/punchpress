@@ -1121,6 +1121,14 @@ describe("Raster Crop", () => {
     editor.startCrop();
     editor.updateCrop({ height: 150, width: 160, x: -30, y: -20 });
 
+    expect(editor.getRasterCropPreviewNode()).toMatchObject({
+      baseHeight: 100,
+      baseWidth: 100,
+      baseX: 30,
+      baseY: 20,
+      height: 150,
+      width: 160,
+    });
     expect(editor.getNode(image.id)).toEqual(image);
     expect(editor.cancelCrop()).toBe(true);
     expect(editor.getNode(image.id)).toEqual(image);
@@ -1129,10 +1137,15 @@ describe("Raster Crop", () => {
     editor.startCrop();
     editor.updateCrop({ height: 150, width: 160, x: -30, y: -20 });
     expect(editor.commitCrop()).toBe(true);
+    const committed = structuredClone(editor.getNode(image.id));
+
     expect(editor.canUndo).toBe(true);
     expect(editor.undo()).toBe(true);
     expect(editor.getNode(image.id)).toEqual(image);
     expect(editor.canUndo).toBe(false);
+    expect(editor.canRedo).toBe(true);
+    expect(editor.redo()).toBe(true);
+    expect(editor.getNode(image.id)).toEqual(committed);
   });
 
   test("Crop rejects a locked Raster", () => {
