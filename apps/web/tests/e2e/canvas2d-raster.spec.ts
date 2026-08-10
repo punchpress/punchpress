@@ -685,6 +685,86 @@ test("Crop clips retained resident pixels and later reveals them on expansion", 
   });
 });
 
+test("Crop corner handles render inward-facing borders", async ({ page }) => {
+  await gotoEditor(page);
+  const src = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+
+    canvas.width = 1;
+    canvas.height = 1;
+    return canvas.toDataURL("image/png");
+  });
+
+  await loadDocument(page, createImageDocument(src));
+  await resetViewport(page);
+  await setViewport(page, { x: 0, y: 0, zoom: 1 });
+  await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    editor?.select("canvas2d-raster");
+
+    if (!editor?.startCrop("canvas2d-raster")) {
+      throw new Error("Expected Crop to start for the selected Raster");
+    }
+  });
+
+  const expectedSides = {
+    ne: { bottom: false, left: false, right: true, top: true },
+    nw: { bottom: false, left: true, right: false, top: true },
+    se: { bottom: true, left: false, right: true, top: false },
+    sw: { bottom: true, left: true, right: false, top: false },
+  } as const;
+
+  for (const [handleName, expected] of Object.entries(expectedSides)) {
+    const handle = page.locator(
+      `[data-testid="raster-crop-overlay"] [data-raster-crop-handle="${handleName}"]`
+    );
+
+    await expect(handle).toBeVisible();
+    const actual = await handle.evaluate((element) => {
+      const style = getComputedStyle(element);
+
+      return {
+        bottom: style.borderBottomWidth !== "0px",
+        left: style.borderLeftWidth !== "0px",
+        right: style.borderRightWidth !== "0px",
+        top: style.borderTopWidth !== "0px",
+      };
+    });
+
+    expect(actual, `${handleName} Crop corner border sides`).toEqual(expected);
+  }
+
+  const northwestHandle = page.locator(
+    '[data-testid="raster-crop-overlay"] [data-raster-crop-handle="nw"]'
+  );
+  const northwestBox = await northwestHandle.boundingBox();
+
+  if (!northwestBox) {
+    throw new Error("Expected northwest Crop handle bounds");
+  }
+
+  const northwestPoint = {
+    x: northwestBox.x + northwestBox.width / 2,
+    y: northwestBox.y + northwestBox.height / 2,
+  };
+
+  await northwestHandle.hover();
+  await page.mouse.down();
+  await page.mouse.move(northwestPoint.x + 16, northwestPoint.y + 16, {
+    steps: 2,
+  });
+  await expect(
+    page.getByTestId("raster-crop-overlay").locator(":scope > svg")
+  ).toHaveAttribute("width", "240");
+  await expect(
+    page.getByTestId("raster-crop-overlay").locator(":scope > svg")
+  ).toHaveAttribute("height", "240");
+  await page.mouse.up();
+
+  await page.evaluate(() => window.__PUNCHPRESS_EDITOR__?.cancelCrop());
+});
+
 test("standalone Raster Crop preview reveals retained pixels before Done", async ({
   page,
 }) => {
