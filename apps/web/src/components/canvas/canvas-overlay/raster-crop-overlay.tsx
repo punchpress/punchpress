@@ -1,4 +1,5 @@
 import {
+  getNodeCssTransform,
   getNodeLocalPoint,
   type RasterCropRect,
   round,
@@ -162,24 +163,27 @@ export const CanvasRasterCropOverlay = () => {
   const state = useEditorValue((editor, store) => {
     const session = store.rasterCropSession;
     const node = session ? editor.getNode(session.nodeId) : null;
-    const frame = node ? editor.getNodeRenderFrame(node.id) : null;
+    const previewNode = session ? editor.getRasterCropPreviewNode?.() : null;
+    const frame = previewNode ? getCropPreviewFrame(previewNode) : null;
 
     return {
       frame,
       node: node?.type === "image" ? node : null,
+      previewNode: previewNode?.type === "image" ? previewNode : null,
       rect: session?.rect || null,
       zoom: store.viewport.zoom,
     };
   });
   const clipId = `raster-crop-${useId().replaceAll(":", "")}`;
 
-  if (!(state.node && state.frame && state.rect)) {
+  if (!(state.node && state.previewNode && state.frame && state.rect)) {
     return null;
   }
 
-  const { frame, node, rect, zoom } = state;
+  const { frame, node, previewNode, rect, zoom } = state;
   const handleSize = 12 / zoom;
   const sideLength = 24 / zoom;
+  const previewRect = { ...rect, x: 0, y: 0 };
   const shellStyle = {
     height: frame.bounds.height,
     left: frame.bounds.minX,
@@ -200,17 +204,17 @@ export const CanvasRasterCropOverlay = () => {
         <svg
           aria-label="Raster Crop preview"
           className="pointer-events-none absolute inset-0 overflow-visible"
-          height={node.height}
-          viewBox={`0 0 ${node.width} ${node.height}`}
-          width={node.width}
+          height={previewNode.height}
+          viewBox={`0 0 ${previewNode.width} ${previewNode.height}`}
+          width={previewNode.width}
         >
           <defs>
             <clipPath id={clipId}>
               <rect
-                height={rect.height}
-                width={rect.width}
-                x={rect.x}
-                y={rect.y}
+                height={previewRect.height}
+                width={previewRect.width}
+                x={previewRect.x}
+                y={previewRect.y}
               />
             </clipPath>
             <pattern
@@ -226,22 +230,22 @@ export const CanvasRasterCropOverlay = () => {
           <g clipPath={`url(#${clipId})`}>
             <rect
               fill={`url(#${clipId}-checker)`}
-              height={rect.height}
-              width={rect.width}
-              x={rect.x}
-              y={rect.y}
+              height={previewRect.height}
+              width={previewRect.width}
+              x={previewRect.x}
+              y={previewRect.y}
             />
-            <RasterCropArtwork node={node} />
+            <RasterCropArtwork node={previewNode} />
           </g>
           <rect
             fill="none"
-            height={rect.height}
+            height={previewRect.height}
             stroke="var(--canvas-selected)"
             strokeWidth={2 / zoom}
             vectorEffect="non-scaling-stroke"
-            width={rect.width}
-            x={rect.x}
-            y={rect.y}
+            width={previewRect.width}
+            x={previewRect.x}
+            y={previewRect.y}
           />
         </svg>
         <button
@@ -253,10 +257,10 @@ export const CanvasRasterCropOverlay = () => {
             startCropDrag({ editor, event, handle: "move", node, rect })
           }
           style={{
-            height: rect.height,
-            left: rect.x,
-            top: rect.y,
-            width: rect.width,
+            height: previewRect.height,
+            left: previewRect.x,
+            top: previewRect.y,
+            width: previewRect.width,
           }}
           type="button"
         />
@@ -283,8 +287,8 @@ export const CanvasRasterCropOverlay = () => {
               }
               style={{
                 height,
-                left: left(rect),
-                top: top(rect),
+                left: left(previewRect),
+                top: top(previewRect),
                 transform: "translate(-50%, -50%)",
                 width,
               }}
@@ -299,8 +303,8 @@ export const CanvasRasterCropOverlay = () => {
           onClick={() => editor.commitCrop()}
           size="sm"
           style={{
-            left: rect.x + rect.width / 2,
-            top: rect.y + rect.height + 16 / zoom,
+            left: previewRect.x + previewRect.width / 2,
+            top: previewRect.y + previewRect.height + 16 / zoom,
             transform: `translate(-50%, 0) scale(${1 / zoom})`,
             transformOrigin: "top center",
           }}
@@ -326,3 +330,15 @@ const RasterCropArtwork = ({ node }: { node: ImageNodeDocument }) => (
     width={node.width}
   />
 );
+
+const getCropPreviewFrame = (node: ImageNodeDocument) => ({
+  bounds: {
+    height: node.height,
+    maxX: node.transform.x + node.width,
+    maxY: node.transform.y + node.height,
+    minX: node.transform.x,
+    minY: node.transform.y,
+    width: node.width,
+  },
+  transform: getNodeCssTransform(node),
+});
