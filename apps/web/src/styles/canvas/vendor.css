@@ -9,6 +9,13 @@
     @apply rounded;
   }
 
+  .canvas-host[data-panning="true"] .canvas-moveable,
+  .canvas-host[data-panning="true"] .canvas-moveable *,
+  .canvas-host[data-panning="true"] [data-node-id],
+  .canvas-host[data-panning="true"] [data-node-id] * {
+    pointer-events: none !important;
+  }
+
   .moveable-control-box {
     z-index: 10 !important;
   }

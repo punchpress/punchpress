@@ -15,6 +15,7 @@ import {
   getHostRectFromCanvasBounds,
   getHostRectFromNodeFrame,
 } from "../canvas-overlay-geometry";
+import { canStartSelectionInteraction } from "../canvas-overlay-interactions";
 import {
   getRotateCursorRotationDegrees,
   getScaleCursorRotationDegrees,
@@ -296,7 +297,7 @@ export const CanvasMultiSelectionForeground = ({
   const contextMenuNodeId = nodeIds[0] || selectedGroupNodeId || null;
 
   const startSelectionDrag = (event) => {
-    if (!(event.button === 0 && isDraggable)) {
+    if (!canStartSelectionInteraction(editor, event, isDraggable)) {
       return;
     }
 
@@ -416,7 +417,7 @@ export const CanvasMultiSelectionForeground = ({
   };
 
   const startResize = (corner, event) => {
-    if (!(event.button === 0 && isResizable)) {
+    if (!canStartSelectionInteraction(editor, event, isResizable)) {
       return;
     }
 
@@ -497,7 +498,7 @@ export const CanvasMultiSelectionForeground = ({
   };
 
   const startRotate = (corner: TransformCorner, event) => {
-    if (!(event.button === 0 && isRotatable)) {
+    if (!canStartSelectionInteraction(editor, event, isRotatable)) {
       return;
     }
 

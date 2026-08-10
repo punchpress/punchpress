@@ -12,6 +12,7 @@ import {
 } from "../../canvas-cursor-assets";
 import { openCanvasNodeEditingMode } from "../../canvas-node-editing";
 import { getHostRectFromNodeFrame } from "../canvas-overlay-geometry";
+import { canStartSelectionInteraction } from "../canvas-overlay-interactions";
 import { getTextPathTransformTargetStyle } from "../text/path-geometry";
 import {
   getRotateCursorRotationDegrees,
@@ -464,7 +465,7 @@ export const CanvasSingleSelectionForeground = ({
   const cursorClassName = "canvas-cursor-default";
 
   const startSelectionDrag = (event) => {
-    if (!(event.button === 0 && isDraggable)) {
+    if (!canStartSelectionInteraction(editor, event, isDraggable)) {
       return;
     }
 
@@ -604,7 +605,7 @@ export const CanvasSingleSelectionForeground = ({
   };
 
   const startResize = (handle, event) => {
-    if (!(event.button === 0 && isResizable)) {
+    if (!canStartSelectionInteraction(editor, event, isResizable)) {
       return;
     }
 
@@ -682,7 +683,7 @@ export const CanvasSingleSelectionForeground = ({
   };
 
   const startRotate = (corner: TransformCorner, event) => {
-    if (!(event.button === 0 && isRotatable)) {
+    if (!canStartSelectionInteraction(editor, event, isRotatable)) {
       return;
     }
 
