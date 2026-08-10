@@ -89,20 +89,15 @@ const drawExactRaster = (
     return;
   }
 
-  if (canvas.height !== presentation.backingHeight) {
-    canvas.height = presentation.backingHeight;
-  }
-  if (canvas.width !== presentation.backingWidth) {
-    canvas.width = presentation.backingWidth;
-  }
-  const context = canvas.getContext("2d");
+  const buffer = getExactRasterBuffer(canvas, presentation);
+  const context = buffer.getContext("2d");
 
   if (!context) {
     return;
   }
 
   context.resetTransform();
-  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.clearRect(0, 0, buffer.width, buffer.height);
   context.imageSmoothingEnabled = false;
   context.drawImage(
     source,
@@ -115,6 +110,51 @@ const drawExactRaster = (
     presentation.destination.width,
     presentation.destination.height
   );
+
+  if (canvas.height !== presentation.backingHeight) {
+    canvas.height = presentation.backingHeight;
+  }
+  if (canvas.width !== presentation.backingWidth) {
+    canvas.width = presentation.backingWidth;
+  }
+  const presentationContext = canvas.getContext("2d");
+
+  if (!presentationContext) {
+    return;
+  }
+
+  const bitmap = buffer.transferToImageBitmap();
+
+  presentationContext.globalCompositeOperation = "copy";
+  presentationContext.drawImage(bitmap, 0, 0);
+  presentationContext.globalCompositeOperation = "source-over";
+  bitmap.close();
+};
+
+const exactRasterBuffers = new WeakMap<HTMLCanvasElement, OffscreenCanvas>();
+
+const getExactRasterBuffer = (
+  canvas: HTMLCanvasElement,
+  presentation: NonNullable<
+    ReturnType<typeof getNativeRasterViewportPresentation>
+  >
+) => {
+  const current = exactRasterBuffers.get(canvas);
+
+  if (
+    current?.height === presentation.backingHeight &&
+    current.width === presentation.backingWidth
+  ) {
+    return current;
+  }
+
+  const buffer = new OffscreenCanvas(
+    presentation.backingWidth,
+    presentation.backingHeight
+  );
+
+  exactRasterBuffers.set(canvas, buffer);
+  return buffer;
 };
 
 export const useExactRasterPresentation = ({
