@@ -22,6 +22,8 @@ The layers panel exposes the document tree as editable layer rows.
 - Deleting the active layer activates the nearest surviving sibling, then its
   parent Frame. An empty document has no active layer.
 - Reordering rows changes document order.
+- Reparenting and detaching are explicit Layers-panel actions. Canvas geometry
+  transforms never change a row's parent or nesting.
 - Visibility toggles update node visibility.
 - Group and vector rows can expose child rows.
 - Layer menus route to editor commands; they do not mutate private panel state.

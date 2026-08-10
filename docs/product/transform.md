@@ -12,6 +12,11 @@ Transforms move, resize, and rotate selected objects.
 ## Contract
 
 - Pointer-driven transforms preview during the gesture and commit once.
+- Geometry transforms preserve document hierarchy. Moving a node into, within,
+  or beyond a Frame changes only its geometry; Frame membership and clipping
+  remain stable through preview, commit, Undo, and Redo.
+- Frame clipping follows transient geometry during the held gesture: pixels are
+  hidden or revealed immediately as they cross the Frame boundary.
 - Selection frames stay aligned with visible artwork.
 - Corner handles resize.
 - Rotation starts from the corner perimeter.

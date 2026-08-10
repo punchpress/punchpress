@@ -46,14 +46,18 @@ grid only, never editing coordinates or authority.
 
 Frame clipping is applied in resident-surface pixel coordinates. Brush-created
 Frame children may grow tight content bounds after a Stroke; the Canvas and
-Frame-local writable plane remain stable. Crop changes the visible/writable
-rectangle and retains source pixels according to Crop geometry.
+Frame-local writable plane remain stable. Imported Frame children also retain
+source pixels beyond that writable plane so those pixels can re-enter the Frame
+during a live geometry transform. The stationary Frame shell remains the
+visibility boundary. Crop changes the visible/writable rectangle and retains
+source pixels according to Crop geometry.
 
 The resident surface records its decode-time source bounds. Ordinary Image
 resize scales those bounds into current document geometry while retaining the
-same Canvas allocation and intrinsic `pixelWidth`/`pixelHeight`. Rendering, Brush coordinate conversion, Crop
-snapshotting, persistence, and export resolve through this one mapping. Crop
-offsets the source window without introducing a resize scale.
+same Canvas allocation and intrinsic `pixelWidth`/`pixelHeight`. Rendering,
+Brush coordinate conversion, Crop snapshotting, persistence, and export resolve
+through this one mapping. Crop offsets the source window without introducing a
+resize scale.
 
 ## Commit, History, And Dirty State
 
