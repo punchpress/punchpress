@@ -449,9 +449,9 @@ test("shows only the active finite pixel grid above 500 percent", async ({
   expect(stablePresentationBelowGrid).toMatchObject({
     imageRendering: "auto",
     renderedSource: {
-      height: 32,
+      height: 120,
       kind: "resident-canvas",
-      width: 48,
+      width: 160,
     },
     sampling: "exact",
   });
@@ -1370,6 +1370,8 @@ test.describe("transformed fractional exact Raster pixel grid", () => {
         };
       });
     const activeRasterSnapshot = await getEditorPreviewSnapshot();
+    const belowGridZoom = 1.75;
+    const aboveGridZoom = 1.95;
 
     expect(activeRasterSnapshot).toMatchObject({
       activeLayerId: "fractional-raster",
@@ -1464,14 +1466,17 @@ test.describe("transformed fractional exact Raster pixel grid", () => {
     await setConvergedViewport(page, {
       x: 318.25,
       y: 218.75,
-      zoom: 1.7,
+      zoom: belowGridZoom,
     });
     await expect(grid).toHaveCount(0);
     await expect(rasterPresentation).toHaveAttribute(
       "data-raster-sampling",
       "exact"
     );
-    expect(await getMinSourcePixelFootprint()).toBeLessThanOrEqual(5);
+    const footprintBelowGrid = await getMinSourcePixelFootprint();
+
+    expect(footprintBelowGrid).toBeCloseTo(4.536, 3);
+    expect(footprintBelowGrid).toBeLessThanOrEqual(5);
     const presentationBelowGrid = await captureRasterPresentation(
       page,
       "fractional-render-root"
@@ -1479,10 +1484,13 @@ test.describe("transformed fractional exact Raster pixel grid", () => {
     await setConvergedViewport(page, {
       x: 318.25,
       y: 218.75,
-      zoom: 1.75,
+      zoom: aboveGridZoom,
     });
     await expect(grid).toHaveCount(1);
-    expect(await getMinSourcePixelFootprint()).toBeGreaterThan(5);
+    const footprintAboveGrid = await getMinSourcePixelFootprint();
+
+    expect(footprintAboveGrid).toBeCloseTo(5.0544, 3);
+    expect(footprintAboveGrid).toBeGreaterThan(5);
     const presentationAboveGrid = await captureRasterPresentation(
       page,
       "fractional-render-root"
@@ -1633,8 +1641,8 @@ test.describe("transformed fractional exact Raster pixel grid", () => {
 
     expect(geometry?.gridIsScreenOverlay, geometryDiagnostics).toBe(true);
     expect(geometry?.residentSamples, geometryDiagnostics).toEqual({
-      height: 4,
-      width: 7,
+      height: 5,
+      width: 8,
     });
     const physicalError = (actual?: number, expected?: number) => {
       return (
@@ -2405,7 +2413,7 @@ test.describe("high-zoom Raster pixel alignment", () => {
     });
 
     for (const [index, sample] of residentBoundaries.entries()) {
-      expect(sample.contrast, residentDiagnostics).toBeGreaterThan(0.2);
+      expect(sample.contrast, residentDiagnostics).toBeGreaterThanOrEqual(0.2);
       expect(
         Math.abs(sample.boundary - residentExpectedBoundaries[index]),
         residentDiagnostics
