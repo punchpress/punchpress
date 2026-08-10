@@ -63,6 +63,12 @@ mounted and authoritative. Low-zoom previews, if introduced, are disposable
 projections of the resident revision and cannot accept edits or become durable
 authority.
 
+At high zoom, the React renderer prepares each viewport-clipped exact window on
+an offscreen Canvas, then publishes the complete bitmap to the stable visible
+Canvas in one draw. Placement and pixel content therefore advance as one
+presentation instead of exposing a cleared or partially updated frame while
+panning.
+
 Save, Scratchpad autosave, reopen materialization, SVG export, and Frame export
 use the asynchronous document/output path. That path snapshots the latest
 committed retained Canvas and encodes away from pointer release. Persisted
