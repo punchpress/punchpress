@@ -3,6 +3,7 @@ import {
   gotoEditor,
   loadDocument,
   resetViewport,
+  serializeDocument,
   setViewport,
 } from "./helpers/editor";
 
@@ -328,6 +329,135 @@ test("space-drag pan keeps the same screen-space speed at high zoom", async ({
     -dragDelta.y / 16,
     0
   );
+});
+
+test("space-drag over a selected Raster pans without changing the document", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  const src = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 64;
+    canvas.height = 64;
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      throw new Error("Expected Canvas2D");
+    }
+
+    context.fillStyle = "#3366ff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/png");
+  });
+
+  await loadDocument(
+    page,
+    JSON.stringify({
+      nodes: [
+        {
+          assetId: "asset-space-pan-raster",
+          height: 64,
+          id: "space-pan-raster",
+          mimeType: "image/png",
+          name: "Space Pan Raster",
+          opacity: 1,
+          parentId: "root",
+          src,
+          transform: {
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            x: 320,
+            y: 220,
+          },
+          type: "image",
+          visible: true,
+          width: 64,
+        },
+      ],
+      version: "1.8",
+    })
+  );
+  await resetViewport(page);
+  await setViewport(
+    page,
+    await page.evaluate(() => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
+      const hostRect = editor?.hostRef?.getBoundingClientRect();
+      const zoom = 16;
+
+      if (!(editor && hostRect)) {
+        throw new Error("Expected editor viewport");
+      }
+
+      return {
+        x: 320 + 32 - hostRect.width / (2 * zoom),
+        y: 220 + 32 - hostRect.height / (2 * zoom),
+        zoom,
+      };
+    })
+  );
+
+  await page.evaluate(() => {
+    window.__PUNCHPRESS_EDITOR__?.select("space-pan-raster");
+  });
+
+  const rasterButton = page.locator('[data-node-id="space-pan-raster"] button');
+  await expect(rasterButton).toBeVisible();
+  const rasterBox = await rasterButton.boundingBox();
+
+  if (!rasterBox) {
+    throw new Error("Expected selected Raster hit target");
+  }
+
+  const start = {
+    x: rasterBox.x + rasterBox.width / 2,
+    y: rasterBox.y + rasterBox.height / 2,
+  };
+  const dragDelta = { x: 96, y: 64 };
+  const initialScroll = await getViewerScroll(page);
+  const beforeDocument = await serializeDocument(page);
+
+  await page.keyboard.down("Space");
+  await expect(page.locator(".canvas-host")).toHaveAttribute(
+    "data-panning",
+    "true"
+  );
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + dragDelta.x, start.y + dragDelta.y, {
+    steps: 4,
+  });
+  await page.mouse.up();
+  await page.keyboard.up("Space");
+
+  await expect.poll(() => getViewerScroll(page)).not.toEqual(initialScroll);
+  expect(await serializeDocument(page)).toBe(beforeDocument);
+
+  const beforeNormalDragDocument = await serializeDocument(page);
+  const normalDragBox = await rasterButton.boundingBox();
+
+  if (!normalDragBox) {
+    throw new Error("Expected Raster hit target after Space release");
+  }
+
+  const normalDragStart = {
+    x: normalDragBox.x + normalDragBox.width / 2,
+    y: normalDragBox.y + normalDragBox.height / 2,
+  };
+
+  await page.mouse.move(normalDragStart.x, normalDragStart.y);
+  await page.mouse.down();
+  await page.mouse.move(
+    normalDragStart.x + dragDelta.x,
+    normalDragStart.y + dragDelta.y,
+    { steps: 4 }
+  );
+  await page.mouse.up();
+
+  await expect
+    .poll(() => serializeDocument(page))
+    .not.toBe(beforeNormalDragDocument);
 });
 
 test("repeated trackpad pinch zoom keeps the cursor world point anchored", async ({
