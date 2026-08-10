@@ -367,9 +367,14 @@ const CanvasStandardNodeArt = ({ nodeId }) => {
       }
     : null;
   const presentationBounds = durablePresentationBounds || artState.bbox;
+  const node = editor.getNode(nodeId);
+  const parentNode = node?.parentId ? editor.getNode(node.parentId) : null;
 
   return (
     <CanvasNodeArt
+      allowImageOverflow={Boolean(
+        artState.image && parentNode?.type === "artboard"
+      )}
       bbox={presentationBounds}
       fill={artState.fill}
       fillRule={artState.fillRule}

@@ -391,10 +391,6 @@ export const getRasterSurfaceBounds = (editor, node) => {
     return sourceBounds;
   }
 
-  if (getOwningFrame(editor, node)) {
-    return writableBounds;
-  }
-
   const x = Math.min(sourceBounds.x, writableBounds.x);
   const y = Math.min(sourceBounds.y, writableBounds.y);
   const maxX = Math.max(
