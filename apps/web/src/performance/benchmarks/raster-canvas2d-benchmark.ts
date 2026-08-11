@@ -73,6 +73,82 @@ export const rasterCanvas2dBenchmark: PerformanceBenchmarkDefinition = {
   usesScratchDocument: true,
 };
 
+export const rasterResizeBenchmark: PerformanceBenchmarkDefinition = {
+  defaultOptions: {
+    frames: 1,
+    nodeCount: 1,
+    stepX: 0,
+    stepY: 0,
+    warmupFrames: 4,
+  },
+  description:
+    "Resizes one resident 4500×5400 Raster to 3600×4320, gates synchronous pointer-release scheduling below 50 ms, and records the 97.2 MB resident plus 62.208 MB transient RGBA planes.",
+  id: "raster-resize",
+  label: "Raster Resize",
+  setup: async ({ editor, waitForFrames }) => {
+    const src = createOpaquePixelSource();
+
+    editor.loadDocument(createBenchmarkDocument(src));
+    await editor.rasterSurface.ensureSurface({
+      height: TARGET_HEIGHT,
+      id: TARGET_ID,
+      src,
+      width: TARGET_WIDTH,
+    });
+    editor.select(TARGET_ID);
+    await waitForFrames(2);
+  },
+  run: async ({ editor, waitForFrames }) => {
+    const frame = editor.getNodeTransformFrame(TARGET_ID);
+
+    if (!frame) {
+      throw new Error("Expected the Raster resize transform frame");
+    }
+
+    const session = editor.beginResizeSelection({
+      anchorCanvas: {
+        x: frame.bounds.minX,
+        y: frame.bounds.minY,
+      },
+      direction: [1, 1],
+      nodeId: TARGET_ID,
+    });
+
+    editor.updateResizeSelection(session, { scale: 0.8 });
+    incrementPerfCounter(
+      PERF_COUNTERS.rasterResizeResidentBytes,
+      TARGET_WIDTH * TARGET_HEIGHT * 4
+    );
+    incrementPerfCounter(
+      PERF_COUNTERS.rasterResizeTransientBytes,
+      3600 * 4320 * 4
+    );
+    const pointerReleaseStartedAt = performance.now();
+    const completion = editor.commitResizeSelection(session);
+    const pointerReleaseDurationMs =
+      performance.now() - pointerReleaseStartedAt;
+
+    if (pointerReleaseDurationMs >= 50) {
+      throw new Error(
+        `Raster pointer release blocked for ${pointerReleaseDurationMs.toFixed(2)} ms`
+      );
+    }
+
+    await completion;
+    await waitForFrames(2);
+
+    const presentation = editor.rasterSurface.getPresentation(TARGET_ID);
+
+    if (
+      presentation?.canvas.width !== 3600 ||
+      presentation.canvas.height !== 4320
+    ) {
+      throw new Error("Raster resize did not publish the target pixel plane");
+    }
+  },
+  usesScratchDocument: true,
+};
+
 export const rasterLargestSupportedPlaneBenchmark: PerformanceBenchmarkDefinition =
   {
     defaultOptions: {

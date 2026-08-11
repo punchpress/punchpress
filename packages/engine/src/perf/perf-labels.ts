@@ -65,6 +65,7 @@ export const PERF_SPANS = {
   rasterDocumentSnapshot: "raster.document.snapshot",
   rasterSurfaceEncode: "raster.surface.encode",
   rasterSurfaceDecode: "raster.surface.decode",
+  rasterSurfaceResample: "raster.surface.resample",
   brushNativeBoundaryApply: "brush.nativeBoundary.apply",
   brushNativeBoundaryGenerate: "brush.nativeBoundary.generate",
   brushNativeStrokeClassify: "brush.nativeStroke.classify",
@@ -99,6 +100,8 @@ export const PERF_COUNTERS = {
   rasterBenchmarkExtremeZoomOut: "raster.benchmark.extremeZoomOut",
   rasterBenchmarkLargeEraser: "raster.benchmark.largeEraser",
   rasterBenchmarkPixelZoom: "raster.benchmark.pixelZoom",
+  rasterResizeResidentBytes: "raster.resize.residentBytes",
+  rasterResizeTransientBytes: "raster.resize.transientBytes",
 } as const;
 
 export type PerfCounterName = (typeof PERF_COUNTERS)[keyof typeof PERF_COUNTERS];

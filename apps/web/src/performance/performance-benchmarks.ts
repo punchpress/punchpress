@@ -19,6 +19,7 @@ import {
   rasterHighZoomBenchmark,
   rasterHighZoomBrushBenchmark,
   rasterLargestSupportedPlaneBenchmark,
+  rasterResizeBenchmark,
 } from "./benchmarks/raster-canvas2d-benchmark";
 import {
   rasterFrameBrushBenchmark,
@@ -50,6 +51,7 @@ export const performanceBenchmarks = [
   rasterCanvas2dBenchmark,
   rasterCanvas2dExtremeDiagonalBenchmark,
   rasterCanvas2dSquareBenchmark,
+  rasterResizeBenchmark,
   rasterFrameBrushBenchmark,
   rasterFrameBrushStablePlaneBenchmark,
   rasterHighZoomBrushBenchmark,
