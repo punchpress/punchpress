@@ -17,9 +17,11 @@ describe visible content. A standalone Raster may retain a larger finite
 `writable*` rectangle. A Frame child derives its writable plane and clip polygon
 from the owning Frame, independent of tight content bounds.
 
-Imported JPEG or PNG payloads remain unchanged until edited. Current edited
-payloads use one alpha-capable PNG asset. There is no tiled storage or runtime
-tile source model.
+Imported JPEG or PNG payloads decode at their orientation-corrected natural
+integer dimensions. Node geometry and the resident Canvas use that same sample
+plane; viewport fitting changes only the camera. Payloads remain unchanged
+until edited. Current edited payloads use one alpha-capable PNG asset. There is
+no tiled storage, runtime tile source model, or hidden original-source plane.
 
 ## Targeting
 
@@ -52,12 +54,16 @@ during a live geometry transform. The stationary Frame shell remains the
 visibility boundary. Crop changes the visible/writable rectangle and retains
 source pixels according to Crop geometry.
 
-The resident surface records its decode-time source bounds. Ordinary Image
-resize scales those bounds into current document geometry while retaining the
-same Canvas allocation and intrinsic `pixelWidth`/`pixelHeight`. Rendering,
-Brush coordinate conversion, Crop snapshotting, persistence, and export resolve
-through this one mapping. Crop offsets the source window without introducing a
-resize scale.
+The resident surface records its source bounds. Ordinary Image resize previews
+through transformed geometry, then resamples the full retained plane once into
+an integer-size detached Canvas. The runtime publishes geometry and the new
+resident surface atomically. Crop offsets the source window without introducing
+a resize scale. A later enlargement starts from that committed plane, so pixels
+discarded by a prior shrink return only through Undo.
+
+Only one resize may target a Raster. New resize, document load/reset, deletion,
+Undo, or Redo cancels pending publication. Failure retains the old surface and
+geometry. Brush and Eraser reject a Raster while its resize is pending.
 
 ## Commit, History, And Dirty State
 
@@ -67,7 +73,8 @@ Canvas identity and pixels therefore remain stable across release.
 
 Raster-only history revisions participate in document dirty state even when the
 synchronous JSON snapshot still contains the last encoded `src`. Undo and Redo
-apply pixel effects and geometry changes together.
+apply pixel effects and geometry changes together. A Raster resize stores its
+old/new surface swap with its geometry change as one step.
 
 ## Persistence And Export
 

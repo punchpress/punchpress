@@ -118,6 +118,16 @@ container, and drives the editor resize session for a deterministic frame pass.
 Use it to compare aggregate resize preview and commit changes before relying on
 manual resize feel.
 
+Raster backing-plane resize work should also run:
+
+```bash
+bun run perf:json raster-resize
+```
+
+The fixture records a 97.2 MB resident `4500 × 5400` RGBA plane and one
+62.208 MB transient `3600 × 4320` target plane. It gates synchronous release
+work below 50 ms; the detached resample completes asynchronously.
+
 Rotation performance work should also run the shared rotation benchmark:
 
 ```bash

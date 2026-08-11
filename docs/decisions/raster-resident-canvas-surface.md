@@ -33,11 +33,18 @@ One resident Raster owns one stable, full-resolution Canvas2D surface.
   never bridge working pixels to durable pixels.
 - Frame children edit the stable Frame-local writable plane. Content bounds may
   remain tight while the writable plane stays fixed and finite.
-- Ordinary object resize changes the Canvas-to-document geometry mapping, not
-  the Canvas object or its pixels. Rendering, Brush targeting, Crop, save, and
-  export consume that same mapping. Persisted intrinsic sample dimensions stay
-  independent from resized geometry. Crop alone changes the visible source
-  window without scaling it, and Save retains pixels outside that window.
+- Raster import allocates the resident Canvas at the browser-decoded natural
+  pixel dimensions and gives the node matching geometry. Fitting a first import
+  is a camera operation, never a pixel resample.
+- Raster resize keeps a transformed preview visible during input, then creates
+  one detached Canvas at integer target dimensions and publishes it atomically.
+  The resident identity changes only after the complete resample is ready.
+- Canvas2D resize uses smoothing with `imageSmoothingQuality = "high"` when the
+  browser supports it. The deterministic fallback repeatedly halves large
+  downscales before the final smoothed draw. Crop alone changes the visible
+  source window without scaling it, and Save retains pixels outside that window.
+- The resident plane is the destructive resize source. No separate original
+  bitmap survives as a Smart Object authority after pixels are committed.
 
 RasterTileSurface execution, tile authoring, dirty-tile scheduling, tile LOD,
 gutters, culling, and working-presentation acknowledgements are removed from
@@ -57,7 +64,8 @@ omission.
 
 - Pointer release is a visual no-op and remains independent of encode latency.
 - Pixel Undo and Redo operate on exact dirty patches while preserving Canvas
-  identity.
+  identity. Raster resize history retains exact old and new resident surfaces
+  and swaps them with geometry as one logical step.
 - Memory use is proportional to resident finite planes plus bounded history
   patches. Surfaces still referenced by Undo or Redo stay resident until the
   document resets; inactive surfaces with a durable encoded source may evict as

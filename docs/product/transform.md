@@ -30,6 +30,10 @@ Transforms move, resize, and rotate selected objects.
   object during the gesture; nested descendants receive durable transform
   updates only when the gesture commits.
 - Artboards can resize but do not rotate.
+- Raster resize keeps its transformed preview after input ends until one
+  asynchronous backing-plane resample publishes at integer dimensions.
+- Holding Shift while dragging a Raster resize handle preserves its aspect
+  ratio for that gesture, including when the Image dimensions lock is off.
 
 ## Feedback
 

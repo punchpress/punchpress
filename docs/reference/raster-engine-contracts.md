@@ -51,6 +51,12 @@ handoff. Undo and Redo mutate the same Canvas with the returned patch.
 The renderer may derive disposable low-zoom projections, but they do not
 implement `RasterSurface` and are never editing or persistence authority.
 
+Raster resize is a separate surface-resolver operation. The engine supplies
+integer target pixels and source geometry; the browser prepares one detached
+Canvas, then returns an exact reversible old/new surface swap for atomic
+publication with geometry. No Stroke session, encode, or per-input readback
+participates.
+
 ## Settings And Presets
 
 Settings include color, size, opacity, flow, hardness, spacing, angle,

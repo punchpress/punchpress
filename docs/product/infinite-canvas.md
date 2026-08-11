@@ -19,12 +19,19 @@ product meaning.
 - Zoom remains numerically honest. Fit-to-view may produce a low zoom value; it
   does not redefine `100%`.
 - Wheel, trackpad, and pinch zoom should feel steady.
+- Browser page zoom is suppressed inside the editor shell. Trackpad pinch over
+  the canvas changes canvas zoom; pinch over editor chrome is consumed.
 - One zoom update is capped so large device deltas do not runaway.
 - Zoom focuses on the pointer so content under the cursor stays under it.
 - A keyless trackpad pinch zooms around the pointer; two-finger scrolling pans.
 - Command-Option and Control-Option wheel gestures remain pans, not zooms.
 - The browser's internal pinch signal keeps its zoom mode through the trackpad
   momentum tail and cannot turn that tail into a pan.
+- Rapid Zoom In and Zoom Out clicks apply every requested step. Dragging the
+  toolbar zoom percentage horizontally scrubs logarithmically: right zooms in,
+  left zooms out, and a 120 px drag doubles or halves the current zoom.
+- The zoom percentage exposes slider semantics. Arrow keys apply discrete zoom
+  steps; Home and End move to the minimum and maximum zoom.
 - Users can fit selected content or an artboard on demand.
 - The active finite Frame or standalone Raster shows a subtle pixel grid once
   both target pixel axes exceed `5` logical screen pixels. That is above `500%`

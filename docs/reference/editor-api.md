@@ -22,13 +22,13 @@ and future clients should converge here instead of inventing parallel behavior.
 | Editing modes | `setActiveTool`, `startEditing`, `commitEditing`, `cancelEditing`, `startPathEditing`, `stopPathEditing`. |
 | Vector/path | point movement, point deletion, topology operations, curve merge/separate/join, compound paths, boolean operations. |
 | Transform | move, resize, rotate, selection drag, text path positioning. |
-| Viewport | zoom, wheel zoom, focus canvas bounds, pending focus. |
+| Viewport | `zoomIn`, `zoomOut`, `zoomTo`, wheel zoom, focus canvas bounds, pending focus. |
 | Fonts | initialize/request local fonts, preload fonts, set last used font. |
 | Clipboard | `copySelection`, `pasteClipboardContent`, `pasteText`. |
 | History | undo, redo, commit history step, dirty/saved marks. |
 | Inspection | debug dump, selection properties, overlay state, node geometry, layer rows. |
 | Raster host | Constructor-injected `RasterSurfaceResolver` for finite browser or headless Raster targets. |
-| Raster editing | `getRasterTargetState`, `startCrop`, `updateCrop`, `commitCrop`, `cancelCrop`, `getRasterCropPreviewNode`. |
+| Raster editing | Raster aspect lock and async resize session commands; `getRasterTargetState`; Crop start, update, commit, cancel, and preview. |
 
 Capture a save checkpoint before asynchronous serialization and pass it to
 `markDocumentSaved(checkpoint)` after the file write succeeds. Edits committed

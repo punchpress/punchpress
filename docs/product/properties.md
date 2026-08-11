@@ -27,3 +27,6 @@ The properties panel edits the active selection.
 - Vector selection exposes object-level and aggregate child-path appearance.
 - Group selection exposes group-level controls and aggregate selection colors.
 - Path-editing selection exposes point or logical-corner controls when relevant.
+- Image selection exposes linked integer Width and Height controls. The link is
+  on by default; pending resampling disables the controls and shows delayed
+  compact status without flashing for fast work.

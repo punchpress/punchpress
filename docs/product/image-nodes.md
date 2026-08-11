@@ -18,6 +18,11 @@ Image nodes represent raster artwork in a PunchPress document.
   editable vector paths.
 - PNG and JPG asset imports create image nodes.
 - Dragging PNG or JPG files from the OS onto the canvas creates image nodes.
+- Import uses the browser-decoded, orientation-corrected natural pixel size for
+  both node geometry and the resident Canvas. A `2000 × 2000` source therefore
+  enters the document as a `2000 × 2000` Raster, never as a viewport-sized copy.
+- The first Raster in an empty document may fit and center by moving the camera.
+  Import beside existing content preserves the current camera.
 - Image nodes reference raster assets in the document asset table.
 - Image node bounds come from explicit width and height values.
 - Image node natural pixel dimensions belong to the raster asset.
@@ -25,8 +30,8 @@ Image nodes represent raster artwork in a PunchPress document.
   their stored raster rectangle.
 - Each image node resolves one current Raster payload. While resident, one
   stable full-resolution Canvas is its editing and presentation authority.
-- The properties panel exposes width and height controls for selected image
-  nodes.
+- The properties panel exposes integer width and height controls with a visible
+  aspect-ratio lock enabled by default.
 - Image nodes can be moved, resized, rotated, hidden, deleted, copied, and
   pasted like other canvas objects.
 
@@ -45,6 +50,12 @@ Image nodes represent raster artwork in a PunchPress document.
   eraser or selection-delete tools.
 - Users resize images through object transform handles or the image dimensions
   in the properties panel.
+- Resize input stays live through a transformed preview. Commit resamples the
+  resident Raster once; a slow commit disables dimensions, lock, handles, and
+  painting and shows `Resizing…` only after about 150 ms.
+- Resize is destructive from the current resident plane. PunchPress does not
+  retain a separate original-source or Smart Object representation; Undo is the
+  exact recovery path for the previous pixels and geometry.
 
 ## Export
 

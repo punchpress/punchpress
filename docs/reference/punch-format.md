@@ -75,9 +75,9 @@ type ImageNode = {
 transform bounds. `baseX`, `baseY`, `baseWidth`, and `baseHeight` place the
 single persisted payload behind those bounds when Crop retains source pixels
 outside the visible rectangle. They are not tile coordinates or extra payloads.
-`pixelWidth` and `pixelHeight` preserve that payload's intrinsic sample plane
-when ordinary resize changes its document geometry. They are independent from
-Crop-visible and Frame-writable bounds.
+`pixelWidth` and `pixelHeight` record the committed payload's intrinsic sample
+plane. Ordinary Raster resize updates them with the resampled resident Canvas;
+they remain independent from Crop-visible and Frame-writable bounds.
 `writableX`, `writableY`, `writableWidth`, and
 `writableHeight` store a standalone Raster's finite paintable rectangle when it
 differs from the logical content bounds. They are omitted for imported images

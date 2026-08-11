@@ -53,8 +53,8 @@ type RasterAsset = {
 Imported payloads may retain JPEG or PNG. Pixel edits normally write PNG so
 alpha remains representable. Before package creation, asynchronous document
 serialization snapshots the latest committed retained Canvas revision. Asset
-width and height describe its intrinsic samples, independently from resized
-image-node geometry.
+width and height describe its committed intrinsic samples. Raster resize
+rewrites the single payload and these dimensions before the next package save.
 
 Each image node references one asset id. Runtime `src` is hydrated from the
 asset file on open and stripped from `document.json` on package write.

@@ -71,9 +71,9 @@ panning.
 
 Save, Scratchpad autosave, reopen materialization, SVG export, and Frame export
 use the asynchronous document/output path. That path snapshots the latest
-committed retained Canvas and encodes away from pointer release. Persisted
-sample dimensions remain distinct from resized document geometry, while SVG
-clipping keeps output bounds tight. During an
+committed retained Canvas and encodes away from pointer release. Committed
+Raster resize updates persisted sample dimensions with the resident plane,
+while SVG clipping keeps output bounds tight. During an
 active Stroke, exact rollback strips replace uncommitted pixels in the snapshot
 copy; the visible authoritative Canvas is never rolled back for persistence.
 

@@ -36,8 +36,13 @@ undoable action.
 - **Finite standalone canvas.** Detaching a Raster from a Frame retains the
   former Frame-sized writable canvas. Imported standalone images use their
   image canvas. Neither standalone canvas grows from Brush input.
-- **Ordinary resize.** Selection handles scale retained Raster content and its
-  visible bounds together. Crop is the only bounds-only image resize.
+- **Ordinary resize.** Width and Height are linked by default. Handles and
+  dimension fields preview transformed content live, then resample the retained
+  Raster once to integer pixel dimensions on commit. Unlocking permits
+  independent width and height; holding Shift during a handle drag temporarily
+  preserves the source aspect ratio. The finite Raster limits remain 16,384
+  pixels per dimension and 100,000,000 pixels total. Crop is the only
+  bounds-only image resize.
 - **Finite auto creation.** An active visible, writable Frame is a finite
   insertion target. Brush creates a Raster only when a gesture first intersects
   that Frame.
@@ -131,6 +136,8 @@ hidden for Eraser.
   expand it. Crop expansion explicitly creates additional paintable area.
 - **Frame clipping.** Frame bounds clip Stroke input before Dab generation or
   pixel work. Off-Frame drag distance does not allocate or paint.
+- **Resize exclusion.** Brush and Eraser cannot target a Raster while its
+  committed pixel plane is being resampled.
 
 ## Layer Materialization
 

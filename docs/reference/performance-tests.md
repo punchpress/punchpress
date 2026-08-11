@@ -165,6 +165,7 @@ Raster adapter gates:
 | `raster-canvas2d-strokes` | Runs high pixel zoom, normal zoom, large Eraser, low zoom, asynchronous save snapshot, and export on one resident `4500 × 5400` Raster. |
 | `raster-canvas2d-extreme-diagonal` | Runs the full-target 4%-zoom diagonal alone for flame and browser-trace capture. |
 | `raster-canvas2d-square` | Runs normal, 15%, and high pixel zoom plus async save/export on a resident `5000 × 5000` Raster. |
+| `raster-resize` | Resizes one resident `4500 × 5400` Raster to `3600 × 4320`, gates synchronous pointer release below 50 ms, and records resident/transient RGBA allocation expectations. |
 | `raster-frame-brush` | Draws one rapid default Hard Round stroke through the canvas pointer-event path across an initially empty `4500 × 5400` Frame at 12% zoom. |
 | `raster-frame-brush-stable-plane` | Repeats `raster-frame-brush` after corner marks have expanded the Raster content bounds. Compare the pair to detect latency caused by content-bound growth rather than brush work. |
 | `raster-high-zoom` | Pans a resident `4500 × 5400` Frame/Raster at 12,800% with exact samples and the Frame-local pixel grid visible. |

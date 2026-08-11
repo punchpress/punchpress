@@ -22,6 +22,7 @@ History tracks logical document edits, not raw pointer events.
   and committed pixels in one logical step.
 - A changed Crop commit is one logical step; Crop preview and cancellation are
   not history.
+- Raster geometry and its resampled old/new pixel planes are one logical step.
 
 ## Undo And Redo
 

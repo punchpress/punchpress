@@ -33,6 +33,8 @@ and add to the active canvas.
 ## Placement
 
 SVG assets use the same normalization path as local SVG imports. Raster assets
-become image nodes that preserve their chosen source format. The import target is
-the active editor viewport center, so users can search and add artwork without
-leaving their current design area.
+become image nodes at their browser-decoded natural pixel dimensions and
+preserve their chosen source format until edited. The import target is the
+active editor viewport center. A first import into an empty document may fit by
+changing the camera; adding beside existing content does not replace the user's
+current view.
