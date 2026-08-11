@@ -75,6 +75,27 @@ export const EditorShell = () => {
     };
   }, [cursorStyle]);
 
+  useEffect(() => {
+    const preventBrowserPinchZoom = (event: WheelEvent) => {
+      if (
+        event.ctrlKey &&
+        event.target instanceof Element &&
+        event.target.closest("[data-editor-shell-root]")
+      ) {
+        event.preventDefault();
+      }
+    };
+
+    document.addEventListener("wheel", preventBrowserPinchZoom, {
+      capture: true,
+      passive: false,
+    });
+
+    return () => {
+      document.removeEventListener("wheel", preventBrowserPinchZoom, true);
+    };
+  }, []);
+
   return (
     <Designer
       data-editor-shell-root=""

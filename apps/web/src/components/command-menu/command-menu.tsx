@@ -167,8 +167,15 @@ export const CommandMenu = () => {
         src: importedAsset.dataUrl,
         targetCenter,
       });
+      const shouldFocusImportedImage = editor.nodes.every(
+        (node) => node.type === "empty"
+      );
 
       editor.insertNodes([imageNode]);
+
+      if (shouldFocusImportedImage) {
+        editor.scheduleViewportFocus([imageNode.id]);
+      }
     },
     [editor]
   );

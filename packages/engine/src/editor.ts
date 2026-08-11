@@ -135,6 +135,13 @@ import {
   updateRasterCrop as updateEditorRasterCrop,
 } from "./raster/crop";
 import {
+  beginRasterResize as beginEditorRasterResize,
+  cancelRasterResize as cancelEditorRasterResize,
+  commitRasterResize as commitEditorRasterResize,
+  resizeRaster as resizeEditorRaster,
+  updateRasterResize as updateEditorRasterResize,
+} from "./raster/resize";
+import {
   handleCanvasShortcutKeyDown as handleEditorCanvasShortcutKeyDown,
   handleEditingShortcutKeyDown as handleEditorEditingShortcutKeyDown,
   handlePenDirectSelectionModifierDown as handleEditorPenDirectSelectionModifierDown,
@@ -291,6 +298,7 @@ import {
   scheduleViewportFocus as scheduleEditorViewportFocus,
   zoomIn as zoomEditorIn,
   zoomOut as zoomEditorOut,
+  zoomTo as zoomEditorTo,
 } from "./viewport/viewport-focus";
 import {
   getViewportCenter as getEditorViewportCenter,
@@ -338,6 +346,9 @@ export interface Editor {
   unsubscribe: any;
   vectorRenderSurfaces: any;
   rasterSurface: any;
+  rasterAspectRatioLocks: Map<string, boolean>;
+  rasterResizeOperations: Map<string, symbol>;
+  rasterResizeStates: Map<string, any>;
   rasterStrokeRuntime: RasterStrokeRuntime;
   viewerRef: any;
   viewportFocusRequest: any;
@@ -374,6 +385,9 @@ export class Editor {
     this.nodeTree = new NodeTreeManager();
     this.vectorRenderSurfaces = new VectorRenderSurfaceManager();
     this.rasterSurface = rasterSurface;
+    this.rasterAspectRatioLocks = new Map();
+    this.rasterResizeOperations = new Map();
+    this.rasterResizeStates = new Map();
     this.rasterStrokeRuntime = new RasterStrokeRuntime(this);
     // @ts-expect-error TODO(typecheck-baseline): Map infers narrowest tool overload; union is correct at runtime
     this.tools = new Map([
@@ -884,6 +898,44 @@ export class Editor {
     return getEditorNodeResizeMode(this, nodeId);
   }
 
+  isRasterAspectRatioLocked(nodeId) {
+    return this.rasterAspectRatioLocks.get(nodeId) ?? true;
+  }
+
+  setRasterAspectRatioLocked(nodeId, locked) {
+    if (this.getNode(nodeId)?.type !== "image") {
+      return false;
+    }
+
+    this.rasterAspectRatioLocks.set(nodeId, Boolean(locked));
+    this.notifyInteractionPreviewChanged();
+    return true;
+  }
+
+  getRasterResizeState(nodeId) {
+    return this.rasterResizeStates.get(nodeId) ?? null;
+  }
+
+  resizeRaster(nodeId, size) {
+    return resizeEditorRaster(this, nodeId, size);
+  }
+
+  beginRasterResize(nodeId) {
+    return beginEditorRasterResize(this, nodeId);
+  }
+
+  updateRasterResize(session, size) {
+    return updateEditorRasterResize(this, session, size);
+  }
+
+  commitRasterResize(session) {
+    return commitEditorRasterResize(this, session);
+  }
+
+  cancelRasterResize(nodeId = undefined) {
+    cancelEditorRasterResize(this, nodeId);
+  }
+
   getNodeRotateMode(nodeId) {
     return getEditorNodeRotateMode(this, nodeId);
   }
@@ -1211,6 +1263,9 @@ export class Editor {
   }
 
   deleteSelected() {
+    for (const nodeId of this.selectedNodeIds) {
+      this.cancelRasterResize(nodeId);
+    }
     deleteEditorSelected(this);
   }
 
@@ -1248,6 +1303,7 @@ export class Editor {
   }
 
   deleteNode(nodeId) {
+    this.cancelRasterResize(nodeId);
     deleteEditorNode(this, nodeId);
   }
 
@@ -2022,10 +2078,14 @@ export class Editor {
   }
 
   loadDocument(contents) {
+    this.cancelRasterResize();
+    this.rasterAspectRatioLocks.clear();
     return loadEditorDocument(this, contents);
   }
 
   newDocument() {
+    this.cancelRasterResize();
+    this.rasterAspectRatioLocks.clear();
     this.cancelRasterStroke();
     createNewEditorDocument(this);
   }
@@ -2084,6 +2144,7 @@ export class Editor {
 
   redo() {
     const historyTool = this.currentTool;
+    this.cancelRasterResize();
     this.cancelRasterStroke();
     const didRedo = this.history.redo();
 
@@ -2096,6 +2157,7 @@ export class Editor {
 
   undo() {
     const historyTool = this.currentTool;
+    this.cancelRasterResize();
     this.cancelRasterStroke();
     const didUndo = this.history.undo();
 
@@ -2137,6 +2199,10 @@ export class Editor {
 
   zoomOut() {
     zoomEditorOut(this);
+  }
+
+  zoomTo(zoom) {
+    return zoomEditorTo(this, zoom);
   }
 
   getViewportCenter() {

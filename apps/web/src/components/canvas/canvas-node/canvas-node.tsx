@@ -366,7 +366,9 @@ const CanvasStandardNodeArt = ({ nodeId }) => {
         width: writableBounds.width,
       }
     : null;
-  const presentationBounds = durablePresentationBounds || artState.bbox;
+  const presentationBounds = resizePreviewNode
+    ? artState.bbox
+    : durablePresentationBounds || artState.bbox;
   const node = editor.getNode(nodeId);
   const parentNode = node?.parentId ? editor.getNode(node.parentId) : null;
 

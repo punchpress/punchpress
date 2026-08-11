@@ -8,7 +8,7 @@ export const zoomIn = (editor) => {
     return;
   }
 
-  viewer.setZoom(clamp(editor.zoom * 1.18, MIN_ZOOM, MAX_ZOOM));
+  applyDiscreteZoom(editor, clamp(editor.zoom * 1.18, MIN_ZOOM, MAX_ZOOM));
 };
 
 export const zoomOut = (editor) => {
@@ -17,7 +17,32 @@ export const zoomOut = (editor) => {
     return;
   }
 
-  viewer.setZoom(clamp(editor.zoom / 1.18, MIN_ZOOM, MAX_ZOOM));
+  applyDiscreteZoom(editor, clamp(editor.zoom / 1.18, MIN_ZOOM, MAX_ZOOM));
+};
+
+export const zoomTo = (editor, zoom) => {
+  if (!(editor.viewerRef && Number.isFinite(zoom))) {
+    return false;
+  }
+
+  applyDiscreteZoom(editor, clamp(zoom, MIN_ZOOM, MAX_ZOOM));
+  return true;
+};
+
+const applyDiscreteZoom = (editor, zoom) => {
+  const viewer = editor.viewerRef;
+  const wasInteracting = editor.viewportInteracting;
+
+  viewer.setZoom(zoom);
+  editor.setViewport({
+    x: viewer.getScrollLeft?.() ?? editor.viewport.x ?? 0,
+    y: viewer.getScrollTop?.() ?? editor.viewport.y ?? 0,
+    zoom: viewer.getZoom?.() ?? zoom,
+  });
+  if (!wasInteracting) {
+    editor.setViewportInteracting(false);
+  }
+  editor.onViewportChange?.();
 };
 
 export const cancelPendingViewportFocus = (editor) => {

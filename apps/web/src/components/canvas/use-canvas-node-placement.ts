@@ -287,7 +287,9 @@ const applyPreviewTransform = (editor, previewEntry: PreviewEntry, preview) => {
     : `translate3d(${previewBounds.minX}px, ${previewBounds.minY}px, 0)`;
   transformElement.style.transform =
     resizeFrame?.transform || shellState.transform || "";
-  transformElement.style.transformOrigin = shellState.transformOrigin;
+  transformElement.style.transformOrigin = resizeFrame
+    ? "center center"
+    : shellState.transformOrigin;
 };
 
 const sameNodeIds = (left = [], right = []) => {

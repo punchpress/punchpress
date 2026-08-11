@@ -2,6 +2,7 @@ export interface Canvas2dRasterCapabilities {
   createCanvas: (width: number, height: number) => HTMLCanvasElement;
   decodeImage: (src: string) => Promise<CanvasImageSource>;
   encodeCanvas: (canvas: HTMLCanvasElement) => Promise<string>;
+  scheduleResample?: () => Promise<void>;
 }
 
 export const browserCanvas2dCapabilities: Canvas2dRasterCapabilities = {
@@ -33,6 +34,10 @@ export const browserCanvas2dCapabilities: Canvas2dRasterCapabilities = {
         reader.addEventListener("load", () => resolve(String(reader.result)));
         reader.readAsDataURL(blob);
       }, "image/png");
+    }),
+  scheduleResample: () =>
+    new Promise((resolve) => {
+      requestAnimationFrame(() => resolve());
     }),
 };
 

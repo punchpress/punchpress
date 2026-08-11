@@ -34,6 +34,7 @@ export interface Canvas2dRasterPresentation {
 }
 
 export interface Canvas2dRasterRuntime extends RasterSurfaceResolver {
+  cancelResample: (targetId: string) => void;
   ensureSurface: (
     input: EnsureCanvas2dRasterSurfaceInput
   ) => Promise<Canvas2dRasterPresentation>;
@@ -88,6 +89,7 @@ export const createCanvas2dRasterRuntime = (
   >();
   const listeners = new Set<() => void>();
   const presentationListeners = new Map<string, Set<() => void>>();
+  const resampleVersions = new Map<string, number>();
   const notify = () => {
     for (const listener of listeners) {
       listener();
@@ -100,6 +102,9 @@ export const createCanvas2dRasterRuntime = (
   };
 
   return {
+    cancelResample: (targetId) => {
+      resampleVersions.set(targetId, (resampleVersions.get(targetId) ?? 0) + 1);
+    },
     ensureSurface: async (input) => {
       const current = records.get(input.id);
       const pendingSurface = pending.get(input.id);
@@ -178,7 +183,82 @@ export const createCanvas2dRasterRuntime = (
     resetSurfaces: () => {
       records.clear();
       pending.clear();
+      resampleVersions.clear();
       notify();
+    },
+    resampleSurface: async ({ bounds, pixelSize, sourceBounds, targetId }) => {
+      const beforeRecord = records.get(targetId);
+
+      if (!beforeRecord) {
+        throw new Error(`Raster surface is not resident: ${targetId}`);
+      }
+
+      const version = (resampleVersions.get(targetId) ?? 0) + 1;
+      resampleVersions.set(targetId, version);
+      await capabilities.scheduleResample?.();
+
+      if (
+        resampleVersions.get(targetId) !== version ||
+        records.get(targetId) !== beforeRecord
+      ) {
+        throw new Error(`Raster resample was superseded: ${targetId}`);
+      }
+
+      const resampleStartedAt = getNow();
+      const canvas = capabilities.createCanvas(
+        pixelSize.width,
+        pixelSize.height
+      );
+      drawHighQualityResample(
+        capabilities,
+        beforeRecord.presentation.canvas,
+        canvas
+      );
+      const resampleEndedAt = getNow();
+
+      recordPerfSpan({
+        depth: 0,
+        durationMs: resampleEndedAt - resampleStartedAt,
+        endMs: resampleEndedAt,
+        label: PERF_SPANS.rasterSurfaceResample,
+        startMs: resampleStartedAt,
+      });
+
+      if (
+        resampleVersions.get(targetId) !== version ||
+        records.get(targetId) !== beforeRecord
+      ) {
+        throw new Error(`Raster resample was superseded: ${targetId}`);
+      }
+
+      const afterRecord = {
+        key: `${pixelSize.width}:${pixelSize.height}:${bounds.x}:${bounds.y}:${beforeRecord.source}`,
+        presentation: {
+          canvas,
+          height: bounds.height,
+          sourceBounds: { ...sourceBounds },
+          width: bounds.width,
+          x: bounds.x,
+          y: bounds.y,
+        },
+        source: beforeRecord.source,
+        surface: createCanvas2dRasterSurface(
+          canvas,
+          capabilities,
+          () => notifyPresentation(targetId),
+          brushTipCache
+        ),
+      };
+      const publish = (record) => {
+        records.set(targetId, record);
+        notify();
+        notifyPresentation(targetId);
+      };
+
+      return {
+        redo: () => publish(afterRecord),
+        undo: () => publish(beforeRecord),
+      };
     },
     resolveSurface: (target) => {
       const record = records.get(target.id);
@@ -312,6 +392,62 @@ export const createCanvas2dRasterRuntime = (
       };
     },
   };
+};
+
+const drawHighQualityResample = (
+  capabilities: Canvas2dRasterCapabilities,
+  source: HTMLCanvasElement,
+  target: HTMLCanvasElement
+) => {
+  let current = source;
+  const targetWidth = target.width;
+  const targetHeight = target.height;
+  const targetContext = requireCanvas2dContext(target);
+  const supportsQuality = "imageSmoothingQuality" in targetContext;
+
+  if (!supportsQuality) {
+    while (
+      current.width / 2 > targetWidth ||
+      current.height / 2 > targetHeight
+    ) {
+      const width = Math.max(targetWidth, Math.floor(current.width / 2));
+      const height = Math.max(targetHeight, Math.floor(current.height / 2));
+      const intermediate = capabilities.createCanvas(width, height);
+      const context = requireCanvas2dContext(intermediate);
+
+      context.imageSmoothingEnabled = true;
+      context.drawImage(
+        current,
+        0,
+        0,
+        current.width,
+        current.height,
+        0,
+        0,
+        width,
+        height
+      );
+      current = intermediate;
+    }
+  }
+
+  targetContext.imageSmoothingEnabled = true;
+
+  if (supportsQuality) {
+    targetContext.imageSmoothingQuality = "high";
+  }
+
+  targetContext.drawImage(
+    current,
+    0,
+    0,
+    current.width,
+    current.height,
+    0,
+    0,
+    targetWidth,
+    targetHeight
+  );
 };
 
 const restoreCommittedPixels = ({

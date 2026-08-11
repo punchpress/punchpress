@@ -106,5 +106,11 @@ export type RasterSurfaceResolver = {
     sourceBounds?: Readonly<RasterRect>
   ) => (RasterRect & { src: string }) | null;
   retainTargets?: (targetIds: readonly string[]) => void;
+  resampleSurface?: (request: {
+    bounds: RasterRect;
+    pixelSize: RasterPixelSize;
+    sourceBounds: RasterRect;
+    targetId: string;
+  }) => Promise<RasterHistoryPatch | null>;
   resolveSurface: (target: Readonly<RasterTarget>) => RasterSurface | null;
 };

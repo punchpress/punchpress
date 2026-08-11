@@ -9,7 +9,10 @@ export const getPixelGridTarget = (editor): PixelGridTarget | null => {
 
   if (
     !activeNode ||
-    !editor.isNodeEffectivelyVisible(activeNode.id)
+    !editor.isNodeEffectivelyVisible(activeNode.id) ||
+    editor.getRasterResizeState?.(activeNode.id) ||
+    (editor.selectionDragPreview?.resize &&
+      editor.selectionDragPreview.nodeIds?.includes(activeNode.id))
   ) {
     return null;
   }

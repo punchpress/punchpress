@@ -223,7 +223,8 @@ const isRasterWritable = (editor, node) => {
     !(
       getNodeSourceKind(node) === "raster" &&
       editor.isNodeEffectivelyVisible(node.id) &&
-      isNodeTreeUnlocked(editor, node)
+      isNodeTreeUnlocked(editor, node) &&
+      !editor.getRasterResizeState?.(node.id)
     )
   ) {
     return false;
