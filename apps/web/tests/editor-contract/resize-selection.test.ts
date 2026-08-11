@@ -38,8 +38,8 @@ describe("Editor.resizeSelectionFromCorner", () => {
     expect(afterNode?.height).toBeGreaterThan(beforeNode.height);
   });
 
-  test("resizes a selected image through the public corner resize command", () => {
-    const editor = new Editor();
+  test("resizes a selected image through the public corner resize command", async () => {
+    const editor = createRasterEditor();
     const imageNode = {
       ...createDefaultImageNode({
         height: 180,
@@ -65,7 +65,7 @@ describe("Editor.resizeSelectionFromCorner", () => {
     const fixedCornerBefore = beforeFrame
       ? { x: beforeFrame.bounds.minX, y: beforeFrame.bounds.minY }
       : null;
-    const resizedNodeIds = editor.resizeSelectionFromCorner({
+    const resizedNodeIds = await editor.resizeSelectionFromCorner({
       corner: "se",
       scale: 1.5,
     });
@@ -88,8 +88,8 @@ describe("Editor.resizeSelectionFromCorner", () => {
     expect(afterFrame?.bounds.minY).toBeCloseTo(fixedCornerBefore?.y || 0, 2);
   });
 
-  test("scales retained Raster content on resize while Crop only changes visible bounds", () => {
-    const editor = new Editor();
+  test("scales retained Raster content on resize while Crop only changes visible bounds", async () => {
+    const editor = createRasterEditor();
     const imageNode = {
       ...createDefaultImageNode({
         height: 180,
@@ -109,7 +109,7 @@ describe("Editor.resizeSelectionFromCorner", () => {
 
     editor.getState().loadNodes([imageNode]);
     editor.select(imageNode.id);
-    editor.resizeSelectionFromCorner({ corner: "se", scale: 0.5 });
+    await editor.resizeSelectionFromCorner({ corner: "se", scale: 0.5 });
 
     const resized = editor.getNode(imageNode.id);
     expect(resized).toMatchObject({
@@ -135,8 +135,8 @@ describe("Editor.resizeSelectionFromCorner", () => {
     });
   });
 
-  test("Undo and Redo restore ordinary Raster resize independently from Crop", () => {
-    const editor = new Editor();
+  test("Undo and Redo restore ordinary Raster resize independently from Crop", async () => {
+    const editor = createRasterEditor();
     const imageNode = {
       ...createDefaultImageNode({
         height: 60,
@@ -156,7 +156,7 @@ describe("Editor.resizeSelectionFromCorner", () => {
 
     editor.getState().loadNodes([imageNode]);
     editor.select(imageNode.id);
-    editor.resizeSelectionFromCorner({ corner: "se", scale: 2 });
+    await editor.resizeSelectionFromCorner({ corner: "se", scale: 2 });
 
     expect(editor.getNode(imageNode.id)).toMatchObject({
       baseHeight: 120,
@@ -426,6 +426,17 @@ const createTextNode = (editor, { text, x, y }) => {
 
   return editor.selectedNodeId;
 };
+
+const createRasterEditor = () =>
+  new Editor({
+    rasterSurface: {
+      resampleSurface: async () => ({
+        redo: () => undefined,
+        undo: () => undefined,
+      }),
+      resolveSurface: () => null,
+    },
+  });
 
 const createRectanglePath = (id, parentId, x, y) => ({
   closed: true,

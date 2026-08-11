@@ -1047,7 +1047,7 @@ test("held Frame Brush stroke is visible beyond committed tight Raster bounds", 
   ).toBe("live-frame-stable-canvas");
 });
 
-test("imported Raster landmarks scale live and remain scaled after resize", async ({
+test("imported Raster landmarks preview live and commit to a resampled Canvas", async ({
   page,
 }) => {
   await gotoEditor(page);
@@ -1102,6 +1102,9 @@ test("imported Raster landmarks scale live and remain scaled after resize", asyn
     handleBox.y + handleBox.height / 2 + 60,
     { steps: 24 }
   );
+  await page.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  );
 
   expect(await sampleSelectionFraction(page, { x: 0.75, y: 0.25 })).toEqual({
     blue: 0,
@@ -1110,6 +1113,16 @@ test("imported Raster landmarks scale live and remain scaled after resize", asyn
   });
 
   await page.mouse.up();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__PUNCHPRESS_EDITOR__?.getRasterResizeState(
+            "canvas2d-raster"
+          ) ?? null
+      )
+    )
+    .toBeNull();
 
   expect(await sampleSelectionFraction(page, { x: 0.75, y: 0.25 })).toEqual({
     blue: 0,
@@ -1123,7 +1136,7 @@ test("imported Raster landmarks scale live and remain scaled after resize", asyn
   });
   expect(
     await residentCanvas.evaluate((canvas) => canvas.dataset.surfaceIdentity)
-  ).toBe("resize-stable-canvas");
+  ).toBeUndefined();
 
   const persistedResize = await page.evaluate(async () => {
     const editor = window.__PUNCHPRESS_EDITOR__;
@@ -1151,10 +1164,10 @@ test("imported Raster landmarks scale live and remain scaled after resize", asyn
   });
 
   expect(persistedResize).toEqual({
-    naturalHeight: 60,
-    naturalWidth: 80,
-    pixelHeight: 60,
-    pixelWidth: 80,
+    naturalHeight: 120,
+    naturalWidth: 160,
+    pixelHeight: 120,
+    pixelWidth: 160,
   });
   await expect(residentCanvas).toHaveCount(1);
   await expect
@@ -1164,13 +1177,13 @@ test("imported Raster landmarks scale live and remain scaled after resize", asyn
         width: canvas.width,
       }))
     )
-    .toEqual({ height: 60, width: 80 });
+    .toEqual({ height: 120, width: 160 });
   expect(
     await residentCanvas.evaluate((canvas) => ({
       height: canvas.height,
       width: canvas.width,
     }))
-  ).toEqual({ height: 60, width: 80 });
+  ).toEqual({ height: 120, width: 160 });
   expect(await sampleSelectionFraction(page, { x: 0.75, y: 0.25 })).toEqual({
     blue: 0,
     green: 255,

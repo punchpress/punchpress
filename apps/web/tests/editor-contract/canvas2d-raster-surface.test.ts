@@ -166,6 +166,58 @@ describe("Canvas2D Raster surface", () => {
     );
   });
 
+  test("atomically publishes one high-quality resampled Canvas with reversible identity", async () => {
+    const browser = createFakeCanvasBrowser();
+    const runtime = createCanvas2dRasterRuntime(browser.capabilities);
+    const before = await runtime.ensureSurface({
+      height: 60,
+      id: target.id,
+      src: "data:image/png;base64,existing",
+      width: 80,
+    });
+
+    const patch = await runtime.resampleSurface?.({
+      bounds: { height: 90, width: 120, x: 0, y: 0 },
+      pixelSize: { height: 90, width: 120 },
+      sourceBounds: { height: 90, width: 120, x: 0, y: 0 },
+      targetId: target.id,
+    });
+    const preparedCanvas = [...browser.contexts.keys()].at(-1);
+    const afterContext = browser.contexts.get(preparedCanvas);
+
+    expect(runtime.getPresentation(target.id)?.canvas).toBe(before.canvas);
+    expect(preparedCanvas).not.toBe(before.canvas);
+    expect({
+      height: preparedCanvas?.height,
+      width: preparedCanvas?.width,
+    }).toEqual({
+      height: 90,
+      width: 120,
+    });
+    expect(afterContext?.imageSmoothingEnabled).toBe(true);
+    expect(afterContext?.imageSmoothingQuality).toBe("high");
+    expect(afterContext?.drawImageCalls).toContainEqual([
+      before.canvas,
+      0,
+      0,
+      80,
+      60,
+      0,
+      0,
+      120,
+      90,
+    ]);
+    expect(browser.encodes).toEqual([]);
+
+    patch?.redo();
+    const after = runtime.getPresentation(target.id);
+    expect(after?.canvas).toBe(preparedCanvas);
+    patch?.undo();
+    expect(runtime.getPresentation(target.id)?.canvas).toBe(before.canvas);
+    patch?.redo();
+    expect(runtime.getPresentation(target.id)?.canvas).toBe(after?.canvas);
+  });
+
   test("lazy decode allocates persisted samples behind resized geometry", async () => {
     const browser = createFakeCanvasBrowser();
     const runtime = createCanvas2dRasterRuntime({
@@ -1030,6 +1082,7 @@ const createFakeCanvasBrowser = () => {
     },
     globalAlpha: 1,
     imageSmoothingEnabled: true,
+    imageSmoothingQuality: "low" as ImageSmoothingQuality,
     lineTo(x: number, y: number) {
       this.lineToCalls.push({ x, y });
     },
