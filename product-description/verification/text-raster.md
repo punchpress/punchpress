@@ -235,4 +235,3 @@ Not checkable by hand:
 
 - Internal asset encoding/storage structure and history-mark ownership need source or artifact inspection.
 - Product decisions and unknown device delivery are not established by a source draft; see [open questions](../documents/fonts.md#open-questions-and-verification).
-

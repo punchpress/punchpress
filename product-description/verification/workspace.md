@@ -61,4 +61,3 @@ Description: [Performance](../cross-cutting/performance.md).
 | PERF-01 | P2 | Mouse + keyboard unless stated | [HUD shortcut](../cross-cutting/performance.md#press) | 1. Editor focus. 2. Cmd+Shift+P. | Performance HUD appears. | pass; agent UI 2026-09-07 |
 | PERF-02 | P1 | Mouse + keyboard unless stated | [Cancel destructive benchmark prompt](../cross-cutting/performance.md#release-without-dragging) | 1. Disposable content. 2. Request scratch benchmark. 3. Cancel. | Artwork remains; benchmark not started. | pass; agent UI 2026-09-07 |
 | PERF-03 | P1 | Mouse + keyboard unless stated | [Scratch completion and error](../cross-cutting/performance.md#release) | 1. Disposable content only. 2. Confirm benchmark. 3. Repeat an error scenario. | Result/status recorded; scratch scene clears after either ending. | not run |
-
