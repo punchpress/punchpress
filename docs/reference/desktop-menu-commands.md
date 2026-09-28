@@ -18,6 +18,12 @@ The Electron shell sends document and editor commands to the renderer.
 - `export`
 - `import-svg`
 
+## File Menu Export
+
+| Menu label | Command id | Shortcut | Result |
+| --- | --- | --- | --- |
+| Export... | `export` | `Cmd/Ctrl+E` | Export the selected Frame as PNG; otherwise export the active document as SVG. |
+
 ## Editor Commands
 
 | Type | Actions |

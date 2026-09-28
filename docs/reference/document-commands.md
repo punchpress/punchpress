@@ -15,7 +15,7 @@ Document commands target the active workspace tab.
 | `open` | `Cmd/Ctrl+O` | Open or focus a `.punch` file-backed tab. |
 | `save` | `Cmd/Ctrl+S` | Save active file-backed tab. |
 | `save-as` | `Cmd/Ctrl+Shift+S` | Save active file-backed tab to a chosen path. |
-| `export` | `Cmd/Ctrl+E` | Export active document or selected export boundary. |
+| `export` | `Cmd/Ctrl+E` | Export the selected Frame as PNG; otherwise export the active document as SVG. |
 | `import-svg` | menu command | Import SVG into active tab. |
 
 ## Rules
