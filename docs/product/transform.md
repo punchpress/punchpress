@@ -12,6 +12,10 @@ Transforms move, resize, and rotate selected objects.
 ## Contract
 
 - Pointer-driven transforms preview during the gesture and commit once.
+- Move activation requires three screen pixels from the initial press. A
+  selected-object move session may be prewarmed before that threshold, but
+  release without qualifying motion is a no-op; once activated, later pointer
+  motion remains live even when it returns inside the threshold.
 - Escape or pointer cancellation restores the geometry from before a gesture,
   without adding an Undo step. Releasing the pointer commits normally.
 - Selection frames stay aligned with visible artwork.

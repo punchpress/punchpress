@@ -46,10 +46,9 @@ the history boundary is restored by the explicit revert path.
 
 ### Begin dragging
 
-The ordinary movement policy is three screen pixels, but selected-object
-preparation can bypass the subsequent distance check. See the suspected
-small-motion inconsistency under Edge cases rather than promising a universal
-three-pixel dead zone.
+The ordinary movement policy is three screen pixels. Selected-object
+preparation may create the move session before visible motion for responsiveness
+and duplicate setup, but it does not bypass the movement check.
 
 ### While dragging
 
@@ -101,10 +100,9 @@ and concurrent editing of the same target remain outside tested behavior.
 
 ## Edge cases
 
-- Preparing a selected-object move on an animation frame makes `dragSession`
-  truthy. The movement gate accepts that session without checking three pixels,
-  so tiny pointer motion can move a selected object. This may be worth treating
-  as a bug rather than documenting as intentional; see local triage.
+- Preparing a selected-object move on an animation frame can make `dragSession`
+  truthy before the gesture qualifies. Releasing without three screen pixels of
+  movement cancels that prepared session without changing the document.
 - Browser cancellation commits moved content while an explicit engine cancel
   restores it. Reproduce with a real interruption before choosing the UX policy.
 - No-movement, move-then-return, and duplicate-then-return are different cases:
@@ -112,8 +110,7 @@ and concurrent editing of the same target remain outside tested behavior.
 
 ## Open questions and verification
 
-- Verify tiny motion after a brief held press and compare with an unselected
-  target; verify browser cancellation, Escape, and undo during movement.
+- Verify browser cancellation, Escape, and undo during movement.
 - Evidence: `transform/selection-drag.ts`, canvas node drag listeners, single and
   multi-selection move overlays, move/history/container-drag contract tests.
 
