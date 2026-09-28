@@ -52,8 +52,8 @@ export class HistoryManager {
     return this.captureSnapshot() !== this.savedSnapshot;
   }
 
-  markSaved() {
-    this.savedSnapshot = this.captureSnapshot();
+  markSaved(snapshot = this.captureSnapshot()) {
+    this.savedSnapshot = snapshot;
   }
 
   mark(name) {

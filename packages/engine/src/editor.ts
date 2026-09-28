@@ -1931,8 +1931,8 @@ export class Editor {
     return serializeEditorDocument(this);
   }
 
-  markDocumentSaved() {
-    this.history.markSaved();
+  markDocumentSaved(snapshot = this.serializeDocument()) {
+    this.history.markSaved(snapshot);
   }
 
   markHistoryStep(name) {

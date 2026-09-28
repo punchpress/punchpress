@@ -7,13 +7,11 @@ import { tryParseEmbeddedDocument } from "@/platform/svg-embedded-import";
 import { importSvgToNodes } from "@/platform/svg-import-document";
 import {
   clearRecentPunchDocumentFiles,
-  getDocumentBaseName,
   getRecentPunchDocumentFiles,
   openPunchDocumentFile,
   openRecentPunchDocumentFile,
   openSvgImportFile,
   type PunchRecentDocument,
-  savePunchDocumentFile,
   savePunchPngFile,
   savePunchSvgFile,
 } from "@/platform/web-document-files";
@@ -24,6 +22,7 @@ import {
   formatFontList,
   getDocumentCommandErrorTitle,
 } from "./document-command-utils";
+import { saveDocumentTab as saveFileTab } from "./save-document-tab";
 import { useDocumentCommandTriggers } from "./use-document-command-triggers";
 import { useEditorModalBlocking } from "./use-editor-modal-blocking";
 import { useUnsavedDocumentWarning } from "./use-unsaved-document-warning";
@@ -160,29 +159,22 @@ export const useDocumentCommands = () => {
         return false;
       }
 
-      const result = await savePunchDocumentFile(
-        tab.editor.serializeDocument(),
-        tab.baseName,
-        tab.fileHandle,
-        forceDialog
-      );
+      const saved = await saveFileTab({
+        forceDialog,
+        tab,
+        updateIdentity: workspace.updateTabFileIdentity,
+      });
 
-      if (result.canceled) {
+      if (!saved) {
         return false;
       }
 
-      workspace.updateTabFileIdentity(tab.id, {
-        baseName: result.fileName ? getDocumentBaseName(result.fileName) : null,
-        fileHandle: result.fileHandle || tab.fileHandle,
-      });
-      tab.editor.markDocumentSaved();
-
       showToast({
-        message: `Saved ${result.fileName || `${tab.baseName}.punch`}`,
+        message: `Saved ${saved.fileName || `${tab.baseName}.punch`}`,
         type: "success",
       });
       await refreshRecentDocuments();
-      return true;
+      return !tab.editor.isDirty;
     }
   );
 
