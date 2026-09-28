@@ -32,6 +32,11 @@ leave it drafted.
 
 ## First-pass results
 
+These counts describe the original baseline, before the user-approved fix pass.
+Later regression tests and UI demos are recorded with the
+[triage findings](../bug-triage.md); they do not retroactively change these counts
+or constitute a human pass over the full checklist.
+
 On 2026-09-07, Codex drove the in-app browser through UI input and inspected
 screenshots and accessibility state. It used disposable artwork, without state
 injection. Several rows reuse one gesture's evidence, so these counts describe
@@ -66,13 +71,29 @@ flows, downloads, external asset services, and controlled persistence races need
 additional verification. The benchmark itself was not run. Observing a basic
 interaction does not verify its complete modifier or interruption matrix.
 
-Start the next pass with the three high-severity findings in
-[bug triage](../bug-triage.md): scratchpad debounce on tab switching, editing
-during an awaited save, and loading before local-font access. Use disposable
-fixtures and inspect persisted results. Then finish P1/P2 checks cluster by
-cluster. No document is marked verified yet.
+The fix pass addresses all seventeen findings in
+[bug triage](../bug-triage.md), including controlled persistence and font-access
+races. The remaining human review should finish P1/P2 checks cluster by cluster.
+No document is marked verified yet.
 
-## Automated checks
+## Fix-pass verification, 2026-09-28
+
+All seventeen fixes passed coordinator review and were integrated locally at
+`24af71ac`. The combined checkout passed 448 editor tests across 80 files,
+4 focused browser-utility tests, and 16 desktop tests. Schema/engine typecheck,
+repository checks, the web production build, and Electron compilation passed.
+The web build retains its existing bundle-size warning.
+
+The combined browser run passed 44 tests and exposed a loading race in the new
+font test. After correcting its polling helper, the font test passed three
+repeated runs in the combined checkout. All 45 distinct browser cases now pass.
+UI demos and controlled-fixture limitations were reviewed per task; see the
+[fix resolution table](../bug-triage.md#fix-review--2026-09-28).
+
+These regression checks do not constitute execution of all 709 checklist rows.
+The original observations below remain unchanged.
+
+## Original automated checks
 
 At the same source baseline, `bun run test:editor` passed 410 tests across 74
 files with 1,830 assertions. `bun run typecheck` passed for punch-schema and the
@@ -85,6 +106,7 @@ Run the imported consistency checker from the monorepo root:
 python3 .agents/skills/product-description/references/check-links.py product-description
 ```
 
-The final pass checks relative files and anchors, the inventory, checklist IDs,
-and the shared feature skeleton. Application source and existing docs were not
-modified by this description work.
+The consistency check covers relative files and anchors, the inventory,
+checklist IDs, and the shared feature skeleton. The initial description pass
+left application source and existing docs untouched; the subsequent fix pass
+updates both.

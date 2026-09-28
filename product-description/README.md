@@ -11,7 +11,8 @@ or retain the existing docs after reviewing the resulting set.
 
 - Describe the default web editor at `/`, with mouse and keyboard on macOS.
 - Cover the full editor feature set below, including browser workflows and a
-  separately labeled desktop comparison. Existing docs remain untouched.
+  separately labeled desktop comparison. The initial description pass left
+  existing docs untouched; the subsequent fix pass updates their contracts.
 - Native Electron behavior is source-described as a platform comparison; native
   dialogs, physical touch/stylus, permissions, and external services may remain
   blocked in verification. Record each limitation rather than guessing.
@@ -156,10 +157,13 @@ contain 709 checks. The first agent browser pass records 30 passes, two failures
 one partial check, and nine blocked checks; 667 checks remain unrun. See the
 [verification report](verification/README.md) for evidence and limitations.
 
-[Bug triage](bug-triage.md) records 17 deduplicated findings. Two are browser
-confirmed. Three high-severity source findings concern scratchpad persistence,
-the saved baseline during a pending write, and font substitution before browser
-font access. These need controlled reproduction before fixes are scoped.
+[Bug triage](bug-triage.md) records 17 deduplicated findings from that baseline.
+The user approved all seventeen fixes and product calls. The subsequent fix pass
+uses separate implementation tasks, regression tests, UI demos, and coordinator
+review. Draft descriptions retain baseline source references; consult the
+resolution table for changed behavior. Original checklist counts remain a
+historical baseline; current behavior contracts are updated in `docs/`. Agent verification
+does not promote these draft descriptions to human-verified status.
 
 ## Comparing with existing docs
 

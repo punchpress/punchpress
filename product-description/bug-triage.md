@@ -1,11 +1,50 @@
 # Bug triage
 
-Seventeen deduplicated findings from the description pass. Two are confirmed by
-agent-driven browser input; the rest are source-supported risks or product calls.
-The three high-severity entries concern persistence or font substitution and
-need controlled reproduction.
-No application fixes or external issues were made. All source references use
-PunchPress baseline `d4e6d4a`; line ranges describe that baseline.
+Seventeen deduplicated findings from the original description pass. Two were confirmed by
+agent-driven browser input; the rest began as source-supported risks or product
+calls. The three high-severity entries concerned persistence or font substitution
+and required controlled reproduction.
+The user approved fixes for all seventeen findings, including the product calls.
+Implementation and review are tracked in separate Punchpress tasks. The findings
+below preserve the original observations; they are not a list of current bugs.
+All source references below use PunchPress baseline `d4e6d4a`; line ranges
+describe that baseline. Current contracts live in `docs/product/` and
+`docs/reference/`.
+
+## Fix review — 2026-09-28
+
+Each finding has its own implementation task and isolated checkout. Fixes are
+integrated locally after coordinator review of source, regression tests, and UI
+evidence. Nothing has been pushed or released.
+
+| Finding | Resolution and current contract | Review |
+| --- | --- | --- |
+| B-01 | [Frame and mixed stroke fields](../docs/product/properties.md) retain invalid drafts without changing artwork; untouched blur is a no-op. | accepted |
+| B-02 | [Command menu](../docs/product/command-menu.md) resets on every dismissal, including outside clicks. | accepted |
+| B-03 | [Canceled transforms](../docs/product/transform.md) and guide edits roll back without an Undo step. | accepted |
+| B-04 | [Moves](../docs/product/transform.md) activate after three screen pixels and stay active when returning toward the origin. | accepted |
+| B-05 | [Scratchpad](../docs/product/scratchpad.md) flushes pending edits before switching tabs. | accepted |
+| B-06 | [Save](../docs/product/workspace-tabs.md) marks only the written snapshot saved; later edits remain dirty. | accepted |
+| B-07 | [Browser tabs](../docs/product/workspace-tabs.md) use file-handle identity, serialize opens, and recheck live tabs after async comparisons. | accepted |
+| B-08 | [Asset pagination](../docs/product/assets.md) uses the submitted query and discards stale responses. | accepted |
+| B-09 | [Native Export](../docs/reference/desktop-menu-commands.md) uses a generic label for its selection-sensitive PNG/SVG output. | accepted |
+| B-10 | [Pen handles](../docs/product/path-editing.md) activate by screen distance while geometry stays in document coordinates. | accepted |
+| B-11 | [Shape Escape](../docs/product/shape-tool.md) cancels the held placement before release. | accepted |
+| B-12 | [Join endpoints](../docs/product/path-editing.md) preserves distinct anchors and merges coincident endpoints with their handles. | accepted |
+| B-13 | [Merge Curves](../docs/product/path-editing.md) discloses style loss; confirmation stays bound to its document. | accepted |
+| B-14 | [Wave and Slant](../docs/product/text-warping.md) accept finite values beyond scrub ranges without rounding typed precision. | accepted |
+| B-15 | [Image paste](../docs/product/clipboard.md) imports PNG/JPEG bytes while preserving native payload precedence and text focus. | accepted |
+| B-16 | [Desktop updates](../docs/product/desktop.md) distinguish quiet automatic checks from visible user-requested feedback. | accepted |
+| B-17 | [Unresolved fonts](../docs/product/fonts.md) retain their saved descriptors and use temporary previews until resolved or explicitly replaced. | accepted |
+
+UI evidence includes agent-driven browser screenshots and automated browser
+captures. Delayed writes, browser handles, asset responses, updater states, and
+font-catalog access use labeled controlled fixtures where necessary. Native
+Export was checked through Electron accessibility state; its menu/dialog image
+capture was unavailable. Hardware pointer cancellation and real update downloads
+were not exercised. These checks do not replace the full human P1/P2 pass.
+
+## Original findings
 
 | ID | Finding | Severity | Decision | Evidence |
 | --- | --- | --- | --- | --- |
