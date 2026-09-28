@@ -39,6 +39,8 @@ a specific path-editing mode.
 - Inline guides are centered through the text rather than anchored to the top.
 - Wave defaults to restrained amplitude and clamps to at most three cycles.
 - Inline controls support the intended expressive range in both directions.
+- Wave amplitude and slant rise preserve any finite numeric value, including
+  values outside their convenient scrub ranges.
 
 ## Handles
 
