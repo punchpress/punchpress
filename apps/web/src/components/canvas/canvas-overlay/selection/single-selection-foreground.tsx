@@ -10,6 +10,7 @@ import {
   getCanvasRotateCursor,
   getCanvasScaleCursor,
 } from "../../canvas-cursor-assets";
+import { attachCanvasGestureEvents } from "../../canvas-gesture-events";
 import { openCanvasNodeEditingMode } from "../../canvas-node-editing";
 import { getHostRectFromNodeFrame } from "../canvas-overlay-geometry";
 import { getTextPathTransformTargetStyle } from "../text/path-geometry";
@@ -587,20 +588,20 @@ export const CanvasSingleSelectionForeground = ({
       previousCanvasPoint = nextCanvasPoint;
     };
 
-    const handlePointerEnd = () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointercancel", handlePointerEnd);
-      window.removeEventListener("pointerup", handlePointerEnd);
+    const finishDrag = (cancel = false) => {
       window.cancelAnimationFrame(prewarmFrameId);
 
       if (dragSession) {
-        editor.endSelectionDrag(dragSession, { cancel: !didMove });
+        editor.endSelectionDrag(dragSession, { cancel: cancel || !didMove });
       }
     };
 
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointercancel", handlePointerEnd);
-    window.addEventListener("pointerup", handlePointerEnd);
+    attachCanvasGestureEvents({
+      onCancel: () => finishDrag(true),
+      onFinish: () => finishDrag(),
+      onMove: handlePointerMove,
+      pointerId: event.pointerId,
+    });
   };
 
   const startResize = (handle, event) => {
@@ -663,22 +664,23 @@ export const CanvasSingleSelectionForeground = ({
       editor.updateResizeSelection(resizeState.resizeSession, { scale });
     };
 
-    const handlePointerEnd = () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointercancel", handlePointerEnd);
-      window.removeEventListener("pointerup", handlePointerEnd);
+    const finishResize = (cancel: boolean) => {
       setActiveResizeCorner(null);
       editor.setHoveringSuppressed(false);
-      editor.commitResizeSelection(resizeState.resizeSession);
-
-      if (historyMark) {
+      if (cancel) {
+        editor.cancelGesture(historyMark);
+      } else {
+        editor.commitResizeSelection(resizeState.resizeSession);
         editor.commitHistoryStep(historyMark);
       }
     };
 
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointercancel", handlePointerEnd);
-    window.addEventListener("pointerup", handlePointerEnd);
+    attachCanvasGestureEvents({
+      onCancel: () => finishResize(true),
+      onFinish: () => finishResize(false),
+      onMove: handlePointerMove,
+      pointerId: event.pointerId,
+    });
   };
 
   const startRotate = (corner: TransformCorner, event) => {
@@ -729,23 +731,24 @@ export const CanvasSingleSelectionForeground = ({
       });
     };
 
-    const handlePointerEnd = () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointercancel", handlePointerEnd);
-      window.removeEventListener("pointerup", handlePointerEnd);
+    const finishRotation = (cancel: boolean) => {
       editor.endSelectionRotationInteraction();
       setActiveRotateCursor(null);
       editor.setHoveringSuppressed(false);
-      editor.commitRotateSelection(rotateSession);
-
-      if (historyMark) {
+      if (cancel) {
+        editor.cancelGesture(historyMark);
+      } else {
+        editor.commitRotateSelection(rotateSession);
         editor.commitHistoryStep(historyMark);
       }
     };
 
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointercancel", handlePointerEnd);
-    window.addEventListener("pointerup", handlePointerEnd);
+    attachCanvasGestureEvents({
+      onCancel: () => finishRotation(true),
+      onFinish: () => finishRotation(false),
+      onMove: handlePointerMove,
+      pointerId: event.pointerId,
+    });
   };
 
   return (

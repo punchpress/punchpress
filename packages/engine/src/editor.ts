@@ -1943,6 +1943,11 @@ export class Editor {
     return this.history.commitMark(mark);
   }
 
+  cancelGesture(mark) {
+    this.setSelectionDragPreview(null);
+    return this.history.revertToMark(mark);
+  }
+
   revertToMark(mark) {
     return this.history.revertToMark(mark);
   }

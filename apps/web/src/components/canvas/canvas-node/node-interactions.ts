@@ -5,6 +5,7 @@ import {
   recordPerfSpan,
   round,
 } from "@punchpress/engine";
+import { attachCanvasGestureEvents } from "../canvas-gesture-events";
 import { getCanvasDeepLeafNodeIdAtPoint } from "../canvas-overlay/vector-path/canvas-node-hit-target";
 
 export const getCanvasPoint = (editor, clientX, clientY) => {
@@ -236,21 +237,21 @@ export const startCanvasNodeDragSession = ({
       previousCanvasPoint = nextCanvasPoint;
     });
 
-  const handlePointerEnd = () =>
+  const finishDrag = (cancel = false) =>
     measurePerf(PERF_SPANS.pointerUpHandle, () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointercancel", handlePointerEnd);
-      window.removeEventListener("pointerup", handlePointerEnd);
       window.cancelAnimationFrame(prewarmFrameId);
 
       if (dragSession) {
-        editor.endSelectionDrag(dragSession, { cancel: !didMove });
+        editor.endSelectionDrag(dragSession, { cancel: cancel || !didMove });
       }
     });
 
-  window.addEventListener("pointermove", handlePointerMove);
-  window.addEventListener("pointercancel", handlePointerEnd);
-  window.addEventListener("pointerup", handlePointerEnd);
+  attachCanvasGestureEvents({
+    onCancel: () => finishDrag(true),
+    onFinish: () => finishDrag(),
+    onMove: handlePointerMove,
+    pointerId: event.pointerId,
+  });
 };
 
 export const shouldIgnoreCanvasNodePointerDown = ({
@@ -310,10 +311,6 @@ export const handleNodeToolIdlePointerDown = ({
     }
   };
   const handlePointerEnd = (upEvent) => {
-    window.removeEventListener("pointermove", handlePointerMove);
-    window.removeEventListener("pointercancel", handlePointerEnd);
-    window.removeEventListener("pointerup", handlePointerEnd);
-
     if (didMove || editor.pathEditingNodeId) {
       return;
     }
@@ -325,7 +322,9 @@ export const handleNodeToolIdlePointerDown = ({
     });
   };
 
-  window.addEventListener("pointermove", handlePointerMove);
-  window.addEventListener("pointercancel", handlePointerEnd);
-  window.addEventListener("pointerup", handlePointerEnd);
+  attachCanvasGestureEvents({
+    onFinish: handlePointerEnd,
+    onMove: handlePointerMove,
+    pointerId: event.pointerId,
+  });
 };

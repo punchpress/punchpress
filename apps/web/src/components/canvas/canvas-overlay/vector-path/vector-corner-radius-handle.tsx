@@ -4,6 +4,7 @@ import {
   getVectorPathCursorToken,
   setActiveCanvasCursorToken,
 } from "../../canvas-cursor-policy";
+import { attachCanvasGestureEvents } from "../../canvas-gesture-events";
 import {
   CANVAS_HANDLE_BUTTON_CLASS,
   CANVAS_HANDLE_DOT_ACTIVE_CLASS,
@@ -267,12 +268,14 @@ export const VectorCornerRadiusHandle = ({
       applyDragMove(moveEvent);
     };
 
-    const handlePointerEnd = () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointercancel", handlePointerEnd);
-      window.removeEventListener("pointerup", handlePointerEnd);
+    const finishDrag = (cancel: boolean) => {
       onDragStateChange?.(null);
       setActiveCanvasCursorToken(editor.hostRef, null);
+
+      if (cancel) {
+        editor.cancelGesture(historyMark);
+        return;
+      }
 
       if (didChange && historyMark) {
         editor.commitHistoryStep(historyMark);
@@ -290,9 +293,12 @@ export const VectorCornerRadiusHandle = ({
       editor.setPathEditingPoints([pathPoint], pathPoint);
     };
 
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointercancel", handlePointerEnd);
-    window.addEventListener("pointerup", handlePointerEnd);
+    attachCanvasGestureEvents({
+      onCancel: () => finishDrag(true),
+      onFinish: () => finishDrag(false),
+      onMove: handlePointerMove,
+      pointerId: event.pointerId,
+    });
   };
 
   return (

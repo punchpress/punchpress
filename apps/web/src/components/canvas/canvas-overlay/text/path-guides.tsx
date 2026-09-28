@@ -9,6 +9,7 @@ import {
   getTextPathHandleCursorToken,
   setActiveCanvasCursorToken,
 } from "../../canvas-cursor-policy";
+import { attachCanvasGestureEvents } from "../../canvas-gesture-events";
 import { CanvasGuide } from "../visuals/guide";
 import {
   CANVAS_HANDLE_BUTTON_CLASS,
@@ -520,19 +521,23 @@ const TextPathHandles = ({
       }
     };
 
-    const handlePointerEnd = () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointercancel", handlePointerEnd);
-      window.removeEventListener("pointerup", handlePointerEnd);
+    const finishEdit = (cancel: boolean) => {
       editor.endTextPathPositioningInteraction();
       setActiveCanvasCursorToken(editor.hostRef, null);
-      editor.commitHistoryStep(historyMark);
+      if (cancel) {
+        editor.cancelGesture(historyMark);
+      } else {
+        editor.commitHistoryStep(historyMark);
+      }
       setSpringState(null);
     };
 
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointercancel", handlePointerEnd);
-    window.addEventListener("pointerup", handlePointerEnd);
+    attachCanvasGestureEvents({
+      onCancel: () => finishEdit(true),
+      onFinish: () => finishEdit(false),
+      onMove: handlePointerMove,
+      pointerId: event.pointerId,
+    });
   };
 
   return guide.handles.map((handle) => {

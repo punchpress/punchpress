@@ -37,6 +37,8 @@ export const beginSelectionDrag = (
       return null;
     }
 
+    const initialSelectedNodeIds = [...editor.selectedNodeIds];
+
     if (duplicate) {
       duplicateForDrag(editor, nodeId);
     }
@@ -56,6 +58,7 @@ export const beginSelectionDrag = (
     return {
       changed: duplicate,
       historyMark,
+      initialSelectedNodeIds,
       moveSession,
     };
   });
@@ -105,7 +108,9 @@ export const endSelectionDrag = (editor, session, options: { delta?: any; dragEv
         editor.setHoveringSuppressed(false);
       }
 
-      return editor.revertToMark(session.historyMark);
+      const didRevert = editor.revertToMark(session.historyMark);
+      editor.setSelectedNodes(session.initialSelectedNodeIds);
+      return didRevert;
     }
 
     commitMoveSelection(editor, session.moveSession);
