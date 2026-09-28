@@ -1,0 +1,31 @@
+{
+  "version": "1.8",
+  "nodes": [
+    {
+      "id": "font-access-node",
+      "parentId": "root",
+      "type": "text",
+      "text": "FONT",
+      "font": {
+        "family": "Arial",
+        "fullName": "Arial",
+        "postscriptName": "ArialMT",
+        "style": "Regular"
+      },
+      "transform": {
+        "x": 420,
+        "y": 360,
+        "rotation": 0,
+        "scaleX": 1,
+        "scaleY": 1
+      },
+      "fontSize": 100,
+      "tracking": 0,
+      "fill": "#222222",
+      "stroke": null,
+      "strokeWidth": 0,
+      "visible": true,
+      "warp": { "kind": "none" }
+    }
+  ]
+}

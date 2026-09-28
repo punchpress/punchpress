@@ -212,7 +212,7 @@ describe("Editor.loadDocument", () => {
     expect(editor.selectedNodeId).toBeNull();
   });
 
-  test("replaces missing fonts with the resolved default font on import", () => {
+  test("keeps a missing font descriptor when a ready catalog lacks it", () => {
     const editor = new Editor();
     editor.applyLocalFontCatalog({
       error: "",
@@ -225,8 +225,8 @@ describe("Editor.loadDocument", () => {
     );
 
     expect(resolution.missingFonts).toEqual([MISSING_FONT]);
-    expect(resolution.replacementFont).toEqual(AVAILABLE_FONT);
-    expect(editor.nodes[0]?.font).toEqual(AVAILABLE_FONT);
+    expect(resolution.replacementFont).toBeNull();
+    expect(editor.nodes[0]?.font).toEqual(MISSING_FONT);
   });
 
   test("fills in the default circle path position when a document omits it", () => {

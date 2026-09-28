@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { readLocalFontBytes } from "../../../src/platform/local-fonts";
+import {
+  getInitialLocalFontCatalog,
+  readLocalFontBytes,
+  requestLocalFontCatalog,
+} from "../../../src/platform/local-fonts";
 
 const restoreWindow = () => {
   if ("window" in globalThis) {
@@ -9,6 +13,71 @@ const restoreWindow = () => {
 
 afterEach(() => {
   restoreWindow();
+});
+
+describe("local font catalog availability", () => {
+  test("browser initial state leaves installed fonts unqueried", async () => {
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: { queryLocalFonts: () => Promise.resolve([]) },
+    });
+
+    expect(await getInitialLocalFontCatalog()).toEqual({
+      error: "",
+      fonts: [],
+      state: "action-required",
+    });
+  });
+
+  test("browser denial keeps the catalog unresolved", async () => {
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        queryLocalFonts: () =>
+          Promise.reject(new DOMException("Denied", "NotAllowedError")),
+      },
+    });
+
+    expect(await requestLocalFontCatalog()).toEqual({
+      error: "Local font access was denied.",
+      fonts: [],
+      state: "permission-denied",
+    });
+  });
+
+  test("desktop scan reports a ready catalog even when no fonts are found", async () => {
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        electron: { localFonts: { listFonts: () => Promise.resolve([]) } },
+      },
+    });
+
+    expect(await getInitialLocalFontCatalog()).toEqual({
+      error: "",
+      fonts: [],
+      state: "ready",
+    });
+  });
+
+  test("desktop scan failure remains an unknown catalog", async () => {
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        electron: {
+          localFonts: {
+            listFonts: () => Promise.reject(new Error("Font scan failed")),
+          },
+        },
+      },
+    });
+
+    expect(await requestLocalFontCatalog()).toEqual({
+      error: "Font scan failed",
+      fonts: [],
+      state: "error",
+    });
+  });
 });
 
 describe("readLocalFontBytes", () => {
