@@ -61,7 +61,11 @@ test("preserves saved font through access changes and explicit replacement", asy
   const savedFont = () =>
     page.evaluate(() => {
       const contents = window.__PUNCHPRESS_EDITOR__?.serializeDocument();
-      return contents ? JSON.parse(contents).nodes[0].font : null;
+      return contents
+        ? (JSON.parse(contents).nodes.find(
+            (node) => node.id === "font-access-node"
+          )?.font ?? null)
+        : null;
     });
   await expect.poll(savedFont).toEqual(INTENDED_FONT);
   await expect(
