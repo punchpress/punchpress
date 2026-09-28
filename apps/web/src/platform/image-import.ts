@@ -121,3 +121,29 @@ export const createImageNodeFromDataUrl = async ({
     },
   };
 };
+
+export const importImageFile = async ({
+  file,
+  targetCenter,
+}: {
+  file: File;
+  targetCenter: { x: number; y: number };
+}) => {
+  const mimeType = getSupportedImageMimeType(file);
+
+  if (!mimeType) {
+    throw new Error("Unsupported image file type.");
+  }
+
+  const src = normalizeImageDataUrlMimeType({
+    mimeType,
+    src: await readFileAsDataUrl(file),
+  });
+
+  return createImageNodeFromDataUrl({
+    mimeType,
+    name: file.name || "Image",
+    src,
+    targetCenter,
+  });
+};

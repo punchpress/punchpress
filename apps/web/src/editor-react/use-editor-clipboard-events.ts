@@ -6,6 +6,8 @@ import {
   serializeClipboardContent,
 } from "@punchpress/punch-schema";
 import { useEffect } from "react";
+import { showToast } from "@/components/ui/toast";
+import { importImageFile, isSupportedImageFile } from "@/platform/image-import";
 
 const getClipboardText = (content) => {
   return content.nodes
@@ -41,10 +43,43 @@ const getClipboardContentFromHtml = (html) => {
   }
 };
 
-const hasClipboardFiles = (clipboardData) => {
+const hasClipboardFiles = (clipboardData: DataTransfer) => {
   return Array.from(clipboardData?.items || []).some((item) => {
     return item.kind === "file";
   });
+};
+
+const getClipboardImageFile = (clipboardData: DataTransfer) => {
+  const files = Array.from(clipboardData.items || [])
+    .filter((item) => item.kind === "file")
+    .map((item) => item.getAsFile())
+    .filter((file): file is File => file !== null);
+
+  return files.find(isSupportedImageFile) || null;
+};
+
+const pasteClipboardImage = async (editor, file, isActive) => {
+  const targetCenter = editor.getViewportCenter();
+
+  if (!(file && targetCenter)) {
+    return;
+  }
+
+  try {
+    const node = await importImageFile({ file, targetCenter });
+    if (isActive()) {
+      editor.insertNodes([node]);
+    }
+  } catch (error) {
+    console.error(error);
+    showToast({
+      message: `Import image failed: ${
+        error instanceof Error ? error.message : "Unknown file error."
+      }`,
+      priority: "high",
+      type: "error",
+    });
+  }
 };
 
 export const useEditorClipboardEvents = (editor) => {
@@ -54,6 +89,7 @@ export const useEditorClipboardEvents = (editor) => {
     }
 
     const ownerDocument = window.document;
+    let active = true;
 
     const handleCopy = (event) => {
       if (
@@ -106,6 +142,8 @@ export const useEditorClipboardEvents = (editor) => {
 
       if (hasClipboardFiles(event.clipboardData)) {
         event.preventDefault();
+        const file = getClipboardImageFile(event.clipboardData);
+        pasteClipboardImage(editor, file, () => active);
         return;
       }
 
@@ -122,6 +160,7 @@ export const useEditorClipboardEvents = (editor) => {
     ownerDocument.addEventListener("paste", handlePaste);
 
     return () => {
+      active = false;
       ownerDocument.removeEventListener("copy", handleCopy);
       ownerDocument.removeEventListener("paste", handlePaste);
     };
