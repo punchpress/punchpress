@@ -13,7 +13,6 @@ import { WorkspaceContext } from "./workspace-context";
 import {
   createFileOpenQueue,
   findLiveMatchingFileTab,
-  findMatchingFileTab,
 } from "./workspace-file-identity";
 
 const SCRATCHPAD_TAB_ID = "scratchpad";
@@ -206,8 +205,8 @@ export const WorkspaceProvider = ({ children }) => {
 
         if (existingTab) {
           await focusTab(existingTab.id);
-          const stillOpen = await findMatchingFileTab(
-            tabsRef.current,
+          const stillOpen = await findLiveMatchingFileTab(
+            () => tabsRef.current,
             openedDocument.fileHandle
           );
 
