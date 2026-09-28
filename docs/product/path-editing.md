@@ -50,6 +50,11 @@ Path editing manipulates editable curve geometry while preserving node identity.
 - Users can close eligible open contours.
 - Users can merge compatible curves into a multi-contour path and separate
   multi-contour paths back into separate path nodes.
+- A merged path has one style: the first selected curve's style. When styles
+  differ, Merge Curves asks for confirmation and points to Group selection to
+  keep each curve's appearance. Cancel leaves the selection and history intact.
+  Separate Curves uses the merged style for every resulting path; Undo restores
+  the originals.
 - Drawing disconnected paths creates separate path nodes by default unless the
   user is editing a vector container.
 
@@ -57,7 +62,7 @@ Path editing manipulates editable curve geometry while preserving node identity.
 
 | Command | Product meaning |
 | --- | --- |
-| `Merge Curves` | Combine compatible selected curves into one multi-contour path or vector-owned path set without baking unrelated styling. |
+| `Merge Curves` | Combine compatible selected curves into one multi-contour path with the first selected curve's style. |
 | `Separate Curves` | Split a multi-contour path into separate editable path nodes or child paths while preserving visual order. |
 | `Join Curves` | Connect eligible open endpoints into one continuous contour. |
 | `Close Curve` | Close an eligible open contour by connecting its endpoints. |

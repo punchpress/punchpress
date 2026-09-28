@@ -37,7 +37,7 @@ The Electron shell sends document and editor commands to the renderer.
 
 | Menu label | Command id | Semantics |
 | --- | --- | --- |
-| Merge Curves | `merge-curves` | Combine compatible selected curves into one editable multi-contour result. |
+| Merge Curves | `merge-curves` | Combine compatible selected curves into one editable multi-contour result; confirm first when their styles differ. |
 | Separate Curves | `separate-curves` | Split a multi-contour result into separate editable curves. |
 | Join Curves | `join-curves` | Connect eligible open endpoints into one contour. |
 
