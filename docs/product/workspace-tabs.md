@@ -39,6 +39,8 @@ files.
 - Save writes the active file-backed tab.
 - Save As writes the active file-backed tab to a chosen file and updates tab
   identity.
+- Browser file handles use native file identity when available, so reopening
+  the same handle focuses its tab while same-name files remain separate.
 - A save clears the dirty indicator only for the document content it wrote. If
   the document changes while a write is pending, those edits remain dirty and
   a close or quit request keeps the tab open.

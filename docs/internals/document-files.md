@@ -19,6 +19,10 @@ Document files span schema, engine, workspace, and platform layers.
 4. Workspace tabs own active editor, dirty status, basename, and file identity.
 5. Recent documents track file-backed documents only.
 
+Browser file-backed tabs compare `FileSystemFileHandle.isSameEntry()` when a
+native handle is available. File names are display labels, not identity keys;
+browser opens without a handle cannot be deduplicated.
+
 The save command serializes the tab's editor before writing. On success it
 marks that serialized snapshot as the saved baseline for the same editor; a
 later edit remains dirty, including after Save As changes the tab's file

@@ -10,6 +10,11 @@ import {
   saveScratchpadDocument,
 } from "./scratchpad-storage";
 import { WorkspaceContext } from "./workspace-context";
+import {
+  createFileOpenQueue,
+  findLiveMatchingFileTab,
+  findMatchingFileTab,
+} from "./workspace-file-identity";
 
 const SCRATCHPAD_TAB_ID = "scratchpad";
 
@@ -17,14 +22,12 @@ const createTabId = () => {
   return `tab-${crypto.randomUUID()}`;
 };
 
-const getFileKey = (openedDocument) => {
-  if (!openedDocument?.fileHandle) {
+const getFileKey = (fileHandle) => {
+  if (!fileHandle) {
     return null;
   }
 
-  return typeof openedDocument.fileHandle === "string"
-    ? openedDocument.fileHandle
-    : null;
+  return typeof fileHandle === "string" ? fileHandle : null;
 };
 
 const getTabTitle = (tab) => {
@@ -63,10 +66,27 @@ const getTabIsDirty = (tab) => {
 
 export const WorkspaceProvider = ({ children }) => {
   const [tabs, setTabs] = useState(() => [createScratchpadTab()]);
+  const tabsRef = useRef(tabs);
   const [activeTabId, setActiveTabId] = useState(SCRATCHPAD_TAB_ID);
   const mountedEditorRef = useRef(null);
   const scratchpadAutosaveRef = useRef(null);
   const tabSwitchRequestRef = useRef(0);
+  const fileOpenQueueRef = useRef(null);
+
+  if (!fileOpenQueueRef.current) {
+    fileOpenQueueRef.current = createFileOpenQueue();
+  }
+
+  const updateTabs = useCallback((nextTabsOrUpdater) => {
+    const nextTabs =
+      typeof nextTabsOrUpdater === "function"
+        ? nextTabsOrUpdater(tabsRef.current)
+        : nextTabsOrUpdater;
+
+    tabsRef.current = nextTabs;
+    setTabs(nextTabs);
+    return nextTabs;
+  }, []);
 
   const scratchpadEditor = tabs[0].editor;
   const activeTab = tabs.find((tab) => tab.id === activeTabId) || tabs[0];
@@ -85,7 +105,7 @@ export const WorkspaceProvider = ({ children }) => {
 
         scratchpadEditor.loadDocument(contents);
         scratchpadEditor.markDocumentSaved();
-        setTabs((currentTabs) => [...currentTabs]);
+        updateTabs((currentTabs) => [...currentTabs]);
       })
       .catch((error) => {
         console.error(error);
@@ -94,7 +114,7 @@ export const WorkspaceProvider = ({ children }) => {
     return () => {
       canceled = true;
     };
-  }, [scratchpadEditor]);
+  }, [scratchpadEditor, updateTabs]);
 
   useEffect(() => {
     const previousEditor = mountedEditorRef.current;
@@ -128,11 +148,11 @@ export const WorkspaceProvider = ({ children }) => {
 
   useEffect(() => {
     const unsubscribe = activeEditor.store.subscribe(() => {
-      setTabs((currentTabs) => [...currentTabs]);
+      updateTabs((currentTabs) => [...currentTabs]);
     });
 
     return unsubscribe;
-  }, [activeEditor]);
+  }, [activeEditor, updateTabs]);
 
   useEffect(() => {
     const autosave = createScratchpadAutosave(
@@ -177,37 +197,46 @@ export const WorkspaceProvider = ({ children }) => {
   );
 
   const openDocumentTab = useCallback(
-    async (openedDocument) => {
-      const fileKey = getFileKey(openedDocument);
-      const existingTab = fileKey
-        ? tabs.find((tab) => tab.fileKey === fileKey)
-        : null;
+    (openedDocument) => {
+      return fileOpenQueueRef.current(async () => {
+        const existingTab = await findLiveMatchingFileTab(
+          () => tabsRef.current,
+          openedDocument.fileHandle
+        );
 
-      if (existingTab) {
-        await focusTab(existingTab.id);
-        return { missingFonts: [], replacementFont: null };
-      }
+        if (existingTab) {
+          await focusTab(existingTab.id);
+          const stillOpen = await findMatchingFileTab(
+            tabsRef.current,
+            openedDocument.fileHandle
+          );
 
-      const editor = createConfiguredEditor();
-      await editor.initializeLocalFonts().catch(() => undefined);
-      const resolution = editor.loadDocument(openedDocument.contents);
-      editor.markDocumentSaved();
+          if (stillOpen) {
+            return { missingFonts: [], replacementFont: null };
+          }
+        }
 
-      const nextTab = {
-        baseName: getDocumentBaseName(openedDocument.fileName),
-        editor,
-        fileHandle: openedDocument.fileHandle,
-        fileKey,
-        id: createTabId(),
-        kind: "file",
-      };
+        const editor = createConfiguredEditor();
+        await editor.initializeLocalFonts().catch(() => undefined);
+        const resolution = editor.loadDocument(openedDocument.contents);
+        editor.markDocumentSaved();
 
-      setTabs((currentTabs) => [...currentTabs, nextTab]);
-      await focusTab(nextTab.id);
+        const nextTab = {
+          baseName: getDocumentBaseName(openedDocument.fileName),
+          editor,
+          fileHandle: openedDocument.fileHandle,
+          fileKey: getFileKey(openedDocument.fileHandle),
+          id: createTabId(),
+          kind: "file",
+        };
 
-      return resolution;
+        updateTabs([...tabsRef.current, nextTab]);
+        await focusTab(nextTab.id);
+
+        return resolution;
+      });
     },
-    [focusTab, tabs]
+    [focusTab, updateTabs]
   );
 
   const createNewFileTab = useCallback(
@@ -243,15 +272,15 @@ export const WorkspaceProvider = ({ children }) => {
         });
       }
 
-      setTabs((currentTabs) => [...currentTabs, nextTab]);
+      updateTabs((currentTabs) => [...currentTabs, nextTab]);
       focusTab(nextTab.id);
     },
-    [focusTab]
+    [focusTab, updateTabs]
   );
 
   const updateTabFileIdentity = useCallback(
     (tabId, { baseName, fileHandle }) => {
-      setTabs((currentTabs) =>
+      updateTabs((currentTabs) =>
         currentTabs.map((tab) => {
           if (tab.id !== tabId || tab.kind !== "file") {
             return tab;
@@ -266,7 +295,7 @@ export const WorkspaceProvider = ({ children }) => {
         })
       );
     },
-    []
+    [updateTabs]
   );
 
   const updateActiveFileIdentity = useCallback(
@@ -278,24 +307,27 @@ export const WorkspaceProvider = ({ children }) => {
 
   const closeTab = useCallback(
     (tabId) => {
-      const tabIndex = tabs.findIndex((tab) => tab.id === tabId);
-      const tab = tabs[tabIndex];
+      const currentTabs = tabsRef.current;
+      const tabIndex = currentTabs.findIndex((tab) => tab.id === tabId);
+      const tab = currentTabs[tabIndex];
 
       if (!(tab && tab.kind !== "scratchpad")) {
         return;
       }
 
-      const nextTabs = tabs.filter((entry) => entry.id !== tabId);
+      const nextTabs = currentTabs.filter((entry) => entry.id !== tabId);
+      const currentActiveTab =
+        currentTabs.find((entry) => entry.id === activeTabId) || currentTabs[0];
       const nextActiveTab =
         activeTabId === tabId
           ? nextTabs[Math.max(0, tabIndex - 1)] || nextTabs[0]
-          : activeTab;
+          : currentActiveTab;
 
       tab.editor.dispose();
-      setTabs(nextTabs);
+      updateTabs(nextTabs);
       setActiveTabId(nextActiveTab.id);
     },
-    [activeTab, activeTabId, tabs]
+    [activeTabId, updateTabs]
   );
 
   const tabSummaries = useMemo(
