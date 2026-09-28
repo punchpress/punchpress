@@ -456,6 +456,50 @@ test("shows and edits frame properties for a selected artboard", async ({
     });
 });
 
+test("keeps frame width stable through blank and invalid numeric drafts", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadArtboardPropertiesDocument(page);
+  await selectNodes(page, ["artboard-node"]);
+
+  const widthInput = getSection(page, "Frame").getByRole("textbox").nth(0);
+  const getWidth = () =>
+    page.evaluate(() => {
+      return window.__PUNCHPRESS_EDITOR__?.getNode("artboard-node")?.width;
+    });
+
+  await expect(widthInput).toHaveValue("340");
+
+  await widthInput.fill("");
+  await expect(widthInput).toHaveValue("");
+  await expect.poll(getWidth).toBe(340);
+
+  await widthInput.fill("420");
+  await expect.poll(getWidth).toBe(420);
+  await widthInput.blur();
+  await expect(widthInput).toHaveValue("420");
+  await expect.poll(getWidth).toBe(420);
+
+  await widthInput.fill("500");
+  await expect.poll(getWidth).toBe(500);
+  await widthInput.press("Enter");
+  await expect(widthInput).toHaveValue("500");
+  await expect.poll(getWidth).toBe(500);
+
+  await widthInput.fill("");
+  await expect.poll(getWidth).toBe(500);
+  await widthInput.press("Escape");
+  await expect(widthInput).toHaveValue("500");
+  await expect.poll(getWidth).toBe(500);
+
+  await widthInput.fill("-");
+  await expect.poll(getWidth).toBe(500);
+  await widthInput.press("Enter");
+  await expect(widthInput).toHaveValue("500");
+  await expect.poll(getWidth).toBe(500);
+});
+
 test("shows bulk path corner controls for a selected standalone path outside path edit mode", async ({
   page,
 }) => {
