@@ -13,9 +13,9 @@ const TEST_FONT = {
   style: "Regular",
 };
 
-const loadSlantDocument = async (page, rotation = 0) => {
+const loadSlantDocument = async (page, rotation = 0, rise = -120) => {
   await page.evaluate(
-    ({ font, rotation }) => {
+    ({ font, rise, rotation }) => {
       const editor = window.__PUNCHPRESS_EDITOR__;
 
       if (!editor) {
@@ -46,7 +46,7 @@ const loadSlantDocument = async (page, rotation = 0) => {
               visible: true,
               warp: {
                 kind: "slant",
-                rise: -120,
+                rise,
               },
             },
           ],
@@ -56,7 +56,7 @@ const loadSlantDocument = async (page, rotation = 0) => {
 
       return true;
     },
-    { font: TEST_FONT, rotation }
+    { font: TEST_FONT, rise, rotation }
   );
 };
 
@@ -122,6 +122,34 @@ test("applies slant from the panel with the default preset", async ({
     kind: "slant",
     rise: -120,
   });
+});
+
+test("preserves slant rise outside the scrub range when edited numerically", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadSlantDocument(page, 0, -560.25);
+  await page.locator('.canvas-node[data-node-id="slant-node"]').click();
+  await pauseForUi(page);
+
+  const slantSlider = page.getByRole("slider", { name: "Slant" });
+  await expect(slantSlider).toHaveAttribute("aria-valuetext", "-560.25");
+
+  await slantSlider.press("Enter");
+  const slantInput = slantSlider.locator("input");
+  await expect(slantInput).toHaveValue("-560.25");
+  await slantInput.fill("-640.125");
+  await slantInput.press("Enter");
+
+  await expect
+    .poll(async () => {
+      const after = await getStateSnapshot(page);
+      const node = after.nodes.find((entry) => entry.id === "slant-node");
+
+      return node?.warp?.kind === "slant" ? node.warp.rise : null;
+    })
+    .toBe(-640.125);
+  await expect(slantSlider).toHaveAttribute("aria-valuetext", "-640.125");
 });
 
 test("edits slant from the on-canvas handle", async ({ page }) => {

@@ -14,9 +14,9 @@ const TEST_FONT = {
   style: "Regular",
 };
 
-const loadWaveDocument = async (page, rotation = 0) => {
+const loadWaveDocument = async (page, rotation = 0, amplitude = 180) => {
   await page.evaluate(
-    ({ font, rotation }) => {
+    ({ amplitude, font, rotation }) => {
       const editor = window.__PUNCHPRESS_EDITOR__;
 
       if (!editor) {
@@ -46,7 +46,7 @@ const loadWaveDocument = async (page, rotation = 0) => {
               type: "text",
               visible: true,
               warp: {
-                amplitude: 180,
+                amplitude,
                 cycles: 2,
                 kind: "wave",
               },
@@ -58,7 +58,7 @@ const loadWaveDocument = async (page, rotation = 0) => {
 
       return true;
     },
-    { font: TEST_FONT, rotation }
+    { amplitude, font: TEST_FONT, rotation }
   );
 };
 
@@ -120,6 +120,34 @@ test("applies wave from the panel with the restrained default preset", async ({
     cycles: 1,
     kind: "wave",
   });
+});
+
+test("preserves wave amplitude outside the scrub range when edited numerically", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadWaveDocument(page, 0, 760.25);
+  await page.locator('.canvas-node[data-node-id="wave-node"]').click();
+  await pauseForUi(page);
+
+  const amplitudeSlider = page.getByRole("slider", { name: "Amplitude" });
+  await expect(amplitudeSlider).toHaveAttribute("aria-valuetext", "760.25");
+
+  await amplitudeSlider.press("Enter");
+  const amplitudeInput = amplitudeSlider.locator("input");
+  await expect(amplitudeInput).toHaveValue("760.25");
+  await amplitudeInput.fill("840.125");
+  await amplitudeInput.press("Enter");
+
+  await expect
+    .poll(async () => {
+      const after = await getStateSnapshot(page);
+      const node = after.nodes.find((entry) => entry.id === "wave-node");
+
+      return node?.warp?.kind === "wave" ? node.warp.amplitude : null;
+    })
+    .toBe(840.125);
+  await expect(amplitudeSlider).toHaveAttribute("aria-valuetext", "840.125");
 });
 
 test("edits wave amplitude and cycles from inline handles", async ({
