@@ -53,6 +53,7 @@ export const startCanvasToolPlacementSession = ({
     x: event.clientX,
     y: event.clientY,
   };
+  const shouldCancelOnEscape = editor.activeTool === "shape";
   let pendingUpdate: PlacementSessionUpdate | null = null;
   let updateFrameId = 0;
 
@@ -86,6 +87,9 @@ export const startCanvasToolPlacementSession = ({
       window.removeEventListener(eventNames.cancel, handlePointerCancel);
     }
 
+    if (shouldCancelOnEscape) {
+      window.removeEventListener("keydown", handleKeyDown, true);
+    }
     window.cancelAnimationFrame(updateFrameId);
     updateFrameId = 0;
     pendingUpdate = null;
@@ -117,6 +121,17 @@ export const startCanvasToolPlacementSession = ({
     session.cancel();
   };
 
+  const handleKeyDown = (keyEvent) => {
+    if (!(shouldCancelOnEscape && keyEvent.key === "Escape")) {
+      return;
+    }
+
+    keyEvent.preventDefault();
+    keyEvent.stopPropagation();
+    cleanup();
+    session.cancel();
+  };
+
   const handlePointerUp = (upEvent) => {
     flushPendingUpdate();
     cleanup();
@@ -136,6 +151,10 @@ export const startCanvasToolPlacementSession = ({
 
   window.addEventListener(eventNames.move, handlePointerMove);
   window.addEventListener(eventNames.up, handlePointerUp);
+
+  if (shouldCancelOnEscape) {
+    window.addEventListener("keydown", handleKeyDown, true);
+  }
 
   if (eventNames.cancel) {
     window.addEventListener(eventNames.cancel, handlePointerCancel);
