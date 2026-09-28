@@ -551,7 +551,7 @@ export const CanvasSingleSelectionForeground = ({
     const handlePointerMove = (moveEvent) => {
       if (
         !(
-          dragSession ||
+          didMove ||
           hasPointerMovedAtLeast(
             startClientPoint,
             { x: moveEvent.clientX, y: moveEvent.clientY },

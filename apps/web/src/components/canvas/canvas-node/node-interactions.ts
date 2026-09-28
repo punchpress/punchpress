@@ -203,7 +203,7 @@ export const startCanvasNodeDragSession = ({
     measurePerf(PERF_SPANS.pointerMoveHandle, () => {
       if (
         !(
-          dragSession ||
+          didMove ||
           hasPointerMovedAtLeast(
             startClientPoint,
             { x: moveEvent.clientX, y: moveEvent.clientY },
