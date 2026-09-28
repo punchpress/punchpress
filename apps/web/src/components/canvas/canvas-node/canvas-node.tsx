@@ -15,6 +15,7 @@ import { usePerformanceRenderCounter } from "../../../performance/use-performanc
 import { openCanvasNodeEditingMode } from "../canvas-node-editing";
 import { startCanvasToolPlacementSession } from "../canvas-tool-placement-session";
 import { CanvasRasterImage } from "../raster/canvas-raster-image";
+import { CanvasFallbackText } from "./canvas-fallback-text";
 import {
   getMemoizedNodeArtState,
   getResizePreviewNode,
@@ -339,6 +340,7 @@ const CanvasStandardNodeArt = ({ nodeId }) => {
   return artState ? (
     <CanvasNodeArt
       bbox={artState.bbox}
+      fallbackText={artState.fallbackText}
       fill={artState.fill}
       fillRule={artState.fillRule}
       height={Math.max(1, artState.bbox.height)}
@@ -437,6 +439,7 @@ const CanvasNodeArt = memo(
   ({
     bbox,
     fill,
+    fallbackText,
     fillRule,
     height,
     isEditing,
@@ -482,6 +485,16 @@ const CanvasNodeArt = memo(
             strokeLineCap={strokeLineCap}
             strokeLineJoin={strokeLineJoin}
             strokeMiterLimit={strokeMiterLimit}
+            strokeWidth={strokeWidth}
+          />
+        );
+      } else if (fallbackText) {
+        renderedContent = (
+          <CanvasFallbackText
+            {...fallbackText}
+            fill={fill}
+            isEditing={isEditing}
+            stroke={stroke}
             strokeWidth={strokeWidth}
           />
         );

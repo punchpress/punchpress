@@ -27,7 +27,6 @@ export {
 } from "./vector-stroke-style";
 export {
   getMissingDocumentFonts,
-  replaceMissingDocumentFonts,
 } from "./document-fonts";
 export { normalizeNodeForSchema, normalizeNodesForSchema } from "./normalize";
 export { createRasterAssetId } from "./normalize";

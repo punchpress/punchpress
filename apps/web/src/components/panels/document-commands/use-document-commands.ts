@@ -122,16 +122,18 @@ export const useDocumentCommands = () => {
   );
 
   const showMissingFontWarning = useEffectEvent((resolution) => {
-    if (resolution.missingFonts.length === 0 || !resolution.replacementFont) {
+    if (resolution.missingFonts.length === 0) {
       return;
     }
 
+    const fontList = formatFontList(resolution.missingFonts);
+    const message =
+      resolution.catalogState === "ready"
+        ? `${fontList} is not installed. Saved fonts are unchanged; choose a replacement in Text properties if needed.`
+        : `Saved font${resolution.missingFonts.length === 1 ? "" : "s"} ${fontList} could not be checked. Text uses a temporary preview until local fonts are available.`;
+
     showToast({
-      message: `Replaced missing font${
-        resolution.missingFonts.length === 1 ? "" : "s"
-      } ${formatFontList(resolution.missingFonts)} with ${
-        resolution.replacementFont.fullName
-      }.`,
+      message,
       type: "warning",
     });
   });
@@ -405,6 +407,7 @@ export const useDocumentCommands = () => {
     clearRecentDocumentsSafely,
     closeTabSafely,
     missingFontsExportDialogProps: {
+      catalogState: editor.fontCatalogState,
       missingFonts: missingFontsForExport,
       onOpenChange: setIsMissingFontsExportDialogOpen,
       open: isMissingFontsExportDialogOpen,

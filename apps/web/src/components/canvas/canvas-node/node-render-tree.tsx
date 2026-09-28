@@ -13,6 +13,7 @@ import {
 } from "@punchpress/engine";
 import { CanvasRasterImage } from "../raster/canvas-raster-image";
 import { getVectorPathPaintOrder } from "../vector-paint-order";
+import { CanvasFallbackText } from "./canvas-fallback-text";
 
 export const getCanvasNodePathFill = (path, fill) => {
   if (path.closed === false && !path.fill) {
@@ -201,6 +202,22 @@ export const getGroupNodeRenderTree = (
 
     const geometry = editor.getNodeRenderGeometry(childNode.id);
 
+    const fallbackText = editor.getTextFallbackPreview(childNode, geometry);
+    if (fallbackText) {
+      return [
+        {
+          ...fallbackText,
+          fill: childNode.fill,
+          key: childNode.id,
+          opacity: getNodeOpacity(childNode),
+          stroke: childNode.stroke,
+          strokeWidth: childNode.strokeWidth,
+          transform: getSvgNodeTransform(childNode, geometry?.bbox),
+          type: "fallback-text",
+        },
+      ];
+    }
+
     if (childNode.type === "image" && geometry?.bbox) {
       return [
         {
@@ -358,6 +375,12 @@ export const CanvasNodeRenderTree = ({
           transform={item.transform || undefined}
           width={item.width}
         />
+      );
+    }
+
+    if (item.type === "fallback-text") {
+      return (
+        <CanvasFallbackText {...item} isEditing={isEditing} key={item.key} />
       );
     }
 

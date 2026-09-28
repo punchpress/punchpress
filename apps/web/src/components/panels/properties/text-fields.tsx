@@ -22,6 +22,22 @@ export const TextFields = ({ node }) => {
     return null;
   }
 
+  const fontAvailability = editor.getFontAvailability(node.font);
+  const fontStatus = {
+    "action-required":
+      "Enable local font access to render this saved font accurately.",
+    error: "Local font access failed. The saved font is unchanged.",
+    loading: "Checking local fonts. The saved font is unchanged.",
+    "load-error":
+      "This font was found but could not be loaded. The saved font is unchanged.",
+    missing:
+      "This font is not installed. The saved font is unchanged until you choose another.",
+    "permission-denied":
+      "Local font access was denied. The saved font is unchanged.",
+    unsupported:
+      "This browser cannot access local fonts. The saved font is unchanged.",
+  }[fontAvailability];
+
   return (
     <Section title="Text">
       <FieldRow label="Text">
@@ -35,22 +51,29 @@ export const TextFields = ({ node }) => {
       </FieldRow>
 
       <FieldRow label="Font">
-        <FontPicker
-          fonts={availableFonts}
-          onRequestFonts={() => {
-            editor.requestLocalFonts().catch(() => undefined);
-          }}
-          onValueChange={(font) => {
-            editor.setLastUsedFont(font);
-            editor.setSelectionProperty(
-              "font",
-              createLocalFontDescriptor(font)
-            );
-          }}
-          state={fontCatalogState}
-          stateMessage={fontCatalogError}
-          value={createLocalFontOption(node.font)}
-        />
+        <div className="min-w-0">
+          <FontPicker
+            fonts={availableFonts}
+            onRequestFonts={() => {
+              editor.requestLocalFonts().catch(() => undefined);
+            }}
+            onValueChange={(font) => {
+              editor.setLastUsedFont(font);
+              editor.setSelectionProperty(
+                "font",
+                createLocalFontDescriptor(font)
+              );
+            }}
+            state={fontCatalogState}
+            stateMessage={fontCatalogError}
+            value={createLocalFontOption(node.font)}
+          />
+          {fontStatus ? (
+            <output className="mt-2 block text-muted-foreground text-xs">
+              {fontStatus}
+            </output>
+          ) : null}
+        </div>
       </FieldRow>
 
       <FieldRow label="Size">

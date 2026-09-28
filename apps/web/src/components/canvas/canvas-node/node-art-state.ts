@@ -65,6 +65,7 @@ export const selectNodeArtState = (
   return {
     bbox,
     fill: node.fill,
+    fallbackText: editor.getTextFallbackPreview(node, geometry),
     fillRule: node.type === "path" ? node.fillRule : undefined,
     isEditing: state.editingNodeId === nodeId,
     opacity: getNodeOpacity(node),

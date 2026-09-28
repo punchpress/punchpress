@@ -94,7 +94,10 @@ export const FontPicker = ({
   }, [isOpen]);
 
   const showActionButton =
-    state === "action-required" && typeof onRequestFonts === "function";
+    (state === "action-required" ||
+      state === "permission-denied" ||
+      state === "error") &&
+    typeof onRequestFonts === "function";
   const emptyStateCopy = getEmptyStateCopy(
     filteredFonts.length === 0 ? state : "ready",
     stateMessage
@@ -176,7 +179,9 @@ export const FontPicker = ({
                 type="button"
                 variant="outline"
               >
-                Enable local fonts
+                {state === "action-required"
+                  ? "Enable local fonts"
+                  : "Retry local fonts"}
               </Button>
             </div>
           ) : null}

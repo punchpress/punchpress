@@ -1,3 +1,4 @@
+import { getLocalFontId } from "@punchpress/punch-schema";
 import {
   buildNodeCapabilityGeometry,
   getNodeGeometrySignature,
@@ -30,10 +31,11 @@ export class GeometryManager {
 
     for (const node of nodes) {
       const signature = getNodeGeometrySignature(node, fontRevision);
+      const fontId = "font" in node ? getLocalFontId(node.font) : null;
       const cached = this.cache.get(node.id);
 
       if (!signature) {
-        nextCache.set(node.id, { geometry: null, signature });
+        nextCache.set(node.id, { fontId, geometry: null, signature });
         geometryById.set(node.id, null);
         continue;
       }
@@ -49,18 +51,22 @@ export class GeometryManager {
       const builtGeometry = buildNodeCapabilityGeometry(node, font);
 
       if (!builtGeometry) {
-        nextCache.set(node.id, { geometry: null, signature });
+        nextCache.set(node.id, { fontId, geometry: null, signature });
         geometryById.set(node.id, null);
         continue;
       }
 
-      if (!builtGeometry.ready && cached?.geometry?.ready) {
+      if (
+        !builtGeometry.ready &&
+        cached?.geometry?.ready &&
+        cached.fontId === fontId
+      ) {
         nextCache.set(node.id, cached);
         geometryById.set(node.id, cached.geometry);
         continue;
       }
 
-      nextCache.set(node.id, { geometry: builtGeometry, signature });
+      nextCache.set(node.id, { fontId, geometry: builtGeometry, signature });
       geometryById.set(node.id, builtGeometry);
     }
 

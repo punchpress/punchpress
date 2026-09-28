@@ -114,8 +114,10 @@ import {
 import {
   applyLocalFontCatalog as applyEditorLocalFontCatalog,
   getDefaultFont as getEditorDefaultFont,
+  getFontAvailability as getEditorFontAvailability,
   getFontPreviewFamily as getEditorFontPreviewFamily,
   getFontPreviewState as getEditorFontPreviewState,
+  getTextFallbackPreview as getEditorTextFallbackPreview,
   initializeLocalFonts as initializeEditorLocalFonts,
   loadLocalFontCatalog as loadEditorLocalFontCatalog,
   preloadFontOptions as preloadEditorFontOptions,
@@ -667,6 +669,14 @@ export class Editor {
 
   getFontPreviewFamily(font) {
     return getEditorFontPreviewFamily(this, font);
+  }
+
+  getFontAvailability(font) {
+    return getEditorFontAvailability(this, font);
+  }
+
+  getTextFallbackPreview(node, geometry) {
+    return getEditorTextFallbackPreview(this, node, geometry);
   }
 
   getDefaultFont() {

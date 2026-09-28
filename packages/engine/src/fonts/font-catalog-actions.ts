@@ -1,5 +1,6 @@
 import {
   createLocalFontDescriptor,
+  getLocalFontId,
   type LocalFontCatalogResult,
 } from "@punchpress/punch-schema";
 import { resolveDefaultFont } from "./resolve-default-font";
@@ -32,6 +33,36 @@ export const getFontPreviewFamily = (editor, font) => {
 
 export const getDefaultFont = (editor) => {
   return createLocalFontDescriptor(editor.defaultFont);
+};
+
+export const getFontAvailability = (editor, font) => {
+  const state = editor.fontCatalogState;
+
+  if (state !== "ready") {
+    return state;
+  }
+
+  const fontId = getLocalFontId(font);
+  if (!editor.availableFonts.some((availableFont) => availableFont.id === fontId)) {
+    return "missing";
+  }
+
+  return editor.fonts.getLoadState(font) === "error"
+    ? "load-error"
+    : "available";
+};
+
+export const getTextFallbackPreview = (editor, node, geometry) => {
+  if (node.type !== "text" || geometry?.ready) {
+    return null;
+  }
+
+  return {
+    fontFamily: editor.fonts.getEditableFontFamily(node.font),
+    fontSize: node.fontSize,
+    text: node.text,
+    width: geometry?.bbox?.width ?? 0,
+  };
 };
 
 export const initializeLocalFonts = async (editor) => {

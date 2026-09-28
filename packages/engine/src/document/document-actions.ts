@@ -2,7 +2,6 @@ import {
   getMissingDocumentFonts,
   loadDesignDocument,
   MissingDocumentFontsError,
-  replaceMissingDocumentFonts,
   saveDesignDocument,
 } from "@punchpress/punch-schema";
 import { finishEditingIfNeeded } from "../editing/editing-actions";
@@ -58,18 +57,19 @@ export const exportSelectedArtboardSvg = (editor, artboardId = editor.selectedNo
 
 export const loadDocument = (editor, contents) => {
   const { nodes } = loadDesignDocument(contents);
-  const resolution = replaceMissingDocumentFonts(
-    toInternalEditorNodes(nodes),
-    editor.availableFonts,
-    editor.getDefaultFont()
-  );
+  const internalNodes = toInternalEditorNodes(nodes);
+  const resolution = {
+    catalogState: editor.fontCatalogState,
+    missingFonts: getMissingDocumentFonts(internalNodes, editor.availableFonts),
+    replacementFont: null,
+  };
 
-  editor.getState().loadNodes(resolution.nodes);
+  editor.getState().loadNodes(internalNodes);
   editor.resetHistory();
   editor.resetPasteSequence();
 
   if (typeof window !== "undefined") {
-    editor.scheduleViewportFocus(resolution.nodes.map((node) => node.id));
+    editor.scheduleViewportFocus(internalNodes.map((node) => node.id));
   }
 
   return resolution;

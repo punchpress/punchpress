@@ -60,13 +60,21 @@ const isPermissionError = (error: unknown) => {
 };
 
 const listDesktopFonts = async (): Promise<LocalFontCatalogResult> => {
-  const fonts = await window.electron?.localFonts?.listFonts();
+  try {
+    const fonts = await window.electron?.localFonts?.listFonts();
 
-  return {
-    error: "",
-    fonts: toFontOptions(fonts || []),
-    state: "ready",
-  };
+    return {
+      error: "",
+      fonts: toFontOptions(fonts || []),
+      state: "ready",
+    };
+  } catch (error) {
+    return {
+      error: getPermissionErrorMessage(error),
+      fonts: [],
+      state: "error",
+    };
+  }
 };
 
 const listBrowserFonts = async (): Promise<LocalFontCatalogResult> => {
