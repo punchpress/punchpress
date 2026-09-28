@@ -9,6 +9,25 @@ const ARIAL_FONT = {
 } as const;
 
 describe("Editor history", () => {
+  test("a completed save marks its serialized snapshot through undo and redo", () => {
+    const editor = createEditor();
+
+    editor.addShapeNode({ x: 100, y: 100 });
+    const savedSnapshot = editor.serializeDocument();
+
+    editor.addShapeNode({ x: 200, y: 200 });
+    editor.markDocumentSaved(savedSnapshot);
+
+    expect(editor.isDirty).toBe(true);
+    expect(editor.serializeDocument()).not.toBe(savedSnapshot);
+
+    editor.undo();
+    expect(editor.isDirty).toBe(false);
+
+    editor.redo();
+    expect(editor.isDirty).toBe(true);
+  });
+
   test("undo and redo restore a created node", () => {
     const editor = createEditor();
 
