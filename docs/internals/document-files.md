@@ -19,6 +19,11 @@ Document files span schema, engine, workspace, and platform layers.
 4. Workspace tabs own active editor, dirty status, basename, and file identity.
 5. Recent documents track file-backed documents only.
 
+The save command serializes the tab's editor before writing. On success it
+marks that serialized snapshot as the saved baseline for the same editor; a
+later edit remains dirty, including after Save As changes the tab's file
+identity. A canceled or failed write does not change the baseline or identity.
+
 ## Boundaries
 
 - Schema owns the format.

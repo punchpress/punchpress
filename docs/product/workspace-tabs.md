@@ -39,6 +39,9 @@ files.
 - Save writes the active file-backed tab.
 - Save As writes the active file-backed tab to a chosen file and updates tab
   identity.
+- A save clears the dirty indicator only for the document content it wrote. If
+  the document changes while a write is pending, those edits remain dirty and
+  a close or quit request keeps the tab open.
 - Open Recent creates or focuses a file-backed tab.
 - Import and export operate on the active tab.
 - Desktop open-file events open file-backed tabs.
