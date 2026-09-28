@@ -18,7 +18,10 @@ Ctrl+K elsewhere.
   page.
 - Command-specific pages can use their own result layout when rows are not the
   right shape.
-- Escape closes the menu from the default view.
+- Escape, Cmd/Ctrl+K, and outside dismissal close the menu and reset it to the
+  default view with an empty command query.
+- Selecting a command-specific page clears the command query; returning to the
+  command list starts with an empty query.
 
 ## Assets
 

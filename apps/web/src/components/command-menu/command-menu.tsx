@@ -81,15 +81,21 @@ export const CommandMenu = () => {
     setSearchQuery("");
   }, []);
 
+  const closeMenu = useCallback(() => {
+    setOpen(false);
+    reset();
+  }, [reset]);
+
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
-      setOpen(nextOpen);
-
-      if (!nextOpen) {
-        reset();
+      if (nextOpen) {
+        setOpen(true);
+        return;
       }
+
+      closeMenu();
     },
-    [reset]
+    [closeMenu]
   );
 
   useEffect(() => {
@@ -102,12 +108,16 @@ export const CommandMenu = () => {
       }
 
       event.preventDefault();
-      setOpen((currentOpen) => !currentOpen);
+      if (open) {
+        closeMenu();
+      } else {
+        setOpen(true);
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [closeMenu, open]);
 
   const filterItem = useCallback(
     (itemValue: unknown, query: string): boolean => {
@@ -136,9 +146,9 @@ export const CommandMenu = () => {
   }, [commandGroups, filterItem, searchQuery]);
 
   const openAssets = useCallback(() => {
-    setSearchQuery("");
+    reset();
     setView("assets");
-  }, []);
+  }, [reset]);
 
   const addAsset = useCallback(
     async (asset: Asset, importedAsset: ImportedAsset) => {
@@ -261,13 +271,7 @@ export const CommandMenu = () => {
                 Assets
               </div>
             </div>
-            <AssetSearchPanel
-              onAddAsset={addAsset}
-              onAdded={() => {
-                setOpen(false);
-                reset();
-              }}
-            />
+            <AssetSearchPanel onAddAsset={addAsset} onAdded={closeMenu} />
           </div>
         )}
       </CommandDialogPopup>
