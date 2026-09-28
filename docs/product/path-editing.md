@@ -40,7 +40,13 @@ Path editing manipulates editable curve geometry while preserving node identity.
 - Users can add points on existing segments.
 - Users can delete selected points.
 - Users can split a path at a selected point.
-- Users can join compatible open endpoints.
+- Joining endpoints on the same contour closes it. Distinct endpoints stay as
+  separate anchors connected by a new segment; coincident endpoints become one
+  anchor with the incoming and outgoing handles from their original sides.
+  The joined anchor stays smooth only when both endpoints were smooth and their
+  handles share a tangent.
+- Joining endpoints on separate contours connects them into one contour with
+  the same distinct-or-coincident anchor behavior.
 - Users can close eligible open contours.
 - Users can merge compatible curves into a multi-contour path and separate
   multi-contour paths back into separate path nodes.
