@@ -70,17 +70,51 @@ describe("Editor artboards", () => {
     expect(afterShape?.parentId).toBe(artboardId);
   });
 
-  test("moving a root node into an artboard reparents it", () => {
+  test("canvas movement preserves a child Frame membership through Undo and Redo", () => {
     const editor = new Editor();
 
     editor.addArtboardNode({ x: 0, y: 0 });
     const artboardId = editor.selectedNodeId;
+    editor.addShapeNode({ x: 300, y: 300 }, "polygon");
+    const shapeId = editor.selectedNodeId;
+    editor.moveNodeToParent(shapeId, artboardId, null);
+
+    const moveSession = editor.beginMoveSelection({ nodeId: shapeId });
+    const historyMark = editor.markHistoryStep("move selection");
+
+    if (!(moveSession && historyMark)) {
+      throw new Error("Expected a child move session and history mark");
+    }
+
+    editor.updateMoveSelection(moveSession, { delta: { x: 6000, y: 6000 } });
+
+    expect(editor.getNode(shapeId)?.parentId).toBe(artboardId);
+
+    editor.commitMoveSelection(moveSession);
+    editor.commitHistoryStep(historyMark);
+
+    expect(editor.getNode(shapeId)?.parentId).toBe(artboardId);
+    expect(editor.selectedNodeId).toBe(shapeId);
+
+    expect(editor.undo()).toBe(true);
+    expect(editor.getNode(shapeId)?.parentId).toBe(artboardId);
+    expect(editor.selectedNodeId).toBe(shapeId);
+
+    expect(editor.redo()).toBe(true);
+    expect(editor.getNode(shapeId)?.parentId).toBe(artboardId);
+    expect(editor.selectedNodeId).toBe(shapeId);
+  });
+
+  test("moving a root node across an artboard preserves its root membership", () => {
+    const editor = new Editor();
+
+    editor.addArtboardNode({ x: 0, y: 0 });
     editor.addShapeNode({ x: 6000, y: 6000 }, "polygon");
     const shapeId = editor.selectedNodeId;
 
     editor.moveSelectionBy({ x: -5750, y: -5750 });
 
-    expect(editor.getNode(shapeId)?.parentId).toBe(artboardId);
+    expect(editor.getNode(shapeId)?.parentId).toBe("root");
   });
 
   test("resizing an artboard changes its surface without scaling child content", () => {

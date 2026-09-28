@@ -54,6 +54,21 @@ const CanvasNodeShell = ({ children, isReady, nodeId }) => {
 
     return editor.isSelected(targetNodeId);
   });
+  const rasterHitArea = useEditorValue((editor) => {
+    const node = editor.getNode(nodeId);
+    const writableBounds = editor.getRasterWritableBounds(nodeId);
+
+    if (!(node?.type === "image" && writableBounds)) {
+      return null;
+    }
+
+    return {
+      height: node.height,
+      left: -writableBounds.x,
+      top: -writableBounds.y,
+      width: node.width,
+    };
+  });
   const cursorClassName = "canvas-cursor-default";
 
   return (
@@ -308,7 +323,7 @@ const CanvasNodeShell = ({ children, isReady, nodeId }) => {
 
                   editor.setHoveredNode(hoverTargetNodeId);
                 }}
-                style={{ left: 0, top: 0 }}
+                style={rasterHitArea || { left: 0, top: 0 }}
                 type="button"
               />
             }
@@ -337,13 +352,37 @@ const CanvasStandardNodeArt = ({ nodeId }) => {
     [artInputs, editor, nodeId, resizePreviewNode]
   );
 
-  return artState ? (
+  if (!artState) {
+    return null;
+  }
+
+  const writableBounds = editor.getRasterWritableBounds(nodeId);
+  const durablePresentationBounds = writableBounds
+    ? {
+        height: writableBounds.height,
+        maxX: writableBounds.x + writableBounds.width,
+        maxY: writableBounds.y + writableBounds.height,
+        minX: writableBounds.x,
+        minY: writableBounds.y,
+        width: writableBounds.width,
+      }
+    : null;
+  const presentationBounds = resizePreviewNode
+    ? artState.bbox
+    : durablePresentationBounds || artState.bbox;
+  const node = editor.getNode(nodeId);
+  const parentNode = node?.parentId ? editor.getNode(node.parentId) : null;
+
+  return (
     <CanvasNodeArt
-      bbox={artState.bbox}
+      allowImageOverflow={Boolean(
+        artState.image && parentNode?.type === "artboard"
+      )}
+      bbox={presentationBounds}
       fallbackText={artState.fallbackText}
       fill={artState.fill}
       fillRule={artState.fillRule}
-      height={Math.max(1, artState.bbox.height)}
+      height={Math.max(1, presentationBounds.height)}
       image={artState.image}
       isEditing={artState.isEditing}
       isInteractionProxy={artState.isInteractionProxy}
@@ -351,15 +390,16 @@ const CanvasStandardNodeArt = ({ nodeId }) => {
       paintPreview={paintPreview}
       paths={artState.paths}
       renderMode={artState.renderMode}
+      renderRootNodeId={nodeId}
       renderTree={artState.renderTree}
       stroke={artState.stroke}
       strokeLineCap={artState.strokeLineCap}
       strokeLineJoin={artState.strokeLineJoin}
       strokeMiterLimit={artState.strokeMiterLimit}
       strokeWidth={artState.strokeWidth}
-      width={Math.max(1, artState.bbox.width)}
+      width={Math.max(1, presentationBounds.width)}
     />
-  ) : null;
+  );
 };
 
 const CanvasVectorNodeArt = ({ nodeId }) => {
@@ -391,6 +431,7 @@ const CanvasVectorNodeArt = ({ nodeId }) => {
       paintPreview={paintPreview}
       paths={artState.paths}
       renderMode={artState.renderMode}
+      renderRootNodeId={nodeId}
       renderTree={artState.renderTree}
       stroke={artState.stroke}
       strokeLineCap={artState.strokeLineCap}
@@ -437,6 +478,7 @@ export const CanvasNode = memo(CanvasNodeComponent);
 
 const CanvasNodeArt = memo(
   ({
+    allowImageOverflow,
     bbox,
     fill,
     fallbackText,
@@ -448,6 +490,7 @@ const CanvasNodeArt = memo(
     opacity,
     paintPreview,
     paths,
+    renderRootNodeId,
     renderMode,
     renderTree,
     stroke,
@@ -469,8 +512,8 @@ const CanvasNodeArt = memo(
             baseY={image.baseY}
             height={image.height}
             nodeId={image.id}
+            renderRootNodeId={renderRootNodeId}
             src={image.src}
-            tileSources={image.tileSources}
             width={image.width}
           />
         );
@@ -481,6 +524,7 @@ const CanvasNodeArt = memo(
             fillRule={fillRule}
             isEditing={isEditing}
             items={renderTree}
+            renderRootNodeId={renderRootNodeId}
             stroke={stroke}
             strokeLineCap={strokeLineCap}
             strokeLineJoin={strokeLineJoin}
@@ -521,7 +565,10 @@ const CanvasNodeArt = memo(
     return (
       <svg
         aria-label="Canvas node"
-        className="pointer-events-none block h-full w-full overflow-visible"
+        className={cn(
+          "pointer-events-none block h-full w-full",
+          image && !allowImageOverflow ? "overflow-hidden" : "overflow-visible"
+        )}
         height={height}
         role="img"
         style={getPaintPreviewStyle(paintPreview)}

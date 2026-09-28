@@ -162,19 +162,9 @@ export const WorkspaceProvider = ({ children }) => {
 
     return () => {
       scratchpadAutosaveRef.current = null;
-      autosave.dispose();
+      autosave.dispose().catch(console.error);
     };
   }, [scratchpadEditor]);
-
-  useEffect(() => {
-    if (activeTab.kind !== "scratchpad") {
-      return;
-    }
-
-    return () => {
-      scratchpadAutosaveRef.current?.flush();
-    };
-  }, [activeTab.kind]);
 
   const focusTab = useCallback(
     async (tabId) => {

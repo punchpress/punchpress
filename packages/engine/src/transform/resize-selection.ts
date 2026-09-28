@@ -15,6 +15,7 @@ import {
 } from "../primitives/group-resize";
 import { getNodeWorldPoint } from "../primitives/rotation";
 import { getResizedShapeNodeUpdate } from "../primitives/shape-resize";
+import { getRasterBoxResizeUpdate } from "../raster/resize";
 
 const CORNER_DIRECTION = {
   ne: [1, -1],
@@ -103,13 +104,37 @@ const getSingleNodeResizeSession = (
     !(
       resizedNode &&
       bbox &&
-      (direction || (resizedNode.type === "shape" && handle))
+      (direction ||
+        ((resizedNode.type === "shape" || resizedNode.type === "image") &&
+          handle))
     )
   ) {
     return null;
   }
 
   const resizeMode = editor.getNodeResizeMode(resizedNodeId);
+
+  if (resizedNode.type === "image" && handle) {
+    return {
+      anchorCanvas: { ...anchorCanvas },
+      baseBBox: { ...bbox },
+      baseNode: { ...resizedNode },
+      handle,
+      mode: "raster-box",
+      nodeIds: [resizedNodeId],
+    };
+  }
+
+  if (resizedNode.type === "image" && direction) {
+    return {
+      anchorCanvas: { ...anchorCanvas },
+      baseBBox: { ...bbox },
+      baseNode: { ...resizedNode },
+      direction: [...direction],
+      mode: "raster-scale",
+      nodeIds: [resizedNodeId],
+    };
+  }
 
   if (resizeMode === "bounds" && resizedNode.type === "shape" && handle) {
     return {
@@ -339,6 +364,41 @@ const updateResizeSelectionMeasured = (
     return session.nodeIds;
   }
 
+  if (session.mode === "raster-scale") {
+    if (!Number.isFinite(scale)) {
+      return [];
+    }
+
+    const nodeUpdate = getResizedNodeUpdate(
+      session.baseNode,
+      session.baseBBox,
+      session.anchorCanvas,
+      scale,
+      session.direction
+    );
+    session.previewNodeUpdate = nodeUpdate;
+    return setShapeBoxResizePreview(editor, session, nodeUpdate);
+  }
+
+  if (session.mode === "raster-box") {
+    const nodeUpdate = getRasterBoxResizeUpdate(
+      editor,
+      session.baseNode,
+      session.baseBBox,
+      session.anchorCanvas,
+      pointCanvas,
+      session.handle,
+      { preserveAspectRatio }
+    );
+
+    if (!nodeUpdate) {
+      return [];
+    }
+
+    session.previewNodeUpdate = nodeUpdate;
+    return setShapeBoxResizePreview(editor, session, nodeUpdate);
+  }
+
   if (session.mode === "artboard-box") {
     const nodeId = session.nodeIds[0];
     const nodeUpdate = getResizedArtboardNodeUpdate(
@@ -397,6 +457,27 @@ const updateResizeSelectionMeasured = (
 
 export const commitResizeSelection = (editor, session) => {
   return measurePerf(PERF_SPANS.transformResizeCommit, () => {
+    if (
+      session?.mode === "raster-scale" ||
+      session?.mode === "raster-box"
+    ) {
+      const nodeId = session.nodeIds?.[0];
+      const nodeUpdate = session.previewNodeUpdate;
+
+      if (!(nodeId && nodeUpdate)) {
+        editor.setSelectionDragPreview(null);
+        return [];
+      }
+
+      return editor
+        .resizeRaster(nodeId, {
+          height: nodeUpdate.height,
+          transform: nodeUpdate.transform,
+          width: nodeUpdate.width,
+        })
+        .then((didResize) => (didResize ? [nodeId] : []));
+    }
+
     if (session?.mode === "shape-box") {
       const nodeId = session.nodeIds?.[0];
       const nodeUpdate = session.previewNodeUpdate;
@@ -484,10 +565,16 @@ export const resizeSelectionFromCorner = (
       nodeId: selectedNode.id,
     });
 
-    return updateResizeSelection(editor, resizeSession, {
+    const resizedNodeIds = updateResizeSelection(editor, resizeSession, {
       queueRefresh: true,
       scale,
     });
+
+    return resizeSession &&
+      "mode" in resizeSession &&
+      resizeSession.mode === "raster-scale"
+      ? commitResizeSelection(editor, resizeSession)
+      : resizedNodeIds;
   }
 
   const selectionNodeIds =

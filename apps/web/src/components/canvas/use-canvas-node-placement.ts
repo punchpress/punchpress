@@ -6,7 +6,9 @@ import { resolvePreviewPlacementNodeIds } from "./canvas-node-preview-placement"
 interface NodeShellState {
   clipPath: string;
   height: number;
+  stationaryClipAncestorId: string | null;
   transform: string;
+  transformOrigin: string;
   width: number;
   x: number;
   y: number;
@@ -25,20 +27,52 @@ interface PlacementElements {
 }
 
 const getNodeShellState = (editor, nodeId): NodeShellState | null => {
-  const frame = editor.getNodeRenderFrame(nodeId);
   const node = editor.getNode(nodeId);
+  const frame = editor.getNodeRenderFrame(nodeId);
 
   if (!(frame && node)) {
     return null;
   }
+  const writableBounds = editor.getRasterWritableBounds(nodeId);
+  const presentationBounds = writableBounds
+    ? {
+        height: writableBounds.height,
+        maxX: writableBounds.x + writableBounds.width,
+        maxY: writableBounds.y + writableBounds.height,
+        minX: writableBounds.x,
+        minY: writableBounds.y,
+        width: writableBounds.width,
+      }
+    : null;
+  const bounds = presentationBounds
+    ? {
+        height: presentationBounds.height,
+        maxX: (node.transform?.x || 0) + presentationBounds.maxX,
+        maxY: (node.transform?.y || 0) + presentationBounds.maxY,
+        minX: (node.transform?.x || 0) + presentationBounds.minX,
+        minY: (node.transform?.y || 0) + presentationBounds.minY,
+        width: presentationBounds.width,
+      }
+    : frame.bounds;
+  const transformOrigin = presentationBounds
+    ? `${node.width / 2 - presentationBounds.minX}px ${
+        node.height / 2 - presentationBounds.minY
+      }px`
+    : "center center";
+  const parentNode = editor.getNode(node.parentId);
 
   return {
-    clipPath: getArtboardClipPath(editor, nodeId, frame.bounds),
-    height: Math.max(1, frame.bounds.height),
+    clipPath: getArtboardClipPath(editor, nodeId, bounds),
+    height: Math.max(1, bounds.height),
+    stationaryClipAncestorId:
+      presentationBounds && parentNode?.type === "artboard"
+        ? parentNode.id
+        : null,
     transform: frame.transform || "",
-    width: Math.max(1, frame.bounds.width),
-    x: frame.bounds.minX,
-    y: frame.bounds.minY,
+    transformOrigin,
+    width: Math.max(1, bounds.width),
+    x: bounds.minX,
+    y: bounds.minY,
   };
 };
 
@@ -52,7 +86,9 @@ const getShellKey = (shellState, delta) => {
     shellState.height,
     shellState.x,
     shellState.y,
+    shellState.stationaryClipAncestorId,
     shellState.transform,
+    shellState.transformOrigin,
     shellState.clipPath,
     delta?.x || 0,
     delta?.y || 0,
@@ -148,6 +184,7 @@ const applyNodeShellState = (
     shellElement.style.transformOrigin = "";
     shellElement.style.willChange = "";
     transformElement.style.transform = "";
+    transformElement.style.transformOrigin = "";
     return;
   }
 
@@ -161,6 +198,7 @@ const applyNodeShellState = (
   shellElement.style.transformOrigin = "";
   shellElement.style.willChange = "";
   transformElement.style.transform = shellState.transform || "";
+  transformElement.style.transformOrigin = shellState.transformOrigin;
 };
 
 const syncNodeShell = (
@@ -215,6 +253,23 @@ const applyPreviewTransform = (editor, previewEntry: PreviewEntry, preview) => {
   };
   const rotateTransform = getRotatePreviewTransform(previewBounds, preview);
 
+  if (
+    shellState.stationaryClipAncestorId &&
+    !preview.nodeIds?.includes(shellState.stationaryClipAncestorId) &&
+    !(resizeBounds || rotateTransform)
+  ) {
+    shellElement.style.clipPath = shellState.clipPath;
+    shellElement.style.width = `${shellState.width}px`;
+    shellElement.style.height = `${shellState.height}px`;
+    shellElement.style.willChange = "";
+    shellElement.style.transformOrigin = "";
+    shellElement.style.transform = `translate3d(${shellState.x}px, ${shellState.y}px, 0)`;
+    transformElement.style.transform =
+      `translate3d(${delta.x || 0}px, ${delta.y || 0}px, 0) ${shellState.transform}`.trim();
+    transformElement.style.transformOrigin = shellState.transformOrigin;
+    return;
+  }
+
   shellElement.style.clipPath = getArtboardClipPath(
     editor,
     previewEntry.nodeId,
@@ -232,6 +287,9 @@ const applyPreviewTransform = (editor, previewEntry: PreviewEntry, preview) => {
     : `translate3d(${previewBounds.minX}px, ${previewBounds.minY}px, 0)`;
   transformElement.style.transform =
     resizeFrame?.transform || shellState.transform || "";
+  transformElement.style.transformOrigin = resizeFrame
+    ? "center center"
+    : shellState.transformOrigin;
 };
 
 const sameNodeIds = (left = [], right = []) => {

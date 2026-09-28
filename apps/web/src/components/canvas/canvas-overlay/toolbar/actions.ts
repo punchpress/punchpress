@@ -277,6 +277,20 @@ const getSharedToolbarActions = (editor, state) => {
   return [
     ...getPathModeToolbarActions(editor, state),
     ...getBooleanToolbarActions(editor, state),
+    ...(state.selectedNode?.type === "image"
+      ? [
+          {
+            id: "crop-raster",
+            isActive: false,
+            label: "Crop",
+            title: "Crop Raster",
+            variant: "ghost",
+            onSelect: () => {
+              editor.startCrop(state.selectedNode.id);
+            },
+          },
+        ]
+      : []),
     {
       id: "delete-selection",
       isActive: false,

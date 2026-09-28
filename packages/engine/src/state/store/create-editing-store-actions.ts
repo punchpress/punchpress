@@ -90,6 +90,7 @@ export const createEditingStoreActions = (set) => {
 
         return withDocumentMutation(state, {
           ...baseState,
+          activeLayerId: node.id,
           activeTool: "pointer",
           editingNodeId: node.id,
           editingOriginalText: node.text,
@@ -116,6 +117,7 @@ export const createEditingStoreActions = (set) => {
         }
 
         return {
+          activeLayerId: nextSelectedNodeIds[0] || state.activeLayerId,
           ...(preservesPathEditing ? {} : exitPathEditingInteractionState()),
           pathEditingNodeId: preservesPathEditing
             ? state.pathEditingNodeId
@@ -156,6 +158,8 @@ export const createEditingStoreActions = (set) => {
             }
 
             return {
+              activeLayerId:
+                nextSelectedNodeIds.at(-1) || state.activeLayerId,
               ...(preservesPathEditing ? {} : exitPathEditingInteractionState()),
               pathEditingNodeId: preservesPathEditing
                 ? state.pathEditingNodeId
@@ -196,7 +200,13 @@ export const createEditingStoreActions = (set) => {
           );
         }
 
+        const removesSelectedNode = state.selectedNodeIds.includes(nodeId);
+
         return {
+          activeLayerId:
+            (removesSelectedNode
+              ? nextSelectedNodeIds.at(-1)
+              : nodeId) || state.activeLayerId,
           ...(preservesPathEditing ? {} : exitPathEditingInteractionState()),
           pathEditingNodeId: preservesPathEditing
             ? state.pathEditingNodeId

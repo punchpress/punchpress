@@ -1,15 +1,11 @@
 import { expect, test } from "@playwright/test";
-import type { DesignDocument } from "@punchpress/punch-schema";
 import {
   createDesignDocument,
   createPunchPackage,
   loadPunchPackageContents,
-  PUNCH_DOCUMENT_MIME_TYPE,
-  PUNCH_DOCUMENT_VERSION,
   parseDesignDocument,
   serializeDesignDocument,
 } from "@punchpress/punch-schema";
-import { createZipArchive } from "../../../../packages/punch-schema/src/zip";
 import {
   gotoEditor,
   loadDocument,
@@ -27,13 +23,6 @@ const ARIAL_FONT = {
 
 const PNG_SRC =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR42mP8z8BQDwAFgwJ/lhL1WQAAAABJRU5ErkJggg==";
-const textEncoder = new TextEncoder();
-
-const decodeBase64DataUrl = (src: string) => {
-  const payload = src.split(",")[1] || "";
-
-  return Uint8Array.from(Buffer.from(payload, "base64"));
-};
 
 const transform = (x: number, y: number, rotation = 0) => ({
   rotation,
@@ -192,89 +181,6 @@ const createHydratedPunchPackageContents = () => {
   return loadPunchPackageContents(packageBytes);
 };
 
-const createHydratedTiledRasterPackageContents = () => {
-  const tileRefs = [
-    "assets/raster/asset_tiled_image/tiles/0_0.png",
-    "assets/raster/asset_tiled_image/tiles/1_0.png",
-  ];
-  const document = {
-    assets: {
-      asset_tiled_image: {
-        colorSpace: "srgb",
-        currentMimeType: "image/png",
-        hasAlpha: true,
-        height: 64,
-        id: "asset_tiled_image",
-        kind: "raster",
-        name: "Loaded Tiled Image",
-        originalMimeType: "image/png",
-        preferredExportMimeType: "image/png",
-        storage: "tiled",
-        tileSize: 32,
-        tiles: [
-          {
-            col: 0,
-            height: 64,
-            ref: tileRefs[0],
-            row: 0,
-            width: 32,
-            x: 0,
-            y: 0,
-          },
-          {
-            col: 1,
-            height: 64,
-            ref: tileRefs[1],
-            row: 0,
-            width: 32,
-            x: 32,
-            y: 0,
-          },
-        ],
-        width: 64,
-      },
-    },
-    nodes: [
-      {
-        assetId: "asset_tiled_image",
-        height: 64,
-        id: "tiled-image-layer",
-        name: "Loaded Tiled Image",
-        opacity: 1,
-        parentId: "root",
-        transform: transform(320, 280),
-        type: "image",
-        visible: true,
-        width: 64,
-      },
-    ],
-    version: PUNCH_DOCUMENT_VERSION,
-  };
-  const tileBytes = decodeBase64DataUrl(PNG_SRC);
-  const packageBytes = createZipArchive([
-    {
-      data: textEncoder.encode(PUNCH_DOCUMENT_MIME_TYPE),
-      path: "mimetype",
-    },
-    {
-      data: textEncoder.encode(
-        serializeDesignDocument(document as DesignDocument)
-      ),
-      path: "document.json",
-    },
-    {
-      data: tileBytes,
-      path: tileRefs[0],
-    },
-    {
-      data: tileBytes,
-      path: tileRefs[1],
-    },
-  ]);
-
-  return loadPunchPackageContents(packageBytes);
-};
-
 const getRenderedCanvasNodeIds = (page) => {
   return page
     .locator(".canvas-node[data-node-id]")
@@ -294,30 +200,12 @@ const getCanvasNodeArtSummary = (page, nodeId: string) => {
     const image = shell?.querySelector("image");
 
     return {
+      hasResidentCanvas: Boolean(
+        shell?.querySelector('canvas[data-raster-source-canvas="true"]')
+      ),
       imageHref: image?.getAttribute("href") || null,
       pathCount: shell?.querySelectorAll("path").length || 0,
     };
-  }, nodeId);
-};
-
-const getCanvasNodeTileSummary = (page, nodeId: string) => {
-  return page.evaluate((targetNodeId) => {
-    const hitTarget = document.querySelector(
-      `.canvas-node[data-node-id="${targetNodeId}"]`
-    );
-    const shell = hitTarget?.closest('[data-node-shell="true"]');
-    const tiles = [
-      ...(shell?.querySelectorAll("[data-raster-tile-ref]") || []),
-    ];
-
-    return tiles.map((tile) => ({
-      height: tile.getAttribute("height"),
-      href: tile.getAttribute("href"),
-      ref: tile.getAttribute("data-raster-tile-ref"),
-      width: tile.getAttribute("width"),
-      x: tile.getAttribute("x"),
-      y: tile.getAttribute("y"),
-    }));
   }, nodeId);
 };
 
@@ -380,7 +268,7 @@ test("packaged .punch files hydrate and render each loaded layer kind", async ({
 
   await expect
     .poll(async () => await getCanvasNodeArtSummary(page, "image-layer"))
-    .toMatchObject({ imageHref: PNG_SRC });
+    .toMatchObject({ hasResidentCanvas: true });
   expect(
     (await getCanvasNodeArtSummary(page, "text-layer")).pathCount
   ).toBeGreaterThan(0);
@@ -415,46 +303,4 @@ test("packaged .punch files hydrate and render each loaded layer kind", async ({
 
   expect(imageNode?.type).toBe("image");
   expect(imageNode?.src).toBe(PNG_SRC);
-});
-
-test("packaged tiled raster assets hydrate and render as image tiles", async ({
-  page,
-}) => {
-  await gotoEditor(page);
-  await loadDocument(page, createHydratedTiledRasterPackageContents());
-  await resetViewport(page);
-  await waitForNodeReady(page, "tiled-image-layer");
-
-  await expect(
-    page.locator('.canvas-node[data-node-id="tiled-image-layer"]')
-  ).toBeVisible();
-  await expect
-    .poll(async () => await getCanvasNodeTileSummary(page, "tiled-image-layer"))
-    .toEqual([
-      {
-        height: "64",
-        href: PNG_SRC,
-        ref: "assets/raster/asset_tiled_image/tiles/0_0.png",
-        width: "32",
-        x: "0",
-        y: "0",
-      },
-      {
-        height: "64",
-        href: PNG_SRC,
-        ref: "assets/raster/asset_tiled_image/tiles/1_0.png",
-        width: "32",
-        x: "32",
-        y: "0",
-      },
-    ]);
-
-  const serializedDocument = parseDesignDocument(await serializeDocument(page));
-  const tiledNode = serializedDocument.nodes[0];
-
-  expect(tiledNode.type).toBe("image");
-  expect(tiledNode.type === "image" ? tiledNode.src : null).toBeUndefined();
-  expect(tiledNode.type === "image" ? tiledNode.tileSources?.length : 0).toBe(
-    2
-  );
 });

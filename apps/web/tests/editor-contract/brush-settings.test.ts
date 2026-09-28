@@ -10,33 +10,87 @@ import {
 } from "../../../../packages/engine/src/tools/brush-mask";
 
 describe("brush settings", () => {
+  test("selects presets into independent temporary Brush and Eraser copies", () => {
+    const editor = new Editor();
+
+    editor.selectBrushPreset("chalk", "brush");
+    editor.setBrushSettings({ flow: 0.2, size: 77 }, "brush");
+    editor.selectBrushPreset("pixel", "eraser");
+
+    expect(editor.getBrushToolPresetId("brush")).toBe("chalk");
+    expect(editor.getBrushToolSettings("brush")).toMatchObject({
+      flow: 0.2,
+      size: 77,
+      tip: { kind: "sampled", sampleId: "chalk" },
+    });
+    expect(editor.getBrushToolPresetId("eraser")).toBe("pixel");
+    expect(editor.getBrushToolSettings("eraser")).toMatchObject({
+      flow: 1,
+      size: 8,
+      tip: { kind: "sampled", sampleId: "pixel" },
+    });
+
+    editor.selectBrushPreset("chalk", "brush");
+
+    expect(editor.getBrushToolSettings("brush")).toMatchObject({
+      flow: 0.45,
+      size: 36,
+    });
+  });
+
   test("updates brush tool settings through the editor facade", () => {
     const editor = new Editor();
 
     expect(editor.getBrushToolSettings("brush")).toMatchObject({
+      angle: 0,
+      angleJitter: 0,
       color: "#111111",
+      flow: 1,
       hardness: 1,
       opacity: 1,
+      roundness: 1,
+      scatter: 0,
+      seed: 1,
       size: 24,
+      sizeJitter: 0,
+      smoothing: 0.1,
       spacing: 0,
+      tip: { kind: "round" },
     });
 
     editor.setBrushSettings({
+      angle: -45,
+      angleJitter: 0.25,
       color: "#FF0033",
+      flow: 0.6,
       hardness: 0.35,
       opacity: 0.5,
+      roundness: 0.4,
+      scatter: 0.8,
+      seed: 1234,
       size: 42,
+      sizeJitter: 0.3,
+      smoothing: 0.75,
       spacing: 1.25,
     });
 
     expect(editor.getBrushToolSettings("brush")).toEqual({
+      angle: -45,
+      angleJitter: 0.25,
       color: "#FF0033",
+      flow: 0.6,
       hardness: 0.35,
       opacity: 0.5,
+      roundness: 0.4,
+      scatter: 0.8,
+      seed: 1234,
       size: 42,
+      sizeJitter: 0.3,
+      smoothing: 0.75,
       spacing: 1.25,
+      tip: { kind: "round" },
     });
-    expect(editor.getBrushToolSettings("eraser")).toEqual({
+    expect(editor.getBrushToolSettings("eraser")).toMatchObject({
       color: "#111111",
       hardness: 1,
       opacity: 1,
@@ -73,19 +127,36 @@ describe("brush settings", () => {
     const editor = new Editor();
 
     editor.setBrushSettings({
+      angle: 999,
+      angleJitter: 10,
       color: "not-a-color",
+      flow: Number.NaN,
       hardness: 10,
       opacity: -1,
+      roundness: -1,
+      scatter: 10,
+      seed: -100,
       size: 100_000,
+      sizeJitter: 10,
+      smoothing: 10,
       spacing: 100,
     });
 
     expect(editor.getBrushToolSettings("brush")).toEqual({
+      angle: 180,
+      angleJitter: 1,
       color: "#111111",
+      flow: 1,
       hardness: 1,
       opacity: 0,
+      roundness: 0.01,
+      scatter: 1,
+      seed: 0,
       size: 500,
+      sizeJitter: 1,
+      smoothing: 1,
       spacing: 2,
+      tip: { kind: "round" },
     });
   });
 

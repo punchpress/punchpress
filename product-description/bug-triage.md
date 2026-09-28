@@ -14,8 +14,9 @@ describe that baseline. Current contracts live in `docs/product/` and
 ## Fix review — 2026-09-28
 
 Each finding has its own implementation task and isolated checkout. Fixes are
-integrated locally after coordinator review of source, regression tests, and UI
-evidence. Nothing has been pushed or released.
+integrated after coordinator review of source, regression tests, and UI
+evidence. The integration with the newer raster editor preserves both sets of
+behavior, including asynchronous raster persistence.
 
 | Finding | Resolution and current contract | Review |
 | --- | --- | --- |

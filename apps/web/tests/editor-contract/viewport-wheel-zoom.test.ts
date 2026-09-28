@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { Editor, MAX_ZOOM } from "@punchpress/engine";
 
 describe("Editor.zoomViewportFromWheel", () => {
   test("clamps oversized wheel zoom and keeps the cursor anchored to the same page point", () => {
@@ -94,5 +94,53 @@ describe("Editor.zoomViewportFromWheel", () => {
     expect(didZoom).toBe(true);
     expect(nextViewport?.zoom).toBe(0.01);
     expect(editor.zoom).toBe(0.01);
+  });
+
+  test("clamps at 12,800 percent without moving the pointer anchor", () => {
+    const editor = new Editor({ initialZoom: 127 });
+    let nextViewport: { x: number; y: number; zoom: number } | null = null;
+
+    editor.viewerRef = {
+      getContainer: () => ({
+        getBoundingClientRect: () => ({
+          height: 640,
+          left: 80,
+          top: 40,
+          width: 960,
+        }),
+      }),
+      getScrollLeft: () => 4100.125,
+      getScrollTop: () => 2700.75,
+      setTo: (options) => {
+        nextViewport = options;
+      },
+    };
+
+    const didZoom = editor.zoomViewportFromWheel({
+      clientX: 713.25,
+      clientY: 427.75,
+      deltaY: -2000,
+    });
+
+    if (!nextViewport) {
+      throw new Error("Expected viewer.setTo to be called");
+    }
+
+    const localX = 713.25 - 80;
+    const localY = 427.75 - 40;
+    const before = {
+      x: 4100.125 + localX / 127,
+      y: 2700.75 + localY / 127,
+    };
+    const after = {
+      x: nextViewport.x + localX / nextViewport.zoom,
+      y: nextViewport.y + localY / nextViewport.zoom,
+    };
+
+    expect(MAX_ZOOM).toBe(128);
+    expect(didZoom).toBe(true);
+    expect(nextViewport.zoom).toBe(MAX_ZOOM);
+    expect(after.x).toBeCloseTo(before.x, 10);
+    expect(after.y).toBeCloseTo(before.y, 10);
   });
 });

@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.8.0 - 2026-08-11
+
+### Added
+
+- Paint and erase directly on finite image and Frame layers with native Brush presets, adjustable size, opacity, flow, hardness, spacing, angle, roundness, smoothing, scatter, and jitter.
+- Crop Raster layers non-destructively, expand them to recover retained pixels, and undo or redo pixel edits and geometry changes together.
+- Inspect and edit individual source pixels at high zoom with crisp sampling and an aligned pixel grid.
+- Import and organize image assets as editable Raster layers, including Frame clipping and export support.
+
+### Changed
+
+- Raster drawing now stays responsive across large 4500×5400 Frames and 5000×5000 images, including strokes that leave and re-enter a Frame or image boundary.
+- Imported images retain their natural pixel dimensions instead of being reduced to fit the viewport, preserving source fidelity for later editing.
+- Image resizing preserves proportions by default, supports deliberate non-proportional resizing, previews changes live, and resamples the underlying pixels once when committed.
+- Canvas zoom and pan feel more direct: rapid zoom-button clicks accumulate correctly, the zoom percentage can be scrubbed horizontally, trackpad pinch stays inside the editor, and Space reliably prioritizes viewport panning.
+
+### Fixed
+
+- Brush and Eraser strokes no longer flash, shift, duplicate, disappear, or leave stale gaps while drawing, committing, undoing, or crossing Raster boundaries.
+- Frame-clipped Raster layers reveal re-entering pixels during live drags and preserve their Frame membership during canvas moves.
+- Crop previews reveal retained pixels immediately, keep excluded pixels clipped, and orient all four corner handles correctly.
+- High-zoom Raster presentation and pixel grids remain stable and aligned while zooming, panning, resizing, rotating, and changing viewport position.
+
 ## v0.7.0 - 2026-05-27
 
 ### Added

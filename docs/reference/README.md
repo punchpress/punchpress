@@ -18,6 +18,7 @@ scan.
 | Public editor methods and grouped responsibilities | [Editor API](editor-api.md) |
 | Node capability methods and extension points | [Node capabilities](node-capabilities.md) |
 | Tool event lifecycle | [Tool events](tool-events.md) |
+| Finite Raster Strokes, Dabs, surfaces, presets, and fixtures | [Raster engine contracts](raster-engine-contracts.md) |
 | Render, selection, transform, and hit frames | [Geometry frames](geometry-frames.md) |
 | Canvas, viewport, screen, local, and SVG coordinates | [Coordinate spaces](coordinate-spaces.md) |
 | Cursor tokens and precedence | [Canvas cursors](canvas-cursors.md) |

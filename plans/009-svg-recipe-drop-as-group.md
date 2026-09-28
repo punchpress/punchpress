@@ -51,7 +51,7 @@ makes component reuse awkward. New contract:
 - Assets (RESOLVED by prior executor's investigation): there is NO live
   asset map — `document.assets` is derived at save/export time by
   `createDocumentAssetsFromNodes`; live image nodes are self-contained
-  (`src`, `tileSources`, ...). Conversion therefore needs NO asset merging.
+  (`src` plus single-payload geometry). Conversion therefore needs NO asset merging.
   Guard only: if a recipe image node lacks usable inline data (empty `src`),
   SKIP that node and surface one toast noting skipped images.
 

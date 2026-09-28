@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/toolbar";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
+import { CanvasZoomControl } from "./canvas-zoom-control";
 import { ShapeToolbarButton } from "./shape-toolbar-button";
 
 const PRIMARY_TOOL_CONFIG = [
@@ -117,7 +118,6 @@ const addArtboardToCurrentView = (editor) => {
 export const CanvasToolbar = () => {
   const editor = useEditor();
   const activeTool = useEditorValue((_, state) => state.activeTool);
-  const zoom = useEditorValue((_, state) => state.viewport.zoom);
   const activeToolCursor =
     TOOL_CURSOR_BY_ID[activeTool] || TOOL_CURSOR_BY_ID.pointer;
 
@@ -170,9 +170,7 @@ export const CanvasToolbar = () => {
             strokeWidth={1.8}
           />
         </ToolbarButton>
-        <span className="min-w-10 select-none text-center text-muted-foreground text-xs tabular-nums">
-          {Math.round(zoom * 100)}%
-        </span>
+        <CanvasZoomControl />
         <ToolbarButton
           aria-label="Zoom in"
           onClick={() => editor.zoomIn()}

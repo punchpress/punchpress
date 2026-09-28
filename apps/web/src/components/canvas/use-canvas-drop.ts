@@ -121,7 +121,15 @@ export const useCanvasDrop = ({ editor, getCanvasPoint }) => {
         }
 
         const nodes = await importer.importFile({ file, targetCenter });
+        const shouldFocusImportedImage = editor.nodes.every(
+          (node) => node.type === "empty"
+        );
         editor.insertNodes(nodes);
+
+        if (shouldFocusImportedImage) {
+          editor.scheduleViewportFocus(nodes.map((node) => node.id));
+        }
+
         showToast({
           message: `Imported ${file.name}`,
           type: "success",

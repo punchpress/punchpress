@@ -1,0 +1,269 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "hard-round",
+      "mode": "exact",
+      "settings": {
+        "angle": 0,
+        "angleJitter": 0,
+        "color": "#2468AC",
+        "flow": 1,
+        "hardness": 1,
+        "opacity": 1,
+        "roundness": 1,
+        "scatter": 0,
+        "seed": 1000,
+        "size": 24,
+        "sizeJitter": 0,
+        "smoothing": 0.1,
+        "spacing": 0,
+        "tip": { "kind": "round" }
+      },
+      "expectedDabs": [
+        {
+          "angle": 0,
+          "center": { "x": 40, "y": 50 },
+          "color": "#2468AC",
+          "flow": 1,
+          "hardness": 1,
+          "opacity": 1,
+          "roundness": 1,
+          "size": 24,
+          "tip": { "kind": "round" }
+        }
+      ]
+    },
+    {
+      "id": "soft-round",
+      "mode": "tolerant",
+      "settings": {
+        "angle": 0,
+        "angleJitter": 0,
+        "color": "#2468AC",
+        "flow": 1,
+        "hardness": 0,
+        "opacity": 1,
+        "roundness": 1,
+        "scatter": 0,
+        "seed": 1001,
+        "size": 64,
+        "sizeJitter": 0,
+        "smoothing": 0.1,
+        "spacing": 0.12,
+        "tip": { "kind": "round" }
+      },
+      "expectedDabs": [
+        {
+          "angle": 0,
+          "center": { "x": 40, "y": 50 },
+          "color": "#2468AC",
+          "flow": 1,
+          "hardness": 0,
+          "opacity": 1,
+          "roundness": 1,
+          "size": 64,
+          "tip": { "kind": "round" }
+        }
+      ]
+    },
+    {
+      "id": "ink",
+      "mode": "tolerant",
+      "settings": {
+        "angle": -12,
+        "angleJitter": 0,
+        "color": "#2468AC",
+        "flow": 0.85,
+        "hardness": 0.9,
+        "opacity": 1,
+        "roundness": 0.35,
+        "scatter": 0,
+        "seed": 1002,
+        "size": 16,
+        "sizeJitter": 0,
+        "smoothing": 0.2,
+        "spacing": 0.06,
+        "tip": { "kind": "round" }
+      },
+      "expectedDabs": [
+        {
+          "angle": -12,
+          "center": { "x": 40, "y": 50 },
+          "color": "#2468AC",
+          "flow": 0.85,
+          "hardness": 0.9,
+          "opacity": 1,
+          "roundness": 0.35,
+          "size": 16,
+          "tip": { "kind": "round" }
+        }
+      ]
+    },
+    {
+      "id": "pencil",
+      "mode": "tolerant",
+      "settings": {
+        "angle": 0,
+        "angleJitter": 0.08,
+        "color": "#2468AC",
+        "flow": 0.35,
+        "hardness": 1,
+        "opacity": 1,
+        "roundness": 0.65,
+        "scatter": 0.04,
+        "seed": 1003,
+        "size": 8,
+        "sizeJitter": 0.15,
+        "smoothing": 0.12,
+        "spacing": 0.08,
+        "tip": { "kind": "sampled", "sampleId": "pencil" }
+      },
+      "expectedDabs": [
+        {
+          "angle": 12.777781111747,
+          "center": { "x": 39.98191854495, "y": 50.031054946432 },
+          "color": "#2468AC",
+          "flow": 0.35,
+          "hardness": 1,
+          "opacity": 1,
+          "roundness": 0.65,
+          "size": 6.897362537682,
+          "tip": { "kind": "sampled", "sampleId": "pencil" }
+        }
+      ]
+    },
+    {
+      "id": "marker",
+      "mode": "tolerant",
+      "settings": {
+        "angle": 20,
+        "angleJitter": 0,
+        "color": "#2468AC",
+        "flow": 0.25,
+        "hardness": 0.8,
+        "opacity": 0.7,
+        "roundness": 0.25,
+        "scatter": 0,
+        "seed": 1004,
+        "size": 48,
+        "sizeJitter": 0,
+        "smoothing": 0.25,
+        "spacing": 0.05,
+        "tip": { "kind": "round" }
+      },
+      "expectedDabs": [
+        {
+          "angle": 20,
+          "center": { "x": 40, "y": 50 },
+          "color": "#2468AC",
+          "flow": 0.25,
+          "hardness": 0.8,
+          "opacity": 0.7,
+          "roundness": 0.25,
+          "size": 48,
+          "tip": { "kind": "round" }
+        }
+      ]
+    },
+    {
+      "id": "chalk",
+      "mode": "tolerant",
+      "settings": {
+        "angle": 0,
+        "angleJitter": 0.12,
+        "color": "#2468AC",
+        "flow": 0.45,
+        "hardness": 1,
+        "opacity": 1,
+        "roundness": 1,
+        "scatter": 0.08,
+        "seed": 1005,
+        "size": 36,
+        "sizeJitter": 0.2,
+        "smoothing": 0.1,
+        "spacing": 0.16,
+        "tip": { "kind": "sampled", "sampleId": "chalk" }
+      },
+      "expectedDabs": [
+        {
+          "angle": 2.892327140272,
+          "center": { "x": 39.13135444185, "y": 50.489029421487 },
+          "color": "#2468AC",
+          "flow": 0.45,
+          "hardness": 1,
+          "opacity": 1,
+          "roundness": 1,
+          "size": 32.062891875766,
+          "tip": { "kind": "sampled", "sampleId": "chalk" }
+        }
+      ]
+    },
+    {
+      "id": "grain",
+      "mode": "tolerant",
+      "settings": {
+        "angle": 0,
+        "angleJitter": 0.35,
+        "color": "#2468AC",
+        "flow": 0.25,
+        "hardness": 1,
+        "opacity": 0.8,
+        "roundness": 1,
+        "scatter": 0.18,
+        "seed": 1006,
+        "size": 54,
+        "sizeJitter": 0.3,
+        "smoothing": 0.1,
+        "spacing": 0.18,
+        "tip": { "kind": "sampled", "sampleId": "grain" }
+      },
+      "expectedDabs": [
+        {
+          "angle": 58.725517900195,
+          "center": { "x": 39.35617455122, "y": 50.85685042303 },
+          "color": "#2468AC",
+          "flow": 0.25,
+          "hardness": 1,
+          "opacity": 0.8,
+          "roundness": 1,
+          "size": 38.88860762883,
+          "tip": { "kind": "sampled", "sampleId": "grain" }
+        }
+      ]
+    },
+    {
+      "id": "pixel",
+      "mode": "exact",
+      "settings": {
+        "angle": 0,
+        "angleJitter": 0,
+        "color": "#2468AC",
+        "flow": 1,
+        "hardness": 1,
+        "opacity": 1,
+        "roundness": 1,
+        "scatter": 0,
+        "seed": 1007,
+        "size": 8,
+        "sizeJitter": 0,
+        "smoothing": 0,
+        "spacing": 0,
+        "tip": { "kind": "sampled", "sampleId": "pixel" }
+      },
+      "expectedDabs": [
+        {
+          "angle": 0,
+          "center": { "x": 40, "y": 50 },
+          "color": "#2468AC",
+          "flow": 1,
+          "hardness": 1,
+          "opacity": 1,
+          "roundness": 1,
+          "size": 8,
+          "tip": { "kind": "sampled", "sampleId": "pixel" }
+        }
+      ]
+    }
+  ]
+}

@@ -22,3 +22,13 @@ export const shouldBlockSelectionStart = (target) => {
     )
   );
 };
+
+export const shouldDeferSelectionInteraction = (editor) => {
+  return editor.activeTool === "hand" || editor.getState().spacePressed;
+};
+
+export const canStartSelectionInteraction = (editor, event, isEnabled) => {
+  return (
+    !shouldDeferSelectionInteraction(editor) && event.button === 0 && isEnabled
+  );
+};

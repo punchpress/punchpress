@@ -28,4 +28,14 @@
   .dark .canvas-dot-grid {
     color: rgb(255 255 255 / 0.18);
   }
+
+  [data-raster-sampling="smooth"] image,
+  [data-raster-sampling="smooth"] canvas {
+    image-rendering: auto;
+  }
+
+  [data-raster-sampling="exact"] image,
+  [data-raster-sampling="exact"] canvas {
+    image-rendering: pixelated;
+  }
 }

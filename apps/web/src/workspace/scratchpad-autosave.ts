@@ -1,5 +1,5 @@
 interface ScratchpadEditor {
-  serializeDocument: () => string;
+  serializeDocumentAsync: () => Promise<string>;
   store: { subscribe: (listener: () => void) => () => void };
 }
 
@@ -21,11 +21,10 @@ export const createScratchpadAutosave = (
       timeoutId = undefined;
 
       if (revision > queuedRevision) {
-        const contents = editor.serializeDocument();
         const writeRevision = revision;
         queuedRevision = writeRevision;
         latestWrite = pendingWrite
-          .then(() => save(contents))
+          .then(async () => save(await editor.serializeDocumentAsync()))
           .then(
             () => {
               savedRevision = writeRevision;

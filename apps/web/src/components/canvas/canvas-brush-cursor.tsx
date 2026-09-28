@@ -1,4 +1,11 @@
-import { useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
 
 interface BrushCursorPosition {
@@ -19,18 +26,45 @@ const isBrushCursorTarget = (target: EventTarget | null) => {
   );
 };
 
+const getBrushCursorPosition = (
+  hostElement: HTMLDivElement,
+  event: PointerEvent,
+  target: EventTarget | null
+): BrushCursorPosition | null => {
+  if (!isBrushCursorTarget(target)) {
+    return null;
+  }
+
+  const rect = hostElement.getBoundingClientRect();
+
+  return {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+  };
+};
+
 export const CanvasBrushCursor = ({
   hostElement,
 }: {
   hostElement: HTMLDivElement | null;
 }) => {
-  const { activeTool, settings, zoom } = useEditorValue((editor, state) => {
-    return {
-      activeTool: state.activeTool,
-      settings: editor.getBrushToolSettings(state.activeTool),
-      zoom: state.viewport.zoom,
-    };
-  });
+  const editor = useEditor();
+  const {
+    x: viewportX,
+    y: viewportY,
+    zoom,
+  } = useLiveViewportPresentation(editor);
+  const { activeTool, settings, targetRevision } = useEditorValue(
+    (editor, state) => {
+      return {
+        activeTool: state.activeTool,
+        settings: editor.getBrushToolSettings(state.activeTool),
+        targetRevision: `${state.activeLayerId || ""}:${state.selectedNodeIds.join(",")}:${state.nodes
+          .map((node) => `${node.id}:${node.visible}:${node.locked ?? ""}`)
+          .join("|")}`,
+      };
+    }
+  );
   const [position, setPosition] = useState<BrushCursorPosition | null>(null);
 
   useEffect(() => {
@@ -58,16 +92,15 @@ export const CanvasBrushCursor = ({
     };
 
     const handlePointerMove = (event: PointerEvent) => {
-      if (!isBrushCursorTarget(event.target)) {
-        schedulePosition(null);
-        return;
-      }
-
-      const rect = hostElement.getBoundingClientRect();
-      schedulePosition({
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top,
-      });
+      schedulePosition(
+        getBrushCursorPosition(
+          hostElement,
+          event,
+          isBrushCursorTarget(event.target)
+            ? event.target
+            : document.elementFromPoint(event.clientX, event.clientY)
+        )
+      );
     };
 
     const handlePointerLeave = () => {
@@ -87,7 +120,48 @@ export const CanvasBrushCursor = ({
     };
   }, [hostElement]);
 
-  if (!(position && settings && isRasterTool(activeTool))) {
+  const point =
+    position && editor.viewerRef
+      ? {
+          x: viewportX + position.x / zoom,
+          y: viewportY + position.y / zoom,
+        }
+      : null;
+  const disabled = Boolean(
+    targetRevision &&
+      point &&
+      isRasterTool(activeTool) &&
+      !editor.currentTool.hasActiveSession?.() &&
+      !editor.getRasterTargetState({ point, tool: activeTool }).enabled
+  );
+  const enabled = Boolean(
+    position && settings && isRasterTool(activeTool) && !disabled
+  );
+
+  useLayoutEffect(() => {
+    if (!hostElement) {
+      return;
+    }
+
+    if (disabled) {
+      hostElement.dataset.rasterCursorDisabled = "true";
+    } else {
+      delete hostElement.dataset.rasterCursorDisabled;
+    }
+
+    if (enabled) {
+      hostElement.dataset.rasterCursorEnabled = "true";
+    } else {
+      delete hostElement.dataset.rasterCursorEnabled;
+    }
+
+    return () => {
+      delete hostElement.dataset.rasterCursorDisabled;
+      delete hostElement.dataset.rasterCursorEnabled;
+    };
+  }, [disabled, enabled, hostElement]);
+
+  if (!enabled) {
     return null;
   }
 
@@ -97,6 +171,7 @@ export const CanvasBrushCursor = ({
     <div
       aria-hidden="true"
       className="pointer-events-none absolute top-0 left-0 z-40 rounded-full border border-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.75),0_0_3px_rgba(0,0,0,0.35)]"
+      data-raster-target="enabled"
       data-testid="brush-cursor"
       style={{
         height: size,
@@ -105,4 +180,17 @@ export const CanvasBrushCursor = ({
       }}
     />
   );
+};
+
+const useLiveViewportPresentation = (editor: ReturnType<typeof useEditor>) => {
+  useSyncExternalStore(
+    useCallback(
+      (listener) => editor.subscribeViewportPresentation(listener),
+      [editor]
+    ),
+    useCallback(() => editor.getViewportPresentationRevision(), [editor]),
+    () => 0
+  );
+
+  return editor.viewport;
 };

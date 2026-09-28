@@ -15,18 +15,24 @@ and future clients should converge here instead of inventing parallel behavior.
 
 | Group | Examples |
 | --- | --- |
-| Document | `newDocument`, `loadDocument`, `serializeDocument`, `exportDocument`, `markDocumentSaved`. |
+| Document | `newDocument`, `loadDocument`, `serializeDocument`, `serializeDocumentAsync`, `exportDocument`, `createDocumentSaveCheckpoint`, `markDocumentSaved`. |
 | Nodes | `addTextNode`, `addShapeNode`, `addArtboardNode`, `insertNodes`, `updateNode`, `deleteSelected`, `duplicate`, `groupSelected`, `ungroup`. |
-| Selection | `select`, `setSelectedNodes`, `toggleSelection`, `clearSelection`, `ensureSelected`, `isSelected`. |
+| Active layer and selection | `activeLayerId`, `activeLayer`, `select`, `setSelectedNodes`, `toggleSelection`, `clearSelection`, `ensureSelected`, `isSelected`. |
 | Layering | `bringToFront`, `sendToBack`, `setNodeOrder`, `moveNodeToParent`, `toggleVisibility`. |
 | Editing modes | `setActiveTool`, `startEditing`, `commitEditing`, `cancelEditing`, `startPathEditing`, `stopPathEditing`. |
 | Vector/path | point movement, point deletion, topology operations, curve merge/separate/join, compound paths, boolean operations. |
 | Transform | move, resize, rotate, selection drag, text path positioning. |
-| Viewport | zoom, wheel zoom, focus canvas bounds, pending focus. |
+| Viewport | `zoomIn`, `zoomOut`, `zoomTo`, wheel zoom, focus canvas bounds, pending focus. |
 | Fonts | initialize/request local fonts, preload fonts, set last used font. |
 | Clipboard | `copySelection`, `pasteClipboardContent`, `pasteText`. |
 | History | undo, redo, commit or cancel a gesture, dirty/saved marks. |
 | Inspection | debug dump, selection properties, overlay state, node geometry, layer rows. |
+| Raster host | Constructor-injected `RasterSurfaceResolver` for finite browser or headless Raster targets. |
+| Raster editing | Raster aspect lock and async resize session commands; `getRasterTargetState`; Crop start, update, commit, cancel, and preview. |
+
+Capture a save checkpoint before asynchronous serialization and pass it to
+`markDocumentSaved(checkpoint)` after the file write succeeds. Edits committed
+while encoding or choosing a destination remain dirty.
 
 ## Rules
 
@@ -35,3 +41,8 @@ and future clients should converge here instead of inventing parallel behavior.
   method or session model.
 - Keep DOM, pointer capture, native dialogs, and platform-specific file handles
   outside the engine facade.
+- Browser Raster canvas allocation, decode, and presentation stay behind the
+  injected surface resolver; the engine sees only finite Raster contracts.
+- Resident Raster surfaces remain authoritative across pointer release.
+  Asynchronous document and export paths snapshot their latest committed
+  revision through the injected resolver.

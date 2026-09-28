@@ -1,7 +1,11 @@
-import { createDefaultImageNode, round } from "@punchpress/engine";
+import {
+  createDefaultImageNode,
+  MAX_RASTER_CROP_AREA,
+  MAX_RASTER_CROP_DIMENSION,
+  round,
+} from "@punchpress/engine";
 
 const DEFAULT_IMAGE_SIZE = 360;
-const MAX_IMAGE_SIDE = 720;
 const SUPPORTED_IMAGE_MIME_TYPES = ["image/png", "image/jpeg"];
 const DATA_URL_MIME_TYPE_PATTERN = /^data:[^;,]*(?=[;,])/;
 
@@ -75,7 +79,7 @@ const loadImageDimensions = (src: string) => {
   });
 };
 
-const getPlacedImageSize = ({ height, width }) => {
+const getNaturalRasterSize = ({ height, width }) => {
   if (!(width > 0 && height > 0)) {
     return {
       height: DEFAULT_IMAGE_SIZE,
@@ -83,12 +87,20 @@ const getPlacedImageSize = ({ height, width }) => {
     };
   }
 
-  const scale = Math.min(1, MAX_IMAGE_SIDE / Math.max(width, height));
+  const naturalWidth = Math.round(width);
+  const naturalHeight = Math.round(height);
 
-  return {
-    height: round(Math.max(1, height * scale), 2),
-    width: round(Math.max(1, width * scale), 2),
-  };
+  if (
+    naturalWidth > MAX_RASTER_CROP_DIMENSION ||
+    naturalHeight > MAX_RASTER_CROP_DIMENSION ||
+    naturalWidth * naturalHeight > MAX_RASTER_CROP_AREA
+  ) {
+    throw new Error(
+      "Image dimensions exceed the 16,384px side or 100,000,000px area limit."
+    );
+  }
+
+  return { height: naturalHeight, width: naturalWidth };
 };
 
 export const createImageNodeFromDataUrl = async ({
@@ -103,7 +115,7 @@ export const createImageNodeFromDataUrl = async ({
   targetCenter: { x: number; y: number };
 }) => {
   const dimensions = await loadImageDimensions(src);
-  const size = getPlacedImageSize(dimensions);
+  const size = getNaturalRasterSize(dimensions);
   const imageNode = createDefaultImageNode({
     height: size.height,
     mimeType,
@@ -114,6 +126,8 @@ export const createImageNodeFromDataUrl = async ({
 
   return {
     ...imageNode,
+    pixelHeight: size.height,
+    pixelWidth: size.width,
     transform: {
       ...imageNode.transform,
       x: round(targetCenter.x - imageNode.width / 2, 2),

@@ -8,6 +8,26 @@ const importImageImport = () => {
   );
 };
 
+const useImageDimensions = ({ height, width }) => {
+  globalThis.Image = class {
+    naturalHeight = height;
+    naturalWidth = width;
+    private loadListener: (() => void) | null = null;
+
+    addEventListener(eventName: string, listener: () => void) {
+      if (eventName === "load") {
+        this.loadListener = listener;
+      }
+    }
+
+    set src(_src: string) {
+      queueMicrotask(() => {
+        this.loadListener?.();
+      });
+    }
+  } as unknown as typeof Image;
+};
+
 describe("image import", () => {
   afterEach(() => {
     globalThis.Image = originalImage;
@@ -59,6 +79,45 @@ describe("image import", () => {
         src: "data:;base64,abc123",
       })
     ).toBe("data:image/png;base64,abc123");
+  });
+
+  test("creates imported Raster geometry at decoded natural dimensions", async () => {
+    const { createImageNodeFromDataUrl } = await importImageImport();
+
+    useImageDimensions({ height: 2000, width: 2000 });
+    const node = await createImageNodeFromDataUrl({
+      mimeType: "image/jpeg",
+      name: "natural.jpg",
+      src: "data:image/jpeg;base64,natural",
+      targetCenter: { x: 1000, y: 1000 },
+    });
+
+    expect(node).toMatchObject({
+      baseHeight: 2000,
+      baseWidth: 2000,
+      height: 2000,
+      pixelHeight: 2000,
+      pixelWidth: 2000,
+      transform: { x: 0, y: 0 },
+      width: 2000,
+    });
+  });
+
+  test("rejects decoded images beyond the finite Raster allocation limit", async () => {
+    const { createImageNodeFromDataUrl } = await importImageImport();
+
+    useImageDimensions({ height: 1, width: 16_385 });
+
+    await expect(
+      createImageNodeFromDataUrl({
+        mimeType: "image/jpeg",
+        name: "too-wide.jpg",
+        src: "data:image/jpeg;base64,too-wide",
+        targetCenter: { x: 0, y: 0 },
+      })
+    ).rejects.toThrow(
+      "Image dimensions exceed the 16,384px side or 100,000,000px area limit."
+    );
   });
 
   test("rejects image data URLs that cannot be decoded", async () => {

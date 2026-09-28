@@ -230,7 +230,6 @@ export const getGroupNodeRenderTree = (
           nodeId: childNode.id,
           opacity: getNodeOpacity(childNode),
           src: childNode.src,
-          tileSources: childNode.tileSources,
           transform: getSvgNodeTransform(childNode, geometry.bbox),
           type: "image",
           width: childNode.width,
@@ -330,6 +329,7 @@ export const CanvasNodeRenderTree = ({
   fillRule,
   isEditing,
   items,
+  renderRootNodeId,
   stroke,
   strokeLineCap,
   strokeLineJoin,
@@ -349,6 +349,7 @@ export const CanvasNodeRenderTree = ({
             fillRule={fillRule}
             isEditing={isEditing}
             items={item.children || []}
+            renderRootNodeId={renderRootNodeId}
             stroke={stroke}
             strokeLineCap={strokeLineCap}
             strokeLineJoin={strokeLineJoin}
@@ -361,20 +362,29 @@ export const CanvasNodeRenderTree = ({
 
     if (item.type === "image") {
       return (
-        <CanvasRasterImage
-          baseHeight={item.baseHeight}
-          baseWidth={item.baseWidth}
-          baseX={item.baseX}
-          baseY={item.baseY}
-          height={item.height}
-          key={item.key}
-          nodeId={item.nodeId}
-          opacity={isEditing ? 0 : (item.opacity ?? 1)}
-          src={item.src}
-          tileSources={item.tileSources}
-          transform={item.transform || undefined}
-          width={item.width}
-        />
+        <g key={item.key} transform={item.transform || undefined}>
+          <svg
+            aria-hidden="true"
+            height={item.height}
+            overflow="hidden"
+            width={item.width}
+            x={0}
+            y={0}
+          >
+            <CanvasRasterImage
+              baseHeight={item.baseHeight}
+              baseWidth={item.baseWidth}
+              baseX={item.baseX}
+              baseY={item.baseY}
+              height={item.height}
+              nodeId={item.nodeId}
+              opacity={isEditing ? 0 : (item.opacity ?? 1)}
+              renderRootNodeId={renderRootNodeId}
+              src={item.src}
+              width={item.width}
+            />
+          </svg>
+        </g>
       );
     }
 

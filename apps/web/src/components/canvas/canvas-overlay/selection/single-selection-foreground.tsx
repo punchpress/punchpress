@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from "react";
 import { NodeContextMenuItems } from "@/components/context-menus/node-context-menu-items";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { useEditor } from "../../../../editor-react/use-editor";
+import { useEditorPreviewValue } from "../../../../editor-react/use-editor-preview-value";
 import { useEditorSelectionDragPreviewValue } from "../../../../editor-react/use-editor-selection-drag-preview-value";
 import { useEditorSurfaceValue } from "../../../../editor-react/use-editor-surface-value";
 import { useEditorValue } from "../../../../editor-react/use-editor-value";
@@ -13,6 +14,7 @@ import {
 import { attachCanvasGestureEvents } from "../../canvas-gesture-events";
 import { openCanvasNodeEditingMode } from "../../canvas-node-editing";
 import { getHostRectFromNodeFrame } from "../canvas-overlay-geometry";
+import { canStartSelectionInteraction } from "../canvas-overlay-interactions";
 import { getTextPathTransformTargetStyle } from "../text/path-geometry";
 import {
   getRotateCursorRotationDegrees,
@@ -341,7 +343,14 @@ export const CanvasSingleSelectionForeground = ({
   const isArtboardNode = useEditorValue((editor) => {
     return editor.getNode(nodeId)?.type === "artboard";
   });
-  const usesBoxResize = isShapeNode || isArtboardNode;
+  const isImageNode = useEditorValue((editor) => {
+    return editor.getNode(nodeId)?.type === "image";
+  });
+  const usesBoxResize = isShapeNode || isArtboardNode || isImageNode;
+  const rasterResizePending = useEditorPreviewValue((activeEditor) => {
+    return Boolean(activeEditor.getRasterResizeState(nodeId));
+  });
+  const resizeEnabled = isResizable && !rasterResizePending;
   const isPathEditing = useEditorValue((editor, state) => {
     return state.pathEditingNodeId === nodeId && editor.isPathEditing(nodeId);
   });
@@ -465,7 +474,7 @@ export const CanvasSingleSelectionForeground = ({
   const cursorClassName = "canvas-cursor-default";
 
   const startSelectionDrag = (event) => {
-    if (!(event.button === 0 && isDraggable)) {
+    if (!canStartSelectionInteraction(editor, event, isDraggable)) {
       return;
     }
 
@@ -605,7 +614,7 @@ export const CanvasSingleSelectionForeground = ({
   };
 
   const startResize = (handle, event) => {
-    if (!(event.button === 0 && isResizable)) {
+    if (!canStartSelectionInteraction(editor, event, resizeEnabled)) {
       return;
     }
 
@@ -684,7 +693,7 @@ export const CanvasSingleSelectionForeground = ({
   };
 
   const startRotate = (corner: TransformCorner, event) => {
-    if (!(event.button === 0 && isRotatable)) {
+    if (!canStartSelectionInteraction(editor, event, isRotatable)) {
       return;
     }
 
@@ -786,18 +795,21 @@ export const CanvasSingleSelectionForeground = ({
         {(["n", "s", "w", "e"] as const).map((edge) => {
           return (
             <div
+              aria-disabled={!resizeEnabled || undefined}
               className={`absolute ${usesBoxResize ? edgeCursorClassName[edge] : ""}`}
               data-edge={edge}
               key={edge}
               onPointerDown={
-                usesBoxResize ? (event) => startResize(edge, event) : undefined
+                usesBoxResize && resizeEnabled
+                  ? (event) => startResize(edge, event)
+                  : undefined
               }
               ref={(element) => {
                 edgeElementsRef.current[edge] = element;
               }}
               style={{
                 ...edgeHitAreaStyle[edge],
-                pointerEvents: usesBoxResize ? "auto" : "none",
+                pointerEvents: usesBoxResize && resizeEnabled ? "auto" : "none",
               }}
             >
               <div
@@ -830,6 +842,7 @@ export const CanvasSingleSelectionForeground = ({
 
               <button
                 className={`moveable-control moveable-${corner} canvas-single-node-control pointer-events-auto absolute ${resizeCursorClassName[corner]}`}
+                disabled={!resizeEnabled}
                 onPointerDown={(event) => startResize(corner, event)}
                 ref={(element) => {
                   handleElementsRef.current[corner] = element;

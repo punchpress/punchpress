@@ -35,6 +35,7 @@ import { CanvasHostOverlays } from "./canvas-overlay/host-overlays";
 import { CanvasStageOverlays } from "./canvas-overlay/stage-overlays";
 import { getCanvasDeepLeafNodeIdAtPoint } from "./canvas-overlay/vector-path/canvas-node-hit-target";
 import { resolveVectorPenHoverAction } from "./canvas-overlay/vector-path/pen-hover";
+import { CanvasPixelGrid } from "./canvas-pixel-grid";
 import { CanvasTextEditor } from "./canvas-text-editor";
 import { startCanvasToolPlacementSession } from "./canvas-tool-placement-session";
 import { CanvasToolbar } from "./canvas-toolbar";
@@ -166,6 +167,10 @@ const shouldIgnoreCanvasPointerTarget = (event, activeTool) => {
     return true;
   }
 
+  if (event.target.closest("[data-raster-crop-overlay]")) {
+    return true;
+  }
+
   if (
     event.target.closest("[data-node-id], [data-testid='canvas-text-input']")
   ) {
@@ -189,6 +194,16 @@ const shouldIgnoreCanvasPointerTarget = (event, activeTool) => {
   return Boolean(!isRasterTool && event.target.closest(".canvas-moveable"));
 };
 
+const commitCropFromOutsidePress = (editor, event) => {
+  if (
+    editor.rasterCropSession &&
+    event.target instanceof Element &&
+    !event.target.closest("[data-raster-crop-overlay]")
+  ) {
+    editor.commitCrop();
+  }
+};
+
 const isTransformOverlayWheelTarget = (target) => {
   return Boolean(
     target instanceof Element && target.closest(".canvas-moveable")
@@ -206,7 +221,7 @@ const getWheelScrollDelta = (event, zoom) => {
   };
 };
 
-const markViewportInteraction = (editor, timeoutRef) => {
+const markViewportInteraction = (editor, timeoutRef, wheelGestureModeRef) => {
   editor.setViewportInteracting(true);
 
   if (timeoutRef.current !== null) {
@@ -215,6 +230,7 @@ const markViewportInteraction = (editor, timeoutRef) => {
 
   timeoutRef.current = window.setTimeout(() => {
     timeoutRef.current = null;
+    wheelGestureModeRef.current = null;
     editor.setViewportInteracting(false);
   }, 120);
 };
@@ -281,6 +297,7 @@ export const Canvas = () => {
   const viewerRef = useRef(null);
   const hostRef = useRef(null);
   const viewportInteractionTimeoutRef = useRef<number | null>(null);
+  const wheelGestureModeRef = useRef<"pan" | "zoom" | null>(null);
   const lastPenHoverClientPointRef = useRef<{ x: number; y: number } | null>(
     null
   );
@@ -318,6 +335,7 @@ export const Canvas = () => {
         window.clearTimeout(viewportInteractionTimeoutRef.current);
         viewportInteractionTimeoutRef.current = null;
       }
+      wheelGestureModeRef.current = null;
       editor.setViewportInteracting(false);
       editor.viewerRef = null;
       editor.hostRef = null;
@@ -383,7 +401,11 @@ export const Canvas = () => {
   const handleScroll = useCallback(
     (event) => {
       const viewer = viewerRef.current;
-      markViewportInteraction(editor, viewportInteractionTimeoutRef);
+      markViewportInteraction(
+        editor,
+        viewportInteractionTimeoutRef,
+        wheelGestureModeRef
+      );
 
       editor.setViewport({
         x: viewer?.getScrollLeft?.() ?? editor.viewport.x ?? 0,
@@ -394,6 +416,13 @@ export const Canvas = () => {
     },
     [editor]
   );
+  const handleCanvasPanEnd = useCallback(() => {
+    queueMicrotask(() => {
+      // InfiniteViewer applies pointer velocity as unscaled world-space
+      // momentum. Stop that fling so drag panning remains screen-space.
+      viewerRef.current?.scrollBy?.(0, 0);
+    });
+  }, []);
   const getCanvasDropPoint = useCallback(
     (clientX, clientY) =>
       getCanvasPoint(
@@ -411,22 +440,29 @@ export const Canvas = () => {
   });
   const handleCanvasWheel = useCallback(
     (event) => {
-      const isZoomWheel = event.metaKey || event.ctrlKey;
+      const viewer = viewerRef.current;
+
+      if (!viewer) {
+        return;
+      }
+
+      const isPinchZoom = event.ctrlKey && !event.altKey && !event.metaKey;
+      const isZoomWheel = isPinchZoom || wheelGestureModeRef.current === "zoom";
+
+      wheelGestureModeRef.current = isZoomWheel ? "zoom" : "pan";
+      markViewportInteraction(
+        editor,
+        viewportInteractionTimeoutRef,
+        wheelGestureModeRef
+      );
 
       if (!isZoomWheel) {
         if (!isTransformOverlayWheelTarget(event.target)) {
           return;
         }
 
-        const viewer = viewerRef.current;
-
-        if (!viewer) {
-          return;
-        }
-
         event.preventDefault();
         event.stopPropagation();
-        markViewportInteraction(editor, viewportInteractionTimeoutRef);
 
         const delta = getWheelScrollDelta(event, editor.viewport.zoom);
         viewer.scrollBy?.(delta.x, delta.y);
@@ -439,15 +475,17 @@ export const Canvas = () => {
         return;
       }
 
-      const viewer = viewerRef.current;
       const host = hostRef.current;
-      if (!(viewer && host)) {
+      if (!host) {
         return;
       }
 
       event.preventDefault();
       event.stopPropagation();
-      markViewportInteraction(editor, viewportInteractionTimeoutRef);
+
+      if (!isPinchZoom) {
+        return;
+      }
 
       editor.zoomViewportFromWheel({
         clientX: event.clientX,
@@ -464,6 +502,8 @@ export const Canvas = () => {
       if (spacePressed || activeTool === "hand") {
         return;
       }
+
+      commitCropFromOutsidePress(editor, event);
 
       if (
         pathEditingNodeId &&
@@ -655,6 +695,7 @@ export const Canvas = () => {
         <InfiniteViewer
           className="canvas-surface relative z-[1] h-full w-full"
           margin={CANVAS_STAGE_MARGIN}
+          onDragEnd={handleCanvasPanEnd}
           onScroll={handleScroll}
           ref={viewerRef}
           threshold={0}
@@ -662,7 +703,6 @@ export const Canvas = () => {
           useMouseDrag={spacePressed || activeTool === "hand"}
           useWheelPinch={false}
           useWheelScroll
-          wheelPinchKey="meta"
           zoom={zoom}
           zoomRange={[MIN_ZOOM, MAX_ZOOM]}
         >
@@ -679,6 +719,7 @@ export const Canvas = () => {
               />
               <CanvasArtboards />
               <CanvasNodes />
+              <CanvasPixelGrid />
               <CanvasStageOverlays />
               <CanvasTextEditor />
             </Profiler>

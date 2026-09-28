@@ -18,6 +18,11 @@ Transforms move, resize, and rotate selected objects.
   motion remains live even when it returns inside the threshold.
 - Escape or pointer cancellation restores the geometry from before a gesture,
   without adding an Undo step. Releasing the pointer commits normally.
+- Geometry transforms preserve document hierarchy. Moving a node into, within,
+  or beyond a Frame changes only its geometry; Frame membership and clipping
+  remain stable through preview, commit, Undo, and Redo.
+- Frame clipping follows transient geometry during the held gesture: pixels are
+  hidden or revealed immediately as they cross the Frame boundary.
 - Selection frames stay aligned with visible artwork.
 - Corner handles resize.
 - Rotation starts from the corner perimeter.
@@ -31,6 +36,10 @@ Transforms move, resize, and rotate selected objects.
   object during the gesture; nested descendants receive durable transform
   updates only when the gesture commits.
 - Artboards can resize but do not rotate.
+- Raster resize keeps its transformed preview after input ends until one
+  asynchronous backing-plane resample publishes at integer dimensions.
+- Holding Shift while dragging a Raster resize handle preserves its aspect
+  ratio for that gesture, including when the Image dimensions lock is off.
 
 ## Feedback
 

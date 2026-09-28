@@ -379,6 +379,7 @@ export const createDocumentStoreActions = (set, resolveDefaultFont) => {
         pathEditingNodeId: null,
         pathEditingPoint: null,
         pathEditingPoints: [],
+        rasterCropSession: null,
         selectedNodeIds: [],
         viewport: state.viewport,
       }));

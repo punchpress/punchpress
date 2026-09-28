@@ -1,15 +1,27 @@
 // @ts-nocheck TODO(typecheck-baseline): raster runtime exempt — in-flight redesign owns these files
 export const DEFAULT_BRUSH_SETTINGS = {
+  angle: 0,
+  angleJitter: 0,
   color: "#111111",
+  flow: 1,
   hardness: 1,
   opacity: 1,
+  roundness: 1,
+  scatter: 0,
+  seed: 1,
   size: 24,
+  sizeJitter: 0,
+  smoothing: 0.1,
   spacing: 0,
+  tip: { kind: "round" },
 };
 
+const BRUSH_ANGLE_RANGE = { max: 180, min: -180 };
 const BRUSH_SIZE_RANGE = { max: 500, min: 1 };
+const BRUSH_ROUNDNESS_RANGE = { max: 1, min: 0.01 };
 const BRUSH_UNIT_RANGE = { max: 1, min: 0 };
 const BRUSH_SPACING_RANGE = { max: 2, min: 0 };
+const BRUSH_SEED_RANGE = { max: 0xffff_ffff, min: 0 };
 
 const HEX_COLOR_REGEX = /^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 const RGB_COLOR_REGEX = /^rgba?\(\s*([^)]+)\)$/i;
@@ -112,8 +124,32 @@ export const normalizeBrushSettings = (
 ) => {
   const nextSettings = { ...baseSettings };
 
+  if (Object.hasOwn(patch, "angle")) {
+    nextSettings.angle = normalizeBrushNumber(
+      patch.angle,
+      BRUSH_ANGLE_RANGE,
+      baseSettings.angle
+    );
+  }
+
+  if (Object.hasOwn(patch, "angleJitter")) {
+    nextSettings.angleJitter = normalizeBrushNumber(
+      patch.angleJitter,
+      BRUSH_UNIT_RANGE,
+      baseSettings.angleJitter
+    );
+  }
+
   if (Object.hasOwn(patch, "color")) {
     nextSettings.color = normalizeBrushColor(patch.color, baseSettings.color);
+  }
+
+  if (Object.hasOwn(patch, "flow")) {
+    nextSettings.flow = normalizeBrushNumber(
+      patch.flow,
+      BRUSH_UNIT_RANGE,
+      baseSettings.flow
+    );
   }
 
   if (Object.hasOwn(patch, "hardness")) {
@@ -132,6 +168,32 @@ export const normalizeBrushSettings = (
     );
   }
 
+  if (Object.hasOwn(patch, "roundness")) {
+    nextSettings.roundness = normalizeBrushNumber(
+      patch.roundness,
+      BRUSH_ROUNDNESS_RANGE,
+      baseSettings.roundness
+    );
+  }
+
+  if (Object.hasOwn(patch, "scatter")) {
+    nextSettings.scatter = normalizeBrushNumber(
+      patch.scatter,
+      BRUSH_UNIT_RANGE,
+      baseSettings.scatter
+    );
+  }
+
+  if (Object.hasOwn(patch, "seed")) {
+    nextSettings.seed = Math.round(
+      normalizeBrushNumber(
+        patch.seed,
+        BRUSH_SEED_RANGE,
+        baseSettings.seed
+      )
+    );
+  }
+
   if (Object.hasOwn(patch, "size")) {
     nextSettings.size = normalizeBrushNumber(
       patch.size,
@@ -146,6 +208,36 @@ export const normalizeBrushSettings = (
       BRUSH_SPACING_RANGE,
       baseSettings.spacing
     );
+  }
+
+  if (Object.hasOwn(patch, "sizeJitter")) {
+    nextSettings.sizeJitter = normalizeBrushNumber(
+      patch.sizeJitter,
+      BRUSH_UNIT_RANGE,
+      baseSettings.sizeJitter
+    );
+  }
+
+  if (Object.hasOwn(patch, "smoothing")) {
+    nextSettings.smoothing = normalizeBrushNumber(
+      patch.smoothing,
+      BRUSH_UNIT_RANGE,
+      baseSettings.smoothing
+    );
+  }
+
+  if (Object.hasOwn(patch, "tip")) {
+    const tip = patch.tip;
+
+    if (tip?.kind === "round") {
+      nextSettings.tip = { kind: "round" };
+    } else if (
+      tip?.kind === "sampled" &&
+      typeof tip.sampleId === "string" &&
+      tip.sampleId.length > 0
+    ) {
+      nextSettings.tip = { kind: "sampled", sampleId: tip.sampleId };
+    }
   }
 
   return nextSettings;

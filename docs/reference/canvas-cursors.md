@@ -25,3 +25,6 @@ Cursor state is semantic and resolved at the canvas boundary.
 - Node components do not own tool-specific cursor props.
 - Overlay handles expose semantic cursor tokens.
 - Engine geometry does not carry raw CSS cursor strings.
+- Brush and Eraser show the footprint only for a valid finite Raster target.
+  Invalid Raster targets use the disabled cursor and do not show sentence
+  errors.

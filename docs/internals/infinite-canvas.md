@@ -12,7 +12,8 @@ The web canvas integrates `react-infinite-viewer` with engine viewport state.
 ## Owners
 
 - React owns viewer refs, DOM host refs, pointer events, and canvas coordinate
-  conversion.
+  conversion. It also prevents browser page zoom for pinch-wheel events inside
+  the editor shell.
 - Engine owns viewport state, zoom helpers, pending focus, and tool dispatch.
 - Canvas components render artboards, nodes, overlays, text editor, toolbar, and
   grid in the current viewport.
@@ -21,6 +22,8 @@ The web canvas integrates `react-infinite-viewer` with engine viewport state.
 
 - Convert client coordinates to canvas/world coordinates before engine dispatch.
 - Viewport pan and zoom are session state.
+- Discrete zoom commands publish immediately. Scrub zoom keeps live viewer
+  state transient during pointer movement and publishes once at pointer release.
 - First-add focus may schedule viewport movement; ordinary later placement does
   not.
 - Stage bounds are an interaction surface, not document size.

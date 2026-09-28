@@ -92,6 +92,7 @@ export const getLayerRow = (editor, nodeId) => {
     isFrontmost: layerMeta.isFrontmost,
     isEmpty: isEmptyNode(node),
     isGroup: isGroupNode(node),
+    isActive: editor.activeLayerId === node.id,
     isSelected: editor.isSelected(node.id),
     isVector: isVectorNode(node),
     isVisible,
@@ -607,6 +608,11 @@ const getVectorChildPathWorldFrame = (editor, nodeId) => {
   const node = editor.getNode(nodeId);
   const parentNode = node?.parentId ? editor.getNode(node.parentId) : null;
   const worldPoints = getVectorChildPathWorldPoints(editor, nodeId);
+
+  if (worldPoints.length === 0) {
+    return null;
+  }
+
   const preferredRotation =
     node && parentNode
       ? normalizeSelectionFrameRotation(

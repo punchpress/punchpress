@@ -1,6 +1,7 @@
 import { PERF_COUNTERS } from "@punchpress/engine";
 import { useEffect, useState } from "react";
 import { useEditor } from "../../../editor-react/use-editor";
+import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
 import { CanvasSelectionForeground } from "./selection/selection-foreground";
 import { CanvasSelectionMarquee } from "./selection/selection-marquee";
@@ -15,6 +16,9 @@ import {
 export const CanvasHostOverlays = () => {
   usePerformanceRenderCounter(PERF_COUNTERS.renderCanvasOverlay);
   const editor = useEditor();
+  const isRasterCropping = useEditorValue((_, state) =>
+    Boolean(state.rasterCropSession)
+  );
   const [viewportRevision, setViewportRevision] = useState(0);
 
   useEffect(() => {
@@ -29,6 +33,10 @@ export const CanvasHostOverlays = () => {
       }
     };
   }, [editor]);
+
+  if (isRasterCropping) {
+    return null;
+  }
 
   return (
     <>

@@ -5,6 +5,7 @@ import {
   areCornerRadiiEquivalent,
   clampCornerRadius,
 } from "../primitives/corner-radius";
+import { getScaledImageNodeUpdate } from "../primitives/group-resize";
 import {
   getNodeTransformForPinnedWorldPoint,
   getNodeWorldPoint,
@@ -65,9 +66,14 @@ const setImageDimensionFromCenter = (node, propertyId, value) => {
     x: bounds.width / 2,
     y: bounds.height / 2,
   });
+  const nodeUpdate = getScaledImageNodeUpdate(
+    node,
+    propertyId === "width" ? value / node.width : 1,
+    propertyId === "height" ? value / node.height : 1
+  );
   const nextNode = {
     ...node,
-    [propertyId]: value,
+    ...nodeUpdate,
   };
   const nextBounds = getImageNodeBounds(nextNode);
   const transform = getNodeTransformForPinnedWorldPoint(
@@ -81,7 +87,7 @@ const setImageDimensionFromCenter = (node, propertyId, value) => {
   );
 
   return {
-    [propertyId]: value,
+    ...nodeUpdate,
     transform,
   };
 };

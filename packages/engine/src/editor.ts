@@ -20,6 +20,7 @@ import {
   getDocument as getEditorDocument,
   loadDocument as loadEditorDocument,
   serializeDocument as serializeEditorDocument,
+  serializeDocumentAsync as serializeEditorDocumentAsync,
 } from "./document/document-actions";
 import {
   bringToFront as bringEditorToFront,
@@ -129,6 +130,20 @@ import {
   applyDocumentChange,
   createDocumentChange,
 } from "./history/document-change";
+import {
+  cancelRasterCrop as cancelEditorRasterCrop,
+  commitRasterCrop as commitEditorRasterCrop,
+  getRasterCropPreviewNode as getEditorRasterCropPreviewNode,
+  startRasterCrop as startEditorRasterCrop,
+  updateRasterCrop as updateEditorRasterCrop,
+} from "./raster/crop";
+import {
+  beginRasterResize as beginEditorRasterResize,
+  cancelRasterResize as cancelEditorRasterResize,
+  commitRasterResize as commitEditorRasterResize,
+  resizeRaster as resizeEditorRaster,
+  updateRasterResize as updateEditorRasterResize,
+} from "./raster/resize";
 import {
   handleCanvasShortcutKeyDown as handleEditorCanvasShortcutKeyDown,
   handleEditingShortcutKeyDown as handleEditorEditingShortcutKeyDown,
@@ -241,6 +256,13 @@ import { getSelectionBounds as getEditorSelectionBounds } from "./selection/sele
 import { createEditorStore } from "./state/store/create-editor-store";
 import { HandTool } from "./tools/hand-tool";
 import { BrushTool } from "./tools/brush-tool";
+import { RasterStrokeRuntime } from "./tools/raster-stroke-runtime";
+import {
+  getRasterSurfaceBounds as getEditorRasterSurfaceBounds,
+  getRasterSurfacePixelSize as getEditorRasterSurfacePixelSize,
+  getRasterTargetState as getEditorRasterTargetState,
+  getRasterWritableBounds as getEditorRasterWritableBounds,
+} from "./tools/brush-target";
 import { NodeTool } from "./tools/node-tool";
 import { PenTool } from "./tools/pen-tool";
 import { PointerTool } from "./tools/pointer-tool";
@@ -279,6 +301,7 @@ import {
   scheduleViewportFocus as scheduleEditorViewportFocus,
   zoomIn as zoomEditorIn,
   zoomOut as zoomEditorOut,
+  zoomTo as zoomEditorTo,
 } from "./viewport/viewport-focus";
 import {
   getViewportCenter as getEditorViewportCenter,
@@ -325,14 +348,21 @@ export interface Editor {
   tools: any;
   unsubscribe: any;
   vectorRenderSurfaces: any;
+  rasterSurface: any;
+  rasterAspectRatioLocks: Map<string, boolean>;
+  rasterResizeOperations: Map<string, symbol>;
+  rasterResizeStates: Map<string, any>;
+  rasterStrokeRuntime: RasterStrokeRuntime;
   viewerRef: any;
   viewportFocusRequest: any;
   viewportInteracting: any;
+  viewportPresentationListeners: any;
+  viewportPresentationRevision: any;
   viewportState: any;
 }
 
 export class Editor {
-  constructor({ accent = UI_ACCENT, initialZoom = 1 } = {}) {
+  constructor({ accent = UI_ACCENT, initialZoom = 1, rasterSurface = null } = {}) {
     this.accent = accent;
     this.availableFonts = [];
     this.defaultFont = createLocalFontDescriptor(DEFAULT_LOCAL_FONT);
@@ -357,11 +387,16 @@ export class Editor {
     this.geometry = new GeometryManager(this.fonts);
     this.nodeTree = new NodeTreeManager();
     this.vectorRenderSurfaces = new VectorRenderSurfaceManager();
+    this.rasterSurface = rasterSurface;
+    this.rasterAspectRatioLocks = new Map();
+    this.rasterResizeOperations = new Map();
+    this.rasterResizeStates = new Map();
+    this.rasterStrokeRuntime = new RasterStrokeRuntime(this);
     // @ts-expect-error TODO(typecheck-baseline): Map infers narrowest tool overload; union is correct at runtime
     this.tools = new Map([
       ["pointer", new PointerTool(this)],
-      ["brush", new BrushTool(this, "paint")],
-      ["eraser", new BrushTool(this, "erase")],
+      ["brush", new BrushTool(this, this.rasterStrokeRuntime, "paint")],
+      ["eraser", new BrushTool(this, this.rasterStrokeRuntime, "erase")],
       ["node", new NodeTool(this)],
       ["hand", new HandTool(this)],
       ["pen", new PenTool(this)],
@@ -382,6 +417,8 @@ export class Editor {
     this.selectionColorPreviewState = null;
     this.placementSurfaceListeners = new Set();
     this.viewportInteracting = false;
+    this.viewportPresentationListeners = new Set();
+    this.viewportPresentationRevision = 0;
     this.history = new HistoryManager({
       applyChange: applyDocumentChange,
       applyState: (nodes) => {
@@ -613,6 +650,14 @@ export class Editor {
     return [...this.getChildNodeIds(ROOT_PARENT_ID)].reverse();
   }
 
+  get activeLayer() {
+    return this.getNode(this.activeLayerId);
+  }
+
+  get activeLayerId() {
+    return this.getState().activeLayerId;
+  }
+
   get selectedNode() {
     return this.getNode(this.selectedNodeId);
   }
@@ -795,6 +840,10 @@ export class Editor {
     return isArtboardNode(this.getNode(nodeId));
   }
 
+  isActiveLayer(nodeId) {
+    return Boolean(nodeId && this.activeLayerId === nodeId);
+  }
+
   isNodeEffectivelyVisible(nodeId) {
     const node = this.getNode(nodeId);
     if (!node || node.visible === false) {
@@ -858,6 +907,44 @@ export class Editor {
 
   getNodeResizeMode(nodeId) {
     return getEditorNodeResizeMode(this, nodeId);
+  }
+
+  isRasterAspectRatioLocked(nodeId) {
+    return this.rasterAspectRatioLocks.get(nodeId) ?? true;
+  }
+
+  setRasterAspectRatioLocked(nodeId, locked) {
+    if (this.getNode(nodeId)?.type !== "image") {
+      return false;
+    }
+
+    this.rasterAspectRatioLocks.set(nodeId, Boolean(locked));
+    this.notifyInteractionPreviewChanged();
+    return true;
+  }
+
+  getRasterResizeState(nodeId) {
+    return this.rasterResizeStates.get(nodeId) ?? null;
+  }
+
+  resizeRaster(nodeId, size) {
+    return resizeEditorRaster(this, nodeId, size);
+  }
+
+  beginRasterResize(nodeId) {
+    return beginEditorRasterResize(this, nodeId);
+  }
+
+  updateRasterResize(session, size) {
+    return updateEditorRasterResize(this, session, size);
+  }
+
+  commitRasterResize(session) {
+    return commitEditorRasterResize(this, session);
+  }
+
+  cancelRasterResize(nodeId = undefined) {
+    cancelEditorRasterResize(this, nodeId);
   }
 
   getNodeRotateMode(nodeId) {
@@ -1052,23 +1139,68 @@ export class Editor {
     return this.tools.get(toolId)?.getSettings?.() || null;
   }
 
+  getBrushToolPresetId(toolId = this.activeTool) {
+    if (!(toolId === "brush" || toolId === "eraser")) {
+      return null;
+    }
+
+    const state = this.getState();
+
+    return toolId === "eraser"
+      ? state.eraserPresetId
+      : state.brushPresetId;
+  }
+
+  getRasterTargetState(input) {
+    return getEditorRasterTargetState(this, input);
+  }
+
+  getRasterWritableBounds(nodeId) {
+    return getEditorRasterWritableBounds(this, this.getNode(nodeId));
+  }
+
+  getRasterSurfaceBounds(nodeId) {
+    return getEditorRasterSurfaceBounds(this, this.getNode(nodeId));
+  }
+
+  getRasterSurfacePixelSize(nodeId) {
+    return getEditorRasterSurfacePixelSize(this, this.getNode(nodeId));
+  }
+
+  get rasterCropSession() {
+    return this.getState().rasterCropSession;
+  }
+
+  startCrop(nodeId = this.selectedNodeId) {
+    return startEditorRasterCrop(this, nodeId);
+  }
+
+  updateCrop(rect) {
+    return updateEditorRasterCrop(this, rect);
+  }
+
+  commitCrop() {
+    return commitEditorRasterCrop(this);
+  }
+
+  cancelCrop() {
+    return cancelEditorRasterCrop(this);
+  }
+
+  getRasterCropPreviewNode() {
+    return getEditorRasterCropPreviewNode(this);
+  }
+
   setBrushSettings(patch, toolId) {
     this.getState().setBrushSettings(patch, toolId);
   }
 
-  getBrushWorkingSurfaceStates() {
-    return [
-      ...(this.tools.get("brush")?.getWorkingSurfaceStates?.() || []),
-      ...(this.tools.get("eraser")?.getWorkingSurfaceStates?.() || []),
-    ];
+  selectBrushPreset(presetId, toolId) {
+    this.getState().selectBrushPreset(presetId, toolId);
   }
 
-  getBrushWorkingSurfaceStateForNode(nodeId) {
-    return (
-      this.tools.get("brush")?.getWorkingSurfaceStateForNode?.(nodeId) ||
-      this.tools.get("eraser")?.getWorkingSurfaceStateForNode?.(nodeId) ||
-      null
-    );
+  cancelRasterStroke() {
+    this.rasterStrokeRuntime.cancelActiveStroke();
   }
 
   getSelectionFrameKey(nodeIds = this.selectedNodeIds) {
@@ -1128,10 +1260,12 @@ export class Editor {
   }
 
   clearSelection() {
+    this.commitCrop();
     clearEditorSelection(this);
   }
 
   clearSelectionPreservingFocus() {
+    this.commitCrop();
     clearEditorSelectionPreservingFocus(this);
   }
 
@@ -1144,6 +1278,9 @@ export class Editor {
   }
 
   deleteSelected() {
+    for (const nodeId of this.selectedNodeIds) {
+      this.cancelRasterResize(nodeId);
+    }
     deleteEditorSelected(this);
   }
 
@@ -1181,6 +1318,7 @@ export class Editor {
   }
 
   deleteNode(nodeId) {
+    this.cancelRasterResize(nodeId);
     deleteEditorNode(this, nodeId);
   }
 
@@ -1257,14 +1395,29 @@ export class Editor {
   }
 
   select(nodeId) {
+    if (
+      this.rasterCropSession &&
+      (this.selectedNodeIds.length !== 1 || this.selectedNodeId !== nodeId)
+    ) {
+      this.commitCrop();
+    }
     selectEditorNode(this, nodeId);
   }
 
   setSelectedNodes(nodeIds) {
+    if (
+      this.rasterCropSession &&
+      (nodeIds.length !== 1 || nodeIds[0] !== this.selectedNodeId)
+    ) {
+      this.commitCrop();
+    }
     setEditorSelectedNodes(this, nodeIds);
   }
 
   toggleSelection(nodeId) {
+    if (this.rasterCropSession) {
+      this.commitCrop();
+    }
     toggleEditorSelection(this, nodeId);
   }
 
@@ -1273,6 +1426,9 @@ export class Editor {
   }
 
   deselect(nodeId) {
+    if (this.rasterCropSession) {
+      this.commitCrop();
+    }
     deselectEditorNode(this, nodeId);
   }
 
@@ -1357,6 +1513,26 @@ export class Editor {
     }
 
     this.notifyInteractionPreviewChanged();
+  }
+
+  notifyViewportPresentationChanged() {
+    this.viewportPresentationRevision += 1;
+
+    for (const listener of this.viewportPresentationListeners) {
+      listener();
+    }
+  }
+
+  getViewportPresentationRevision() {
+    return this.viewportPresentationRevision;
+  }
+
+  subscribeViewportPresentation(listener) {
+    this.viewportPresentationListeners.add(listener);
+
+    return () => {
+      this.viewportPresentationListeners.delete(listener);
+    };
   }
 
   notifyInteractionPreviewChanged() {
@@ -1454,6 +1630,12 @@ export class Editor {
   }
 
   setActiveTool(toolId) {
+    if (this.rasterCropSession && toolId !== this.activeTool) {
+      this.commitCrop();
+    }
+    if (toolId === "hand" && toolId !== this.activeTool) {
+      this.setViewportInteracting(false);
+    }
     setEditorActiveTool(this, toolId);
   }
 
@@ -1911,10 +2093,15 @@ export class Editor {
   }
 
   loadDocument(contents) {
+    this.cancelRasterResize();
+    this.rasterAspectRatioLocks.clear();
     return loadEditorDocument(this, contents);
   }
 
   newDocument() {
+    this.cancelRasterResize();
+    this.rasterAspectRatioLocks.clear();
+    this.cancelRasterStroke();
     createNewEditorDocument(this);
   }
 
@@ -1946,16 +2133,24 @@ export class Editor {
     return serializeEditorDocument(this);
   }
 
-  markDocumentSaved(snapshot = this.serializeDocument()) {
-    this.history.markSaved(snapshot);
+  async serializeDocumentAsync() {
+    return await serializeEditorDocumentAsync(this);
+  }
+
+  createDocumentSaveCheckpoint() {
+    return this.history.captureSaveCheckpoint();
+  }
+
+  markDocumentSaved(checkpoint?) {
+    this.history.markSaved(checkpoint);
   }
 
   markHistoryStep(name) {
     return this.history.mark(name);
   }
 
-  commitHistoryStep(mark) {
-    return this.history.commitMark(mark);
+  commitHistoryStep(mark, effect = null) {
+    return this.history.commitMark(mark, effect);
   }
 
   cancelGesture(mark) {
@@ -1969,6 +2164,8 @@ export class Editor {
 
   redo() {
     const historyTool = this.currentTool;
+    this.cancelRasterResize();
+    this.cancelRasterStroke();
     const didRedo = this.history.redo();
 
     if (didRedo) {
@@ -1980,6 +2177,8 @@ export class Editor {
 
   undo() {
     const historyTool = this.currentTool;
+    this.cancelRasterResize();
+    this.cancelRasterStroke();
     const didUndo = this.history.undo();
 
     if (didUndo) {
@@ -2020,6 +2219,10 @@ export class Editor {
 
   zoomOut() {
     zoomEditorOut(this);
+  }
+
+  zoomTo(zoom) {
+    return zoomEditorTo(this, zoom);
   }
 
   getViewportCenter() {

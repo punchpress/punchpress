@@ -28,7 +28,8 @@ export const saveDocumentTab = async ({
   updateIdentity,
   writeFile = savePunchDocumentFile,
 }: SaveDocumentTabOptions) => {
-  const snapshot = tab.editor.serializeDocument();
+  const checkpoint = tab.editor.createDocumentSaveCheckpoint();
+  const snapshot = await tab.editor.serializeDocumentAsync();
   const result = await writeFile(
     snapshot,
     tab.baseName,
@@ -44,7 +45,7 @@ export const saveDocumentTab = async ({
     baseName: result.fileName ? getDocumentBaseName(result.fileName) : null,
     fileHandle: result.fileHandle || tab.fileHandle,
   });
-  tab.editor.markDocumentSaved(snapshot);
+  tab.editor.markDocumentSaved(checkpoint);
 
   return { fileName: result.fileName };
 };

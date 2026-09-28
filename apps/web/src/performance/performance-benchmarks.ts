@@ -1,5 +1,4 @@
 import { compoundVectorDragBenchmark } from "./benchmarks/compound-vector-drag-benchmark";
-import { hugeRasterViewportBenchmark } from "./benchmarks/huge-raster-viewport-benchmark";
 import { idleSoakBenchmark } from "./benchmarks/idle-soak-benchmark";
 import {
   largeSvgDeselectBenchmark,
@@ -13,6 +12,19 @@ import {
   largeSvgTextDeselectBenchmark,
   largeSvgViewportBenchmark,
 } from "./benchmarks/large-svg-benchmark";
+import {
+  rasterCanvas2dBenchmark,
+  rasterCanvas2dExtremeDiagonalBenchmark,
+  rasterCanvas2dSquareBenchmark,
+  rasterHighZoomBenchmark,
+  rasterHighZoomBrushBenchmark,
+  rasterLargestSupportedPlaneBenchmark,
+  rasterResizeBenchmark,
+} from "./benchmarks/raster-canvas2d-benchmark";
+import {
+  rasterFrameBrushBenchmark,
+  rasterFrameBrushStablePlaneBenchmark,
+} from "./benchmarks/raster-frame-brush-benchmark";
 import { shapeDragBenchmarkLarge } from "./benchmarks/square-drag-benchmark";
 import {
   textDragBenchmark,
@@ -36,7 +48,15 @@ export const performanceBenchmarks = [
   largeSvgTextDeselectBenchmark,
   largeSvgPathPointDragBenchmark,
   simpleVectorPathPointDragBenchmark,
-  hugeRasterViewportBenchmark,
+  rasterCanvas2dBenchmark,
+  rasterCanvas2dExtremeDiagonalBenchmark,
+  rasterCanvas2dSquareBenchmark,
+  rasterResizeBenchmark,
+  rasterFrameBrushBenchmark,
+  rasterFrameBrushStablePlaneBenchmark,
+  rasterHighZoomBrushBenchmark,
+  rasterHighZoomBenchmark,
+  rasterLargestSupportedPlaneBenchmark,
   compoundVectorDragBenchmark,
   idleSoakBenchmark,
   shapeDragBenchmarkLarge,

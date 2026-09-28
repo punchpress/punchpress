@@ -14,9 +14,10 @@ describe("Editor history", () => {
 
     editor.addShapeNode({ x: 100, y: 100 });
     const savedSnapshot = editor.serializeDocument();
+    const checkpoint = editor.createDocumentSaveCheckpoint();
 
     editor.addShapeNode({ x: 200, y: 200 });
-    editor.markDocumentSaved(savedSnapshot);
+    editor.markDocumentSaved(checkpoint);
 
     expect(editor.isDirty).toBe(true);
     expect(editor.serializeDocument()).not.toBe(savedSnapshot);
@@ -26,6 +27,20 @@ describe("Editor history", () => {
 
     editor.redo();
     expect(editor.isDirty).toBe(true);
+  });
+
+  test("marks the serialized checkpoint saved without clearing a newer edit", () => {
+    const editor = createEditor();
+
+    createTextNode(editor, { text: "before save", x: 10, y: 10 });
+    const checkpoint = editor.createDocumentSaveCheckpoint();
+    editor.moveSelectionBy({ x: 20, y: 0 });
+
+    editor.markDocumentSaved(checkpoint);
+
+    expect(editor.isDirty).toBe(true);
+    expect(editor.undo()).toBe(true);
+    expect(editor.isDirty).toBe(false);
   });
 
   test("undo and redo restore a created node", () => {

@@ -212,6 +212,29 @@ describe("Editor.loadDocument", () => {
     expect(editor.selectedNodeId).toBeNull();
   });
 
+  test("failed document validation preserves the active Raster Stroke", () => {
+    const editor = new Editor();
+    let invalidationCount = 0;
+
+    editor.loadDocument(createDocument("first-node", "FIRST", AVAILABLE_FONT));
+    editor.rasterStrokeRuntime.cancelActiveStroke = () => {
+      invalidationCount += 1;
+    };
+
+    expect(() => editor.loadDocument("{not valid JSON")).toThrow(
+      "Document is not valid JSON."
+    );
+    expect(editor.getNode("first-node")?.type).toBe("text");
+    expect(invalidationCount).toBe(0);
+
+    editor.loadDocument(
+      createDocument("second-node", "SECOND", AVAILABLE_FONT)
+    );
+
+    expect(editor.getNode("second-node")?.type).toBe("text");
+    expect(invalidationCount).toBe(1);
+  });
+
   test("keeps a missing font descriptor when a ready catalog lacks it", () => {
     const editor = new Editor();
     editor.applyLocalFontCatalog({

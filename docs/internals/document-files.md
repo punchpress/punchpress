@@ -23,10 +23,11 @@ Browser file-backed tabs compare `FileSystemFileHandle.isSameEntry()` when a
 native handle is available. File names are display labels, not identity keys;
 browser opens without a handle cannot be deduplicated.
 
-The save command serializes the tab's editor before writing. On success it
-marks that serialized snapshot as the saved baseline for the same editor; a
-later edit remains dirty, including after Save As changes the tab's file
-identity. A canceled or failed write does not change the baseline or identity.
+The save command captures a history checkpoint before asynchronously serializing
+the tab's editor, including resident raster pixels. On success it marks that
+checkpoint saved for the same editor; edits made during serialization or writing
+remain dirty, including after Save As changes the tab's file identity. A canceled
+or failed write does not change the baseline or identity.
 
 ## Boundaries
 

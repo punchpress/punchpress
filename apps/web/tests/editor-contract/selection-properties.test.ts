@@ -384,6 +384,8 @@ describe("Editor selection properties", () => {
 
     expect(afterHeightNode.width).toBe(240);
     expect(afterHeightNode.height).toBe(240);
+    expect(afterHeightNode.baseWidth).toBe(240);
+    expect(afterHeightNode.baseHeight).toBe(240);
     expect(afterHeightNode.transform.rotation).toBe(32);
     expect(afterHeightCenter.x).toBeCloseTo(beforeCenter.x, 2);
     expect(afterHeightCenter.y).toBeCloseTo(beforeCenter.y, 2);
@@ -397,6 +399,8 @@ describe("Editor selection properties", () => {
 
     expect(afterWidthNode.width).toBe(360);
     expect(afterWidthNode.height).toBe(240);
+    expect(afterWidthNode.baseWidth).toBe(360);
+    expect(afterWidthNode.baseHeight).toBe(240);
     expect(afterWidthNode.transform.rotation).toBe(32);
     expect(afterWidthCenter.x).toBeCloseTo(beforeCenter.x, 2);
     expect(afterWidthCenter.y).toBeCloseTo(beforeCenter.y, 2);

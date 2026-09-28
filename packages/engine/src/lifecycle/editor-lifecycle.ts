@@ -1,4 +1,5 @@
 export const mountEditor = (editor) => {
+  editor.rasterSurface?.retainTargets?.(editor.nodes.map((node) => node.id));
   editor.preloadFonts();
   editor.initializeLocalFonts().catch((error) => {
     editor
@@ -20,6 +21,9 @@ export const mountEditor = (editor) => {
       }
 
       previousNodes = state.nodes;
+      editor.rasterSurface?.retainTargets?.(
+        state.nodes.map((node) => node.id)
+      );
       editor.preloadFonts(state.nodes);
     });
   }

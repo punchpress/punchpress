@@ -1,7 +1,7 @@
 ---
-summary: Defines PunchPress Brush and Eraser tool behavior, empty-layer materialization, brush options, and raster asset commits.
+summary: Defines PunchPress Brush, Eraser, Raster targeting, bounds, materialization, and Crop behavior.
 read_when:
-  - changing Brush or Eraser tool behavior, brush options, empty-layer materialization, or raster layer painting
+  - changing Brush, Eraser, or Crop behavior, Raster targeting, bounds, materialization, or painting
   - deciding how raster tools appear in the action bar and how they create or target raster content
   - debugging a brush stroke that applies to the wrong layer, creates the wrong source kind, or writes the wrong raster asset
 ---
@@ -26,12 +26,38 @@ undoable action.
   layer as raster content.
 - **Bounded new raster layers.** Brush-created layers start with the rectangle
   that contains painted pixels. Strokes expand the layer when needed.
-- **Stable existing raster planes.** Existing image layers keep their width,
-  height, transform, rotation, and base raster plane while Brush and Eraser
-  update pixels.
-- **Auto layer creation.** If Brush starts with no compatible selected layer,
-  PunchPress creates a new layer and materializes it as raster content on the
-  first stroke.
+- **Distinct Raster bounds.** Content bounds describe the visible layer,
+  writable bounds describe where Brush may add pixels, and pixel allocation
+  describes the full resident Canvas plane. Tight content does not reduce
+  writable bounds.
+- **Frame-owned writable canvas.** A Raster nested anywhere in a Frame can
+  paint throughout that Frame. Strokes outside the Frame are no-ops, and
+  transformed child overflow remains clipped to the Frame.
+- **Finite standalone canvas.** Detaching a Raster from a Frame retains the
+  former Frame-sized writable canvas. Imported standalone images use their
+  image canvas. Neither standalone canvas grows from Brush input.
+- **Ordinary resize.** Width and Height are linked by default. Handles and
+  dimension fields preview transformed content live, then resample the retained
+  Raster once to integer pixel dimensions on commit. Unlocking permits
+  independent width and height; holding Shift during a handle drag temporarily
+  preserves the source aspect ratio. The finite Raster limits remain 16,384
+  pixels per dimension and 100,000,000 pixels total. Crop is the only
+  bounds-only image resize.
+- **Finite auto creation.** An active visible, writable Frame is a finite
+  insertion target. Brush creates a Raster only when a gesture first intersects
+  that Frame.
+- **Crop.** Crop changes a Raster's visible and writable canvas without
+  deleting retained pixels. Expansion adds transparent paintable area.
+- **Pixel presentation.** Raster zoom is presentation-only. Browser
+  interpolation stays smooth while either source-pixel axis is small or
+  minified. Once both axes reach `2` logical screen pixels per source pixel,
+  imported and resident Brush surfaces use pixel-preserving sampling.
+- **Pixel grid.** A non-exporting grid appears once both target pixel axes
+  exceed `5` logical screen pixels. This is above `500%` for an untransformed
+  Frame; standalone Raster transforms and intrinsic sample density affect the
+  threshold. Crossing it changes only the overlay. Grid strokes keep a thin,
+  screen-constant weight while zooming. Frame-owned Raster growth never moves
+  the Frame-local grid.
 - **Export.** Export preserves transparency when the chosen format supports it
   and flattens against a chosen background when it does not.
 
@@ -53,14 +79,25 @@ not action bar items and not selected-layer properties.
 
 | Option | Behavior |
 | --- | --- |
+| Preset | Loads one immutable built-in into a temporary working copy. |
 | Brush color | Controls painted pixel color. |
-| Brush size | Controls brush radius. |
+| Brush size | Controls Dab diameter in document pixels. |
 | Brush opacity | Controls painted pixel opacity. |
+| Flow | Controls opacity applied by each Dab. |
 | Hardness | Controls brush edge falloff. |
 | Spacing | Controls the distance between brush dabs. |
+| Angle | Rotates the generated or sampled tip. |
+| Roundness | Scales the tip's minor axis. |
+| Smoothing | Smooths the document-space input path. |
+| Scatter | Offsets Dabs around the sampled path. |
+| Size jitter | Seeded variation in Dab size. |
+| Angle jitter | Seeded variation in Dab angle. |
 
-Eraser uses the same Size, Opacity, Hardness, and Spacing controls as Brush.
-Brush color is hidden for Eraser.
+PunchPress ships Hard Round, Soft Round, Ink, Pencil, Marker, Chalk, Grain, and
+Pixel. Selecting a built-in replaces that tool's temporary working copy with
+the preset defaults. Editing a control never mutates the built-in. Brush and
+Eraser remember independent preset choices and working settings; Brush color is
+hidden for Eraser.
 
 ## Tool Rules
 
@@ -68,17 +105,39 @@ Brush color is hidden for Eraser.
   raster working surface while the pointer moves.
 - **Eraser stroke.** Dragging removes alpha from the current raster working
   surface using the same brush engine as Brush.
-- **Raster layer.** A brush stroke on a selected image node updates that node's
-  current raster asset, even when the stroke starts outside the node's current
-  trimmed bounds.
-- **Empty layer.** A brush stroke on an empty layer turns that layer into a
-  raster image node and writes the first stroke into its raster asset.
-- **No target.** A brush stroke with no compatible target creates a new layer,
-  materializes it as raster content, and writes the stroke.
+- **Active Raster.** One active visible, unlocked Raster is authoritative even
+  when transform selection is empty or the pointer starts over another layer.
+  The Stroke locks that target until release.
+- **Deferred intersection.** A gesture may begin outside its active Raster or
+  Frame. It stays allocation-free and produces no Dabs until its path first
+  intersects the finite target.
+- **Active empty layer.** Brush materializes one active visible empty layer
+  only after the gesture intersects its writable parent Frame.
+- **Active Frame.** Brush creates one Raster child at first intersection. The
+  Frame remains a container and insertion target, never a pixel buffer.
+- **Later Frame strokes.** Pointer-up does not replace the target. A later
+  Stroke elsewhere inside the Frame expands the same Raster's content even
+  when it starts outside that Raster's current visible bounds. Once the earlier
+  Stroke is durably committed, the later Stroke paints immediately in the
+  stable Frame-local plane; it does not wait for image encoding or renderer
+  handoff.
+- **Standalone bounds.** Brush clips a root Raster to its retained finite
+  writable canvas. Crop is the explicit operation for enlarging or reducing
+  that canvas.
+- **Outside-only gesture.** A gesture that never intersects the active finite
+  target creates no layer, pixels, allocation, or history step.
+- **Invalid target.** Empty documents and active vector, text, hidden, or
+  locked layers show a disabled Brush cursor and do nothing. Brush never
+  retargets from pixels or Frames under the pointer.
+- **Eraser.** Eraser requires an active writable Raster. It never creates,
+  materializes, or expands a Raster.
 - **Bounds.** Brush-created layers can grow from their painted pixels. Existing
-  raster layers preserve their intrinsic pixel plane; paint does not shrink the
-  layer to the latest stroke, and Eraser does not expand a layer by erasing
-  transparent space.
+  raster layers preserve their intrinsic pixel plane; Brush and Eraser do not
+  expand it. Crop expansion explicitly creates additional paintable area.
+- **Frame clipping.** Frame bounds clip Stroke input before Dab generation or
+  pixel work. Off-Frame drag distance does not allocate or paint.
+- **Resize exclusion.** Brush and Eraser cannot target a Raster while its
+  committed pixel plane is being resampled.
 
 ## Layer Materialization
 
@@ -87,21 +146,40 @@ The first content action sets the source kind.
 
 | First action | Result |
 | --- | --- |
-| Brush or Eraser stroke | Raster image layer. |
+| Brush Stroke whose path intersects the layer's Frame | Raster image layer. |
+| Eraser stroke | No materialization. |
 | Shape, Pen, or vector action | Vector content. |
 | Text action | Text content. |
 
 Empty layers can be renamed, reordered, hidden, selected, and deleted. Empty
 layers do not export.
 
+## Crop
+
+Crop is an isolated modal interaction for one selected Raster.
+
+- Drag side or corner handles to trim or extend the visible bounds. Drag inside
+  the bounds to move the fixed Crop rectangle.
+- Trim and extension are non-destructive. Hidden source pixels remain available
+  to a later expansion; newly exposed space is transparent.
+- Existing pixels remain stationary in the Workspace. Crop does not scale,
+  resample, rotate, or move source pixels.
+- Crop preview lifts normal Frame clipping so retained pixels outside the Frame
+  can guide the edit.
+- Done or Enter commits one logical change. Escape restores the exact starting
+  state. Clicking outside commits before the normal selection action continues.
+- Pan and zoom remain available. Bounds are limited to 16,384 units per
+  dimension and 100,000,000 square units.
+
 ## Out Of Scope
 
 - Background Eraser.
 - Rect Select, Lasso, Magic Wand, and selection delete.
-- Crop.
 - Masks.
 - Rasterize prompts for existing vector, text, group, or artboard content.
-- Imported brush presets, textured brushes, and Photoshop-style brush packs.
+- Imported brush presets, custom tip images, and Photoshop-style brush packs.
+- Saving, duplicating, renaming, deleting, or organizing custom presets.
+- Stylus pressure, tilt, twist, and rotation mappings.
 
 ## Related
 

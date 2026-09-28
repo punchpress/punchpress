@@ -7,7 +7,7 @@ const createEditor = () => {
 
   return {
     editor: {
-      serializeDocument: () => contents,
+      serializeDocumentAsync: async () => contents,
       store: {
         subscribe: (listener: () => void) => {
           listeners.add(listener);
@@ -46,6 +46,44 @@ test("flushing a pending Scratchpad edit writes the latest content once", async 
   autosave.dispose();
 });
 
+test("flush waits for async serialization and saves edits made during it", async () => {
+  const { editor, edit } = createEditor();
+  const saved: string[] = [];
+  let releaseSerialization!: () => void;
+  const serializationBlocked = new Promise<void>((resolve) => {
+    releaseSerialization = resolve;
+  });
+  let serializationStarted!: () => void;
+  const started = new Promise<void>((resolve) => {
+    serializationStarted = resolve;
+  });
+  let serializations = 0;
+  const serialize = editor.serializeDocumentAsync;
+  editor.serializeDocumentAsync = async () => {
+    serializations += 1;
+    const snapshot = await serialize();
+    if (serializations === 1) {
+      serializationStarted();
+      await serializationBlocked;
+    }
+    return snapshot;
+  };
+  const autosave = createScratchpadAutosave(editor, (contents) => {
+    saved.push(contents);
+    return Promise.resolve();
+  });
+
+  edit("first");
+  const flushing = autosave.flush();
+  await started;
+  edit("latest");
+  releaseSerialization();
+  await flushing;
+
+  expect(saved).toEqual(["first", "latest"]);
+  await autosave.dispose();
+});
+
 test("disposing with a pending timer flushes and removes the editor subscription", async () => {
   const { editor, edit, listenerCount } = createEditor();
   const saved: string[] = [];
@@ -72,6 +110,14 @@ test("a newer Scratchpad write waits for an earlier write", async () => {
   const saved: string[] = [];
   let finishFirstWrite: (() => void) | undefined;
   let finishLatestWrite: (() => void) | undefined;
+  let signalFirstWriteStarted!: () => void;
+  const firstWriteStarted = new Promise<void>((resolve) => {
+    signalFirstWriteStarted = resolve;
+  });
+  let signalLatestWriteStarted!: () => void;
+  const latestWriteStarted = new Promise<void>((resolve) => {
+    signalLatestWriteStarted = resolve;
+  });
   const autosave = createScratchpadAutosave(editor, (contents) => {
     if (contents === "first") {
       return new Promise<void>((resolve) => {
@@ -79,6 +125,7 @@ test("a newer Scratchpad write waits for an earlier write", async () => {
           saved.push(contents);
           resolve();
         };
+        signalFirstWriteStarted();
       });
     }
 
@@ -87,6 +134,7 @@ test("a newer Scratchpad write waits for an earlier write", async () => {
         saved.push(contents);
         resolve();
       };
+      signalLatestWriteStarted();
     });
   });
 
@@ -96,15 +144,13 @@ test("a newer Scratchpad write waits for an earlier write", async () => {
   firstWrite.then(() => {
     firstWriteSettled = true;
   });
-  await Promise.resolve();
+  await firstWriteStarted;
   edit("latest");
   const latestWrite = autosave.flush();
 
   expect(saved).toEqual([]);
   finishFirstWrite?.();
-  for (let index = 0; index < 5 && !finishLatestWrite; index += 1) {
-    await Promise.resolve();
-  }
+  await latestWriteStarted;
   expect(firstWriteSettled).toBe(false);
   expect(finishLatestWrite).toBeDefined();
   finishLatestWrite?.();

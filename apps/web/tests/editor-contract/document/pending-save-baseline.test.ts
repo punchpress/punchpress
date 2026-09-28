@@ -24,22 +24,67 @@ const deferredWrite = () => {
 };
 
 describe("pending document save", () => {
+  test("an edit during async serialization remains dirty after save", async () => {
+    const tab = createFileTab("serializing", "/tmp/serializing.punch");
+    const serialize = tab.editor.serializeDocumentAsync.bind(tab.editor);
+    let signalSerializationStarted!: () => void;
+    const serializationStarted = new Promise<void>((resolve) => {
+      signalSerializationStarted = resolve;
+    });
+    let releaseSerialization!: () => void;
+    const serializationBlocked = new Promise<void>((resolve) => {
+      releaseSerialization = resolve;
+    });
+    tab.editor.serializeDocumentAsync = async () => {
+      signalSerializationStarted();
+      await serializationBlocked;
+      return serialize();
+    };
+    let writtenSnapshot = "";
+
+    const saving = saveDocumentTab({
+      tab,
+      updateIdentity: () => undefined,
+      writeFile: (snapshot) => {
+        writtenSnapshot = snapshot;
+        return Promise.resolve({
+          canceled: false,
+          fileHandle: "/tmp/serializing.punch",
+          fileName: "serializing.punch",
+        });
+      },
+    });
+    await serializationStarted;
+    tab.editor.addShapeNode({ x: 200, y: 200 });
+    releaseSerialization();
+    await saving;
+
+    expect(writtenSnapshot).toBe(tab.editor.serializeDocument());
+    expect(tab.editor.isDirty).toBe(true);
+  });
+
   test("successful slow write saves only its snapshot and stays on its tab", async () => {
     const tab = createFileTab("first", "/tmp/first.punch");
     const otherTab = createFileTab("second", "/tmp/second.punch");
     const write = deferredWrite();
     const updatedTabs: string[] = [];
     let writtenSnapshot = "";
+    let signalWriteStarted!: () => void;
+    const writeStarted = new Promise<void>((resolve) => {
+      signalWriteStarted = resolve;
+    });
 
     const saving = saveDocumentTab({
       tab,
       updateIdentity: (id) => updatedTabs.push(id),
       writeFile: (snapshot) => {
         writtenSnapshot = snapshot;
+        signalWriteStarted();
         return write.promise;
       },
     });
 
+    await writeStarted;
     tab.editor.addShapeNode({ x: 200, y: 200 });
     const editedSnapshot = tab.editor.serializeDocument();
     otherTab.editor.addShapeNode({ x: 300, y: 300 });
@@ -70,12 +115,20 @@ describe("pending document save", () => {
     const tab = createFileTab("failed", "/tmp/failed.punch");
     const write = deferredWrite();
     const updatedTabs: string[] = [];
+    let signalWriteStarted!: () => void;
+    const writeStarted = new Promise<void>((resolve) => {
+      signalWriteStarted = resolve;
+    });
     const saving = saveDocumentTab({
       tab,
       updateIdentity: (id) => updatedTabs.push(id),
-      writeFile: () => write.promise,
+      writeFile: () => {
+        signalWriteStarted();
+        return write.promise;
+      },
     });
 
+    await writeStarted;
     tab.editor.addShapeNode({ x: 200, y: 200 });
     write.reject(new Error("write failed"));
 
@@ -94,6 +147,10 @@ describe("pending document save", () => {
     const identities: unknown[] = [];
     let forceDialogRequested = false;
     let writtenSnapshot = "";
+    let signalWriteStarted!: () => void;
+    const writeStarted = new Promise<void>((resolve) => {
+      signalWriteStarted = resolve;
+    });
     const saving = saveDocumentTab({
       forceDialog: true,
       tab,
@@ -101,10 +158,12 @@ describe("pending document save", () => {
       writeFile: (snapshot, _name, _handle, forceDialog) => {
         writtenSnapshot = snapshot;
         forceDialogRequested = forceDialog === true;
+        signalWriteStarted();
         return write.promise;
       },
     });
 
+    await writeStarted;
     tab.editor.addShapeNode({ x: 200, y: 200 });
     write.resolve({
       canceled: false,

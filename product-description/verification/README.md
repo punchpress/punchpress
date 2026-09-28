@@ -93,6 +93,20 @@ UI demos and controlled-fixture limitations were reviewed per task; see the
 These regression checks do not constitute execution of all 709 checklist rows.
 The original observations below remain unchanged.
 
+## Integration with the raster editor, 2026-09-28
+
+The fix branch was merged with `origin/main` at `8cdea20c`. Save now captures a
+history checkpoint before asynchronous raster serialization. Scratchpad flushes
+await serialization and ordered writes before switching editors.
+
+The integrated checkout passed 569 editor tests, 4 focused browser-utility tests,
+16 desktop tests, schema/engine typecheck, repository checks, web build, and
+Electron compilation. All 64 selected browser cases passed, including the
+original fix coverage and raster crop, resize, Frame movement, and Space-pan
+presentation. Four cases needed a focused rerun after the checkout stopped
+changing; the first run encountered page reloads and insufficient screencast
+frames. No browser assertions were weakened.
+
 ## Original automated checks
 
 At the same source baseline, `bun run test:editor` passed 410 tests across 74

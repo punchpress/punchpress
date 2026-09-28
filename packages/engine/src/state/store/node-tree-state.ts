@@ -74,11 +74,59 @@ const getInsertedRootNodeIds = (nodes) => {
     .map((node) => node.id);
 };
 
+export const getActiveLayerIdAfterDeletion = (state, nextNodes) => {
+  const nextNodeIds = new Set(nextNodes.map((node) => node.id));
+
+  if (state.activeLayerId && nextNodeIds.has(state.activeLayerId)) {
+    return state.activeLayerId;
+  }
+
+  const nodesById = createNodeMap(state.nodes);
+  const childIdsByParent = getChildIdsByParent(state.nodes);
+  let deletedNodeId = state.activeLayerId;
+
+  while (deletedNodeId) {
+    const deletedNode = nodesById.get(deletedNodeId);
+    if (!deletedNode) {
+      break;
+    }
+
+    const parentId = getNodeParentId(deletedNode);
+    const siblingIds = childIdsByParent.get(parentId) || [];
+    const deletedIndex = siblingIds.indexOf(deletedNodeId);
+    const nearestSiblingId = siblingIds
+      .filter((nodeId) => nextNodeIds.has(nodeId))
+      .sort((firstId, secondId) => {
+        const firstIndex = siblingIds.indexOf(firstId);
+        const secondIndex = siblingIds.indexOf(secondId);
+        const distanceDelta =
+          Math.abs(firstIndex - deletedIndex) -
+          Math.abs(secondIndex - deletedIndex);
+
+        return distanceDelta || secondIndex - firstIndex;
+      })[0];
+
+    if (nearestSiblingId) {
+      return nearestSiblingId;
+    }
+
+    if (parentId !== ROOT_PARENT_ID && nextNodeIds.has(parentId)) {
+      return parentId;
+    }
+
+    deletedNodeId =
+      parentId === ROOT_PARENT_ID ? null : parentId;
+  }
+
+  return nextNodes.at(-1)?.id || null;
+};
+
 export const deleteNodeTreeState = (state, nodeIds) => {
   const nextNodes = removeNodeSubtrees(state.nodes, dedupeIds(nodeIds));
   const nextNodeIds = new Set(nextNodes.map((node) => node.id));
 
   return {
+    activeLayerId: getActiveLayerIdAfterDeletion(state, nextNodes),
     focusedGroupId:
       state.focusedGroupId && nextNodeIds.has(state.focusedGroupId)
         ? state.focusedGroupId

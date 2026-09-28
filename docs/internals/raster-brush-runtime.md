@@ -1,98 +1,85 @@
 ---
-summary: Captures the raster brush runtime architecture, reference-editor learnings, and the direct working-surface invariants for huge tiled strokes.
+summary: Defines the finite stable Canvas2D Raster runtime, direct Stroke mutation, exact patch history, and asynchronous output boundary.
 read_when:
-  - changing raster brush working surfaces, tiled stroke commit, dirty-tile scheduling, or raster LOD behavior
-  - debugging huge brush strokes that flash, shift, disappear, seam, or lag during pointerup, zoom, or pan
-  - comparing PunchPress raster behavior against tldraw, MyPaint, Krita, or PhotoDemon-style rendering pipelines
+  - changing resident Raster canvases, Canvas2D Stroke application, dirty patches, Frame clipping, surface caching, or pointer-release behavior
+  - debugging Raster strokes that lag, shift, flash, duplicate, disappear, or change identity across pointer release
 ---
 
 # Raster Brush Runtime
 
-The raster brush runtime is a working-surface system:
+The browser injects one Canvas2D runtime into `Editor`. A resident Raster owns
+one full-resolution Canvas. That Canvas is both editing memory and the rendered
+source, so there is no working-versus-committed presentation transition.
 
-| Surface | Owns |
+## Ownership
+
+| Layer | Responsibility |
 | --- | --- |
-| Stroke session | Sampled points, brush settings, target node, dirty region, history mark, and commit lifetime. |
-| Working surface | Pixel mutation, dirty tile ownership, tile gutters, visible tile/canvas buffers, and commit payloads. |
-| Raster renderer | Committed image/tile rendering, active working-surface rendering, viewport culling, LOD projection, and render-ready acknowledgement. |
-| Brush cursor | Tool footprint chrome only. It does not own stroke pixels. |
+| Engine Stroke runtime | Finite target lock, input clipping, Dabs, one history boundary, and content-bound updates. |
+| Canvas2D runtime | Stable surface identity, decode, direct mutation, exact dirty patches, presentation subscription, snapshot, and cache lifecycle. |
+| React renderer | Mount the resident Canvas and select crisp or smoothed sampling from zoom. |
+| File/export clients | Await an encoded snapshot of the latest committed revision. |
 
-Pointer moves write into the authoritative in-memory raster surface immediately.
-The renderer draws that same surface while the stroke is active and while async
-persistence is catching up. Pointerup finalizes the dirty surface into document
-assets and creates one history entry. There is no SVG/vector live-stroke overlay
-and no live-preview-to-raster handoff.
+Brush and Eraser share one active runtime. A Stroke locks one target and one
+settings snapshot. Pointer samples are preserved, clipped to the finite target,
+and forwarded in order. An outside-only gesture allocates nothing.
 
-## Reference Findings
+## Surface Lifecycle
 
-tldraw keeps transient drawing feedback in stable session records and renders
-from those records until the tool intentionally retires them. The PunchPress
-lesson is to keep active, completed, and retiring interaction state addressable
-by one logical session identity instead of converting between unrelated visual
-systems during pointerup.
+Existing Rasters lazily decode into a Canvas sized to their finite writable
+plane. A Frame child uses the complete Frame-local plane even when its visible
+content is tight. Newly painted content expands node content bounds and shifts
+the resident presentation bounds while keeping existing pixels pinned.
 
-libmypaint treats the brush as a producer of operations against a surface
-interface. Its tiled surface batches operations per affected tile, processes the
-dirty tile set, and reports invalidated rectangles at the end of an atomic
-stroke. The PunchPress lesson is that dirty tiles are the natural edit unit.
+`resolveSurface` returns the same Canvas-backed surface while the Raster is
+resident. React does not replace an authoritative preparation with a smaller
+content-only decode. Source changes invalidate stale records. Targets leaving
+the mounted editor may be encoded and evicted once no history entry depends on
+their resident identity; activation decodes them again. Document reset releases
+all retained surfaces.
 
-Krita separates stroke jobs, paint devices, projections, level-of-detail work,
-and tile-based undo transactions. Undo swaps old and new tile data rather than
-replaying the brush. The PunchPress lesson is that durable commit, projection
-invalidation, and working-surface lifetime are separate phases.
+The existing finite dimension and area guard is the allocation limit. Workspace
+size and viewport zoom never expand a Raster plane.
 
-PhotoDemon uses a staged viewport pipeline: viewport-specific layer compositing
-happens before final UI/tool chrome. The PunchPress lesson is that brush pixels
-belong to raster surfaces, while cursor chrome belongs to the tool overlay.
+## Stroke And History
 
-## Invariants
+Each Dab batch mutates the resident Canvas directly and notifies presentation
+subscribers. The Canvas adapter clips both bounds and transformed Frame polygons
+in surface pixel coordinates.
 
-- Brush content is always raster pixels. Brush and Eraser never author vector
-  path data.
-- Pointer moves mutate the working raster surface directly.
-- Paint strokes use tiled working surfaces when the raster is large or visually
-  over-dense. Density is based on raster pixels per visible screen pixel, not a
-  fixed zoom number.
-- Existing unclipped raster planes keep their intrinsic width, height,
-  transform, rotation, and base frame when a stroke commits.
-- Brush-created layers can start bounded around their first stroke.
-- Artboard-child rasters clip to the artboard.
-- Eraser uses the same brush engine and clips to the existing raster plane. It
-  does not expand a layer by erasing transparent space outside the current
-  pixels.
-- Completed working surfaces remain mounted until the document has received
-  updated tile sources and the raster renderer acknowledges that the matching
-  committed render key has painted. The renderer waits for a short stable
-  paint window after committed tile images load, because image `load` does not
-  guarantee that a large SVG tile set is composited on screen. A time fallback
-  only protects offscreen or unmounted renderer cases.
-- Tile gutters are part of the tile surface contract. They prevent visual gaps
-  between adjacent committed tile images and working tile canvases.
-- Raster LOD previews are derived from committed raster/tile data. They do not
-  own brush commit state.
-- When a working surface exists for a raster node, that node's raster LOD
-  preview yields and exact committed tiles remain mounted. The normal
-  low-resolution projection resumes after the working surface retires.
+For every changed rectangle the adapter captures Canvas copies immediately
+before and after mutation. Commit composes those rectangles into one reversible
+history effect. Undo applies before-patches in reverse order; Redo applies
+after-patches in order. No full-plane clone, pixel readback, or image encoding
+occurs on pointer release.
 
-## Runtime Flow
+Cancel restores the before-patches and leaves no history step. A completed
+Brush or Eraser gesture produces exactly one target and one history step.
 
-1. Pointer down resolves a raster target and opens one stroke session.
-2. Pointer move appends points and flushes them into the working canvas or
-   touched working tiles.
-3. The raster renderer mounts the working canvas or working tiles inside the
-   image node's normal render tree.
-4. Pointerup flushes remaining points and starts commit.
-5. Commit encodes dirty PNG tile sources or the dirty single raster payload.
-6. The completed working surface stays visible until committed raster rendering
-   acknowledges the matching render key.
-7. The session retires and undo/redo treats the stroke as one history step.
+## Presentation And Output
 
-## Debug Capture
+Pointer release is a visual no-op: the same Canvas object and pixels remain
+mounted and authoritative. Low-zoom previews, if introduced, are disposable
+projections of the resident revision and cannot accept edits or become durable
+authority.
 
-In development, raster brush activity records a bounded timeline on
-`window.__PUNCHPRESS_RASTER_DEBUG__`. The capture includes brush session
-events, tile commit transitions, render-ready handoff events, raster DOM state,
-and frame samples while a stroke or handoff is active. Use
-`window.__PUNCHPRESS_RASTER_DEBUG__.clear()` before a repro and
-`window.__PUNCHPRESS_RASTER_DEBUG__.snapshot()` after the repro to inspect the
-timeline.
+At high zoom, the React renderer prepares each viewport-clipped exact window on
+an offscreen Canvas, then publishes the complete bitmap to the stable visible
+Canvas in one draw. Placement and pixel content therefore advance as one
+presentation instead of exposing a cleared or partially updated frame while
+panning.
+
+Save, Scratchpad autosave, reopen materialization, SVG export, and Frame export
+use the asynchronous document/output path. That path snapshots the latest
+committed retained Canvas and encodes away from pointer release. Committed
+Raster resize updates persisted sample dimensions with the resident plane,
+while SVG clipping keeps output bounds tight. During an
+active Stroke, exact rollback strips replace uncommitted pixels in the snapshot
+copy; the visible authoritative Canvas is never rolled back for persistence.
+
+## Related
+
+- [Raster image editor](raster-image-editor.md)
+- [Raster engine contracts](../reference/raster-engine-contracts.md)
+- [Resident Canvas2D decision](../decisions/raster-resident-canvas-surface.md)
+- [Performance tests](../reference/performance-tests.md)
