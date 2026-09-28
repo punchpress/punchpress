@@ -28,7 +28,13 @@ test("command-menu dismissal paths reopen with an empty query", async ({
   await expect(input).toHaveValue("");
 
   await input.fill("assets");
-  await page.mouse.click(4, 4);
+  await expect(page.getByRole("dialog")).not.toHaveAttribute(
+    "data-starting-style"
+  );
+  await page
+    .locator('[data-slot="command-dialog-backdrop"]')
+    .click({ position: { x: 4, y: 4 } });
+  await expect(page.getByRole("dialog")).toBeHidden();
   input = await openCommandMenu(page);
   await expect(input).toHaveValue("");
 });

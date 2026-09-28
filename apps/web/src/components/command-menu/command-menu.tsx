@@ -86,6 +86,18 @@ export const CommandMenu = () => {
     reset();
   }, [reset]);
 
+  const handleBackdropPointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (event.target !== event.currentTarget) {
+        return;
+      }
+
+      event.preventDefault();
+      closeMenu();
+    },
+    [closeMenu]
+  );
+
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
       if (nextOpen) {
@@ -185,7 +197,7 @@ export const CommandMenu = () => {
 
   return (
     <CommandDialog onOpenChange={handleOpenChange} open={open}>
-      <CommandDialogPopup>
+      <CommandDialogPopup onBackdropPointerDown={handleBackdropPointerDown}>
         {view === "commands" ? (
           <Command filter={filterItem} items={commandGroups}>
             <CommandInput
