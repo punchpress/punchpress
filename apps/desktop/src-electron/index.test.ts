@@ -8,6 +8,16 @@ const DOCUMENT_RECENT_DOCUMENTS_CHANGED_CHANNEL =
 const EDITOR_COMMAND_CHANNEL = "editor:command";
 const RENDERER_READY_CHANNEL = "document:renderer-ready";
 
+type TestMenuItem = {
+  accelerator?: string;
+  checked?: boolean;
+  click?: () => void;
+  enabled?: boolean;
+  label?: string;
+  submenu?: TestMenuItem[];
+  type?: string;
+};
+
 const appHandlers = new Map<string, (...args: unknown[]) => void>();
 const ipcInvokeHandlers = new Map<string, (...args: unknown[]) => unknown>();
 const ipcHandlers = new Map<string, (...args: unknown[]) => void>();
@@ -90,7 +100,7 @@ class FakeBrowserWindow {
 const appQuitMock = mock(() => undefined);
 const appSetNameMock = mock((_name: string) => undefined);
 const appSetPathMock = mock((_name: string, _value: string) => undefined);
-const buildFromTemplateMock = mock((template: unknown) => ({ template }));
+const buildFromTemplateMock = mock((template: TestMenuItem[]) => ({ template }));
 const configurePrivilegedStaticAppSchemeMock = mock(() => undefined);
 const fromPartitionMock = mock((_partition: string) => ({ id: "shared" }));
 const getAppPathMock = mock(() => "/Applications/PunchPress.app");
@@ -363,6 +373,21 @@ describe("desktop index bootstrap", () => {
     expect(checkItem).toBeDefined();
     checkItem?.click?.();
     expect(requestCheckForUpdatesMock).toHaveBeenCalledTimes(1);
+  });
+
+  test("labels the selection-sensitive export command generically", async () => {
+    await importDesktopIndex();
+    await flushTasks();
+
+    const template = buildFromTemplateMock.mock.calls.at(-1)?.[0];
+    const exportItem = template
+      .find((item) => item.label === "File")
+      ?.submenu?.find((item) => item.label?.startsWith("Export"));
+
+    expect(exportItem).toMatchObject({
+      accelerator: "CmdOrCtrl+E",
+      label: "Export...",
+    });
   });
 
   test("rebuilds the native object menu from renderer state and routes editor commands back", async () => {

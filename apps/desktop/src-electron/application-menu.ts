@@ -133,7 +133,7 @@ export const installApplicationMenu = async ({
         {
           accelerator: "CmdOrCtrl+E",
           click: () => sendDocumentCommand("export"),
-          label: "Export SVG...",
+          label: "Export...",
         },
       ],
     },
