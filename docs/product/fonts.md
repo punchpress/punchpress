@@ -20,7 +20,11 @@ rendering with user-installed fonts.
 
 ## Missing Fonts
 
-- Loading a document may require fallback when a font is unavailable.
-- Replacement should preserve editable text.
-- Export prompts should prevent users from unknowingly baking incorrect
-  typography.
+- Opening and saving a document preserve every font descriptor, even before
+  local font access is granted or when a font is missing.
+- Unavailable text has a temporary canvas preview. When the original font
+  becomes available to PunchPress, its rendering returns without changing the
+  document.
+- Choosing another font in Text properties permanently changes selected text.
+- Export stops when a document font is unavailable, so the temporary preview
+  cannot become production output.

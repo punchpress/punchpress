@@ -12,7 +12,13 @@ Local fonts are a platform capability around the editor's text model.
 - The editor requests available local fonts through the host platform.
 - Font descriptors are stored in text nodes.
 - Font bytes are loaded when rendering or export needs them.
-- Missing fonts are resolved to editable fallbacks when possible.
-- Export surfaces unresolved fonts before baking output.
+- Browser font access can be unrequested, denied, unsupported, or ready. An
+  unqueried catalog does not prove that an installed font is missing.
+- A successful desktop font scan produces a ready catalog. A failed scan leaves
+  availability unknown.
+- Unavailable fonts use a temporary canvas preview while their saved
+  descriptors remain intact. The Text panel explains whether access is needed
+  or the font is confirmed missing.
+- Export blocks unresolved fonts before baking output.
 - Browser and Electron font access should converge on the same editor-facing
   behavior.
