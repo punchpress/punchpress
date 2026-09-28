@@ -14,4 +14,6 @@ The Shape tool creates live shape nodes.
 - Click-created shapes use ergonomic whole-number starter dimensions.
 - Drag-created shapes use the user's exact drag size.
 - Holding `Shift` during drag placement locks the placement box to `1:1`.
+- Pressing `Escape` during a held placement cancels the gesture, removes its
+  preview, and prevents the later pointer release from creating a shape.
 - Created shapes remain live shape nodes until an edit breaks the family.
