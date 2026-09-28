@@ -29,6 +29,7 @@ export {
   canJoinCurves,
   canMergeCurves,
   canSeparateCurves,
+  hasMixedCurveStyles,
   joinCurves,
   mergeCurves,
   separateCurves,

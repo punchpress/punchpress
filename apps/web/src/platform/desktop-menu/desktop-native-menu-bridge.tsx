@@ -1,5 +1,6 @@
 import { useEffect, useEffectEvent } from "react";
 import { useElectronIpcEvent } from "@/hooks/use-electron-ipc-event";
+import { useMergeCurves } from "../../components/editor/merge-curves-confirmation";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
 import { getDesktopCompoundVectorSelection } from "./desktop-native-menu-compound";
@@ -37,7 +38,11 @@ const handleCompoundOperationCommand = (
   return true;
 };
 
-const handleSelectionCommand = (editor, command: DesktopEditorCommand) => {
+const handleSelectionCommand = (
+  editor,
+  mergeCurves,
+  command: DesktopEditorCommand
+) => {
   if (command.type !== "selection") {
     return false;
   }
@@ -53,7 +58,7 @@ const handleSelectionCommand = (editor, command: DesktopEditorCommand) => {
   }
 
   if (command.action === "merge-curves") {
-    editor.mergeCurves();
+    mergeCurves();
     return true;
   }
 
@@ -77,6 +82,7 @@ const handleSelectionCommand = (editor, command: DesktopEditorCommand) => {
 
 export const DesktopNativeMenuBridge = () => {
   const editor = useEditor();
+  const mergeCurves = useMergeCurves();
   const menuState = useEditorValue((editor, state) =>
     getDesktopAppMenuState(editor, state.selectedNodeIds)
   );
@@ -90,7 +96,7 @@ export const DesktopNativeMenuBridge = () => {
       if (
         handleHistoryCommand(editor, command) ||
         handleCompoundOperationCommand(editor, command) ||
-        handleSelectionCommand(editor, command)
+        handleSelectionCommand(editor, mergeCurves, command)
       ) {
         return;
       }

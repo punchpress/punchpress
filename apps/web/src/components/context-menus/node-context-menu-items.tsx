@@ -27,6 +27,7 @@ import {
 } from "@/lib/vector-compound-operation";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
+import { useMergeCurves } from "../editor/merge-curves-confirmation";
 import {
   LAYER_SHORTCUTS,
   LayerGlyph,
@@ -87,6 +88,7 @@ const CompoundNodeContextMenuItems = ({
   targetNodeIds,
 }) => {
   const editor = useEditor();
+  const mergeCurves = useMergeCurves();
 
   if (
     !(
@@ -132,7 +134,7 @@ const CompoundNodeContextMenuItems = ({
         </ContextMenuItem>
       ) : null}
       {canMergeCurves ? (
-        <ContextMenuItem onClick={() => editor.mergeCurves(targetNodeIds)}>
+        <ContextMenuItem onClick={() => mergeCurves(targetNodeIds)}>
           <LayerGlyph
             icon={GeometricShapes01Icon}
             size={17}

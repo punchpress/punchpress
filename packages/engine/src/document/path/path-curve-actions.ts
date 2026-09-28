@@ -218,6 +218,26 @@ export const canMergeCurves = (editor, nodeIds = editor.selectedNodeIds) => {
   return Boolean(getMergeablePathSelection(editor, nodeIds));
 };
 
+export const hasMixedCurveStyles = (editor, nodeIds = editor.selectedNodeIds) => {
+  const pathNodes = getMergeablePathSelection(editor, nodeIds);
+
+  if (!pathNodes) {
+    return false;
+  }
+
+  const first = pathNodes[0];
+
+  return pathNodes.slice(1).some((node) =>
+    node.fill !== first.fill ||
+    node.fillRule !== first.fillRule ||
+    node.stroke !== first.stroke ||
+    node.strokeWidth !== first.strokeWidth ||
+    node.strokeLineCap !== first.strokeLineCap ||
+    node.strokeLineJoin !== first.strokeLineJoin ||
+    node.strokeMiterLimit !== first.strokeMiterLimit
+  );
+};
+
 export const mergeCurves = (editor, nodeIds = editor.selectedNodeIds) => {
   const pathNodes = getMergeablePathSelection(editor, nodeIds);
 

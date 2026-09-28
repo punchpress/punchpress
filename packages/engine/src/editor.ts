@@ -53,6 +53,7 @@ import {
   canJoinCurves as canEditorJoinCurves,
   canMergeCurves as canEditorMergeCurves,
   canSeparateCurves as canEditorSeparateCurves,
+  hasMixedCurveStyles as editorHasMixedCurveStyles,
   joinCurves as joinEditorCurves,
   mergeCurves as mergeEditorCurves,
   separateCurves as separateEditorCurves,
@@ -947,6 +948,10 @@ export class Editor {
 
   canMergeCurves(nodeIds = this.selectedNodeIds) {
     return canEditorMergeCurves(this, nodeIds);
+  }
+
+  hasMixedCurveStyles(nodeIds = this.selectedNodeIds) {
+    return editorHasMixedCurveStyles(this, nodeIds);
   }
 
   mergeCurves(nodeIds = this.selectedNodeIds) {

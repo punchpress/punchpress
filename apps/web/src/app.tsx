@@ -1,4 +1,5 @@
 import { EditorShell } from "./components/editor/editor-shell";
+import { MergeCurvesProvider } from "./components/editor/merge-curves-confirmation";
 import { ToastProvider } from "./components/ui/toast";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { PerformanceProvider } from "./performance/performance-provider";
@@ -13,8 +14,10 @@ export const App = () => {
         <ToastProvider>
           <WorkspaceProvider>
             <PerformanceProvider>
-              <DesktopNativeMenuBridge />
-              <EditorShell />
+              <MergeCurvesProvider>
+                <DesktopNativeMenuBridge />
+                <EditorShell />
+              </MergeCurvesProvider>
             </PerformanceProvider>
           </WorkspaceProvider>
         </ToastProvider>

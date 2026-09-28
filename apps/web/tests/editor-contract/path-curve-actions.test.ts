@@ -11,6 +11,7 @@ const segment = (x: number, y: number) => ({
 const createPathNode = ({
   contours,
   id,
+  stroke = "#000000",
   x = 0,
 }: {
   contours: Array<{
@@ -18,6 +19,7 @@ const createPathNode = ({
     segments: ReturnType<typeof segment>[];
   }>;
   id: string;
+  stroke?: string;
   x?: number;
 }) => ({
   contours,
@@ -25,7 +27,7 @@ const createPathNode = ({
   fillRule: "nonzero" as const,
   id,
   parentId: "root",
-  stroke: "#000000",
+  stroke,
   strokeLineCap: "butt" as const,
   strokeLineJoin: "miter" as const,
   strokeMiterLimit: 4,
@@ -42,6 +44,50 @@ const createPathNode = ({
 });
 
 describe("path curve actions", () => {
+  test("mixed styles are disclosed before merging, and merge remains one style through Separate", () => {
+    const editor = new Editor();
+    editor.getState().loadNodes([
+      createPathNode({
+        contours: [
+          { closed: false, segments: [segment(0, 0), segment(20, 0)] },
+        ],
+        id: "red",
+        stroke: "#ff0000",
+      }),
+      createPathNode({
+        contours: [
+          { closed: false, segments: [segment(0, 0), segment(20, 0)] },
+        ],
+        id: "blue",
+        stroke: "#0000ff",
+        x: 40,
+      }),
+    ]);
+    editor.setSelectedNodes(["red", "blue"]);
+
+    expect(editor.hasMixedCurveStyles()).toBe(true);
+    expect(editor.nodes.map((node) => node.stroke)).toEqual([
+      "#ff0000",
+      "#0000ff",
+    ]);
+
+    expect(editor.mergeCurves()).toBe(true);
+    expect(editor.nodes.map((node) => node.stroke)).toEqual(["#ff0000"]);
+
+    expect(editor.separateCurves()).toBe(true);
+    expect(editor.nodes.map((node) => node.stroke)).toEqual([
+      "#ff0000",
+      "#ff0000",
+    ]);
+
+    editor.undo();
+    editor.undo();
+    expect(editor.nodes.map((node) => node.stroke)).toEqual([
+      "#ff0000",
+      "#0000ff",
+    ]);
+  });
+
   test("merge curves combines selected path nodes as one multi-contour path", () => {
     const editor = new Editor();
 
@@ -62,6 +108,7 @@ describe("path curve actions", () => {
     ]);
     editor.setSelectedNodes(["left", "right"]);
 
+    expect(editor.hasMixedCurveStyles()).toBe(false);
     expect(editor.mergeCurves()).toBe(true);
 
     const mergedPath = editor.getNode("left");
