@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Editor } from "@punchpress/engine";
+import { confirmMergeCurves } from "../../src/components/editor/merge-curves-command";
 
 const segment = (x: number, y: number) => ({
   handleIn: { x: 0, y: 0 },
@@ -11,6 +12,7 @@ const segment = (x: number, y: number) => ({
 const createPathNode = ({
   contours,
   id,
+  opacity = 1,
   stroke = "#000000",
   x = 0,
 }: {
@@ -19,6 +21,7 @@ const createPathNode = ({
     segments: ReturnType<typeof segment>[];
   }>;
   id: string;
+  opacity?: number;
   stroke?: string;
   x?: number;
 }) => ({
@@ -26,6 +29,7 @@ const createPathNode = ({
   fill: null,
   fillRule: "nonzero" as const,
   id,
+  opacity,
   parentId: "root",
   stroke,
   strokeLineCap: "butt" as const,
@@ -44,6 +48,59 @@ const createPathNode = ({
 });
 
 describe("path curve actions", () => {
+  test("opacity differences require the mixed-style confirmation", () => {
+    const editor = new Editor();
+    editor.getState().loadNodes([
+      createPathNode({
+        contours: [
+          { closed: false, segments: [segment(0, 0), segment(20, 0)] },
+        ],
+        id: "opaque",
+      }),
+      createPathNode({
+        contours: [
+          { closed: false, segments: [segment(40, 0), segment(60, 0)] },
+        ],
+        id: "faded",
+        opacity: 0.3,
+      }),
+    ]);
+    editor.setSelectedNodes(["opaque", "faded"]);
+
+    expect(editor.hasMixedCurveStyles()).toBe(true);
+  });
+
+  test("a pending merge cannot run in another editor with matching node IDs", () => {
+    const first = new Editor();
+    const second = new Editor();
+    const nodes = [
+      createPathNode({
+        contours: [
+          { closed: false, segments: [segment(0, 0), segment(20, 0)] },
+        ],
+        id: "red",
+        stroke: "#ff0000",
+      }),
+      createPathNode({
+        contours: [
+          { closed: false, segments: [segment(40, 0), segment(60, 0)] },
+        ],
+        id: "blue",
+        stroke: "#0000ff",
+      }),
+    ];
+    first.getState().loadNodes(nodes);
+    second.getState().loadNodes(nodes);
+    const pending = { editor: first, nodeIds: ["red", "blue"] };
+
+    expect(confirmMergeCurves(second, pending)).toBe(false);
+    expect(second.nodes).toHaveLength(2);
+    expect(first.nodes).toHaveLength(2);
+    expect(confirmMergeCurves(first, pending)).toBe(true);
+    expect(first.nodes).toHaveLength(1);
+    expect(second.nodes).toHaveLength(2);
+  });
+
   test("mixed styles are disclosed before merging, and merge remains one style through Separate", () => {
     const editor = new Editor();
     editor.getState().loadNodes([

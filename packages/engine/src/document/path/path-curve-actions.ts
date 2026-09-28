@@ -228,6 +228,7 @@ export const hasMixedCurveStyles = (editor, nodeIds = editor.selectedNodeIds) =>
   const first = pathNodes[0];
 
   return pathNodes.slice(1).some((node) =>
+    node.opacity !== first.opacity ||
     node.fill !== first.fill ||
     node.fillRule !== first.fillRule ||
     node.stroke !== first.stroke ||

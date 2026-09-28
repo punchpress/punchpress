@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -9,6 +9,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useEditor } from "../../editor-react/use-editor";
+import {
+  confirmMergeCurves,
+  type PendingMergeCurves,
+} from "./merge-curves-command";
 
 const MergeCurvesContext = createContext<((nodeIds?: string[]) => void) | null>(
   null
@@ -20,7 +24,13 @@ export const MergeCurvesProvider = ({
   children: React.ReactNode;
 }) => {
   const editor = useEditor();
-  const [pendingNodeIds, setPendingNodeIds] = useState<string[] | null>(null);
+  const [pendingMerge, setPendingMerge] = useState<PendingMergeCurves | null>(
+    null
+  );
+
+  useEffect(() => {
+    setPendingMerge((pending) => (pending?.editor === editor ? pending : null));
+  }, [editor]);
 
   const mergeCurves = (nodeIds = editor.selectedNodeIds) => {
     if (!editor.canMergeCurves(nodeIds)) {
@@ -28,7 +38,7 @@ export const MergeCurvesProvider = ({
     }
 
     if (editor.hasMixedCurveStyles(nodeIds)) {
-      setPendingNodeIds([...nodeIds]);
+      setPendingMerge({ editor, nodeIds: [...nodeIds] });
       return;
     }
 
@@ -36,10 +46,8 @@ export const MergeCurvesProvider = ({
   };
 
   const confirmMerge = () => {
-    if (pendingNodeIds) {
-      editor.mergeCurves(pendingNodeIds);
-    }
-    setPendingNodeIds(null);
+    confirmMergeCurves(editor, pendingMerge);
+    setPendingMerge(null);
   };
 
   return (
@@ -49,10 +57,10 @@ export const MergeCurvesProvider = ({
         modal
         onOpenChange={(open) => {
           if (!open) {
-            setPendingNodeIds(null);
+            setPendingMerge(null);
           }
         }}
-        open={pendingNodeIds !== null}
+        open={pendingMerge?.editor === editor}
       >
         <DialogPopup bottomStickOnMobile={false} showCloseButton={false}>
           <DialogHeader>
@@ -65,7 +73,7 @@ export const MergeCurvesProvider = ({
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button onClick={() => setPendingNodeIds(null)} variant="ghost">
+            <Button onClick={() => setPendingMerge(null)} variant="ghost">
               Cancel
             </Button>
             <Button onClick={confirmMerge}>Merge Curves</Button>
