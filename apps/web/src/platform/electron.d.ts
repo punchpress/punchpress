@@ -24,9 +24,16 @@ export interface DesktopSaveFileResult {
 
 export type DesktopUpdateStatus =
   | { phase: "idle" }
-  | { phase: "checking" }
-  | { phase: "downloading"; percent: number; version: string | null }
-  | { phase: "ready"; version: string | null };
+  | { phase: "checking"; initiation: "automatic" | "manual" }
+  | {
+      phase: "downloading";
+      initiation: "automatic" | "manual";
+      percent: number;
+      version: string | null;
+    }
+  | { phase: "ready"; version: string | null }
+  | { phase: "up-to-date" }
+  | { phase: "error" };
 
 export interface DesktopLocalFont {
   family: string;

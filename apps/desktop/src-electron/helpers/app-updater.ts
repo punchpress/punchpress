@@ -7,12 +7,22 @@ const UPDATE_CHECK_INTERVAL_MS = 10 * 60 * 1000;
 
 export type DesktopUpdateStatus =
   | { phase: "idle" }
-  | { phase: "checking" }
-  | { phase: "downloading"; percent: number; version: string | null }
-  | { phase: "ready"; version: string | null };
+  | { phase: "checking"; initiation: "automatic" | "manual" }
+  | {
+      phase: "downloading";
+      initiation: "automatic" | "manual";
+      percent: number;
+      version: string | null;
+    }
+  | { phase: "ready"; version: string | null }
+  | { phase: "up-to-date" }
+  | { phase: "error" };
 
 let isUpdaterInitialized = false;
+let areUpdaterListenersRegistered = false;
+let checkRunId = 0;
 let autoUpdaterStatus: DesktopUpdateStatus = { phase: "idle" };
+let activeInitiation: "automatic" | "manual" = "automatic";
 let requestQuitAndInstallHandler: (() => void) | null = null;
 
 const statusListeners = new Set<(status: DesktopUpdateStatus) => void>();
@@ -68,6 +78,37 @@ export const quitAndInstallUpdate = () => {
   autoUpdater.quitAndInstall();
 };
 
+export const requestCheckForUpdates = async () => {
+  if (!isUpdaterInitialized) {
+    setAutoUpdaterStatus({ phase: "error" });
+    return;
+  }
+
+  if (!areUpdaterListenersRegistered) {
+    initAutoUpdater(false);
+  }
+
+  if (autoUpdaterStatus.phase === "ready") {
+    return;
+  }
+
+  if (autoUpdaterStatus.phase === "downloading") {
+    activeInitiation = "manual";
+    setAutoUpdaterStatus({ ...autoUpdaterStatus, initiation: "manual" });
+    return;
+  }
+
+  if (autoUpdaterStatus.phase === "checking") {
+    activeInitiation = "manual";
+    setAutoUpdaterStatus({ phase: "checking", initiation: "manual" });
+    return;
+  }
+
+  activeInitiation = "manual";
+  setAutoUpdaterStatus({ phase: "checking", initiation: "manual" });
+  await checkForUpdates(true);
+};
+
 export const startAutoUpdater = ({
   initialDelayMs = 3000,
 }: {
@@ -86,24 +127,38 @@ export const startAutoUpdater = ({
       return;
     }
 
-    initAutoUpdater();
+    initAutoUpdater(true);
   }, initialDelayMs);
 };
 
-const initAutoUpdater = () => {
+const initAutoUpdater = (runInitialCheck: boolean) => {
+  if (areUpdaterListenersRegistered) {
+    return;
+  }
+
+  areUpdaterListenersRegistered = true;
   autoUpdater.on("error", (error) => {
-    setAutoUpdaterStatus({ phase: "idle" });
+    setAutoUpdaterStatus(
+      activeInitiation === "manual" ? { phase: "error" } : { phase: "idle" }
+    );
+    activeInitiation = "automatic";
     console.error("Auto-updater error", error);
   });
 
   autoUpdater.on("checking-for-update", () => {
-    setAutoUpdaterStatus({ phase: "checking" });
+    if (
+      autoUpdaterStatus.phase !== "checking" ||
+      autoUpdaterStatus.initiation !== activeInitiation
+    ) {
+      setAutoUpdaterStatus({ phase: "checking", initiation: activeInitiation });
+    }
     console.info("Checking for desktop updates");
   });
 
   autoUpdater.on("update-available", (info: { version?: string | null }) => {
     setAutoUpdaterStatus({
       phase: "downloading",
+      initiation: activeInitiation,
       percent: 0,
       version: info.version ?? null,
     });
@@ -111,7 +166,12 @@ const initAutoUpdater = () => {
   });
 
   autoUpdater.on("update-not-available", () => {
-    setAutoUpdaterStatus({ phase: "idle" });
+    setAutoUpdaterStatus(
+      activeInitiation === "manual"
+        ? { phase: "up-to-date" }
+        : { phase: "idle" }
+    );
+    activeInitiation = "automatic";
     console.info("Desktop update not available");
   });
 
@@ -120,6 +180,10 @@ const initAutoUpdater = () => {
     (progress: { percent: number; total: number; transferred: number }) => {
       setAutoUpdaterStatus({
         phase: "downloading",
+        initiation:
+          autoUpdaterStatus.phase === "downloading"
+            ? autoUpdaterStatus.initiation
+            : activeInitiation,
         percent: progress.percent,
         version: getTrackedUpdateVersion(),
       });
@@ -137,6 +201,7 @@ const initAutoUpdater = () => {
         phase: "ready",
         version: info.version ?? getTrackedUpdateVersion(),
       });
+      activeInitiation = "automatic";
 
       const { response } = await dialog.showMessageBox({
         type: "info",
@@ -155,9 +220,11 @@ const initAutoUpdater = () => {
     }
   );
 
-  checkForUpdates().catch((error) => {
-    console.error(error);
-  });
+  if (runInitialCheck) {
+    checkForUpdates().catch((error) => {
+      console.error(error);
+    });
+  }
 
   setInterval(() => {
     checkForUpdates().catch((error) => {
@@ -166,11 +233,33 @@ const initAutoUpdater = () => {
   }, UPDATE_CHECK_INTERVAL_MS);
 };
 
-const checkForUpdates = async () => {
+const checkForUpdates = async (manual = false) => {
+  if (
+    autoUpdaterStatus.phase === "ready" ||
+    autoUpdaterStatus.phase === "downloading" ||
+    (autoUpdaterStatus.phase === "checking" && !manual)
+  ) {
+    return;
+  }
+
+  if (autoUpdaterStatus.phase !== "checking") {
+    activeInitiation = "automatic";
+  }
+
+  const runId = ++checkRunId;
   try {
     await autoUpdater.checkForUpdatesAndNotify();
   } catch (error) {
-    setAutoUpdaterStatus({ phase: "idle" });
+    if (runId !== checkRunId) {
+      return;
+    }
+
+    if (autoUpdaterStatus.phase !== "error") {
+      setAutoUpdaterStatus(
+        activeInitiation === "manual" ? { phase: "error" } : { phase: "idle" }
+      );
+    }
+    activeInitiation = "automatic";
     console.error("Failed to check for desktop updates", error);
   }
 };

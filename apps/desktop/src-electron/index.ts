@@ -26,6 +26,7 @@ import {
   onAutoUpdaterStatus,
   onRequestQuitAndInstallUpdate,
   quitAndInstallUpdate,
+  requestCheckForUpdates,
   requestQuitAndInstallUpdate,
   startAutoUpdater,
 } from "./helpers/app-updater.js";
@@ -66,6 +67,9 @@ const sendEditorCommand = (command: DesktopEditorCommand) => {
 const syncApplicationMenu = () => {
   return installApplicationMenu({
     appMenuState,
+    checkForUpdates: () => {
+      requestCheckForUpdates().catch((error) => console.error(error));
+    },
     clearRecentDocumentsFromMenu: () => {
       return documentOpeningController.clearRecentDocumentsFromMenu();
     },

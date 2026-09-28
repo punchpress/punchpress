@@ -13,6 +13,7 @@ import { getRecentDocuments } from "./recent-documents.js";
 
 interface InstallApplicationMenuOptions {
   appMenuState: DesktopAppMenuState | null;
+  checkForUpdates: () => void;
   clearRecentDocumentsFromMenu: () => Promise<void>;
   openRecentDocumentFromMenu: (filePath: string) => Promise<void>;
   sendDocumentCommand: (
@@ -73,6 +74,7 @@ const buildOpenRecentSubmenu = async ({
 
 export const installApplicationMenu = async ({
   appMenuState,
+  checkForUpdates,
   clearRecentDocumentsFromMenu,
   openRecentDocumentFromMenu,
   sendDocumentCommand,
@@ -87,6 +89,8 @@ export const installApplicationMenu = async ({
       label: "PunchPress",
       submenu: [
         { role: "about" },
+        { label: "Check for Updates...", click: checkForUpdates },
+        { type: "separator" },
         {
           label: "Open Recent",
           submenu: openRecentSubmenu,
