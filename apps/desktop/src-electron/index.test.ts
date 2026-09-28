@@ -151,6 +151,7 @@ const quitAndInstallUpdateMock = mock(() => undefined);
 const requestQuitAndInstallUpdateMock = mock(() => {
   requestQuitAndInstallHandler?.();
 });
+const requestCheckForUpdatesMock = mock(async () => undefined);
 const startAutoUpdaterMock = mock(() => undefined);
 const whenReadyMock = mock(() => whenReadyPromise);
 
@@ -195,6 +196,7 @@ mock.module("./helpers/app-updater.js", () => ({
   onAutoUpdaterStatus: onAutoUpdaterStatusMock,
   quitAndInstallUpdate: quitAndInstallUpdateMock,
   requestQuitAndInstallUpdate: requestQuitAndInstallUpdateMock,
+  requestCheckForUpdates: requestCheckForUpdatesMock,
   startAutoUpdater: startAutoUpdaterMock,
 }));
 
@@ -267,6 +269,7 @@ describe("desktop index bootstrap", () => {
     quitAndInstallUpdateMock.mockClear();
     requestQuitAndInstallHandler = null;
     requestQuitAndInstallUpdateMock.mockClear();
+    requestCheckForUpdatesMock.mockClear();
     registerDocumentFileHandlersMock.mockClear();
     registerLocalFontHandlersMock.mockClear();
     requestSingleInstanceLockMock.mockClear();
@@ -343,6 +346,23 @@ describe("desktop index bootstrap", () => {
     expect(mainWindow.webContents.send).toHaveBeenCalledWith(
       DOCUMENT_RECENT_DOCUMENTS_CHANGED_CHANNEL
     );
+  });
+
+  test("routes Check for Updates from the PunchPress menu", async () => {
+    await importDesktopIndex();
+    await flushTasks();
+
+    const template = buildFromTemplateMock.mock.calls.at(-1)?.[0] as {
+      label?: string;
+      submenu?: { click?: () => void; label?: string }[];
+    }[];
+    const checkItem = template
+      .find((item) => item.label === "PunchPress")
+      ?.submenu?.find((item) => item.label === "Check for Updates...");
+
+    expect(checkItem).toBeDefined();
+    checkItem?.click?.();
+    expect(requestCheckForUpdatesMock).toHaveBeenCalledTimes(1);
   });
 
   test("rebuilds the native object menu from renderer state and routes editor commands back", async () => {
