@@ -17,9 +17,10 @@ The properties panel edits the active selection.
 - Multi-selection shows shared controls and mixed values.
 - Unsupported controls are hidden instead of guessing.
 - Aggregate color controls edit every selected paint that uses the chosen color.
-- Numeric fields keep empty, incomplete, and invalid drafts local; they never
-  coerce a blank draft to zero or a minimum.
-- Valid numeric drafts apply live. Blur and Enter normalize valid drafts or
+- NumberField-backed Frame dimensions and mixed Stroke width/Miter controls
+  keep empty, incomplete, and invalid drafts local; they never coerce a blank
+  draft to zero or a minimum.
+- Valid NumberField drafts apply live. Blur and Enter normalize valid drafts or
   restore the last accepted value; Escape discards only the current draft,
   restores that value, and blurs.
 

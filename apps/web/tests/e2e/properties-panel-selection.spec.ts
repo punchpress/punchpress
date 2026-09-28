@@ -101,6 +101,67 @@ const loadVectorStrokeStyleDocument = (page) => {
   );
 };
 
+const createMiterPath = (id, strokeMiterLimit, x) => ({
+  closed: true,
+  fill: "#ffffff",
+  fillRule: "nonzero",
+  id,
+  parentId: "root",
+  segments: [
+    {
+      handleIn: { x: 0, y: 0 },
+      handleOut: { x: 0, y: 0 },
+      point: { x: -80, y: -60 },
+      pointType: "corner",
+    },
+    {
+      handleIn: { x: 0, y: 0 },
+      handleOut: { x: 0, y: 0 },
+      point: { x: 80, y: -60 },
+      pointType: "corner",
+    },
+    {
+      handleIn: { x: 0, y: 0 },
+      handleOut: { x: 0, y: 0 },
+      point: { x: 80, y: 60 },
+      pointType: "corner",
+    },
+    {
+      handleIn: { x: 0, y: 0 },
+      handleOut: { x: 0, y: 0 },
+      point: { x: -80, y: 60 },
+      pointType: "corner",
+    },
+  ],
+  stroke: "#000000",
+  strokeLineCap: "butt",
+  strokeLineJoin: "miter",
+  strokeMiterLimit,
+  strokeWidth: 12,
+  transform: {
+    rotation: 0,
+    scaleX: 1,
+    scaleY: 1,
+    x,
+    y: 240,
+  },
+  type: "path",
+  visible: true,
+});
+
+const loadMixedMiterDocument = (page) => {
+  return loadDocument(
+    page,
+    JSON.stringify({
+      nodes: [
+        createMiterPath("miter-path-one", 4, 220),
+        createMiterPath("miter-path-two", 8, 460),
+      ],
+      version: "1.8",
+    })
+  );
+};
+
 const loadIrregularVectorCornerDocument = (page) => {
   return loadDocument(
     page,
@@ -498,6 +559,42 @@ test("keeps frame width stable through blank and invalid numeric drafts", async 
   await widthInput.press("Enter");
   await expect(widthInput).toHaveValue("500");
   await expect.poll(getWidth).toBe(500);
+});
+
+test("does not commit a mixed miter draft on focus and blur alone", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadMixedMiterDocument(page);
+  await selectNodes(page, ["miter-path-one", "miter-path-two"]);
+
+  const miterRow = getStrokeSection(page)
+    .locator("label", { hasText: "Miter" })
+    .locator("xpath=ancestor::div[contains(@class, 'grid')][1]");
+  const miterInput = miterRow.getByRole("textbox");
+
+  await expect(miterInput).toHaveValue("0");
+  await miterInput.focus();
+  await miterInput.blur();
+
+  await expect
+    .poll(async () => {
+      const state = await getStateSnapshot(page);
+
+      return state.nodes
+        .filter((node) => {
+          return node.id === "miter-path-one" || node.id === "miter-path-two";
+        })
+        .map((node) => ({
+          id: node.id,
+          strokeMiterLimit: node.strokeMiterLimit,
+        }))
+        .sort((left, right) => left.id.localeCompare(right.id));
+    })
+    .toEqual([
+      { id: "miter-path-one", strokeMiterLimit: 4 },
+      { id: "miter-path-two", strokeMiterLimit: 8 },
+    ]);
 });
 
 test("shows bulk path corner controls for a selected standalone path outside path edit mode", async ({

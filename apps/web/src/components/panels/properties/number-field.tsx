@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 
 interface NumberFieldProps {
@@ -38,8 +38,15 @@ export const NumberField = ({
 }: NumberFieldProps) => {
   const [draft, setDraft] = useState(toDisplayValue(value));
   const [isFocused, setIsFocused] = useState(false);
+  const hasUserEditedDraftRef = useRef(false);
 
   const commitDraft = () => {
+    if (!hasUserEditedDraftRef.current) {
+      setDraft(toDisplayValue(value));
+      return;
+    }
+
+    hasUserEditedDraftRef.current = false;
     const nextValue = parseDraftValue(draft);
 
     if (nextValue === null) {
@@ -57,6 +64,7 @@ export const NumberField = ({
   };
 
   const cancelDraft = () => {
+    hasUserEditedDraftRef.current = false;
     setDraft(toDisplayValue(value));
   };
 
@@ -80,6 +88,7 @@ export const NumberField = ({
         const nextDraft = event.target.value;
         const nextValue = parseDraftValue(nextDraft);
 
+        hasUserEditedDraftRef.current = true;
         setDraft(nextDraft);
 
         if (nextValue === null) {
@@ -88,7 +97,10 @@ export const NumberField = ({
 
         onValueChange(normalizeValue(nextValue, min));
       }}
-      onFocus={() => setIsFocused(true)}
+      onFocus={() => {
+        hasUserEditedDraftRef.current = false;
+        setIsFocused(true);
+      }}
       onKeyDown={(event) => {
         if (event.key === "Enter") {
           event.preventDefault();
