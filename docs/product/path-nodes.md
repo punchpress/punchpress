@@ -25,6 +25,7 @@ Path nodes are first-class editable curve objects.
 
 Path styling includes:
 
+- opacity
 - fill color
 - stroke color
 - stroke width
