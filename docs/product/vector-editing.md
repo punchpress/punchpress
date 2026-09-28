@@ -41,6 +41,8 @@ on the canvas.
   drilled into the group.
 - Inside a vector, one child path is focused for point editing at a time while
   the parent vector remains the visual object.
+- Escape or pointer cancellation during a corner-radius drag restores the
+  starting radius without adding an Undo step.
 
 ## Relationship To Shapes
 

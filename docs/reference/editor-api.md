@@ -25,7 +25,7 @@ and future clients should converge here instead of inventing parallel behavior.
 | Viewport | zoom, wheel zoom, focus canvas bounds, pending focus. |
 | Fonts | initialize/request local fonts, preload fonts, set last used font. |
 | Clipboard | `copySelection`, `pasteClipboardContent`, `pasteText`. |
-| History | undo, redo, commit history step, dirty/saved marks. |
+| History | undo, redo, commit or cancel a gesture, dirty/saved marks. |
 | Inspection | debug dump, selection properties, overlay state, node geometry, layer rows. |
 
 ## Rules

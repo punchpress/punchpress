@@ -12,6 +12,8 @@ Transforms move, resize, and rotate selected objects.
 ## Contract
 
 - Pointer-driven transforms preview during the gesture and commit once.
+- Escape or pointer cancellation restores the geometry from before a gesture,
+  without adding an Undo step. Releasing the pointer commits normally.
 - Selection frames stay aligned with visible artwork.
 - Corner handles resize.
 - Rotation starts from the corner perimeter.

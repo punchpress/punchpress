@@ -46,3 +46,5 @@ a specific path-editing mode.
 - Circle path-position handles also follow path tangent.
 - Static-position handles may show a subtle spring effect while dragging.
 - Handles that move with the node during adjustment do not use the spring effect.
+- Escape or pointer cancellation restores the warp value from before the handle
+  drag, without adding an Undo step.
