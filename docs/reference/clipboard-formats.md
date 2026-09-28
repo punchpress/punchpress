@@ -1,5 +1,5 @@
 ---
-summary: Defines clipboard payload precedence for PunchPress-owned content, plain text, future image payloads, paste identity, placement, and unsupported payload no-ops.
+summary: Defines clipboard payload precedence for PunchPress-owned content, external images, plain text, paste identity, placement, and unsupported payload no-ops.
 read_when:
   - changing clipboard serialization, paste interpretation, external payload support, paste offsets, or text-field copy behavior
   - debugging paste that flattens editable content, chooses plain text over native payloads, or reuses node ids
@@ -27,7 +27,7 @@ Clipboard interpretation chooses the highest-fidelity supported payload.
 ## External Payloads
 
 - Plain text becomes a text node.
-- Supported image/file payloads should become corresponding nodes when those
-  node types exist.
+- PNG and JPEG file items become image nodes through the canvas image import
+  path. Other file types do not create nodes.
 - Generic representations of native PunchPress payloads should not win over the
   native payload.

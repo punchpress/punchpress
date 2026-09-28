@@ -36,7 +36,11 @@ Copy and paste duplicate or insert content without leaving the canvas.
 - PunchPress chooses the highest-fidelity supported payload.
 - PunchPress-owned payloads beat generic representations of the same content.
 - Plain text from outside PunchPress becomes a new text node.
-- Supported external images should become image nodes when image nodes exist.
+- External PNG and JPEG clipboard files become selected image nodes centered in
+  the visible canvas. Their image bytes remain part of the document for save and
+  export, and Undo removes the pasted image.
+- Unsupported files do not create nodes. Image decode failures leave the
+  document unchanged and show an import error.
 - Unsupported payloads are no-ops.
 
 ## Focus
