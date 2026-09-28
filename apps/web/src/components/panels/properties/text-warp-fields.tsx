@@ -30,9 +30,14 @@ import { warpIcons } from "./warp-icons";
 const ARCH_BEND_RANGE = { min: -ARCH_BEND_LIMIT, max: ARCH_BEND_LIMIT };
 const CIRCLE_RADIUS_RANGE = { min: 1, max: 5000 };
 const CIRCLE_SWEEP_RANGE = { min: -360, max: 360 };
-const WAVE_AMPLITUDE_RANGE = { min: -500, max: 500 };
 const WAVE_CYCLES_RANGE = { min: WAVE_CYCLES_MIN, max: WAVE_CYCLES_MAX };
-const SLANT_RISE_RANGE = { min: -400, max: 400 };
+const WAVE_AMPLITUDE_SCRUB_RANGE = { min: -500, max: 500 };
+const SLANT_RISE_SCRUB_RANGE = { min: -400, max: 400 };
+const FINITE_NUMBER_RANGE = {
+  min: Number.NEGATIVE_INFINITY,
+  max: Number.POSITIVE_INFINITY,
+};
+const formatWarpValue = (value: number) => value.toString();
 
 const startPathEditing = (editor, nodeId) => {
   if (editor.startPathEditing(nodeId)) {
@@ -160,11 +165,7 @@ const TextWarpKindFields = ({ node }) => {
 
   if (node.warp.kind === "wave") {
     const setAmplitude = (value) => {
-      const amplitude = clamp(
-        toNumber(value, node.warp.amplitude),
-        WAVE_AMPLITUDE_RANGE.min,
-        WAVE_AMPLITUDE_RANGE.max
-      );
+      const amplitude = toNumber(value, node.warp.amplitude);
       update({ amplitude });
     };
 
@@ -182,9 +183,13 @@ const TextWarpKindFields = ({ node }) => {
         <FieldRow label="Amplitude">
           <ScrubSlider
             ariaLabel="Amplitude"
-            max={WAVE_AMPLITUDE_RANGE.max}
-            min={WAVE_AMPLITUDE_RANGE.min}
+            formatValue={formatWarpValue}
+            max={FINITE_NUMBER_RANGE.max}
+            min={FINITE_NUMBER_RANGE.min}
             onValueChange={setAmplitude}
+            preserveTypedValue
+            scrubMax={WAVE_AMPLITUDE_SCRUB_RANGE.max}
+            scrubMin={WAVE_AMPLITUDE_SCRUB_RANGE.min}
             step={1}
             value={node.warp.amplitude}
           />
@@ -293,11 +298,7 @@ const TextWarpKindFields = ({ node }) => {
 
   if (node.warp.kind === "slant") {
     const setRise = (value) => {
-      const rise = clamp(
-        toNumber(value, node.warp.rise),
-        SLANT_RISE_RANGE.min,
-        SLANT_RISE_RANGE.max
-      );
+      const rise = toNumber(value, node.warp.rise);
       update({ rise });
     };
 
@@ -305,9 +306,13 @@ const TextWarpKindFields = ({ node }) => {
       <FieldRow label="Slant">
         <ScrubSlider
           ariaLabel="Slant"
-          max={SLANT_RISE_RANGE.max}
-          min={SLANT_RISE_RANGE.min}
+          formatValue={formatWarpValue}
+          max={FINITE_NUMBER_RANGE.max}
+          min={FINITE_NUMBER_RANGE.min}
           onValueChange={setRise}
+          preserveTypedValue
+          scrubMax={SLANT_RISE_SCRUB_RANGE.max}
+          scrubMin={SLANT_RISE_SCRUB_RANGE.min}
           step={1}
           value={node.warp.rise}
         />

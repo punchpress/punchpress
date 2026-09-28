@@ -21,6 +21,7 @@ interface ScrubSliderProps {
   overflowRecoveryPixels?: number;
   pixelsPerStep?: number;
   preserveDisplayValueWhileDragging?: boolean;
+  preserveTypedValue?: boolean;
   scrubMax?: number;
   scrubMin?: number;
   step?: number;
@@ -321,6 +322,7 @@ export const ScrubSlider = (props: ScrubSliderProps) => {
     onValueChange,
     overflowRecoveryPixels = 80,
     pixelsPerStep = 2,
+    preserveTypedValue = false,
     preserveDisplayValueWhileDragging = false,
     scrubMax = max,
     scrubMin = min,
@@ -367,7 +369,11 @@ export const ScrubSlider = (props: ScrubSliderProps) => {
   };
 
   const commitTypedValue = (nextValue: number) => {
-    onValueChange(normalizeValue(nextValue, min, max, step));
+    onValueChange(
+      preserveTypedValue
+        ? clamp(nextValue, min, max)
+        : normalizeValue(nextValue, min, max, step)
+    );
   };
 
   const startEditing = () => {
