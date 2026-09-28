@@ -54,6 +54,32 @@ const arePointsCoincident = (
   return Math.hypot(left.x - right.x, left.y - right.y) <= JOIN_POINT_EPSILON;
 };
 
+const getJoinedPointType = (
+  incoming: VectorContourDocument["segments"][number],
+  outgoing: VectorContourDocument["segments"][number]
+) => {
+  const handleIn = incoming.handleIn;
+  const handleOut = outgoing.handleOut;
+  const inLength = Math.hypot(handleIn.x, handleIn.y);
+  const outLength = Math.hypot(handleOut.x, handleOut.y);
+
+  if (
+    incoming.pointType !== "smooth" ||
+    outgoing.pointType !== "smooth" ||
+    inLength <= JOIN_POINT_EPSILON ||
+    outLength <= JOIN_POINT_EPSILON
+  ) {
+    return "corner";
+  }
+
+  const cross = handleIn.x * handleOut.y - handleIn.y * handleOut.x;
+  const dot = handleIn.x * handleOut.x + handleIn.y * handleOut.y;
+
+  return Math.abs(cross) <= inLength * outLength * 1e-6 && dot < 0
+    ? "smooth"
+    : "corner";
+};
+
 const isEndpoint = (contour: VectorContourDocument, segmentIndex: number) => {
   if (contour.closed) {
     return false;
@@ -205,12 +231,14 @@ const getSameContourJoinResult = (
     return null;
   }
 
-  nextSegments[0] = {
-    ...firstSegment,
-    handleIn: cloneHandle(lastSegment.handleIn),
-    pointType: "corner",
-  };
-  nextSegments.pop();
+  if (arePointsCoincident(firstSegment.point, lastSegment.point)) {
+    nextSegments[0] = {
+      ...firstSegment,
+      handleIn: cloneHandle(lastSegment.handleIn),
+      pointType: getJoinedPointType(lastSegment, firstSegment),
+    };
+    nextSegments.pop();
+  }
 
   return {
     contours: contours.map((currentContour, currentContourIndex) => {
@@ -262,15 +290,7 @@ const getJoinedSegments = (
     {
       ...cloneSegment(firstJoinSegment),
       handleOut: cloneHandle(secondJoinSegment.handleOut),
-      pointType:
-        Math.hypot(firstJoinSegment.handleIn.x, firstJoinSegment.handleIn.y) >
-          JOIN_POINT_EPSILON ||
-        Math.hypot(
-          secondJoinSegment.handleOut.x,
-          secondJoinSegment.handleOut.y
-        ) > JOIN_POINT_EPSILON
-          ? "smooth"
-          : "corner",
+      pointType: getJoinedPointType(firstJoinSegment, secondJoinSegment),
     },
     ...orientedSecondContour.segments.slice(1),
   ];
