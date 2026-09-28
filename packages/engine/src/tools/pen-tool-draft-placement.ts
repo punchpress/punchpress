@@ -187,7 +187,7 @@ const finishClosedContour = (
 export const updateDraftPlacement = (
   tool: PenTool,
   point,
-  { spaceKey = false } = {}
+  { dragDistancePx = 0, spaceKey = false } = {}
 ) => {
   const session = getActiveAuthoringSession(tool);
 
@@ -261,10 +261,9 @@ export const updateDraftPlacement = (
 
   if (draft.kind === "first-point") {
     const nextHandle = getPenDragHandle({
-      anchorCanvasPoint: draft.anchorCanvasPoint,
       anchorLocalPoint: draft.anchorLocalPoint,
-      currentCanvasPoint: point,
       currentLocalPoint: localPoint,
+      dragDistancePx,
     });
 
     draft.dragHandle = nextHandle;
@@ -290,10 +289,9 @@ export const updateDraftPlacement = (
   }
 
   draft.dragHandle = getPenDragHandle({
-    anchorCanvasPoint: draft.anchorCanvasPoint,
     anchorLocalPoint: draft.anchorLocalPoint,
-    currentCanvasPoint: point,
     currentLocalPoint: localPoint,
+    dragDistancePx,
   });
   draft.target = resolveCloseTarget(
     tool,

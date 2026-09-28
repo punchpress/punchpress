@@ -77,7 +77,9 @@ act on the selected path or vector-capable objects.
 - Holding Space while authoring repositions the pending anchor without
   discarding handles.
 - Small unintended screen-space jitter still places a straight point until
-  handle length is meaningful.
+  handle length is meaningful. The click-versus-handle threshold uses screen
+  distance across zoom levels, while authored handle geometry remains in
+  document space.
 - Pen hover feedback is action-specific: close path, continue path, add point,
   or delete point.
 - Closing a contour keeps the vector in path edit mode with the closing anchor

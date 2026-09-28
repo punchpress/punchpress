@@ -68,7 +68,7 @@ const getInsertPointPlacementContours = (
   tool: PenTool,
   placement: InsertPointPlacement,
   point,
-  { spaceKey = false } = {}
+  { dragDistancePx = 0, spaceKey = false } = {}
 ) => {
   const node = tool.editor.getNode(placement.nodeId);
   const bbox = tool.editor.getNodeGeometry(placement.nodeId)?.bbox;
@@ -118,10 +118,9 @@ const getInsertPointPlacementContours = (
 
   const currentLocalPoint = getNodeLocalPoint(node, bbox, point);
   const dragHandle = getPenDragHandle({
-    anchorCanvasPoint: placement.anchorCanvasPoint,
     anchorLocalPoint: placement.anchorLocalPoint,
-    currentCanvasPoint: point,
     currentLocalPoint,
+    dragDistancePx,
   });
 
   placement.currentCanvasPoint = nextCanvasPoint;

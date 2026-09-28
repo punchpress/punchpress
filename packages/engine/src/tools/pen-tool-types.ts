@@ -1,6 +1,7 @@
 import { round } from "../primitives/math";
 import { getPathNodeContours } from "../nodes/path/path-contours";
 import {
+  getGestureTolerancePx,
   hasPointerMovedAtLeast,
   hasPointerMovedWithin,
 } from "../primitives/pointer-distance";
@@ -97,18 +98,11 @@ export const roundHandle = (handle) => {
 };
 
 export const getPenDragHandle = ({
-  anchorCanvasPoint,
   anchorLocalPoint,
-  currentCanvasPoint,
   currentLocalPoint,
+  dragDistancePx = 0,
 }) => {
-  if (
-    !hasPointerMovedAtLeast(
-      anchorCanvasPoint,
-      currentCanvasPoint,
-      "penHandleLength"
-    )
-  ) {
+  if (dragDistancePx < getGestureTolerancePx("penHandleLength")) {
     return null;
   }
 

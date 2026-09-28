@@ -66,7 +66,8 @@ const ensurePointTypeTogglePlacementHistory = (
 const getPointTypeTogglePlacementContours = (
   tool: PenTool,
   placement: PointTypeTogglePlacement,
-  point
+  point,
+  { dragDistancePx = 0 } = {}
 ) => {
   const node = tool.editor.getNode(placement.nodeId);
   const bbox = tool.editor.getNodeGeometry(placement.nodeId)?.bbox;
@@ -77,10 +78,9 @@ const getPointTypeTogglePlacementContours = (
 
   const currentLocalPoint = getNodeLocalPoint(node, bbox, point);
   const dragHandle = getPenDragHandle({
-    anchorCanvasPoint: placement.anchorCanvasPoint,
     anchorLocalPoint: placement.anchorLocalPoint,
-    currentCanvasPoint: point,
     currentLocalPoint,
+    dragDistancePx,
   });
 
   if (!dragHandle) {
@@ -97,7 +97,8 @@ const getPointTypeTogglePlacementContours = (
 const updatePointTypeTogglePlacement = (
   tool: PenTool,
   placement: PointTypeTogglePlacement,
-  point
+  point,
+  options = {}
 ) => {
   if (placement.initialPointType !== "corner") {
     return false;
@@ -106,7 +107,8 @@ const updatePointTypeTogglePlacement = (
   const nextContours = getPointTypeTogglePlacementContours(
     tool,
     placement,
-    point
+    point,
+    options
   );
 
   if (nextContours === placement.baseContours && !placement.historyMark) {
@@ -134,11 +136,12 @@ const cancelPointTypeTogglePlacement = (
 const completePointTypeTogglePlacement = (
   tool: PenTool,
   placement: PointTypeTogglePlacement,
-  point
+  point,
+  options = {}
 ) => {
   const didAuthorHandles =
     placement.initialPointType === "corner"
-      ? updatePointTypeTogglePlacement(tool, placement, point)
+      ? updatePointTypeTogglePlacement(tool, placement, point, options)
       : false;
 
   if (didAuthorHandles && placement.historyMark) {
@@ -192,9 +195,9 @@ export const startPointTypeToggleAction = (
 
   return createPlacementSession(
     () => cancelPointTypeTogglePlacement(tool, placement),
-    ({ point: nextPoint = point } = {}) =>
-      completePointTypeTogglePlacement(tool, placement, nextPoint),
-    ({ point: nextPoint = point } = {}) =>
-      updatePointTypeTogglePlacement(tool, placement, nextPoint)
+    ({ point: nextPoint = point, ...options } = {}) =>
+      completePointTypeTogglePlacement(tool, placement, nextPoint, options),
+    ({ point: nextPoint = point, ...options } = {}) =>
+      updatePointTypeTogglePlacement(tool, placement, nextPoint, options)
   );
 };

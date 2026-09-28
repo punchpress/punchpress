@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { Editor, getGestureTolerancePx } from "@punchpress/engine";
 import { PUNCH_DOCUMENT_VERSION } from "@punchpress/punch-schema";
 import { getNodeWorldPoint } from "../../../../packages/engine/src/primitives/rotation";
 
@@ -212,6 +212,38 @@ const dragPenWithUpdates = (
   if (session.complete(lastUpdate) !== true) {
     throw new Error("Expected the pen tool drag session to complete.");
   }
+};
+
+const dragPenAtZoom = (zoom: number, screenDistancePx: number) => {
+  const editor = new Editor({ initialZoom: zoom });
+  const startPoint = { x: 200, y: 160 };
+  const endPoint = {
+    x: startPoint.x + screenDistancePx / zoom,
+    y: startPoint.y,
+  };
+
+  editor.setActiveTool("pen");
+  const session = editor.dispatchCanvasPointerDown({ point: startPoint });
+
+  if (!session) {
+    throw new Error("Expected the pen tool to create a placement session.");
+  }
+
+  session.update({
+    dragDistancePx: screenDistancePx,
+    point: endPoint,
+  });
+
+  if (
+    session.complete({
+      dragDistancePx: screenDistancePx,
+      point: endPoint,
+    }) !== true
+  ) {
+    throw new Error("Expected the pen tool drag session to complete.");
+  }
+
+  return getPathNode(editor).segments[0];
 };
 
 const movePen = (editor: Editor, point: { x: number; y: number }) => {
@@ -639,6 +671,29 @@ describe("vector pen authoring", () => {
     expect(segment?.pointType).toBe("corner");
     expect(segment?.handleIn).toEqual({ x: 0, y: 0 });
     expect(segment?.handleOut).toEqual({ x: 0, y: 0 });
+  });
+
+  test("uses screen-space handle activation while keeping handles in document space", () => {
+    const handleThresholdPx = getGestureTolerancePx("penHandleLength");
+    const zooms = [0.5, 1, 2];
+
+    for (const zoom of zooms) {
+      const belowThreshold = dragPenAtZoom(zoom, handleThresholdPx - 1);
+      const aboveThreshold = dragPenAtZoom(zoom, handleThresholdPx + 4);
+
+      expect(belowThreshold?.pointType).toBe("corner");
+      expect(belowThreshold?.handleIn).toEqual({ x: 0, y: 0 });
+      expect(belowThreshold?.handleOut).toEqual({ x: 0, y: 0 });
+      expect(aboveThreshold?.pointType).toBe("smooth");
+      expect(aboveThreshold?.handleIn?.x).toBeCloseTo(
+        -(handleThresholdPx + 4) / zoom
+      );
+      expect(aboveThreshold?.handleIn?.y).toBeCloseTo(0);
+      expect(aboveThreshold?.handleOut?.x).toBeCloseTo(
+        (handleThresholdPx + 4) / zoom
+      );
+      expect(aboveThreshold?.handleOut?.y).toBeCloseTo(0);
+    }
   });
 
   test("dragging a following point creates a smooth anchor with incoming and outgoing handles", () => {
