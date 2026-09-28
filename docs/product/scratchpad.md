@@ -11,6 +11,8 @@ The scratchpad is the default local workspace.
 
 - It is always present.
 - It autosaves without prompting.
+- Leaving its tab writes any pending edit immediately; the latest content is
+  restored when PunchPress reopens.
 - It has a tab and cannot be closed.
 - It is internal local storage, not a user-selected `.punch` file.
 - It does not appear in recent documents.

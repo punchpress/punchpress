@@ -4,6 +4,7 @@ import { createConfiguredEditor } from "@/editor-react/create-configured-editor"
 import { EditorContext } from "@/editor-react/editor-context";
 import { useEditorClipboardEvents } from "@/editor-react/use-editor-clipboard-events";
 import { getDocumentBaseName } from "@/platform/web-document-files";
+import { createScratchpadAutosave } from "./scratchpad-autosave";
 import {
   loadScratchpadDocument,
   saveScratchpadDocument,
@@ -61,15 +62,13 @@ const getTabIsDirty = (tab) => {
 };
 
 export const WorkspaceProvider = ({ children }) => {
-  const scratchpadEditorRef = useRef(null);
-  const [tabs, setTabs] = useState(() => {
-    const scratchpadTab = createScratchpadTab();
-    scratchpadEditorRef.current = scratchpadTab.editor;
-    return [scratchpadTab];
-  });
+  const [tabs, setTabs] = useState(() => [createScratchpadTab()]);
   const [activeTabId, setActiveTabId] = useState(SCRATCHPAD_TAB_ID);
   const mountedEditorRef = useRef(null);
+  const scratchpadAutosaveRef = useRef(null);
+  const tabSwitchRequestRef = useRef(0);
 
+  const scratchpadEditor = tabs[0].editor;
   const activeTab = tabs.find((tab) => tab.id === activeTabId) || tabs[0];
   const activeEditor = activeTab.editor;
 
@@ -84,8 +83,8 @@ export const WorkspaceProvider = ({ children }) => {
           return;
         }
 
-        scratchpadEditorRef.current?.loadDocument(contents);
-        scratchpadEditorRef.current?.markDocumentSaved();
+        scratchpadEditor.loadDocument(contents);
+        scratchpadEditor.markDocumentSaved();
         setTabs((currentTabs) => [...currentTabs]);
       })
       .catch((error) => {
@@ -95,7 +94,7 @@ export const WorkspaceProvider = ({ children }) => {
     return () => {
       canceled = true;
     };
-  }, []);
+  }, [scratchpadEditor]);
 
   useEffect(() => {
     const previousEditor = mountedEditorRef.current;
@@ -136,38 +135,46 @@ export const WorkspaceProvider = ({ children }) => {
   }, [activeEditor]);
 
   useEffect(() => {
+    const autosave = createScratchpadAutosave(
+      scratchpadEditor,
+      saveScratchpadDocument
+    );
+    scratchpadAutosaveRef.current = autosave;
+
+    return () => {
+      scratchpadAutosaveRef.current = null;
+      autosave.dispose();
+    };
+  }, [scratchpadEditor]);
+
+  useEffect(() => {
     if (activeTab.kind !== "scratchpad") {
       return;
     }
 
-    let timeoutId = window.setTimeout(() => {
-      saveScratchpadDocument(activeEditor.serializeDocument()).catch(
-        (error) => {
-          console.error(error);
-        }
-      );
-    }, 400);
-
-    const unsubscribe = activeEditor.store.subscribe(() => {
-      window.clearTimeout(timeoutId);
-      timeoutId = window.setTimeout(() => {
-        saveScratchpadDocument(activeEditor.serializeDocument()).catch(
-          (error) => {
-            console.error(error);
-          }
-        );
-      }, 400);
-    });
-
     return () => {
-      unsubscribe();
-      window.clearTimeout(timeoutId);
+      scratchpadAutosaveRef.current?.flush();
     };
-  }, [activeEditor, activeTab.kind]);
+  }, [activeTab.kind]);
 
-  const focusTab = useCallback((tabId) => {
-    setActiveTabId(tabId);
-  }, []);
+  const focusTab = useCallback(
+    async (tabId) => {
+      const requestId = ++tabSwitchRequestRef.current;
+      if (activeTab.kind === "scratchpad" && tabId !== SCRATCHPAD_TAB_ID) {
+        try {
+          await scratchpadAutosaveRef.current?.flush();
+        } catch (error) {
+          console.error(error);
+          return;
+        }
+      }
+
+      if (requestId === tabSwitchRequestRef.current) {
+        setActiveTabId(tabId);
+      }
+    },
+    [activeTab.kind]
+  );
 
   const openDocumentTab = useCallback(
     async (openedDocument) => {
@@ -177,7 +184,7 @@ export const WorkspaceProvider = ({ children }) => {
         : null;
 
       if (existingTab) {
-        setActiveTabId(existingTab.id);
+        await focusTab(existingTab.id);
         return { missingFonts: [], replacementFont: null };
       }
 
@@ -196,48 +203,51 @@ export const WorkspaceProvider = ({ children }) => {
       };
 
       setTabs((currentTabs) => [...currentTabs, nextTab]);
-      setActiveTabId(nextTab.id);
+      await focusTab(nextTab.id);
 
       return resolution;
     },
-    [tabs]
+    [focusTab, tabs]
   );
 
-  const createNewFileTab = useCallback((request = {}) => {
-    const editor = createConfiguredEditor();
-    const nextTab = createFileTab({
-      baseName: request.baseName || DEFAULT_DOCUMENT_BASE_NAME,
-      editor,
-    });
-
-    if (request.artboard) {
-      editor.run(() => {
-        const nodeId = editor.getState().addArtboardNode(
-          {
-            x: 0,
-            y: 0,
-          },
-          {
-            patch: {
-              height: request.artboard.height,
-              name: request.artboard.name,
-              width: request.artboard.width,
-            },
-          }
-        );
-
-        if (nodeId) {
-          editor.scheduleViewportFocus([nodeId], {
-            paddingX: request.artboard.width * 0.1,
-            paddingY: request.artboard.height * 0.1,
-          });
-        }
+  const createNewFileTab = useCallback(
+    (request = {}) => {
+      const editor = createConfiguredEditor();
+      const nextTab = createFileTab({
+        baseName: request.baseName || DEFAULT_DOCUMENT_BASE_NAME,
+        editor,
       });
-    }
 
-    setTabs((currentTabs) => [...currentTabs, nextTab]);
-    setActiveTabId(nextTab.id);
-  }, []);
+      if (request.artboard) {
+        editor.run(() => {
+          const nodeId = editor.getState().addArtboardNode(
+            {
+              x: 0,
+              y: 0,
+            },
+            {
+              patch: {
+                height: request.artboard.height,
+                name: request.artboard.name,
+                width: request.artboard.width,
+              },
+            }
+          );
+
+          if (nodeId) {
+            editor.scheduleViewportFocus([nodeId], {
+              paddingX: request.artboard.width * 0.1,
+              paddingY: request.artboard.height * 0.1,
+            });
+          }
+        });
+      }
+
+      setTabs((currentTabs) => [...currentTabs, nextTab]);
+      focusTab(nextTab.id);
+    },
+    [focusTab]
+  );
 
   const updateTabFileIdentity = useCallback(
     (tabId, { baseName, fileHandle }) => {
