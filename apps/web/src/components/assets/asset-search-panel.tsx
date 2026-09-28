@@ -1,5 +1,5 @@
 import { ImagesIcon, Loader2Icon, PlusIcon, SearchIcon } from "lucide-react";
-import { type ReactNode, useCallback, useState } from "react";
+import { type ReactNode, useCallback, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   type Asset,
@@ -31,64 +31,76 @@ export const AssetSearchPanel = ({
   onAdded?: () => void;
 }) => {
   const [term, setTerm] = useState("");
+  const [submittedTerm, setSubmittedTerm] = useState("");
   const [page, setPage] = useState(1);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [lastPage, setLastPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [importingAssetId, setImportingAssetId] = useState<string | null>(null);
   const [status, setStatus] = useState("Search assets.");
+  const searchVersionRef = useRef(0);
 
   const hasMoreResults = page < lastPage;
 
   const runSearch = useCallback(
-    async (nextPage = 1) => {
-      const query = term.trim();
+    async (query: string, nextPage: number, searchVersion: number) => {
       const isFirstPage = nextPage === 1;
-
-      if (!query) {
-        setAssets([]);
-        setPage(1);
-        setLastPage(1);
-        setStatus("Enter a search term.");
-        return;
-      }
 
       setLoading(true);
       setStatus(isFirstPage ? "Searching assets..." : "Loading more assets...");
 
       try {
         const result = await searchAssets(query, nextPage);
+
+        if (searchVersion !== searchVersionRef.current) {
+          return;
+        }
+
         const nextCurrentPage = result.meta?.current_page || nextPage;
 
         setAssets((currentAssets) => {
-          if (isFirstPage) {
-            return result.data;
-          }
-
-          const currentAssetIds = new Set(
-            currentAssets.map((asset) => String(asset.id))
-          );
-          const newAssets = result.data.filter((asset) => {
-            return !currentAssetIds.has(String(asset.id));
-          });
-
-          return [...currentAssets, ...newAssets];
+          return mergeAssetResults(currentAssets, result.data, isFirstPage);
         });
         setPage(nextCurrentPage);
         setLastPage(result.meta?.last_page || nextPage);
-        setStatus(result.data.length > 0 ? "Search complete." : "No results.");
+        setStatus(getSearchStatus(result.data.length > 0));
       } catch (error) {
+        if (searchVersion !== searchVersionRef.current) {
+          return;
+        }
+
         if (isFirstPage) {
           setAssets([]);
         }
 
         setStatus(error instanceof Error ? error.message : "Search failed.");
       } finally {
-        setLoading(false);
+        if (searchVersion === searchVersionRef.current) {
+          setLoading(false);
+        }
       }
     },
-    [term]
+    []
   );
+
+  const submitSearch = useCallback(() => {
+    const query = term.trim();
+    const searchVersion = searchVersionRef.current + 1;
+
+    searchVersionRef.current = searchVersion;
+    setSubmittedTerm(query);
+    setAssets([]);
+    setPage(1);
+    setLastPage(1);
+
+    if (!query) {
+      setLoading(false);
+      setStatus("Enter a search term.");
+      return;
+    }
+
+    runSearch(query, 1, searchVersion);
+  }, [runSearch, term]);
 
   const addAsset = useCallback(
     async (asset: Asset) => {
@@ -128,12 +140,12 @@ export const AssetSearchPanel = ({
   );
 
   const loadMoreAssets = useCallback(() => {
-    if (loading || !hasMoreResults || !term.trim()) {
+    if (loading || !hasMoreResults || !submittedTerm) {
       return;
     }
 
-    runSearch(page + 1);
-  }, [hasMoreResults, loading, page, runSearch, term]);
+    runSearch(submittedTerm, page + 1, searchVersionRef.current);
+  }, [hasMoreResults, loading, page, runSearch, submittedTerm]);
 
   const handleResultsScroll = useCallback(
     (event) => {
@@ -195,7 +207,7 @@ export const AssetSearchPanel = ({
         className="flex shrink-0 items-center gap-2 border-border border-b px-4 py-3"
         onSubmit={(event) => {
           event.preventDefault();
-          runSearch(1);
+          submitSearch();
         }}
       >
         <InputGroup className="flex-1">
@@ -227,6 +239,29 @@ export const AssetSearchPanel = ({
       </ScrollArea>
     </div>
   );
+};
+
+const getSearchStatus = (hasResults: boolean) => {
+  return hasResults ? "Search complete." : "No results.";
+};
+
+const mergeAssetResults = (
+  currentAssets: Asset[],
+  nextAssets: Asset[],
+  replace: boolean
+) => {
+  if (replace) {
+    return nextAssets;
+  }
+
+  const currentAssetIds = new Set(
+    currentAssets.map((asset) => String(asset.id))
+  );
+  const newAssets = nextAssets.filter((asset) => {
+    return !currentAssetIds.has(String(asset.id));
+  });
+
+  return [...currentAssets, ...newAssets];
 };
 
 const AssetPanelEmpty = ({ children, icon }) => {

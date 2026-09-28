@@ -17,6 +17,10 @@ and add to the active canvas.
   menu to an asset search page.
 - The asset page shows a search bar and a dense grid of rectangular asset previews.
 - Asset results load more items with infinite scroll.
+- The search field is draft input; pagination uses the last submitted, trimmed
+  query until another search is submitted.
+- Submitting a new query clears the prior result grid and resets pagination;
+  responses from older searches cannot append to the new query's results.
 - Asset search requests SVG, PNG, and JPG-capable results from the provider.
 - Each result resolves to one preferred format in order: SVG, then PNG, then JPG.
 - The active workspace tab receives imported assets.
