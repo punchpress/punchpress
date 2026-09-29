@@ -25,6 +25,8 @@ Transforms move, resize, and rotate selected objects.
   hidden or revealed immediately as they cross the Frame boundary.
 - Selection frames stay aligned with visible artwork.
 - Corner handles resize.
+- Dragging a corner past its opposite corner flips the crossed axis and keeps
+  resizing from the same fixed anchor.
 - Rotation starts from the corner perimeter.
 - Rotated resize anchors to the opposite corner.
 - Multi-selection and group transforms follow the same model as single objects.

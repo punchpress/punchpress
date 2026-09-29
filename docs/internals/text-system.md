@@ -18,6 +18,7 @@ Text internals live in engine text modules plus the React text editor overlay.
 - text paths and hit regions
 - text placement capabilities
 - text property support
+- unavailable-font fallback bounds and warp readiness
 
 ## React Owns
 

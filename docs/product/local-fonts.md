@@ -10,6 +10,8 @@ read_when:
 Local fonts are a platform capability around the editor's text model.
 
 - The editor requests available local fonts through the host platform.
+- The editor ships Source Sans Pro as a bundled default so new text can render
+  and export without local-font permission.
 - Font descriptors are stored in text nodes.
 - Font bytes are loaded when rendering or export needs them.
 - Browser font access can be unrequested, denied, unsupported, or ready. An
@@ -18,7 +20,8 @@ Local fonts are a platform capability around the editor's text model.
   availability unknown.
 - Unavailable fonts use a temporary canvas preview while their saved
   descriptors remain intact. The Text panel explains whether access is needed
-  or the font is confirmed missing.
+  or the font is confirmed missing. Font-dependent warp controls stay disabled
+  until the saved font is available.
 - Export blocks unresolved fonts before baking output.
 - Browser and Electron font access should converge on the same editor-facing
   behavior.

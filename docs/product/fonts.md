@@ -13,6 +13,8 @@ rendering with user-installed fonts.
 ## Contract
 
 - Text nodes store font descriptors, not baked outlines.
+- New text uses the bundled Source Sans Pro font when no available last-used
+  font is selected; it is available before local-font permission is granted.
 - Font family, full name, postscript name, and style identify a local font.
 - The editor can resolve default fonts for new text.
 - Font previews should reflect the selected font when available.
@@ -28,3 +30,5 @@ rendering with user-installed fonts.
 - Choosing another font in Text properties permanently changes selected text.
 - Export stops when a document font is unavailable, so the temporary preview
   cannot become production output.
+- Warp controls remain unavailable while a saved font cannot be loaded because
+  the fallback preview cannot reproduce font-dependent warp geometry.

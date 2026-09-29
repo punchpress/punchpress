@@ -11,6 +11,10 @@ read_when:
 Warped text remains a text node with normal node selection unless the user enters
 a specific path-editing mode.
 
+Warp previews and controls require the saved font to be available. An
+unresolved font keeps its warp state intact but shows a flat fallback preview
+and disables font-dependent warp editing until the font loads.
+
 ## Path-Guided Text
 
 - A selected path-guided text node may show a subtle path preview.

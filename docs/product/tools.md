@@ -33,8 +33,8 @@ Tools define the user's current canvas intent.
 ## Direct Editing
 
 - Direct vector editing belongs to the Node tool.
-- Leaving Node exits direct path or shape editing unless the next tool
-  intentionally continues vector editing, such as Pen.
+- Leaving Node or Pen exits direct path or shape editing unless the next tool
+  continues vector editing with Node or Pen. Pointer restores object selection.
 - `Esc` clears inner point selection before returning from Node to Pointer.
 - Holding Space temporarily uses the hand-pan cursor and suppresses editing or
   selection cursors until panning ends.

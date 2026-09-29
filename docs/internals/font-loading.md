@@ -18,6 +18,11 @@ Fonts cross platform and engine boundaries.
 5. Unloaded text uses a canvas-only preview until its original font bytes load.
 6. Unresolved fonts block export when output fidelity would change.
 
+The web editor registers the bundled Source Sans Pro descriptor with
+`Editor.setBundledFonts` and supplies its bytes through the font loader before
+it asks the host for local fonts. This gives new text a stable, usable default
+while preserving local descriptors for loaded documents.
+
 ## Rules
 
 - Text remains editable even when a font is missing.
@@ -27,4 +32,6 @@ Fonts cross platform and engine boundaries.
   that confirms a missing font. A later catalog update preloads original fonts
   and invalidates text geometry without changing document history.
 - Preview text is never used by the export path.
+- Font-dependent warp controls stay disabled while a saved font is unresolved;
+  the flat fallback preview does not claim to render a warp.
 - React font pickers consume engine font state; they do not own font resolution.

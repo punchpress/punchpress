@@ -26,6 +26,10 @@ The layers panel exposes the document tree as editable layer rows.
   transforms never change a row's parent or nesting.
 - Visibility toggles update node visibility.
 - Group and vector rows can expose child rows.
+- Generated labels use per-parent source-family numbering. A label is assigned
+  when a node first appears and stays with that node through sibling insertion,
+  reorder, deletion, and undo; loading or starting a new document starts
+  numbering again.
 - Layer menus route to editor commands; they do not mutate private panel state.
 - The New Layer button and `Cmd/Ctrl+Shift+N` create an empty layer. The first
   content action materializes its source kind.
