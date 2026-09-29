@@ -4,6 +4,8 @@ import {
   getNodeTransformForPinnedWorldPoint,
 } from "./rotation";
 
+const RESIZE_DIRECTION_EPSILON = 0.0001;
+
 const isCornerHandle = (handle) => {
   return handle.length === 2;
 };
@@ -19,24 +21,64 @@ const getMinimumOuterSize = (node) => {
 const getClampedFreeformBounds = (bounds, pointerLocal, handle, node) => {
   const minOuterWidth = getMinimumOuterSize(node);
   const minOuterHeight = getMinimumOuterSize(node);
+
+  let horizontalHandle = "";
+  let verticalHandle = "";
   let minX = bounds.minX;
   let maxX = bounds.maxX;
   let minY = bounds.minY;
   let maxY = bounds.maxY;
 
-  if (handle.endsWith("w")) {
-    minX = Math.min(pointerLocal.x, maxX - minOuterWidth);
-  } else if (handle.endsWith("e")) {
-    maxX = Math.max(pointerLocal.x, minX + minOuterWidth);
+  if (handle.endsWith("w") || handle.endsWith("e")) {
+    const fixedX = handle.endsWith("w") ? bounds.maxX : bounds.minX;
+    horizontalHandle =
+      Math.abs(pointerLocal.x - fixedX) <= RESIZE_DIRECTION_EPSILON
+        ? handle.endsWith("w")
+          ? "w"
+          : "e"
+        : pointerLocal.x < fixedX
+          ? "w"
+          : "e";
+    minX = Math.min(pointerLocal.x, fixedX);
+    maxX = Math.max(pointerLocal.x, fixedX);
+
+    if (maxX - minX < minOuterWidth) {
+      if (horizontalHandle === "w") {
+        minX = fixedX - minOuterWidth;
+        maxX = fixedX;
+      } else {
+        minX = fixedX;
+        maxX = fixedX + minOuterWidth;
+      }
+    }
   }
 
-  if (handle.startsWith("n")) {
-    minY = Math.min(pointerLocal.y, maxY - minOuterHeight);
-  } else if (handle.startsWith("s")) {
-    maxY = Math.max(pointerLocal.y, minY + minOuterHeight);
+  if (handle.startsWith("n") || handle.startsWith("s")) {
+    const fixedY = handle.startsWith("n") ? bounds.maxY : bounds.minY;
+    verticalHandle =
+      Math.abs(pointerLocal.y - fixedY) <= RESIZE_DIRECTION_EPSILON
+        ? handle.startsWith("n")
+          ? "n"
+          : "s"
+        : pointerLocal.y < fixedY
+          ? "n"
+          : "s";
+    minY = Math.min(pointerLocal.y, fixedY);
+    maxY = Math.max(pointerLocal.y, fixedY);
+
+    if (maxY - minY < minOuterHeight) {
+      if (verticalHandle === "n") {
+        minY = fixedY - minOuterHeight;
+        maxY = fixedY;
+      } else {
+        minY = fixedY;
+        maxY = fixedY + minOuterHeight;
+      }
+    }
   }
 
   return {
+    handle: `${verticalHandle}${horizontalHandle}`,
     maxX,
     maxY,
     minX,
@@ -44,7 +86,13 @@ const getClampedFreeformBounds = (bounds, pointerLocal, handle, node) => {
   };
 };
 
-const getAspectLockedBounds = (baseBounds, rawBounds, handle, node) => {
+const getAspectLockedBounds = (
+  baseBounds,
+  rawBounds,
+  originalHandle,
+  resizeHandle,
+  node
+) => {
   const baseWidth = baseBounds.maxX - baseBounds.minX;
   const baseHeight = baseBounds.maxY - baseBounds.minY;
   const rawWidth = rawBounds.maxX - rawBounds.minX;
@@ -59,16 +107,18 @@ const getAspectLockedBounds = (baseBounds, rawBounds, handle, node) => {
   );
   const nextWidth = baseWidth * scale;
   const nextHeight = baseHeight * scale;
+  const fixedX = originalHandle.endsWith("w")
+    ? baseBounds.maxX
+    : baseBounds.minX;
+  const fixedY = originalHandle.startsWith("n")
+    ? baseBounds.maxY
+    : baseBounds.minY;
 
   return {
-    maxX: handle.endsWith("w") ? baseBounds.maxX : baseBounds.minX + nextWidth,
-    maxY: handle.startsWith("n")
-      ? baseBounds.maxY
-      : baseBounds.minY + nextHeight,
-    minX: handle.endsWith("w") ? baseBounds.maxX - nextWidth : baseBounds.minX,
-    minY: handle.startsWith("n")
-      ? baseBounds.maxY - nextHeight
-      : baseBounds.minY,
+    maxX: resizeHandle.endsWith("w") ? fixedX : fixedX + nextWidth,
+    maxY: resizeHandle.startsWith("n") ? fixedY : fixedY + nextHeight,
+    minX: resizeHandle.endsWith("w") ? fixedX - nextWidth : fixedX,
+    minY: resizeHandle.startsWith("n") ? fixedY - nextHeight : fixedY,
   };
 };
 
@@ -125,9 +175,16 @@ export const getResizedShapeNodeUpdate = (
     handle,
     node
   );
+  const resizeHandle = rawBounds.handle;
   const nextBounds =
     preserveAspectRatio && isCornerHandle(handle)
-      ? getAspectLockedBounds(bounds, rawBounds, handle, node)
+      ? getAspectLockedBounds(
+          bounds,
+          rawBounds,
+          handle,
+          resizeHandle,
+          node
+        )
       : rawBounds;
   const strokeInset = getStrokeInset(node);
   const width = round(
@@ -145,7 +202,7 @@ export const getResizedShapeNodeUpdate = (
     transform: getNodeTransformForPinnedWorldPoint(
       node,
       nextShapeBounds,
-      getBoundsForHandle(nextShapeBounds, handle),
+      getBoundsForHandle(nextShapeBounds, resizeHandle),
       anchorCanvas
     ),
     width,

@@ -434,14 +434,6 @@ const ColorValueTrigger = ({
         onChange={(event) => {
           const nextHex = trimHashPrefix(event.currentTarget.value);
           setHexDraftValue(nextHex);
-
-          const normalizedValue = formatColorWithOpacity(
-            nextHex,
-            opacityDraftValue
-          );
-          if (normalizedValue) {
-            onChange(normalizedValue);
-          }
         }}
         onClick={handleTextInputClick}
         onFocus={selectInputText}

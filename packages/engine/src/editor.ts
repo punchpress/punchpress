@@ -2,6 +2,8 @@ import {
   createLocalFontDescriptor,
   DEFAULT_LOCAL_FONT,
   ROOT_PARENT_ID,
+  type LocalFontDescriptor,
+  type LocalFontOption,
 } from "@punchpress/punch-schema";
 import {
   copySelection as copyEditorSelection,
@@ -124,6 +126,7 @@ import {
   preloadFontOptions as preloadEditorFontOptions,
   preloadFonts as preloadEditorFonts,
   requestLocalFonts as requestEditorLocalFonts,
+  setBundledFonts as setEditorBundledFonts,
   setLastUsedFont as setEditorLastUsedFont,
 } from "./fonts/font-catalog-actions";
 import {
@@ -314,6 +317,7 @@ import { zoomViewportFromWheel as zoomEditorViewportFromWheel } from "./viewport
 export interface Editor {
   accent: any;
   availableFonts: any;
+  bundledFonts: LocalFontOption[];
   defaultFont: any;
   editingHistoryMark: any;
   fonts: any;
@@ -365,6 +369,7 @@ export class Editor {
   constructor({ accent = UI_ACCENT, initialZoom = 1, rasterSurface = null } = {}) {
     this.accent = accent;
     this.availableFonts = [];
+    this.bundledFonts = [];
     this.defaultFont = createLocalFontDescriptor(DEFAULT_LOCAL_FONT);
     this.getInitialLocalFontCatalog = null;
     this.lastUsedFont = null;
@@ -734,6 +739,10 @@ export class Editor {
 
   setDefaultFont(font) {
     this.defaultFont = createLocalFontDescriptor(font || DEFAULT_LOCAL_FONT);
+  }
+
+  setBundledFonts(fonts: readonly (LocalFontDescriptor | LocalFontOption)[]) {
+    setEditorBundledFonts(this, fonts);
   }
 
   setFontBytesLoader(loadFontBytes) {

@@ -52,14 +52,24 @@ export const TextWarpFields = ({ node, withTopBorder = true }) => {
     return null;
   }
 
+  const warpAvailable =
+    editor.getFontAvailability(node.font) === "available" &&
+    editor.getFontPreviewState(node.font) === "ready";
+
   return (
     <Section
       className={withTopBorder ? "border-black/4 border-t" : undefined}
       title="Warp"
     >
+      {warpAvailable ? null : (
+        <output className="block text-muted-foreground text-xs">
+          The saved font must be loaded to preview or edit warp controls.
+        </output>
+      )}
       <FieldRow className="items-start" label="Type" labelClassName="pt-2.5">
         <IconSegmentedControl
           className="grid-cols-3"
+          disabled={!warpAvailable}
           onValueChange={(values) => {
             const nextKind = values[0] ?? "none";
             editor.updateSelectedNode({
@@ -99,7 +109,7 @@ export const TextWarpFields = ({ node, withTopBorder = true }) => {
 
       {node.warp.kind !== "none" ? (
         <div className="mt-2 grid gap-2">
-          <TextWarpKindFields node={node} />
+          <TextWarpKindFields disabled={!warpAvailable} node={node} />
         </div>
       ) : null}
 
@@ -128,7 +138,7 @@ const WarpOptionPlaceholder = () => {
   );
 };
 
-const TextWarpKindFields = ({ node }) => {
+const TextWarpKindFields = ({ disabled, node }) => {
   const editor = useEditor();
   const update = (warpPatch) => {
     editor.updateSelectedNode({
@@ -153,6 +163,7 @@ const TextWarpKindFields = ({ node }) => {
       <FieldRow label="Bend">
         <ScrubSlider
           ariaLabel="Bend"
+          disabled={disabled}
           max={ARCH_BEND_RANGE.max}
           min={ARCH_BEND_RANGE.min}
           onValueChange={setBend}
@@ -183,6 +194,7 @@ const TextWarpKindFields = ({ node }) => {
         <FieldRow label="Amplitude">
           <ScrubSlider
             ariaLabel="Amplitude"
+            disabled={disabled}
             formatValue={formatWarpValue}
             max={FINITE_NUMBER_RANGE.max}
             min={FINITE_NUMBER_RANGE.min}
@@ -197,6 +209,7 @@ const TextWarpKindFields = ({ node }) => {
         <FieldRow label="Cycles">
           <ScrubSlider
             ariaLabel="Cycles"
+            disabled={disabled}
             max={WAVE_CYCLES_RANGE.max}
             min={WAVE_CYCLES_RANGE.min}
             onValueChange={setCycles}
@@ -235,6 +248,7 @@ const TextWarpKindFields = ({ node }) => {
               render={
                 <Button
                   className="w-full justify-center"
+                  disabled={disabled}
                   onClick={() => {
                     if (isPathEditing) {
                       editor.setActiveTool("pointer");
@@ -265,6 +279,7 @@ const TextWarpKindFields = ({ node }) => {
         <FieldRow label="Side">
           <ToggleGroup
             className="grid grid-cols-2 gap-1.5"
+            disabled={disabled}
             onValueChange={setSide}
             value={[node.warp.inverted ? "inside" : "outside"]}
           >
@@ -275,6 +290,7 @@ const TextWarpKindFields = ({ node }) => {
         <FieldRow label="Radius">
           <ScrubSlider
             ariaLabel="Radius"
+            disabled={disabled}
             max={CIRCLE_RADIUS_RANGE.max}
             min={CIRCLE_RADIUS_RANGE.min}
             onValueChange={setRadius}
@@ -285,6 +301,7 @@ const TextWarpKindFields = ({ node }) => {
         <FieldRow label="Sweep">
           <ScrubSlider
             ariaLabel="Sweep"
+            disabled={disabled}
             max={CIRCLE_SWEEP_RANGE.max}
             min={CIRCLE_SWEEP_RANGE.min}
             onValueChange={setSweep}
@@ -306,6 +323,7 @@ const TextWarpKindFields = ({ node }) => {
       <FieldRow label="Slant">
         <ScrubSlider
           ariaLabel="Slant"
+          disabled={disabled}
           formatValue={formatWarpValue}
           max={FINITE_NUMBER_RANGE.max}
           min={FINITE_NUMBER_RANGE.min}

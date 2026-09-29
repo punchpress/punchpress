@@ -24,9 +24,9 @@ export interface LocalFontCatalogResult {
 }
 
 export const DEFAULT_LOCAL_FONT: LocalFontDescriptor = {
-  family: "System UI",
-  fullName: "System UI",
-  postscriptName: "system-ui",
+  family: "Source Sans Pro",
+  fullName: "Source Sans Pro",
+  postscriptName: "SourceSansPro-Regular",
   style: "Regular",
 };
 

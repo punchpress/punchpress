@@ -131,6 +131,7 @@ export const loadDocument = (editor, contents) => {
 
   editor.cancelRasterStroke();
   editor.rasterSurface?.resetSurfaces?.();
+  editor.nodeTree.resetGeneratedLayerLabels();
   editor.getState().loadNodes(internalNodes);
   editor.resetHistory();
   editor.resetPasteSequence();
@@ -145,6 +146,7 @@ export const loadDocument = (editor, contents) => {
 export const newDocument = (editor) => {
   finishEditingIfNeeded(editor);
   editor.rasterSurface?.resetSurfaces?.();
+  editor.nodeTree.resetGeneratedLayerLabels();
   editor.getState().loadNodes([]);
   editor.resetHistory();
   editor.resetPasteSequence();

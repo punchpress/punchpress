@@ -4,8 +4,25 @@ import {
   isContainerNode,
 } from "../nodes/node-tree";
 
+const getGeneratedLayerLabelKey = (node) => {
+  if (!node) {
+    return null;
+  }
+
+  const parentId = getNodeParentId(node);
+
+  if (node.type === "shape") {
+    return `${parentId}:shape:${node.shape}`;
+  }
+
+  return `${parentId}:${node.type}`;
+};
+
 export interface NodeTreeManager {
   childIdsByParent: any;
+  generatedLayerLabelIndexById: Map<string, number>;
+  generatedLayerLabelKeyById: Map<string, string>;
+  generatedLayerLabelNextIndexByKey: Map<string, number>;
   layerMetaById: any;
   nodes: any;
   nodesById: any;
@@ -14,6 +31,9 @@ export interface NodeTreeManager {
 export class NodeTreeManager {
   constructor() {
     this.childIdsByParent = new Map();
+    this.generatedLayerLabelIndexById = new Map();
+    this.generatedLayerLabelKeyById = new Map();
+    this.generatedLayerLabelNextIndexByKey = new Map();
     this.layerMetaById = new Map();
     this.nodes = null;
     this.nodesById = new Map();
@@ -22,6 +42,20 @@ export class NodeTreeManager {
   sync(nodes) {
     if (this.nodes === nodes) {
       return;
+    }
+
+    for (const node of nodes) {
+      const key = getGeneratedLayerLabelKey(node);
+
+      if (!key || this.generatedLayerLabelKeyById.get(node.id) === key) {
+        continue;
+      }
+
+      const nextIndex =
+        (this.generatedLayerLabelNextIndexByKey.get(key) || 0) + 1;
+      this.generatedLayerLabelKeyById.set(node.id, key);
+      this.generatedLayerLabelIndexById.set(node.id, nextIndex);
+      this.generatedLayerLabelNextIndexByKey.set(key, nextIndex);
     }
 
     const childIdsByParent = new Map();
@@ -113,5 +147,17 @@ export class NodeTreeManager {
     this.sync(nodes);
 
     return this.layerMetaById.get(nodeId) || null;
+  }
+
+  resetGeneratedLayerLabels() {
+    this.generatedLayerLabelIndexById.clear();
+    this.generatedLayerLabelKeyById.clear();
+    this.generatedLayerLabelNextIndexByKey.clear();
+  }
+
+  getGeneratedLayerLabelIndex(nodes, nodeId) {
+    this.sync(nodes);
+
+    return this.generatedLayerLabelIndexById.get(nodeId) || 1;
   }
 }

@@ -83,11 +83,13 @@ export class PenTool extends Tool {
     return startSelectedEndpointContinuationSession(this);
   }
 
-  onDeactivate() {
+  onDeactivate({ nextToolId = undefined } = {}) {
     const didFinish = finishAuthoringSession(this, { commit: true });
     const didClearIdleHover = clearIdleHoverTarget(this);
+    const didStopEditing =
+      nextToolId !== "node" && this.editor.stopPathEditing();
 
-    return didFinish || didClearIdleHover;
+    return didFinish || didClearIdleHover || didStopEditing;
   }
 
   onPathEditingStopped() {

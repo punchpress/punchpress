@@ -1,4 +1,5 @@
 export const CanvasFallbackText = ({
+  baselineOffset,
   fill,
   fontFamily,
   fontSize,
@@ -13,6 +14,7 @@ export const CanvasFallbackText = ({
   return (
     <text
       dominantBaseline="middle"
+      dy={baselineOffset || undefined}
       fill={fill || "none"}
       fontFamily={fontFamily}
       fontSize={fontSize}

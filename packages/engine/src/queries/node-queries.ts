@@ -57,6 +57,12 @@ const isNodeEffectivelyVisible = (editor, node) => {
   return isNodeEffectivelyVisible(editor, editor.getNode(node.parentId));
 };
 
+const getGeneratedLayerLabelIndex = (editor, node) => {
+  return (
+    editor.nodeTree?.getGeneratedLayerLabelIndex(editor.nodes, node.id) || 1
+  );
+};
+
 export const getLayerRow = (editor, nodeId) => {
   const node = editor.getNode(nodeId);
   const layerMeta = editor.nodeTree?.getLayerMeta(editor.nodes, nodeId) || null;
@@ -66,23 +72,25 @@ export const getLayerRow = (editor, nodeId) => {
   }
 
   const isVisible = isNodeEffectivelyVisible(editor, node);
-  let label = node.name || `Group ${layerMeta.containerLayerIndex + 1}`;
+  let label = node.name || `Group ${getGeneratedLayerLabelIndex(editor, node)}`;
 
   if (isArtboardNode(node)) {
-    label = node.name || `Artboard ${layerMeta.containerLayerIndex + 1}`;
+    label = node.name || `Artboard ${getGeneratedLayerLabelIndex(editor, node)}`;
   } else if (isEmptyNode(node)) {
-    label = node.name || `Layer ${layerMeta.layerIndex + 1}`;
+    label = node.name || `Layer ${getGeneratedLayerLabelIndex(editor, node)}`;
   } else if (isTextNode(node)) {
     label =
-      node.text.trim().length > 0 ? node.text : `Text ${layerMeta.layerIndex + 1}`;
+      node.text.trim().length > 0
+        ? node.text
+        : `Text ${getGeneratedLayerLabelIndex(editor, node)}`;
   } else if (isShapeNode(node)) {
-    label = `${node.shape[0].toUpperCase()}${node.shape.slice(1)} ${layerMeta.layerIndex + 1}`;
+    label = `${node.shape[0].toUpperCase()}${node.shape.slice(1)} ${getGeneratedLayerLabelIndex(editor, node)}`;
   } else if (isImageNode(node)) {
-    label = node.name || `Image ${layerMeta.layerIndex + 1}`;
+    label = node.name || `Image ${getGeneratedLayerLabelIndex(editor, node)}`;
   } else if (isVectorNode(node)) {
-    label = node.name || `Vector ${layerMeta.containerLayerIndex + 1}`;
+    label = node.name || `Vector ${getGeneratedLayerLabelIndex(editor, node)}`;
   } else if (isPathNode(node)) {
-    label = `Path ${layerMeta.layerIndex + 1}`;
+    label = `Path ${getGeneratedLayerLabelIndex(editor, node)}`;
   }
 
   return {

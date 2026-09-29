@@ -1,7 +1,10 @@
 import {
+  createLocalFontOption,
   createLocalFontDescriptor,
   getLocalFontId,
   type LocalFontCatalogResult,
+  type LocalFontDescriptor,
+  type LocalFontOption,
 } from "@punchpress/punch-schema";
 import { resolveDefaultFont } from "./resolve-default-font";
 
@@ -15,6 +18,26 @@ const preloadDefaultFont = (editor) => {
   }
 
   editor.fonts.preloadFont(editor.getDefaultFont());
+};
+
+type FontInput = LocalFontDescriptor | LocalFontOption;
+
+const mergeFontOptions = (
+  ...fontLists: ReadonlyArray<ReadonlyArray<FontInput>>
+) => {
+  const fontsById = new Map<string, LocalFontOption>();
+
+  for (const fonts of fontLists) {
+    for (const font of fonts || []) {
+      const option = createLocalFontOption(font);
+
+      if (!fontsById.has(option.id)) {
+        fontsById.set(option.id, option);
+      }
+    }
+  }
+
+  return [...fontsById.values()];
 };
 
 export const preloadFontOptions = (editor, fonts) => {
@@ -36,13 +59,23 @@ export const getDefaultFont = (editor) => {
 };
 
 export const getFontAvailability = (editor, font) => {
+  const fontId = getLocalFontId(font);
+  const isBundledFont = (editor.bundledFonts || []).some(
+    (bundledFont) => bundledFont.id === fontId
+  );
+
+  if (isBundledFont) {
+    return editor.fonts.getLoadState(font) === "error"
+      ? "load-error"
+      : "available";
+  }
+
   const state = editor.fontCatalogState;
 
   if (state !== "ready") {
     return state;
   }
 
-  const fontId = getLocalFontId(font);
   if (!editor.availableFonts.some((availableFont) => availableFont.id === fontId)) {
     return "missing";
   }
@@ -58,6 +91,7 @@ export const getTextFallbackPreview = (editor, node, geometry) => {
   }
 
   return {
+    baselineOffset: -node.fontSize * 0.18,
     fontFamily: editor.fonts.getEditableFontFamily(node.font),
     fontSize: node.fontSize,
     text: node.text,
@@ -96,6 +130,30 @@ export const setLastUsedFont = (editor, font) => {
   editor.persistLastUsedFont?.(descriptor);
 };
 
+export const setBundledFonts = (
+  editor,
+  fonts: readonly FontInput[] = []
+) => {
+  editor.bundledFonts = mergeFontOptions(fonts);
+  editor.availableFonts = mergeFontOptions(
+    editor.bundledFonts,
+    editor.availableFonts
+  );
+
+  const preferredFont = resolveDefaultFont(
+    editor.availableFonts,
+    editor.lastUsedFont
+  );
+
+  if (preferredFont) {
+    editor.defaultFont = createLocalFontDescriptor(preferredFont);
+  }
+
+  editor.getState().bumpFontRevision();
+  preloadDefaultFont(editor);
+  preloadFonts(editor);
+};
+
 export const loadLocalFontCatalog = (editor, loadCatalog, { force = false } = {}) => {
   if (!force && editor.localFontCatalogPromise) {
     return editor.localFontCatalogPromise;
@@ -118,9 +176,12 @@ export const applyLocalFontCatalog = (
   editor,
   catalog: LocalFontCatalogResult
 ) => {
-  editor.availableFonts = catalog.fonts;
+  editor.availableFonts = mergeFontOptions(editor.bundledFonts, catalog.fonts);
 
-  const preferredFont = resolveDefaultFont(catalog.fonts, editor.lastUsedFont);
+  const preferredFont = resolveDefaultFont(
+    editor.availableFonts,
+    editor.lastUsedFont
+  );
 
   if (preferredFont) {
     editor.defaultFont = createLocalFontDescriptor(preferredFont);

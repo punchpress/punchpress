@@ -1,5 +1,7 @@
+import bundledSourceSansFontUrl from "@fontsource/source-sans-pro/files/source-sans-pro-all-400-normal.woff?url";
 import {
   createLocalFontOption,
+  DEFAULT_LOCAL_FONT,
   getLocalFontId,
   type LocalFontCatalogResult,
   type LocalFontDescriptor,
@@ -143,6 +145,20 @@ const toArrayBuffer = (value: ArrayBuffer | Uint8Array) => {
   );
 };
 
+const readBundledFontBytes = async (font: LocalFontDescriptor) => {
+  if (getLocalFontId(font) !== getLocalFontId(DEFAULT_LOCAL_FONT)) {
+    return null;
+  }
+
+  const response = await fetch(bundledSourceSansFontUrl);
+
+  if (!response.ok) {
+    throw new Error(`Unable to load bundled font (${response.status}).`);
+  }
+
+  return response.arrayBuffer();
+};
+
 const readBrowserFontBytes = async (font: LocalFontDescriptor) => {
   if (typeof window.queryLocalFonts !== "function") {
     return null;
@@ -168,6 +184,12 @@ const readBrowserFontBytes = async (font: LocalFontDescriptor) => {
 };
 
 export const readLocalFontBytes = async (font: LocalFontDescriptor) => {
+  const bundledBytes = await readBundledFontBytes(font);
+
+  if (bundledBytes) {
+    return bundledBytes;
+  }
+
   if (window.electron?.localFonts) {
     const bytes = await window.electron.localFonts.readFont(
       getLocalFontId(font)

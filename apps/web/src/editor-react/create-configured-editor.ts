@@ -1,4 +1,5 @@
 import { Editor } from "@punchpress/engine";
+import { DEFAULT_LOCAL_FONT } from "@punchpress/punch-schema";
 import {
   getInitialLocalFontCatalog,
   readLocalFontBytes,
@@ -19,6 +20,7 @@ export const createConfiguredEditor = () => {
   }
 
   editor.setFontBytesLoader(readLocalFontBytes);
+  editor.setBundledFonts([DEFAULT_LOCAL_FONT]);
   editor.setLastUsedFontPersistence(rememberLastUsedFont);
   editor.setLocalFontCatalogLoaders({
     getInitialCatalog: getInitialLocalFontCatalog,
