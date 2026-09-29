@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { DEFAULT_LOCAL_FONT } from "@punchpress/punch-schema";
 import {
   getInitialLocalFontCatalog,
   readLocalFontBytes,
@@ -11,8 +12,11 @@ const restoreWindow = () => {
   }
 };
 
+const originalFetch = globalThis.fetch;
+
 afterEach(() => {
   restoreWindow();
+  globalThis.fetch = originalFetch;
 });
 
 describe("local font catalog availability", () => {
@@ -81,6 +85,22 @@ describe("local font catalog availability", () => {
 });
 
 describe("readLocalFontBytes", () => {
+  test("loads the bundled default without requesting local font access", async () => {
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        queryLocalFonts: () =>
+          Promise.reject(new DOMException("Denied", "NotAllowedError")),
+      },
+    });
+    globalThis.fetch = async () =>
+      new Response(new Uint8Array([1, 2, 3]), { status: 200 });
+
+    const bytes = await readLocalFontBytes(DEFAULT_LOCAL_FONT);
+
+    expect(bytes).toEqual(new Uint8Array([1, 2, 3]).buffer);
+  });
+
   test("returns null when the requested browser font is not available", async () => {
     Object.defineProperty(globalThis, "window", {
       configurable: true,

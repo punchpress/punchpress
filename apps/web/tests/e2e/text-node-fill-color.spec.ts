@@ -77,6 +77,32 @@ test("normalizes a typed fill color and applies it to the selected node", async 
   await expect.poll(() => getSelectedNodeFill(page, nodeId)).toBe("#11AA22");
 });
 
+test("keeps keyboard-entered hex colors intact until they are committed", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+
+  for (const nextHex of ["123456", "FF0000"]) {
+    await loadDocumentFixture(page, "color-picker-field.punch");
+    const nodeId = "color-node";
+    await page.getByRole("button", { name: "Color" }).first().click();
+    const fillInput = getFillColorInput(page);
+
+    await fillInput.click();
+    await fillInput.pressSequentially(nextHex);
+
+    await expect(fillInput).toHaveValue(nextHex);
+    await expect.poll(() => getSelectedNodeFill(page, nodeId)).toBe("#ffffff");
+
+    await fillInput.blur();
+
+    await expect(fillInput).toHaveValue(nextHex);
+    await expect
+      .poll(() => getSelectedNodeFill(page, nodeId))
+      .toBe(`#${nextHex}`);
+  }
+});
+
 test("reverts an invalid fill draft to the last committed color on blur", async ({
   page,
 }) => {
