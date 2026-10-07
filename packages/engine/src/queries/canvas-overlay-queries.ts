@@ -49,7 +49,10 @@ const getTransformFlags = ({
 
   if (isPathEditingSelection) {
     return {
-      isDraggable: false,
+      // Text path editing keeps transform chrome; dragging the text moves it.
+      isDraggable: Boolean(
+        canTransform && selectedNode && !editingNodeId && !isTextPathPositioning
+      ),
       isResizable: Boolean(
         canTransform &&
           selectedNode &&

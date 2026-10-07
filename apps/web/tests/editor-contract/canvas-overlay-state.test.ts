@@ -217,6 +217,24 @@ describe("canvas overlay state queries", () => {
     expect(editor.getCanvasTransformOverlayState()).toBeNull();
   });
 
+  test("keeps text path nodes draggable while path editing", () => {
+    const editor = createEditor();
+    const node = createCircleTextNode();
+
+    editor.getState().loadNodes([node]);
+    mockCircleGuideGeometry(editor, node);
+    editor.select(node.id);
+    expect(editor.startPathEditing(node.id)).toBe(true);
+    editor.setActiveTool("node");
+
+    expect(editor.getCanvasTransformOverlayState()).toMatchObject({
+      isDraggable: true,
+      isRotatable: false,
+      mode: "single",
+      selectedNodeId: "circle-node",
+    });
+  });
+
   test("returns multi-node transform overlay state for a multi-selection", () => {
     const editor = createEditor();
 
