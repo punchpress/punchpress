@@ -59,6 +59,12 @@ export {
   recipeToComponentNodes,
 } from "./document/recipe-component-nodes";
 export { Editor } from "./editor";
+export type {
+  RenderItem,
+  RenderLayer,
+  RenderLeaf,
+  RenderTree,
+} from "./render-tree/render-tree";
 export {
   getNodePropertySupport,
   getSelectionProperties,

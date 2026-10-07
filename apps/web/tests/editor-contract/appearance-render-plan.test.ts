@@ -250,7 +250,7 @@ describe("appearance render plan", () => {
     });
   });
 
-  test("export wraps node opacity times ancestor opacity once", async () => {
+  test("export composites a translucent group once over its opaque children", async () => {
     const editor = new Editor();
     const group = {
       id: "group",
@@ -261,23 +261,33 @@ describe("appearance render plan", () => {
       type: "group",
       visible: true,
     };
-    const shape = {
+    const child = (id: string, x: number, opacity = 1) => ({
       ...createDefaultShapeNode("polygon"),
-      appearance: createSolidAppearance({
-        fill: "#ff0000",
-        stroke: "#000000",
-        strokeWidth: 4,
-      }),
-      id: "shape",
-      opacity: 0.5,
+      appearance: createSolidAppearance({ fill: "#ff0000" }),
+      id,
+      opacity,
       parentId: "group",
-    };
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x, y: 0 },
+    });
 
-    editor.getState().loadNodes([group, shape] as never);
+    editor
+      .getState()
+      .loadNodes([
+        group,
+        child("a", 0),
+        child("b", 50, 0.5),
+        child("x", 400),
+      ] as never);
+    editor.moveNodeToParent("x", "root");
 
     const body = (await editor.exportDocument()).split("<metadata>")[0];
+    const groupStart = body.indexOf('<g opacity="0.5">');
+    const groupBody = body.slice(groupStart, body.lastIndexOf("</g>"));
 
-    expect(body).toContain('<g opacity="0.25"><path');
-    expect(body.match(/opacity="/g)).toHaveLength(1);
+    // One wrapper owns the group opacity; the opaque child carries none and
+    // the 0.5 child carries only its own. Overlap alpha is 0.5, not 0.75.
+    expect(groupStart).toBeGreaterThanOrEqual(0);
+    expect(groupBody.match(/opacity="0.25"/g)).toBeNull();
+    expect(body.match(/opacity="/g)).toHaveLength(2);
   });
 });

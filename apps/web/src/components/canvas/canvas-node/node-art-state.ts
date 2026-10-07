@@ -3,11 +3,7 @@ import {
   getNodeAppearance,
   getPrimaryPaint,
 } from "@punchpress/engine";
-import {
-  getGroupNodeArtState,
-  getNodeOpacity,
-  getSvgNodeAncestorOpacityChain,
-} from "./node-render-tree";
+import { getGroupNodeArtState, getNodeOpacity } from "./node-render-tree";
 
 export const mergeNodeUpdate = (node, nodeUpdate) => {
   return {
@@ -39,6 +35,7 @@ export const selectNodeArtState = (
   nodeId,
   previewNode = null
 ) => {
+  const isEditingText = state.editingNodeId === nodeId && !previewNode;
   const node = previewNode || editor.getNode(nodeId);
 
   if (!node) {
@@ -49,9 +46,7 @@ export const selectNodeArtState = (
     return getGroupNodeArtState(editor, state, nodeId);
   }
 
-  const geometry = previewNode
-    ? editor.buildPreviewNodeGeometry(previewNode)
-    : editor.getNodeRenderGeometry(nodeId);
+  const geometry = getArtGeometry(editor, nodeId, previewNode, isEditingText);
   const bbox = geometry?.bbox ||
     editor.getNodeRenderFrame(nodeId)?.bounds || {
       height: 0,
@@ -70,13 +65,15 @@ export const selectNodeArtState = (
       : null,
     fallbackText,
     image: node.type === "image" ? node : null,
-    isEditing: state.editingNodeId === nodeId,
+    // Text edits paint their live preview here; other edited art hides.
+    isEditing: state.editingNodeId === nodeId && !isEditingText,
+    isEditingText,
     isInteractionProxy: false,
     objects: buildAppearanceObjects(node, geometry?.paths, (id) =>
       editor.getNode(id)
     ),
-    opacity:
-      getNodeOpacity(node) * getSvgNodeAncestorOpacityChain(editor, node.id),
+    // Ancestor opacity lives on the group and artboard layers.
+    opacity: getNodeOpacity(node),
     ready: Boolean(geometry?.ready),
     renderTree: null,
   };
@@ -89,6 +86,7 @@ export const selectNodeReadyState = (editor, _state, nodeId) => {
 export const selectNodeArtInputs = (editor, state, nodeId) => {
   return {
     editingNodeId: state.editingNodeId,
+    editingText: state.editingNodeId === nodeId ? state.editingText : null,
     fontRevision: state.fontRevision,
     node: editor.getNode(nodeId),
     nodes: state.nodes,
@@ -103,4 +101,16 @@ export const getMemoizedNodeArtState = (
   previewNode = null
 ) => {
   return selectNodeArtState(editor, editor.getState(), nodeId, previewNode);
+};
+
+const getArtGeometry = (editor, nodeId, previewNode, isEditingText) => {
+  if (isEditingText) {
+    return (
+      editor.editingPreviewGeometry || editor.getNodeRenderGeometry(nodeId)
+    );
+  }
+
+  return previewNode
+    ? editor.buildPreviewNodeGeometry(previewNode)
+    : editor.getNodeRenderGeometry(nodeId);
 };

@@ -1,16 +1,7 @@
-import {
-  buildAppearanceObjects,
-  isNodeVisible,
-  resolveTrackingPx,
-} from "@punchpress/engine";
+import { isNodeVisible, resolveTrackingPx } from "@punchpress/engine";
 import { useEffect, useRef, useState } from "react";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
-import { CanvasAppearanceObjects } from "./canvas-node/canvas-appearance-objects";
-import {
-  getNodeOpacity,
-  getSvgNodeAncestorOpacityChain,
-} from "./canvas-node/node-render-tree";
 
 const measurementCanvas =
   typeof document === "undefined" ? null : document.createElement("canvas");
@@ -39,9 +30,11 @@ export const CanvasTextEditor = () => {
   const editingNode = useEditorValue((editor) => {
     return isNodeVisible(editor.editingNode) ? editor.editingNode : null;
   });
-  const editingFrame = useEditorValue((editor) => editor.editingFrame);
-  const editingPreviewGeometry = useEditorValue(
-    (editor) => editor.editingPreviewGeometry
+  // The input and caret share the edited node's render frame and transform,
+  // so they line up with the artwork painted in the node's shell (including
+  // flips, which the selection frame's transform omits).
+  const editingFrame = useEditorValue(
+    (editor) => editor.editingRenderFrame || editor.editingFrame
   );
   const editingText = useEditorValue((_, state) => state.editingText);
   const fontFamily = useEditorValue((editor) => editor.editingFontFamily);
@@ -121,7 +114,6 @@ export const CanvasTextEditor = () => {
   }
 
   const frame = editingFrame.bounds;
-  const previewBounds = editingPreviewGeometry?.bbox;
   const input = inputRef.current;
   const hasCollapsedSelection = selectionRange.start === selectionRange.end;
   const caretIndex = hasCollapsedSelection ? selectionRange.end : null;
@@ -164,36 +156,6 @@ export const CanvasTextEditor = () => {
         width: `${frame.width}px`,
       }}
     >
-      <svg
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 block overflow-visible"
-        data-testid="canvas-text-preview"
-        height={frame.height}
-        viewBox={`0 0 ${frame.width} ${frame.height}`}
-        width={frame.width}
-      >
-        {previewBounds ? (
-          <g
-            transform={`translate(${-previewBounds.minX} ${-previewBounds.minY})`}
-          >
-            <g
-              opacity={
-                getNodeOpacity(editingNode) *
-                getSvgNodeAncestorOpacityChain(editor, editingNode.id)
-              }
-            >
-              <CanvasAppearanceObjects
-                objects={buildAppearanceObjects(
-                  editingNode,
-                  editingPreviewGeometry?.paths,
-                  (nodeId) => editor.getNode(nodeId)
-                )}
-              />
-            </g>
-          </g>
-        ) : null}
-      </svg>
-
       {caretLeft !== null ? (
         <div
           aria-hidden="true"

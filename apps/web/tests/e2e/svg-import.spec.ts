@@ -363,13 +363,16 @@ test("preserves SVG group opacity while rendering imported paths", async ({
     })
     .toContain("0.3");
 
+  // The group's render layer owns its opacity, applied once to the surface.
   await expect
     .poll(() => {
-      return page.evaluate(() => {
-        return document
-          .querySelector(".canvas-node-layer svg > g")
-          ?.getAttribute("opacity");
-      });
+      return page.evaluate((groupId) => {
+        return (
+          document.querySelector<HTMLElement>(
+            `[data-render-layer="${groupId}"]`
+          )?.style.opacity ?? null
+        );
+      }, importedGroup?.id);
     })
     .toBe("0.4");
 

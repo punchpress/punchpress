@@ -189,3 +189,47 @@ test("keeps stroked text paint order consistent between normal render and edit p
     new Set(editPaint.map(([fill, stroke]) => `${fill}/${stroke}`))
   ).toEqual(new Set(["#ffffff/none", "none/#000000"]));
 });
+
+test("flipped text edits with artwork, input, and caret in one coordinate system", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(
+    page,
+    JSON.stringify({
+      ...STROKED_TEXT_DOCUMENT,
+      nodes: [
+        {
+          ...STROKED_TEXT_DOCUMENT.nodes[0],
+          transform: {
+            ...STROKED_TEXT_DOCUMENT.nodes[0].transform,
+            rotation: 18,
+            scaleX: -1,
+          },
+        },
+      ],
+    })
+  );
+  await pauseForUi(page);
+  await clickNodeCenter(page, "stroked-text-node");
+  await pauseForUi(page);
+  await doubleClickNodeCenter(page, "stroked-text-node");
+  await pauseForUi(page);
+
+  const transforms = await page.evaluate(() => {
+    const node = document.querySelector<HTMLElement>(
+      '.canvas-node[data-node-id="stroked-text-node"]'
+    );
+    const caret = document.querySelector<HTMLElement>(
+      '[data-testid="canvas-text-caret"]'
+    );
+
+    return {
+      editor: caret?.parentElement?.style.transform ?? null,
+      node: node?.style.transform ?? null,
+    };
+  });
+
+  expect(transforms.node).toContain("scale(-1");
+  expect(transforms.editor).toBe(transforms.node);
+});

@@ -55,23 +55,6 @@ export const getNodeOpacity = (node) => {
   return typeof node?.opacity === "number" ? node.opacity : 1;
 };
 
-export const getSvgNodeAncestorOpacityChain = (editor, nodeId) => {
-  let opacity = 1;
-  let currentNode = editor.getNode(nodeId);
-
-  while (currentNode?.parentId) {
-    currentNode = editor.getNode(currentNode.parentId);
-
-    if (!currentNode) {
-      break;
-    }
-
-    opacity *= getNodeOpacity(currentNode);
-  }
-
-  return opacity;
-};
-
 const getSvgNodeTransformBounds = (editor, node) => {
   return getNodeLocalTransformBounds(editor, node.id);
 };
@@ -188,8 +171,9 @@ export const getGroupNodeArtState = (editor, state, nodeId) => {
     isEditing: state.editingNodeId === nodeId,
     isInteractionProxy: false,
     objects: [],
-    opacity:
-      getNodeOpacity(node) * getSvgNodeAncestorOpacityChain(editor, nodeId),
+    // The group's render layer owns its opacity; nested groups inside the
+    // surface keep their own SVG opacity boundaries.
+    opacity: 1,
     ready: true,
     renderTree: getGroupNodeRenderTree(editor, nodeId),
   };

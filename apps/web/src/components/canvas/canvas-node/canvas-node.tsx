@@ -381,6 +381,7 @@ const CanvasStandardNodeArt = ({ nodeId }) => {
       height={Math.max(1, presentationBounds.height)}
       image={artState.image}
       isEditing={artState.isEditing}
+      isEditingText={artState.isEditingText}
       isInteractionProxy={artState.isInteractionProxy}
       objects={artState.objects}
       opacity={artState.opacity}
@@ -468,6 +469,7 @@ const CanvasNodeArt = memo(
     fallbackText,
     height,
     isEditing,
+    isEditingText,
     isInteractionProxy,
     image,
     objects,
@@ -524,6 +526,7 @@ const CanvasNodeArt = memo(
           "pointer-events-none block h-full w-full",
           image && !allowImageOverflow ? "overflow-hidden" : "overflow-visible"
         )}
+        data-testid={isEditingText ? "canvas-text-preview" : undefined}
         height={height}
         role="img"
         style={getPaintPreviewStyle(paintPreview)}

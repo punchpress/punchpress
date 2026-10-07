@@ -28,7 +28,9 @@ interface PlacementElements {
 
 const getNodeShellState = (editor, nodeId): NodeShellState | null => {
   const node = editor.getNode(nodeId);
-  const frame = editor.getNodeRenderFrame(nodeId);
+  const frame =
+    (editor.editingNodeId === nodeId && editor.editingRenderFrame) ||
+    editor.getNodeRenderFrame(nodeId);
 
   if (!(frame && node)) {
     return null;

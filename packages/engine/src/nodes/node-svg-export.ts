@@ -78,7 +78,6 @@ export const buildSvgExport = (
     height?: any;
     offsetX?: any;
     offsetY?: any;
-    inheritedOpacityById?: any;
     background?: any;
     nodeById?: Map<string, unknown>;
   } = {}
@@ -87,7 +86,6 @@ export const buildSvgExport = (
   const height = options.height ?? ARTBOARD_HEIGHT;
   const offsetX = options.offsetX ?? 0;
   const offsetY = options.offsetY ?? 0;
-  const inheritedOpacityById = options.inheritedOpacityById ?? new Map();
   const background = options.background ?? "#2d2d2d";
   const nodeById =
     options.nodeById ?? new Map(nodes.map((node) => [node.id, node]));
@@ -97,6 +95,8 @@ export const buildSvgExport = (
       ? `<rect width="${format(width)}" height="${format(height)}" fill="${background}"/>`
       : "",
   ];
+
+  const layers = createLayerWriter(body, getNode);
 
   for (const node of nodes) {
     if (node.visible === false || node.type === "artboard") {
@@ -108,16 +108,10 @@ export const buildSvgExport = (
       continue;
     }
 
+    layers.enter(node);
+
     if (node.type === "image") {
-      body.push(
-        buildSvgImageMarkup(
-          node,
-          geometry,
-          inheritedOpacityById.get(node.id) ?? 1,
-          offsetX,
-          offsetY
-        )
-      );
+      body.push(buildSvgImageMarkup(node, geometry, 1, offsetX, offsetY));
       continue;
     }
 
@@ -137,14 +131,12 @@ export const buildSvgExport = (
       body.push(`<g transform="${localTransform}">`);
     }
 
-    const inheritedOpacity = inheritedOpacityById.get(node.id) ?? 1;
-
     body.push(
       wrapSvgOpacity(
         serializeAppearanceObjects(
           buildAppearanceObjects(node, geometry.paths, getNode)
         ),
-        (node.opacity ?? 1) * inheritedOpacity
+        node.opacity ?? 1
       )
     );
 
@@ -155,5 +147,68 @@ export const buildSvgExport = (
     body.push("</g>");
   }
 
+  layers.closeAll();
+
   return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${format(width)}" height="${format(height)}" viewBox="0 0 ${format(width)} ${format(height)}">${body.join("")}</svg>`;
+};
+
+// Groups and artboards are compositing layers: their opacity applies once to
+// their flattened content, never multiplied into leaves. Nodes arrive in
+// canonical paint order (each subtree contiguous), so layers open and close
+// as the walk enters and leaves each container's subtree.
+const createLayerWriter = (body: string[], getNode) => {
+  const open: { closes: boolean; id: string }[] = [];
+
+  const getLayerChain = (node) => {
+    const chain: { id: string; opacity: number }[] = [];
+    let parent = getNode(node.parentId);
+
+    while (parent) {
+      if (parent.type === "group" || parent.type === "artboard") {
+        chain.unshift({ id: parent.id, opacity: parent.opacity ?? 1 });
+      }
+
+      parent = getNode(parent.parentId);
+    }
+
+    return chain;
+  };
+
+  return {
+    closeAll: () => {
+      while (open.length > 0) {
+        if (open.pop()?.closes) {
+          body.push("</g>");
+        }
+      }
+    },
+    enter: (node) => {
+      const chain = getLayerChain(node);
+      let shared = 0;
+
+      while (
+        shared < open.length &&
+        shared < chain.length &&
+        open[shared].id === chain[shared].id
+      ) {
+        shared += 1;
+      }
+
+      while (open.length > shared) {
+        if (open.pop()?.closes) {
+          body.push("</g>");
+        }
+      }
+
+      for (const layer of chain.slice(shared)) {
+        const closes = layer.opacity < 1;
+
+        if (closes) {
+          body.push(`<g opacity="${format(layer.opacity)}">`);
+        }
+
+        open.push({ closes, id: layer.id });
+      }
+    },
+  };
 };

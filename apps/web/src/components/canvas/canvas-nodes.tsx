@@ -1,110 +1,62 @@
-import { isArtboardNode, isEmptyNode, isGroupNode } from "@punchpress/engine";
+import type { RenderItem } from "@punchpress/engine";
+import { memo } from "react";
 import { useEditorValue } from "../../editor-react/use-editor-value";
 import { CanvasNode } from "./canvas-node/canvas-node";
 import { useCanvasNodePlacement } from "./use-canvas-node-placement";
 
-const DENSE_GROUP_RENDER_THRESHOLD = 300;
-const LARGE_GROUP_RENDER_AREA_THRESHOLD = 3_000_000;
-const LARGE_GROUP_RENDER_LEAF_THRESHOLD = 24;
-
-const collectDescendantNodeIds = (editor, nodeId) => {
-  const descendantNodeIds: string[] = [];
-
-  const visit = (parentId) => {
-    for (const childNodeId of editor.getChildNodeIds(parentId)) {
-      descendantNodeIds.push(childNodeId);
-      visit(childNodeId);
-    }
-  };
-
-  visit(nodeId);
-
-  return descendantNodeIds;
-};
-
-const shouldRenderGroupSurface = (editor, node) => {
-  if (!isGroupNode(node) || editor.focusedGroupId === node.id) {
-    return false;
-  }
-
-  const leafCount = editor.getDescendantLeafNodeIds(node.id).length;
-
-  if (leafCount > DENSE_GROUP_RENDER_THRESHOLD) {
-    return true;
-  }
-
-  if (leafCount <= LARGE_GROUP_RENDER_LEAF_THRESHOLD) {
-    return false;
-  }
-
-  const bounds = editor.getNodeRenderFrame(node.id)?.bounds;
-  const area = (bounds?.width || 0) * (bounds?.height || 0);
-
-  return area > LARGE_GROUP_RENDER_AREA_THRESHOLD;
-};
-
-const shouldRenderNode = (editor, node) => {
-  if (isArtboardNode(node)) {
-    return false;
-  }
-
-  if (isEmptyNode(node)) {
-    return false;
-  }
-
-  if (isGroupNode(node)) {
-    return shouldRenderGroupSurface(editor, node);
-  }
-
-  if (node.type !== "path") {
-    return true;
-  }
-
-  return editor.getNode(node.parentId)?.type !== "vector";
-};
-
-const selectNodeIds = (editor, state) => {
-  const hiddenNodeIds = new Set();
-  const nodeIds: string[] = [];
-
-  for (const node of state.nodes) {
-    if (
-      hiddenNodeIds.has(node.id) ||
-      !editor.isNodeEffectivelyVisible(node.id)
-    ) {
-      continue;
-    }
-
-    if (shouldRenderGroupSurface(editor, node)) {
-      nodeIds.push(node.id);
-
-      for (const descendantNodeId of collectDescendantNodeIds(
-        editor,
-        node.id
-      )) {
-        hiddenNodeIds.add(descendantNodeId);
-      }
-      continue;
-    }
-
-    if (shouldRenderNode(editor, node)) {
-      nodeIds.push(node.id);
-    }
-  }
-
-  return nodeIds;
-};
-
+// Mounts the engine render tree. Groups and artboards are compositing layers
+// that never move; placement writes only to shell and surface nodes.
 export const CanvasNodes = () => {
-  const nodeIds = useEditorValue(selectNodeIds);
+  const tree = useEditorValue((editor) => editor.getRenderTree());
 
-  useCanvasNodePlacement(nodeIds);
+  useCanvasNodePlacement(tree.placedNodeIds);
 
   return (
     <div className="canvas-node-layer absolute inset-0">
-      {nodeIds.map((nodeId) => {
-        return <CanvasNode key={nodeId} nodeId={nodeId} />;
-      })}
+      <CanvasRenderItems items={tree.items} />
     </div>
   );
 };
+
+const CanvasRenderItems = ({ items }: { items: RenderItem[] }) => {
+  return items.map((item) => {
+    if (item.kind === "layer") {
+      return (
+        <CanvasRenderLayer
+          items={item.children}
+          key={item.nodeId}
+          nodeId={item.nodeId}
+          opacity={item.opacity}
+        />
+      );
+    }
+
+    return <CanvasNode key={item.nodeId} nodeId={item.nodeId} />;
+  });
+};
+
+// A zero-size, unpositioned-content wrapper: its descendants keep stage
+// coordinates, and CSS opacity below 1 isolates the whole subtree so the
+// layer's opacity applies once to its flattened content. It carries no
+// node markers, so hit testing and selection never target it.
+const CanvasRenderLayer = memo(
+  ({
+    items,
+    nodeId,
+    opacity,
+  }: {
+    items: RenderItem[];
+    nodeId: string;
+    opacity: number;
+  }) => {
+    return (
+      <div
+        className="pointer-events-none absolute top-0 left-0 h-0 w-0"
+        data-render-layer={nodeId}
+        style={opacity < 1 ? { opacity } : undefined}
+      >
+        <CanvasRenderItems items={items} />
+      </div>
+    );
+  }
+);

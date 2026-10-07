@@ -1,14 +1,14 @@
 import {
   createLocalFontDescriptor,
   DEFAULT_LOCAL_FONT,
-  ROOT_PARENT_ID,
   type LocalFontDescriptor,
   type LocalFontOption,
+  ROOT_PARENT_ID,
 } from "@punchpress/punch-schema";
 import {
+  type AppearanceSlot,
   addFill as addEditorFill,
   addStroke as addEditorStroke,
-  type AppearanceSlot,
   moveAppearanceLayer as moveEditorAppearanceLayer,
   removeAppearanceLayer as removeEditorAppearanceLayer,
   setAppearance as setEditorAppearance,
@@ -24,8 +24,6 @@ import {
 import { resetPasteSequence as resetEditorPasteSequence } from "./clipboard/clipboard-placement";
 import { UI_ACCENT } from "./constants";
 import { getEditorDebugDump } from "./debug-dump";
-import { measurePerf } from "./perf/perf-hooks";
-import { PERF_SPANS } from "./perf/perf-labels";
 import {
   newDocument as createNewEditorDocument,
   exportDocument as exportEditorDocument,
@@ -36,11 +34,11 @@ import {
   serializeDocumentAsync as serializeEditorDocumentAsync,
 } from "./document/document-actions";
 import {
+  addEmptyLayer as addEditorEmptyLayer,
   bringToFront as bringEditorToFront,
   deleteNode as deleteEditorNode,
   deleteSelected as deleteEditorSelected,
   duplicate as duplicateEditorNodes,
-  addEmptyLayer as addEditorEmptyLayer,
   groupSelected as groupEditorSelected,
   insertNodes as insertEditorNodes,
   moveNodeToParent as moveEditorNodeToParent,
@@ -64,24 +62,11 @@ import {
 } from "./document/path/path-boolean-actions";
 import { setVectorPathComposition as setEditorVectorPathComposition } from "./document/path/path-composition-actions";
 import {
-  canJoinCurves as canEditorJoinCurves,
-  canMergeCurves as canEditorMergeCurves,
-  canSeparateCurves as canEditorSeparateCurves,
-  hasMixedCurveStyles as editorHasMixedCurveStyles,
-  joinCurves as joinEditorCurves,
-  mergeCurves as mergeEditorCurves,
-  separateCurves as separateEditorCurves,
-} from "./document/path/path-curve-actions";
-import {
   canMakeCompoundPath as canEditorMakeCompoundPath,
   canReleaseCompoundPath as canEditorReleaseCompoundPath,
   makeCompoundPath as makeEditorCompoundPath,
   releaseCompoundPath as releaseEditorCompoundPath,
 } from "./document/path/path-compound-actions";
-import {
-  canConvertShapeToPath as canEditorConvertShapeToPath,
-  convertShapeToPath as convertEditorShapeToPath,
-} from "./document/path/shape-convert-actions";
 import {
   canRoundPathPoint as canEditorRoundPathPoint,
   getPathCornerRadiusStableMax as getEditorPathCornerRadiusStableMax,
@@ -91,6 +76,15 @@ import {
   setPathCornerRadius as setEditorPathCornerRadius,
   setPathPointCornerRadius as setEditorPathPointCornerRadius,
 } from "./document/path/path-corner-actions";
+import {
+  canJoinCurves as canEditorJoinCurves,
+  canMergeCurves as canEditorMergeCurves,
+  canSeparateCurves as canEditorSeparateCurves,
+  hasMixedCurveStyles as editorHasMixedCurveStyles,
+  joinCurves as joinEditorCurves,
+  mergeCurves as mergeEditorCurves,
+  separateCurves as separateEditorCurves,
+} from "./document/path/path-curve-actions";
 import {
   deletePathPoint as deleteEditorPathPoint,
   deletePathPoints as deleteEditorPathPoints,
@@ -112,6 +106,10 @@ import {
   joinVectorPathEndpoints as joinEditorVectorPathEndpoints,
   splitVectorPath as splitEditorVectorPath,
 } from "./document/path/path-topology-actions";
+import {
+  canConvertShapeToPath as canEditorConvertShapeToPath,
+  convertShapeToPath as convertEditorShapeToPath,
+} from "./document/path/shape-convert-actions";
 import {
   addArtboardNode as addEditorArtboardNode,
   addShapeNode as addEditorShapeNode,
@@ -145,20 +143,6 @@ import {
   createDocumentChange,
 } from "./history/document-change";
 import {
-  cancelRasterCrop as cancelEditorRasterCrop,
-  commitRasterCrop as commitEditorRasterCrop,
-  getRasterCropPreviewNode as getEditorRasterCropPreviewNode,
-  startRasterCrop as startEditorRasterCrop,
-  updateRasterCrop as updateEditorRasterCrop,
-} from "./raster/crop";
-import {
-  beginRasterResize as beginEditorRasterResize,
-  cancelRasterResize as cancelEditorRasterResize,
-  commitRasterResize as commitEditorRasterResize,
-  resizeRaster as resizeEditorRaster,
-  updateRasterResize as updateEditorRasterResize,
-} from "./raster/resize";
-import {
   handleCanvasShortcutKeyDown as handleEditorCanvasShortcutKeyDown,
   handleEditingShortcutKeyDown as handleEditorEditingShortcutKeyDown,
   handlePenDirectSelectionModifierDown as handleEditorPenDirectSelectionModifierDown,
@@ -173,14 +157,6 @@ import {
 import { getPathEditingInspectorState as getEditorPathEditingInspectorState } from "./inspection/path/path-edit-inspector";
 import { getSelectionBooleanOperations as getEditorSelectionBooleanOperations } from "./inspection/selection-boolean-operations";
 import {
-  getCachedSelectionPropertiesSnapshot as getEditorCachedSelectionPropertiesSnapshot,
-  getNodePropertySupport as getEditorNodePropertySupport,
-  getSelectionProperties as getEditorSelectionProperties,
-  getSelectionPropertiesKey as getEditorSelectionPropertiesKey,
-  setSelectionColor as setEditorSelectionColor,
-  setSelectionProperty as setEditorSelectionProperty,
-} from "./inspection/selection-properties";
-import {
   beginSelectionColorChange as beginEditorSelectionColorChange,
   cancelSelectionColorChange as cancelEditorSelectionColorChange,
   commitSelectionColorChange as commitEditorSelectionColorChange,
@@ -189,6 +165,14 @@ import {
   isSelectionColorPreviewAffectingNode as isEditorSelectionColorPreviewAffectingNode,
   updateSelectionColorChange as updateEditorSelectionColorChange,
 } from "./inspection/selection-colors";
+import {
+  getCachedSelectionPropertiesSnapshot as getEditorCachedSelectionPropertiesSnapshot,
+  getNodePropertySupport as getEditorNodePropertySupport,
+  getSelectionProperties as getEditorSelectionProperties,
+  getSelectionPropertiesKey as getEditorSelectionPropertiesKey,
+  setSelectionColor as setEditorSelectionColor,
+  setSelectionProperty as setEditorSelectionProperty,
+} from "./inspection/selection-properties";
 import {
   beginSelectionDragInteraction as beginEditorSelectionDragInteraction,
   beginSelectionRotationInteraction as beginEditorSelectionRotationInteraction,
@@ -224,11 +208,13 @@ import {
 import {
   getEffectiveSelectionNodeIds,
   getSelectionTargetNodeId,
-  isDescendantOf,
   isArtboardNode,
+  isDescendantOf,
   isGroupNode,
 } from "./nodes/node-tree";
 import { getVectorPathEditingChildId } from "./nodes/vector/vector-path-composition";
+import { measurePerf } from "./perf/perf-hooks";
+import { PERF_SPANS } from "./perf/perf-labels";
 import { beginNodePlacement as beginEditorNodePlacement } from "./placement/node-placement";
 import {
   getCanvasTransformOverlayState as getEditorCanvasTransformOverlayState,
@@ -243,11 +229,11 @@ import {
   getNodeFrame as getEditorNodeFrame,
   getNodeGeometry as getEditorNodeGeometry,
   getNodeHitBounds as getEditorNodeHitBounds,
-  getNodeResizeMode as getEditorNodeResizeMode,
-  getNodeRotateMode as getEditorNodeRotateMode,
   getNodeRenderBounds as getEditorNodeRenderBounds,
   getNodeRenderFrame as getEditorNodeRenderFrame,
   getNodeRenderGeometry as getEditorNodeRenderGeometry,
+  getNodeResizeMode as getEditorNodeResizeMode,
+  getNodeRotateMode as getEditorNodeRotateMode,
   getNodeSelectionFrame as getEditorNodeSelectionFrame,
   getNodeTransformBounds as getEditorNodeTransformBounds,
   getNodeTransformFrame as getEditorNodeTransformFrame,
@@ -256,6 +242,21 @@ import {
   getSelectionTransformFrame as getEditorSelectionTransformFrame,
   hitTestNodePoint as hitTestEditorNodePoint,
 } from "./queries/node-queries";
+import {
+  cancelRasterCrop as cancelEditorRasterCrop,
+  commitRasterCrop as commitEditorRasterCrop,
+  getRasterCropPreviewNode as getEditorRasterCropPreviewNode,
+  startRasterCrop as startEditorRasterCrop,
+  updateRasterCrop as updateEditorRasterCrop,
+} from "./raster/crop";
+import {
+  beginRasterResize as beginEditorRasterResize,
+  cancelRasterResize as cancelEditorRasterResize,
+  commitRasterResize as commitEditorRasterResize,
+  resizeRaster as resizeEditorRaster,
+  updateRasterResize as updateEditorRasterResize,
+} from "./raster/resize";
+import { getRenderTree as getEditorRenderTree } from "./render-tree/render-tree";
 import {
   clearSelection as clearEditorSelection,
   clearSelectionPreservingFocus as clearEditorSelectionPreservingFocus,
@@ -268,18 +269,18 @@ import {
 } from "./selection/selection-actions";
 import { getSelectionBounds as getEditorSelectionBounds } from "./selection/selection-bounds";
 import { createEditorStore } from "./state/store/create-editor-store";
-import { HandTool } from "./tools/hand-tool";
-import { BrushTool } from "./tools/brush-tool";
-import { RasterStrokeRuntime } from "./tools/raster-stroke-runtime";
 import {
   getRasterSurfaceBounds as getEditorRasterSurfaceBounds,
   getRasterSurfacePixelSize as getEditorRasterSurfacePixelSize,
   getRasterTargetState as getEditorRasterTargetState,
   getRasterWritableBounds as getEditorRasterWritableBounds,
 } from "./tools/brush-target";
+import { BrushTool } from "./tools/brush-tool";
+import { HandTool } from "./tools/hand-tool";
 import { NodeTool } from "./tools/node-tool";
 import { PenTool } from "./tools/pen-tool";
 import { PointerTool } from "./tools/pointer-tool";
+import { RasterStrokeRuntime } from "./tools/raster-stroke-runtime";
 import { ShapeTool } from "./tools/shape-tool";
 import { TextTool } from "./tools/text-tool";
 import {
@@ -352,6 +353,11 @@ export interface Editor {
   pendingViewportFocusFrame: any;
   persistLastUsedFont: any;
   placementSurfaceListeners: any;
+  rasterAspectRatioLocks: Map<string, boolean>;
+  rasterResizeOperations: Map<string, symbol>;
+  rasterResizeStates: Map<string, any>;
+  rasterStrokeRuntime: RasterStrokeRuntime;
+  rasterSurface: any;
   requestLocalFontCatalog: any;
   selectionBoundsCache: any;
   selectionColorPreviewState: any;
@@ -363,11 +369,6 @@ export interface Editor {
   tools: any;
   unsubscribe: any;
   vectorRenderSurfaces: any;
-  rasterSurface: any;
-  rasterAspectRatioLocks: Map<string, boolean>;
-  rasterResizeOperations: Map<string, symbol>;
-  rasterResizeStates: Map<string, any>;
-  rasterStrokeRuntime: RasterStrokeRuntime;
   viewerRef: any;
   viewportFocusRequest: any;
   viewportInteracting: any;
@@ -377,7 +378,11 @@ export interface Editor {
 }
 
 export class Editor {
-  constructor({ accent = UI_ACCENT, initialZoom = 1, rasterSurface = null } = {}) {
+  constructor({
+    accent = UI_ACCENT,
+    initialZoom = 1,
+    rasterSurface = null,
+  } = {}) {
     this.accent = accent;
     this.availableFonts = [];
     this.bundledFonts = [];
@@ -579,6 +584,24 @@ export class Editor {
       this.editingPreviewNode,
       this.editingPreviewGeometry,
       "selection"
+    );
+  }
+
+  // Render frame of the text being edited, from its live preview geometry, so
+  // the node's own shell can paint the edit in its tree slot.
+  get editingRenderFrame() {
+    const geometry = this.editingPreviewGeometry;
+
+    // Without a loaded font there is no preview geometry; the shell keeps the
+    // node's own frame so frame and fallback artwork stay consistent.
+    if (!(this.editingPreviewNode && geometry)) {
+      return null;
+    }
+
+    return getNodeFrameFromGeometry(
+      this.editingPreviewNode,
+      geometry,
+      "render"
     );
   }
 
@@ -1011,6 +1034,10 @@ export class Editor {
     return moveEditorAppearanceLayer(this, slot, toIndex, nodeIds);
   }
 
+  getRenderTree() {
+    return getEditorRenderTree(this);
+  }
+
   getPrimaryStrokeStyle(nodeIds = this.selectedNodeIds) {
     return getEditorPrimaryStrokeStyle(this, nodeIds);
   }
@@ -1202,9 +1229,7 @@ export class Editor {
 
     const state = this.getState();
 
-    return toolId === "eraser"
-      ? state.eraserPresetId
-      : state.brushPresetId;
+    return toolId === "eraser" ? state.eraserPresetId : state.brushPresetId;
   }
 
   getRasterTargetState(input) {
