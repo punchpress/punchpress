@@ -9,7 +9,7 @@ read_when:
 # Appearance Stack Plan
 
 This plan implements [Appearance stack](../decisions/appearance-stack.md).
-Delete this page once stage 5 lands and its durable rules move to product
+Delete this page once stage 6 lands and its durable rules move to product
 and reference docs.
 
 ## Stage Gates
@@ -47,23 +47,31 @@ Every stage goes through the same sequence:
    - Panel family covering solid layers and node opacity.
    - New text default.
    - Ancestor opacity keeps today's per-leaf multiplication on both canvas
-     and export, so parity holds until stage 2.
-2. **Isolated group compositing.**
-   - Group layer wrappers on the canvas.
-   - Nested `<g opacity>` in dense surfaces and export.
-   - Preview transforms target the outermost wrapper when a whole group is
-     dragged.
+     and export, so parity holds until stage 3.
+2. **Group contiguity invariant.** Engine only.
+   - Canonicalize subtree order on load (normalize), insert, reparent,
+     reorder, and paste.
+   - Editor-contract tests for each ingress, including malformed loaded
+     documents and clipboard payloads.
+   - No rendering change. It ships first because stage 3 relies on it.
+3. **Engine-owned render tree and isolated groups.**
    - Starts with its own high-effort architecture review.
-   - Stops for a report if isolation forces a larger canvas restructuring than
-     the decision describes.
-3. **Linear gradients.** Paint union, userSpace defs, a gradient strip with
+   - Ordered render tree with clip, presentation, and effect layers.
+   - Disjoint preview roots and the placement rewrite.
+   - Representation stable across gestures and aware of ancestry.
+   - Editing artwork and raster ownership on the tree.
+   - Hierarchical export.
+   - Isolated group opacity.
+   - Codex's estimate: 12–18 production files and 800–1,500 changed lines.
+4. **Linear gradients.** Paint union, userSpace defs, a gradient strip with
    stop ids, and stop colors in selection colors.
-4. **Stroke alignment.** Offset-outline compiler (chosen against the
+5. **Stroke alignment.** Offset-outline compiler (chosen against the
    dependency checklist), alignment-aware ink bounds and hit testing, and
    outside strokes below fills.
-5. **Drop shadow on nodes and groups.**
-   - Effects list, the filter plan, and CSS `drop-shadow()` on group layers.
-   - Vector-container and group effects, including resize scaling.
+6. **Drop shadow on nodes and groups.**
+   - Effects list and one branched filter graph per effect owner.
+   - Vector-container and group effects, including resize and baked
+     group-transform scaling.
 
 The schema version bumps at each stage that widens it.
 
@@ -82,6 +90,7 @@ drop shadow.
 | `appearance-shadow-scrub` | p95 ≤ 8.33 ms; ≤ 1 node-art render per frame, including color preview |
 | `appearance-nested-groups-200` | 200 nodes in 20 nested translucent groups (depth 3, opacity 0.6 at every level); viewport ladder plus whole-group drag. Gate: p95 ≤ 1.25 × plain p95; `renderCanvasNode` ≤ 5 during the drag |
 | `appearance-shadowed-groups` | 20 shadowed groups of 10 nodes. Variants: whole-group drag (gate p95 ≤ 8.33 ms) and single-child drag inside a group (records the per-frame group re-filter cost; gate p95 ≤ 16.7 ms) |
+| `appearance-representation-thresholds` | groups crossing the dense thresholds (300↔301 leaves, 24↔25 leaves plus area); nested drill-in; opacity and effect toggles; hidden-child insertion. Gate: no frame > 50 ms and no resident raster remount |
 | `appearance-max-stack` | 20 nodes with 8/8/4 stacks and blur 500, zoomed 1% → 6400% → 1%; max frame ≤ 100 ms; export SVG + PNG latency recorded |
 
 Viewport scenarios zoom along the ladder `[1, 0.5, 0.35, 0.21, 0.1, 0.05, 0.01]`

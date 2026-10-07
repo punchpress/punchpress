@@ -142,6 +142,7 @@ effect group.
 These boundaries hold on the canvas, in dense surfaces, and in export:
 
 - Each paint node is one opacity group, and its effects wrap that group.
+  Opacity applies to the content and its shadow together.
 - A group with opacity < 1 or any enabled effect is an **isolated layer**:
   - Its children composite first.
   - Group opacity then applies to the flattened result, so overlapping
@@ -152,7 +153,7 @@ These boundaries hold on the canvas, in dense surfaces, and in export:
 - A group with opacity 1 and no effects is not isolated. Isolating it would
   render the same, so it gets no extra layer.
 
-The canvas mechanism for isolation is in the next section.
+The render tree below defines the canvas mechanism for isolation.
 
 #### Paint order
 
@@ -201,40 +202,85 @@ primitives.
 Production fidelity targets the app's Chromium, both for the PNG and for SVG
 viewed in Chromium. Other SVG consumers are best effort.
 
-### Isolated group layers on the canvas
+### Group contiguity invariant
 
-Non-dense groups have no DOM element today. Their children render as flat
-sibling shells (`canvas-nodes.tsx`). For an isolated group, the canvas adds
-a **group layer**: an absolutely positioned, `pointer-events: none` wrapper
-`div` at stage origin. The group's descendant shells render inside it, in
-document order.
+A group's descendants are contiguous in document paint order. The engine
+enforces this as a document-model invariant:
 
-- **Compositing.** CSS `opacity` and `filter` on an HTML element isolate the
-  subtree into one stacking context. This matches SVG group opacity
-  semantics.
-- **Shadow.** The plan's shadow parameters drive CSS `drop-shadow()` on the
-  wrapper. `drop-shadow()` takes its blur as a standard deviation, so it
-  receives `blur / 2`. Effects with more than one shadow chain one
-  `drop-shadow()` per shadow. Export emits the equivalent SVG filter on
-  `<g>`. Parity is tested.
-- **Nesting.** Nested isolated groups nest wrappers. Non-isolated groups
-  between them add no element.
-- **Artboard clipping.** Inside an artboard, the wrapper also carries the
-  artboard clip as an absolute `polygon()`, so a group shadow clips to the
-  artboard like child art does.
-- **Dense surfaces.** Isolation is a nested SVG `<g opacity filter>` inside
-  the single surface `<svg>`, built from the same plan.
-- **Selection and hit testing.** Unchanged. The wrapper never receives
-  pointer events, and group shadows never hit. Drill-in and in-place child
-  editing mount and update child shells inside the wrapper.
-- **Drag.** When the selection covers a whole isolated group, the shared
-  preview transform goes on the outermost wrapper, not on the child shells.
-  The composited layer then moves without re-running its filter. Moving one
-  child inside a shadowed group re-filters the group every frame, and the
-  child-drag perf scenario bounds that cost.
-- **Raster editing.** Brush work inside a shadowed group re-filters the group
-  on every presented frame. The raster brush gates run once with the group
-  present.
+- normalize on load
+- insert
+- reparent
+- reorder
+- paste
+
+Each operation canonicalizes subtree order instead of rejecting the input.
+Renderers and export rely on the invariant and never work around
+interleaving.
+
+### Engine-owned render tree
+
+Today the canvas renders a flat list of node ids (`canvas-nodes.tsx`), and
+export discards groups. Both move to one engine-owned ordered **render tree**
+derived from the document. The vector render-surface pipeline already plans
+this direction (engine-owned render derivation). The tree has three kinds of
+layer:
+
+| Layer | Owns | Moves during drag |
+| --- | --- | --- |
+| Clip | artboard clip, stationary in stage space | only when its artboard moves |
+| Presentation | placement and the shared preview transform | yes |
+| Effect | isolation, opacity, and the effect filter graph | with its presentation parent |
+
+**Isolation.** An isolated group is an effect layer wrapping its descendants'
+presentation. The order is: clip → presentation → effect → children.
+Descendant artboard clips inside that boundary are dropped, so shadow input
+is never pre-clipped.
+
+**Composite order.** Opacity applies to content plus shadow together: the
+filter runs first, then opacity. This is native CSS and SVG order, and it
+matches Figma.
+
+**Multiple shadows.** Each shadow branches from the same `SourceAlpha` and
+merges through one filter graph (canvas `filter: url(#…)` from that graph, or
+the SVG filter in export). Chained `drop-shadow()` is not used, because it
+shadows earlier shadows.
+
+**Preview ownership.** The placement layer resolves a disjoint set of fully
+covered presentation roots for each gesture:
+
+- descendants of a root receive no writes
+- partial selections keep leaf transforms
+- cancel and commit restore the same roots
+
+**Representation.** The dense-surface choice is part of the tree. It is
+aware of the focused and editing ancestry, and it stays stable during
+gestures, so a drill-in or edit expands every necessary ancestor while every
+isolation boundary is preserved.
+
+**Editing artwork.** The text-edit preview renders in its node's tree slot,
+so group opacity and effects apply. Caret and input chrome stay outside the
+effect layers.
+
+**Raster.** Raster pixel-grid chrome sits outside effect layers. Exact raster
+presentation expands by effect support, so offscreen pixels still cast an
+onscreen shadow. Resident Canvas ownership survives representation changes.
+
+**Hit testing.** Leaf hit buttons and engine geometry checks are unchanged.
+Effect and clip layers never register as hit targets. Dense presentation
+bounds stay separate from geometric hit bounds.
+
+**Group coordinates.** Groups have no persistent transform. Group effect
+offsets are stored in group space. When group rotate, scale, or flip bakes
+into the children, the same commit rotates and scales the group's effect
+offsets and blur. Preview and commit therefore agree.
+
+**Export.** Export serializes the same tree hierarchically. Each opacity or
+effect has exactly one owner, and nothing is multiplied into leaves at
+isolation boundaries.
+
+**Performance.** A stacking context is not a guaranteed cached bitmap. Only
+active presentation roots are promoted. Layer count, filter work, memory, and
+settle frames are measured in the shipped Chromium.
 
 ### Bounds and hit testing
 
