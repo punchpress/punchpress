@@ -48,8 +48,16 @@ const getNodeOpacity = (node) => {
   return typeof node.opacity === "number" ? node.opacity : 1;
 };
 
+const getNodeById = (document) => {
+  return new Map<string, unknown>(
+    document.nodes.map((node) => [node.id, node])
+  );
+};
+
 const buildInheritedOpacityById = (document) => {
-  const nodeById = new Map<string, any>(document.nodes.map((node) => [node.id, node]));
+  const nodeById = new Map<string, any>(
+    document.nodes.map((node) => [node.id, node])
+  );
   const inheritedOpacityById = new Map<string, number>();
 
   for (const node of document.nodes) {
@@ -126,10 +134,13 @@ export const exportDesignDocument = async (
   document: DesignDocument,
   loadFont: (font: TextNodeDocument["font"]) => Promise<unknown>
 ) => {
-  const nodes = document.nodes.filter((node) => shouldExportNode(document, node));
+  const nodes = document.nodes.filter((node) =>
+    shouldExportNode(document, node)
+  );
   const geometryById = await buildGeometryById(document, loadFont);
   const svg = buildSvgExport(nodes, geometryById, {
     inheritedOpacityById: buildInheritedOpacityById(document),
+    nodeById: getNodeById(document),
   });
 
   return withDocumentMetadata(svg, document);
@@ -158,6 +169,7 @@ export const exportArtboardSvg = async (
     background: artboard.background,
     height: artboard.height,
     inheritedOpacityById: buildInheritedOpacityById(document),
+    nodeById: getNodeById(document),
     offsetX: artboard.transform.x,
     offsetY: artboard.transform.y,
     width: artboard.width,

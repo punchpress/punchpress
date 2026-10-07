@@ -75,8 +75,9 @@ describe("vector svg export", () => {
 
     const svg = await editor.exportDocument();
 
-    expect(svg).toContain('fill="rgba(255, 0, 0, 0.4)"');
-    expect(svg).toContain('stroke="rgba(0, 0, 0, 0.6)"');
+    expect(svg).toContain('fill="#ff0000" fill-opacity="0.4"');
+    expect(svg).toContain('stroke="#000000" stroke-opacity="0.6"');
+    expect(svg.split("<metadata>")[0]).not.toContain("rgba(");
     expect(svg).toContain('fill-rule="evenodd"');
     expect(svg).toContain('stroke-linecap="square"');
     expect(svg).toContain('stroke-linejoin="miter"');

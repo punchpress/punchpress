@@ -1,12 +1,12 @@
 import {
-  DEFAULT_VECTOR_STROKE_LINE_CAP,
-  DEFAULT_VECTOR_STROKE_LINE_JOIN,
-  DEFAULT_VECTOR_STROKE_MITER_LIMIT,
+  buildAppearanceObjects,
+  getNodeAppearance,
+  getPrimaryPaint,
 } from "@punchpress/engine";
 import {
   getGroupNodeArtState,
   getNodeOpacity,
-  getNodeRenderPaths,
+  getSvgNodeAncestorOpacityChain,
 } from "./node-render-tree";
 
 export const mergeNodeUpdate = (node, nodeUpdate) => {
@@ -61,33 +61,24 @@ export const selectNodeArtState = (
       minY: 0,
       width: 0,
     };
+  const fallbackText = editor.getTextFallbackPreview(node, geometry);
 
   return {
     bbox,
-    fill: node.fill,
-    fallbackText: editor.getTextFallbackPreview(node, geometry),
-    fillRule: node.type === "path" ? node.fillRule : undefined,
-    isEditing: state.editingNodeId === nodeId,
-    opacity: getNodeOpacity(node),
-    paths: getNodeRenderPaths(editor, node, geometry?.paths || []),
-    ready: Boolean(geometry?.ready),
+    fallbackPaint: fallbackText
+      ? getPrimaryPaint(getNodeAppearance(node))
+      : null,
+    fallbackText,
     image: node.type === "image" ? node : null,
-    renderMode: "paths",
+    isEditing: state.editingNodeId === nodeId,
+    isInteractionProxy: false,
+    objects: buildAppearanceObjects(node, geometry?.paths, (id) =>
+      editor.getNode(id)
+    ),
+    opacity:
+      getNodeOpacity(node) * getSvgNodeAncestorOpacityChain(editor, node.id),
+    ready: Boolean(geometry?.ready),
     renderTree: null,
-    stroke: node.stroke,
-    strokeLineCap:
-      node.type === "path"
-        ? (node.strokeLineCap ?? DEFAULT_VECTOR_STROKE_LINE_CAP)
-        : DEFAULT_VECTOR_STROKE_LINE_CAP,
-    strokeLineJoin:
-      node.type === "path"
-        ? (node.strokeLineJoin ?? DEFAULT_VECTOR_STROKE_LINE_JOIN)
-        : DEFAULT_VECTOR_STROKE_LINE_JOIN,
-    strokeMiterLimit:
-      node.type === "path"
-        ? (node.strokeMiterLimit ?? DEFAULT_VECTOR_STROKE_MITER_LIMIT)
-        : DEFAULT_VECTOR_STROKE_MITER_LIMIT,
-    strokeWidth: node.strokeWidth,
   };
 };
 

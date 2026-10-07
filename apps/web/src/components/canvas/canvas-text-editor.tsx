@@ -1,8 +1,16 @@
-import { isNodeVisible, resolveTrackingPx } from "@punchpress/engine";
+import {
+  buildAppearanceObjects,
+  isNodeVisible,
+  resolveTrackingPx,
+} from "@punchpress/engine";
 import { useEffect, useRef, useState } from "react";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
-import { getVectorPathPaintOrder } from "./vector-paint-order";
+import { CanvasAppearanceObjects } from "./canvas-node/canvas-appearance-objects";
+import {
+  getNodeOpacity,
+  getSvgNodeAncestorOpacityChain,
+} from "./canvas-node/node-render-tree";
 
 const measurementCanvas =
   typeof document === "undefined" ? null : document.createElement("canvas");
@@ -168,22 +176,20 @@ export const CanvasTextEditor = () => {
           <g
             transform={`translate(${-previewBounds.minX} ${-previewBounds.minY})`}
           >
-            {(editingPreviewGeometry?.paths || []).map((path) => {
-              return (
-                <path
-                  d={path.d}
-                  fill={editingNode.fill}
-                  key={path.key || `${path.transform || "shape"}-${path.d}`}
-                  paintOrder={getVectorPathPaintOrder()}
-                  pointerEvents="none"
-                  stroke={editingNode.stroke}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={editingNode.strokeWidth}
-                  transform={path.transform || undefined}
-                />
-              );
-            })}
+            <g
+              opacity={
+                getNodeOpacity(editingNode) *
+                getSvgNodeAncestorOpacityChain(editor, editingNode.id)
+              }
+            >
+              <CanvasAppearanceObjects
+                objects={buildAppearanceObjects(
+                  editingNode,
+                  editingPreviewGeometry?.paths,
+                  (nodeId) => editor.getNode(nodeId)
+                )}
+              />
+            </g>
           </g>
         ) : null}
       </svg>

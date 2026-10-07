@@ -6,6 +6,22 @@ export {
   DEFAULT_VECTOR_STROKE_MITER_LIMIT,
 } from "@punchpress/punch-schema";
 export {
+  buildAppearanceObjects,
+  getAppearanceDraws,
+  getAppearancePasses,
+  getPrimaryPaint,
+} from "./appearance/appearance-render-plan";
+export type {
+  Appearance,
+  AppearanceDraw,
+  AppearanceObject,
+  AppearancePass,
+  AppearancePath,
+  FillLayer,
+  StrokeLayer,
+} from "./appearance/appearance-types";
+export { getNodeAppearance } from "./appearance/node-appearance";
+export {
   ARTBOARD_HEIGHT,
   ARTBOARD_WIDTH,
   MAX_ZOOM,
@@ -14,10 +30,6 @@ export {
   WARP_TEXT_NODE_KIND,
 } from "./constants";
 export { offsetEditablePathPoints } from "./document/path/editable-path-actions";
-export {
-  insertComponentNodes,
-  recipeToComponentNodes,
-} from "./document/recipe-component-nodes";
 export { setVectorPathComposition } from "./document/path/path-composition-actions";
 export {
   canMakeCompoundPath,
@@ -34,6 +46,10 @@ export {
   mergeCurves,
   separateCurves,
 } from "./document/path/path-curve-actions";
+export {
+  insertComponentNodes,
+  recipeToComponentNodes,
+} from "./document/recipe-component-nodes";
 export { Editor } from "./editor";
 export {
   getNodePropertySupport,
@@ -125,6 +141,7 @@ export {
   setAllVectorPointCornerRadii,
   setVectorPointCornerRadius,
 } from "./nodes/vector/vector-corner-controls";
+export type { PerfSpanSample } from "./perf/perf-hooks";
 export {
   incrementPerfCounter,
   measurePerf,
@@ -132,25 +149,12 @@ export {
   setPerfLogConfig,
   setPerfSink,
 } from "./perf/perf-hooks";
-export { PERF_COUNTERS, PERF_SPANS } from "./perf/perf-labels";
 export type { PerfCounterName, PerfSpanLabel } from "./perf/perf-labels";
-export type { PerfSpanSample } from "./perf/perf-hooks";
+export { PERF_COUNTERS, PERF_SPANS } from "./perf/perf-labels";
 export {
   isInputElement,
   shouldIgnoreGlobalShortcutTarget,
 } from "./primitives/dom";
-export {
-  defineRasterBrushPreset,
-  getRasterBrushPreset,
-  PUNCHPRESS_RASTER_BRUSH_PRESET_VERSION,
-  RASTER_BRUSH_PRESETS,
-} from "./raster/brush-preset";
-export { getSampledBrushTipAsset } from "./raster/brush-tip-assets";
-export type { SampledBrushTipAsset } from "./raster/brush-tip-assets";
-export type {
-  RasterBrushPreset,
-  RasterBrushPresetSettings,
-} from "./raster/brush-preset";
 export { getResizeCorner } from "./primitives/group-resize";
 export { clamp, format, round, toNumber, toSafeHex } from "./primitives/math";
 export type { GestureTolerance } from "./primitives/pointer-distance";
@@ -170,52 +174,18 @@ export {
   getNodeRotationCenter,
   getNodeWorldPoint,
 } from "./primitives/rotation";
-export {
-  includesPathPoint,
-  isSamePathPoint,
-  normalizePathPoint,
-  normalizePathPointSelection,
-  toPathPointKey,
-} from "./state/store/path/path-point-selection";
-export { createRasterDabGenerator } from "./raster/dab-generator";
-export { getRasterDabSpacing } from "./raster/dab-spacing";
-export {
-  compareRasterDabsExact,
-  compareRasterDabsTolerant,
-  RASTER_FIDELITY_FIXTURE_VERSION,
-} from "./raster/fidelity";
 export type {
-  RasterFidelityComparison,
-  RasterFidelityFixture,
-  RasterFidelityFixtureSuite,
-} from "./raster/fidelity";
-export { createRasterOperationRecorder } from "./raster/operation-recorder";
-export type {
-  RasterOperationRecorder,
-  RecordedRasterCommit,
-} from "./raster/operation-recorder";
-export { createRasterStroke } from "./raster/stroke";
-export type { RasterStroke } from "./raster/stroke";
+  RasterBrushPreset,
+  RasterBrushPresetSettings,
+} from "./raster/brush-preset";
 export {
-  getCroppedImageNode,
-  MAX_RASTER_CROP_AREA,
-  MAX_RASTER_CROP_DIMENSION,
-  normalizeRasterCropRect,
-} from "./raster/crop";
-export type { RasterCropRect } from "./raster/crop";
-export {
-  getRasterPixelFootprint,
-  getRasterSampling,
-  PIXEL_GRID_SCREEN_PIXEL_THRESHOLD,
-  RASTER_MAGNIFIED_SCREEN_PIXEL_THRESHOLD,
-  shouldShowPixelGrid,
-  shouldUseFullResolutionRasterSource,
-} from "./raster/presentation";
-export type {
-  RasterPixelFootprint,
-  RasterPixelFootprintOptions,
-  RasterSampling,
-} from "./raster/presentation";
+  defineRasterBrushPreset,
+  getRasterBrushPreset,
+  PUNCHPRESS_RASTER_BRUSH_PRESET_VERSION,
+  RASTER_BRUSH_PRESETS,
+} from "./raster/brush-preset";
+export type { SampledBrushTipAsset } from "./raster/brush-tip-assets";
+export { getSampledBrushTipAsset } from "./raster/brush-tip-assets";
 export type {
   RasterBrushTip,
   RasterCommit,
@@ -232,12 +202,58 @@ export type {
   RasterSurfaceSession,
   RasterTarget,
 } from "./raster/contracts";
+export type { RasterCropRect } from "./raster/crop";
+export {
+  getCroppedImageNode,
+  MAX_RASTER_CROP_AREA,
+  MAX_RASTER_CROP_DIMENSION,
+  normalizeRasterCropRect,
+} from "./raster/crop";
+export { createRasterDabGenerator } from "./raster/dab-generator";
+export { getRasterDabSpacing } from "./raster/dab-spacing";
+export type {
+  RasterFidelityComparison,
+  RasterFidelityFixture,
+  RasterFidelityFixtureSuite,
+} from "./raster/fidelity";
+export {
+  compareRasterDabsExact,
+  compareRasterDabsTolerant,
+  RASTER_FIDELITY_FIXTURE_VERSION,
+} from "./raster/fidelity";
+export type {
+  RasterOperationRecorder,
+  RecordedRasterCommit,
+} from "./raster/operation-recorder";
+export { createRasterOperationRecorder } from "./raster/operation-recorder";
+export type {
+  RasterPixelFootprint,
+  RasterPixelFootprintOptions,
+  RasterSampling,
+} from "./raster/presentation";
+export {
+  getRasterPixelFootprint,
+  getRasterSampling,
+  PIXEL_GRID_SCREEN_PIXEL_THRESHOLD,
+  RASTER_MAGNIFIED_SCREEN_PIXEL_THRESHOLD,
+  shouldShowPixelGrid,
+  shouldUseFullResolutionRasterSource,
+} from "./raster/presentation";
+export type { RasterStroke } from "./raster/stroke";
+export { createRasterStroke } from "./raster/stroke";
+export {
+  includesPathPoint,
+  isSamePathPoint,
+  normalizePathPoint,
+  normalizePathPointSelection,
+  toPathPointKey,
+} from "./state/store/path/path-point-selection";
 export type { PenHoverIntent, PenHoverState } from "./tools/pen-tool-types";
-export { getPixelGridTarget } from "./viewport/pixel-grid-target";
-export type { PixelGridTarget } from "./viewport/pixel-grid-target";
 export {
   getNodeLocalMatrix,
   getNodeLocalTransformBounds,
   invertMatrix,
   multiplyMatrix,
 } from "./transform/node-transform-matrix";
+export type { PixelGridTarget } from "./viewport/pixel-grid-target";
+export { getPixelGridTarget } from "./viewport/pixel-grid-target";

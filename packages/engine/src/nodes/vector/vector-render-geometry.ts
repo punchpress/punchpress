@@ -154,6 +154,7 @@ const toRenderEntries = (pathNode, geometry) => {
     strokeLineJoin: style.strokeLineJoin,
     strokeMiterLimit: style.strokeMiterLimit,
     strokeWidth: style.strokeWidth,
+    styleNodeId: pathNode.id,
     transform,
   }));
 };
@@ -352,6 +353,7 @@ const buildCompoundFillEntries = (vectorNode, pathNodes, getPathGeometry) => {
           strokeLineJoin: style.strokeLineJoin,
           strokeMiterLimit: style.strokeMiterLimit,
           strokeWidth: style.strokeWidth,
+          styleNodeId: (pathNodes.at(-1) || pathNodes[0]).id,
           transform: null,
         },
       ],
@@ -405,6 +407,7 @@ const buildBooleanCompoundEntries = (
       strokeLineJoin: style.strokeLineJoin,
       strokeMiterLimit: style.strokeMiterLimit,
       strokeWidth: style.strokeWidth,
+      styleNodeId: (pathNodes.at(-1) || pathNodes[0]).id,
       transform: null,
     }));
     const selectionPoints = getPaperPathSelectionPoints(

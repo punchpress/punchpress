@@ -57,6 +57,23 @@ export {
   getLocalFontSearchText,
 } from "./local-fonts";
 export { migrateDocument } from "./migrate";
+export { upgradeNodeAppearance1_8 } from "./migrate-appearance";
+export {
+  appearanceSchema,
+  colorSchema,
+  fillLayerSchema,
+  MAX_APPEARANCE_LAYERS,
+  paintSchema,
+  strokeLayerSchema,
+} from "./appearance-schema";
+export type {
+  AppearanceDocument,
+  FillLayerDocument,
+  PaintDocument,
+  StrokeLayerDocument,
+} from "./appearance-schema";
+export { formatColor, isCanonicalColor, parseColor } from "./color";
+export type { ParsedColor } from "./color";
 export {
   createPunchPackage,
   isPunchPackageBytes,

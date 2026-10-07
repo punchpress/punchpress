@@ -15,6 +15,7 @@ import { usePerformanceRenderCounter } from "../../../performance/use-performanc
 import { openCanvasNodeEditingMode } from "../canvas-node-editing";
 import { startCanvasToolPlacementSession } from "../canvas-tool-placement-session";
 import { CanvasRasterImage } from "../raster/canvas-raster-image";
+import { CanvasAppearanceObjects } from "./canvas-appearance-objects";
 import { CanvasFallbackText } from "./canvas-fallback-text";
 import {
   getMemoizedNodeArtState,
@@ -35,11 +36,7 @@ import {
   shouldStartNodeDrag,
   startCanvasNodeDragSession,
 } from "./node-interactions";
-import {
-  CanvasNodePath,
-  CanvasNodeRenderTree,
-  getPaintPreviewStyle,
-} from "./node-render-tree";
+import { CanvasNodeRenderTree, getPaintPreviewStyle } from "./node-render-tree";
 
 const CanvasNodeShell = ({ children, isReady, nodeId }) => {
   usePerformanceRenderCounter(PERF_COUNTERS.renderCanvasNode);
@@ -379,24 +376,17 @@ const CanvasStandardNodeArt = ({ nodeId }) => {
         artState.image && parentNode?.type === "artboard"
       )}
       bbox={presentationBounds}
+      fallbackPaint={artState.fallbackPaint}
       fallbackText={artState.fallbackText}
-      fill={artState.fill}
-      fillRule={artState.fillRule}
       height={Math.max(1, presentationBounds.height)}
       image={artState.image}
       isEditing={artState.isEditing}
       isInteractionProxy={artState.isInteractionProxy}
+      objects={artState.objects}
       opacity={artState.opacity}
       paintPreview={paintPreview}
-      paths={artState.paths}
-      renderMode={artState.renderMode}
       renderRootNodeId={nodeId}
       renderTree={artState.renderTree}
-      stroke={artState.stroke}
-      strokeLineCap={artState.strokeLineCap}
-      strokeLineJoin={artState.strokeLineJoin}
-      strokeMiterLimit={artState.strokeMiterLimit}
-      strokeWidth={artState.strokeWidth}
       width={Math.max(1, presentationBounds.width)}
     />
   );
@@ -421,23 +411,17 @@ const CanvasVectorNodeArt = ({ nodeId }) => {
   return artState ? (
     <CanvasNodeArt
       bbox={artState.bbox}
-      fill={artState.fill}
-      fillRule={artState.fillRule}
+      fallbackPaint={artState.fallbackPaint}
+      fallbackText={artState.fallbackText}
       height={Math.max(1, artState.bbox.height)}
       image={artState.image}
       isEditing={artState.isEditing}
       isInteractionProxy={artState.isInteractionProxy}
+      objects={artState.objects}
       opacity={artState.opacity}
       paintPreview={paintPreview}
-      paths={artState.paths}
-      renderMode={artState.renderMode}
       renderRootNodeId={nodeId}
       renderTree={artState.renderTree}
-      stroke={artState.stroke}
-      strokeLineCap={artState.strokeLineCap}
-      strokeLineJoin={artState.strokeLineJoin}
-      strokeMiterLimit={artState.strokeMiterLimit}
-      strokeWidth={artState.strokeWidth}
       width={Math.max(1, artState.bbox.width)}
     />
   ) : null;
@@ -480,29 +464,22 @@ const CanvasNodeArt = memo(
   ({
     allowImageOverflow,
     bbox,
-    fill,
+    fallbackPaint,
     fallbackText,
-    fillRule,
     height,
     isEditing,
     isInteractionProxy,
     image,
+    objects,
     opacity,
     paintPreview,
-    paths,
     renderRootNodeId,
-    renderMode,
     renderTree,
-    stroke,
-    strokeLineCap,
-    strokeLineJoin,
-    strokeMiterLimit,
-    strokeWidth,
     width,
   }) => {
     let renderedContent: ReactNode = null;
 
-    if (!(isInteractionProxy || renderMode === "image")) {
+    if (!isInteractionProxy) {
       if (image) {
         renderedContent = (
           <CanvasRasterImage
@@ -520,45 +497,23 @@ const CanvasNodeArt = memo(
       } else if (renderTree) {
         renderedContent = (
           <CanvasNodeRenderTree
-            fill={fill}
-            fillRule={fillRule}
             isEditing={isEditing}
             items={renderTree}
             renderRootNodeId={renderRootNodeId}
-            stroke={stroke}
-            strokeLineCap={strokeLineCap}
-            strokeLineJoin={strokeLineJoin}
-            strokeMiterLimit={strokeMiterLimit}
-            strokeWidth={strokeWidth}
           />
         );
       } else if (fallbackText) {
         renderedContent = (
           <CanvasFallbackText
             {...fallbackText}
-            fill={fill}
+            {...fallbackPaint}
             isEditing={isEditing}
-            stroke={stroke}
-            strokeWidth={strokeWidth}
           />
         );
       } else {
-        renderedContent = paths.map((path) => {
-          return (
-            <CanvasNodePath
-              fill={fill}
-              fillRule={fillRule}
-              isEditing={isEditing}
-              key={path.key || `${path.transform || "shape"}-${path.d}`}
-              path={path}
-              stroke={stroke}
-              strokeLineCap={strokeLineCap}
-              strokeLineJoin={strokeLineJoin}
-              strokeMiterLimit={strokeMiterLimit}
-              strokeWidth={strokeWidth}
-            />
-          );
-        });
+        renderedContent = (
+          <CanvasAppearanceObjects isEditing={isEditing} objects={objects} />
+        );
       }
     }
 

@@ -1,8 +1,7 @@
 import {
-  DEFAULT_VECTOR_STROKE_LINE_CAP,
-  DEFAULT_VECTOR_STROKE_LINE_JOIN,
-  DEFAULT_VECTOR_STROKE_MITER_LIMIT,
+  buildAppearanceObjects,
   format,
+  getNodeAppearance,
   getNodeLocalMatrix,
   getNodeLocalTransformBounds,
   getNodeRotation,
@@ -10,24 +9,14 @@ import {
   getNodeScaleY,
   getNodeX,
   getNodeY,
+  getPrimaryPaint,
 } from "@punchpress/engine";
+import { parseColor } from "@punchpress/punch-schema";
 import { CanvasRasterImage } from "../raster/canvas-raster-image";
-import { getVectorPathPaintOrder } from "../vector-paint-order";
+import { CanvasAppearanceObjects } from "./canvas-appearance-objects";
 import { CanvasFallbackText } from "./canvas-fallback-text";
 
-export const getCanvasNodePathFill = (path, fill) => {
-  if (path.closed === false && !path.fill) {
-    return "none";
-  }
-
-  return path.fill || fill || "none";
-};
-
-export const getCanvasNodePathStroke = (path, stroke) => {
-  return path.stroke || stroke || "none";
-};
-
-export const getPaintVariableName = (value) => {
+const getPaintVariableName = (value) => {
   if (
     typeof value !== "string" ||
     value === "none" ||
@@ -51,10 +40,15 @@ export const getCanvasPaintValue = (value) => {
   return variableName ? `var(${variableName}, ${value})` : value;
 };
 
+// Paint draws key their variable by canonical color, so the preview's base and
+// target colors are canonicalized the same way (alpha stays on the layer).
 export const getPaintPreviewStyle = (preview) => {
-  const variableName = getPaintVariableName(preview?.baseValue);
+  const baseColor = parseColor(preview?.baseValue)?.color ?? preview?.baseValue;
+  const variableName = getPaintVariableName(baseColor);
 
-  return variableName ? { [variableName]: preview.value } : undefined;
+  return variableName
+    ? { [variableName]: parseColor(preview.value)?.color ?? preview.value }
+    : undefined;
 };
 
 export const getNodeOpacity = (node) => {
@@ -78,29 +72,11 @@ export const getSvgNodeAncestorOpacityChain = (editor, nodeId) => {
   return opacity;
 };
 
-export const getNodeRenderPaths = (editor, node, paths) => {
-  const inheritedOpacity = getSvgNodeAncestorOpacityChain(editor, node.id);
-  const nodeOpacity = getNodeOpacity(node);
-  const shouldNormalizeNodeOpacity =
-    node.type === "path" ||
-    (node.type === "vector" && editor.getChildNodeIds(node.id).length === 0);
-
-  return paths.map((path) => ({
-    ...path,
-    opacity:
-      path.opacity == null
-        ? undefined
-        : (shouldNormalizeNodeOpacity && nodeOpacity
-            ? path.opacity / nodeOpacity
-            : path.opacity) * inheritedOpacity,
-  }));
-};
-
-export const getSvgNodeTransformBounds = (editor, node) => {
+const getSvgNodeTransformBounds = (editor, node) => {
   return getNodeLocalTransformBounds(editor, node.id);
 };
 
-export const getSvgNodeTransform = (node, bbox) => {
+const getSvgNodeTransform = (node, bbox) => {
   const x = getNodeX(node) || 0;
   const y = getNodeY(node) || 0;
   const rotation = getNodeRotation(node) || 0;
@@ -114,63 +90,6 @@ export const getSvgNodeTransform = (node, bbox) => {
   const matrix = getNodeLocalMatrix(node, bbox);
 
   return `matrix(${format(matrix.a)} ${format(matrix.b)} ${format(matrix.c)} ${format(matrix.d)} ${format(matrix.e)} ${format(matrix.f)})`;
-};
-
-export const getSvgNodeTransformChain = (
-  editor,
-  rootNodeId,
-  descendantNodeId
-) => {
-  const nodes: unknown[] = [];
-  let currentNode = editor.getNode(descendantNodeId);
-
-  while (currentNode && currentNode.id !== rootNodeId) {
-    nodes.push(currentNode);
-    currentNode = currentNode.parentId
-      ? editor.getNode(currentNode.parentId)
-      : null;
-  }
-
-  return nodes
-    .reverse()
-    .map((node) =>
-      getSvgNodeTransform(node, getSvgNodeTransformBounds(editor, node))
-    )
-    .filter(Boolean)
-    .join(" ");
-};
-
-export const getGroupNodePaths = (editor, nodeId) => {
-  return editor.getDescendantLeafNodeIds(nodeId).flatMap((descendantNodeId) => {
-    const descendantNode = editor.getNode(descendantNodeId);
-    const geometry = editor.getNodeRenderGeometry(descendantNodeId);
-
-    if (
-      !(
-        descendantNode &&
-        editor.isNodeEffectivelyVisible(descendantNodeId) &&
-        geometry?.paths?.length > 0
-      )
-    ) {
-      return [];
-    }
-
-    const nodeTransform = getSvgNodeTransformChain(
-      editor,
-      nodeId,
-      descendantNode.id
-    );
-
-    return geometry.paths.map((path, index) => ({
-      ...path,
-      key: `${descendantNodeId}-${path.key || index}`,
-      opacity:
-        (path.opacity ?? getNodeOpacity(descendantNode)) *
-        getSvgNodeAncestorOpacityChain(editor, descendantNode.id),
-      sourceNodeId: descendantNode.id,
-      transform: [nodeTransform, path.transform].filter(Boolean).join(" "),
-    }));
-  });
 };
 
 export const getGroupNodeRenderTree = (
@@ -207,11 +126,9 @@ export const getGroupNodeRenderTree = (
       return [
         {
           ...fallbackText,
-          fill: childNode.fill,
+          ...getPrimaryPaint(getNodeAppearance(childNode)),
           key: childNode.id,
           opacity: getNodeOpacity(childNode),
-          stroke: childNode.stroke,
-          strokeWidth: childNode.strokeWidth,
           transform: getSvgNodeTransform(childNode, geometry?.bbox),
           type: "fallback-text",
         },
@@ -241,22 +158,17 @@ export const getGroupNodeRenderTree = (
       return [];
     }
 
-    const nodeTransform = getSvgNodeTransform(childNode, geometry.bbox);
-    const childNodeOpacity = getNodeOpacity(childNode);
-    const shouldApplyContainerOpacity =
-      childNode.type === "vector" &&
-      editor.getChildNodeIds(childNode.id).length > 0;
-
-    return geometry.paths.map((path, index) => ({
-      ...path,
-      key: `${childNode.id}-${path.key || index}`,
-      opacity: shouldApplyContainerOpacity
-        ? (path.opacity ?? 1) * childNodeOpacity
-        : (path.opacity ?? childNodeOpacity),
-      sourceNodeId: childNode.id,
-      transform: [nodeTransform, path.transform].filter(Boolean).join(" "),
-      type: "path",
-    }));
+    return [
+      {
+        key: childNode.id,
+        objects: buildAppearanceObjects(childNode, geometry.paths, (id) =>
+          editor.getNode(id)
+        ),
+        opacity: getNodeOpacity(childNode),
+        transform: getSvgNodeTransform(childNode, geometry.bbox),
+        type: "objects",
+      },
+    ];
   });
 };
 
@@ -270,71 +182,23 @@ export const getGroupNodeArtState = (editor, state, nodeId) => {
 
   return {
     bbox: frame.bounds,
-    fill: null,
-    fillRule: undefined,
+    fallbackPaint: null,
+    fallbackText: null,
+    image: null,
     isEditing: state.editingNodeId === nodeId,
     isInteractionProxy: false,
-    opacity: getNodeOpacity(node),
-    paths: getGroupNodePaths(editor, nodeId),
+    objects: [],
+    opacity:
+      getNodeOpacity(node) * getSvgNodeAncestorOpacityChain(editor, nodeId),
     ready: true,
-    renderMode: "paths",
     renderTree: getGroupNodeRenderTree(editor, nodeId),
-    stroke: null,
-    strokeLineCap: DEFAULT_VECTOR_STROKE_LINE_CAP,
-    strokeLineJoin: DEFAULT_VECTOR_STROKE_LINE_JOIN,
-    strokeMiterLimit: DEFAULT_VECTOR_STROKE_MITER_LIMIT,
-    strokeWidth: 0,
   };
 };
 
-export const CanvasNodePath = ({
-  fill,
-  fillRule,
-  isEditing,
-  path,
-  stroke,
-  strokeLineCap,
-  strokeLineJoin,
-  strokeMiterLimit,
-  strokeWidth,
-}) => {
-  const fillValue = getCanvasNodePathFill(path, fill);
-  const strokeValue = getCanvasNodePathStroke(path, stroke);
-
-  return (
-    <path
-      d={path.d}
-      fill={fillValue}
-      fillRule={path.fillRule || fillRule}
-      key={path.key || `${path.transform || "shape"}-${path.d}`}
-      opacity={isEditing ? 0 : (path.opacity ?? 1)}
-      paintOrder={getVectorPathPaintOrder()}
-      pointerEvents="none"
-      stroke={strokeValue}
-      strokeLinecap={path.strokeLineCap || strokeLineCap}
-      strokeLinejoin={path.strokeLineJoin || strokeLineJoin}
-      strokeMiterlimit={path.strokeMiterLimit ?? strokeMiterLimit}
-      strokeWidth={path.strokeWidth ?? strokeWidth}
-      style={{
-        fill: getCanvasPaintValue(fillValue),
-        stroke: getCanvasPaintValue(strokeValue),
-      }}
-      transform={path.transform || undefined}
-    />
-  );
-};
-
 export const CanvasNodeRenderTree = ({
-  fill,
-  fillRule,
   isEditing,
   items,
   renderRootNodeId,
-  stroke,
-  strokeLineCap,
-  strokeLineJoin,
-  strokeMiterLimit,
-  strokeWidth,
 }) => {
   return items.map((item) => {
     if (item.type === "group") {
@@ -345,16 +209,9 @@ export const CanvasNodeRenderTree = ({
           transform={item.transform || undefined}
         >
           <CanvasNodeRenderTree
-            fill={fill}
-            fillRule={fillRule}
             isEditing={isEditing}
             items={item.children || []}
             renderRootNodeId={renderRootNodeId}
-            stroke={stroke}
-            strokeLineCap={strokeLineCap}
-            strokeLineJoin={strokeLineJoin}
-            strokeMiterLimit={strokeMiterLimit}
-            strokeWidth={strokeWidth}
           />
         </g>
       );
@@ -395,18 +252,13 @@ export const CanvasNodeRenderTree = ({
     }
 
     return (
-      <CanvasNodePath
-        fill={fill}
-        fillRule={fillRule}
-        isEditing={isEditing}
-        key={item.key || `${item.transform || "shape"}-${item.d}`}
-        path={item}
-        stroke={stroke}
-        strokeLineCap={strokeLineCap}
-        strokeLineJoin={strokeLineJoin}
-        strokeMiterLimit={strokeMiterLimit}
-        strokeWidth={strokeWidth}
-      />
+      <g
+        key={item.key}
+        opacity={isEditing ? 0 : (item.opacity ?? 1)}
+        transform={item.transform || undefined}
+      >
+        <CanvasAppearanceObjects objects={item.objects} />
+      </g>
     );
   });
 };

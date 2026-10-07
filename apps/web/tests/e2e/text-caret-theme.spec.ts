@@ -151,9 +151,17 @@ test("keeps stroked text paint order consistent between normal render and edit p
   );
   await expect(canvasPath.first()).toBeVisible();
 
-  const normalPaintOrder = await canvasPath.first().evaluate((element) => {
-    return element.getAttribute("paint-order");
-  });
+  const readPaint = (paths) => {
+    return paths.evaluateAll((elements) => {
+      return elements.map((element) => [
+        element.getAttribute("fill"),
+        element.getAttribute("stroke"),
+        element.getAttribute("stroke-width"),
+        element.getAttribute("paint-order"),
+      ]);
+    });
+  };
+  const normalPaint = await readPaint(canvasPath);
 
   await clickNodeCenter(page, "stroked-text-node");
   await pauseForUi(page);
@@ -164,10 +172,20 @@ test("keeps stroked text paint order consistent between normal render and edit p
     .getByTestId("canvas-text-preview")
     .locator("path");
   await expect(editPreviewPath.first()).toBeVisible();
-  const editPaintOrder = await editPreviewPath.first().evaluate((element) => {
-    return element.getAttribute("paint-order");
-  });
+  const editPaint = await readPaint(editPreviewPath);
 
-  expect(normalPaintOrder).toBe("fill stroke");
-  expect(editPaintOrder).toBe(normalPaintOrder);
+  // The merged canvas path carries fill under stroke on one element. The edit
+  // preview paints per-glyph paths, so it paints every glyph fill before any
+  // glyph stroke, with the same paint.
+  expect(normalPaint).toEqual([["#ffffff", "#000000", "12", "fill stroke"]]);
+
+  const firstEditStroke = editPaint.findIndex(
+    ([, stroke]) => stroke !== "none"
+  );
+  const lastEditFill = editPaint.findLastIndex(([fill]) => fill !== "none");
+
+  expect(firstEditStroke).toBeGreaterThan(lastEditFill);
+  expect(
+    new Set(editPaint.map(([fill, stroke]) => `${fill}/${stroke}`))
+  ).toEqual(new Set(["#ffffff/none", "none/#000000"]));
 });

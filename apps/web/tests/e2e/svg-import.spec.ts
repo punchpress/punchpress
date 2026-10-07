@@ -569,15 +569,27 @@ test("applies nested vector opacity inside dense group surfaces", async ({
       return page.evaluate(() => {
         return {
           canvasNodeCount: document.querySelectorAll(".canvas-node").length,
-          opacity: document
-            .querySelector('.canvas-node-layer path[fill="#390075"]')
-            ?.getAttribute("opacity"),
+          // Effective opacity: every opacity attribute between the painted
+          // path and the node's <svg>, multiplied.
+          opacity: (() => {
+            let element = document.querySelector(
+              '.canvas-node-layer path[fill="#390075"]'
+            );
+            let opacity = 1;
+
+            while (element && element.tagName.toLowerCase() !== "svg") {
+              opacity *= Number(element.getAttribute("opacity") ?? 1);
+              element = element.parentElement;
+            }
+
+            return Number(opacity.toFixed(4));
+          })(),
         };
       });
     })
     .toEqual({
       canvasNodeCount: 1,
-      opacity: "0.25",
+      opacity: 0.25,
     });
 });
 
