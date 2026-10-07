@@ -1,3 +1,4 @@
+import { getPaintHitStyle } from "../../appearance/paint-extent";
 import { createPaintedHitRegion } from "../../primitives/node-geometry";
 
 const isWhitespaceGlyph = (char) => {
@@ -84,9 +85,7 @@ export const createTextHitRegions = (node, contours, bridgeContours = []) => {
   const hitRegions = [
     createPaintedHitRegion({
       contours,
-      fill: node.fill,
-      stroke: node.stroke,
-      strokeWidth: node.strokeWidth,
+      ...getPaintHitStyle(node),
     }),
   ];
 

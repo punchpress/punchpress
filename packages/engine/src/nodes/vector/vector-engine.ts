@@ -34,21 +34,18 @@ const commandsToPathData = (commands) => {
     .join(" ");
 };
 
+// Contours carry only what geometry needs: the fill rule plus paint presence and
+// stroke width for bounds and hit testing (see getPaintHitStyle).
 const getContourStyle = (contour) => {
   return {
     fill: contour.fill ?? null,
     fillRule: contour.fillRule ?? "nonzero",
-    opacity: contour.opacity,
     stroke: contour.stroke ?? null,
-    strokeLineCap: contour.strokeLineCap ?? "round",
-    strokeLineJoin: contour.strokeLineJoin ?? "round",
-    strokeMiterLimit: contour.strokeMiterLimit ?? 4,
     strokeWidth: contour.strokeWidth ?? 0,
   };
 };
 
 export const buildVectorNodeGeometry = (node) => {
-  const nodeOpacity = node.opacity ?? 1;
   const visibleContours = (node.contours || []).filter(
     (contour) => contour?.visible !== false
   );
@@ -63,12 +60,7 @@ export const buildVectorNodeGeometry = (node) => {
       fill: style.fill,
       fillRule: style.fillRule,
       key: contour.id || `vector-${index}`,
-      opacity:
-        style.opacity == null ? undefined : style.opacity * nodeOpacity,
       stroke: style.stroke,
-      strokeLineCap: style.strokeLineCap,
-      strokeLineJoin: style.strokeLineJoin,
-      strokeMiterLimit: style.strokeMiterLimit,
       strokeWidth: style.strokeWidth,
     };
   });
@@ -110,7 +102,13 @@ export const buildVectorNodeGeometry = (node) => {
       strokeWidth: path.strokeWidth,
     })
   );
-  const renderedPaths = paths.map(({ commands: _commands, ...path }) => path);
+  // Rendered paths are geometry only; the appearance plan supplies paint.
+  const renderedPaths = paths.map(({ closed, d, fillRule, key }) => ({
+    closed,
+    d,
+    fillRule,
+    key,
+  }));
 
   return withNodeGeometryBehavior({
     bbox,

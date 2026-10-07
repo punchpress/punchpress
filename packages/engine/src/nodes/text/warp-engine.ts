@@ -1,3 +1,4 @@
+import { getPaintExtent } from "../../appearance/paint-extent";
 import { format } from "../../primitives/math";
 import {
   contoursToPath,
@@ -23,7 +24,7 @@ import {
 import { estimateBounds, inflateBounds, layoutGlyphs } from "./warp-layout";
 
 const getStrokeInflatedBounds = (node, bbox) => {
-  const strokeInset = Math.max(node.strokeWidth / 2, 0);
+  const strokeInset = getPaintExtent(node).strokeWidth / 2;
   if (strokeInset === 0) {
     return bbox;
   }

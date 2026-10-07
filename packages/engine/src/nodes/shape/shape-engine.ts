@@ -1,3 +1,4 @@
+import { getPaintExtent } from "../../appearance/paint-extent";
 import {
   DEFAULT_VECTOR_STROKE_LINE_CAP,
   DEFAULT_VECTOR_STROKE_LINE_JOIN,
@@ -15,7 +16,7 @@ import {
 } from "./shape-corner-controls";
 
 const getStrokeInset = (node) => {
-  return Math.max(node.strokeWidth / 2, 0);
+  return getPaintExtent(node).strokeWidth / 2;
 };
 const HANDLE_EPSILON = 0.01;
 const ELLIPSE_KAPPA = 0.5522847498307936;

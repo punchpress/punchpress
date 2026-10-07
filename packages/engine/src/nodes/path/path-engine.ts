@@ -1,21 +1,18 @@
+import { getPaintHitStyle } from "../../appearance/paint-extent";
 import { withNodeGeometryBehavior } from "../../primitives/node-geometry";
 import { buildVectorNodeGeometry } from "../vector/vector-engine";
 import { getPathNodeContours } from "./path-contours";
 
 export const buildPathNodeGeometry = (node) => {
   const contours = getPathNodeContours(node);
+  const paintHitStyle = getPaintHitStyle(node);
   const geometry = buildVectorNodeGeometry({
     ...node,
     contours: contours.map((contour) => {
       return {
         ...contour,
-        fill: node.fill,
+        ...paintHitStyle,
         fillRule: node.fillRule,
-        stroke: node.stroke,
-        strokeLineCap: node.strokeLineCap,
-        strokeLineJoin: node.strokeLineJoin,
-        strokeMiterLimit: node.strokeMiterLimit,
-        strokeWidth: node.strokeWidth,
       };
     }),
   });

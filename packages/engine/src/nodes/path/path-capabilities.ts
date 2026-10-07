@@ -1,8 +1,4 @@
-import {
-  DEFAULT_VECTOR_STROKE_LINE_CAP,
-  DEFAULT_VECTOR_STROKE_LINE_JOIN,
-  DEFAULT_VECTOR_STROKE_MITER_LIMIT,
-} from "@punchpress/punch-schema";
+import { getPaintSignature } from "../../appearance/paint-extent";
 import { toTransformedWorldFrame, toWorldFrame } from "../node-frame-utils";
 import { createDefaultPathNode } from "./model";
 import { getPathNodeContours } from "./path-contours";
@@ -38,15 +34,9 @@ export const pathNodeCapabilities = {
   getGeometrySignature: (node, fontRevision) => {
     return JSON.stringify({
       contours: getPathNodeContours(node),
-      fill: node.fill,
       fillRule: node.fillRule,
       fontRevision,
-      stroke: node.stroke,
-      strokeLineCap: node.strokeLineCap ?? DEFAULT_VECTOR_STROKE_LINE_CAP,
-      strokeLineJoin: node.strokeLineJoin ?? DEFAULT_VECTOR_STROKE_LINE_JOIN,
-      strokeMiterLimit:
-        node.strokeMiterLimit ?? DEFAULT_VECTOR_STROKE_MITER_LIMIT,
-      strokeWidth: node.strokeWidth,
+      paint: getPaintSignature(node),
     });
   },
 

@@ -1,3 +1,4 @@
+import { getPaintExtent } from "../appearance/paint-extent";
 import { round } from "./math";
 import {
   getNodeLocalPoint,
@@ -11,7 +12,7 @@ const isCornerHandle = (handle) => {
 };
 
 const getStrokeInset = (node) => {
-  return Math.max(node.strokeWidth / 2, 0);
+  return getPaintExtent(node).strokeWidth / 2;
 };
 
 const getMinimumOuterSize = (node) => {

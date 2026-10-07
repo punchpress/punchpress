@@ -1,4 +1,8 @@
 import {
+  getPaintHitStyle,
+  getPaintSignature,
+} from "../../appearance/paint-extent";
+import {
   createPaintedHitRegion,
   withNodeGeometryBehavior,
 } from "../../primitives/node-geometry";
@@ -23,9 +27,7 @@ export const shapeNodeCapabilities = {
       hitRegions: [
         createPaintedHitRegion({
           contours,
-          fill: node.fill,
-          stroke: node.stroke,
-          strokeWidth: node.strokeWidth,
+          ...getPaintHitStyle(node),
         }),
       ],
       id: node.id,
@@ -69,13 +71,11 @@ export const shapeNodeCapabilities = {
     return JSON.stringify({
       cornerRadii: node.cornerRadii,
       cornerRadius: node.cornerRadius ?? 0,
-      fill: node.fill,
       fontRevision,
       height: node.height,
+      paint: getPaintSignature(node),
       points: node.points,
       shape: node.shape,
-      stroke: node.stroke,
-      strokeWidth: node.strokeWidth,
       width: node.width,
     });
   },

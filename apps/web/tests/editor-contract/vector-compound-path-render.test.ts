@@ -125,10 +125,13 @@ describe("vector compound path rendering", () => {
     const svg = await editor.exportDocument();
 
     expect(geometry?.paths).toHaveLength(1);
+    // Geometry names the child whose stack paints the compiled result; the
+    // appearance plan, not the geometry, carries the paint.
     expect(geometry?.paths[0]).toMatchObject({
-      fill: "#000000",
       fillRule: "evenodd",
+      styleNodeId: "vector-node-path-2",
     });
+    expect(svg).toContain('fill="#000000"');
     expect(geometry?.paths[0]?.d.match(/M/g)?.length).toBe(2);
     expect(svg.match(/<path /g)?.length).toBe(1);
     expect(svg).toContain('fill-rule="evenodd"');

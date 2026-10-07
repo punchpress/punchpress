@@ -1,4 +1,8 @@
 import {
+  getPaintHitStyle,
+  getPaintSignature,
+} from "../../appearance/paint-extent";
+import {
   createPaintedHitRegion,
   withNodeGeometryBehavior,
 } from "../../primitives/node-geometry";
@@ -88,9 +92,7 @@ const getTextFallbackHitRegions = (node, bbox) => {
           ],
         },
       ],
-      fill: node.fill,
-      stroke: node.stroke,
-      strokeWidth: node.strokeWidth,
+      ...getPaintHitStyle(node),
     }),
   ];
 };
@@ -159,7 +161,7 @@ export const textNodeCapabilities = {
       fontRevision,
       font: node.font,
       fontSize: node.fontSize,
-      strokeWidth: node.strokeWidth,
+      paint: getPaintSignature(node),
       text: node.text,
       tracking: node.tracking,
       warp: node.warp,

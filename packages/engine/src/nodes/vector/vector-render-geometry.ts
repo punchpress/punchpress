@@ -1,8 +1,4 @@
-import {
-  DEFAULT_VECTOR_STROKE_LINE_CAP,
-  DEFAULT_VECTOR_STROKE_LINE_JOIN,
-  DEFAULT_VECTOR_STROKE_MITER_LIMIT,
-} from "@punchpress/punch-schema";
+import { getPaintExtent } from "../../appearance/paint-extent";
 import { createHeadlessPaperCompiler } from "../../primitives/headless-paper-compiler";
 import { format } from "../../primitives/math";
 import { withNodeGeometryBehavior } from "../../primitives/node-geometry";
@@ -120,40 +116,18 @@ const buildNodeSvgTransform = (node, bbox) => {
   return transforms.join(" ");
 };
 
-const getPathStyle = (node) => {
-  return {
-    fill: node.fill,
-    fillRule: node.fillRule,
-    opacity: node.opacity ?? 1,
-    stroke: node.stroke,
-    strokeLineCap: node.strokeLineCap ?? DEFAULT_VECTOR_STROKE_LINE_CAP,
-    strokeLineJoin: node.strokeLineJoin ?? DEFAULT_VECTOR_STROKE_LINE_JOIN,
-    strokeMiterLimit:
-      node.strokeMiterLimit ?? DEFAULT_VECTOR_STROKE_MITER_LIMIT,
-    strokeWidth: node.strokeWidth,
-  };
-};
-
 const toRenderEntries = (pathNode, geometry) => {
   if (!(geometry?.paths?.length > 0 && geometry.bbox)) {
     return [];
   }
 
   const transform = buildNodeSvgTransform(pathNode, geometry.bbox);
-  const style = getPathStyle(pathNode);
 
   return geometry.paths.map((path, index) => ({
     closed: path.closed,
     d: path.d,
-    fill: style.fill,
-    fillRule: style.fillRule,
+    fillRule: pathNode.fillRule,
     key: `${pathNode.id}-${index}`,
-    opacity: style.opacity,
-    stroke: style.stroke,
-    strokeLineCap: style.strokeLineCap,
-    strokeLineJoin: style.strokeLineJoin,
-    strokeMiterLimit: style.strokeMiterLimit,
-    strokeWidth: style.strokeWidth,
     styleNodeId: pathNode.id,
     transform,
   }));
@@ -329,8 +303,11 @@ const buildCompoundFillEntries = (vectorNode, pathNodes, getPathGeometry) => {
     const resultPaths = sourceItems.flatMap((item) =>
       getPaperResultPaths(item)
     );
-    const style = getPathStyle(pathNodes.at(-1) || pathNodes[0]);
-    const bounds = expandBounds(toBounds(boundsItem.bounds), style.strokeWidth);
+    const styleNode = pathNodes.at(-1) || pathNodes[0];
+    const bounds = expandBounds(
+      toBounds(boundsItem.bounds),
+      getPaintExtent(styleNode).strokeWidth
+    );
 
     if (!(bounds && resultPaths.length > 0)) {
       return null;
@@ -344,16 +321,9 @@ const buildCompoundFillEntries = (vectorNode, pathNodes, getPathGeometry) => {
           d: resultPaths
             .map((path) => path.pathData || path.getPathData())
             .join(" "),
-          fill: style.fill,
-          fillRule: style.fillRule,
+          fillRule: styleNode.fillRule,
           key: `${vectorNode.id}-compound-fill`,
-          opacity: style.opacity,
-          stroke: style.stroke,
-          strokeLineCap: style.strokeLineCap,
-          strokeLineJoin: style.strokeLineJoin,
-          strokeMiterLimit: style.strokeMiterLimit,
-          strokeWidth: style.strokeWidth,
-          styleNodeId: (pathNodes.at(-1) || pathNodes[0]).id,
+          styleNodeId: styleNode.id,
           transform: null,
         },
       ],
@@ -393,21 +363,17 @@ const buildBooleanCompoundEntries = (
     const resultItem = restItems.reduce((currentItem, item) => {
       return currentItem[methodName](item);
     }, firstItem);
-    const style = getPathStyle(pathNodes.at(-1) || pathNodes[0]);
-    const bounds = expandBounds(toBounds(resultItem.bounds), style.strokeWidth);
+    const styleNode = pathNodes.at(-1) || pathNodes[0];
+    const bounds = expandBounds(
+      toBounds(resultItem.bounds),
+      getPaintExtent(styleNode).strokeWidth
+    );
     const entries = getPaperResultPaths(resultItem).map((path, index) => ({
       closed: path.closed,
       d: path.pathData || path.getPathData(),
-      fill: style.fill,
-      fillRule: style.fillRule,
+      fillRule: styleNode.fillRule,
       key: `${vectorNode.id}-boolean-${index}`,
-      opacity: style.opacity,
-      stroke: style.stroke,
-      strokeLineCap: style.strokeLineCap,
-      strokeLineJoin: style.strokeLineJoin,
-      strokeMiterLimit: style.strokeMiterLimit,
-      strokeWidth: style.strokeWidth,
-      styleNodeId: (pathNodes.at(-1) || pathNodes[0]).id,
+      styleNodeId: styleNode.id,
       transform: null,
     }));
     const selectionPoints = getPaperPathSelectionPoints(
