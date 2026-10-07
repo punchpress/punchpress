@@ -457,7 +457,9 @@ test("selecting a hidden subtract operand shows a ghost path on canvas", async (
       vectorCount: 1,
     });
 
-  await page.getByRole("button", { name: "Path 2" }).first().click();
+  // Subtract rebuilds both operands as new nodes, so they take the next
+  // generated labels; the front (hidden) operand is now "Path 4".
+  await page.getByRole("button", { name: "Path 4" }).first().click();
 
   await expect
     .poll(async () => {

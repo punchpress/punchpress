@@ -1029,8 +1029,9 @@ test("keeps one selected circle guide visible while dragging a selected node", a
     throw new Error("Missing circle node bounds");
   }
 
-  const startX = beforeNodeBox.x + beforeNodeBox.width / 2;
-  const startY = beforeNodeBox.y + beforeNodeBox.height / 2;
+  // Press on glyph ink; the empty middle of circle text is not a node hit.
+  const startX = beforeNodeBox.x + beforeNodeBox.width * 0.1;
+  const startY = beforeNodeBox.y + beforeNodeBox.height * 0.78;
   const dragDelta = { x: 80, y: 40 };
 
   await page.mouse.move(startX, startY);
@@ -1103,8 +1104,9 @@ test("keeps the path action bar visible during drag", async ({ page }) => {
     throw new Error("Missing circle node bounds");
   }
 
-  const startX = nodeBox.x + nodeBox.width / 2;
-  const startY = nodeBox.y + nodeBox.height / 2;
+  // Press on glyph ink; the empty middle of circle text is not a node hit.
+  const startX = nodeBox.x + nodeBox.width * 0.1;
+  const startY = nodeBox.y + nodeBox.height * 0.78;
 
   await page.mouse.move(startX, startY);
   await page.mouse.down();

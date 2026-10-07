@@ -520,6 +520,8 @@ test("shows and edits frame properties for a selected artboard", async ({
   await inputs.nth(0).fill("420");
   await inputs.nth(1).fill("315");
   await inputs.nth(2).fill("#ffcc00");
+  // Hex drafts commit on Enter or blur, not per keystroke.
+  await inputs.nth(2).press("Enter");
 
   await expect
     .poll(() => {
@@ -754,7 +756,8 @@ test("shows selection colors for a selected multi-path vector and applies one sw
   await expect(redSelectionColorInput).toHaveValue("F63F3F");
 
   await redSelectionColorInput.fill("#112233");
-  await page.locator("body").click();
+  // Hex drafts commit on Enter or blur, not per keystroke.
+  await redSelectionColorInput.press("Enter");
 
   await expect
     .poll(async () => {

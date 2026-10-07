@@ -85,9 +85,17 @@ const TRACE_REPLAY_DOCUMENT = {
 } as const;
 
 const TRACE_ZOOM = 0.445_612_442_210_268_24;
+// The trace was recorded in a taller window; its raw client points now land on
+// the bottom tool dock. Shift the whole replay up so it stays on the canvas
+// while keeping every point in the same place relative to the artwork.
+const TRACE_CLIENT_OFFSET_Y = -300;
+const shiftTracePoint = (point: { x: number; y: number }) => ({
+  x: point.x,
+  y: point.y + TRACE_CLIENT_OFFSET_Y,
+});
 const TRACE_ANCHOR = {
   canvas: { x: 749.81, y: 1010.67 },
-  client: { x: 852.92, y: 688.31 },
+  client: shiftTracePoint({ x: 852.92, y: 688.31 }),
 };
 const TRACE_TEXT_ATTEMPTS = [
   {
@@ -104,7 +112,11 @@ const TRACE_TEXT_ATTEMPTS = [
     move: { x: 772.63, y: 718.11 },
     up: { x: 772.63, y: 718.11 },
   },
-] as const;
+].map((attempt) => ({
+  down: shiftTracePoint(attempt.down),
+  move: "move" in attempt ? shiftTracePoint(attempt.move) : undefined,
+  up: shiftTracePoint(attempt.up),
+}));
 
 const alignViewportToTraceAnchor = async (page) => {
   await page.evaluate(
