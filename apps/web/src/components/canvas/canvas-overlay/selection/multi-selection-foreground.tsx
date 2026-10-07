@@ -24,7 +24,10 @@ import {
   type TransformCorner,
 } from "../transform-cursor-angle";
 import { useActiveTransformCursor } from "../use-active-transform-cursor";
-import { getCanvasVectorChildPathNodeIdAtPoint } from "../vector-path/canvas-node-hit-target";
+import {
+  getCanvasDeepLeafNodeIdAtPoint,
+  getCanvasVectorChildPathNodeIdAtPoint,
+} from "../vector-path/canvas-node-hit-target";
 
 const ROTATION_ZONE_SIZE = 56;
 const CORNERS = ["nw", "ne", "sw", "se"] as const;
@@ -572,14 +575,11 @@ export const CanvasMultiSelectionForeground = ({
       event.clientX,
       event.clientY
     );
+    // Node shells are pointer-events: none, so resolve the hit through node
+    // geometry instead of the first DOM element carrying a node id.
     const targetNodeId =
       directChildNodeId ||
-      document
-        .elementsFromPoint(event.clientX, event.clientY)
-        .find(
-          (element) => element instanceof HTMLElement && element.dataset.nodeId
-        )
-        ?.getAttribute("data-node-id");
+      getCanvasDeepLeafNodeIdAtPoint(editor, event.clientX, event.clientY);
 
     if (
       !(
