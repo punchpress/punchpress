@@ -263,10 +263,12 @@ covered presentation roots for each gesture:
 - partial selections keep leaf transforms
 - cancel and commit restore the same roots
 
-**Representation.** The dense-surface choice is part of the tree. It is
-aware of the focused and editing ancestry, and it stays stable during
-gestures, so a drill-in or edit expands every necessary ancestor while every
-isolation boundary is preserved.
+**Representation.** The dense-surface choice is part of the tree. A dense
+group stays one surface unless it is the focused group, or the text or path
+being edited sits inside it; then every group on that path expands. Focus
+alone keeps dense ancestors collapsed, since deep hit testing reaches into
+surfaces. Previews never write the store, so the tree stays referentially
+stable through gestures.
 
 **Editing artwork.** The text-edit preview renders in its node's tree slot,
 so group opacity and effects apply. Caret and input chrome stay outside the
@@ -314,6 +316,30 @@ settle frames are measured in the shipped Chromium.
 - **Group resize:** scales shape and text stroke widths, all shadow offsets
   and blur, vector-container effects, and the group's own effects. Child-backed vectors resize through
   their descendants.
+
+### Render tree as built (stage 3)
+
+Stage 3 builds the opacity part of this model. Shadows need the rest, so it
+lands with stage 6:
+
+- `editor.getRenderTree()` returns layers (every group and artboard, always
+  present so opacity changes never re-parent descendants), shells, and dense
+  surfaces, plus the flat list of placed shell and surface ids.
+- A layer is a zero-size `div` with no node markers. CSS `opacity` below 1
+  isolates its subtree. Layers never move: previews keep moving leaf shells, so
+  preview roots stay disjoint without a placement rewrite.
+- Leaf art and dense-surface roots carry only their own opacity. Ancestor
+  opacity lives on the layers, and export nests one `<g opacity>` per
+  translucent group or artboard.
+- Artboard opacity fades the artboard's content, not its background.
+- The text-edit preview paints in its node's shell, sized from the live
+  preview frame, so group compositing applies while editing. The input and
+  caret stay outside.
+- Deferred to stage 6, where shadows make them necessary and measurable:
+  stationary artboard clip layers (per-shell clips stay; their rotation-preview
+  inaccuracy predates this work), moving presentation layers during whole-group
+  drags, and expanding exact-raster presentation by effect support. Raster
+  pixel-grid chrome already renders outside node art.
 
 ## Rejected Alternatives
 

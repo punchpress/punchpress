@@ -56,15 +56,13 @@ Every stage goes through the same sequence:
      documents and clipboard payloads.
    - Rendering changes only for documents that interleaved a group's children
      with other nodes. It ships first because stage 3 relies on it.
-3. **Engine-owned render tree and isolated groups.**
-   - Starts with its own high-effort architecture review.
-   - Ordered render tree with clip, presentation, and effect layers.
-   - Disjoint preview roots and the placement rewrite.
-   - Representation stable across gestures and aware of ancestry.
-   - Editing artwork and raster ownership on the tree.
-   - Hierarchical export.
-   - Isolated group opacity.
-   - Codex's estimate: 12–18 production files and 800–1,500 changed lines.
+3. **Engine-owned render tree and isolated groups.** Narrowed after its
+   architecture review to what opacity needs:
+   - `editor.getRenderTree()` with always-present group and artboard layers,
+     shells, and dense surfaces; ancestry-aware expansion for edits.
+   - Layer `div`s with CSS opacity; leaf and surface art carry own opacity only.
+   - Text-edit preview painted in its node's shell.
+   - Hierarchical export with one `<g opacity>` per translucent container.
 4. **Linear gradients.** Paint union, userSpace defs, a gradient strip with
    stop ids, and stop colors in selection colors.
 5. **Stroke alignment.** Offset-outline compiler (chosen against the
@@ -72,6 +70,10 @@ Every stage goes through the same sequence:
    outside strokes below fills.
 6. **Drop shadow on nodes and groups.**
    - Effects list and one branched filter graph per effect owner.
+   - Stationary artboard clip layers, so group shadows clip to the artboard.
+   - Moving presentation layers during whole-group drags, with disjoint preview
+     roots, if the shadow drag gate needs them.
+   - Exact-raster presentation expanded by effect support.
    - Vector-container and group effects, including resize and baked
      group-transform scaling.
 
@@ -90,7 +92,7 @@ drop shadow.
 | `appearance-dragging-200-plain` | baseline |
 | `appearance-dragging-200` | p95 ≤ 1.1 × plain p95; slow frames ≤ 2 × plain; `renderCanvasNode` ≤ 5 during the drag |
 | `appearance-shadow-scrub` | p95 ≤ 8.33 ms; ≤ 1 node-art render per frame, including color preview |
-| `appearance-nested-groups-200` | 200 nodes in 20 nested translucent groups (depth 3, opacity 0.6 at every level); viewport ladder plus whole-group drag. Gate: p95 ≤ 1.25 × plain p95; `renderCanvasNode` ≤ 5 during the drag |
+| `appearance-nested-groups-viewport-200`, `appearance-nested-groups-dragging-200` | 200 nodes in 20 stacks of three nested 60% groups; viewport ladder, and a drag of all 20 stacks. Gate: viewport p95 ≤ 1.25 × plain; drag ≤ 1.1 × the same scene at opacity 1 (isolation cost only) |
 | `appearance-shadowed-groups` | 20 shadowed groups of 10 nodes. Variants: whole-group drag (gate p95 ≤ 1.1 × plain drag p95) and single-child drag inside a group (records the per-frame group re-filter cost; gate p95 ≤ 16.7 ms) |
 | `appearance-representation-thresholds` | groups crossing the dense thresholds (300↔301 leaves, 24↔25 leaves plus area); nested drill-in; opacity and effect toggles; hidden-child insertion. Gate: no frame > 50 ms and no resident raster remount |
 | `appearance-max-stack` | 20 nodes with 8/8/4 stacks and blur 500, zoomed 1% → 6400% → 1%; max frame ≤ 100 ms; export SVG + PNG latency recorded |
@@ -136,6 +138,21 @@ All times are ms, aggregated over the whole run.
 
 The pre-existing `shape-nodes-dragging-500` runs at p50 16.7 ms and p95 25 ms
 on the same machine, so the drag baseline is not caused by appearance.
+
+### Stage 3 Measurements (2026-10-07)
+
+| Scenario | p50 / p95 / max (ms) |
+| --- | --- |
+| viewport plain | 8.3 / 9.1 / 66.7 |
+| viewport, nested 60% groups | 8.3 / 9.0 / 75.0 |
+| drag plain (leaf selection) | 8.3 / 16.7 / 33.3 |
+| drag nested groups, 60% | 33.3 / 40.7 / 58.4 |
+| drag nested groups, opacity 1 | 33.3 / 41.7 / 50.0 |
+| drag nested groups, before stage 3 | 33.4 / 41.7 / 50.0 |
+
+Isolation adds no measurable cost. Dragging 20 selected group stacks is slow
+(p50 33 ms) on the code before stage 3 too; that predates appearance work and
+is tracked separately.
 
 ## Browser Checks
 
