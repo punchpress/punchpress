@@ -30,6 +30,9 @@ The layers panel exposes the document tree as editable layer rows.
   when a node first appears and stays with that node through sibling insertion,
   reorder, deletion, and undo; loading or starting a new document starts
   numbering again.
+- Boolean operations keep operand layer names even though they rebuild the
+  result nodes: result paths take their operands' labels bottom-first, and a
+  new result vector keeps the bottom vector operand's name.
 - Layer menus route to editor commands; they do not mutate private panel state.
 - The New Layer button and `Cmd/Ctrl+Shift+N` create an empty layer. The first
   content action materializes its source kind.

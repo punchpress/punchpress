@@ -282,6 +282,27 @@ export class NodeTreeManager {
     this.generatedLayerLabelNextIndexByKey.clear();
   }
 
+  // Replacement nodes (such as boolean results) keep the generated label of the
+  // node they replace when both share a label family under the same parent.
+  inheritGeneratedLayerLabels(nodes, replacements) {
+    this.sync(nodes);
+
+    for (const { fromNodeId, toNode } of replacements) {
+      const key = getGeneratedLayerLabelKey(toNode);
+      const index = this.generatedLayerLabelIndexById.get(fromNodeId);
+
+      if (
+        !(key && index) ||
+        this.generatedLayerLabelKeyById.get(fromNodeId) !== key
+      ) {
+        continue;
+      }
+
+      this.generatedLayerLabelKeyById.set(toNode.id, key);
+      this.generatedLayerLabelIndexById.set(toNode.id, index);
+    }
+  }
+
   getGeneratedLayerLabelIndex(nodes, nodeId) {
     this.sync(nodes);
 

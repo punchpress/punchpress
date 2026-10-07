@@ -314,12 +314,8 @@ const performBooleanOperation = (
   }, firstItem);
 };
 
-const createResultNodes = (
-  editor,
-  resultItem,
-  parentId: string,
-  styleTemplate
-) => {
+const createResultNodes = (editor, resultItem, selection) => {
+  const { parentId, styleTemplate } = selection;
   const paths = getPaperResultPaths(resultItem);
 
   if (paths.length === 0) {
@@ -358,15 +354,36 @@ const createResultNodes = (
     return pathNodes;
   }
 
+  const bottomOperand = selection.sources[0]?.node;
   const vectorNode = {
     ...createDefaultVectorContainerNode(),
     compoundWrapper: false,
     id: resultVectorId,
+    // The result keeps the bottom vector operand's layer name.
+    ...(bottomOperand?.type === "vector" && bottomOperand.name
+      ? { name: bottomOperand.name }
+      : {}),
     parentId,
     pathComposition: paths.length > 1 ? "compound-fill" : "independent",
   };
 
   return [vectorNode, ...pathNodes];
+};
+
+// Pairs path operands with result paths under the same parent, bottom first,
+// so recreated paths keep the operands' generated layer labels.
+const getOperandLabelReplacements = (selection, resultNodes) => {
+  const operands = selection.sources
+    .map((source) => source.node)
+    .filter((node) => node.type === "path");
+  const results = resultNodes.filter((node) => {
+    return node.type === "path" && node.parentId === selection.parentId;
+  });
+
+  return results.slice(0, operands.length).map((toNode, index) => ({
+    fromNodeId: operands[index].id,
+    toNode,
+  }));
 };
 
 export const canApplyBooleanOperation = (
@@ -414,12 +431,7 @@ export const applyBooleanOperation = (
       return [];
     }
 
-    return createResultNodes(
-      editor,
-      resultItem,
-      selection.parentId,
-      selection.styleTemplate
-    );
+    return createResultNodes(editor, resultItem, selection);
   });
 
   if (resultNodes.length === 0) {
@@ -445,6 +457,10 @@ export const applyBooleanOperation = (
       });
     }
 
+    editor.nodeTree.inheritGeneratedLayerLabels(
+      editor.nodes,
+      getOperandLabelReplacements(selection, resultNodes)
+    );
     editor.getState().replaceNodeBlocks(nodeIds, resultNodes);
 
     if (
