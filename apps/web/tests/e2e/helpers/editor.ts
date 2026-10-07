@@ -218,9 +218,18 @@ export const setViewport = (page, viewport) => {
       return false;
     }
 
+    const wasInteracting = editor.viewportInteracting;
+
     editor.cancelPendingViewportFocus();
     viewer.setTo?.(nextViewport);
     editor.setViewport(nextViewport);
+    // setTo echoes through the viewer scroll handler, which marks the viewport
+    // as interacting and defers the store write. End that synthetic
+    // interaction now, as discrete zoom does, so a later render cannot replay
+    // the store's previous zoom into the viewer.
+    if (!wasInteracting) {
+      editor.setViewportInteracting(false);
+    }
     editor.onViewportChange?.();
 
     return true;
