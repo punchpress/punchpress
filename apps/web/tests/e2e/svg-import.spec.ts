@@ -433,18 +433,23 @@ test("applies vector container opacity while rendering child paths", async ({
       },
       {
         closed: true,
+        appearance: {
+          fills: [
+            {
+              enabled: true,
+              id: "fill-1",
+              opacity: 1,
+              paint: { color: "#390075", kind: "solid" },
+            },
+          ],
+          strokes: [],
+        },
         contours: [contour],
-        fill: "#390075",
         fillRule: "nonzero",
         id: "opacity-vector-path",
         opacity: 0.5,
         parentId: "opacity-vector",
         segments: contour.segments,
-        stroke: null,
-        strokeLineCap: "butt",
-        strokeLineJoin: "miter",
-        strokeMiterLimit: 4,
-        strokeWidth: 0,
         transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
         type: "path",
         visible: true,
@@ -509,22 +514,28 @@ test("applies nested vector opacity inside dense group surfaces", async ({
         },
       ],
     });
+    const createFillAppearance = (color) => ({
+      fills: [
+        {
+          enabled: true,
+          id: "fill-1",
+          opacity: 1,
+          paint: { color, kind: "solid" },
+        },
+      ],
+      strokes: [],
+    });
     const createPath = (id, parentId, visible = true) => {
       const contour = createContour(0, 0, 1, 1);
 
       return {
+        appearance: createFillAppearance("#111111"),
         closed: true,
         contours: [contour],
-        fill: "#111111",
         fillRule: "nonzero",
         id,
         parentId,
         segments: contour.segments,
-        stroke: null,
-        strokeLineCap: "butt",
-        strokeLineJoin: "miter",
-        strokeMiterLimit: 4,
-        strokeWidth: 0,
         transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
         type: "path",
         visible,
@@ -555,8 +566,8 @@ test("applies nested vector opacity inside dense group surfaces", async ({
       },
       {
         ...createPath("nested-opacity-path", "nested-opacity-vector"),
+        appearance: createFillAppearance("#390075"),
         contours: [contour],
-        fill: "#390075",
         opacity: 0.5,
         segments: contour.segments,
       },
@@ -781,18 +792,23 @@ test("rotates dense imported svg group surfaces uniformly across nesting depths"
       ],
     });
     const createPath = (id, parentId, fill, transform, contour) => ({
+      appearance: {
+        fills: [
+          {
+            enabled: true,
+            id: "fill-1",
+            opacity: 1,
+            paint: { color: fill.toLowerCase(), kind: "solid" },
+          },
+        ],
+        strokes: [],
+      },
       closed: true,
       contours: [contour],
-      fill,
       fillRule: "nonzero",
       id,
       parentId,
       segments: contour.segments,
-      stroke: null,
-      strokeLineCap: "butt",
-      strokeLineJoin: "miter",
-      strokeMiterLimit: 4,
-      strokeWidth: 0,
       transform,
       type: "path",
       visible: true,
@@ -1461,10 +1477,23 @@ test("imports compound path svg artwork into the current document as one editabl
       { closed: true, segments: 4 },
       { closed: true, segments: 4 },
     ],
-    fill: "rgba(255,0,0,0.5)",
+    appearance: {
+      fills: [{ opacity: 0.5, paint: { color: "#ff0000", kind: "solid" } }],
+      strokes: [
+        {
+          cap: "square",
+          join: "bevel",
+          miterLimit: 9,
+          opacity: 0.25,
+          paint: { color: "#000000", kind: "solid" },
+          width: 4,
+        },
+      ],
+    },
+    fill: "#ff0000",
     fillRule: "evenodd",
     parentId: importedGroup?.id,
-    stroke: "rgba(0,0,0,0.25)",
+    stroke: "#000000",
     strokeLineCap: "square",
     strokeLineJoin: "bevel",
     strokeMiterLimit: 9,

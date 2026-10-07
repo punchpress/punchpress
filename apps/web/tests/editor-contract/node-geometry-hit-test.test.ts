@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 import { getLocalFontId } from "@punchpress/punch-schema";
 
 const FONT = {
@@ -12,7 +12,7 @@ const TRANSLATE_X_REGEX = /^translate\(([-\d.]+)/;
 
 const createSquarePathNode = () => ({
   closed: true,
-  fill: "#111111",
+  appearance: createSolidAppearance({ fill: "#111111" }),
   fillRule: "nonzero" as const,
   id: "square",
   parentId: "root",
@@ -42,11 +42,6 @@ const createSquarePathNode = () => ({
       pointType: "corner" as const,
     },
   ],
-  stroke: "#111111",
-  strokeLineCap: "round" as const,
-  strokeLineJoin: "round" as const,
-  strokeMiterLimit: 4,
-  strokeWidth: 0,
   transform: {
     rotation: 32,
     scaleX: 1.35,
@@ -60,13 +55,11 @@ const createSquarePathNode = () => ({
 
 const createEllipseShapeNode = () => ({
   cornerRadius: 0,
-  fill: "#111111",
+  appearance: createSolidAppearance({ fill: "#111111" }),
   height: 100,
   id: "ellipse",
   parentId: "root",
   shape: "ellipse" as const,
-  stroke: "none",
-  strokeWidth: 0,
   transform: {
     rotation: 0,
     scaleX: 1,
@@ -108,13 +101,11 @@ const createLoadedFont = () => {
 };
 
 const createTrackedTextNode = (text = "AA") => ({
-  fill: "#111111",
+  appearance: createSolidAppearance({ fill: "#111111" }),
   font: FONT,
   fontSize: 100,
   id: "text",
   parentId: "root",
-  stroke: null,
-  strokeWidth: 0,
   text,
   tracking: 200,
   transform: {

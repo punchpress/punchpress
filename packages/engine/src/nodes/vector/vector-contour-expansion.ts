@@ -16,13 +16,8 @@ const createPathNodeFromContour = (
   contour,
   {
     defaultTransform,
-    fallbackFill = null,
+    fallbackAppearance = null,
     fallbackFillRule = "nonzero",
-    fallbackStroke = null,
-    fallbackStrokeLineCap = null,
-    fallbackStrokeLineJoin = null,
-    fallbackStrokeMiterLimit = null,
-    fallbackStrokeWidth = null,
     id,
     parentId,
   }
@@ -31,26 +26,14 @@ const createPathNodeFromContour = (
 
   return withPathNodeContours(
     {
-    ...baseNode,
-    fill: contour.fill ?? fallbackFill,
-    fillRule: contour.fillRule ?? fallbackFillRule,
-    id: contour.id || id || createId(),
-    parentId,
-    stroke: contour.stroke ?? fallbackStroke,
-    strokeLineCap:
-      contour.strokeLineCap ?? fallbackStrokeLineCap ?? baseNode.strokeLineCap,
-    strokeLineJoin:
-      contour.strokeLineJoin ??
-      fallbackStrokeLineJoin ??
-      baseNode.strokeLineJoin,
-    strokeMiterLimit:
-      contour.strokeMiterLimit ??
-      fallbackStrokeMiterLimit ??
-      baseNode.strokeMiterLimit,
-    strokeWidth:
-      contour.strokeWidth ?? fallbackStrokeWidth ?? baseNode.strokeWidth,
-    transform: defaultTransform,
-    visible: contour.visible !== false,
+      ...baseNode,
+      appearance:
+        contour.appearance ?? fallbackAppearance ?? baseNode.appearance,
+      fillRule: contour.fillRule ?? fallbackFillRule,
+      id: contour.id || id || createId(),
+      parentId,
+      transform: defaultTransform,
+      visible: contour.visible !== false,
     },
     [
       {
@@ -72,13 +55,8 @@ export const expandContourOwnedVectorNode = (node) => {
     return [
       createPathNodeFromContour(contours[0], {
         defaultTransform: node.transform,
-        fallbackFill: node.fill ?? null,
+        fallbackAppearance: node.appearance ?? null,
         fallbackFillRule: node.fillRule ?? "nonzero",
-        fallbackStroke: node.stroke ?? null,
-        fallbackStrokeLineCap: node.strokeLineCap,
-        fallbackStrokeLineJoin: node.strokeLineJoin,
-        fallbackStrokeMiterLimit: node.strokeMiterLimit,
-        fallbackStrokeWidth: node.strokeWidth,
         id: node.id,
         parentId: node.parentId || ROOT_PARENT_ID,
       }),
@@ -105,13 +83,8 @@ export const expandContourOwnedVectorNode = (node) => {
   const childPathNodes = contours.map((contour, contourIndex) => {
     return createPathNodeFromContour(contour, {
       defaultTransform: node.transform,
-      fallbackFill: node.fill ?? null,
+      fallbackAppearance: node.appearance ?? null,
       fallbackFillRule: node.fillRule ?? "nonzero",
-      fallbackStroke: node.stroke ?? null,
-      fallbackStrokeLineCap: node.strokeLineCap,
-      fallbackStrokeLineJoin: node.strokeLineJoin,
-      fallbackStrokeMiterLimit: node.strokeMiterLimit,
-      fallbackStrokeWidth: node.strokeWidth,
       id: contour.id || `${node.id}-path-${contourIndex + 1}`,
       parentId: vectorNode.id,
     });

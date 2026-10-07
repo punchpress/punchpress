@@ -1,4 +1,4 @@
-import { createDefaultNode } from "@punchpress/engine";
+import { createDefaultNode, createSolidAppearance } from "@punchpress/engine";
 import { saveDesignDocument } from "@punchpress/punch-schema";
 import type { PerformanceBenchmarkDefinition } from "../performance-benchmark-types";
 
@@ -13,7 +13,11 @@ const createBenchmarkNodes = (nodeCount: number) => {
     return {
       ...node,
       fontSize: 220,
-      strokeWidth: 8,
+      appearance: createSolidAppearance({
+        fill: "#ffffff",
+        stroke: "#000000",
+        strokeWidth: 8,
+      }),
       text: `Node ${index + 1}`,
       warp: { kind: "arch", bend: 0.28 },
       transform: {

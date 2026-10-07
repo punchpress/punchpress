@@ -10,15 +10,10 @@ import {
   getNodeTransformForPinnedWorldPoint,
   getNodeWorldPoint,
 } from "../primitives/rotation";
-import {
-  fillRuleStyleDescriptor,
-  fillStyleDescriptor,
-  strokeLineCapStyleDescriptor,
-  strokeLineJoinStyleDescriptor,
-  strokeMiterLimitStyleDescriptor,
-  strokeStyleDescriptor,
-  strokeWidthStyleDescriptor,
-} from "../styles/style-descriptors";
+import { appearanceSchema } from "@punchpress/punch-schema";
+import { areAppearancesEqual } from "../appearance/appearance-layers";
+import { getNodeAppearance } from "../appearance/node-appearance";
+import { fillRuleStyleDescriptor } from "../styles/style-descriptors";
 
 const createPropertyDescriptor = ({
   id,
@@ -35,6 +30,31 @@ const createPropertyDescriptor = ({
     setValue,
   };
 };
+
+// Read-only through selection properties: stacks change through the
+// appearance commands. Multi-selection shares a stack only when every stack is
+// equal apart from layer ids; otherwise the property reads as mixed.
+const appearanceDescriptor = createPropertyDescriptor({
+  getValue: (node) => getNodeAppearance(node),
+  id: "appearance",
+  isEqual: areAppearancesEqual,
+  scopes: ["single", "multi"],
+  // Generic writes must still produce a valid stack; invalid input is a no-op.
+  setValue: (_node, value) => {
+    const result = appearanceSchema.safeParse(value);
+
+    return result.success ? { appearance: result.data } : {};
+  },
+});
+
+const opacityDescriptor = createPropertyDescriptor({
+  getValue: (node) => (typeof node.opacity === "number" ? node.opacity : 1),
+  id: "opacity",
+  scopes: ["single", "multi"],
+  setValue: (_node, value) => ({
+    opacity: Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 1,
+  }),
+});
 
 const backgroundDescriptor = createPropertyDescriptor({
   getValue: (node) => node.background,
@@ -182,19 +202,15 @@ const yDescriptor = createPropertyDescriptor({
 });
 
 const PROPERTY_DESCRIPTORS = {
+  appearance: appearanceDescriptor,
   background: backgroundDescriptor,
   cornerRadius: cornerRadiusDescriptor,
-  fill: fillStyleDescriptor,
   fillRule: fillRuleStyleDescriptor,
   font: fontDescriptor,
   fontSize: fontSizeDescriptor,
   height: heightDescriptor,
+  opacity: opacityDescriptor,
   shape: shapeDescriptor,
-  stroke: strokeStyleDescriptor,
-  strokeLineCap: strokeLineCapStyleDescriptor,
-  strokeLineJoin: strokeLineJoinStyleDescriptor,
-  strokeMiterLimit: strokeMiterLimitStyleDescriptor,
-  strokeWidth: strokeWidthStyleDescriptor,
   text: textDescriptor,
   tracking: trackingDescriptor,
   warp: warpDescriptor,

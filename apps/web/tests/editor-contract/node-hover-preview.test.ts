@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 
 const COMPOUND_VECTOR_NODES = [
   {
@@ -19,7 +19,11 @@ const COMPOUND_VECTOR_NODES = [
   },
   {
     closed: true,
-    fill: "#ff0000",
+    appearance: createSolidAppearance({
+      fill: "#ff0000",
+      stroke: "#111111",
+      strokeWidth: 3,
+    }),
     fillRule: "evenodd",
     id: "path-1",
     parentId: "vector-1",
@@ -49,11 +53,6 @@ const COMPOUND_VECTOR_NODES = [
         pointType: "corner",
       },
     ],
-    stroke: "#111111",
-    strokeWidth: 3,
-    strokeLineCap: "round",
-    strokeLineJoin: "round",
-    strokeMiterLimit: 4,
     transform: {
       rotation: 0,
       scaleX: 1,
@@ -66,7 +65,11 @@ const COMPOUND_VECTOR_NODES = [
   },
   {
     closed: true,
-    fill: "#ff0000",
+    appearance: createSolidAppearance({
+      fill: "#ff0000",
+      stroke: "#111111",
+      strokeWidth: 3,
+    }),
     fillRule: "evenodd",
     id: "path-2",
     parentId: "vector-1",
@@ -96,11 +99,6 @@ const COMPOUND_VECTOR_NODES = [
         pointType: "corner",
       },
     ],
-    stroke: "#111111",
-    strokeWidth: 3,
-    strokeLineCap: "round",
-    strokeLineJoin: "round",
-    strokeMiterLimit: 4,
     transform: {
       rotation: 0,
       scaleX: 1,
@@ -212,16 +210,11 @@ const createPathNode = ({ id, parentId, transform }) => {
   return {
     closed: true,
     contours: [contour],
-    fill: "#3AAAFF",
+    appearance: createSolidAppearance({ fill: "#3AAAFF" }),
     fillRule: "nonzero",
     id,
     parentId,
     segments: contour.segments,
-    stroke: null,
-    strokeLineCap: "butt",
-    strokeLineJoin: "miter",
-    strokeMiterLimit: 4,
-    strokeWidth: 0,
     transform,
     type: "path",
     visible: true,

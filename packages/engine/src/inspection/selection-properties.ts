@@ -13,24 +13,16 @@ import {
 } from "./selection-colors";
 
 const EMPTY_PROPERTIES = Object.freeze({});
-const VECTOR_AGGREGATE_PROPERTY_IDS = [
-  "fill",
-  "fillRule",
-  "stroke",
-  "strokeLineCap",
-  "strokeLineJoin",
-  "strokeMiterLimit",
-  "strokeWidth",
-] as const;
+const VECTOR_AGGREGATE_PROPERTY_IDS = ["appearance", "fillRule"] as const;
 
-const getVectorAggregatePropertyNodes = (editor, nodeId) => {
+export const getVectorAggregatePropertyNodes = (editor, nodeId) => {
   return editor
     .getChildNodeIds(nodeId)
     .map((childNodeId) => editor.getNode(childNodeId))
     .filter((node) => node?.type === "path");
 };
 
-const isVectorAggregatePropertySelection = (editor, nodeId) => {
+export const isVectorAggregatePropertySelection = (editor, nodeId) => {
   const node = editor.getNode(nodeId);
 
   return (

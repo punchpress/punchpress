@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 import { getArtboardClipPath } from "../src/components/canvas/artboard-clip-path";
 
 describe("artboard clip path", () => {
@@ -41,13 +41,11 @@ describe("artboard clip path", () => {
       },
       {
         cornerRadius: 0,
-        fill: "#3366ff",
+        appearance: createSolidAppearance({ fill: "#3366ff" }),
         height: 180,
         id: "shape-1",
         parentId: "group-1",
         shape: "polygon",
-        stroke: null,
-        strokeWidth: 0,
         transform: {
           rotation: 0,
           scaleX: 1,

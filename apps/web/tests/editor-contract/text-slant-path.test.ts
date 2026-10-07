@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { Editor, getNodeWorldPoint } from "@punchpress/engine";
+import {
+  createSolidAppearance,
+  Editor,
+  getNodeWorldPoint,
+} from "@punchpress/engine";
 
 const FONT = {
   family: "Arial",
@@ -10,13 +14,11 @@ const FONT = {
 
 const createSlantNode = () => {
   return {
-    fill: "#000000",
+    appearance: createSolidAppearance({ fill: "#000000" }),
     font: FONT,
     fontSize: 120,
     id: "slant-node",
     parentId: "root",
-    stroke: null,
-    strokeWidth: 0,
     text: "SLANT",
     tracking: 0,
     transform: {

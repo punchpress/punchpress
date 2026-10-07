@@ -1,11 +1,7 @@
 export const VECTOR_NODE_PROPERTY_IDS = [
-  "fill",
+  "appearance",
   "fillRule",
-  "stroke",
-  "strokeLineCap",
-  "strokeLineJoin",
-  "strokeMiterLimit",
-  "strokeWidth",
+  "opacity",
   "x",
   "y",
 ];

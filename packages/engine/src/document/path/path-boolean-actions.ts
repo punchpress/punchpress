@@ -1,8 +1,3 @@
-import {
-  DEFAULT_VECTOR_STROKE_LINE_CAP,
-  DEFAULT_VECTOR_STROKE_LINE_JOIN,
-  DEFAULT_VECTOR_STROKE_MITER_LIMIT,
-} from "@punchpress/punch-schema";
 import type paper from "paper/dist/paper-core.js";
 import { finishEditingIfNeeded } from "../../editing/editing-actions";
 import { buildNodeCapabilityGeometry } from "../../nodes/node-capabilities";
@@ -111,30 +106,14 @@ const getPaperResultPaths = (item) => {
   return [];
 };
 
+// The whole stack of the style source carries over to the result.
 const getStyleTemplateFromNode = (editor, node) => {
   if (node?.type === "path") {
-    return {
-      fill: node.fill,
-      fillRule: node.fillRule,
-      stroke: node.stroke,
-      strokeLineCap: node.strokeLineCap ?? DEFAULT_VECTOR_STROKE_LINE_CAP,
-      strokeLineJoin: node.strokeLineJoin ?? DEFAULT_VECTOR_STROKE_LINE_JOIN,
-      strokeMiterLimit:
-        node.strokeMiterLimit ?? DEFAULT_VECTOR_STROKE_MITER_LIMIT,
-      strokeWidth: node.strokeWidth,
-    };
+    return { appearance: node.appearance, fillRule: node.fillRule };
   }
 
   if (node?.type === "shape") {
-    return {
-      fill: node.fill,
-      fillRule: "nonzero",
-      stroke: node.stroke,
-      strokeLineCap: DEFAULT_VECTOR_STROKE_LINE_CAP,
-      strokeLineJoin: DEFAULT_VECTOR_STROKE_LINE_JOIN,
-      strokeMiterLimit: DEFAULT_VECTOR_STROKE_MITER_LIMIT,
-      strokeWidth: node.strokeWidth,
-    };
+    return { appearance: node.appearance, fillRule: "nonzero" };
   }
 
   if (node?.type === "vector") {
@@ -367,13 +346,8 @@ const createResultNodes = (
     return withPathNodeContours(
       {
         ...baseNode,
-        fill: styleTemplate.fill,
+        appearance: styleTemplate.appearance,
         fillRule: styleTemplate.fillRule,
-        stroke: styleTemplate.stroke,
-        strokeLineCap: styleTemplate.strokeLineCap,
-        strokeLineJoin: styleTemplate.strokeLineJoin,
-        strokeMiterLimit: styleTemplate.strokeMiterLimit,
-        strokeWidth: styleTemplate.strokeWidth,
         transform: pathTransform,
       },
       [contour]

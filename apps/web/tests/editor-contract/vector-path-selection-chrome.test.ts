@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 import { getVectorCornerWidgetGeometry } from "../../src/components/canvas/canvas-overlay/vector-path/corner-widget-geometry";
 import { getVectorCornerDragIdentity } from "../../src/components/canvas/canvas-overlay/vector-path/vector-corner-drag-session";
 import { VectorCornerRadiusHandles } from "../../src/components/canvas/canvas-overlay/vector-path/vector-corner-radius-handle";
@@ -17,7 +17,11 @@ import {
 const createRectangleVectorNode = () => {
   return {
     closed: true,
-    fill: "#ffffff",
+    appearance: createSolidAppearance({
+      fill: "#ffffff",
+      stroke: "#000000",
+      strokeWidth: 12,
+    }),
     fillRule: "nonzero" as const,
     id: "vector-node",
     parentId: "root",
@@ -47,8 +51,6 @@ const createRectangleVectorNode = () => {
         pointType: "corner" as const,
       },
     ],
-    stroke: "#000000",
-    strokeWidth: 12,
     transform: {
       rotation: 0,
       scaleX: 1,
@@ -105,7 +107,11 @@ const getEditableContours = (node) => {
 const createIrregularPolygonVectorNode = () => {
   return {
     closed: true,
-    fill: "#ffffff",
+    appearance: createSolidAppearance({
+      fill: "#ffffff",
+      stroke: "#000000",
+      strokeWidth: 12,
+    }),
     fillRule: "nonzero" as const,
     id: "irregular-vector-node",
     parentId: "root",
@@ -141,8 +147,6 @@ const createIrregularPolygonVectorNode = () => {
         pointType: "corner" as const,
       },
     ],
-    stroke: "#000000",
-    strokeWidth: 12,
     transform: {
       rotation: 0,
       scaleX: 1,
@@ -158,7 +162,11 @@ const createIrregularPolygonVectorNode = () => {
 const createDiamondVectorNode = () => {
   return {
     closed: true,
-    fill: "#ffffff",
+    appearance: createSolidAppearance({
+      fill: "#ffffff",
+      stroke: "#000000",
+      strokeWidth: 12,
+    }),
     fillRule: "nonzero" as const,
     id: "diamond-vector-node",
     parentId: "root",
@@ -188,8 +196,6 @@ const createDiamondVectorNode = () => {
         pointType: "corner" as const,
       },
     ],
-    stroke: "#000000",
-    strokeWidth: 12,
     transform: {
       rotation: 0,
       scaleX: 1,

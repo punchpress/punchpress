@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  createSolidAppearance,
   Editor,
   insertComponentNodes,
   recipeToComponentNodes,
@@ -56,14 +57,12 @@ const buildText = (
   y: number,
   text = "Hello"
 ) => ({
-  fill: "#000000",
+  appearance: createSolidAppearance({ fill: "#000000" }),
   font: FONT,
   fontSize: 120,
   id,
   opacity: 1,
   parentId,
-  stroke: null,
-  strokeWidth: 0,
   text,
   tracking: 0,
   transform: transform(x, y),

@@ -1,8 +1,4 @@
-import {
-  DEFAULT_VECTOR_STROKE_LINE_CAP,
-  DEFAULT_VECTOR_STROKE_LINE_JOIN,
-  DEFAULT_VECTOR_STROKE_MITER_LIMIT,
-} from "@punchpress/punch-schema";
+import { createSolidAppearance } from "../../appearance/appearance-layers";
 import { createId } from "../text/model";
 import { withPathNodeContours } from "./path-contours";
 
@@ -55,16 +51,15 @@ export const createDefaultPathNode = (parentId: string) => {
 
   return withPathNodeContours(
     {
-      fill: "#ffffff",
+      appearance: createSolidAppearance({
+        fill: "#ffffff",
+        stroke: "#000000",
+        strokeWidth: DEFAULT_PATH_STROKE_WIDTH,
+      }),
       fillRule: "evenodd",
       id: createId(),
       opacity: 1,
       parentId,
-      stroke: "#000000",
-      strokeLineCap: DEFAULT_VECTOR_STROKE_LINE_CAP,
-      strokeLineJoin: DEFAULT_VECTOR_STROKE_LINE_JOIN,
-      strokeMiterLimit: DEFAULT_VECTOR_STROKE_MITER_LIMIT,
-      strokeWidth: DEFAULT_PATH_STROKE_WIDTH,
       transform: {
         rotation: 0,
         scaleX: 1,

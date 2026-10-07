@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 
 const ROTATE_TRANSFORM_REGEX = /rotate\((-?\d+(?:\.\d+)?)deg\)/;
 
@@ -25,7 +25,11 @@ const createPathNode = (
   points: Array<{ x: number; y: number }>
 ) => ({
   closed: true,
-  fill: "#ffffff",
+  appearance: createSolidAppearance({
+    fill: "#ffffff",
+    stroke: "#000000",
+    strokeWidth: 3,
+  }),
   fillRule: "nonzero" as const,
   id,
   parentId,
@@ -35,11 +39,6 @@ const createPathNode = (
     point,
     pointType: "corner" as const,
   })),
-  stroke: "#000000",
-  strokeLineCap: "round" as const,
-  strokeLineJoin: "round" as const,
-  strokeMiterLimit: 4,
-  strokeWidth: 3,
   transform: {
     rotation: 0,
     scaleX: 1,

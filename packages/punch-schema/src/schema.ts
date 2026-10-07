@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { appearanceSchema } from "./appearance-schema";
 import { PUNCH_DOCUMENT_VERSION, ROOT_PARENT_ID } from "./constants";
 import {
   VECTOR_STROKE_LINE_CAP_VALUES,
@@ -88,9 +89,7 @@ export const textNodeSchema = baseNodeSchema
     transform: transformSchema,
     fontSize: finiteNumber,
     tracking: finiteNumber,
-    fill: z.string().min(1),
-    stroke: z.string().min(1).nullable(),
-    strokeWidth: finiteNumber,
+    appearance: appearanceSchema,
     warp: warpSchema,
   })
   .strict();
@@ -135,12 +134,10 @@ export const shapeNodeSchema = baseNodeSchema
   .extend({
     cornerRadii: z.array(finiteNumber).optional(),
     cornerRadius: finiteNumber.optional(),
-    fill: z.string().min(1),
+    appearance: appearanceSchema,
     height: finiteNumber,
     points: z.array(shapePointSchema).min(3).optional(),
     shape: shapeKindSchema,
-    stroke: z.string().min(1).nullable(),
-    strokeWidth: finiteNumber,
     transform: transformSchema,
     type: z.literal("shape"),
     width: finiteNumber,
@@ -247,14 +244,9 @@ export const vectorNodeSchema = baseNodeSchema
 
 export const pathNodeSchema = baseNodeSchema
   .extend({
+    appearance: appearanceSchema,
     contours: z.array(vectorContourSchema).min(1),
-    fill: z.string().min(1).nullable(),
     fillRule: vectorFillRuleSchema,
-    stroke: z.string().min(1).nullable(),
-    strokeLineCap: vectorStrokeLineCapSchema,
-    strokeLineJoin: vectorStrokeLineJoinSchema,
-    strokeMiterLimit: finiteNumber,
-    strokeWidth: finiteNumber,
     transform: transformSchema,
     type: z.literal("path"),
   })

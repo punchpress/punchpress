@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 
 describe("vector container drag preview", () => {
   test("applies preview delta once to a selected vector container transform frame", () => {
@@ -22,7 +22,11 @@ describe("vector container drag preview", () => {
       },
       {
         closed: true,
-        fill: "#ffffff",
+        appearance: createSolidAppearance({
+          fill: "#ffffff",
+          stroke: "#000000",
+          strokeWidth: 3,
+        }),
         fillRule: "nonzero",
         id: "vector-path",
         parentId: "vector-container",
@@ -52,11 +56,6 @@ describe("vector container drag preview", () => {
             pointType: "corner",
           },
         ],
-        stroke: "#000000",
-        strokeLineCap: "round",
-        strokeLineJoin: "round",
-        strokeMiterLimit: 4,
-        strokeWidth: 3,
         transform: {
           rotation: 0,
           scaleX: 1,

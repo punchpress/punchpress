@@ -62,18 +62,58 @@ const rectangleContour = (width: number, height: number) => ({
   ],
 });
 
-const createPathNode = (id: string, parentId: string, fill: string) => ({
-  contours: [rectangleContour(96, 72)],
+const solidAppearance = ({
+  cap = "butt" as "butt" | "round" | "square",
   fill,
+  join = "miter" as "bevel" | "miter" | "round",
+  miterLimit = 4,
+  stroke,
+  width,
+}: {
+  cap?: "butt" | "round" | "square";
+  fill: string;
+  join?: "bevel" | "miter" | "round";
+  miterLimit?: number;
+  stroke: string;
+  width: number;
+}) => ({
+  fills: [
+    {
+      enabled: true,
+      id: "fill-1",
+      opacity: 1,
+      paint: { color: fill, kind: "solid" as const },
+    },
+  ],
+  strokes: [
+    {
+      align: "center" as const,
+      cap,
+      enabled: true,
+      id: "stroke-1",
+      join,
+      miterLimit,
+      opacity: 1,
+      paint: { color: stroke, kind: "solid" as const },
+      width,
+    },
+  ],
+});
+
+const createPathNode = (id: string, parentId: string, fill: string) => ({
+  appearance: solidAppearance({
+    cap: "round",
+    fill,
+    join: "bevel",
+    miterLimit: 8,
+    stroke: "#111111",
+    width: 4,
+  }),
+  contours: [rectangleContour(96, 72)],
   fillRule: "evenodd" as const,
   id,
   opacity: 0.9,
   parentId,
-  stroke: "#111111",
-  strokeLineCap: "round" as const,
-  strokeLineJoin: "bevel" as const,
-  strokeMiterLimit: 8,
-  strokeWidth: 4,
   transform: transform(0, 0, 0),
   type: "path" as const,
   visible: true,
@@ -111,14 +151,16 @@ const createPackageLoadNodes = () => [
     visible: true,
   },
   {
-    fill: "#202020",
+    appearance: solidAppearance({
+      fill: "#202020",
+      stroke: "#ffffff",
+      width: 2,
+    }),
     font: ARIAL_FONT,
     fontSize: 72,
     id: "text-layer",
     opacity: 1,
     parentId: "root",
-    stroke: "#ffffff",
-    strokeWidth: 2,
     text: "Loaded Text",
     tracking: 12,
     transform: transform(260, 220, 4),
@@ -129,15 +171,17 @@ const createPackageLoadNodes = () => [
     },
   },
   {
+    appearance: solidAppearance({
+      fill: "#ffcc00",
+      stroke: "#222222",
+      width: 6,
+    }),
     cornerRadius: 10,
-    fill: "#ffcc00",
     height: 140,
     id: "hidden-shape-layer",
     opacity: 0.75,
     parentId: "root",
     shape: "polygon" as const,
-    stroke: "#222222",
-    strokeWidth: 6,
     transform: transform(520, 290, 15),
     type: "shape" as const,
     visible: false,

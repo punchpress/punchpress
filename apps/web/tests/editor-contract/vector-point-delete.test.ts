@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 
 const createRectangleContour = () => {
   return {
@@ -62,13 +62,15 @@ const createOpenLineContour = () => {
 const createPathNode = (contour) => {
   return {
     closed: contour.closed,
-    fill: "#ffffff",
+    appearance: createSolidAppearance({
+      fill: "#ffffff",
+      stroke: "#000000",
+      strokeWidth: 8,
+    }),
     fillRule: "nonzero" as const,
     id: "vector-node",
     parentId: "root",
     segments: contour.segments,
-    stroke: "#000000",
-    strokeWidth: 8,
     transform: {
       rotation: 0,
       scaleX: 1,

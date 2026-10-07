@@ -1,17 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 import { getDesktopAppMenuState } from "../../src/platform/desktop-menu/desktop-native-menu-state";
 
 const createShapeNode = (id: string) => {
   return {
     cornerRadius: 24,
-    fill: "#000000",
+    appearance: createSolidAppearance({ fill: "#000000" }),
     height: 160,
     id,
     parentId: "root",
     shape: "polygon" as const,
-    stroke: null,
-    strokeWidth: 0,
     transform: {
       rotation: 0,
       scaleX: 1,
@@ -67,7 +65,11 @@ describe("desktop native menu state", () => {
       },
       {
         closed: true,
-        fill: "#ff0000",
+        appearance: createSolidAppearance({
+          fill: "#ff0000",
+          stroke: "#000000",
+          strokeWidth: 3,
+        }),
         fillRule: "evenodd",
         id: "vector-node-path-1",
         parentId: "vector-node",
@@ -97,11 +99,6 @@ describe("desktop native menu state", () => {
             pointType: "corner",
           },
         ],
-        stroke: "#000000",
-        strokeLineCap: "round",
-        strokeLineJoin: "round",
-        strokeMiterLimit: 4,
-        strokeWidth: 3,
         transform: {
           rotation: 0,
           scaleX: 1,
@@ -114,7 +111,11 @@ describe("desktop native menu state", () => {
       },
       {
         closed: true,
-        fill: "#ff0000",
+        appearance: createSolidAppearance({
+          fill: "#ff0000",
+          stroke: "#000000",
+          strokeWidth: 3,
+        }),
         fillRule: "evenodd",
         id: "vector-node-path-2",
         parentId: "vector-node",
@@ -144,11 +145,6 @@ describe("desktop native menu state", () => {
             pointType: "corner",
           },
         ],
-        stroke: "#000000",
-        strokeLineCap: "round",
-        strokeLineJoin: "round",
-        strokeMiterLimit: 4,
-        strokeWidth: 3,
         transform: {
           rotation: 0,
           scaleX: 1,

@@ -2,6 +2,7 @@ import {
   createDefaultArtboardNode,
   createDefaultNode,
   createDefaultShapeNode,
+  createSolidAppearance,
   type Editor,
 } from "@punchpress/engine";
 import {
@@ -43,11 +44,9 @@ const createAppearanceBenchmarkNodes = (nodeCount: number) => {
 
       return {
         ...node,
-        fill: "#1f6feb",
+        appearance: createSolidAppearance({ fill: "#1f6feb" }),
         height: size,
         parentId: artboard.id,
-        stroke: null,
-        strokeWidth: 0,
         transform: { ...node.transform, x, y },
         width: size,
       };
@@ -57,11 +56,9 @@ const createAppearanceBenchmarkNodes = (nodeCount: number) => {
 
     return {
       ...node,
-      fill: "#111111",
+      appearance: createSolidAppearance({ fill: "#111111" }),
       fontSize: size * 0.4,
       parentId: artboard.id,
-      stroke: null,
-      strokeWidth: 0,
       text: `Tee ${index}`,
       transform: { ...node.transform, x: x + size / 2, y: y + size / 2 },
     };

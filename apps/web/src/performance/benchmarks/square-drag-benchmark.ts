@@ -1,4 +1,7 @@
-import { createDefaultShapeNode } from "@punchpress/engine";
+import {
+  createDefaultShapeNode,
+  createSolidAppearance,
+} from "@punchpress/engine";
 import { saveDesignDocument } from "@punchpress/punch-schema";
 import type { PerformanceBenchmarkDefinition } from "../performance-benchmark-types";
 
@@ -12,11 +15,9 @@ const createBenchmarkNodes = (nodeCount: number) => {
 
     return {
       ...node,
-      fill: "#000000",
+      appearance: createSolidAppearance({ fill: "#000000" }),
       height: 220,
       shape: "polygon",
-      stroke: null,
-      strokeWidth: 0,
       transform: {
         ...node.transform,
         x: 1150 + column * 340,

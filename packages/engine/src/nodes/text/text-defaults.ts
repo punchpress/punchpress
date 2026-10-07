@@ -1,9 +1,7 @@
 export const DEFAULT_TEXT_CONTENT = "YOUR TEXT";
 export const DEFAULT_TEXT_STYLE = {
-  fill: "#ffffff",
+  fill: "#000000",
   fontSize: 100,
-  stroke: "#000000",
-  strokeWidth: 3,
   tracking: 0,
 } as const;
 

@@ -20,6 +20,14 @@ export type {
   FillLayer,
   StrokeLayer,
 } from "./appearance/appearance-types";
+export type {
+  AppearanceList,
+  AppearanceSlot,
+} from "./appearance/appearance-commands";
+export {
+  areAppearancesEqual,
+  createSolidAppearance,
+} from "./appearance/appearance-layers";
 export { getNodeAppearance } from "./appearance/node-appearance";
 export {
   ARTBOARD_HEIGHT,

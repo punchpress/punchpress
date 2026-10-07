@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 import {
   getLocalFontId,
   MissingDocumentFontsError,
@@ -23,13 +23,11 @@ const REPLACEMENT_FONT = {
 const documentContents = JSON.stringify({
   nodes: [
     {
-      fill: "#222222",
+      appearance: createSolidAppearance({ fill: "#222222" }),
       font: INTENDED_FONT,
       fontSize: 120,
       id: "font-fixture",
       parentId: "root",
-      stroke: null,
-      strokeWidth: 0,
       text: "PRESERVE ME",
       tracking: 0,
       transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 100, y: 200 },

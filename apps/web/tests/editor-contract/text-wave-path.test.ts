@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { Editor, getNodeWorldPoint } from "@punchpress/engine";
+import {
+  createSolidAppearance,
+  Editor,
+  getNodeWorldPoint,
+} from "@punchpress/engine";
 
 const FONT = {
   family: "Arial",
@@ -11,13 +15,11 @@ const GUIDE_PATH_START_REGEX = /^M\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)/;
 
 const createWaveNode = () => {
   return {
-    fill: "#000000",
+    appearance: createSolidAppearance({ fill: "#000000" }),
     font: FONT,
     fontSize: 120,
     id: "wave-node",
     parentId: "root",
-    stroke: null,
-    strokeWidth: 0,
     text: "FLAG",
     tracking: 0,
     transform: {

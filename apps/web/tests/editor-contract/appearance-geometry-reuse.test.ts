@@ -25,20 +25,6 @@ const stroke = (color: string, width: number) => ({
   width,
 });
 
-const stripFlatPaint = (node) => {
-  const {
-    fill: _fill,
-    stroke: _stroke,
-    strokeLineCap: _cap,
-    strokeLineJoin: _join,
-    strokeMiterLimit: _miter,
-    strokeWidth: _width,
-    ...rest
-  } = node;
-
-  return rest;
-};
-
 const square = (x: number) => ({
   closed: true,
   segments: [
@@ -58,7 +44,8 @@ describe("appearance edits and geometry", () => {
   test("color and opacity edits reuse shape geometry; width edits rebuild it", () => {
     const editor = new Editor();
     const shape = {
-      ...stripFlatPaint({ ...createDefaultShapeNode("polygon"), id: "shape" }),
+      ...createDefaultShapeNode("polygon"),
+      id: "shape",
       appearance: { fills: [fill("#ff0000")], strokes: [stroke("#000000", 4)] },
     };
 
@@ -100,11 +87,9 @@ describe("appearance edits and geometry", () => {
       visible: true,
     };
     const child = (id: string, x: number, color: string) => ({
-      ...stripFlatPaint(
-        withPathNodeContours({ ...createDefaultPathNode("vector"), id }, [
-          square(x),
-        ])
-      ),
+      ...withPathNodeContours({ ...createDefaultPathNode("vector"), id }, [
+        square(x),
+      ]),
       appearance: { fills: [fill(color)], strokes: [] },
     });
 
@@ -130,7 +115,8 @@ describe("hit testing without paint", () => {
   test("a node with every layer disabled stays clickable by its area", () => {
     const editor = new Editor();
     const shape = {
-      ...stripFlatPaint({ ...createDefaultShapeNode("polygon"), id: "shape" }),
+      ...createDefaultShapeNode("polygon"),
+      id: "shape",
       appearance: {
         fills: [{ ...fill("#ff0000"), enabled: false }],
         strokes: [],

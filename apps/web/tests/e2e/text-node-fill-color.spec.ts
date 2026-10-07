@@ -5,23 +5,21 @@ import {
   loadDocumentFixture,
 } from "./helpers/editor";
 
-const RGBA_ALPHA_PATTERN =
-  /rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*([0-9.]+)\s*\)/;
-
-const getFillAndStrokeSection = (page) => {
-  return page.locator("section").filter({ hasText: "Fill" });
+const getFillItem = (page) => {
+  return page.getByTestId("appearance-fills-item").first();
 };
 
 const getFillColorInput = (page) => {
-  return getFillAndStrokeSection(page).getByLabel("Hex color").nth(0);
+  return getFillItem(page).getByLabel("Hex color");
 };
 
 const getFillOpacityInput = (page) => {
-  return getFillAndStrokeSection(page).getByLabel("Color opacity").nth(0);
+  return getFillItem(page).getByLabel("Color opacity");
 };
 
+// The color field's popover trigger wraps its hex input.
 const getFillColorButton = (page) => {
-  return getFillAndStrokeSection(page).getByRole("button").nth(0);
+  return getFillColorInput(page).locator("xpath=..");
 };
 
 const clickColorSwatch = async (locator) => {
@@ -41,22 +39,12 @@ const getSelectedNodeFill = async (page, nodeId) => {
   return node?.fill ?? null;
 };
 
-const getFillAlpha = (fill) => {
-  if (typeof fill !== "string") {
-    return null;
-  }
+// Alpha lives on the primary fill layer's opacity.
+const getSelectedNodeFillAlpha = async (page, nodeId) => {
+  const state = await getStateSnapshot(page);
+  const node = state?.nodes?.find((candidate) => candidate.id === nodeId);
 
-  const rgbaMatch = fill.match(RGBA_ALPHA_PATTERN);
-
-  if (rgbaMatch) {
-    return Number.parseFloat(rgbaMatch[1] || "0");
-  }
-
-  if (fill.startsWith("#")) {
-    return 1;
-  }
-
-  return null;
+  return node?.appearance?.fills?.[0]?.opacity ?? null;
 };
 
 test("normalizes a typed fill color and applies it to the selected node", async ({
@@ -74,7 +62,7 @@ test("normalizes a typed fill color and applies it to the selected node", async 
   await fillInput.blur();
 
   await expect(fillInput).toHaveValue("11AA22");
-  await expect.poll(() => getSelectedNodeFill(page, nodeId)).toBe("#11AA22");
+  await expect.poll(() => getSelectedNodeFill(page, nodeId)).toBe("#11aa22");
 });
 
 test("keeps keyboard-entered hex colors intact until they are committed", async ({
@@ -99,7 +87,7 @@ test("keeps keyboard-entered hex colors intact until they are committed", async 
     await expect(fillInput).toHaveValue(nextHex);
     await expect
       .poll(() => getSelectedNodeFill(page, nodeId))
-      .toBe(`#${nextHex}`);
+      .toBe(`#${nextHex.toLowerCase()}`);
   }
 });
 
@@ -146,9 +134,8 @@ test("updates the selected node when the alpha slider changes", async ({
   await alphaSlider.focus();
   await alphaSlider.press("Home");
 
-  await expect
-    .poll(() => getSelectedNodeFill(page, nodeId))
-    .toBe("rgba(255, 0, 0, 0)");
+  await expect.poll(() => getSelectedNodeFill(page, nodeId)).toBe("#ff0000");
+  await expect.poll(() => getSelectedNodeFillAlpha(page, nodeId)).toBe(0);
   await expect(fillInput).toHaveValue("FF0000");
   await expect(fillOpacityInput).toHaveValue("0");
 });
@@ -185,7 +172,7 @@ test("clicking the alpha slider applies the clicked value instead of resetting t
 
   await expect
     .poll(async () => {
-      const alpha = getFillAlpha(await getSelectedNodeFill(page, nodeId));
+      const alpha = await getSelectedNodeFillAlpha(page, nodeId);
       return alpha !== null && alpha > 0.55 && alpha < 0.85;
     })
     .toBe(true);
@@ -220,7 +207,7 @@ test("keeps the color picker open while dragging the alpha slider with the mouse
     return;
   }
 
-  const initialFill = await getSelectedNodeFill(page, nodeId);
+  const initialAlpha = await getSelectedNodeFillAlpha(page, nodeId);
   const startPoint = {
     x: alphaSliderBox.x + alphaSliderBox.width / 2,
     y: alphaSliderBox.y + alphaSliderBox.height / 2,
@@ -236,13 +223,11 @@ test("keeps the color picker open while dragging the alpha slider with the mouse
   await page.mouse.up();
 
   await expect
-    .poll(async () => {
-      return getFillAlpha(await getSelectedNodeFill(page, nodeId));
-    })
+    .poll(() => getSelectedNodeFillAlpha(page, nodeId))
     .toBeLessThan(0.3);
   await expect
-    .poll(() => getSelectedNodeFill(page, nodeId))
-    .not.toBe(initialFill);
+    .poll(() => getSelectedNodeFillAlpha(page, nodeId))
+    .not.toBe(initialAlpha);
   await expect
     .poll(async () => {
       const state = await getStateSnapshot(page);

@@ -1,5 +1,6 @@
 import { PUNCH_DOCUMENT_VERSION } from "./constants";
 import { UnsupportedDocumentVersionError } from "./errors";
+import { upgradeNodeAppearance1_8 } from "./migrate-appearance";
 import { normalizeNodesForSchema } from "./normalize";
 import { createDocumentAssetsFromNodes } from "./raster-assets";
 
@@ -35,6 +36,18 @@ export const migrateDocument = (value: unknown) => {
     return normalizeDocumentRecord(value);
   }
 
+  // 1.8 → 1.9 is the one supported upgrade: flat fill/stroke fields fold into
+  // appearance stacks. Older versions stay unsupported.
+  if (value.version === "1.8") {
+    return normalizeDocumentRecord({
+      ...value,
+      nodes: Array.isArray(value.nodes)
+        ? upgradeNodesAppearance1_8(value.nodes)
+        : value.nodes,
+      version: PUNCH_DOCUMENT_VERSION,
+    });
+  }
+
   if (typeof value.version !== "string" || value.version.length === 0) {
     throw new UnsupportedDocumentVersionError(
       "Document is missing a supported version."
@@ -44,4 +57,10 @@ export const migrateDocument = (value: unknown) => {
   throw new UnsupportedDocumentVersionError(
     `Unsupported document version: ${value.version}`
   );
+};
+
+export const upgradeNodesAppearance1_8 = (nodes: unknown[]) => {
+  return nodes.map((node) => {
+    return isRecord(node) ? upgradeNodeAppearance1_8(node) : node;
+  });
 };

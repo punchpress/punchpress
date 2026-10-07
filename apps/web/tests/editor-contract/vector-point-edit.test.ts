@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 import { PUNCH_DOCUMENT_VERSION } from "@punchpress/punch-schema";
 import {
   setVectorPointHandlesFromAnchorDrag,
@@ -292,16 +292,17 @@ describe("vector point editing", () => {
           },
           {
             closed: true,
-            fill: "#ffffff",
+            appearance: createSolidAppearance({
+              cap: "butt",
+              fill: "#ffffff",
+              join: "miter",
+              stroke: "#000000",
+              strokeWidth: 12,
+            }),
             fillRule: "nonzero",
             id: "vector-node",
             parentId: "vector-container",
             segments: createRectangleContour().segments,
-            stroke: "#000000",
-            strokeLineCap: "butt",
-            strokeLineJoin: "miter",
-            strokeMiterLimit: 4,
-            strokeWidth: 12,
             transform: {
               rotation: 0,
               scaleX: 1,

@@ -1,18 +1,90 @@
+import { parseColor, toRgb } from "@punchpress/punch-schema";
+import { getNodeAppearance } from "../appearance/node-appearance";
 import { supportsNodeProperty } from "../nodes/node-property-support";
 import { isContainerNode } from "../nodes/node-tree";
 import { measurePerf } from "../perf/perf-hooks";
 import { PERF_SPANS } from "../perf/perf-labels";
-import { getPropertyDescriptor } from "./property-descriptors";
 
-const SELECTION_COLOR_PROPERTY_IDS = ["background", "fill", "stroke"];
 const MAX_VISIBLE_SELECTION_COLORS = 12;
 
 const createSelectionColorId = (value) => {
   return JSON.stringify(value);
 };
 
-const createSelectionColorFieldId = (nodeId, propertyId) => {
-  return `${nodeId}:${propertyId}`;
+const createSelectionColorFieldId = (nodeId, fieldKey) => {
+  return `${nodeId}:${fieldKey}`;
+};
+
+// Every color a node paints with: an artboard background, or each enabled
+// layer of a paint node's stack. Values are canonical colors so equal paints
+// group; writers replace only that field.
+const getNodeColorFields = (node) => {
+  if (supportsNodeProperty(node, "background")) {
+    const color = parseColor(node.background)?.color;
+
+    return color
+      ? [
+          {
+            key: "background",
+            setValue: (_node, value) => ({ background: value }),
+            value: color,
+          },
+        ]
+      : [];
+  }
+
+  if (!supportsNodeProperty(node, "appearance")) {
+    return [];
+  }
+
+  const appearance = getNodeAppearance(node);
+
+  return (["fills", "strokes"] as const).flatMap((list) => {
+    return appearance[list]
+      .filter((layer) => layer.enabled)
+      .map((layer) => ({
+        key: `${list}.${layer.id}`,
+        setValue: (currentNode, value) =>
+          setLayerColor(currentNode, list, layer.id, value),
+        value: formatPaintValue(layer.paint.color, layer.opacity),
+      }));
+  });
+};
+
+// Selection colors group layers by color *and* opacity, so a swatch's alpha is
+// the exact layer opacity it stands for and editing it is lossless.
+const formatPaintValue = (color: string, opacity: number) => {
+  if (opacity >= 1) {
+    return color;
+  }
+
+  const { b, g, r } = toRgb(color);
+
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+};
+
+const setLayerColor = (node, list, layerId, value) => {
+  const parsed = parseColor(value);
+  const appearance = getNodeAppearance(node);
+
+  if (!parsed) {
+    return {};
+  }
+
+  return {
+    appearance: {
+      ...appearance,
+      [list]: appearance[list].map((layer) => {
+        return layer.id === layerId
+          ? {
+              ...layer,
+              opacity: parsed.opacity,
+              paint: { ...layer.paint, color: parsed.color },
+            }
+          : layer;
+      }),
+    },
+  };
 };
 
 const getSelectionColorTargetNodeIds = (editor, nodeIds) => {
@@ -59,9 +131,10 @@ const getSelectionColorTargetNodeIds = (editor, nodeIds) => {
 };
 
 const supportsSelectionColor = (node) => {
-  return SELECTION_COLOR_PROPERTY_IDS.some((propertyId) => {
-    return supportsNodeProperty(node, propertyId);
-  });
+  return (
+    supportsNodeProperty(node, "background") ||
+    supportsNodeProperty(node, "appearance")
+  );
 };
 
 const shouldExposeSelectionColors = (editor, nodeIds) => {
@@ -82,12 +155,8 @@ const resolveSelectionColor = (editor, selectionColorId, nodeIds) => {
   });
 };
 
-const resolveSelectionColorTargetProperties = (
-  editor,
-  selectionColor,
-  nodeIds
-) => {
-  const targetPropertyIdsByNodeId = new Map();
+const resolveSelectionColorTargetFields = (editor, selectionColor, nodeIds) => {
+  const targetFieldKeysByNodeId = new Map();
 
   for (const nodeId of getSelectionColorTargetNodeIds(editor, nodeIds)) {
     const node = editor.getNode(nodeId);
@@ -96,24 +165,16 @@ const resolveSelectionColorTargetProperties = (
       continue;
     }
 
-    for (const propertyId of SELECTION_COLOR_PROPERTY_IDS) {
-      if (!supportsNodeProperty(node, propertyId)) {
-        continue;
-      }
+    const fieldKeys = getNodeColorFields(node)
+      .filter((field) => field.value === selectionColor.value)
+      .map((field) => field.key);
 
-      const descriptor = getPropertyDescriptor(propertyId);
-
-      if (descriptor?.getValue(node) !== selectionColor.value) {
-        continue;
-      }
-
-      const propertyIds = targetPropertyIdsByNodeId.get(node.id) || [];
-      propertyIds.push(propertyId);
-      targetPropertyIdsByNodeId.set(node.id, propertyIds);
+    if (fieldKeys.length > 0) {
+      targetFieldKeysByNodeId.set(node.id, fieldKeys);
     }
   }
 
-  return targetPropertyIdsByNodeId;
+  return targetFieldKeysByNodeId;
 };
 
 export const getSelectionColors = (editor, nodeIds = editor.selectedNodeIds) => {
@@ -133,19 +194,8 @@ export const getSelectionColors = (editor, nodeIds = editor.selectedNodeIds) => 
         continue;
       }
 
-      for (const propertyId of SELECTION_COLOR_PROPERTY_IDS) {
-        if (!supportsNodeProperty(node, propertyId)) {
-          continue;
-        }
-
-        const descriptor = getPropertyDescriptor(propertyId);
-        const value = descriptor?.getValue(node);
-
-        if (value == null) {
-          continue;
-        }
-
-        const id = createSelectionColorId(value);
+      for (const field of getNodeColorFields(node)) {
+        const id = createSelectionColorId(field.value);
         const existingColor = colorsById.get(id);
 
         if (existingColor) {
@@ -154,10 +204,10 @@ export const getSelectionColors = (editor, nodeIds = editor.selectedNodeIds) => 
         }
 
         colorsById.set(id, {
-          fieldId: createSelectionColorFieldId(node.id, propertyId),
+          fieldId: createSelectionColorFieldId(node.id, field.key),
           id,
           usageCount: 1,
-          value,
+          value: field.value,
         });
 
         if (colorsById.size > MAX_VISIBLE_SELECTION_COLORS) {
@@ -184,12 +234,12 @@ export const beginSelectionColorChange = (
       return null;
     }
 
-    const targetPropertyIdsByNodeId = measurePerf(
+    const targetFieldKeysByNodeId = measurePerf(
       PERF_SPANS.selectionAppearanceChangeTargets,
-      () => resolveSelectionColorTargetProperties(editor, selectionColor, nodeIds)
+      () => resolveSelectionColorTargetFields(editor, selectionColor, nodeIds)
     );
 
-    if (targetPropertyIdsByNodeId.size === 0) {
+    if (targetFieldKeysByNodeId.size === 0) {
       return null;
     }
 
@@ -197,7 +247,7 @@ export const beginSelectionColorChange = (
       baseValue: selectionColor.value,
       nodeIds: [...nodeIds],
       selectionColorId,
-      targetPropertyIdsByNodeId,
+      targetFieldKeysByNodeId,
     };
   });
 };
@@ -207,7 +257,7 @@ export const commitSelectionColorChange = (editor, session, value) => {
     return false;
   }
 
-  const targetNodeIds = [...session.targetPropertyIdsByNodeId.keys()];
+  const targetNodeIds = [...session.targetFieldKeysByNodeId.keys()];
 
   if (targetNodeIds.length === 0) {
     return false;
@@ -215,24 +265,22 @@ export const commitSelectionColorChange = (editor, session, value) => {
 
   measurePerf(PERF_SPANS.selectionAppearanceChangeCommit, () => {
     editor.updateNodes(targetNodeIds, (node) => {
-      const propertyIds = session.targetPropertyIdsByNodeId.get(node.id) || [];
-      const nextNode = {};
+      const fieldKeys = session.targetFieldKeysByNodeId.get(node.id) || [];
+      let nextNode = node;
+      let patch = {};
 
-      for (const propertyId of propertyIds) {
-        if (!supportsNodeProperty(node, propertyId)) {
+      for (const field of getNodeColorFields(node)) {
+        if (!fieldKeys.includes(field.key) || field.value !== session.baseValue) {
           continue;
         }
 
-        const descriptor = getPropertyDescriptor(propertyId);
+        const fieldPatch = field.setValue(nextNode, value);
 
-        if (descriptor?.getValue(node) !== session.baseValue) {
-          continue;
-        }
-
-        Object.assign(nextNode, descriptor.setValue(node, value));
+        nextNode = { ...nextNode, ...fieldPatch };
+        patch = { ...patch, ...fieldPatch };
       }
 
-      return nextNode;
+      return patch;
     });
   });
 
@@ -267,7 +315,7 @@ export const updateSelectionColorChange = (editor, session, value) => {
 
   editor.selectionColorPreviewState = {
     baseValue: session.baseValue,
-    targetPropertyIdsByNodeId: session.targetPropertyIdsByNodeId,
+    targetFieldKeysByNodeId: session.targetFieldKeysByNodeId,
     value,
   };
   editor.notifyInteractionPreviewChanged();
@@ -287,7 +335,7 @@ export const cancelSelectionColorChange = (editor) => {
 export const getSelectionColorPreviewValue = (
   editor,
   nodeId,
-  propertyId,
+  fieldKey,
   currentValue
 ) => {
   const preview = editor.selectionColorPreviewState;
@@ -296,7 +344,7 @@ export const getSelectionColorPreviewValue = (
     return currentValue;
   }
 
-  if (!preview.targetPropertyIdsByNodeId.get(nodeId)?.includes(propertyId)) {
+  if (!preview.targetFieldKeysByNodeId.get(nodeId)?.includes(fieldKey)) {
     return currentValue;
   }
 
@@ -310,11 +358,11 @@ export const isSelectionColorPreviewAffectingNode = (editor, nodeId) => {
     return false;
   }
 
-  if (preview.targetPropertyIdsByNodeId.has(nodeId)) {
+  if (preview.targetFieldKeysByNodeId.has(nodeId)) {
     return true;
   }
 
-  for (const targetNodeId of preview.targetPropertyIdsByNodeId.keys()) {
+  for (const targetNodeId of preview.targetFieldKeysByNodeId.keys()) {
     if (editor.isDescendantOf(targetNodeId, nodeId)) {
       return true;
     }

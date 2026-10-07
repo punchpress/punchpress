@@ -29,18 +29,25 @@ const SEGMENT = {
 const SEGMENTS = [SEGMENT, SEGMENT, SEGMENT, SEGMENT];
 
 /** A minimal path node that passes designDocumentSchema (modern contours shape). */
+const RED_FILL_APPEARANCE = {
+  fills: [
+    {
+      enabled: true,
+      id: "fill-1",
+      opacity: 1,
+      paint: { color: "#ff0000", kind: "solid" as const },
+    },
+  ],
+  strokes: [],
+};
+
 const VALID_PATH_NODE = {
+  appearance: RED_FILL_APPEARANCE,
   contours: [{ closed: false, segments: SEGMENTS }],
-  fill: "#ff0000",
   fillRule: "evenodd" as const,
   id: "path-1",
   opacity: 1,
   parentId: "root",
-  stroke: null,
-  strokeLineCap: "round" as const,
-  strokeLineJoin: "bevel" as const,
-  strokeMiterLimit: 4,
-  strokeWidth: 0,
   transform: transform(0, 0),
   type: "path" as const,
   visible: true,
@@ -124,12 +131,10 @@ describe("migrateDocument", () => {
 describe("document normalization", () => {
   test("upgrades legacy path shape: segments+closed → contours; strips top-level keys", () => {
     const legacyPathNode = {
-      fill: "#ff0000",
+      appearance: RED_FILL_APPEARANCE,
       fillRule: "evenodd",
       id: "path-legacy",
       parentId: "root",
-      stroke: null,
-      strokeWidth: 0,
       transform: transform(0, 0),
       type: "path",
       visible: true,

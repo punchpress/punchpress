@@ -1,10 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 
 const createRectanglePathNode = () => {
   return {
     closed: true,
-    fill: "#ffffff",
+    appearance: createSolidAppearance({
+      fill: "#ffffff",
+      stroke: "#000000",
+      strokeWidth: 12,
+    }),
     fillRule: "nonzero",
     id: "vector-node",
     parentId: "root",
@@ -34,8 +38,6 @@ const createRectanglePathNode = () => {
         pointType: "corner" as const,
       },
     ],
-    stroke: "#000000",
-    strokeWidth: 12,
     transform: {
       rotation: 0,
       scaleX: 1,
@@ -53,7 +55,11 @@ const createImportedRoundedCornerPathNode = () => {
 
   return {
     closed: true,
-    fill: "#ffffff",
+    appearance: createSolidAppearance({
+      fill: "#ffffff",
+      stroke: "#000000",
+      strokeWidth: 12,
+    }),
     fillRule: "nonzero",
     id: "imported-rounded-corner-vector-node",
     parentId: "root",
@@ -89,8 +95,6 @@ const createImportedRoundedCornerPathNode = () => {
         pointType: "corner" as const,
       },
     ],
-    stroke: "#000000",
-    strokeWidth: 12,
     transform: {
       rotation: 0,
       scaleX: 1,
@@ -106,7 +110,11 @@ const createImportedRoundedCornerPathNode = () => {
 const createIrregularPolygonPathNode = () => {
   return {
     closed: true,
-    fill: "#ffffff",
+    appearance: createSolidAppearance({
+      fill: "#ffffff",
+      stroke: "#000000",
+      strokeWidth: 12,
+    }),
     fillRule: "nonzero",
     id: "irregular-polygon-vector-node",
     parentId: "root",
@@ -142,8 +150,6 @@ const createIrregularPolygonPathNode = () => {
         pointType: "corner" as const,
       },
     ],
-    stroke: "#000000",
-    strokeWidth: 12,
     transform: {
       rotation: 0,
       scaleX: 1,

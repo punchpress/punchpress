@@ -1,3 +1,4 @@
+import { getPaintHitStyle } from "../../appearance/paint-extent";
 import { commandsToContours, getBounds } from "../../primitives/path-geometry";
 import {
   createPaintedHitRegion,
@@ -37,11 +38,13 @@ const commandsToPathData = (commands) => {
 // Contours carry only what geometry needs: the fill rule plus paint presence and
 // stroke width for bounds and hit testing (see getPaintHitStyle).
 const getContourStyle = (contour) => {
+  const paint = contour.appearance ? getPaintHitStyle(contour) : contour;
+
   return {
-    fill: contour.fill ?? null,
+    fill: paint.fill ?? null,
     fillRule: contour.fillRule ?? "nonzero",
-    stroke: contour.stroke ?? null,
-    strokeWidth: contour.strokeWidth ?? 0,
+    stroke: paint.stroke ?? null,
+    strokeWidth: paint.strokeWidth ?? 0,
   };
 };
 
@@ -69,7 +72,7 @@ export const buildVectorNodeGeometry = (node) => {
     return commandsToContours(path.commands, 1.5);
   });
   const strokeInset = visibleContours.reduce((maxStrokeInset, contour) => {
-    return Math.max(maxStrokeInset, (contour.strokeWidth || 0) / 2);
+    return Math.max(maxStrokeInset, getContourStyle(contour).strokeWidth / 2);
   }, 0);
   const sourceBoundsPoints =
     flattenedContours.length > 0

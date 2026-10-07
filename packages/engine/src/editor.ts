@@ -6,6 +6,17 @@ import {
   type LocalFontOption,
 } from "@punchpress/punch-schema";
 import {
+  addFill as addEditorFill,
+  addStroke as addEditorStroke,
+  type AppearanceSlot,
+  moveAppearanceLayer as moveEditorAppearanceLayer,
+  removeAppearanceLayer as removeEditorAppearanceLayer,
+  setAppearance as setEditorAppearance,
+  updateAppearanceLayer as updateEditorAppearanceLayer,
+} from "./appearance/appearance-commands";
+import { getPrimaryStrokeStyle as getEditorPrimaryStrokeStyle } from "./appearance/appearance-inspection";
+import type { Appearance } from "./appearance/appearance-types";
+import {
   copySelection as copyEditorSelection,
   pasteClipboardContent as pasteEditorClipboardContent,
   pasteText as pasteEditorText,
@@ -970,6 +981,42 @@ export class Editor {
 
   setSelectionProperty(propertyId, value, nodeIds = this.selectedNodeIds) {
     return setEditorSelectionProperty(this, propertyId, value, nodeIds);
+  }
+
+  addFill(nodeIds = this.selectedNodeIds) {
+    return addEditorFill(this, nodeIds);
+  }
+
+  addStroke(nodeIds = this.selectedNodeIds) {
+    return addEditorStroke(this, nodeIds);
+  }
+
+  updateAppearanceLayer(
+    slot: AppearanceSlot,
+    patch: Parameters<typeof updateEditorAppearanceLayer>[2],
+    nodeIds = this.selectedNodeIds
+  ) {
+    return updateEditorAppearanceLayer(this, slot, patch, nodeIds);
+  }
+
+  removeAppearanceLayer(slot: AppearanceSlot, nodeIds = this.selectedNodeIds) {
+    return removeEditorAppearanceLayer(this, slot, nodeIds);
+  }
+
+  moveAppearanceLayer(
+    slot: AppearanceSlot,
+    toIndex: number,
+    nodeIds = this.selectedNodeIds
+  ) {
+    return moveEditorAppearanceLayer(this, slot, toIndex, nodeIds);
+  }
+
+  getPrimaryStrokeStyle(nodeIds = this.selectedNodeIds) {
+    return getEditorPrimaryStrokeStyle(this, nodeIds);
+  }
+
+  setAppearance(appearance: Appearance, nodeIds = this.selectedNodeIds) {
+    return setEditorAppearance(this, appearance, nodeIds);
   }
 
   setSelectionColor(selectionColorId, value, nodeIds = this.selectedNodeIds) {

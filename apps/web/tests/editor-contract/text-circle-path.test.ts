@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { Editor, estimateBounds, getNodeWorldPoint } from "@punchpress/engine";
+import {
+  createSolidAppearance,
+  Editor,
+  estimateBounds,
+  getNodeWorldPoint,
+} from "@punchpress/engine";
 import { getLocalFontId } from "@punchpress/punch-schema";
 
 const FONT = {
@@ -47,13 +52,11 @@ const getCirclePoint = (radius: number, angleDeg: number) => {
 
 const createCircleNode = () => {
   return {
-    fill: "#000000",
+    appearance: createSolidAppearance({ fill: "#000000" }),
     font: FONT,
     fontSize: 120,
     id: "circle-node",
     parentId: "root",
-    stroke: null,
-    strokeWidth: 0,
     text: "HEY",
     tracking: 0,
     transform: {
@@ -158,7 +161,7 @@ describe("Editor text circle path sessions", () => {
     const resizedNode = editor.getNode(node.id);
 
     expect(resizedNode?.fontSize).toBe(node.fontSize);
-    expect(resizedNode?.strokeWidth).toBe(node.strokeWidth);
+    expect(resizedNode?.appearance).toEqual(node.appearance);
     expect(resizedNode?.warp.radius).toBeCloseTo(450, 2);
   });
 

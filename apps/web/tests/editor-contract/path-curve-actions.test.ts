@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 import { confirmMergeCurves } from "../../src/components/editor/merge-curves-command";
 
 const segment = (x: number, y: number) => ({
@@ -25,17 +25,17 @@ const createPathNode = ({
   stroke?: string;
   x?: number;
 }) => ({
+  appearance: createSolidAppearance({
+    cap: "butt",
+    join: "miter",
+    stroke,
+    strokeWidth: 2,
+  }),
   contours,
-  fill: null,
   fillRule: "nonzero" as const,
   id,
   opacity,
   parentId: "root",
-  stroke,
-  strokeLineCap: "butt" as const,
-  strokeLineJoin: "miter" as const,
-  strokeMiterLimit: 4,
-  strokeWidth: 2,
   transform: {
     rotation: 0,
     scaleX: 1,
@@ -46,6 +46,10 @@ const createPathNode = ({
   type: "path" as const,
   visible: true,
 });
+
+const getStrokeColor = (node) => {
+  return node.appearance?.strokes[0]?.paint.color ?? null;
+};
 
 describe("path curve actions", () => {
   test("opacity differences require the mixed-style confirmation", () => {
@@ -123,26 +127,17 @@ describe("path curve actions", () => {
     editor.setSelectedNodes(["red", "blue"]);
 
     expect(editor.hasMixedCurveStyles()).toBe(true);
-    expect(editor.nodes.map((node) => node.stroke)).toEqual([
-      "#ff0000",
-      "#0000ff",
-    ]);
+    expect(editor.nodes.map(getStrokeColor)).toEqual(["#ff0000", "#0000ff"]);
 
     expect(editor.mergeCurves()).toBe(true);
-    expect(editor.nodes.map((node) => node.stroke)).toEqual(["#ff0000"]);
+    expect(editor.nodes.map(getStrokeColor)).toEqual(["#ff0000"]);
 
     expect(editor.separateCurves()).toBe(true);
-    expect(editor.nodes.map((node) => node.stroke)).toEqual([
-      "#ff0000",
-      "#ff0000",
-    ]);
+    expect(editor.nodes.map(getStrokeColor)).toEqual(["#ff0000", "#ff0000"]);
 
     editor.undo();
     editor.undo();
-    expect(editor.nodes.map((node) => node.stroke)).toEqual([
-      "#ff0000",
-      "#0000ff",
-    ]);
+    expect(editor.nodes.map(getStrokeColor)).toEqual(["#ff0000", "#0000ff"]);
   });
 
   test("merge curves combines selected path nodes as one multi-contour path", () => {

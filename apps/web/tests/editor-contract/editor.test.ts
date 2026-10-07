@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { Editor, getDefaultWarp } from "@punchpress/engine";
+import {
+  createSolidAppearance,
+  Editor,
+  getDefaultWarp,
+} from "@punchpress/engine";
 import {
   createLocalFontDescriptor,
   getLocalFontId,
@@ -30,13 +34,11 @@ const createDocument = (
   return JSON.stringify({
     nodes: [
       {
-        fill: "#000000",
+        appearance: createSolidAppearance({ fill: "#000000" }),
         fontSize: 120,
         font,
         id,
         parentId: "root",
-        stroke: null,
-        strokeWidth: 0,
         text,
         tracking: 0,
         transform: {
@@ -61,13 +63,11 @@ const createCircleDocument = (id: string, pathPosition?: number) => {
   return JSON.stringify({
     nodes: [
       {
-        fill: "#000000",
+        appearance: createSolidAppearance({ fill: "#000000" }),
         font: AVAILABLE_FONT,
         fontSize: 120,
         id,
         parentId: "root",
-        stroke: null,
-        strokeWidth: 0,
         text: "CIRCLE",
         tracking: 0,
         transform: {
@@ -277,12 +277,10 @@ describe("Editor.exportDocument", () => {
     });
     editor.getState().loadNodes([
       {
-        fill: "#000000",
+        appearance: createSolidAppearance({ fill: "#000000" }),
         font: MISSING_FONT,
         fontSize: 120,
         id: "missing-font-node",
-        stroke: null,
-        strokeWidth: 0,
         text: "TEST",
         tracking: 0,
         transform: {
@@ -343,16 +341,11 @@ describe("Editor.getSelectionTransformFrame", () => {
       },
       {
         closed: true,
-        fill: "#ffffff",
+        appearance: createSolidAppearance({ fill: "#ffffff" }),
         fillRule: "nonzero",
         id: "subtract-base",
         parentId: "subtract-vector",
         segments: createRectangleSegments(),
-        stroke: null,
-        strokeLineCap: "round",
-        strokeLineJoin: "round",
-        strokeMiterLimit: 4,
-        strokeWidth: 0,
         transform: {
           rotation: 0,
           scaleX: 1,
@@ -365,16 +358,11 @@ describe("Editor.getSelectionTransformFrame", () => {
       },
       {
         closed: true,
-        fill: "#ffffff",
+        appearance: createSolidAppearance({ fill: "#ffffff" }),
         fillRule: "nonzero",
         id: "subtract-cutter",
         parentId: "subtract-vector",
         segments: createRectangleSegments(),
-        stroke: null,
-        strokeLineCap: "round",
-        strokeLineJoin: "round",
-        strokeMiterLimit: 4,
-        strokeWidth: 0,
         transform: {
           rotation: 0,
           scaleX: 1,
@@ -437,16 +425,11 @@ describe("Editor.getSelectionTransformFrame", () => {
       },
       {
         closed: true,
-        fill: "#ffffff",
+        appearance: createSolidAppearance({ fill: "#ffffff" }),
         fillRule: "nonzero",
         id: "compound-path-1",
         parentId: "compound-vector",
         segments: createRectangleSegments(),
-        stroke: null,
-        strokeLineCap: "round",
-        strokeLineJoin: "round",
-        strokeMiterLimit: 4,
-        strokeWidth: 0,
         transform: {
           rotation: 0,
           scaleX: 1,
@@ -459,7 +442,7 @@ describe("Editor.getSelectionTransformFrame", () => {
       },
       {
         closed: true,
-        fill: "#ffffff",
+        appearance: createSolidAppearance({ fill: "#ffffff" }),
         fillRule: "nonzero",
         id: "compound-path-2",
         parentId: "compound-vector",
@@ -489,11 +472,6 @@ describe("Editor.getSelectionTransformFrame", () => {
             pointType: "corner",
           },
         ],
-        stroke: null,
-        strokeLineCap: "round",
-        strokeLineJoin: "round",
-        strokeMiterLimit: 4,
-        strokeWidth: 0,
         transform: {
           rotation: 0,
           scaleX: 1,
@@ -601,16 +579,11 @@ describe("Editor.getSelectionTransformFrame", () => {
         },
         {
           closed: true,
-          fill: "#ffffff",
+          appearance: createSolidAppearance({ fill: "#ffffff" }),
           fillRule: "nonzero",
           id: outerPathId,
           parentId: vectorId,
           segments: createRectangleSegments(),
-          stroke: null,
-          strokeLineCap: "round",
-          strokeLineJoin: "round",
-          strokeMiterLimit: 4,
-          strokeWidth: 0,
           transform: {
             rotation: 0,
             scaleX: 1,
@@ -623,7 +596,7 @@ describe("Editor.getSelectionTransformFrame", () => {
         },
         {
           closed: true,
-          fill: "#ffffff",
+          appearance: createSolidAppearance({ fill: "#ffffff" }),
           fillRule: "nonzero",
           id: innerPathId,
           parentId: vectorId,
@@ -653,11 +626,6 @@ describe("Editor.getSelectionTransformFrame", () => {
               pointType: "corner",
             },
           ],
-          stroke: null,
-          strokeLineCap: "round",
-          strokeLineJoin: "round",
-          strokeMiterLimit: 4,
-          strokeWidth: 0,
           transform: {
             rotation: 0,
             scaleX: 1,
@@ -794,16 +762,11 @@ describe("Editor.getSelectionTransformFrame", () => {
         },
         {
           closed: true,
-          fill: "#ffffff",
+          appearance: createSolidAppearance({ fill: "#ffffff" }),
           fillRule: "nonzero",
           id: outerPathId,
           parentId: vectorId,
           segments: createRectangleSegments(),
-          stroke: null,
-          strokeLineCap: "round",
-          strokeLineJoin: "round",
-          strokeMiterLimit: 4,
-          strokeWidth: 0,
           transform: {
             rotation,
             scaleX: 1,
@@ -816,7 +779,7 @@ describe("Editor.getSelectionTransformFrame", () => {
         },
         {
           closed: true,
-          fill: "#ffffff",
+          appearance: createSolidAppearance({ fill: "#ffffff" }),
           fillRule: "nonzero",
           id: innerPathId,
           parentId: vectorId,
@@ -846,11 +809,6 @@ describe("Editor.getSelectionTransformFrame", () => {
               pointType: "corner",
             },
           ],
-          stroke: null,
-          strokeLineCap: "round",
-          strokeLineJoin: "round",
-          strokeMiterLimit: 4,
-          strokeWidth: 0,
           transform: {
             rotation,
             scaleX: 1,
@@ -981,16 +939,11 @@ describe("Editor.getNodeTransformFrame", () => {
       },
       {
         closed: true,
-        fill: "#ffffff",
+        appearance: createSolidAppearance({ fill: "#ffffff" }),
         fillRule: "nonzero",
         id: "scaled-vector-path",
         parentId: "scaled-vector-node",
         segments: createRectangleSegments(),
-        stroke: null,
-        strokeLineCap: "round",
-        strokeLineJoin: "round",
-        strokeMiterLimit: 4,
-        strokeWidth: 0,
         transform: {
           rotation: 30,
           scaleX: 2,
@@ -1021,13 +974,11 @@ describe("Editor.getNodeTransformFrame", () => {
 
     editor.getState().loadNodes([
       {
-        fill: "#000000",
+        appearance: createSolidAppearance({ fill: "#000000" }),
         font: AVAILABLE_FONT,
         fontSize: 120,
         id: "scaled-text-node",
         parentId: "root",
-        stroke: null,
-        strokeWidth: 0,
         text: "TEST",
         tracking: 0,
         transform: {
@@ -1056,7 +1007,7 @@ describe("Editor.getNodeTransformFrame", () => {
     editor.getState().loadNodes([
       {
         closed: true,
-        fill: "#ffffff",
+        appearance: createSolidAppearance({ fill: "#ffffff" }),
         fillRule: "nonzero",
         id: "scaled-path-node",
         parentId: "root",
@@ -1086,11 +1037,6 @@ describe("Editor.getNodeTransformFrame", () => {
             pointType: "corner",
           },
         ],
-        stroke: null,
-        strokeLineCap: "round",
-        strokeLineJoin: "round",
-        strokeMiterLimit: 4,
-        strokeWidth: 0,
         transform: {
           rotation: 30,
           scaleX: 2,
@@ -1137,16 +1083,15 @@ describe("Editor vector resize behavior", () => {
       },
       {
         closed: true,
-        fill: "#ffffff",
+        appearance: createSolidAppearance({
+          fill: "#ffffff",
+          stroke: "#000000",
+          strokeWidth: 12,
+        }),
         fillRule: "nonzero",
         id: "vector-resize-path",
         parentId: "vector-resize-node",
         segments: createRectangleSegments(),
-        stroke: "#000000",
-        strokeLineCap: "round",
-        strokeLineJoin: "round",
-        strokeMiterLimit: 4,
-        strokeWidth: 12,
         transform: {
           rotation: 0,
           scaleX: 1,
@@ -1173,7 +1118,7 @@ describe("Editor vector resize behavior", () => {
       type: "vector",
     });
     expect(editor.getNode("vector-resize-path")).toMatchObject({
-      strokeWidth: 12,
+      appearance: { strokes: [{ width: 12 }] },
       transform: {
         scaleX: 1.5,
         scaleY: 1.5,
@@ -1253,10 +1198,8 @@ describe("Editor text editing mode", () => {
     editor.addTextNode({ x: 320, y: 240 });
 
     expect(editor.selectedNode).toMatchObject({
-      fill: "#ffffff",
+      appearance: createSolidAppearance({ fill: "#000000" }),
       fontSize: 100,
-      stroke: "#000000",
-      strokeWidth: 3,
       text: "YOUR TEXT",
       tracking: 0,
       type: "text",
@@ -1287,8 +1230,8 @@ describe("Editor text editing mode", () => {
     editor.addTextNode({ x: 320, y: 240 });
 
     expect(editor.selectedNode).toMatchObject({
+      appearance: { strokes: [] },
       fontSize: 80,
-      strokeWidth: 2,
       type: "text",
     });
   });
@@ -1454,16 +1397,15 @@ describe("Editor text editing mode", () => {
     editor.getState().loadNodes([
       {
         closed: true,
-        fill: "#ffffff",
+        appearance: createSolidAppearance({
+          fill: "#ffffff",
+          stroke: "#000000",
+          strokeWidth: 54,
+        }),
         fillRule: "nonzero",
         id: "stroke-path",
         parentId: "root",
         segments: createRectangleSegments(),
-        stroke: "#000000",
-        strokeLineCap: "round",
-        strokeLineJoin: "round",
-        strokeMiterLimit: 4,
-        strokeWidth: 54,
         transform: {
           rotation: 0,
           scaleX: 1,
@@ -1618,7 +1560,10 @@ describe("Editor shape export", () => {
       },
       {
         closed: false,
-        fill: null,
+        appearance: createSolidAppearance({
+          stroke: "#000000",
+          strokeWidth: 12,
+        }),
         fillRule: "nonzero",
         id: "open-vector-path",
         parentId: "open-vector-node",
@@ -1648,11 +1593,6 @@ describe("Editor shape export", () => {
             pointType: "corner",
           },
         ],
-        stroke: "#000000",
-        strokeLineCap: "round",
-        strokeLineJoin: "round",
-        strokeMiterLimit: 4,
-        strokeWidth: 12,
         transform: {
           rotation: 0,
           scaleX: 1,
@@ -1697,7 +1637,7 @@ describe("Editor shape export", () => {
         type: "path",
         visible: true,
         closed: true,
-        fill: "#ffffff",
+        appearance: createSolidAppearance({ fill: "#ffffff" }),
         fillRule: "nonzero",
         opacity: 1,
         segments: [
@@ -1720,11 +1660,6 @@ describe("Editor shape export", () => {
             pointType: "corner",
           },
         ],
-        stroke: null,
-        strokeLineCap: "round",
-        strokeLineJoin: "round",
-        strokeMiterLimit: 4,
-        strokeWidth: 0,
         transform: {
           rotation: 0,
           scaleX: 1,
@@ -1750,7 +1685,7 @@ describe("Editor shape export", () => {
         type: "path",
         visible: true,
         closed: true,
-        fill: "#ffffff",
+        appearance: createSolidAppearance({ fill: "#ffffff" }),
         fillRule: "nonzero",
         opacity: 0.5,
         segments: [
@@ -1773,11 +1708,6 @@ describe("Editor shape export", () => {
             pointType: "corner",
           },
         ],
-        stroke: null,
-        strokeLineCap: "round",
-        strokeLineJoin: "round",
-        strokeMiterLimit: 4,
-        strokeWidth: 0,
         transform: {
           rotation: 0,
           scaleX: 1,
@@ -1805,7 +1735,7 @@ describe("Editor shape export", () => {
         contours: [
           {
             closed: true,
-            fill: "#ffffff",
+            appearance: createSolidAppearance({ fill: "#ffffff" }),
             fillRule: "nonzero",
             id: "contour-1",
             segments: [
@@ -1834,11 +1764,6 @@ describe("Editor shape export", () => {
                 pointType: "corner",
               },
             ],
-            stroke: null,
-            strokeLineCap: "round",
-            strokeLineJoin: "round",
-            strokeMiterLimit: 4,
-            strokeWidth: 0,
             visible: true,
           },
         ],

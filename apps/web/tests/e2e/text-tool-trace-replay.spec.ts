@@ -220,10 +220,11 @@ test("placing a new text node uses the starter text preset", async ({
   );
 
   expect(textNode).toMatchObject({
-    fill: "#ffffff",
+    appearance: {
+      fills: [{ enabled: true, opacity: 1, paint: { color: "#000000" } }],
+      strokes: [],
+    },
     fontSize: 100,
-    stroke: "#000000",
-    strokeWidth: 3,
     text: "YOUR TEXT",
     tracking: 0,
     type: "text",
@@ -231,7 +232,6 @@ test("placing a new text node uses the starter text preset", async ({
       kind: "none",
     },
   });
-  await expect(
-    page.getByRole("slider", { name: "Stroke width" })
-  ).toHaveAttribute("aria-valuenow", "3");
+  await expect(page.getByTestId("appearance-fills-item")).toHaveCount(1);
+  await expect(page.getByTestId("appearance-strokes-item")).toHaveCount(0);
 });

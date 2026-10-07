@@ -3,6 +3,7 @@ import {
   buildAppearanceObjects,
   createDefaultPathNode,
   createDefaultShapeNode,
+  createSolidAppearance,
   Editor,
   getAppearanceDraws,
   getAppearancePasses,
@@ -43,17 +44,7 @@ const square = (x: number, closed = true) => ({
 });
 
 const withAppearance = (node, appearance) => {
-  const {
-    fill: _fill,
-    stroke: _stroke,
-    strokeLineCap: _cap,
-    strokeLineJoin: _join,
-    strokeMiterLimit: _miter,
-    strokeWidth: _width,
-    ...rest
-  } = node;
-
-  return { ...rest, appearance };
+  return { ...node, appearance };
 };
 
 const createPath = (id: string, parentId: string, appearance, contour) => {
@@ -211,10 +202,12 @@ describe("appearance render plan", () => {
     const path = withPathNodeContours(
       {
         ...createDefaultPathNode("root"),
-        fill: "#ff0000",
+        appearance: createSolidAppearance({
+          fill: "#ff0000",
+          stroke: "#000000",
+          strokeWidth: 2,
+        }),
         id: "open",
-        stroke: "#000000",
-        strokeWidth: 2,
       },
       [square(0, false)]
     );
@@ -270,12 +263,14 @@ describe("appearance render plan", () => {
     };
     const shape = {
       ...createDefaultShapeNode("polygon"),
-      fill: "#ff0000",
+      appearance: createSolidAppearance({
+        fill: "#ff0000",
+        stroke: "#000000",
+        strokeWidth: 4,
+      }),
       id: "shape",
       opacity: 0.5,
       parentId: "group",
-      stroke: "#000000",
-      strokeWidth: 4,
     };
 
     editor.getState().loadNodes([group, shape] as never);

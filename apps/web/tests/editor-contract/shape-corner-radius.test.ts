@@ -1,16 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 
 const createPolygonShapeNode = () => {
   return {
     cornerRadius: 24,
-    fill: "#000000",
+    appearance: createSolidAppearance({ fill: "#000000" }),
     height: 160,
     id: "shape-node",
     parentId: "root",
     shape: "polygon",
-    stroke: null,
-    strokeWidth: 0,
     transform: {
       rotation: 0,
       scaleX: 1,
@@ -27,7 +25,7 @@ const createPolygonShapeNode = () => {
 const createIrregularPolygonShapeNode = () => {
   return {
     cornerRadius: 0,
-    fill: "#000000",
+    appearance: createSolidAppearance({ fill: "#000000" }),
     height: 160,
     id: "irregular-shape-node",
     parentId: "root",
@@ -39,8 +37,6 @@ const createIrregularPolygonShapeNode = () => {
       { x: 10, y: 120 },
     ],
     shape: "polygon",
-    stroke: null,
-    strokeWidth: 0,
     transform: {
       rotation: 0,
       scaleX: 1,
@@ -57,13 +53,11 @@ const createIrregularPolygonShapeNode = () => {
 const createStarShapeNode = () => {
   return {
     cornerRadius: 18,
-    fill: "#000000",
+    appearance: createSolidAppearance({ fill: "#000000" }),
     height: 200,
     id: "star-node",
     parentId: "root",
     shape: "star",
-    stroke: null,
-    strokeWidth: 0,
     transform: {
       rotation: 0,
       scaleX: 1,

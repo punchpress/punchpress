@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 
 const createVectorNodes = () => {
   return [
@@ -19,7 +19,11 @@ const createVectorNodes = () => {
     },
     {
       closed: true,
-      fill: "#ffffff",
+      appearance: createSolidAppearance({
+        fill: "#ffffff",
+        stroke: "#000000",
+        strokeWidth: 12,
+      }),
       fillRule: "nonzero" as const,
       id: "vector-path",
       parentId: "vector-container",
@@ -49,8 +53,6 @@ const createVectorNodes = () => {
           pointType: "corner" as const,
         },
       ],
-      stroke: "#000000",
-      strokeWidth: 12,
       transform: {
         rotation: 0,
         scaleX: 1,

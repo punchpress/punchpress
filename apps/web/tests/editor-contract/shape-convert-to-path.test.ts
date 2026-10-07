@@ -1,10 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 
 const createRoundedPolygonShapeNode = () => {
   return {
+    appearance: createSolidAppearance({
+      fill: "#123456",
+      stroke: "#abcdef",
+      strokeWidth: 6,
+    }),
     cornerRadius: 18,
-    fill: "#123456",
     height: 120,
     id: "shape-node",
     parentId: "root",
@@ -15,8 +19,6 @@ const createRoundedPolygonShapeNode = () => {
       { x: -100, y: 60 },
     ],
     shape: "polygon",
-    stroke: "#abcdef",
-    strokeWidth: 6,
     transform: {
       rotation: 22,
       scaleX: 1.25,
@@ -59,13 +61,11 @@ describe("shape convert to path", () => {
     }
 
     expect(pathNode).toMatchObject({
+      appearance: node.appearance,
       closed: true,
-      fill: node.fill,
       fillRule: "nonzero",
       id: node.id,
       parentId: node.parentId,
-      stroke: node.stroke,
-      strokeWidth: node.strokeWidth,
       transform: node.transform,
       visible: node.visible,
     });

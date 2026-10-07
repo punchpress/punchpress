@@ -1,10 +1,5 @@
 import { getPaintExtent } from "../../appearance/paint-extent";
 import {
-  DEFAULT_VECTOR_STROKE_LINE_CAP,
-  DEFAULT_VECTOR_STROKE_LINE_JOIN,
-  DEFAULT_VECTOR_STROKE_MITER_LIMIT,
-} from "@punchpress/punch-schema";
-import {
   areCornerRadiiEquivalent,
   clampCornerRadius,
 } from "../../primitives/corner-radius";
@@ -585,17 +580,12 @@ export const setShapeCornerRadius = (node, cornerRadius, points = null) => {
 
 export const createVectorNodeFromShapeContours = (node, contours) => {
   return {
+    appearance: node.appearance,
     contours,
-    fill: node.fill,
     fillRule: "nonzero",
     id: node.id,
     opacity: node.opacity ?? 1,
     parentId: node.parentId,
-    stroke: node.stroke,
-    strokeLineCap: DEFAULT_VECTOR_STROKE_LINE_CAP,
-    strokeLineJoin: DEFAULT_VECTOR_STROKE_LINE_JOIN,
-    strokeMiterLimit: DEFAULT_VECTOR_STROKE_MITER_LIMIT,
-    strokeWidth: node.strokeWidth,
     transform: node.transform,
     type: "vector",
     visible: node.visible,
@@ -604,18 +594,13 @@ export const createVectorNodeFromShapeContours = (node, contours) => {
 
 export const createPathNodeFromShapeContour = (node, contour) => {
   return {
+    appearance: node.appearance,
     closed: contour.closed,
-    fill: node.fill,
     fillRule: "nonzero",
     id: node.id,
     opacity: node.opacity ?? 1,
     parentId: node.parentId,
     segments: contour.segments.map(cloneSegment),
-    stroke: node.stroke,
-    strokeLineCap: DEFAULT_VECTOR_STROKE_LINE_CAP,
-    strokeLineJoin: DEFAULT_VECTOR_STROKE_LINE_JOIN,
-    strokeMiterLimit: DEFAULT_VECTOR_STROKE_MITER_LIMIT,
-    strokeWidth: node.strokeWidth,
     transform: {
       ...node.transform,
     },

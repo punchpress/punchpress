@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { createDefaultImageNode, Editor } from "@punchpress/engine";
+import {
+  createDefaultImageNode,
+  createSolidAppearance,
+  Editor,
+} from "@punchpress/engine";
 
 const ARIAL_FONT = {
   family: "Arial",
@@ -440,7 +444,11 @@ const createRasterEditor = () =>
 
 const createRectanglePath = (id, parentId, x, y) => ({
   closed: true,
-  fill: "#ffffff",
+  appearance: createSolidAppearance({
+    fill: "#ffffff",
+    stroke: "#000000",
+    strokeWidth: 2,
+  }),
   fillRule: "nonzero" as const,
   id,
   parentId,
@@ -470,11 +478,6 @@ const createRectanglePath = (id, parentId, x, y) => ({
       pointType: "corner" as const,
     },
   ],
-  stroke: "#000000",
-  strokeLineCap: "round" as const,
-  strokeLineJoin: "round" as const,
-  strokeMiterLimit: 4,
-  strokeWidth: 2,
   transform: {
     rotation: 0,
     scaleX: 1,

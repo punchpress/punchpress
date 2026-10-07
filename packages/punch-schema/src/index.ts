@@ -72,7 +72,7 @@ export type {
   PaintDocument,
   StrokeLayerDocument,
 } from "./appearance-schema";
-export { formatColor, isCanonicalColor, parseColor } from "./color";
+export { formatColor, isCanonicalColor, parseColor, toRgb } from "./color";
 export type { ParsedColor } from "./color";
 export {
   createPunchPackage,

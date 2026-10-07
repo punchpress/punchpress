@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 import { PUNCH_DOCUMENT_VERSION } from "@punchpress/punch-schema";
 
 const createRectangleContour = () => {
@@ -53,16 +53,11 @@ const createPathDocument = () => {
       },
       {
         closed: true,
-        fill: "#000000",
+        appearance: createSolidAppearance({ fill: "#000000" }),
         fillRule: "nonzero" as const,
         id: "vector-node",
         parentId: "vector-container",
         segments: createRectangleContour().segments,
-        stroke: null,
-        strokeLineCap: "butt",
-        strokeLineJoin: "miter",
-        strokeMiterLimit: 4,
-        strokeWidth: 0,
         transform: {
           rotation: 0,
           scaleX: 1,

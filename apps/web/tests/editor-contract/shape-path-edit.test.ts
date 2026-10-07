@@ -1,15 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 
 const createPolygonShapeNode = () => {
   return {
-    fill: "#000000",
+    appearance: createSolidAppearance({ fill: "#000000" }),
     height: 160,
     id: "shape-node",
     parentId: "root",
     shape: "polygon",
-    stroke: null,
-    strokeWidth: 0,
     transform: {
       rotation: 0,
       scaleX: 1,
@@ -25,13 +23,11 @@ const createPolygonShapeNode = () => {
 
 const createStarShapeNode = () => {
   return {
-    fill: "#000000",
+    appearance: createSolidAppearance({ fill: "#000000" }),
     height: 200,
     id: "star-node",
     parentId: "root",
     shape: "star",
-    stroke: null,
-    strokeWidth: 0,
     transform: {
       rotation: 0,
       scaleX: 1,
@@ -47,13 +43,11 @@ const createStarShapeNode = () => {
 
 const createEllipseShapeNode = () => {
   return {
-    fill: "#000000",
+    appearance: createSolidAppearance({ fill: "#000000" }),
     height: 180,
     id: "ellipse-node",
     parentId: "root",
     shape: "ellipse",
-    stroke: null,
-    strokeWidth: 0,
     transform: {
       rotation: 0,
       scaleX: 1,

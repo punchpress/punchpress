@@ -159,6 +159,7 @@ export const getStateSnapshot = (page) => {
     pathEditingNodeId: dump?.editing?.pathNodeId || null,
     nodes:
       dump?.nodes?.map((node) => ({
+        appearance: node.appearance ?? null,
         fill: node.fill,
         fontSize: node.fontSize,
         font: node.font,

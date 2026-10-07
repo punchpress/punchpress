@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { PUNCH_DOCUMENT_VERSION } from "./constants";
+import { upgradeNodesAppearance1_8 } from "./migrate";
 import { normalizeNodesForSchema } from "./normalize";
 import { nodeSchema } from "./schema";
 
@@ -17,12 +18,21 @@ export const clipboardContentSchema = z
   })
   .strict();
 
+// Payloads copied from a 1.8 build upgrade the same way 1.8 documents do.
 export const parseClipboardContent = (value) => {
   const content = JSON.parse(value);
+  const nodes =
+    content?.documentVersion === "1.8" && Array.isArray(content.nodes)
+      ? upgradeNodesAppearance1_8(content.nodes)
+      : content?.nodes;
 
   return clipboardContentSchema.parse({
     ...content,
-    nodes: normalizeNodesForSchema(content.nodes),
+    documentVersion:
+      content?.documentVersion === "1.8"
+        ? PUNCH_DOCUMENT_VERSION
+        : content?.documentVersion,
+    nodes: normalizeNodesForSchema(nodes),
   });
 };
 

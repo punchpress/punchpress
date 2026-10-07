@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { Editor, TEXT_TRACKING_RANGE } from "@punchpress/engine";
+import {
+  createSolidAppearance,
+  Editor,
+  TEXT_TRACKING_RANGE,
+} from "@punchpress/engine";
 import { getLocalFontId } from "@punchpress/punch-schema";
 
 const FONT = {
@@ -73,13 +77,11 @@ const createVariableWidthLoadedFont = () => {
 
 const createTextNode = ({ fontSize, id, text, tracking }) => {
   return {
-    fill: "#000000",
+    appearance: createSolidAppearance({ fill: "#000000" }),
     font: FONT,
     fontSize,
     id,
     parentId: "root",
-    stroke: null,
-    strokeWidth: 0,
     text,
     tracking,
     transform: {

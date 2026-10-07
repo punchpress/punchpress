@@ -452,31 +452,54 @@ test("shows only shared appearance controls for a mixed text and shape selection
   await loadDocumentFixture(page, "properties-panel-selection.punch");
   await selectNodes(page, ["text-node", "shape-node"]);
 
-  const fillSection = getFillSection(page);
-  const fillInput = fillSection.getByRole("textbox").nth(0);
+  const fillSection = page.getByTestId("appearance-fills");
+  const fillInput = page
+    .getByTestId("appearance-fills-item")
+    .first()
+    .getByLabel("Hex color");
+  const useFirstButton = page.getByRole("button", { name: "Use first" });
+  const getSelectedAppearances = async () => {
+    const state = await getStateSnapshot(page);
 
+    return state.nodes
+      .filter((node) => {
+        return node.id === "text-node" || node.id === "shape-node";
+      })
+      .sort((left, right) => left.id.localeCompare(right.id))
+      .map((node) => ({
+        fills: node.appearance.fills.map((layer) => layer.paint.color),
+        id: node.id,
+        strokes: node.appearance.strokes.map((layer) => layer.paint.color),
+      }));
+  };
+
+  // The text and shape stacks differ, so the panel offers only the shared
+  // layer opacity and a mixed appearance row.
   await expect(getSection(page, "Shape")).toHaveCount(0);
   await expect(getSection(page, "Text")).toHaveCount(0);
-  await expect(fillSection).toBeVisible();
-  await expect(fillInput).toHaveAttribute("placeholder", "Mixed");
+  await expect(page.getByRole("slider", { name: "Opacity" })).toBeVisible();
+  await expect(getSection(page, "Appearance")).toBeVisible();
+  await expect(useFirstButton).toBeVisible();
+  await expect(fillSection).toHaveCount(0);
   await expect(page.getByText(LAYERS_SELECTED_TEXT)).toHaveCount(0);
   await expect(page.getByText(GROUP_SELECTED_TEXT)).toHaveCount(0);
+
+  await useFirstButton.click();
+
+  await expect(fillSection).toBeVisible();
+  // "Use first" copies the first selected node's (text) stack to both.
+  await expect.poll(getSelectedAppearances).toEqual([
+    { fills: ["#ffffff"], id: "shape-node", strokes: ["#000000"] },
+    { fills: ["#ffffff"], id: "text-node", strokes: ["#000000"] },
+  ]);
 
   await fillInput.fill("#123456");
   await fillInput.blur();
 
-  await expect
-    .poll(async () => {
-      const state = await getStateSnapshot(page);
-
-      return state.nodes
-        .filter((node) => {
-          return node.id === "text-node" || node.id === "shape-node";
-        })
-        .map((node) => node.fill)
-        .sort();
-    })
-    .toEqual(["#123456", "#123456"]);
+  await expect.poll(getSelectedAppearances).toEqual([
+    { fills: ["#123456"], id: "shape-node", strokes: ["#000000"] },
+    { fills: ["#123456"], id: "text-node", strokes: ["#000000"] },
+  ]);
 });
 
 test("shows and edits frame properties for a selected artboard", async ({
@@ -561,40 +584,51 @@ test("keeps frame width stable through blank and invalid numeric drafts", async 
   await expect.poll(getWidth).toBe(500);
 });
 
-test("does not commit a mixed miter draft on focus and blur alone", async ({
+test("does not commit a mixed stroke stack until the mixed row is applied", async ({
   page,
 }) => {
   await gotoEditor(page);
   await loadMixedMiterDocument(page);
   await selectNodes(page, ["miter-path-one", "miter-path-two"]);
 
-  const miterRow = getStrokeSection(page)
-    .locator("label", { hasText: "Miter" })
-    .locator("xpath=ancestor::div[contains(@class, 'grid')][1]");
-  const miterInput = miterRow.getByRole("textbox");
+  const useFirstButton = page.getByRole("button", { name: "Use first" });
+  const getMiterLimits = async () => {
+    const state = await getStateSnapshot(page);
 
-  await expect(miterInput).toHaveValue("0");
-  await miterInput.focus();
-  await miterInput.blur();
+    return state.nodes
+      .filter((node) => {
+        return node.id === "miter-path-one" || node.id === "miter-path-two";
+      })
+      .map((node) => ({
+        id: node.id,
+        miterLimit: node.appearance.strokes[0]?.miterLimit ?? null,
+      }))
+      .sort((left, right) => left.id.localeCompare(right.id));
+  };
 
-  await expect
-    .poll(async () => {
-      const state = await getStateSnapshot(page);
+  // Differing miter limits make the stacks mixed: no per-layer stroke
+  // controls, and showing or focusing the mixed row commits nothing.
+  await expect(useFirstButton).toBeVisible();
+  await expect(
+    page.getByRole("slider", { name: "Stroke miter limit" })
+  ).toHaveCount(0);
+  await useFirstButton.focus();
+  await useFirstButton.blur();
 
-      return state.nodes
-        .filter((node) => {
-          return node.id === "miter-path-one" || node.id === "miter-path-two";
-        })
-        .map((node) => ({
-          id: node.id,
-          strokeMiterLimit: node.strokeMiterLimit,
-        }))
-        .sort((left, right) => left.id.localeCompare(right.id));
-    })
-    .toEqual([
-      { id: "miter-path-one", strokeMiterLimit: 4 },
-      { id: "miter-path-two", strokeMiterLimit: 8 },
-    ]);
+  await expect.poll(getMiterLimits).toEqual([
+    { id: "miter-path-one", miterLimit: 4 },
+    { id: "miter-path-two", miterLimit: 8 },
+  ]);
+
+  await useFirstButton.click();
+
+  await expect.poll(getMiterLimits).toEqual([
+    { id: "miter-path-one", miterLimit: 4 },
+    { id: "miter-path-two", miterLimit: 4 },
+  ]);
+  await expect(
+    page.getByRole("slider", { name: "Stroke miter limit" })
+  ).toHaveAttribute("aria-valuenow", "4");
 });
 
 test("shows bulk path corner controls for a selected standalone path outside path edit mode", async ({
@@ -744,7 +778,7 @@ test("shows selection colors for a selected multi-path vector and applies one sw
         stroke: "#000000",
       },
       {
-        fill: "#FFFFFF",
+        fill: "#ffffff",
         id: "vector-path-2",
         stroke: "#112233",
       },
@@ -780,14 +814,14 @@ test("keeps selection color picker open while dragging the color area", async ({
   await expect(colorArea).toBeVisible();
   const originalPathStyles = [
     {
-      fill: "#F63F3F",
+      fill: "#f63f3f",
       id: "vector-path-1",
       stroke: "#000000",
     },
     {
-      fill: "#FFFFFF",
+      fill: "#ffffff",
       id: "vector-path-2",
-      stroke: "#F63F3F",
+      stroke: "#f63f3f",
     },
   ];
 
@@ -906,6 +940,11 @@ test("shows aggregate stroke controls for a selected multi-path vector and appli
   const capTrigger = getRow("Cap").getByRole("combobox");
   const joinTrigger = getRow("Join").getByRole("combobox");
 
+  // The child paths' stacks differ in color; unify them first so the vector
+  // exposes one shared stroke stack.
+  await expect(strokeSection).toHaveCount(0);
+  await page.getByRole("button", { name: "Use first" }).click();
+
   await expect(strokeSection).toBeVisible();
   await expect(capTrigger).toContainText("Butt");
   await expect(joinTrigger).toContainText("Miter");
@@ -1018,6 +1057,13 @@ test("keeps the miter scrub indicator aligned with pointer drag distance", async
   await gotoEditor(page);
   await loadVectorStrokeStyleDocument(page);
   await selectNodes(page, ["vector-node"]);
+  // The miter limit control only shows for miter joins.
+  await page.evaluate(() => {
+    window.__PUNCHPRESS_EDITOR__?.updateAppearanceLayer(
+      { index: 0, list: "strokes" },
+      { join: "miter" }
+    );
+  });
 
   const miterSlider = page.getByRole("slider", { name: "Stroke miter limit" });
   const indicator = miterSlider.locator("[data-slot='scrub-slider-indicator']");

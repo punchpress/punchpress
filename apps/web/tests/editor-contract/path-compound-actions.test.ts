@@ -1,10 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 
 const createPathNode = (id: string, parentId: string, x: number) => {
   return {
     closed: true,
-    fill: "#ff0000",
+    appearance: createSolidAppearance({
+      fill: "#ff0000",
+      stroke: "#000000",
+      strokeWidth: 3,
+    }),
     fillRule: "nonzero" as const,
     id,
     parentId,
@@ -34,11 +38,6 @@ const createPathNode = (id: string, parentId: string, x: number) => {
         pointType: "corner" as const,
       },
     ],
-    stroke: "#000000",
-    strokeLineCap: "round" as const,
-    strokeLineJoin: "round" as const,
-    strokeMiterLimit: 4,
-    strokeWidth: 3,
     transform: {
       rotation: 0,
       scaleX: 1,

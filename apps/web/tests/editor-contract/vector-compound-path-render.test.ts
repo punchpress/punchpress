@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 
 const createCompoundVectorNodes = () => {
   return [
@@ -20,7 +20,7 @@ const createCompoundVectorNodes = () => {
     },
     {
       closed: true,
-      fill: "#000000",
+      appearance: createSolidAppearance({ fill: "#000000" }),
       fillRule: "evenodd" as const,
       id: "vector-node-path-1",
       parentId: "vector-node",
@@ -50,11 +50,6 @@ const createCompoundVectorNodes = () => {
           pointType: "corner" as const,
         },
       ],
-      stroke: null,
-      strokeLineCap: "butt" as const,
-      strokeLineJoin: "miter" as const,
-      strokeMiterLimit: 4,
-      strokeWidth: 0,
       transform: {
         rotation: 0,
         scaleX: 1,
@@ -67,7 +62,7 @@ const createCompoundVectorNodes = () => {
     },
     {
       closed: true,
-      fill: "#000000",
+      appearance: createSolidAppearance({ fill: "#000000" }),
       fillRule: "evenodd" as const,
       id: "vector-node-path-2",
       parentId: "vector-node",
@@ -97,11 +92,6 @@ const createCompoundVectorNodes = () => {
           pointType: "corner" as const,
         },
       ],
-      stroke: null,
-      strokeLineCap: "butt" as const,
-      strokeLineJoin: "miter" as const,
-      strokeMiterLimit: 4,
-      strokeWidth: 0,
       transform: {
         rotation: 0,
         scaleX: 1,

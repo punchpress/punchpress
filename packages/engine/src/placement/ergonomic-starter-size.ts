@@ -3,7 +3,6 @@ import { getViewportWorldBounds } from "../viewport/viewport-queries";
 
 const SHAPE_WIDTH_RATIO = 0.2;
 const TEXT_FONT_SIZE_RATIO = 0.08;
-const TEXT_STROKE_RATIO = 0.03;
 const RECTANGLE_ASPECT_RATIO = 0.64;
 const ELLIPSE_ASPECT_RATIO = 0.74;
 const STAR_ASPECT_RATIO = 1;
@@ -56,8 +55,5 @@ export const getErgonomicTextPatch = (editor, point) => {
 
   const fontSize = roundToStep(bounds.width * TEXT_FONT_SIZE_RATIO);
 
-  return {
-    fontSize,
-    strokeWidth: Math.max(1, Math.round(fontSize * TEXT_STROKE_RATIO)),
-  };
+  return { fontSize };
 };

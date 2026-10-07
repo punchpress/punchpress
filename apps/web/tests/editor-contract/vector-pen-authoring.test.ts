@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { Editor, getGestureTolerancePx } from "@punchpress/engine";
+import {
+  createSolidAppearance,
+  Editor,
+  getGestureTolerancePx,
+} from "@punchpress/engine";
 import { PUNCH_DOCUMENT_VERSION } from "@punchpress/punch-schema";
 import { getNodeWorldPoint } from "../../../../packages/engine/src/primitives/rotation";
 
@@ -49,16 +53,11 @@ const createRectanglePathDocument = () => {
       },
       {
         closed: true,
-        fill: "#000000",
+        appearance: createSolidAppearance({ fill: "#000000" }),
         fillRule: "nonzero" as const,
         id: "vector-node",
         parentId: "vector-container",
         segments,
-        stroke: null,
-        strokeLineCap: "butt",
-        strokeLineJoin: "miter",
-        strokeMiterLimit: 4,
-        strokeWidth: 0,
         transform: {
           rotation: 0,
           scaleX: 1,
@@ -329,7 +328,11 @@ const createOpenPathDocument = () => {
       },
       {
         closed: false,
-        fill: "#000000",
+        appearance: createSolidAppearance({
+          fill: "#000000",
+          stroke: "#000000",
+          strokeWidth: 8,
+        }),
         fillRule: "nonzero" as const,
         id: "open-vector-node",
         parentId: "open-vector-container",
@@ -353,11 +356,6 @@ const createOpenPathDocument = () => {
             pointType: "smooth" as const,
           },
         ],
-        stroke: "#000000",
-        strokeLineCap: "round" as const,
-        strokeLineJoin: "round" as const,
-        strokeMiterLimit: 4,
-        strokeWidth: 8,
         transform: {
           rotation: 0,
           scaleX: 1,
@@ -391,8 +389,8 @@ describe("vector pen authoring", () => {
     });
     expect(selectedPathNode.id).toBe(pathNode.id);
     expect(pathNode).toMatchObject({
+      appearance: { strokes: [{ width: 3 }] },
       parentId: "root",
-      strokeWidth: 3,
       transform: {
         x: 200,
         y: 160,

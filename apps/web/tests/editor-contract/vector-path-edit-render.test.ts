@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 
 describe("vector path edit render", () => {
   test("keeps a compound vector render visible while editing a child path session", () => {
@@ -23,7 +23,11 @@ describe("vector path edit render", () => {
       },
       {
         closed: true,
-        fill: "#ff0000",
+        appearance: createSolidAppearance({
+          fill: "#ff0000",
+          stroke: "#111111",
+          strokeWidth: 6,
+        }),
         fillRule: "evenodd",
         id: "path-1",
         parentId: "vector-1",
@@ -53,11 +57,6 @@ describe("vector path edit render", () => {
             pointType: "corner",
           },
         ],
-        stroke: "#111111",
-        strokeLineCap: "round",
-        strokeLineJoin: "round",
-        strokeMiterLimit: 4,
-        strokeWidth: 6,
         transform: {
           rotation: 0,
           scaleX: 1,
@@ -70,7 +69,11 @@ describe("vector path edit render", () => {
       },
       {
         closed: true,
-        fill: "#ff0000",
+        appearance: createSolidAppearance({
+          fill: "#ff0000",
+          stroke: "#111111",
+          strokeWidth: 6,
+        }),
         fillRule: "evenodd",
         id: "path-2",
         parentId: "vector-1",
@@ -100,11 +103,6 @@ describe("vector path edit render", () => {
             pointType: "corner",
           },
         ],
-        stroke: "#111111",
-        strokeLineCap: "round",
-        strokeLineJoin: "round",
-        strokeMiterLimit: 4,
-        strokeWidth: 6,
         transform: {
           rotation: 0,
           scaleX: 1,

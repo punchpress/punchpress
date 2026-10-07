@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 
 const ARIAL_FONT = {
   family: "Arial",
@@ -160,14 +160,14 @@ describe("Editor.rotateSelectionBy", () => {
         visible: true,
       },
       createPathNode({
-        fill: "#3AAAFF",
+        appearance: createSolidAppearance({ fill: "#3AAAFF" }),
         id: backgroundPathId,
         parentId: rootGroupId,
         transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 100, y: 100 },
         bounds: { maxX: 600, maxY: 600, minX: 0, minY: 0 },
       }),
       createPathNode({
-        fill: "#F99B28",
+        appearance: createSolidAppearance({ fill: "#F99B28" }),
         id: nestedPathId,
         parentId: nestedGroupId,
         transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
@@ -243,17 +243,12 @@ const createPathNode = ({ bounds, fill, id, parentId, transform }) => {
 
   return {
     closed: true,
+    appearance: createSolidAppearance({ fill }),
     contours: [contour],
-    fill,
     fillRule: "nonzero",
     id,
     parentId,
     segments: contour.segments,
-    stroke: null,
-    strokeLineCap: "butt",
-    strokeLineJoin: "miter",
-    strokeMiterLimit: 4,
-    strokeWidth: 0,
     transform,
     type: "path",
     visible: true,

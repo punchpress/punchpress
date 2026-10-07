@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { ARCH_BEND_LIMIT, Editor, getNodeWorldPoint } from "@punchpress/engine";
+import {
+  ARCH_BEND_LIMIT,
+  createSolidAppearance,
+  Editor,
+  getNodeWorldPoint,
+} from "@punchpress/engine";
 
 const FONT = {
   family: "Arial",
@@ -11,13 +16,11 @@ const GUIDE_PATH_START_REGEX = /^M\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)/;
 
 const createArchNode = () => {
   return {
-    fill: "#000000",
+    appearance: createSolidAppearance({ fill: "#000000" }),
     font: FONT,
     fontSize: 120,
     id: "arch-node",
     parentId: "root",
-    stroke: null,
-    strokeWidth: 0,
     text: "HEY",
     tracking: 0,
     transform: {

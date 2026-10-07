@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { createDefaultImageNode, Editor } from "@punchpress/engine";
+import {
+  createDefaultImageNode,
+  createSolidAppearance,
+  Editor,
+} from "@punchpress/engine";
 
 const createVectorNodes = () => {
   return [
@@ -19,7 +23,14 @@ const createVectorNodes = () => {
     },
     {
       closed: true,
-      fill: "rgba(255, 0, 0, 0.4)",
+      appearance: createSolidAppearance({
+        cap: "square",
+        fill: "rgba(255, 0, 0, 0.4)",
+        join: "miter",
+        miterLimit: 12,
+        stroke: "rgba(0, 0, 0, 0.6)",
+        strokeWidth: 14,
+      }),
       fillRule: "evenodd" as const,
       id: "vector-node-path-1",
       parentId: "vector-node",
@@ -49,11 +60,6 @@ const createVectorNodes = () => {
           pointType: "corner" as const,
         },
       ],
-      stroke: "rgba(0, 0, 0, 0.6)",
-      strokeLineCap: "square" as const,
-      strokeLineJoin: "miter" as const,
-      strokeMiterLimit: 12,
-      strokeWidth: 14,
       transform: {
         rotation: 0,
         scaleX: 1,

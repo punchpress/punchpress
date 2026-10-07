@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { Editor, estimateBounds } from "@punchpress/engine";
+import {
+  createSolidAppearance,
+  Editor,
+  estimateBounds,
+} from "@punchpress/engine";
 
 const FONT = {
   family: "Arial",
@@ -34,13 +38,11 @@ const mockCircleGuideGeometry = (editor, node) => {
 
 const createCircleNode = () => {
   return {
-    fill: "#000000",
+    appearance: createSolidAppearance({ fill: "#000000" }),
     font: FONT,
     fontSize: 120,
     id: "circle-node",
     parentId: "root",
-    stroke: null,
-    strokeWidth: 0,
     text: "CIRCLE",
     tracking: 0,
     transform: {
@@ -63,13 +65,11 @@ const createCircleNode = () => {
 
 const createPlainTextNode = () => {
   return {
-    fill: "#000000",
+    appearance: createSolidAppearance({ fill: "#000000" }),
     font: FONT,
     fontSize: 120,
     id: "text-node",
     parentId: "root",
-    stroke: null,
-    strokeWidth: 0,
     text: "TEXT",
     tracking: 0,
     transform: {
@@ -89,13 +89,11 @@ const createPlainTextNode = () => {
 
 const createArchNode = () => {
   return {
-    fill: "#000000",
+    appearance: createSolidAppearance({ fill: "#000000" }),
     font: FONT,
     fontSize: 120,
     id: "arch-node",
     parentId: "root",
-    stroke: null,
-    strokeWidth: 0,
     text: "ARCH",
     tracking: 0,
     transform: {
@@ -116,13 +114,11 @@ const createArchNode = () => {
 
 const createWaveNode = () => {
   return {
-    fill: "#000000",
+    appearance: createSolidAppearance({ fill: "#000000" }),
     font: FONT,
     fontSize: 120,
     id: "wave-node",
     parentId: "root",
-    stroke: null,
-    strokeWidth: 0,
     text: "WAVE",
     tracking: 0,
     transform: {
@@ -144,13 +140,11 @@ const createWaveNode = () => {
 
 const createSlantNode = () => {
   return {
-    fill: "#000000",
+    appearance: createSolidAppearance({ fill: "#000000" }),
     font: FONT,
     fontSize: 120,
     id: "slant-node",
     parentId: "root",
-    stroke: null,
-    strokeWidth: 0,
     text: "SLANT",
     tracking: 0,
     transform: {
@@ -198,12 +192,14 @@ const createVectorNode = () => {
         ],
       },
     ],
-    fill: "#ffffff",
+    appearance: createSolidAppearance({
+      fill: "#ffffff",
+      stroke: "#000000",
+      strokeWidth: 12,
+    }),
     fillRule: "nonzero",
     id: "vector-node",
     parentId: "root",
-    stroke: "#000000",
-    strokeWidth: 12,
     transform: {
       rotation: 0,
       scaleX: 1,
@@ -234,7 +230,11 @@ const createVectorContainerWithPaths = () => {
     },
     {
       closed: true,
-      fill: "#ffffff",
+      appearance: createSolidAppearance({
+        fill: "#ffffff",
+        stroke: "#000000",
+        strokeWidth: 12,
+      }),
       fillRule: "nonzero" as const,
       id: "vector-path-1",
       parentId: "vector-container",
@@ -264,8 +264,6 @@ const createVectorContainerWithPaths = () => {
           pointType: "corner" as const,
         },
       ],
-      stroke: "#000000",
-      strokeWidth: 12,
       transform: {
         rotation: 0,
         scaleX: 1,
@@ -278,7 +276,11 @@ const createVectorContainerWithPaths = () => {
     },
     {
       closed: true,
-      fill: "#ffffff",
+      appearance: createSolidAppearance({
+        fill: "#ffffff",
+        stroke: "#000000",
+        strokeWidth: 12,
+      }),
       fillRule: "nonzero" as const,
       id: "vector-path-2",
       parentId: "vector-container",
@@ -308,8 +310,6 @@ const createVectorContainerWithPaths = () => {
           pointType: "corner" as const,
         },
       ],
-      stroke: "#000000",
-      strokeWidth: 12,
       transform: {
         rotation: 0,
         scaleX: 1,
@@ -341,7 +341,11 @@ const createSinglePathVectorNodes = () => {
     },
     {
       closed: true,
-      fill: "#ffffff",
+      appearance: createSolidAppearance({
+        fill: "#ffffff",
+        stroke: "#000000",
+        strokeWidth: 12,
+      }),
       fillRule: "nonzero" as const,
       id: "vector-path",
       parentId: "vector-container",
@@ -371,8 +375,6 @@ const createSinglePathVectorNodes = () => {
           pointType: "corner" as const,
         },
       ],
-      stroke: "#000000",
-      strokeWidth: 12,
       transform: {
         rotation: 0,
         scaleX: 1,
@@ -678,7 +680,11 @@ describe("Editor interaction mode boundaries", () => {
     const nodes = [
       {
         closed: true,
-        fill: "#ffffff",
+        appearance: createSolidAppearance({
+          fill: "#ffffff",
+          stroke: "#000000",
+          strokeWidth: 12,
+        }),
         fillRule: "nonzero" as const,
         id: "path-a",
         parentId: "root",
@@ -708,8 +714,6 @@ describe("Editor interaction mode boundaries", () => {
             pointType: "corner" as const,
           },
         ],
-        stroke: "#000000",
-        strokeWidth: 12,
         transform: {
           rotation: 0,
           scaleX: 1,
@@ -722,7 +726,11 @@ describe("Editor interaction mode boundaries", () => {
       },
       {
         closed: true,
-        fill: "#ffffff",
+        appearance: createSolidAppearance({
+          fill: "#ffffff",
+          stroke: "#000000",
+          strokeWidth: 12,
+        }),
         fillRule: "nonzero" as const,
         id: "path-b",
         parentId: "root",
@@ -752,8 +760,6 @@ describe("Editor interaction mode boundaries", () => {
             pointType: "corner" as const,
           },
         ],
-        stroke: "#000000",
-        strokeWidth: 12,
         transform: {
           rotation: 0,
           scaleX: 1,

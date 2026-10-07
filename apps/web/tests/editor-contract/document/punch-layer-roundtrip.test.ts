@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 import {
   createPunchPackage,
   DEFAULT_LOCAL_FONT,
@@ -54,17 +54,18 @@ const rectangleContour = (width: number, height: number) => ({
 });
 
 const createPathNode = (id: string, parentId: string, fill: string) => ({
+  appearance: createSolidAppearance({
+    fill,
+    join: "bevel",
+    miterLimit: 8,
+    stroke: "#111111",
+    strokeWidth: 3,
+  }),
   contours: [rectangleContour(90, 60)],
-  fill,
   fillRule: "evenodd" as const,
   id,
   opacity: 0.8,
   parentId,
-  stroke: "#111111",
-  strokeLineCap: "round" as const,
-  strokeLineJoin: "bevel" as const,
-  strokeMiterLimit: 8,
-  strokeWidth: 3,
   transform: transform(20, 30, 8),
   type: "path" as const,
   visible: true,
@@ -102,14 +103,16 @@ const createLayerRoundTripNodes = () => [
     visible: true,
   },
   {
-    fill: "#202020",
+    appearance: createSolidAppearance({
+      fill: "#202020",
+      stroke: "#ffffff",
+      strokeWidth: 2,
+    }),
     font: DEFAULT_LOCAL_FONT,
     fontSize: 72,
     id: "text-layer",
     opacity: 1,
     parentId: "group-layer",
-    stroke: "#ffffff",
-    strokeWidth: 2,
     text: "Punch",
     tracking: 14,
     transform: transform(12, 18, 4),
@@ -123,7 +126,11 @@ const createLayerRoundTripNodes = () => [
   },
   {
     cornerRadii: [4, 8, 12, 16],
-    fill: "#ffcc00",
+    appearance: createSolidAppearance({
+      fill: "#ffcc00",
+      stroke: "#222222",
+      strokeWidth: 6,
+    }),
     height: 180,
     id: "shape-layer",
     opacity: 0.75,
@@ -135,8 +142,6 @@ const createLayerRoundTripNodes = () => [
       { x: -90, y: 60 },
     ],
     shape: "polygon" as const,
-    stroke: "#222222",
-    strokeWidth: 6,
     transform: transform(320, 260, 15),
     type: "shape" as const,
     visible: false,

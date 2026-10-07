@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   createDefaultImageNode,
+  createSolidAppearance,
   Editor,
   getNodeWorldPoint,
 } from "@punchpress/engine";
@@ -15,13 +16,11 @@ const AVAILABLE_FONT = {
 const createShapeNode = (id: string) => {
   return {
     cornerRadius: 24,
-    fill: "#000000",
+    appearance: createSolidAppearance({ fill: "#000000" }),
     height: 160,
     id,
     parentId: "root",
     shape: "polygon",
-    stroke: null,
-    strokeWidth: 0,
     transform: {
       rotation: 0,
       scaleX: 1,
@@ -38,7 +37,7 @@ const createShapeNode = (id: string) => {
 const createIrregularShapeNode = (id: string) => {
   return {
     cornerRadius: 0,
-    fill: "#000000",
+    appearance: createSolidAppearance({ fill: "#000000" }),
     height: 160,
     id,
     parentId: "root",
@@ -50,8 +49,6 @@ const createIrregularShapeNode = (id: string) => {
       { x: 10, y: 120 },
     ],
     shape: "polygon",
-    stroke: null,
-    strokeWidth: 0,
     transform: {
       rotation: 0,
       scaleX: 1,
@@ -67,13 +64,11 @@ const createIrregularShapeNode = (id: string) => {
 
 const createEllipseShapeNode = (id: string) => {
   return {
-    fill: "#000000",
+    appearance: createSolidAppearance({ fill: "#000000" }),
     height: 160,
     id,
     parentId: "root",
     shape: "ellipse",
-    stroke: null,
-    strokeWidth: 0,
     transform: {
       rotation: 0,
       scaleX: 1,
@@ -90,13 +85,11 @@ const createEllipseShapeNode = (id: string) => {
 const createStarShapeNode = (id: string) => {
   return {
     cornerRadius: 18,
-    fill: "#000000",
+    appearance: createSolidAppearance({ fill: "#000000" }),
     height: 200,
     id,
     parentId: "root",
     shape: "star",
-    stroke: null,
-    strokeWidth: 0,
     transform: {
       rotation: 0,
       scaleX: 1,
@@ -112,13 +105,15 @@ const createStarShapeNode = (id: string) => {
 
 const createTextNode = (id: string) => {
   return {
-    fill: "#ffffff",
+    appearance: createSolidAppearance({
+      fill: "#ffffff",
+      stroke: "#000000",
+      strokeWidth: 12,
+    }),
     font: AVAILABLE_FONT,
     fontSize: 320,
     id,
     parentId: "root",
-    stroke: "#000000",
-    strokeWidth: 12,
     text: "Hello",
     tracking: 10,
     transform: {
@@ -207,10 +202,24 @@ const createGroupNode = (id: string, parentId = "root") => {
   };
 };
 
+const createPathAppearance = (
+  paint: Parameters<typeof createSolidAppearance>[0] = {}
+) => {
+  return createSolidAppearance({
+    cap: "square",
+    fill: "rgba(255, 0, 0, 0.4)",
+    join: "miter",
+    miterLimit: 12,
+    stroke: "rgba(0, 0, 0, 0.6)",
+    strokeWidth: 14,
+    ...paint,
+  });
+};
+
 const createPathNode = (id: string, parentId = "root", overrides = {}) => {
   return {
+    appearance: createPathAppearance(),
     closed: true,
-    fill: "rgba(255, 0, 0, 0.4)",
     fillRule: "evenodd" as const,
     id,
     parentId,
@@ -240,11 +249,6 @@ const createPathNode = (id: string, parentId = "root", overrides = {}) => {
         pointType: "corner" as const,
       },
     ],
-    stroke: "rgba(0, 0, 0, 0.6)",
-    strokeLineCap: "square" as const,
-    strokeLineJoin: "miter" as const,
-    strokeMiterLimit: 12,
-    strokeWidth: 14,
     transform: {
       rotation: 0,
       scaleX: 1,
@@ -291,6 +295,13 @@ const createGroupedNodes = (...nodes: Record<string, unknown>[]) => {
   return [createGroupNode("group-node"), ...nodes];
 };
 
+const getPaintColors = (node) => {
+  return {
+    fill: node?.appearance?.fills[0]?.paint.color ?? null,
+    stroke: node?.appearance?.strokes[0]?.paint.color ?? null,
+  };
+};
+
 const loadNodes = (editor: Editor, nodes: Record<string, unknown>[]) => {
   editor.getState().loadNodes(nodes as never);
 };
@@ -306,16 +317,18 @@ describe("Editor selection properties", () => {
 
     expect(selectionProperties.selectionKind).toBe("single");
     expect(Object.keys(selectionProperties.properties).sort()).toEqual([
+      "appearance",
       "cornerRadius",
-      "fill",
       "height",
+      "opacity",
       "shape",
-      "stroke",
-      "strokeWidth",
       "width",
       "x",
       "y",
     ]);
+    expect(selectionProperties.properties.appearance?.value).toEqual(
+      createSolidAppearance({ fill: "#000000" })
+    );
     expect(selectionProperties.properties.cornerRadius?.value).toBe(24);
     expect(selectionProperties.properties.shape?.value).toBe("polygon");
     expect(selectionProperties.properties.width?.value).toBe(260);
@@ -442,22 +455,11 @@ describe("Editor selection properties", () => {
 
     expect(selectionProperties.selectionKind).toBe("multi");
     expect(Object.keys(selectionProperties.properties).sort()).toEqual([
-      "fill",
-      "stroke",
-      "strokeWidth",
+      "appearance",
+      "opacity",
     ]);
-    expect(selectionProperties.properties.fill).toEqual({
-      id: "fill",
-      isMixed: true,
-      value: null,
-    });
-    expect(selectionProperties.properties.stroke).toEqual({
-      id: "stroke",
-      isMixed: true,
-      value: null,
-    });
-    expect(selectionProperties.properties.strokeWidth).toEqual({
-      id: "strokeWidth",
+    expect(selectionProperties.properties.appearance).toEqual({
+      id: "appearance",
       isMixed: true,
       value: null,
     });
@@ -474,11 +476,14 @@ describe("Editor selection properties", () => {
     ]);
     editor.setSelectedNodes(["text-node", "shape-node"]);
 
-    const didApply = editor.setSelectionProperty("fill", "#123456");
+    const didApply = editor.updateAppearanceLayer(
+      { index: 0, list: "fills" },
+      { color: "#123456" }
+    );
 
     expect(didApply).toBe(true);
-    expect(editor.getNode("text-node")?.fill).toBe("#123456");
-    expect(editor.getNode("shape-node")?.fill).toBe("#123456");
+    expect(getPaintColors(editor.getNode("text-node")).fill).toBe("#123456");
+    expect(getPaintColors(editor.getNode("shape-node")).fill).toBe("#123456");
   });
 
   test("applies a single-node descriptor patch through transform-aware updates", () => {
@@ -567,23 +572,26 @@ describe("Editor selection properties", () => {
     const selectionProperties = editor.getSelectionProperties();
 
     expect(Object.keys(selectionProperties.properties).sort()).toEqual([
-      "fill",
+      "appearance",
       "fillRule",
-      "stroke",
-      "strokeLineCap",
-      "strokeLineJoin",
-      "strokeMiterLimit",
-      "strokeWidth",
+      "opacity",
       "x",
       "y",
     ]);
-    expect(selectionProperties.properties.fill?.value).toBe(
-      "rgba(255, 0, 0, 0.4)"
-    );
     expect(selectionProperties.properties.fillRule?.value).toBe("evenodd");
-    expect(selectionProperties.properties.strokeLineCap?.value).toBe("square");
-    expect(selectionProperties.properties.strokeLineJoin?.value).toBe("miter");
-    expect(selectionProperties.properties.strokeMiterLimit?.value).toBe(12);
+    expect(selectionProperties.properties.appearance?.value).toMatchObject({
+      fills: [{ opacity: 0.4, paint: { color: "#ff0000", kind: "solid" } }],
+      strokes: [
+        {
+          cap: "square",
+          join: "miter",
+          miterLimit: 12,
+          opacity: 0.6,
+          paint: { color: "#000000", kind: "solid" },
+          width: 14,
+        },
+      ],
+    });
   });
 
   test("exposes selection colors for a selected multi-path vector", () => {
@@ -593,8 +601,18 @@ describe("Editor selection properties", () => {
       editor,
       createVectorWithTwoPaths(
         "vector-node",
-        { fill: "#F63F3F", stroke: "#000000" },
-        { fill: "#FFFFFF", stroke: "#F63F3F" }
+        {
+          appearance: createPathAppearance({
+            fill: "#F63F3F",
+            stroke: "#000000",
+          }),
+        },
+        {
+          appearance: createPathAppearance({
+            fill: "#FFFFFF",
+            stroke: "#F63F3F",
+          }),
+        }
       )
     );
     editor.select("vector-node");
@@ -603,39 +621,29 @@ describe("Editor selection properties", () => {
 
     expect(selectionProperties.selectionKind).toBe("group");
     expect(Object.keys(selectionProperties.properties).sort()).toEqual([
-      "fill",
+      "appearance",
       "fillRule",
-      "stroke",
-      "strokeLineCap",
-      "strokeLineJoin",
-      "strokeMiterLimit",
-      "strokeWidth",
     ]);
-    expect(selectionProperties.properties.fill?.isMixed).toBe(true);
+    expect(selectionProperties.properties.appearance?.isMixed).toBe(true);
     expect(selectionProperties.properties.fillRule?.value).toBe("evenodd");
-    expect(selectionProperties.properties.stroke?.isMixed).toBe(true);
-    expect(selectionProperties.properties.strokeLineCap?.value).toBe("square");
-    expect(selectionProperties.properties.strokeLineJoin?.value).toBe("miter");
-    expect(selectionProperties.properties.strokeMiterLimit?.value).toBe(12);
-    expect(selectionProperties.properties.strokeWidth?.value).toBe(14);
     expect(selectionProperties.selectionColors).toEqual([
       {
-        fieldId: "vector-node-path-1:fill",
-        id: JSON.stringify("#F63F3F"),
+        fieldId: "vector-node-path-1:fills.fill-1",
+        id: JSON.stringify("#f63f3f"),
         usageCount: 2,
-        value: "#F63F3F",
+        value: "#f63f3f",
       },
       {
-        fieldId: "vector-node-path-1:stroke",
+        fieldId: "vector-node-path-1:strokes.stroke-1",
         id: JSON.stringify("#000000"),
         usageCount: 1,
         value: "#000000",
       },
       {
-        fieldId: "vector-node-path-2:fill",
-        id: JSON.stringify("#FFFFFF"),
+        fieldId: "vector-node-path-2:fills.fill-1",
+        id: JSON.stringify("#ffffff"),
         usageCount: 1,
-        value: "#FFFFFF",
+        value: "#ffffff",
       },
     ]);
   });
@@ -648,39 +656,47 @@ describe("Editor selection properties", () => {
       createVectorWithTwoPaths(
         "vector-node",
         {
-          fill: "#F63F3F",
-          stroke: "#000000",
-          strokeLineCap: "round",
-          strokeLineJoin: "round",
-          strokeMiterLimit: 6,
-          strokeWidth: 10,
+          appearance: createPathAppearance({
+            cap: "round",
+            fill: "#F63F3F",
+            join: "round",
+            miterLimit: 6,
+            stroke: "#000000",
+            strokeWidth: 10,
+          }),
         },
         {
-          fill: "#FFFFFF",
-          stroke: "#F63F3F",
-          strokeLineCap: "round",
-          strokeLineJoin: "round",
-          strokeMiterLimit: 6,
-          strokeWidth: 10,
+          appearance: createPathAppearance({
+            cap: "round",
+            fill: "#FFFFFF",
+            join: "round",
+            miterLimit: 6,
+            stroke: "#F63F3F",
+            strokeWidth: 10,
+          }),
         }
       )
     );
     editor.select("vector-node");
 
-    expect(editor.setSelectionProperty("strokeLineCap", "square")).toBe(true);
-    expect(editor.setSelectionProperty("strokeLineJoin", "bevel")).toBe(true);
-    expect(editor.setSelectionProperty("strokeWidth", 22)).toBe(true);
+    const strokeSlot = { index: 0, list: "strokes" } as const;
 
-    expect(editor.getNode("vector-node-path-1")).toMatchObject({
-      strokeLineCap: "square",
-      strokeLineJoin: "bevel",
-      strokeWidth: 22,
-    });
-    expect(editor.getNode("vector-node-path-2")).toMatchObject({
-      strokeLineCap: "square",
-      strokeLineJoin: "bevel",
-      strokeWidth: 22,
-    });
+    expect(editor.updateAppearanceLayer(strokeSlot, { cap: "square" })).toBe(
+      true
+    );
+    expect(editor.updateAppearanceLayer(strokeSlot, { join: "bevel" })).toBe(
+      true
+    );
+    expect(editor.updateAppearanceLayer(strokeSlot, { width: 22 })).toBe(true);
+
+    for (const nodeId of ["vector-node-path-1", "vector-node-path-2"]) {
+      expect(editor.getNode(nodeId)?.appearance?.strokes).toMatchObject([
+        { cap: "square", join: "bevel", miterLimit: 6, width: 22 },
+      ]);
+    }
+    expect(getPaintColors(editor.getNode("vector-node-path-2")).stroke).toBe(
+      "#f63f3f"
+    );
   });
 
   test("applies a selection color across matching descendant fill and stroke paints for a selected group", () => {
@@ -691,39 +707,47 @@ describe("Editor selection properties", () => {
       createGroupedNodes(
         {
           ...createShapeNode("shape-node"),
-          fill: "#E81D1D",
+          appearance: createSolidAppearance({
+            fill: "#E81D1D",
+            stroke: "#0ACEFF",
+            strokeWidth: 4,
+          }),
           parentId: "group-node",
-          stroke: "#0ACEFF",
         },
         {
           ...createTextNode("text-node"),
-          fill: "#FFFFFF",
+          appearance: createSolidAppearance({
+            fill: "#FFFFFF",
+            stroke: "#E81D1D",
+            strokeWidth: 12,
+          }),
           parentId: "group-node",
-          stroke: "#E81D1D",
         },
         {
           ...createPathNode("path-node", "group-node"),
-          fill: "#6842FF",
-          stroke: "#E81D1D",
+          appearance: createPathAppearance({
+            fill: "#6842FF",
+            stroke: "#E81D1D",
+          }),
         }
       )
     );
     editor.select("group-node");
 
-    const redColorId = JSON.stringify("#E81D1D");
+    const redColorId = JSON.stringify("#e81d1d");
 
     expect(editor.setSelectionColor(redColorId, "#123456")).toBe(true);
 
-    expect(editor.getNode("shape-node")).toMatchObject({
+    expect(getPaintColors(editor.getNode("shape-node"))).toEqual({
       fill: "#123456",
-      stroke: "#0ACEFF",
+      stroke: "#0aceff",
     });
-    expect(editor.getNode("text-node")).toMatchObject({
-      fill: "#FFFFFF",
+    expect(getPaintColors(editor.getNode("text-node"))).toEqual({
+      fill: "#ffffff",
       stroke: "#123456",
     });
-    expect(editor.getNode("path-node")).toMatchObject({
-      fill: "#6842FF",
+    expect(getPaintColors(editor.getNode("path-node"))).toEqual({
+      fill: "#6842ff",
       stroke: "#123456",
     });
   });
@@ -736,43 +760,59 @@ describe("Editor selection properties", () => {
       createGroupedNodes(
         {
           ...createShapeNode("shape-node"),
-          fill: "#E81D1D",
+          appearance: createSolidAppearance({
+            fill: "#E81D1D",
+            stroke: "#0ACEFF",
+            strokeWidth: 4,
+          }),
           parentId: "group-node",
-          stroke: "#0ACEFF",
         },
         {
           ...createPathNode("path-node", "group-node"),
-          fill: "#6842FF",
-          stroke: "#E81D1D",
+          appearance: createPathAppearance({
+            fill: "#6842FF",
+            stroke: "#E81D1D",
+          }),
         }
       )
     );
     editor.select("group-node");
 
-    const redColorId = JSON.stringify("#E81D1D");
+    const redColorId = JSON.stringify("#e81d1d");
     const session = editor.beginSelectionColorChange(redColorId);
 
     expect(session).not.toBeNull();
     expect(editor.updateSelectionColorChange(session, "#123456")).toBe(true);
     expect(
-      editor.getSelectionColorPreviewValue("shape-node", "fill", "#E81D1D")
+      editor.getSelectionColorPreviewValue(
+        "shape-node",
+        "fills.fill-1",
+        "#e81d1d"
+      )
     ).toBe("#123456");
-    expect(editor.getNode("shape-node")).toMatchObject({
-      fill: "#E81D1D",
-      stroke: "#0ACEFF",
+    expect(
+      editor.getSelectionColorPreviewValue(
+        "shape-node",
+        "strokes.stroke-1",
+        "#0aceff"
+      )
+    ).toBe("#0aceff");
+    expect(getPaintColors(editor.getNode("shape-node"))).toEqual({
+      fill: "#e81d1d",
+      stroke: "#0aceff",
     });
-    expect(editor.getNode("path-node")).toMatchObject({
-      fill: "#6842FF",
-      stroke: "#E81D1D",
+    expect(getPaintColors(editor.getNode("path-node"))).toEqual({
+      fill: "#6842ff",
+      stroke: "#e81d1d",
     });
 
     expect(editor.commitSelectionColorChange(session, "#123456")).toBe(true);
-    expect(editor.getNode("shape-node")).toMatchObject({
+    expect(getPaintColors(editor.getNode("shape-node"))).toEqual({
       fill: "#123456",
-      stroke: "#0ACEFF",
+      stroke: "#0aceff",
     });
-    expect(editor.getNode("path-node")).toMatchObject({
-      fill: "#6842FF",
+    expect(getPaintColors(editor.getNode("path-node"))).toEqual({
+      fill: "#6842ff",
       stroke: "#123456",
     });
   });
@@ -784,9 +824,12 @@ describe("Editor selection properties", () => {
       createArtboardNode("artboard-node"),
       {
         ...createShapeNode("shape-node"),
-        fill: "#ffffff",
+        appearance: createSolidAppearance({
+          fill: "#ffffff",
+          stroke: "#000000",
+          strokeWidth: 4,
+        }),
         parentId: "artboard-node",
-        stroke: "#000000",
       },
     ]);
     editor.select("artboard-node");
@@ -802,7 +845,7 @@ describe("Editor selection properties", () => {
         value: "#ffffff",
       },
       {
-        fieldId: "shape-node:stroke",
+        fieldId: "shape-node:strokes.stroke-1",
         id: JSON.stringify("#000000"),
         usageCount: 1,
         value: "#000000",
@@ -813,7 +856,7 @@ describe("Editor selection properties", () => {
     expect(editor.getNode("artboard-node")).toMatchObject({
       background: "#123456",
     });
-    expect(editor.getNode("shape-node")).toMatchObject({
+    expect(getPaintColors(editor.getNode("shape-node"))).toEqual({
       fill: "#123456",
       stroke: "#000000",
     });
@@ -825,30 +868,40 @@ describe("Editor selection properties", () => {
     loadNodes(editor, [
       createPathNode("first-path"),
       createPathNode("second-path", "root", {
-        strokeLineCap: "round",
-        strokeLineJoin: "bevel",
-        strokeMiterLimit: 4,
+        appearance: createPathAppearance({
+          cap: "round",
+          join: "bevel",
+          miterLimit: 4,
+        }),
       }),
     ]);
     editor.setSelectedNodes(["first-path", "second-path"]);
 
-    expect(editor.getSelectionProperties().properties.strokeLineJoin).toEqual({
-      id: "strokeLineJoin",
+    expect(editor.getSelectionProperties().properties.appearance).toEqual({
+      id: "appearance",
       isMixed: true,
       value: null,
     });
 
-    expect(editor.setSelectionProperty("strokeLineJoin", "round")).toBe(true);
-    expect(editor.setSelectionProperty("strokeMiterLimit", 18)).toBe(true);
+    const strokeSlot = { index: 0, list: "strokes" } as const;
+
+    expect(editor.updateAppearanceLayer(strokeSlot, { join: "round" })).toBe(
+      true
+    );
+    expect(editor.updateAppearanceLayer(strokeSlot, { miterLimit: 18 })).toBe(
+      true
+    );
 
     expect(editor.getNode("first-path")).toMatchObject({
-      strokeLineJoin: "round",
-      strokeMiterLimit: 18,
+      appearance: {
+        strokes: [{ cap: "square", join: "round", miterLimit: 18 }],
+      },
       type: "path",
     });
     expect(editor.getNode("second-path")).toMatchObject({
-      strokeLineJoin: "round",
-      strokeMiterLimit: 18,
+      appearance: {
+        strokes: [{ cap: "round", join: "round", miterLimit: 18 }],
+      },
       type: "path",
     });
   });

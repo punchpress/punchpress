@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 
 const createRectangleContour = () => {
   return {
@@ -36,12 +36,14 @@ const createRectangleContour = () => {
 const createVectorNode = () => {
   return {
     contours: [createRectangleContour()],
-    fill: "#ffffff",
+    appearance: createSolidAppearance({
+      fill: "#ffffff",
+      stroke: "#000000",
+      strokeWidth: 8,
+    }),
     fillRule: "nonzero" as const,
     id: "vector-node",
     parentId: "root",
-    stroke: "#000000",
-    strokeWidth: 8,
     transform: {
       rotation: 0,
       scaleX: 1,

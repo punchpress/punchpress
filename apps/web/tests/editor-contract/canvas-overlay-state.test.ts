@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { Editor, estimateBounds } from "@punchpress/engine";
+import {
+  createSolidAppearance,
+  Editor,
+  estimateBounds,
+} from "@punchpress/engine";
 
 const FONT = {
   family: "Arial",
@@ -23,7 +27,11 @@ const createEditor = () => {
 const createPathNode = (id, x = 200, y = 160) => {
   return {
     closed: true,
-    fill: "#ff0000",
+    appearance: createSolidAppearance({
+      fill: "#ff0000",
+      stroke: "#111111",
+      strokeWidth: 3,
+    }),
     fillRule: "nonzero",
     id,
     parentId: "root",
@@ -53,11 +61,6 @@ const createPathNode = (id, x = 200, y = 160) => {
         pointType: "corner",
       },
     ],
-    stroke: "#111111",
-    strokeLineCap: "round",
-    strokeLineJoin: "round",
-    strokeMiterLimit: 4,
-    strokeWidth: 3,
     transform: {
       rotation: 0,
       scaleX: 1,
@@ -120,13 +123,11 @@ const createArtboardNode = (id: string, x = 0, y = 0) => {
 
 const createCircleTextNode = () => {
   return {
-    fill: "#000000",
+    appearance: createSolidAppearance({ fill: "#000000" }),
     font: FONT,
     fontSize: 120,
     id: "circle-node",
     parentId: "root",
-    stroke: null,
-    strokeWidth: 0,
     text: "CIRCLE",
     tracking: 0,
     transform: {
@@ -149,13 +150,11 @@ const createCircleTextNode = () => {
 
 const createPlainTextNode = () => {
   return {
-    fill: "#000000",
+    appearance: createSolidAppearance({ fill: "#000000" }),
     font: FONT,
     fontSize: 120,
     id: "text-node",
     parentId: "root",
-    stroke: null,
-    strokeWidth: 0,
     text: "TEXT",
     tracking: 0,
     transform: {

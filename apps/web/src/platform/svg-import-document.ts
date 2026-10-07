@@ -3,6 +3,7 @@ import {
   ARTBOARD_WIDTH,
   createDefaultGroupNode,
   createDefaultPathNode,
+  createSolidAppearance,
   round,
   withPathNodeContours,
 } from "@punchpress/engine";
@@ -264,21 +265,23 @@ const createPathNodeFromItem = (
     withPathNodeContours(
       {
         ...basePathNode,
-        fill: toStorageColor(fillColor),
+        appearance: createSolidAppearance({
+          cap:
+            item.strokeCap === "round" || item.strokeCap === "square"
+              ? item.strokeCap
+              : "butt",
+          fill: toStorageColor(fillColor),
+          join:
+            item.strokeJoin === "bevel" || item.strokeJoin === "round"
+              ? item.strokeJoin
+              : "miter",
+          miterLimit: roundCoordinate(item.miterLimit || 0),
+          stroke: toStorageColor(strokeColor),
+          strokeWidth: roundCoordinate(item.strokeWidth || 0),
+        }),
         fillRule: item.fillRule === "evenodd" ? "evenodd" : "nonzero",
         opacity: getItemOpacity(item),
         parentId,
-        stroke: toStorageColor(strokeColor),
-        strokeLineCap:
-          item.strokeCap === "round" || item.strokeCap === "square"
-            ? item.strokeCap
-            : "butt",
-        strokeLineJoin:
-          item.strokeJoin === "bevel" || item.strokeJoin === "round"
-            ? item.strokeJoin
-            : "miter",
-        strokeMiterLimit: roundCoordinate(item.miterLimit || 0),
-        strokeWidth: roundCoordinate(item.strokeWidth || 0),
         transform: {
           rotation: 0,
           scaleX: 1,

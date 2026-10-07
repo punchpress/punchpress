@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 
 const loadCompoundVector = (editor: Editor) => {
   editor.getState().loadNodes([
@@ -20,7 +20,7 @@ const loadCompoundVector = (editor: Editor) => {
     },
     {
       closed: true,
-      fill: "#ff0000",
+      appearance: createSolidAppearance({ fill: "#ff0000" }),
       fillRule: "evenodd",
       id: "path-1",
       parentId: "vector-1",
@@ -44,8 +44,6 @@ const loadCompoundVector = (editor: Editor) => {
           pointType: "corner",
         },
       ],
-      stroke: null,
-      strokeWidth: 0,
       transform: {
         rotation: 0,
         scaleX: 1,
@@ -58,7 +56,7 @@ const loadCompoundVector = (editor: Editor) => {
     },
     {
       closed: true,
-      fill: "#ff0000",
+      appearance: createSolidAppearance({ fill: "#ff0000" }),
       fillRule: "evenodd",
       id: "path-2",
       parentId: "vector-1",
@@ -82,8 +80,6 @@ const loadCompoundVector = (editor: Editor) => {
           pointType: "corner",
         },
       ],
-      stroke: null,
-      strokeWidth: 0,
       transform: {
         rotation: 0,
         scaleX: 1,
@@ -116,7 +112,7 @@ describe("path editing ownership", () => {
     editor.getState().loadNodes([
       {
         closed: true,
-        fill: "#ff0000",
+        appearance: createSolidAppearance({ fill: "#ff0000" }),
         fillRule: "nonzero",
         id: "path-1",
         parentId: "root",
@@ -140,8 +136,6 @@ describe("path editing ownership", () => {
             pointType: "corner",
           },
         ],
-        stroke: null,
-        strokeWidth: 0,
         transform: {
           rotation: 0,
           scaleX: 1,

@@ -42,11 +42,18 @@ export const getDesktopAppMenuState = (
     editor,
     selectedNodeIds
   );
+  const primaryStroke = fillRule
+    ? editor.getPrimaryStrokeStyle(selectedNodeIds)
+    : null;
   const strokeLineCap = getChoiceState<DesktopVectorStrokeLineCap>(
-    selectionProperties.properties.strokeLineCap
+    primaryStroke
+      ? { isMixed: primaryStroke.isCapMixed, value: primaryStroke.cap }
+      : undefined
   );
   const strokeLineJoin = getChoiceState<DesktopVectorStrokeLineJoin>(
-    selectionProperties.properties.strokeLineJoin
+    primaryStroke
+      ? { isMixed: primaryStroke.isJoinMixed, value: primaryStroke.join }
+      : undefined
   );
 
   return {

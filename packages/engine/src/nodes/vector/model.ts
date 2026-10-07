@@ -1,7 +1,5 @@
+import { createSolidAppearance } from "../../appearance/appearance-layers";
 import {
-  DEFAULT_VECTOR_STROKE_LINE_CAP,
-  DEFAULT_VECTOR_STROKE_LINE_JOIN,
-  DEFAULT_VECTOR_STROKE_MITER_LIMIT,
   ROOT_PARENT_ID,
 } from "@punchpress/punch-schema";
 import { createId } from "../text/model";
@@ -47,16 +45,15 @@ const createRectangleSegments = (
 
 export const createDefaultVectorContour = () => {
   return {
+    appearance: createSolidAppearance({
+      fill: "#ffffff",
+      stroke: "#000000",
+      strokeWidth: DEFAULT_PATH_STROKE_WIDTH,
+    }),
     closed: true,
-    fill: "#ffffff",
     fillRule: "nonzero",
     id: createId(),
     segments: createRectangleSegments(),
-    stroke: "#000000",
-    strokeLineCap: DEFAULT_VECTOR_STROKE_LINE_CAP,
-    strokeLineJoin: DEFAULT_VECTOR_STROKE_LINE_JOIN,
-    strokeMiterLimit: DEFAULT_VECTOR_STROKE_MITER_LIMIT,
-    strokeWidth: DEFAULT_PATH_STROKE_WIDTH,
     visible: true,
   };
 };

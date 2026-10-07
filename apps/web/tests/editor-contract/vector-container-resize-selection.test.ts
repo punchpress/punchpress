@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 
 const createRectanglePath = (
   id: string,
@@ -8,7 +8,11 @@ const createRectanglePath = (
   y: number
 ) => ({
   closed: true,
-  fill: "#ffffff",
+  appearance: createSolidAppearance({
+    fill: "#ffffff",
+    stroke: "#000000",
+    strokeWidth: 2,
+  }),
   fillRule: "nonzero" as const,
   id,
   parentId,
@@ -38,11 +42,6 @@ const createRectanglePath = (
       pointType: "corner" as const,
     },
   ],
-  stroke: "#000000",
-  strokeLineCap: "round" as const,
-  strokeLineJoin: "round" as const,
-  strokeMiterLimit: 4,
-  strokeWidth: 2,
   transform: {
     rotation: 0,
     scaleX: 1,
@@ -89,7 +88,11 @@ describe("vector container resize selection", () => {
       },
       {
         closed: true,
-        fill: "#ffffff",
+        appearance: createSolidAppearance({
+          fill: "#ffffff",
+          stroke: "#000000",
+          strokeWidth: 3,
+        }),
         fillRule: "nonzero",
         id: "vector-path",
         parentId: "vector-container",
@@ -119,11 +122,6 @@ describe("vector container resize selection", () => {
             pointType: "corner",
           },
         ],
-        stroke: "#000000",
-        strokeLineCap: "round",
-        strokeLineJoin: "round",
-        strokeMiterLimit: 4,
-        strokeWidth: 3,
         transform: {
           rotation: 0,
           scaleX: 1,

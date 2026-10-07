@@ -32,9 +32,17 @@ const VALID_DOCUMENT = {
       },
       fontSize: 120,
       tracking: 0,
-      fill: "#000000",
-      stroke: null,
-      strokeWidth: 0,
+      appearance: {
+        fills: [
+          {
+            enabled: true,
+            id: "fill-1",
+            opacity: 1,
+            paint: { color: "#000000", kind: "solid" },
+          },
+        ],
+        strokes: [],
+      },
       visible: true,
       warp: {
         kind: "none",
@@ -44,6 +52,12 @@ const VALID_DOCUMENT = {
 } as const;
 
 describe("parseDesignDocument", () => {
+  test("accepts the valid fixture document", () => {
+    expect(() =>
+      parseDesignDocument(JSON.stringify(VALID_DOCUMENT))
+    ).not.toThrow();
+  });
+
   test("rejects invalid JSON", () => {
     expect(() => parseDesignDocument("{")).toThrow(DocumentParseError);
   });

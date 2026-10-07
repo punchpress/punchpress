@@ -1,7 +1,6 @@
 export const TEXT_NODE_PROPERTY_IDS = [
-  "fill",
-  "stroke",
-  "strokeWidth",
+  "appearance",
+  "opacity",
   "x",
   "y",
   "text",

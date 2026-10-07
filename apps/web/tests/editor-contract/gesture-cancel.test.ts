@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { Editor, getNodeWorldPoint } from "@punchpress/engine";
+import {
+  createSolidAppearance,
+  Editor,
+  getNodeWorldPoint,
+} from "@punchpress/engine";
 
 const makeShape = () => {
   const editor = new Editor();
@@ -72,7 +76,7 @@ describe("canceled gestures", () => {
   test("text guide edit restores the starting warp without an undo step", () => {
     const editor = new Editor();
     const node = {
-      fill: "#000000",
+      appearance: createSolidAppearance({ fill: "#000000" }),
       font: {
         family: "Arial",
         fullName: "Arial",
@@ -82,8 +86,6 @@ describe("canceled gestures", () => {
       fontSize: 120,
       id: "wave-node",
       parentId: "root",
-      stroke: null,
-      strokeWidth: 0,
       text: "FLAG",
       tracking: 0,
       transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 500, y: 600 },

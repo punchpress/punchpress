@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 
 describe("vector layer moves", () => {
   test("moving a path into a different vector deletes the emptied source vector", () => {
@@ -22,7 +22,11 @@ describe("vector layer moves", () => {
       },
       {
         closed: true,
-        fill: "#ffffff",
+        appearance: createSolidAppearance({
+          fill: "#ffffff",
+          stroke: "#000000",
+          strokeWidth: 3,
+        }),
         fillRule: "nonzero",
         id: "source-path",
         parentId: "source-vector",
@@ -46,11 +50,6 @@ describe("vector layer moves", () => {
             pointType: "corner",
           },
         ],
-        stroke: "#000000",
-        strokeLineCap: "round",
-        strokeLineJoin: "round",
-        strokeMiterLimit: 4,
-        strokeWidth: 3,
         transform: {
           rotation: 0,
           scaleX: 1,

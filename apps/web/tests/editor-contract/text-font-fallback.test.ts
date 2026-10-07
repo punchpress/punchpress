@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 import { DEFAULT_LOCAL_FONT, getLocalFontId } from "@punchpress/punch-schema";
 
 const MISSING_FONT = {
@@ -10,13 +10,15 @@ const MISSING_FONT = {
 } as const;
 
 const createTextNode = (font = MISSING_FONT) => ({
-  fill: "#000000",
+  appearance: createSolidAppearance({
+    fill: "#000000",
+    stroke: "#000000",
+    strokeWidth: 3,
+  }),
   font,
   fontSize: 64,
   id: "fallback-text",
   parentId: "root",
-  stroke: "#000000",
-  strokeWidth: 3,
   text: "PRINT",
   tracking: 0,
   transform: {

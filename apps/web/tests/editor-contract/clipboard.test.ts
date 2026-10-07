@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 import {
   PUNCH_CLIPBOARD_MIME_TYPE,
   PUNCH_DOCUMENT_VERSION,
@@ -198,13 +198,11 @@ describe("Editor clipboard", () => {
         documentVersion: PUNCH_DOCUMENT_VERSION,
         nodes: [
           {
-            fill: "#000000",
+            appearance: createSolidAppearance({ fill: "#000000" }),
             height: 10,
             id: "shape-node",
             parentId: "root",
             shape: "polygon",
-            stroke: null,
-            strokeWidth: 0,
             transform: {
               rotation: 0,
               scaleX: 1,

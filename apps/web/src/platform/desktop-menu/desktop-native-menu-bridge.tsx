@@ -80,6 +80,8 @@ const handleSelectionCommand = (
   return true;
 };
 
+const PRIMARY_STROKE = { index: 0, list: "strokes" } as const;
+
 export const DesktopNativeMenuBridge = () => {
   const editor = useEditor();
   const mergeCurves = useMergeCurves();
@@ -98,6 +100,16 @@ export const DesktopNativeMenuBridge = () => {
         handleCompoundOperationCommand(editor, command) ||
         handleSelectionCommand(editor, mergeCurves, command)
       ) {
+        return;
+      }
+
+      if (command.propertyId === "strokeLineCap") {
+        editor.updateAppearanceLayer(PRIMARY_STROKE, { cap: command.value });
+        return;
+      }
+
+      if (command.propertyId === "strokeLineJoin") {
+        editor.updateAppearanceLayer(PRIMARY_STROKE, { join: command.value });
         return;
       }
 

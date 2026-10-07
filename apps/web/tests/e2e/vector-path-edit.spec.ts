@@ -3857,12 +3857,12 @@ test("clicking a properties panel control does not exit vector path editing", as
   await doubleClickNodeCenter(page, "vector-node");
   await pauseForUi(page);
 
-  const strokeWidthSlider = page.getByRole("slider", {
-    name: "Stroke width",
-  });
+  // The fixture path has no stroke layer; the layer opacity scrub is the
+  // always-present appearance control.
+  const opacitySlider = page.getByRole("slider", { name: "Opacity" });
 
-  await expect(strokeWidthSlider).toBeVisible();
-  await strokeWidthSlider.click();
+  await expect(opacitySlider).toBeVisible();
+  await opacitySlider.click();
   await pauseForUi(page);
 
   await expect

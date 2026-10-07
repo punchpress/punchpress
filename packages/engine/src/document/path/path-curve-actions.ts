@@ -1,3 +1,5 @@
+import { areAppearancesEqual } from "../../appearance/appearance-layers";
+import { getNodeAppearance } from "../../appearance/node-appearance";
 import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
 import { finishEditingIfNeeded } from "../../editing/editing-actions";
 import {
@@ -227,16 +229,13 @@ export const hasMixedCurveStyles = (editor, nodeIds = editor.selectedNodeIds) =>
 
   const first = pathNodes[0];
 
-  return pathNodes.slice(1).some((node) =>
-    node.opacity !== first.opacity ||
-    node.fill !== first.fill ||
-    node.fillRule !== first.fillRule ||
-    node.stroke !== first.stroke ||
-    node.strokeWidth !== first.strokeWidth ||
-    node.strokeLineCap !== first.strokeLineCap ||
-    node.strokeLineJoin !== first.strokeLineJoin ||
-    node.strokeMiterLimit !== first.strokeMiterLimit
-  );
+  return pathNodes.slice(1).some((node) => {
+    return (
+      node.opacity !== first.opacity ||
+      node.fillRule !== first.fillRule ||
+      !areAppearancesEqual(getNodeAppearance(node), getNodeAppearance(first))
+    );
+  });
 };
 
 export const mergeCurves = (editor, nodeIds = editor.selectedNodeIds) => {

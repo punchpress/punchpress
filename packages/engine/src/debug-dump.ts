@@ -1,3 +1,4 @@
+import { getNodeAppearance } from "./appearance/node-appearance";
 export const getEditorDebugDump = (editor) => {
   const state = editor.getState();
   const serializedDocument = editor.serializeDocument();
@@ -35,11 +36,9 @@ export const getEditorDebugDump = (editor) => {
       const nodeDetails = (() => {
         if (node.type === "text") {
           return {
-            fill: node.fill,
+            ...getDumpPaint(node),
             font: { ...node.font },
             fontSize: node.fontSize,
-            stroke: node.stroke,
-            strokeWidth: node.strokeWidth,
             text: node.text,
             tracking: node.tracking,
             warp: { ...node.warp },
@@ -50,13 +49,11 @@ export const getEditorDebugDump = (editor) => {
           return {
             cornerRadii: node.cornerRadii || null,
             cornerRadius: node.cornerRadius ?? 0,
-            fill: node.fill,
+            ...getDumpPaint(node),
             font: null,
             fontSize: null,
             height: node.height,
             shape: node.shape,
-            stroke: node.stroke,
-            strokeWidth: node.strokeWidth,
             text: "",
             tracking: null,
             warp: null,
@@ -73,15 +70,10 @@ export const getEditorDebugDump = (editor) => {
               closed: contour.closed,
               segments: contour.segments.length,
             })),
-            fill: node.fill,
+            ...getDumpPaint(node),
             fillRule: node.fillRule,
             font: null,
             fontSize: null,
-            stroke: node.stroke,
-            strokeLineCap: node.strokeLineCap ?? "round",
-            strokeLineJoin: node.strokeLineJoin ?? "round",
-            strokeMiterLimit: node.strokeMiterLimit ?? 4,
-            strokeWidth: node.strokeWidth,
             text: "",
             tracking: null,
             warp: null,
@@ -93,16 +85,11 @@ export const getEditorDebugDump = (editor) => {
             compoundWrapper: node.compoundWrapper ?? false,
             contours: (node.contours || []).map((contour) => {
               return {
+                ...getDumpPaint(contour),
                 closed: contour.closed,
-                fill: contour.fill ?? null,
                 fillRule: contour.fillRule ?? "nonzero",
                 id: contour.id || null,
                 segments: contour.segments.length,
-                stroke: contour.stroke ?? null,
-                strokeLineCap: contour.strokeLineCap ?? "round",
-                strokeLineJoin: contour.strokeLineJoin ?? "round",
-                strokeMiterLimit: contour.strokeMiterLimit ?? 4,
-                strokeWidth: contour.strokeWidth ?? 0,
                 visible: contour.visible !== false,
               };
             }),
@@ -230,5 +217,23 @@ const getSelectionHandleRects = (editor) => {
         ?.querySelector(".canvas-moveable .moveable-control.moveable-sw")
         ?.getBoundingClientRect?.()
     ),
+  };
+};
+
+// The full stack plus a summary of its primary (first enabled) fill and stroke,
+// which most inspection reads only need.
+const getDumpPaint = (node) => {
+  const appearance = getNodeAppearance(node);
+  const fill = appearance.fills.find((layer) => layer.enabled);
+  const stroke = appearance.strokes.find((layer) => layer.enabled);
+
+  return {
+    appearance,
+    fill: fill?.paint.color ?? null,
+    stroke: stroke?.paint.color ?? null,
+    strokeLineCap: stroke?.cap ?? null,
+    strokeLineJoin: stroke?.join ?? null,
+    strokeMiterLimit: stroke?.miterLimit ?? null,
+    strokeWidth: stroke?.width ?? 0,
   };
 };

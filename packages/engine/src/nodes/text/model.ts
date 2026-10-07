@@ -1,3 +1,4 @@
+import { createSolidAppearance } from "../../appearance/appearance-layers";
 import {
   createLocalFontDescriptor,
   ROOT_PARENT_ID,
@@ -125,10 +126,8 @@ export const createDefaultNode = (font) => {
     font: createLocalFontDescriptor(font),
     fontSize: DEFAULT_TEXT_STYLE.fontSize,
     tracking: DEFAULT_TEXT_STYLE.tracking,
-    fill: DEFAULT_TEXT_STYLE.fill,
+    appearance: createSolidAppearance({ fill: DEFAULT_TEXT_STYLE.fill }),
     opacity: 1,
-    stroke: DEFAULT_TEXT_STYLE.stroke,
-    strokeWidth: DEFAULT_TEXT_STYLE.strokeWidth,
     visible: true,
     warp: { kind: "none" },
     transform: {

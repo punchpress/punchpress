@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
-import { AppearanceFields } from "./appearance-fields";
+import { AppearancePanel } from "./appearance/appearance";
 import { ArtboardFields } from "./artboard-fields";
 import { BrushFields } from "./brush-fields";
 import { ImageFields } from "./image-fields";
@@ -41,12 +41,8 @@ export const PropertiesPanel = () => {
     };
   });
   const hasAppearanceFields = Boolean(
-    selectionProperties.properties.fill ||
-      selectionProperties.properties.stroke ||
-      selectionProperties.properties.strokeLineCap ||
-      selectionProperties.properties.strokeLineJoin ||
-      selectionProperties.properties.strokeMiterLimit ||
-      selectionProperties.properties.strokeWidth
+    selectionProperties.properties.appearance ||
+      selectionProperties.properties.opacity
   );
   const hasSelectionColors = selectionProperties.selectionColors.length > 0;
   const hasRasterToolFields = Boolean(rasterToolState.settings);
@@ -141,17 +137,7 @@ export const PropertiesPanel = () => {
           />
         ) : null}
 
-        {hasAppearanceFields ? (
-          <AppearanceFields
-            fill={selectionProperties.properties.fill}
-            stroke={selectionProperties.properties.stroke}
-            strokeLineCap={selectionProperties.properties.strokeLineCap}
-            strokeLineJoin={selectionProperties.properties.strokeLineJoin}
-            strokeMiterLimit={selectionProperties.properties.strokeMiterLimit}
-            strokeWidth={selectionProperties.properties.strokeWidth}
-            withTopBorder={hasFieldsBeforeAppearance}
-          />
-        ) : null}
+        {hasAppearanceFields ? <AppearancePanel /> : null}
 
         {hasSelectionColors ? (
           <SelectionColorsFields

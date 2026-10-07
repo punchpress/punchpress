@@ -1,3 +1,4 @@
+import { createSolidAppearance } from "../../appearance/appearance-layers";
 import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
 import { createId } from "../text/model";
 
@@ -22,15 +23,13 @@ export const createDefaultShapeNode = (shape = "polygon") => {
   return {
     cornerRadii: undefined,
     cornerRadius: 0,
-    fill: "#000000",
+    appearance: createSolidAppearance({ fill: "#000000" }),
     height: size.height,
     id: createId(),
     opacity: 1,
     parentId: ROOT_PARENT_ID,
     points: undefined,
     shape,
-    stroke: null,
-    strokeWidth: 0,
     transform: {
       rotation: 0,
       scaleX: 1,

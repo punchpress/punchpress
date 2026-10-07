@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 import { resolvePreviewPlacementNodeIds } from "../src/components/canvas/canvas-node-preview-placement";
 
 describe("canvas node preview placement", () => {
@@ -23,7 +23,7 @@ describe("canvas node preview placement", () => {
       },
       {
         closed: true,
-        fill: "#ff0000",
+        appearance: createSolidAppearance({ fill: "#ff0000" }),
         fillRule: "evenodd",
         id: "path-1",
         parentId: "vector-1",
@@ -47,8 +47,6 @@ describe("canvas node preview placement", () => {
             pointType: "corner",
           },
         ],
-        stroke: null,
-        strokeWidth: 0,
         transform: {
           rotation: 0,
           scaleX: 1,
@@ -88,7 +86,7 @@ describe("canvas node preview placement", () => {
       },
       {
         closed: true,
-        fill: "#ff0000",
+        appearance: createSolidAppearance({ fill: "#ff0000" }),
         fillRule: "evenodd",
         id: "path-1",
         parentId: "vector-1",
@@ -112,8 +110,6 @@ describe("canvas node preview placement", () => {
             pointType: "corner",
           },
         ],
-        stroke: null,
-        strokeWidth: 0,
         transform: {
           rotation: 0,
           scaleX: 1,
@@ -126,7 +122,7 @@ describe("canvas node preview placement", () => {
       },
       {
         closed: true,
-        fill: "#00ff00",
+        appearance: createSolidAppearance({ fill: "#00ff00" }),
         fillRule: "evenodd",
         id: "path-2",
         parentId: "vector-1",
@@ -150,8 +146,6 @@ describe("canvas node preview placement", () => {
             pointType: "corner",
           },
         ],
-        stroke: null,
-        strokeWidth: 0,
         transform: {
           rotation: 0,
           scaleX: 1,
@@ -191,7 +185,7 @@ describe("canvas node preview placement", () => {
       },
       {
         closed: true,
-        fill: "#ff0000",
+        appearance: createSolidAppearance({ fill: "#ff0000" }),
         fillRule: "evenodd",
         id: "path-1",
         parentId: "vector-1",
@@ -215,8 +209,6 @@ describe("canvas node preview placement", () => {
             pointType: "corner",
           },
         ],
-        stroke: null,
-        strokeWidth: 0,
         transform: {
           rotation: 0,
           scaleX: 1,
@@ -229,7 +221,7 @@ describe("canvas node preview placement", () => {
       },
       {
         closed: true,
-        fill: "#00ff00",
+        appearance: createSolidAppearance({ fill: "#00ff00" }),
         fillRule: "evenodd",
         id: "path-2",
         parentId: "vector-1",
@@ -253,8 +245,6 @@ describe("canvas node preview placement", () => {
             pointType: "corner",
           },
         ],
-        stroke: null,
-        strokeWidth: 0,
         transform: {
           rotation: 0,
           scaleX: 1,
@@ -282,7 +272,7 @@ describe("canvas node preview placement", () => {
     editor.getState().loadNodes([
       {
         closed: true,
-        fill: "#ff0000",
+        appearance: createSolidAppearance({ fill: "#ff0000" }),
         fillRule: "nonzero",
         id: "path-1",
         parentId: "root",
@@ -306,8 +296,6 @@ describe("canvas node preview placement", () => {
             pointType: "corner",
           },
         ],
-        stroke: null,
-        strokeWidth: 0,
         transform: {
           rotation: 0,
           scaleX: 1,
@@ -347,7 +335,7 @@ describe("canvas node preview placement", () => {
       },
       {
         closed: true,
-        fill: "#ff0000",
+        appearance: createSolidAppearance({ fill: "#ff0000" }),
         fillRule: "nonzero",
         id: "path-1",
         parentId: "group-1",
@@ -371,8 +359,6 @@ describe("canvas node preview placement", () => {
             pointType: "corner",
           },
         ],
-        stroke: null,
-        strokeWidth: 0,
         transform: {
           rotation: 0,
           scaleX: 1,

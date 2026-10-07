@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 import {
   DocumentParseError,
   extractEmbeddedDocumentJson,
@@ -107,9 +107,7 @@ describe("parseEmbeddedDesignDocument", () => {
           },
           fontSize: 120,
           tracking: 0,
-          fill: "#000000",
-          stroke: null,
-          strokeWidth: 0,
+          appearance: createSolidAppearance({ fill: "#000000" }),
           visible: true,
           warp: { kind: "none" },
         },

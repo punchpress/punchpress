@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Editor } from "@punchpress/engine";
+import { createSolidAppearance, Editor } from "@punchpress/engine";
 
 const createShapeNode = (
   id: string,
@@ -8,14 +8,16 @@ const createShapeNode = (
   parentId = "root"
 ) => {
   return {
+    appearance: createSolidAppearance({
+      fill,
+      stroke: "#111111",
+      strokeWidth: 6,
+    }),
     cornerRadius: 0,
-    fill,
     height: 120,
     id,
     parentId,
     shape: "polygon",
-    stroke: "#111111",
-    strokeWidth: 6,
     transform: {
       rotation: 0,
       scaleX: 1,
@@ -31,8 +33,8 @@ const createShapeNode = (
 
 const createOpenPathNode = (id: string) => {
   return {
+    appearance: createSolidAppearance({ stroke: "#111111", strokeWidth: 3 }),
     closed: false,
-    fill: null,
     fillRule: "nonzero" as const,
     id,
     parentId: "root",
@@ -50,11 +52,6 @@ const createOpenPathNode = (id: string) => {
         pointType: "corner" as const,
       },
     ],
-    stroke: "#111111",
-    strokeLineCap: "round" as const,
-    strokeLineJoin: "round" as const,
-    strokeMiterLimit: 4,
-    strokeWidth: 3,
     transform: {
       rotation: 0,
       scaleX: 1,
@@ -91,8 +88,12 @@ const createClosedPathNode = (
   fill: string
 ) => {
   return {
+    appearance: createSolidAppearance({
+      fill,
+      stroke: "#111111",
+      strokeWidth: 6,
+    }),
     closed: true,
-    fill,
     fillRule: "nonzero" as const,
     id,
     parentId,
@@ -122,11 +123,6 @@ const createClosedPathNode = (
         pointType: "corner" as const,
       },
     ],
-    stroke: "#111111",
-    strokeLineCap: "round" as const,
-    strokeLineJoin: "round" as const,
-    strokeMiterLimit: 4,
-    strokeWidth: 6,
     transform: {
       rotation: 0,
       scaleX: 1,
@@ -149,6 +145,10 @@ const createRectangleVectorNodes = (
     createVectorNode(vectorId),
     createClosedPathNode(pathId, vectorId, x, fill),
   ];
+};
+
+const getFillColor = (node) => {
+  return node?.appearance?.fills[0]?.paint.color ?? null;
 };
 
 const getSingleResultVector = (editor: Editor) => {
@@ -224,8 +224,11 @@ describe("boolean selection", () => {
 
     expect(resultPaths).toHaveLength(1);
     expect(resultPaths[0]).toMatchObject({
-      fill: "#FF3366",
-      stroke: "#111111",
+      appearance: createSolidAppearance({
+        fill: "#ff3366",
+        stroke: "#111111",
+        strokeWidth: 6,
+      }),
       type: "path",
     });
     expect(editor.selectedNodeIds).toEqual([resultVector.id]);
@@ -248,7 +251,7 @@ describe("boolean selection", () => {
     const resultPaths = getResultPathNodes(editor, resultVector.id);
 
     expect(resultPaths).toHaveLength(1);
-    expect(resultPaths[0]?.fill).toBe("#FF3366");
+    expect(getFillColor(resultPaths[0])).toBe("#ff3366");
     expect(editor.selectedNodeIds).toEqual([resultVector.id]);
   });
 
@@ -269,7 +272,7 @@ describe("boolean selection", () => {
     const resultPaths = getResultPathNodes(editor, resultVector.id);
 
     expect(resultPaths).toHaveLength(1);
-    expect(resultPaths[0]?.fill).toBe("#FF3366");
+    expect(getFillColor(resultPaths[0])).toBe("#ff3366");
   });
 
   test("exclude creates multiple result paths for the xor areas", () => {
@@ -289,9 +292,9 @@ describe("boolean selection", () => {
     const resultPaths = getResultPathNodes(editor, resultVector.id);
 
     expect(resultPaths).toHaveLength(2);
-    expect(resultPaths.every((pathNode) => pathNode?.fill === "#FF3366")).toBe(
-      true
-    );
+    expect(
+      resultPaths.every((pathNode) => getFillColor(pathNode) === "#ff3366")
+    ).toBe(true);
   });
 
   test("unite supports two top-level vectors and keeps a transform frame on the result selection", () => {
@@ -355,7 +358,7 @@ describe("boolean selection", () => {
     const resultPaths = getResultPathNodes(editor, resultVector.id);
 
     expect(resultPaths).toHaveLength(1);
-    expect(resultPaths[0]?.fill).toBe("#FF3366");
+    expect(getFillColor(resultPaths[0])).toBe("#ff3366");
     expect(resultPaths[0]?.transform.x).toBeLessThan(200);
   });
 
@@ -378,8 +381,8 @@ describe("boolean selection", () => {
 
     expect(vectorNodes).toHaveLength(1);
     expect(resultPaths).toHaveLength(1);
+    expect(getFillColor(resultPaths[0])).toBe("#ff3366");
     expect(resultPaths[0]).toMatchObject({
-      fill: "#FF3366",
       parentId: "vector-node",
       type: "path",
     });

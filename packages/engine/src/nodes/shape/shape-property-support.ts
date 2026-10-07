@@ -1,8 +1,7 @@
 export const SHAPE_NODE_PROPERTY_IDS = [
+  "appearance",
   "cornerRadius",
-  "fill",
-  "stroke",
-  "strokeWidth",
+  "opacity",
   "x",
   "y",
   "width",
