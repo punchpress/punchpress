@@ -247,13 +247,7 @@ export const CanvasMultiSelectionForeground = ({
       resizeBounds: getResizePreviewBounds(editor, frame, nodeIds),
     };
   });
-  const overlayRotationDegrees = useEditorValue((editor) => {
-    const selectionFrame = editor.getSelectionTransformFrame(nodeIds, {
-      includePreview: false,
-    });
-
-    return getTransformRotationDegrees(selectionFrame?.transform);
-  });
+  const overlayRotationDegrees = getTransformRotationDegrees(frame?.transform);
 
   const overlayRect = useMemo(() => {
     const hostRect = selectionPreview.resizeBounds

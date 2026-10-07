@@ -32,7 +32,7 @@ export const isPathNode = (node) => {
   return node?.type === "path";
 };
 
-const hasEditableVectorContours = (node) => {
+export const hasEditableVectorContours = (node) => {
   return (
     isVectorNode(node) &&
     Array.isArray(node.contours) &&
@@ -201,32 +201,6 @@ export const getDescendantLeafNodeIds = (nodes, nodeId) => {
   }
 
   return descendantLeafNodeIds;
-};
-
-export const getEffectiveSelectionNodeIds = (nodes, nodeIds) => {
-  const nodesById = createNodeMap(nodes);
-  const effectiveNodeIds: string[] = [];
-
-  for (const nodeId of nodeIds) {
-    const node = nodesById.get(nodeId);
-    if (!node) {
-      continue;
-    }
-
-    if (!isContentContainerNode(node)) {
-      effectiveNodeIds.push(nodeId);
-      continue;
-    }
-
-    if (hasEditableVectorContours(node)) {
-      effectiveNodeIds.push(nodeId);
-      continue;
-    }
-
-    effectiveNodeIds.push(...getDescendantLeafNodeIds(nodes, nodeId));
-  }
-
-  return [...new Set(effectiveNodeIds)];
 };
 
 export const getTreeOrderedNodes = (

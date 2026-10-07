@@ -98,7 +98,6 @@ export {
   getChildNodeIds,
   getChildNodes,
   getDescendantLeafNodeIds,
-  getEffectiveSelectionNodeIds,
   getSelectionTargetNodeId,
   getSubtreeNodeIds,
   getTreeScopeParentId,

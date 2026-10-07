@@ -49,10 +49,14 @@ export const beginMoveSelection = (editor, { nodeId = undefined, nodeIds = undef
     return null;
   }
 
+  // Membership is fixed for the gesture; previews reuse these by identity so
+  // placement resolution is cached across delta-only updates.
   return {
     baseBBoxes,
     baseTransforms,
+    effectiveNodeIdSet: new Set(resolvedNodeIds),
     nodeIds: [...resolvedNodeIds],
+    previewNodeIdSet: new Set([...resolvedNodeIds, ...requestedNodeIds]),
     previewNodeIds: [...requestedNodeIds],
     previewDelta: { x: 0, y: 0 },
   };
@@ -68,14 +72,14 @@ const setMoveSelectionPreview = (editor, session, nextDelta) => {
     y: round(nextDelta.y, 2),
   };
 
-  const previewNodeIds = session.previewNodeIds || session.nodeIds;
+  const previewNodeIds = session.previewNodeIds;
 
   measurePerf(PERF_SPANS.transformMovePreviewSet, () => {
     session.previewDelta = resolvedDelta;
     editor.setSelectionDragPreview({
       delta: resolvedDelta,
-      effectiveNodeIdSet: new Set(session.nodeIds),
-      nodeIdSet: new Set([...session.nodeIds, ...previewNodeIds]),
+      effectiveNodeIdSet: session.effectiveNodeIdSet,
+      nodeIdSet: session.previewNodeIdSet,
       nodeIds: previewNodeIds,
     });
   });

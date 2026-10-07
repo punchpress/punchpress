@@ -1,7 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
 import { useEditor } from "../../editor-react/use-editor";
 import { getArtboardClipPath } from "./artboard-clip-path";
-import { resolvePreviewPlacementNodeIds } from "./canvas-node-preview-placement";
 
 interface NodeShellState {
   clipPath: string;
@@ -337,7 +336,7 @@ const pruneNodeShells = (
 const syncDurableNodeShells = (editor, visibleNodeIds, placementState) => {
   const { appliedElements, appliedKeys, preview, shellStates } = placementState;
   const previewNodeIdSet = new Set(
-    resolvePreviewPlacementNodeIds(editor, visibleNodeIds, preview)
+    editor.getPreviewPlacementNodeIds(visibleNodeIds, preview)
   );
 
   pruneNodeShells(visibleNodeIds, appliedElements, appliedKeys, shellStates);
@@ -386,7 +385,12 @@ const getPreviewBaseShellStates = (editor, placementState, nodeIds) => {
   return entries;
 };
 
-const syncPreviewNodeShells = (editor, placementState, preview) => {
+const syncPreviewNodeShells = (
+  editor,
+  placementState,
+  preview,
+  placedNodeIds
+) => {
   if (
     !(
       preview?.nodeIds?.length &&
@@ -397,9 +401,8 @@ const syncPreviewNodeShells = (editor, placementState, preview) => {
     return false;
   }
 
-  const previewPlacementNodeIds = resolvePreviewPlacementNodeIds(
-    editor,
-    [...placementState.shellStates.keys()],
+  const previewPlacementNodeIds = editor.getPreviewPlacementNodeIds(
+    placedNodeIds,
     preview
   );
 
@@ -488,7 +491,8 @@ export const useCanvasNodePlacement = (nodeIds) => {
       const didSyncPreview = syncPreviewNodeShells(
         editor,
         placementStateRef.current,
-        preview
+        preview,
+        nodeIdsRef.current
       );
 
       if (!didSyncPreview) {

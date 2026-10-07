@@ -210,10 +210,8 @@ import {
   getNodeFrameFromGeometry,
 } from "./nodes/node-capabilities";
 import {
-  getEffectiveSelectionNodeIds,
   getSelectionTargetNodeId,
   isArtboardNode,
-  isDescendantOf,
   isGroupNode,
 } from "./nodes/node-tree";
 import { getVectorPathEditingChildId } from "./nodes/vector/vector-path-composition";
@@ -260,6 +258,7 @@ import {
   resizeRaster as resizeEditorRaster,
   updateRasterResize as updateEditorRasterResize,
 } from "./raster/resize";
+import { getPreviewPlacementNodeIds as getEditorPreviewPlacementNodeIds } from "./render-tree/preview-placement";
 import { getRenderTree as getEditorRenderTree } from "./render-tree/render-tree";
 import {
   clearSelection as clearEditorSelection,
@@ -825,7 +824,7 @@ export class Editor {
   }
 
   getEffectiveSelectionNodeIds(nodeIds = this.selectedNodeIds) {
-    return getEffectiveSelectionNodeIds(this.nodes, nodeIds);
+    return this.nodeTree.getEffectiveSelectionNodeIds(this.nodes, nodeIds);
   }
 
   getSelectionTargetNodeId(nodeId) {
@@ -876,7 +875,7 @@ export class Editor {
   }
 
   isDescendantOf(nodeId, ancestorId) {
-    return isDescendantOf(this.nodes, nodeId, ancestorId);
+    return this.nodeTree.isDescendantOf(this.nodes, nodeId, ancestorId);
   }
 
   isGroupNode(nodeId) {
@@ -1040,6 +1039,13 @@ export class Editor {
 
   getRenderTree() {
     return getEditorRenderTree(this);
+  }
+
+  getPreviewPlacementNodeIds(
+    placedNodeIds = this.getRenderTree().placedNodeIds,
+    preview = this.selectionDragPreview
+  ) {
+    return getEditorPreviewPlacementNodeIds(this, placedNodeIds, preview);
   }
 
   getPrimaryStrokeStyle(nodeIds = this.selectedNodeIds) {

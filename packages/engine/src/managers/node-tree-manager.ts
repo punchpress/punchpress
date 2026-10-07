@@ -1,7 +1,9 @@
 import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
 import {
   getNodeParentId,
+  hasEditableVectorContours,
   isContainerNode,
+  isContentContainerNode,
 } from "../nodes/node-tree";
 
 const getGeneratedLayerLabelKey = (node) => {
@@ -141,6 +143,57 @@ export class NodeTreeManager {
     visit(nodeId);
 
     return descendantLeafNodeIds;
+  }
+
+  isDescendantOf(nodes, nodeId, ancestorId) {
+    if (!(nodeId && ancestorId) || nodeId === ancestorId) {
+      return nodeId === ancestorId;
+    }
+
+    this.sync(nodes);
+
+    let currentNode = this.nodesById.get(nodeId);
+
+    while (currentNode && getNodeParentId(currentNode) !== ROOT_PARENT_ID) {
+      const parentNode = this.nodesById.get(getNodeParentId(currentNode));
+
+      if (!parentNode) {
+        return false;
+      }
+
+      if (parentNode.id === ancestorId) {
+        return true;
+      }
+
+      currentNode = parentNode;
+    }
+
+    return false;
+  }
+
+  // Content containers expand to their descendant leaves; vectors with
+  // editable contours of their own stay themselves.
+  getEffectiveSelectionNodeIds(nodes, nodeIds) {
+    this.sync(nodes);
+
+    const effectiveNodeIds: string[] = [];
+
+    for (const nodeId of nodeIds) {
+      const node = this.nodesById.get(nodeId);
+
+      if (!node) {
+        continue;
+      }
+
+      if (isContentContainerNode(node) && !hasEditableVectorContours(node)) {
+        effectiveNodeIds.push(...this.getDescendantLeafNodeIds(nodes, nodeId));
+        continue;
+      }
+
+      effectiveNodeIds.push(nodeId);
+    }
+
+    return [...new Set(effectiveNodeIds)];
   }
 
   getLayerMeta(nodes, nodeId) {
