@@ -217,9 +217,16 @@ enforces this as a document-model invariant:
 - reorder
 - paste
 
-Each operation canonicalizes subtree order instead of rejecting the input.
-Renderers and export rely on the invariant and never work around
-interleaving.
+Each operation canonicalizes subtree order instead of rejecting the input:
+canonical order is preorder with siblings in their existing relative order.
+The engine store applies it to every write that carries `nodes`, and
+`punch-schema` applies it on parse and clipboard paste. Parent cycles are
+invalid at document and clipboard ingress. Renderers and export rely on the
+invariant and never work around interleaving.
+
+Older documents whose array interleaved a group's children with other nodes
+change visible stacking on load: each child moves up to its group's subtree,
+which is the stacking the layers panel already showed.
 
 ### Engine-owned render tree
 

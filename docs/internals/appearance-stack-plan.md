@@ -54,7 +54,8 @@ Every stage goes through the same sequence:
      reorder, and paste.
    - Editor-contract tests for each ingress, including malformed loaded
      documents and clipboard payloads.
-   - No rendering change. It ships first because stage 3 relies on it.
+   - Rendering changes only for documents that interleaved a group's children
+     with other nodes. It ships first because stage 3 relies on it.
 3. **Engine-owned render tree and isolated groups.**
    - Starts with its own high-effort architecture review.
    - Ordered render tree with clip, presentation, and effect layers.
