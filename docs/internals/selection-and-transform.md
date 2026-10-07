@@ -23,6 +23,22 @@ React overlays.
 - Commit applies one document change at the gesture boundary.
 - React supplies pointer input and renders preview surfaces.
 
+## Preview Placement
+
+`editor.getPreviewPlacementNodeIds()` maps a transform preview onto the placed
+shells and surfaces of the render tree that move. A placed preview root moves as
+one shell. A group or artboard root moves the placed nodes beneath it that the
+gesture commits: committed leaves, plus vector and dense-group surfaces whose
+leaves are all committed. A vector stands in for its child paths only when every
+rendered child path is previewing. Move sessions keep their preview id list and
+committed set for the whole gesture, so delta-only updates reuse one resolved
+list.
+
+Drag cost scales with the shells that move, not with how many groups the
+selection names. Tree queries on `Editor` (`isDescendantOf`,
+`getEffectiveSelectionNodeIds`) read the cached node index in
+`NodeTreeManager`; per-frame paths must not rebuild document-wide maps.
+
 ## Resize Model
 
 Resize sessions keep two scopes separate:
