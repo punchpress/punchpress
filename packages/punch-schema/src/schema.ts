@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { appearanceSchema } from "./appearance-schema";
 import { PUNCH_DOCUMENT_VERSION, ROOT_PARENT_ID } from "./constants";
+import { findParentCycleIds } from "./tree-order";
 import {
   VECTOR_STROKE_LINE_CAP_VALUES,
   VECTOR_STROKE_LINE_JOIN_VALUES,
@@ -12,11 +13,14 @@ const finiteNumber = z.number().refine(Number.isFinite, {
 const positiveFiniteNumber = finiteNumber.refine((value) => value > 0, {
   message: "Expected a positive number.",
 });
-const opacityNumber = z.number().refine((value) => {
-  return Number.isFinite(value) && value >= 0 && value <= 1;
-}, {
-  message: "Expected a number between 0 and 1.",
-});
+const opacityNumber = z.number().refine(
+  (value) => {
+    return Number.isFinite(value) && value >= 0 && value <= 1;
+  },
+  {
+    message: "Expected a number between 0 and 1.",
+  }
+);
 
 const parentIdSchema = z.string().min(1);
 export const imageMimeTypeSchema = z.enum(["image/jpeg", "image/png"]);
@@ -367,7 +371,30 @@ export const designDocumentSchema = z
         }
       }
     }
+
+    addParentCycleIssues(document.nodes, context);
   });
+
+export const addParentCycleIssues = (
+  nodes: readonly { id: string; parentId: string }[],
+  context: z.RefinementCtx
+) => {
+  const cycleIds = new Set(findParentCycleIds(nodes));
+
+  if (cycleIds.size === 0) {
+    return;
+  }
+
+  for (const [index, node] of nodes.entries()) {
+    if (cycleIds.delete(node.id)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Node is part of a parent cycle: ${node.id}`,
+        path: ["nodes", index, "parentId"],
+      });
+    }
+  }
+};
 
 export type DesignDocument = z.infer<typeof designDocumentSchema>;
 export type ArtboardNodeDocument = z.infer<typeof artboardNodeSchema>;

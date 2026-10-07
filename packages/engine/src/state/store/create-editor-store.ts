@@ -1,13 +1,14 @@
 import {
+  canonicalizeTreeOrder,
   createLocalFontDescriptor,
   DEFAULT_LOCAL_FONT,
 } from "@punchpress/punch-schema";
 import createStore from "zustand/vanilla";
+import { getRasterBrushPreset } from "../../raster/brush-preset";
 import {
   DEFAULT_BRUSH_SETTINGS,
   normalizeBrushSettings,
 } from "../../tools/brush-settings";
-import { getRasterBrushPreset } from "../../raster/brush-preset";
 import { createDocumentStoreActions } from "./create-document-store-actions";
 import { createEditingStoreActions } from "./create-editing-store-actions";
 import { createFontStoreActions } from "./create-font-store-actions";
@@ -27,7 +28,10 @@ export const createEditorStore = ({
   return createStore((set) => {
     const setEditorState = (update) => {
       set((state) => {
-        const patch = typeof update === "function" ? update(state) : update;
+        const patch = withCanonicalTreeOrder(
+          state,
+          typeof update === "function" ? update(state) : update
+        );
 
         if (!(patch && typeof patch === "object")) {
           return patch;
@@ -45,8 +49,7 @@ export const createEditorStore = ({
         }
 
         const nodes = patch.nodes || state.nodes;
-        const selectedNodeIds =
-          patch.selectedNodeIds || state.selectedNodeIds;
+        const selectedNodeIds = patch.selectedNodeIds || state.selectedNodeIds;
         const requestedActiveLayerId =
           "activeLayerId" in patch
             ? patch.activeLayerId
@@ -55,9 +58,7 @@ export const createEditorStore = ({
               : state.activeLayerId;
         const availableNodeIds = new Set(nodes.map((node) => node.id));
         const treeFallbackActiveLayerId =
-          "nodes" in patch
-            ? getActiveLayerIdAfterDeletion(state, nodes)
-            : null;
+          "nodes" in patch ? getActiveLayerIdAfterDeletion(state, nodes) : null;
         const activeLayerId =
           (requestedActiveLayerId &&
           availableNodeIds.has(requestedActiveLayerId)
@@ -112,8 +113,7 @@ export const createEditorStore = ({
       },
       setBrushSettings: (patch, toolId) => {
         setEditorState((state) => ({
-          ...(toolId === "eraser" ||
-          (!toolId && state.activeTool === "eraser")
+          ...(toolId === "eraser" || (!toolId && state.activeTool === "eraser")
             ? {
                 eraserSettings: normalizeBrushSettings(
                   patch || {},
@@ -137,8 +137,7 @@ export const createEditorStore = ({
 
         setEditorState((state) => {
           const isEraser =
-            toolId === "eraser" ||
-            (!toolId && state.activeTool === "eraser");
+            toolId === "eraser" || (!toolId && state.activeTool === "eraser");
           const currentSettings = isEraser
             ? state.eraserSettings
             : state.brushSettings;
@@ -165,4 +164,21 @@ export const createEditorStore = ({
       ...createSelectionStoreActions(setEditorState),
     };
   });
+};
+
+// Every document write keeps each group's descendants contiguous in paint
+// order; renderers and export rely on it. Canonical arrays pass through
+// unchanged, so caches keyed on the nodes array survive.
+const withCanonicalTreeOrder = (state, patch) => {
+  if (
+    !(patch && typeof patch === "object" && Array.isArray(patch.nodes)) ||
+    patch === state ||
+    patch.nodes === state.nodes
+  ) {
+    return patch;
+  }
+
+  const nodes = canonicalizeTreeOrder(patch.nodes);
+
+  return nodes === patch.nodes ? patch : { ...patch, nodes };
 };

@@ -57,6 +57,7 @@ export {
   getLocalFontSearchText,
 } from "./local-fonts";
 export { migrateDocument } from "./migrate";
+export { canonicalizeTreeOrder, findParentCycleIds } from "./tree-order";
 export { upgradeNodeAppearance1_8 } from "./migrate-appearance";
 export {
   appearanceSchema,

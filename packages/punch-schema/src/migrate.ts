@@ -3,6 +3,7 @@ import { UnsupportedDocumentVersionError } from "./errors";
 import { upgradeNodeAppearance1_8 } from "./migrate-appearance";
 import { normalizeNodesForSchema } from "./normalize";
 import { createDocumentAssetsFromNodes } from "./raster-assets";
+import { canonicalizeTreeOrder } from "./tree-order";
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -20,7 +21,9 @@ export const migrateDocument = (value: unknown) => {
       return document;
     }
 
-    const nodes = normalizeNodesForSchema(document.nodes);
+    const nodes = canonicalizeTreeOrder(
+      normalizeNodesForSchema(document.nodes)
+    );
 
     return {
       ...document,

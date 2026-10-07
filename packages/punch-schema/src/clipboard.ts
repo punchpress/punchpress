@@ -2,7 +2,8 @@ import { z } from "zod";
 import { PUNCH_DOCUMENT_VERSION } from "./constants";
 import { upgradeNodesAppearance1_8 } from "./migrate";
 import { normalizeNodesForSchema } from "./normalize";
-import { nodeSchema } from "./schema";
+import { addParentCycleIssues, nodeSchema } from "./schema";
+import { canonicalizeTreeOrder } from "./tree-order";
 
 export const PUNCH_CLIPBOARD_MIME_TYPE =
   "application/vnd.punchpress-clipboard+json";
@@ -16,7 +17,10 @@ export const clipboardContentSchema = z
     type: z.literal(PUNCH_CLIPBOARD_MIME_TYPE),
     version: z.literal(1),
   })
-  .strict();
+  .strict()
+  .superRefine((content, context) => {
+    addParentCycleIssues(content.nodes, context);
+  });
 
 // Payloads copied from a 1.8 build upgrade the same way 1.8 documents do.
 export const parseClipboardContent = (value) => {
@@ -32,7 +36,9 @@ export const parseClipboardContent = (value) => {
       content?.documentVersion === "1.8"
         ? PUNCH_DOCUMENT_VERSION
         : content?.documentVersion,
-    nodes: normalizeNodesForSchema(nodes),
+    nodes: canonicalizeTreeOrder(
+      normalizeNodesForSchema(nodes) as unknown as { id: string }[]
+    ),
   });
 };
 
