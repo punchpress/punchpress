@@ -6,6 +6,7 @@ import {
 } from "../nodes/node-tree";
 import { clamp } from "../primitives/math";
 import { getSelectionBounds } from "../selection/selection-bounds";
+import { applyViewport } from "./viewport-move";
 
 export const zoomIn = (editor) => {
   const viewer = editor.viewerRef;
@@ -51,6 +52,9 @@ const applyDiscreteZoom = (editor, zoom) => {
 };
 
 export const cancelPendingViewportFocus = (editor) => {
+  // Invalidate the request too, so an already-dispatched frame cannot apply it.
+  editor.viewportFocusRequest += 1;
+
   if (
     typeof window === "undefined" ||
     editor.pendingViewportFocusFrame === null
@@ -99,8 +103,8 @@ export const scheduleViewportFocus = (editor, nodeIds, options = {}) => {
       visibleNodeIds.every((nodeId) => isNodeReadyForFocus(editor, nodeId));
 
     if (bounds && hasViewport && (isReady || attempt >= 120)) {
+      editor.pendingViewportFocusFrame = null;
       focusCanvasBoundsInViewport(editor, bounds, options);
-      holdViewportFocusTarget(editor, bounds, options, requestId);
       return;
     }
 
@@ -158,67 +162,6 @@ const hasRenderedElement = (editor, node) => {
   return false;
 };
 
-// React commits queued before a programmatic focus can re-assert a stale
-// viewer zoom/scroll through the controlled viewer props right after the
-// focus applies. Hold the focus target for a few frames and re-apply until
-// the viewport settles; yield immediately to user interaction.
-const FOCUS_HOLD_FRAME_BUDGET = 10;
-const FOCUS_HOLD_STABLE_FRAMES = 2;
-
-const holdViewportFocusTarget = (editor, bounds, options, requestId) => {
-  let target = { ...editor.viewportState };
-  let stableFrames = 0;
-
-  const attemptHold = (frame = 0) => {
-    if (editor.viewportFocusRequest !== requestId) {
-      return;
-    }
-
-    // Note: viewportInteracting is NOT a bail signal here — the stale viewer
-    // echo itself arrives through the scroll handler and marks the viewport
-    // as interacting. The hold budget is a handful of frames, so a real user
-    // gesture can win at most ~160ms later.
-    const viewport = editor.viewportState;
-    const drifted =
-      Math.abs(viewport.zoom - target.zoom) > 0.0001 ||
-      Math.abs(viewport.x - target.x) > 0.5 ||
-      Math.abs(viewport.y - target.y) > 0.5;
-
-    if (drifted) {
-      focusCanvasBoundsInViewport(editor, bounds, options);
-      target = { ...editor.viewportState };
-      stableFrames = 0;
-
-      // setViewport suppresses store writes while the echo has the viewport
-      // marked as interacting; sync the store directly so the controlled
-      // viewer props converge on the focus target instead of replaying it.
-      const storeViewport = editor.getState().viewport;
-      if (
-        storeViewport.x !== target.x ||
-        storeViewport.y !== target.y ||
-        storeViewport.zoom !== target.zoom
-      ) {
-        editor.getState().setViewport(target);
-      }
-    } else {
-      stableFrames += 1;
-    }
-
-    if (stableFrames >= FOCUS_HOLD_STABLE_FRAMES || frame >= FOCUS_HOLD_FRAME_BUDGET) {
-      editor.pendingViewportFocusFrame = null;
-      return;
-    }
-
-    editor.pendingViewportFocusFrame = window.requestAnimationFrame(() => {
-      attemptHold(frame + 1);
-    });
-  };
-
-  editor.pendingViewportFocusFrame = window.requestAnimationFrame(() => {
-    attemptHold();
-  });
-};
-
 export const focusCanvasBoundsInViewport = (editor, bounds, options: { paddingX?: number; paddingY?: number; padding?: number; maxZoom?: number } = {}) => {
   const viewer = editor.viewerRef;
   const host = editor.hostRef;
@@ -249,7 +192,5 @@ export const focusCanvasBoundsInViewport = (editor, bounds, options: { paddingX?
   const x = bounds.minX - (canvasWidth - contentWidth) / 2;
   const y = bounds.minY - (canvasHeight - contentHeight) / 2;
 
-  viewer.setTo?.({ x, y, zoom });
-  editor.setViewport({ x, y, zoom });
-  editor.onViewportChange?.();
+  applyViewport(editor, { x, y, zoom });
 };

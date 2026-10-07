@@ -129,34 +129,4 @@ describe("new-tab viewport focus", () => {
     // zero-size rect (which leaves the artboard out of view). True fit ~0.123.
     expect(editor.zoom).toBeLessThan(0.2);
   });
-
-  test("focus re-asserts when a stale viewer echo overwrites the target", () => {
-    const raf = installFakeRaf();
-    const { editor, nodeId } = createEditorWithArtboard();
-
-    editor.scheduleViewportFocus([nodeId], {
-      paddingX: ARTBOARD_WIDTH * 0.1,
-      paddingY: ARTBOARD_HEIGHT * 0.1,
-    });
-
-    mountFakeViewport(editor);
-
-    let focusZoom: number | null = null;
-    for (let i = 0; i < 130; i++) {
-      raf.tick();
-
-      if (focusZoom === null && editor.zoom < 1) {
-        focusZoom = editor.zoom;
-        // Simulate the controlled-prop race seen in the app: a React commit
-        // queued before the focus re-asserts the stale zoom through the
-        // viewer's scroll event right after the focus applies.
-        editor.setViewport({ x: 1860, y: 2211.5, zoom: 1 });
-      }
-    }
-
-    expect(focusZoom).not.toBeNull();
-    // The focus request owns the viewport until it settles; the stale echo
-    // must not win.
-    expect(editor.zoom).toBe(focusZoom as number);
-  });
 });

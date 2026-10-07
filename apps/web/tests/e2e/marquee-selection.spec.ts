@@ -1194,7 +1194,11 @@ test("node tool marquee uses current zoom for curve candidate geometry", async (
 }) => {
   await gotoEditor(page);
   await loadDocument(page, NESTED_CURVE_DOCUMENT);
-  await setViewport(page, { x: 0, y: 0, zoom: 0.25 });
+  // Keep the zoomed-out curves on open canvas, clear of the layers panel.
+  await setViewport(page, { x: -1800, y: -1000, zoom: 0.25 });
+  await expect
+    .poll(() => page.evaluate(() => window.__PUNCHPRESS_EDITOR__?.zoom))
+    .toBe(0.25);
   await page.getByRole("button", { name: "Node (A)" }).click();
 
   const firstPath = page.locator('[data-node-id="nested-path-a"]');

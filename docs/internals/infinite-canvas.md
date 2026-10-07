@@ -26,4 +26,8 @@ The web canvas integrates `react-infinite-viewer` with engine viewport state.
   state transient during pointer movement and publishes once at pointer release.
 - First-add focus may schedule viewport movement; ordinary later placement does
   not.
+- Programmatic camera moves go through `Editor.moveViewportTo`, which cancels
+  pending focus, moves the viewer, writes the store, and ends the echo-only
+  interaction the viewer's scroll event starts. Viewport focus uses the same
+  path, so a stale store zoom cannot replay into the controlled viewer.
 - Stage bounds are an interaction surface, not document size.

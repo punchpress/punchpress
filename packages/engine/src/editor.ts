@@ -336,6 +336,7 @@ import {
   zoomOut as zoomEditorOut,
   zoomTo as zoomEditorTo,
 } from "./viewport/viewport-focus";
+import { moveViewportTo as moveEditorViewportTo } from "./viewport/viewport-move";
 import {
   getViewportCenter as getEditorViewportCenter,
   setViewport as setEditorViewport,
@@ -2426,6 +2427,10 @@ export class Editor {
 
   zoomTo(zoom) {
     return zoomEditorTo(this, zoom);
+  }
+
+  moveViewportTo(viewport) {
+    return moveEditorViewportTo(this, viewport);
   }
 
   getViewportCenter() {
