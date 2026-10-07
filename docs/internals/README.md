@@ -34,6 +34,7 @@ lives and what boundaries code must preserve.
 | Raster image editing overlay, assets, buffers, and history | [Raster image editor](raster-image-editor.md) |
 | Raster stable Canvas, direct Stroke mutation, and patch history | [Raster brush runtime](raster-brush-runtime.md) |
 | Dense SVG and vector render performance plan | [Vector render performance plan](vector-render-performance-plan.md) |
+| Appearance stack rollout, budgets, and sweep | [Appearance stack plan](appearance-stack-plan.md) |
 | Text metrics, editing, warps, and font use | [Text system](text-system.md) |
 | Shape creation and shape-to-path behavior | [Shape system](shape-system.md) |
 | Panels, dialogs, context menus, and commands | [Panels and commands](panels-and-commands.md) |
