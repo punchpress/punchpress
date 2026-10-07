@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { clickEmptyCanvas } from "./helpers/canvas";
 import {
   getStateSnapshot,
   gotoEditor,
@@ -63,6 +64,44 @@ test("normalizes a typed fill color and applies it to the selected node", async 
 
   await expect(fillInput).toHaveValue("11AA22");
   await expect.poll(() => getSelectedNodeFill(page, nodeId)).toBe("#11aa22");
+});
+
+test("commits a typed hex color when the user clicks the canvas", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocumentFixture(page, "color-picker-field.punch");
+  const nodeId = "color-node";
+  await page.getByRole("button", { name: "Color" }).first().click();
+  const fillInput = getFillColorInput(page);
+
+  await fillInput.click();
+  await fillInput.pressSequentially("123456");
+  await expect.poll(() => getSelectedNodeFill(page, nodeId)).toBe("#ffffff");
+
+  await clickEmptyCanvas(page);
+
+  await expect.poll(() => getSelectedNodeFill(page, nodeId)).toBe("#123456");
+
+  await page.evaluate(() => window.__PUNCHPRESS_EDITOR__?.undo());
+  await expect.poll(() => getSelectedNodeFill(page, nodeId)).toBe("#ffffff");
+});
+
+test("discards a typed hex color on Escape before clicking the canvas", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocumentFixture(page, "color-picker-field.punch");
+  const nodeId = "color-node";
+  await page.getByRole("button", { name: "Color" }).first().click();
+  const fillInput = getFillColorInput(page);
+
+  await fillInput.click();
+  await fillInput.pressSequentially("123456");
+  await fillInput.press("Escape");
+  await clickEmptyCanvas(page);
+
+  await expect.poll(() => getSelectedNodeFill(page, nodeId)).toBe("#ffffff");
 });
 
 test("keeps keyboard-entered hex colors intact until they are committed", async ({

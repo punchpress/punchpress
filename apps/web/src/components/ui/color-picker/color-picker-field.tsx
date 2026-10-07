@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { expireClickGuard } from "../select";
 import { ColorPicker } from "./color-picker";
 import { formatStorageValue, parseColorValue } from "./color-picker-value";
+import { useBlurOnOutsidePress } from "./use-blur-on-outside-press";
 
 interface ColorPickerFieldProps {
   className?: string;
@@ -378,6 +379,19 @@ const ColorValueTrigger = ({
   setOpacityDraftValue: (value: string) => void;
   value?: string | null;
 }) => {
+  const hexInputRef = useRef<HTMLInputElement>(null);
+  const opacityInputRef = useRef<HTMLInputElement>(null);
+  useBlurOnOutsidePress(hexInputRef);
+  useBlurOnOutsidePress(opacityInputRef);
+  // Escape blurs to leave the field; the blur must not commit the discarded
+  // draft, which is still the input's DOM value at that moment.
+  const discardDraftOnBlurRef = useRef(false);
+  const shouldDiscardDraftOnBlur = () => {
+    const shouldDiscard = discardDraftOnBlurRef.current;
+    discardDraftOnBlurRef.current = false;
+    return shouldDiscard;
+  };
+
   const commitHexDraft = (nextHex: string, nextOpacity = opacityDraftValue) => {
     const normalizedValue = formatColorWithOpacity(nextHex, nextOpacity);
 
@@ -432,7 +446,11 @@ const ColorValueTrigger = ({
       <input
         aria-label="Hex color"
         className="ms-2 min-w-0 flex-1 cursor-text bg-transparent p-0 outline-none"
-        onBlur={(event) => commitHexDraft(event.currentTarget.value)}
+        onBlur={(event) => {
+          if (!shouldDiscardDraftOnBlur()) {
+            commitHexDraft(event.currentTarget.value);
+          }
+        }}
         onChange={(event) => {
           const nextHex = trimHashPrefix(event.currentTarget.value);
           setHexDraftValue(nextHex);
@@ -443,12 +461,14 @@ const ColorValueTrigger = ({
           if (event.key === "Enter") {
             event.currentTarget.blur();
           } else if (event.key === "Escape") {
+            discardDraftOnBlurRef.current = true;
             setHexDraftValue(getHexDraftValue(value));
             event.currentTarget.blur();
           }
         }}
         onPointerDown={handleTextInputPointerDown}
         placeholder={placeholder}
+        ref={hexInputRef}
         spellCheck={false}
         value={hexDraftValue}
       />
@@ -461,7 +481,11 @@ const ColorValueTrigger = ({
           aria-label="Color opacity"
           className="w-[3ch] cursor-text bg-transparent p-0 text-right tabular-nums outline-none"
           inputMode="numeric"
-          onBlur={(event) => commitOpacityDraft(event.currentTarget.value)}
+          onBlur={(event) => {
+            if (!shouldDiscardDraftOnBlur()) {
+              commitOpacityDraft(event.currentTarget.value);
+            }
+          }}
           onChange={(event) => {
             const nextOpacity = event.currentTarget.value.replace("%", "");
             setOpacityDraftValue(nextOpacity);
@@ -480,11 +504,13 @@ const ColorValueTrigger = ({
             if (event.key === "Enter") {
               event.currentTarget.blur();
             } else if (event.key === "Escape") {
+              discardDraftOnBlurRef.current = true;
               setOpacityDraftValue(getOpacityDraftValue(value));
               event.currentTarget.blur();
             }
           }}
           onPointerDown={handleTextInputPointerDown}
+          ref={opacityInputRef}
           value={opacityDraftValue}
         />
         <span className="select-none text-muted-foreground">%</span>

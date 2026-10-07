@@ -22,6 +22,9 @@ The properties panel edits the active selection.
 - Valid drafts in these fields apply live. Blur and Enter normalize them or
   restore the last accepted value; Escape discards only the current draft,
   restores that value, and blurs.
+- Color hex drafts commit on Enter, blur, or a press anywhere outside the
+  field, including the canvas, as one Undo step. Escape discards the hex draft
+  without committing it. Valid color opacity drafts apply live.
 
 ## Selection Scopes
 
