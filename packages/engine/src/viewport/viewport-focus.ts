@@ -1,4 +1,9 @@
 import { MAX_ZOOM, MIN_ZOOM } from "../constants";
+import {
+  isArtboardNode,
+  isContentContainerNode,
+  isVectorNode,
+} from "../nodes/node-tree";
 import { clamp } from "../primitives/math";
 import { getSelectionBounds } from "../selection/selection-bounds";
 
@@ -91,18 +96,7 @@ export const scheduleViewportFocus = (editor, nodeIds, options = {}) => {
     );
     const isReady =
       hasMeasurableBounds &&
-      visibleNodeIds.every((nodeId) => {
-        const node = editor.getNode(nodeId);
-        if (node?.type === "artboard") {
-          return Boolean(editor.getNodeGeometry(nodeId)?.ready);
-        }
-
-        return Boolean(
-          (editor.getNodeTransformElement(nodeId) ||
-            editor.getNodeElement(nodeId)) &&
-            editor.getNodeGeometry(nodeId)?.ready
-        );
-      });
+      visibleNodeIds.every((nodeId) => isNodeReadyForFocus(editor, nodeId));
 
     if (bounds && hasViewport && (isReady || attempt >= 120)) {
       focusCanvasBoundsInViewport(editor, bounds, options);
@@ -124,6 +118,44 @@ export const scheduleViewportFocus = (editor, nodeIds, options = {}) => {
   editor.pendingViewportFocusFrame = window.requestAnimationFrame(() => {
     attemptFocus();
   });
+};
+
+const isNodeReadyForFocus = (editor, nodeId) => {
+  const node = editor.getNode(nodeId);
+
+  if (isArtboardNode(node)) {
+    return Boolean(editor.getNodeGeometry(nodeId)?.ready);
+  }
+
+  // Groups and vectors have no geometry of their own; their leaves gate focus.
+  if (isContentContainerNode(node)) {
+    return true;
+  }
+
+  return Boolean(
+    editor.getNodeGeometry(nodeId)?.ready && hasRenderedElement(editor, node)
+  );
+};
+
+// Vector child paths render through their container's element, so readiness
+// accepts the nearest rendered ancestor.
+const hasRenderedElement = (editor, node) => {
+  let currentNode = node;
+
+  while (currentNode) {
+    if (
+      editor.getNodeTransformElement(currentNode.id) ||
+      editor.getNodeElement(currentNode.id)
+    ) {
+      return true;
+    }
+
+    currentNode = isVectorNode(editor.getNode(currentNode.parentId))
+      ? editor.getNode(currentNode.parentId)
+      : null;
+  }
+
+  return false;
 };
 
 // React commits queued before a programmatic focus can re-assert a stale
