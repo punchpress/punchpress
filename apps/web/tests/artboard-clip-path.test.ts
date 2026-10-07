@@ -62,8 +62,9 @@ describe("artboard clip path", () => {
     const bounds = editor.getNodeRenderFrame("shape-1")?.bounds;
 
     expect(bounds).not.toBeNull();
+    // Insets stay exact (and may go negative) so the clip is the artboard rect.
     expect(getArtboardClipPath(editor, "shape-1", bounds)).toBe(
-      "inset(0px 40px 0px 40px)"
+      "inset(-10px 40px -10px 40px)"
     );
   });
 });

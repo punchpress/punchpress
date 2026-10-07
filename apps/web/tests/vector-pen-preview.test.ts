@@ -6,7 +6,7 @@ import {
   getPenPreviewHandleOut,
   shouldShowPenPreviewGhostAnchor,
   shouldShowPenPreviewHandles,
-} from "../src/components/canvas/canvas-overlay/vector-pen-preview";
+} from "../src/components/canvas/canvas-overlay/vector-path/pen-preview";
 
 const contour = {
   closed: false,

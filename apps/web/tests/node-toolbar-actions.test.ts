@@ -228,6 +228,7 @@ describe("selection toolbar actions", () => {
 
     expect(actions.map((action) => action.id)).toEqual([
       "clear-path-selection",
+      "stop-path-editing",
     ]);
 
     actions.find((action) => action.id === "clear-path-selection")?.onSelect();

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { getVectorBezierHandleAppearance } from "../src/components/canvas/canvas-overlay/vector-handle-appearance";
+import { getVectorBezierHandleAppearance } from "../src/components/canvas/canvas-overlay/vector-path/handle-appearance";
 
 describe("vector bezier handle appearance", () => {
   test("uses the same smaller solid style for regular path handles and pen preview handles", () => {

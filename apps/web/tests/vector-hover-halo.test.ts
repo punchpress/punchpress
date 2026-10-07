@@ -4,7 +4,7 @@ import {
   getVectorAnchorHoverHaloRadiusPx,
   getVectorHoverHaloFillAlpha,
   getVectorHoverHaloStrokeWidthPx,
-} from "../src/components/canvas/canvas-overlay/vector-hover-halo";
+} from "../src/components/canvas/canvas-overlay/vector-path/hover-halo";
 
 describe("vector hover halo", () => {
   test("anchor halo uses a filled glow that matches the shared interaction radius", () => {

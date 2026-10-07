@@ -12,14 +12,17 @@ import {
 
 const createTestStyles = (scope: paper.PaperScope): VectorPaperSceneStyles => {
   return {
-    accentFill: new scope.Color("#165DFC"),
-    backgroundFill: new scope.Color("#FFFFFF"),
-    destructiveFill: new scope.Color("#EF4444"),
-    destructiveHalo: new scope.Color("#FF7A93"),
-    destructiveHighlight: new scope.Color("#FF4568"),
-    guide: new scope.Color("#165DFC"),
+    anchorSelectedWidthPx: 2,
+    anchorWidthPx: 1.5,
+    handleLineWidthPx: 1,
     hoverHalo: new scope.Color("#6EA5FF"),
+    indicatorWidthPx: 1.5,
+    selected: new scope.Color("#165DFC"),
     shadow: new scope.Color(0, 0, 0, 0.18),
+    surface: new scope.Color("#FFFFFF"),
+    warning: new scope.Color("#EF4444"),
+    warningSoft: new scope.Color("#FF7A93"),
+    warningStrong: new scope.Color("#FF4568"),
   };
 };
 
@@ -65,10 +68,10 @@ describe("vector segment selection render", () => {
 
     expect(topItem).toBe(selectedChrome.anchor);
     expect(selectedChrome.anchor.fillColor?.toCSS(true)).toBe(
-      styles.accentFill.toCSS(true)
+      styles.selected.toCSS(true)
     );
     expect(unselectedChrome.anchor.fillColor?.toCSS(true)).toBe(
-      styles.backgroundFill.toCSS(true)
+      styles.surface.toCSS(true)
     );
   });
 });
