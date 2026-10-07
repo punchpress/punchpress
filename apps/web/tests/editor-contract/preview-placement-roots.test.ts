@@ -1,8 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createSolidAppearance, Editor } from "@punchpress/engine";
-import { resolvePreviewPlacementNodeIds } from "../src/components/canvas/canvas-node-preview-placement";
 
-describe("canvas node preview placement", () => {
+describe("preview placement roots", () => {
   test("maps a single-child vector preview onto the rendered vector node", () => {
     const editor = new Editor();
 
@@ -60,7 +59,7 @@ describe("canvas node preview placement", () => {
     ]);
 
     expect(
-      resolvePreviewPlacementNodeIds(editor, ["vector-1"], {
+      editor.getPreviewPlacementNodeIds(["vector-1"], {
         nodeIds: ["path-1"],
       })
     ).toEqual(["vector-1"]);
@@ -159,7 +158,7 @@ describe("canvas node preview placement", () => {
     ]);
 
     expect(
-      resolvePreviewPlacementNodeIds(editor, ["vector-1"], {
+      editor.getPreviewPlacementNodeIds(["vector-1"], {
         nodeIds: ["path-1", "path-2"],
       })
     ).toEqual(["vector-1"]);
@@ -260,7 +259,7 @@ describe("canvas node preview placement", () => {
     editor.startPathEditing("vector-1");
 
     expect(
-      resolvePreviewPlacementNodeIds(editor, ["vector-1"], {
+      editor.getPreviewPlacementNodeIds(["vector-1"], {
         nodeIds: ["path-1"],
       })
     ).toEqual([]);
@@ -309,7 +308,7 @@ describe("canvas node preview placement", () => {
     ]);
 
     expect(
-      resolvePreviewPlacementNodeIds(editor, ["path-1"], {
+      editor.getPreviewPlacementNodeIds(["path-1"], {
         nodeIds: ["path-1"],
       })
     ).toEqual(["path-1"]);
@@ -372,7 +371,7 @@ describe("canvas node preview placement", () => {
     ]);
 
     expect(
-      resolvePreviewPlacementNodeIds(editor, ["path-1"], {
+      editor.getPreviewPlacementNodeIds(["path-1"], {
         effectiveNodeIdSet: new Set(["path-1"]),
         nodeIds: ["group-1"],
       })
