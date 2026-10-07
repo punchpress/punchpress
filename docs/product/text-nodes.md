@@ -1,5 +1,5 @@
 ---
-summary: Defines the text node family as editable text with font descriptors, tracking, fill, stroke, transform, and warp state.
+summary: Defines the text node family as editable text with font descriptors, tracking, appearance stack, transform, and warp state.
 read_when:
   - changing text node schema, defaults, property support, render behavior, edit behavior, or export conversion
   - deciding whether a text feature belongs in text nodes, font handling, or text warping
@@ -10,8 +10,8 @@ read_when:
 Text nodes are editable text objects.
 
 - Text nodes store source text.
-- They own local font descriptor, font size, tracking, fill, stroke, stroke
-  width, warp, and transform.
+- They own local font descriptor, font size, tracking, an
+  [appearance stack](appearance.md), warp, and transform.
 - They render as live text geometry in the editor.
 - They remain editable through save/load and normal document workflows.
 - Export may convert text to production-ready outlines.

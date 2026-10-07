@@ -17,8 +17,7 @@ The properties panel edits the active selection.
 - Multi-selection shows shared controls and mixed values.
 - Unsupported controls are hidden instead of guessing.
 - Aggregate color controls edit every selected paint that uses the chosen color.
-- Frame dimensions and mixed Stroke width/Miter controls
-  keep empty, incomplete, and invalid drafts local; they never coerce a blank
+- Frame dimensions keep empty, incomplete, and invalid drafts local; they never coerce a blank
   draft to zero or a minimum.
 - Valid drafts in these fields apply live. Blur and Enter normalize them or
   restore the last accepted value; Escape discards only the current draft,
@@ -27,7 +26,9 @@ The properties panel edits the active selection.
 ## Selection Scopes
 
 - Artboard selection exposes size and background.
-- Text selection exposes text appearance and warp controls.
+- Text, shape, and path selections expose node opacity and the
+  [appearance stack](appearance.md).
+- Text selection also exposes typography and warp controls.
 - Shape selection exposes shape-kind controls and live corner radius.
 - Path selection exposes path geometry and appearance.
 - Vector selection exposes object-level and aggregate child-path appearance.

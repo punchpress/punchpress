@@ -15,7 +15,7 @@ read_when:
 | --- | --- |
 | Extension | `.punch` |
 | MIME type | `application/vnd.punchpress.document` |
-| Current version | `1.8` |
+| Current version | `1.9` |
 | Root parent id | `root` |
 | Default basename | `untitled-design` |
 
@@ -23,7 +23,7 @@ read_when:
 
 ```ts
 type DesignDocument = {
-  version: "1.8";
+  version: "1.9";
   assets: Record<string, DocumentAsset>;
   nodes: Node[];
 };
@@ -42,11 +42,33 @@ not store image bytes inline.
 | `artboard` | Rectangular production surface: name, size, background, lock, transform. |
 | `empty` | Named layer placeholder with no rendered content yet. |
 | `group` | Named container with transform. |
-| `text` | Editable text, local font descriptor, size, tracking, fill, stroke, warp, transform. |
+| `text` | Editable text, local font descriptor, size, tracking, appearance, warp, transform. |
 | `shape` | Live polygon, ellipse, or star with size, points, optional corner radius, appearance, transform. |
 | `image` | Raster artwork that references a document raster asset. |
 | `vector` | Vector object with optional child paths and path composition. |
-| `path` | Editable contours, fill rule, stroke style, appearance, transform. |
+| `path` | Editable contours, fill rule, appearance, transform. |
+
+Text, shape, and path nodes store an `appearance` stack:
+
+```ts
+type Appearance = {
+  fills: FillLayer[]; // bottom → top, at most 8
+  strokes: StrokeLayer[]; // bottom → top, at most 8; paint over fills
+};
+type FillLayer = {
+  id: string; // unique within the node
+  enabled: boolean;
+  opacity: number; // 0..1
+  paint: { kind: "solid"; color: string }; // canonical #rrggbb
+};
+type StrokeLayer = FillLayer & {
+  width: number; // >= 0, node-local units
+  align: "center";
+  cap: "butt" | "round" | "square";
+  join: "miter" | "round" | "bevel";
+  miterLimit: number; // >= 1
+};
+```
 
 Image nodes store logical Raster bounds and an optional finite standalone
 writable plane:

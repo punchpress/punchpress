@@ -27,6 +27,7 @@ edge cases, and intentional omissions without becoming source tours.
 | --- | --- |
 | Document tree, ordering, visibility, grouping, and recent documents | [Layers](layers.md) |
 | Selection-specific editing controls | [Properties](properties.md) |
+| Fill and stroke layers, layer order, and node opacity | [Appearance](appearance.md) |
 | Open, save, export, new file, close, and modal-safe commands | [Document commands](document-commands.md) |
 
 ## Selection And Editing

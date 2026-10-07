@@ -12,9 +12,9 @@ Text nodes store editable text, not baked outlines.
 
 ## Contract
 
-- Text preserves font, size, fill, stroke, tracking, warp, and transform.
+- Text preserves font, size, appearance stack, tracking, warp, and transform.
 - Text can be transformed like any other node while remaining editable.
-- Stroke uses the default centered text-shape model.
+- Strokes are centered on the text outline and paint over every fill.
 - Text remains text through editing, transform, save/load, copy/paste, and
   normal document workflows.
 - Export may outline text, but editing surfaces keep source text.
@@ -29,7 +29,7 @@ Text nodes store editable text, not baked outlines.
 
 ## Controls
 
-- Font size, tracking, stroke width, and path settings support direct numeric
+- Font size, tracking, stroke widths, and path settings support direct numeric
   entry.
 - Scrub controls are allowed when bounded values make interaction faster.
 - Future typography controls should carry through to editing mode when they

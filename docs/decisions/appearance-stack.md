@@ -73,9 +73,10 @@ Paint fields feed geometry signatures (`shape-capabilities.ts`,
   - A path inside a vector has no effects. A shared graph validator enforces
     this for documents, clipboard payloads, and every command that reparents
     a node or mutates effects. The vector owns the object shadow.
-- Colors are canonical `#rrggbb` or `#rrggbbaa`. A headless parser in
-  `punch-schema` canonicalizes input and rejects anything else. `"none"` and
-  `"transparent"` mean an absent layer, not a color.
+- Colors are opaque canonical `#rrggbb`. Transparency is always a layer,
+  stop, or shadow `opacity`, never color alpha, so one value owns it. A
+  headless parser in `punch-schema` canonicalizes input and rejects anything
+  else. `"none"` and `"transparent"` mean an absent layer, not a color.
 - Shadow `blur` uses CSS `box-shadow` blur-radius semantics:
   `stdDeviation = blur / 2`. Offsets and blur are node-local, so shadows rotate
   and scale with the object. New shadows default to blur 0, a hard offset
@@ -119,14 +120,17 @@ all render that plan. PNG export rasterizes the plan-built SVG.
 
 #### Geometry
 
-Paint leaves every geometry output, so a paint edit never rebuilds geometry.
+Geometry, hit regions, signatures, and compiled vector surfaces depend only
+on a paint *extent*: whether any fill is enabled and the widest enabled stroke.
+Color, opacity, cap, join, and order edits therefore never rebuild geometry;
+a width change rebuilds only the extent-dependent bounds and hits.
 
-Within one paint node, geometry merges into two paths:
-
-- a fill path built from closed contours only
-- a stroke path built from all contours
-
-Text glyphs merge, so every stroke paints above every fill across glyphs.
+The plan paints a node's geometry paths in **passes**. A fill directly
+followed by a stroke shares one element (`paint-order: fill stroke`) only when
+the object has a single geometry path; with several paths (unmerged glyphs,
+multi-contour entries) each draw is its own pass across all paths, so every
+stroke paints above every fill. Fills paint open contours with SVG's implicit
+closure, on canvas and in export alike.
 
 #### Vectors
 

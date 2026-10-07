@@ -23,16 +23,9 @@ Path nodes are first-class editable curve objects.
 
 ## Styling
 
-Path styling includes:
-
-- opacity
-- fill color
-- stroke color
-- stroke width
-- fill rule
-- stroke line cap
-- stroke line join
-- miter limit
+Path styling is the node opacity, the fill rule, and an
+[appearance stack](appearance.md) of fill and stroke layers (each stroke with
+width, cap, join, and miter limit).
 
 Changing style does not reduce editability.
 
