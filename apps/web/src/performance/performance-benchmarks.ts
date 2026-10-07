@@ -1,3 +1,7 @@
+import {
+  appearanceDraggingPlainBenchmark,
+  appearanceViewportPlainBenchmark,
+} from "./benchmarks/appearance-benchmark";
 import { compoundVectorDragBenchmark } from "./benchmarks/compound-vector-drag-benchmark";
 import { idleSoakBenchmark } from "./benchmarks/idle-soak-benchmark";
 import {
@@ -58,6 +62,8 @@ export const performanceBenchmarks = [
   rasterHighZoomBenchmark,
   rasterLargestSupportedPlaneBenchmark,
   compoundVectorDragBenchmark,
+  appearanceViewportPlainBenchmark,
+  appearanceDraggingPlainBenchmark,
   idleSoakBenchmark,
   shapeDragBenchmarkLarge,
   textDragBenchmark,
