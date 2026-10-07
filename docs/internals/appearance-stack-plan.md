@@ -9,7 +9,7 @@ read_when:
 # Appearance Stack Plan
 
 This plan implements [Appearance stack](../decisions/appearance-stack.md).
-Delete this page once stage 4 lands and its durable rules move to product
+Delete this page once stage 5 lands and its durable rules move to product
 and reference docs.
 
 ## Stage Gates
@@ -44,16 +44,28 @@ Every stage goes through the same sequence:
    - Commands, with descriptors deleted.
    - Paint removed from geometry.
    - The plan drives the canvas, the edit preview, dense surfaces, and export.
-   - Flattened opacity (A1).
-   - The panel family covering solid layers and node opacity.
-   - The new text default.
-2. **Linear gradients (1.10).** Paint union, userSpace defs, a gradient strip
-   with stop ids, and stop colors in selection colors.
-3. **Stroke alignment (1.11).** The offset-outline compiler, chosen against
-   the dependency checklist; alignment-aware ink bounds and hits; outside
-   strokes painted below fills (A2).
-4. **Drop shadow (1.12).** The effects list, the filter plan, and vector
-   container effects with resize scaling.
+   - Panel family covering solid layers and node opacity.
+   - New text default.
+   - Ancestor opacity keeps today's per-leaf multiplication on both canvas
+     and export, so parity holds until stage 2.
+2. **Isolated group compositing.**
+   - Group layer wrappers on the canvas.
+   - Nested `<g opacity>` in dense surfaces and export.
+   - Preview transforms target the outermost wrapper when a whole group is
+     dragged.
+   - Starts with its own high-effort architecture review.
+   - Stops for a report if isolation forces a larger canvas restructuring than
+     the decision describes.
+3. **Linear gradients.** Paint union, userSpace defs, a gradient strip with
+   stop ids, and stop colors in selection colors.
+4. **Stroke alignment.** Offset-outline compiler (chosen against the
+   dependency checklist), alignment-aware ink bounds and hit testing, and
+   outside strokes below fills.
+5. **Drop shadow on nodes and groups.**
+   - Effects list, the filter plan, and CSS `drop-shadow()` on group layers.
+   - Vector-container and group effects, including resize scaling.
+
+The schema version bumps at each stage that widens it.
 
 ## Performance Scenarios
 
@@ -68,6 +80,8 @@ drop shadow.
 | `appearance-dragging-200-plain` | baseline |
 | `appearance-dragging-200` | p95 ≤ 8.33 ms; `renderCanvasNode` ≤ 5 during the drag |
 | `appearance-shadow-scrub` | p95 ≤ 8.33 ms; ≤ 1 node-art render per frame, including color preview |
+| `appearance-nested-groups-200` | 200 nodes in 20 nested translucent groups (depth 3, opacity 0.6 at every level); viewport ladder plus whole-group drag. Gate: p95 ≤ 1.25 × plain p95; `renderCanvasNode` ≤ 5 during the drag |
+| `appearance-shadowed-groups` | 20 shadowed groups of 10 nodes. Variants: whole-group drag (gate p95 ≤ 8.33 ms) and single-child drag inside a group (records the per-frame group re-filter cost; gate p95 ≤ 16.7 ms) |
 | `appearance-max-stack` | 20 nodes with 8/8/4 stacks and blur 500, zoomed 1% → 6400% → 1%; max frame ≤ 100 ms; export SVG + PNG latency recorded |
 
 Viewport scenarios zoom along the ladder `[1, 0.5, 0.35, 0.21, 0.1, 0.05, 0.01]`
@@ -97,6 +111,7 @@ Seeded command sequences in the engine. After every step, check:
 - the document validates
 - undo restores the exact prior document
 - every export ref resolves
+- isolated group layers on the canvas match isolated groups in export
 - paint box ⊆ selection frame ⊆ ink bounds
 - no vector child has effects
 
@@ -127,6 +142,10 @@ Edge cases:
 - **Opacity and visibility:**
   - hidden ancestors
   - translucent overlapping siblings
+  - nested isolated groups
+  - a group shadow crossing an artboard edge
+  - drilling into a child of a shadowed group
+  - brushing a raster inside a shadowed group
 - **Vectors:** dense imported groups; compound and boolean vectors.
 - **Clipboard:**
   - a 1.8 payload

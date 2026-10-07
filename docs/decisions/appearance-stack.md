@@ -9,7 +9,7 @@ read_when:
 
 # Appearance Stack
 
-Status: Accepted (amendments A1–A3 pending Zach)
+Status: Accepted
 Date: 2026-10-07
 
 The rollout, budgets, and test matrix live in the
@@ -66,8 +66,8 @@ Paint fields feed geometry signatures (`shape-capabilities.ts`,
 - Gradient start and end points are normalized to the paint box. Gradient
   stops are `{ id, offset, color }`.
 - Strokes add `width`, `align`, `join`, `cap`, and `miterLimit`.
-- `text`, `shape`, standalone `path`, and `vector` nodes own
-  `effects: Effect[]`.
+- `text`, `shape`, standalone `path`, `vector`, and `group` nodes own
+  `effects: Effect[]`. Groups own effects only, with no fills or strokes.
   - v1 ships one effect kind: `drop-shadow`, with color, opacity, offset, and
     blur.
   - A path inside a vector has no effects. A shared graph validator enforces
@@ -84,19 +84,14 @@ Paint fields feed geometry signatures (`shape-capabilities.ts`,
 
 ### Versioning
 
-- Exactly one data migration exists: 1.8 → 1.9. It folds the flat fields into
-  layers and maps `"none"` to absent.
+- The only data-reshaping migration is 1.8 → 1.9. It folds the flat fields
+  into layers and maps `"none"` to absent.
 - The normalizer stops synthesizing the retired path stroke fields.
 - Clipboard payloads with `documentVersion: "1.8"` take the same upgrade.
 - 1.7 and older stay unsupported.
-- Each later shipped stage that widens the schema bumps the minor version with
-  a passthrough upgrade step:
-  - gradients (1.10)
-  - stroke alignment (1.11)
-  - effects (1.12)
-
-  An older reader therefore never sees an unknown construct under a known
-  version.
+- Each stage that widens the schema bumps the version freely, with a
+  minimal passthrough upgrade step. Versioning resets before the real release,
+  so migrations stay small.
 
 ### Commands
 
@@ -144,15 +139,20 @@ effect group.
 
 #### Compositing
 
-These boundaries hold on the canvas and in export alike:
+These boundaries hold on the canvas, in dense surfaces, and in export:
 
-- Each paint node is one opacity group. Its opacity is the node opacity times
-  the product of its ancestors' opacities, which matches today's per-leaf
-  multiplication on the canvas.
-- Effects wrap that group.
-- Group nodes never form an isolated compositing group.
-- **(A1)** Dense group surfaces adopt the same flattened rule, replacing their
-  nested `<g opacity>`.
+- Each paint node is one opacity group, and its effects wrap that group.
+- A group with opacity < 1 or any enabled effect is an **isolated layer**:
+  - Its children composite first.
+  - Group opacity then applies to the flattened result, so overlapping
+    translucent children never double-darken.
+  - Group effects apply to that composited result.
+  - Child opacity still multiplies naturally. A 50% child inside a 50% group
+    is 25% wherever it overlaps nothing.
+- A group with opacity 1 and no effects is not isolated. Isolating it would
+  render the same, so it gets no extra layer.
+
+The canvas mechanism for isolation is in the next section.
 
 #### Paint order
 
@@ -165,8 +165,7 @@ The fixed order is:
 
 Within each band, layers paint in list order.
 
-**(A2)** This places outside strokes below fills, a change from the accepted
-"fills then strokes" order. It is the only placement that keeps an outside ring
+Outside strokes go below fills because that is the only placement that keeps an outside ring
 from eating into the fill, and a semi-transparent fill reveals at most a sliver
 of overlap.
 
@@ -202,6 +201,41 @@ primitives.
 Production fidelity targets the app's Chromium, both for the PNG and for SVG
 viewed in Chromium. Other SVG consumers are best effort.
 
+### Isolated group layers on the canvas
+
+Non-dense groups have no DOM element today. Their children render as flat
+sibling shells (`canvas-nodes.tsx`). For an isolated group, the canvas adds
+a **group layer**: an absolutely positioned, `pointer-events: none` wrapper
+`div` at stage origin. The group's descendant shells render inside it, in
+document order.
+
+- **Compositing.** CSS `opacity` and `filter` on an HTML element isolate the
+  subtree into one stacking context. This matches SVG group opacity
+  semantics.
+- **Shadow.** The plan's shadow parameters drive CSS `drop-shadow()` on the
+  wrapper. `drop-shadow()` takes its blur as a standard deviation, so it
+  receives `blur / 2`. Effects with more than one shadow chain one
+  `drop-shadow()` per shadow. Export emits the equivalent SVG filter on
+  `<g>`. Parity is tested.
+- **Nesting.** Nested isolated groups nest wrappers. Non-isolated groups
+  between them add no element.
+- **Artboard clipping.** Inside an artboard, the wrapper also carries the
+  artboard clip as an absolute `polygon()`, so a group shadow clips to the
+  artboard like child art does.
+- **Dense surfaces.** Isolation is a nested SVG `<g opacity filter>` inside
+  the single surface `<svg>`, built from the same plan.
+- **Selection and hit testing.** Unchanged. The wrapper never receives
+  pointer events, and group shadows never hit. Drill-in and in-place child
+  editing mount and update child shells inside the wrapper.
+- **Drag.** When the selection covers a whole isolated group, the shared
+  preview transform goes on the outermost wrapper, not on the child shells.
+  The composited layer then moves without re-running its filter. Moving one
+  child inside a shadowed group re-filters the group every frame, and the
+  child-drag perf scenario bounds that cost.
+- **Raster editing.** Brush work inside a shadowed group re-filters the group
+  on every presented frame. The raster brush gates run once with the group
+  present.
+
 ### Bounds and hit testing
 
 - **Selection frame:** today's semantics. It is the geometry plus half the
@@ -221,7 +255,7 @@ viewed in Chromium. Other SVG consumers are best effort.
   - no enabled paint: the node falls back to its paint box
   - shadows: never hit
 - **Group resize:** scales shape and text stroke widths, all shadow offsets
-  and blur, and vector-container effects. Child-backed vectors resize through
+  and blur, vector-container effects, and the group's own effects. Child-backed vectors resize through
   their descendants.
 
 ## Rejected Alternatives
@@ -235,20 +269,14 @@ viewed in Chromium. Other SVG consumers are best effort.
   alignment instead.
 - **Effects on vector child paths.** Overlapping children would shadow their
   siblings.
-- **Group-level effects.** They need isolated group rendering and are deferred
-  to their own proposal.
+- **Flattened group opacity** (multiplying group opacity into each leaf).
+  Overlapping translucent children double-darken, and group shadows become
+  impossible.
+- **Always isolating groups.** It adds a compositing layer per group with no
+  visual change when opacity is 1 and there are no effects.
 - **Growing shells to ink bounds.** The shell transform pivots at the frame
   center, so shadow edits would move rotated art.
 - **`<use>` in export.** It is SVG2 `href` and breaks SVG 1.1 tooling.
-
-## Amendments Pending Zach
-
-- **A1.** Dense group surfaces switch to flattened opacity. Imported SVGs
-  with group opacity over overlapping children change appearance to match
-  export.
-- **A2.** Outside strokes paint below fills.
-- **A3.** The schema version bumps once per shipped stage (1.9 → 1.12)
-  instead of a single 1.9.
 
 ## Consequences
 
