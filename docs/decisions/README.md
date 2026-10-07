@@ -20,4 +20,5 @@ plans, task lists, or implementation diaries.
 | Rendering | [Interaction render hot path](interaction-render-hot-path.md) |
 | Raster editing | [Resident Canvas2D Raster surface](raster-resident-canvas-surface.md) |
 | Vector rendering | [Vector render surface pipeline](vector-render-surface-pipeline.md) |
+| Appearance | [Appearance stack](appearance-stack.md) (proposed) |
 | Groups and vectors | [Group rotation overlay](group-rotation-overlay.md) |
