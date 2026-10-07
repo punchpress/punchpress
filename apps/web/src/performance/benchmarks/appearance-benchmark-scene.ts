@@ -1,5 +1,6 @@
 import {
   createDefaultArtboardNode,
+  createDefaultGroupNode,
   createDefaultNode,
   createDefaultShapeNode,
   createSolidAppearance,
@@ -70,11 +71,17 @@ const createAppearanceBenchmarkNodes = (nodeCount: number) => {
 export const loadAppearanceBenchmarkScene = async (
   editor: Editor,
   nodeCount: number,
-  waitForFrame: () => Promise<number>
+  waitForFrame: () => Promise<number>,
+  { nestedGroups = false } = {}
 ) => {
   const { artboard, children } = createAppearanceBenchmarkNodes(nodeCount);
+  const groups = nestedGroups
+    ? nestInTranslucentGroups(artboard.id, children)
+    : [];
 
-  editor.loadDocument(saveDesignDocument([artboard, ...children]).contents);
+  editor.loadDocument(
+    saveDesignDocument([artboard, ...groups, ...children]).contents
+  );
   editor.cancelPendingViewportFocus();
   await waitForGeometryReady(
     editor,
@@ -82,7 +89,50 @@ export const loadAppearanceBenchmarkScene = async (
     waitForFrame
   );
 
-  return { artboard, children };
+  return {
+    artboard,
+    children,
+    rootGroupIds: groups
+      .filter((group) => group.parentId === artboard.id)
+      .map((group) => group.id),
+  };
+};
+
+const GROUP_COUNT = 20;
+const GROUP_DEPTH = 3;
+const GROUP_OPACITY = 0.6;
+
+// Splits the children into GROUP_COUNT stacks of GROUP_DEPTH nested groups,
+// every level at GROUP_OPACITY, so each stack is three isolated layers deep.
+// Reparents the children in place; the store canonicalizes paint order.
+const nestInTranslucentGroups = (artboardId: string, children) => {
+  const groups: ReturnType<typeof createDefaultGroupNode>[] = [];
+  const perGroup = Math.ceil(children.length / GROUP_COUNT);
+
+  for (let stack = 0; stack < GROUP_COUNT; stack += 1) {
+    let parentId = artboardId;
+
+    for (let level = 0; level < GROUP_DEPTH; level += 1) {
+      const group = {
+        ...createDefaultGroupNode(),
+        name: `Stack ${stack} level ${level}`,
+        opacity: GROUP_OPACITY,
+        parentId,
+      };
+
+      groups.push(group);
+      parentId = group.id;
+    }
+
+    for (const child of children.slice(
+      stack * perGroup,
+      (stack + 1) * perGroup
+    )) {
+      child.parentId = parentId;
+    }
+  }
+
+  return groups;
 };
 
 // Viewport x/y is the world-space top-left, so keeping the artboard center

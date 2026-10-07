@@ -1,5 +1,7 @@
 import {
   appearanceDraggingPlainBenchmark,
+  appearanceNestedGroupsDraggingBenchmark,
+  appearanceNestedGroupsViewportBenchmark,
   appearanceViewportPlainBenchmark,
 } from "./benchmarks/appearance-benchmark";
 import { compoundVectorDragBenchmark } from "./benchmarks/compound-vector-drag-benchmark";
@@ -64,6 +66,8 @@ export const performanceBenchmarks = [
   compoundVectorDragBenchmark,
   appearanceViewportPlainBenchmark,
   appearanceDraggingPlainBenchmark,
+  appearanceNestedGroupsViewportBenchmark,
+  appearanceNestedGroupsDraggingBenchmark,
   idleSoakBenchmark,
   shapeDragBenchmarkLarge,
   textDragBenchmark,

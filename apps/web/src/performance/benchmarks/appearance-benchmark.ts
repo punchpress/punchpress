@@ -151,3 +151,48 @@ const getLadderZoom = (progress: number) => {
 
   return from * (to / from) ** local;
 };
+
+export const appearanceNestedGroupsViewportBenchmark: PerformanceBenchmarkDefinition =
+  {
+    ...appearanceViewportPlainBenchmark,
+    description:
+      "The appearance scene with its 200 nodes in 20 stacks of three nested 60%-opacity groups, zoomed down the 100→1% ladder and back while panning.",
+    id: "appearance-nested-groups-viewport-200",
+    label: "Appearance Nested Groups Viewport (200)",
+    setup: async ({ editor, options, waitForFrame, waitForFrames }) => {
+      await loadAppearanceBenchmarkScene(
+        editor,
+        options.nodeCount,
+        waitForFrame,
+        {
+          nestedGroups: true,
+        }
+      );
+      editor.clearSelection();
+      editor.setViewport(
+        getCenteredViewport(editor, APPEARANCE_ZOOM_LADDER[0])
+      );
+      await waitForFrames(4);
+    },
+  };
+
+export const appearanceNestedGroupsDraggingBenchmark: PerformanceBenchmarkDefinition =
+  {
+    ...appearanceDraggingPlainBenchmark,
+    description:
+      "Drags all 20 nested translucent group stacks (200 nodes) inside the 4500 × 5400 artboard at 21% zoom.",
+    id: "appearance-nested-groups-dragging-200",
+    label: "Appearance Nested Groups Dragging (200)",
+    setup: async ({ editor, options, waitForFrame, waitForFrames }) => {
+      const { rootGroupIds } = await loadAppearanceBenchmarkScene(
+        editor,
+        options.nodeCount,
+        waitForFrame,
+        { nestedGroups: true }
+      );
+
+      editor.setViewport(getCenteredViewport(editor, 0.21));
+      editor.setSelectedNodes(rootGroupIds);
+      await waitForFrames(4);
+    },
+  };
