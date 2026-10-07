@@ -39,6 +39,13 @@ export const AssetSearchPanel = ({
   const [importingAssetId, setImportingAssetId] = useState<string | null>(null);
   const [status, setStatus] = useState("Search assets.");
   const searchVersionRef = useRef(0);
+  // Scroll events can fire twice before React re-renders `loading`; the ref
+  // keeps one page request in flight.
+  const loadingRef = useRef(false);
+  const updateLoading = useCallback((nextLoading: boolean) => {
+    loadingRef.current = nextLoading;
+    setLoading(nextLoading);
+  }, []);
 
   const hasMoreResults = page < lastPage;
 
@@ -46,7 +53,7 @@ export const AssetSearchPanel = ({
     async (query: string, nextPage: number, searchVersion: number) => {
       const isFirstPage = nextPage === 1;
 
-      setLoading(true);
+      updateLoading(true);
       setStatus(isFirstPage ? "Searching assets..." : "Loading more assets...");
 
       try {
@@ -76,11 +83,11 @@ export const AssetSearchPanel = ({
         setStatus(error instanceof Error ? error.message : "Search failed.");
       } finally {
         if (searchVersion === searchVersionRef.current) {
-          setLoading(false);
+          updateLoading(false);
         }
       }
     },
-    []
+    [updateLoading]
   );
 
   const submitSearch = useCallback(() => {
@@ -94,13 +101,13 @@ export const AssetSearchPanel = ({
     setLastPage(1);
 
     if (!query) {
-      setLoading(false);
+      updateLoading(false);
       setStatus("Enter a search term.");
       return;
     }
 
     runSearch(query, 1, searchVersion);
-  }, [runSearch, term]);
+  }, [runSearch, term, updateLoading]);
 
   const addAsset = useCallback(
     async (asset: Asset) => {
@@ -140,12 +147,12 @@ export const AssetSearchPanel = ({
   );
 
   const loadMoreAssets = useCallback(() => {
-    if (loading || !hasMoreResults || !submittedTerm) {
+    if (loadingRef.current || !hasMoreResults || !submittedTerm) {
       return;
     }
 
     runSearch(submittedTerm, page + 1, searchVersionRef.current);
-  }, [hasMoreResults, loading, page, runSearch, submittedTerm]);
+  }, [hasMoreResults, page, runSearch, submittedTerm]);
 
   const handleResultsScroll = useCallback(
     (event) => {
