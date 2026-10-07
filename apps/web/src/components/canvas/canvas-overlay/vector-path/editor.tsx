@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditor } from "../../../../editor-react/use-editor";
 import { useEditorPathEditingPreviewSurfaceValue } from "../../../../editor-react/use-editor-path-editing-preview-surface-value";
+import { useEditorPenPreviewRevision } from "../../../../editor-react/use-editor-pen-preview-revision";
 import { useEditorValue } from "../../../../editor-react/use-editor-value";
 import {
   getTextPathGuideMatrix,
@@ -130,6 +131,7 @@ export const CanvasVectorEditor = ({ viewportRevision }) => {
     useState<VectorCornerDragSession | null>(null);
   const [transformTargetElement, setTransformTargetElement] = useState(null);
   const activeTool = useEditorValue((_, state) => state.activeTool);
+  useEditorPenPreviewRevision(activeTool === "pen");
   const penDirectSelectionModifierPressed = useEditorValue(
     (_, state) => state.penDirectSelectionModifierPressed
   );
