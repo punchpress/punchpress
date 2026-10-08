@@ -32,12 +32,12 @@ export const pathNodeCapabilities = {
   },
 
   getGeometrySignature: (node, fontRevision) => {
-    return JSON.stringify({
-      contours: getPathNodeContours(node),
-      fillRule: node.fillRule,
+    return [
+      getContoursSignature(getPathNodeContours(node)),
+      node.fillRule,
       fontRevision,
-      paint: getPaintSignature(node),
-    });
+      getPaintSignature(node),
+    ].join("|");
   },
 
   getLocalBounds: (editor, nodeId) => {
@@ -85,4 +85,21 @@ export const pathNodeCapabilities = {
   }),
 
   type: "path",
+};
+
+// Contour arrays are immutable in the store, so moved or restyled paths
+// reuse the serialized contours of their unchanged geometry.
+const contoursSignatures = new WeakMap<object, string>();
+
+const getContoursSignature = (contours) => {
+  const cached = contoursSignatures.get(contours);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const signature = JSON.stringify(contours);
+  contoursSignatures.set(contours, signature);
+
+  return signature;
 };

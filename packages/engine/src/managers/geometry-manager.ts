@@ -30,18 +30,32 @@ export class GeometryManager {
     const geometryById = new Map();
 
     for (const node of nodes) {
-      const signature = getNodeGeometrySignature(node, fontRevision);
-      const fontId = "font" in node ? getLocalFontId(node.font) : null;
       const cached = this.cache.get(node.id);
 
+      // Same node object at the same font revision has the same signature.
+      if (cached?.node === node && cached.fontRevision === fontRevision) {
+        nextCache.set(node.id, cached);
+        geometryById.set(node.id, cached.geometry);
+        continue;
+      }
+
+      const signature = getNodeGeometrySignature(node, fontRevision);
+      const fontId = "font" in node ? getLocalFontId(node.font) : null;
+
       if (!signature) {
-        nextCache.set(node.id, { fontId, geometry: null, signature });
+        nextCache.set(node.id, {
+          fontId,
+          fontRevision,
+          geometry: null,
+          node,
+          signature,
+        });
         geometryById.set(node.id, null);
         continue;
       }
 
       if (cached?.signature === signature) {
-        nextCache.set(node.id, cached);
+        nextCache.set(node.id, { ...cached, fontRevision, node });
         geometryById.set(node.id, cached.geometry);
         continue;
       }
@@ -51,7 +65,13 @@ export class GeometryManager {
       const builtGeometry = buildNodeCapabilityGeometry(node, font);
 
       if (!builtGeometry) {
-        nextCache.set(node.id, { fontId, geometry: null, signature });
+        nextCache.set(node.id, {
+          fontId,
+          fontRevision,
+          geometry: null,
+          node,
+          signature,
+        });
         geometryById.set(node.id, null);
         continue;
       }
@@ -61,12 +81,20 @@ export class GeometryManager {
         cached?.geometry?.ready &&
         cached.fontId === fontId
       ) {
-        nextCache.set(node.id, cached);
+        // Keep the ready geometry under its old signature (and no node) so
+        // the next read retries the build until the replacement font loads.
+        nextCache.set(node.id, { ...cached, node: null });
         geometryById.set(node.id, cached.geometry);
         continue;
       }
 
-      nextCache.set(node.id, { fontId, geometry: builtGeometry, signature });
+      nextCache.set(node.id, {
+        fontId,
+        fontRevision,
+        geometry: builtGeometry,
+        node,
+        signature,
+      });
       geometryById.set(node.id, builtGeometry);
     }
 
