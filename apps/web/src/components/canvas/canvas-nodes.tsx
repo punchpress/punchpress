@@ -1,9 +1,9 @@
 import { useEditorValue } from "../../editor-react/use-editor-value";
 import { CanvasRenderItems } from "./canvas-render-layer";
-import { useCanvasNodePlacement } from "./use-canvas-node-placement";
+import { useCanvasNodePlacement } from "./placement/use-canvas-node-placement";
 
-// Mounts the engine render tree. Groups and artboards are compositing layers
-// that never move; placement writes only to shell and surface nodes.
+// Mounts the engine render tree. Durable placement writes to shells and
+// surfaces; a transform preview moves only the gesture's presentation roots.
 export const CanvasNodes = () => {
   const tree = useEditorValue((editor) => editor.getRenderTree());
 

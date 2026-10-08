@@ -1,237 +1,294 @@
-import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
-import { isContainerNode } from "../nodes/node-tree";
+import type { RenderItem, RenderLayer, RenderTree } from "./render-tree";
+import {
+  isCommittedPlacement,
+  resolvePlacedPreviewNodeIds,
+} from "./preview-shell-placement";
+import { getRenderTreeIndex } from "./render-tree-index";
 
-interface PlacementPreview {
+// A moving presentation root for one gesture. `layer` moves a group's (or a
+// dragged artboard's) presentation wrapper, carrying its effect layers and
+// every shell beneath it; `shell` and `surface` move one placed node.
+export interface PreviewTarget {
+  kind: "layer" | "shell" | "surface";
+  nodeId: string;
+}
+
+export interface PreviewPresentationPlan {
+  // Stationary layers holding moving content: their effect input changes in
+  // their own coordinate space.
+  affectedLayerIds: ReadonlySet<string>;
+  // Layers carried by a moving layer target (the target and every layer
+  // below it): their effect input is unchanged in their own space.
+  carriedLayerIds: ReadonlySet<string>;
+  // Placed shells and surfaces that move, as targets or under one.
+  movedPlacedNodeIds: ReadonlySet<string>;
+  // Disjoint moving roots in paint order.
+  targets: readonly PreviewTarget[];
+}
+
+interface PresentationPreview {
+  delta?: unknown;
   effectiveNodeIdSet?: ReadonlySet<string>;
   nodeIds?: readonly string[];
+  resize?: unknown;
+  rotate?: unknown;
 }
 
-interface ResolvedPlacement {
+const EMPTY_SET: ReadonlySet<string> = new Set();
+
+const EMPTY_PLAN: PreviewPresentationPlan = {
+  affectedLayerIds: EMPTY_SET,
+  carriedLayerIds: EMPTY_SET,
+  movedPlacedNodeIds: EMPTY_SET,
+  targets: [],
+};
+
+interface CachedPlan {
   effectiveNodeIdSet: ReadonlySet<string> | undefined;
+  isMove: boolean;
   nodes: unknown;
   pathEditingNodeId: string | null;
-  placedNodeIds: readonly string[];
+  plan: PreviewPresentationPlan;
   previewNodeIds: readonly string[];
-  result: string[];
+  tree: RenderTree;
 }
 
-const cacheByEditor = new WeakMap<object, ResolvedPlacement>();
+const cacheByEditor = new WeakMap<object, CachedPlan>();
 
-// Maps a transform preview onto the placed shells and surfaces that must move.
-// A preview root that is itself placed (or a vector whose rendered child paths
-// are all previewing) moves as one shell. A root that is not placed (a group or
-// artboard) moves the placed nodes beneath it that the gesture commits: leaves
-// in the committed set, and vector or dense-group surfaces whose leaves all are.
-// Move previews keep their id list and committed set across a gesture, so the
-// result is reused for delta-only updates.
-export const getPreviewPlacementNodeIds = (
+// Resolves which presentation roots a transform preview moves. Membership is
+// fixed for a gesture, so delta-only updates reuse one plan; the plan follows
+// the render tree, the document, path editing, and the transform kind.
+export const getPreviewPresentationPlan = (
   editor,
-  placedNodeIds: readonly string[],
-  preview: PlacementPreview | null
-): string[] => {
+  preview: PresentationPreview | null
+): PreviewPresentationPlan => {
   const previewNodeIds = preview?.nodeIds || [];
+  const tree: RenderTree = editor.getRenderTree();
 
-  if (!(placedNodeIds.length > 0 && previewNodeIds.length > 0)) {
-    return [];
+  if (!(tree.placedNodeIds.length > 0 && previewNodeIds.length > 0)) {
+    return EMPTY_PLAN;
   }
 
-  const cached = cacheByEditor.get(editor);
+  const isMove = Boolean(preview?.delta && !preview.resize && !preview.rotate);
   const pathEditingNodeId = editor.pathEditingNodeId ?? null;
+  const cached = cacheByEditor.get(editor);
 
   if (
     cached &&
+    cached.tree === tree &&
     cached.nodes === editor.nodes &&
-    cached.placedNodeIds === placedNodeIds &&
     cached.previewNodeIds === previewNodeIds &&
     cached.effectiveNodeIdSet === preview?.effectiveNodeIdSet &&
-    cached.pathEditingNodeId === pathEditingNodeId
+    cached.pathEditingNodeId === pathEditingNodeId &&
+    cached.isMove === isMove
   ) {
-    return cached.result;
+    return cached.plan;
   }
 
-  const result = resolvePreviewPlacement(
-    editor,
-    placedNodeIds,
+  const plan = resolvePlan(editor, tree, {
+    committedNodeIdSet: preview?.effectiveNodeIdSet || new Set(previewNodeIds),
+    isMove,
     previewNodeIds,
-    preview?.effectiveNodeIdSet
-  );
+  });
 
   cacheByEditor.set(editor, {
     effectiveNodeIdSet: preview?.effectiveNodeIdSet,
+    isMove,
     nodes: editor.nodes,
     pathEditingNodeId,
-    placedNodeIds,
+    plan,
     previewNodeIds,
-    result,
+    tree,
   });
 
-  return result;
+  return plan;
 };
 
-const resolvePreviewPlacement = (
+interface PlanInputs {
+  committedNodeIdSet: ReadonlySet<string>;
+  isMove: boolean;
+  previewNodeIds: readonly string[];
+}
+
+const resolvePlan = (
   editor,
-  placedNodeIds: readonly string[],
-  previewNodeIds: readonly string[],
-  committedNodeIdSet: ReadonlySet<string> | undefined
-) => {
-  const placedNodeIdSet = new Set(placedNodeIds);
+  tree: RenderTree,
+  { committedNodeIdSet, isMove, previewNodeIds }: PlanInputs
+): PreviewPresentationPlan => {
+  const index = getRenderTreeIndex(tree);
+  const carriedLayerIds = new Set<string>();
+  const movedPlacedNodeIds = new Set<string>();
+  const targets: PreviewTarget[] = [];
 
-  if (previewNodeIds.every((nodeId) => placedNodeIdSet.has(nodeId))) {
-    return [...previewNodeIds];
-  }
-
-  const previewNodeIdSet = new Set(previewNodeIds);
-  const descendantsByRoot = getCoveredDescendantsByPreviewRoot(
-    editor,
-    placedNodeIds,
-    previewNodeIdSet,
-    committedNodeIdSet || previewNodeIdSet
-  );
-  const resolvedNodeIds: string[] = [];
-
-  for (const previewNodeId of previewNodeIds) {
-    const placedAncestorId = getPlacedPreviewAncestorId(
+  // Translation moves whole groups as one presentation root. Resize and
+  // rotation keep per-shell previews.
+  if (isMove) {
+    for (const layer of getCoveredLayerRoots(
       editor,
-      previewNodeId,
-      placedNodeIdSet,
-      previewNodeIdSet
-    );
-
-    if (placedAncestorId) {
-      resolvedNodeIds.push(placedAncestorId);
+      tree,
+      previewNodeIds,
+      committedNodeIdSet
+    )) {
+      targets.push({ kind: "layer", nodeId: layer.nodeId });
+      collectCarried(layer, carriedLayerIds, movedPlacedNodeIds);
     }
-
-    resolvedNodeIds.push(...(descendantsByRoot.get(previewNodeId) || []));
   }
 
-  return [...new Set(resolvedNodeIds)];
+  const remainingNodeIds =
+    movedPlacedNodeIds.size > 0
+      ? tree.placedNodeIds.filter((nodeId) => !movedPlacedNodeIds.has(nodeId))
+      : tree.placedNodeIds;
+
+  for (const nodeId of resolvePlacedPreviewNodeIds(
+    editor,
+    remainingNodeIds,
+    previewNodeIds,
+    committedNodeIdSet
+  )) {
+    targets.push({ kind: index.placedKinds.get(nodeId) ?? "shell", nodeId });
+    movedPlacedNodeIds.add(nodeId);
+  }
+
+  if (targets.length === 0) {
+    return EMPTY_PLAN;
+  }
+
+  targets.sort((left, right) => {
+    return (
+      (index.order.get(getTargetKey(left)) ?? 0) -
+      (index.order.get(getTargetKey(right)) ?? 0)
+    );
+  });
+
+  const affectedLayerIds = new Set<string>();
+
+  for (const target of targets) {
+    let layerId = index.parentLayerIds.get(getTargetKey(target)) ?? null;
+
+    while (layerId && !affectedLayerIds.has(layerId)) {
+      affectedLayerIds.add(layerId);
+      layerId = index.parentLayerIds.get(`layer:${layerId}`) ?? null;
+    }
+  }
+
+  return { affectedLayerIds, carriedLayerIds, movedPlacedNodeIds, targets };
 };
 
-// Each placed id walks its ancestor chain once and is bucketed, in placed
-// (paint) order, under every preview root it is or descends from. Cost is
-// O(placed × depth) however many roots the preview names.
-const getCoveredDescendantsByPreviewRoot = (
+// Walks the tree in paint order and keeps the highest layer that is a
+// requested group (or sits below one) or a dragged artboard, and whose every
+// rendered contribution the gesture commits. An artboard moves only when it
+// is dragged itself; independently selected leaves never infer a root.
+const getCoveredLayerRoots = (
   editor,
-  placedNodeIds: readonly string[],
-  previewNodeIdSet: ReadonlySet<string>,
+  tree: RenderTree,
+  previewNodeIds: readonly string[],
   committedNodeIdSet: ReadonlySet<string>
 ) => {
-  const descendantsByRoot = new Map<string, string[]>();
+  const requestedNodeIdSet = new Set(previewNodeIds);
+  const getCoverage = createLayerCoverage(editor, committedNodeIdSet);
+  const roots: RenderLayer[] = [];
 
-  for (const placedNodeId of placedNodeIds) {
-    let currentNode = editor.getNode(placedNodeId);
-    let isCovered: boolean | null = null;
+  const visit = (items: RenderItem[], isUnderRequested: boolean) => {
+    for (const item of items) {
+      if (item.kind !== "layer") {
+        continue;
+      }
 
-    while (currentNode) {
-      if (previewNodeIdSet.has(currentNode.id)) {
-        isCovered ??= isCommittedPlacement(
-          editor,
-          placedNodeId,
-          committedNodeIdSet
-        );
+      const isRequested = requestedNodeIdSet.has(item.nodeId);
+      const isCandidate =
+        editor.getNode(item.nodeId)?.type === "artboard"
+          ? isRequested
+          : isRequested || isUnderRequested;
 
-        if (!isCovered) {
+      if (isCandidate && getCoverage(item) === "covered") {
+        roots.push(item);
+        continue;
+      }
+
+      visit(item.children, isUnderRequested || isRequested);
+    }
+  };
+
+  visit(tree.items, false);
+
+  return roots;
+};
+
+type LayerCoverage = "covered" | "empty" | "partial";
+
+// Whether the gesture commits every shell and surface beneath a layer.
+// Layers with nothing placed beneath them never block or form a root.
+const createLayerCoverage = (
+  editor,
+  committedNodeIdSet: ReadonlySet<string>
+) => {
+  const coverageByLayer = new Map<RenderLayer, LayerCoverage>();
+  const pathEditingNodeId = editor.pathEditingNodeId ?? null;
+
+  const getCoverage = (layer: RenderLayer): LayerCoverage => {
+    const cached = coverageByLayer.get(layer);
+
+    if (cached) {
+      return cached;
+    }
+
+    let coverage: LayerCoverage = "empty";
+
+    // A contour edit moves points, never the whole vector or its groups.
+    if (
+      pathEditingNodeId &&
+      editor.isDescendantOf(pathEditingNodeId, layer.nodeId)
+    ) {
+      coverage = "partial";
+    } else {
+      for (const child of layer.children) {
+        const childCoverage = getChildCoverage(child);
+
+        if (childCoverage === "partial") {
+          coverage = "partial";
           break;
         }
 
-        const descendants = descendantsByRoot.get(currentNode.id) || [];
-        descendants.push(placedNodeId);
-        descendantsByRoot.set(currentNode.id, descendants);
+        if (childCoverage === "covered") {
+          coverage = "covered";
+        }
       }
-
-      currentNode =
-        currentNode.parentId && currentNode.parentId !== ROOT_PARENT_ID
-          ? editor.getNode(currentNode.parentId)
-          : null;
-    }
-  }
-
-  return descendantsByRoot;
-};
-
-// Commit targets are leaves (or contour vectors), while the render tree places
-// vectors and dense groups as one surface; such a surface moves only when the
-// gesture commits every leaf it paints.
-const isCommittedPlacement = (
-  editor,
-  placedNodeId: string,
-  committedNodeIdSet: ReadonlySet<string>
-) => {
-  if (committedNodeIdSet.has(placedNodeId)) {
-    return true;
-  }
-
-  if (
-    editor.pathEditingNodeId ||
-    !isContainerNode(editor.getNode(placedNodeId))
-  ) {
-    return false;
-  }
-
-  const leafNodeIds = editor.getDescendantLeafNodeIds(placedNodeId);
-
-  return (
-    leafNodeIds.length > 0 &&
-    leafNodeIds.every((nodeId) => committedNodeIdSet.has(nodeId))
-  );
-};
-
-// The nearest placed node at or above a preview root that can stand in for it.
-const getPlacedPreviewAncestorId = (
-  editor,
-  previewNodeId: string,
-  placedNodeIdSet: ReadonlySet<string>,
-  previewNodeIdSet: ReadonlySet<string>
-) => {
-  let currentNode = editor.getNode(previewNodeId);
-
-  while (currentNode) {
-    if (
-      placedNodeIdSet.has(currentNode.id) &&
-      canMapPreviewToPlacedNode(editor, currentNode.id, previewNodeIdSet)
-    ) {
-      return currentNode.id;
     }
 
-    currentNode =
-      currentNode.parentId && currentNode.parentId !== ROOT_PARENT_ID
-        ? editor.getNode(currentNode.parentId)
-        : null;
-  }
+    coverageByLayer.set(layer, coverage);
 
-  return null;
+    return coverage;
+  };
+
+  const getChildCoverage = (child: RenderItem): LayerCoverage => {
+    if (child.kind === "layer") {
+      return getCoverage(child);
+    }
+
+    return isCommittedPlacement(editor, child.nodeId, committedNodeIdSet)
+      ? "covered"
+      : "partial";
+  };
+
+  return getCoverage;
 };
 
-const canMapPreviewToPlacedNode = (
-  editor,
-  placedNodeId: string,
-  previewNodeIdSet: ReadonlySet<string>
+const collectCarried = (
+  layer: RenderLayer,
+  carriedLayerIds: Set<string>,
+  movedPlacedNodeIds: Set<string>
 ) => {
-  if (editor.pathEditingNodeId) {
-    return false;
+  carriedLayerIds.add(layer.nodeId);
+
+  for (const child of layer.children) {
+    if (child.kind === "layer") {
+      collectCarried(child, carriedLayerIds, movedPlacedNodeIds);
+    } else {
+      movedPlacedNodeIds.add(child.nodeId);
+    }
   }
+};
 
-  if (previewNodeIdSet.has(placedNodeId)) {
-    return true;
-  }
-
-  if (editor.getNode(placedNodeId)?.type !== "vector") {
-    return false;
-  }
-
-  const renderedChildPathIds = editor
-    .getChildNodeIds(placedNodeId)
-    .filter((childNodeId) => {
-      return (
-        editor.isNodeEffectivelyVisible(childNodeId) &&
-        editor.getNode(childNodeId)?.type === "path"
-      );
-    });
-
-  return (
-    renderedChildPathIds.length > 0 &&
-    renderedChildPathIds.every((childNodeId) =>
-      previewNodeIdSet.has(childNodeId)
-    )
-  );
+const getTargetKey = (target: PreviewTarget) => {
+  return `${target.kind}:${target.nodeId}`;
 };

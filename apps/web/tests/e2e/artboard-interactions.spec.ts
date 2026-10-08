@@ -426,6 +426,21 @@ test("artboard children stay clipped while drag preview crosses the artboard edg
     throw new Error("Missing shape bounds");
   }
 
+  // The artboard clips its layer once; the shape moves beneath that
+  // stationary clip box instead of carrying its own clip.
+  const readClipBox = () => {
+    return shape.evaluate((element) => {
+      const rect = element
+        .closest("[data-render-clip]")
+        ?.getBoundingClientRect();
+
+      return rect ? [rect.x, rect.y, rect.width, rect.height] : null;
+    });
+  };
+  const clipBefore = await readClipBox();
+
+  expect(clipBefore).not.toBeNull();
+
   await page.mouse.move(
     shapeBox.x + shapeBox.width / 2,
     shapeBox.y + shapeBox.height / 2
@@ -437,18 +452,9 @@ test("artboard children stay clipped while drag preview crosses the artboard edg
 
   try {
     await expect
-      .poll(() => {
-        return shape.evaluate((element) => {
-          const shell =
-            element.closest("[data-node-shell='true']") ||
-            (element.parentElement instanceof HTMLElement
-              ? element.parentElement
-              : element);
-
-          return shell.style.clipPath;
-        });
-      })
-      .toContain("inset(");
+      .poll(async () => (await shape.boundingBox())?.x ?? shapeBox.x)
+      .toBeLessThan(shapeBox.x - 100);
+    expect(await readClipBox()).toEqual(clipBefore);
   } finally {
     await page.mouse.up();
   }

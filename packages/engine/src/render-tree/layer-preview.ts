@@ -4,10 +4,16 @@ import { getNodeEffects } from "../effects/effect-model";
 import { scaleEffects } from "../effects/effect-transform";
 import { unionBounds } from "./output-ink";
 
-// Group and artboard layers never move during previews (previews move leaf
-// shells), so their stage-space filter regions and clips would cut off
-// previewed content. These widen a layer's filter ink to cover the preview,
-// and move an artboard's clip with its own drag.
+// How a render layer's effects and clip present during a transform preview,
+// decided by the gesture's presentation plan:
+// - a layer carried by a moving presentation root keeps its base effects
+//   and ink, since its input is unchanged in its own coordinate space
+// - a stationary layer holding moving content widens its filter ink (in
+//   512-unit steps) to cover the preview, and a group resized as a whole
+//   previews its scaled shadows
+// - any other layer keeps its base effects
+// Equal results keep their identity, so a layer re-renders only when its
+// presentation actually changes.
 
 export const getLayerPreviewEffects = (
   editor,
@@ -17,7 +23,13 @@ export const getLayerPreviewEffects = (
   const effects = withSelectionColorPreview(editor, layerId, layerEffects);
   const preview = editor.selectionDragPreview;
 
-  if (!(effects && preview && previewTouches(editor, preview, layerId))) {
+  if (
+    !(
+      effects &&
+      preview &&
+      editor.getPreviewPresentationPlan(preview).affectedLayerIds.has(layerId)
+    )
+  ) {
     return effects;
   }
 
@@ -29,12 +41,14 @@ export const getLayerPreviewEffects = (
       ? scaleEffects(effects.effects, scale)
       : effects.effects;
 
-  return {
+  return keepIdentity(editor, layerId, {
     effects: scaled,
     ink: moved ? widenInSteps(effects.ink, moved) : effects.ink,
-  };
+  });
 };
 
+// An artboard whose content falls back to per-shell previews (it is dragged
+// but not carried by its own moving layer) moves its clip with the drag.
 export const getLayerPreviewClip = (
   editor,
   layerId: string,
@@ -42,7 +56,10 @@ export const getLayerPreviewClip = (
 ): Bounds | null => {
   const preview = editor.selectionDragPreview;
 
-  if (!(clip && preview?.delta && preview.nodeIdSet?.has(layerId))) {
+  if (
+    !(clip && preview?.delta && preview.nodeIdSet?.has(layerId)) ||
+    editor.getPreviewPresentationPlan(preview).carriedLayerIds.has(layerId)
+  ) {
     return clip;
   }
 
@@ -87,41 +104,48 @@ const withSelectionColorPreview = (
   };
 };
 
-const previewTouches = (editor, preview, layerId: string) => {
-  return getPreviewedLayerIds(editor, preview).has(layerId);
-};
-
-const previewedLayerIdsCache = new WeakMap<
+const lastPreviewByEditor = new WeakMap<
   object,
-  { layerIds: Set<string>; nodes: unknown }
+  Map<string, EffectPresentation>
 >();
 
-// Previewed nodes and all their ancestors. A gesture keeps one previewed id
-// collection, so this is built once per gesture instead of once per layer
-// per frame.
-const getPreviewedLayerIds = (editor, preview) => {
-  const ids: Iterable<string> & object =
-    preview.nodeIdSet ?? preview.nodeIds ?? [];
-  const cached = previewedLayerIdsCache.get(ids);
+// Widened ink only changes when content crosses a step, so most preview
+// frames produce a value equal to the last one; return that object instead.
+const keepIdentity = (
+  editor,
+  layerId: string,
+  next: EffectPresentation
+): EffectPresentation => {
+  let lastByLayer = lastPreviewByEditor.get(editor);
 
-  if (cached?.nodes === editor.nodes) {
-    return cached.layerIds;
+  if (!lastByLayer) {
+    lastByLayer = new Map();
+    lastPreviewByEditor.set(editor, lastByLayer);
   }
 
-  const layerIds = new Set<string>();
+  const last = lastByLayer.get(layerId);
 
-  for (const nodeId of ids) {
-    let current = editor.getNode(nodeId);
-
-    while (current && !layerIds.has(current.id)) {
-      layerIds.add(current.id);
-      current = editor.getNode(current.parentId);
-    }
+  if (
+    last &&
+    haveSameBounds(last.ink, next.ink) &&
+    (last.effects === next.effects ||
+      JSON.stringify(last.effects) === JSON.stringify(next.effects))
+  ) {
+    return last;
   }
 
-  previewedLayerIdsCache.set(ids, { layerIds, nodes: editor.nodes });
+  lastByLayer.set(layerId, next);
 
-  return layerIds;
+  return next;
+};
+
+const haveSameBounds = (left: Bounds, right: Bounds) => {
+  return (
+    left.minX === right.minX &&
+    left.minY === right.minY &&
+    left.maxX === right.maxX &&
+    left.maxY === right.maxY
+  );
 };
 
 // Where the layer's ink could be during this preview: moved by a drag delta,

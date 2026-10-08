@@ -274,6 +274,10 @@ export {
 export type { RasterStroke } from "./raster/stroke";
 export { createRasterStroke } from "./raster/stroke";
 export type {
+  PreviewPresentationPlan,
+  PreviewTarget,
+} from "./render-tree/preview-placement";
+export type {
   RenderItem,
   RenderLayer,
   RenderLeaf,

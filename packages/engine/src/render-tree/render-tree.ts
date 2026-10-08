@@ -20,8 +20,9 @@ const LARGE_GROUP_LEAF_THRESHOLD = 24;
 // even at opacity 1, so toggling opacity never re-parents its descendants.
 export interface RenderLayer {
   children: RenderItem[];
-  // Artboards holding a shadowed group clip here, in stage coordinates, so
-  // group shadows stop at the artboard edge.
+  // An artboard's frame, in stage coordinates. Every artboard clips its
+  // content (and its groups' shadows) here, above any presentation root that
+  // moves beneath it, so shells never carry artboard clips.
   clip: Bounds | null;
   // A group's own shadows, composited over its children's stage-space ink.
   effects: EffectPresentation | null;
@@ -205,7 +206,7 @@ const buildRenderTree = (editor, inputs: RenderTreeInputs): RenderTree => {
     return getEffectPresentation(effects, content);
   };
   const getLayerClip = (node) => {
-    return node.type === "artboard" && facts.hasShadowedGroup(node.id)
+    return node.type === "artboard"
       ? (editor.getNodeRenderFrame(node.id)?.bounds ?? null)
       : null;
   };

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readPixel, toScreen } from "./helpers/appearance-sweep";
 import { gotoEditor, pauseForUi, resetViewport } from "./helpers/editor";
 
 const loadClipDocument = (page) => {
@@ -63,30 +64,35 @@ const loadClipDocument = (page) => {
   });
 };
 
-const getClipInsets = (page, nodeId) => {
-  return page.evaluate((id) => {
-    const el = document.querySelector(`[data-node-id="${id}"]`);
-    const shell =
-      el?.parentElement?.dataset?.nodeShell === "true" ? el.parentElement : el;
-    const clip = shell ? getComputedStyle(shell).clipPath : "";
-    const start = clip.indexOf("inset(");
-    const end = clip.indexOf(")", start);
-    if (start < 0 || end < 0) {
-      return { clip, insets: null };
-    }
-    // Computed clip-path normalizes whitespace to single spaces.
-    const parts = clip
-      .slice(start + "inset(".length, end)
-      .trim()
-      .split(" ")
-      .map((value) => Number.parseFloat(value));
-    if (parts.some((value) => Number.isNaN(value))) {
-      return { clip, insets: null };
-    }
-    // Expand the CSS 1/2/3/4-value shorthand.
-    const [top, right = top, bottom = top, left = right] = parts;
-    return { clip, insets: { bottom, left, right, top } };
-  }, nodeId);
+// Artboards clip once, on their render layer, in stage coordinates. Shells
+// never carry their own artboard clip, so a rotated child is cut by the
+// artboard rect itself rather than by an inset of its unrotated frame.
+const readClipState = (page) => {
+  return page.evaluate(() => {
+    const shellClips = [
+      ...document.querySelectorAll<HTMLElement>('[data-node-shell="true"]'),
+    ].map((shell) => getComputedStyle(shell).clipPath);
+    const box = document
+      .querySelector('[data-render-layer="artboard-1"]')
+      ?.closest<HTMLElement>("[data-render-clip]");
+
+    return {
+      clipBox: box
+        ? {
+            height: box.offsetHeight,
+            left: box.offsetLeft,
+            overflow: getComputedStyle(box).overflow,
+            top: box.offsetTop,
+            width: box.offsetWidth,
+          }
+        : null,
+      shellClips,
+    };
+  });
+};
+
+const pixelAt = async (page, point) => {
+  return readPixel(page, await toScreen(page, point));
 };
 
 test("artboard clip region extends past a rotated child's unrotated frame", async ({
@@ -97,16 +103,24 @@ test("artboard clip region extends past a rotated child's unrotated frame", asyn
   await resetViewport(page);
   await pauseForUi(page, 600);
 
-  // The rotated shape sits fully inside the artboard, so the clip region (the
-  // artboard rect expressed relative to the node's unrotated shell box) must
-  // extend beyond the box on every side: all insets negative. The old code
-  // clamped these at 0, shearing rotated content along its own frame edges.
-  const rotated = await getClipInsets(page, "rotated-shape");
-  expect(rotated.insets).not.toBeNull();
-  expect(rotated.insets.top).toBeLessThan(0);
-  expect(rotated.insets.right).toBeLessThan(0);
-  expect(rotated.insets.bottom).toBeLessThan(0);
-  expect(rotated.insets.left).toBeLessThan(0);
+  const { clipBox, shellClips } = await readClipState(page);
+
+  expect(clipBox).toEqual({
+    height: 600,
+    left: 0,
+    overflow: "clip",
+    top: 0,
+    width: 600,
+  });
+  expect(shellClips.every((clip) => clip === "none")).toBe(true);
+
+  // 120 units along the rotated major axis: far outside the unrotated
+  // 270..330 band, inside the artboard, so it must paint.
+  const [r, g, b] = await pixelAt(page, { x: 360, y: 404 });
+
+  expect(b).toBeGreaterThan(200);
+  expect(r).toBeLessThan(120);
+  expect(g).toBeLessThan(160);
 });
 
 test("artboard still clips children at its own edges", async ({ page }) => {
@@ -115,12 +129,12 @@ test("artboard still clips children at its own edges", async ({ page }) => {
   await resetViewport(page);
   await pauseForUi(page, 600);
 
-  // The edge shape spans x 450..750 against a 600-wide artboard: the clip
-  // must cut exactly 150px from its right side and stay open elsewhere.
-  const edge = await getClipInsets(page, "edge-shape");
-  expect(edge.insets).not.toBeNull();
-  expect(edge.insets.right).toBeCloseTo(150, 0);
-  expect(edge.insets.top).toBeLessThan(0);
-  expect(edge.insets.bottom).toBeLessThan(0);
-  expect(edge.insets.left).toBeLessThan(0);
+  // The edge shape spans x 450..750 against a 600-wide artboard.
+  const inside = await pixelAt(page, { x: 590, y: 500 });
+  const outside = await pixelAt(page, { x: 615, y: 500 });
+
+  expect(inside[0]).toBeGreaterThan(200);
+  expect(inside[2]).toBeLessThan(120);
+  // Orange would keep red high and blue low past the edge.
+  expect(outside[0] - outside[2]).toBeLessThan(40);
 });

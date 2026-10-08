@@ -1,23 +1,30 @@
 import {
   buildEffectFilter,
+  PERF_COUNTERS,
   type RenderItem,
   type RenderLayer,
 } from "@punchpress/engine";
-import { type CSSProperties, memo, useId } from "react";
+import { type CSSProperties, memo, type ReactNode, useId } from "react";
+import { usePerformanceRenderCounter } from "../../performance/use-performance-render-counter";
 import { CanvasNode } from "./canvas-node/canvas-node";
 import { renderSvgElement } from "./canvas-node/svg-element";
 import { getCssDropShadow } from "./css-drop-shadow";
+import { usePresentationElementRef } from "./placement/presentation-elements";
 import { useLayerComposite } from "./use-layer-composite";
 
-// One compositing boundary per group or artboard: a zero-size div at the
-// stage origin, so descendants keep stage coordinates. CSS opacity below 1
-// isolates the subtree; a group's shadows composite through CSS
-// filter: url() over a stage-space SVG filter (applied before opacity, so
-// they fade with the group); an artboard holding shadowed groups clips with
-// clip-path in stage coordinates. The element and its children keep the same
-// shape whether or not a layer is composited, so toggling a shadow never
-// remounts the subtree. It carries no node markers, so hit testing and
-// selection never target it.
+// One render layer per group or artboard, in three stable parts, outermost
+// first:
+// - presentation: a zero-size, stage-origin wrapper that a whole-layer drag
+//   translates as one compositing root (the only element a gesture moves)
+// - clip (artboards only): a box at the artboard frame with `overflow: clip`,
+//   so content and the shadows of its groups stop at the artboard edge while
+//   children move beneath it
+// - effect: opacity and the group's shadow filter, applied once to content
+//   plus shadow (filter before opacity)
+// Descendants keep stage coordinates throughout. The parts keep their shape
+// whether or not a layer is composited, so toggling a shadow never remounts
+// the subtree. No part carries node markers, so hit testing and selection
+// never target them.
 // The engine keeps an unchanged layer's object across rebuilds, so memoizing
 // on `layer` skips its whole subtree when a structural edit lands elsewhere.
 const CanvasRenderLayer = memo(function CanvasRenderLayer({
@@ -25,7 +32,9 @@ const CanvasRenderLayer = memo(function CanvasRenderLayer({
 }: {
   layer: RenderLayer;
 }) {
+  usePerformanceRenderCounter(PERF_COUNTERS.renderLayerComposite);
   const filterId = `pp${useId().replace(/[^a-zA-Z0-9_-]/g, "")}-fx`;
+  const presentationRef = usePresentationElementRef(layer.nodeId);
   const { clip, effects } = useLayerComposite(layer);
   const style: CSSProperties = {};
 
@@ -33,8 +42,8 @@ const CanvasRenderLayer = memo(function CanvasRenderLayer({
     style.opacity = layer.opacity;
   }
 
-  // One shadow is a CSS drop-shadow(), which Chromium can composite without
-  // repainting the group's subtree; several need the branched SVG graph.
+  // One shadow is a CSS drop-shadow(); several need the branched SVG graph,
+  // since chained drop-shadow() would shadow the earlier shadows.
   const cssShadow = effects ? getCssDropShadow(effects) : null;
 
   if (cssShadow) {
@@ -43,11 +52,7 @@ const CanvasRenderLayer = memo(function CanvasRenderLayer({
     style.filter = `url(#${filterId})`;
   }
 
-  if (clip) {
-    style.clipPath = `path('M ${clip.minX} ${clip.minY} H ${clip.maxX} V ${clip.maxY} H ${clip.minX} Z')`;
-  }
-
-  return (
+  const effectLayer = (
     <div
       className="pointer-events-none absolute top-0 left-0 h-0 w-0"
       data-render-layer={layer.nodeId}
@@ -66,7 +71,52 @@ const CanvasRenderLayer = memo(function CanvasRenderLayer({
       ) : null}
     </div>
   );
+
+  return (
+    <div
+      className="pointer-events-none absolute top-0 left-0 h-0 w-0 origin-top-left"
+      data-presentation-node-id={layer.nodeId}
+      ref={presentationRef}
+    >
+      {clip ? (
+        <ArtboardClip clip={clip}>{effectLayer}</ArtboardClip>
+      ) : (
+        effectLayer
+      )}
+    </div>
+  );
 });
+
+// `overflow: clip` is a plain rect clip the compositor applies natively, and
+// unlike `overflow: hidden` it never makes the box scrollable.
+const ArtboardClip = ({
+  children,
+  clip,
+}: {
+  children: ReactNode;
+  clip: NonNullable<RenderLayer["clip"]>;
+}) => {
+  return (
+    <div
+      className="pointer-events-none absolute"
+      data-render-clip={true}
+      style={{
+        height: clip.height,
+        left: clip.minX,
+        overflow: "clip",
+        top: clip.minY,
+        width: clip.width,
+      }}
+    >
+      <div
+        className="pointer-events-none absolute h-0 w-0"
+        style={{ left: -clip.minX, top: -clip.minY }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+};
 
 export const CanvasRenderItems = ({ items }: { items: RenderItem[] }) => {
   return items.map((item) => {

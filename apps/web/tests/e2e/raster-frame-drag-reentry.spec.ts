@@ -170,10 +170,6 @@ test("Frame reveals Raster pixels that re-enter during one held drag", async ({
     const outsideRenderState = await getRasterRenderState(page, rasterId);
 
     expect(isRasterColor(outsidePixel)).toBe(false);
-    expect(outsideRenderState.shell?.left).toBeCloseTo(
-      initialRenderState.shell?.left ?? Number.NaN,
-      1
-    );
     expect(outsideRenderState.node?.left).toBeLessThan(
       (initialRenderState.node?.left ?? Number.NEGATIVE_INFINITY) - 200
     );
@@ -186,10 +182,6 @@ test("Frame reveals Raster pixels that re-enter during one held drag", async ({
     expect(await getRasterTransform(page, rasterId)).toEqual(originalTransform);
     const reentryRenderState = await getRasterRenderState(page, rasterId);
 
-    expect(reentryRenderState.shell?.left).toBeCloseTo(
-      initialRenderState.shell?.left ?? Number.NaN,
-      1
-    );
     expect(reentryRenderState.node?.left).toBeCloseTo(
       (initialRenderState.node?.left ?? Number.NaN) + reentryDeltaX,
       1
@@ -449,13 +441,13 @@ test("canvas drag keeps a Raster nested and clipped by its Frame", async ({
     "data-surface-identity",
     "frame-child-resident-canvas"
   );
-  const previewClipPath = await rasterCanvas.evaluate(
-    (canvas) =>
-      canvas.closest<HTMLElement>("[data-node-shell='true']")?.style.clipPath
+  const previewClipPath = await rasterCanvas.evaluate((canvas) =>
+    // The Frame clips its layer; the Raster shell never carries a clip.
+    canvas.closest<HTMLElement>("[data-render-clip]") ? "frame clip" : ""
   );
   const previewOutsidePixel = await samplePixel(page, outsidePoint);
 
-  expect(previewClipPath).toContain("inset(");
+  expect(previewClipPath).toBe("frame clip");
 
   await page.mouse.up();
   await waitForPaint(page);
@@ -470,12 +462,12 @@ test("canvas drag keeps a Raster nested and clipped by its Frame", async ({
     "data-surface-identity",
     "frame-child-resident-canvas"
   );
-  const committedClipPath = await rasterCanvas.evaluate(
-    (canvas) =>
-      canvas.closest<HTMLElement>("[data-node-shell='true']")?.style.clipPath
+  const committedClipPath = await rasterCanvas.evaluate((canvas) =>
+    // The Frame clips its layer; the Raster shell never carries a clip.
+    canvas.closest<HTMLElement>("[data-render-clip]") ? "frame clip" : ""
   );
 
-  expect(committedClipPath).toContain("inset(");
+  expect(committedClipPath).toBe("frame clip");
   expect(await samplePixel(page, outsidePoint)).toEqual(previewOutsidePixel);
 });
 

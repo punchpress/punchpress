@@ -8,9 +8,9 @@ const noSubscription = () => () => undefined;
 
 // A layer's filter ink, clip, and shadow colors as the current selection and
 // selection-color previews need them. Only layers with effects or a clip
-// subscribe to previews, and the value is cached per preview revision, so
-// unrelated layers never re-render during a drag and affected ones re-render
-// once per preview change.
+// subscribe to previews, and the engine keeps equal values' identity, so
+// carried and unrelated layers never re-render during a drag and a stationary
+// ancestor re-renders only when its widened ink crosses a step.
 export const useLayerComposite = (layer: RenderLayer): LayerComposite => {
   const editor = useEditor();
   const composited = Boolean(layer.effects || layer.clip);

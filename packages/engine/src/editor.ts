@@ -279,7 +279,7 @@ import {
   resizeRaster as resizeEditorRaster,
   updateRasterResize as updateEditorRasterResize,
 } from "./raster/resize";
-import { getPreviewPlacementNodeIds as getEditorPreviewPlacementNodeIds } from "./render-tree/preview-placement";
+import { getPreviewPresentationPlan as getEditorPreviewPresentationPlan } from "./render-tree/preview-placement";
 import {
   getLayerPreviewClip as getEditorLayerPreviewClip,
   getLayerPreviewEffects as getEditorLayerPreviewEffects,
@@ -1110,8 +1110,9 @@ export class Editor {
     return getEditorRenderTree(this);
   }
 
-  // A render layer's filter ink and clip, widened or moved for the current
-  // selection preview (layers themselves never move during previews).
+  // A render layer's effects and clip during the current transform preview:
+  // carried layers keep theirs; stationary layers holding moving content
+  // widen their filter ink.
   getLayerPreviewEffects(layerId: string, effects) {
     return getEditorLayerPreviewEffects(this, layerId, effects);
   }
@@ -1120,11 +1121,10 @@ export class Editor {
     return getEditorLayerPreviewClip(this, layerId, clip);
   }
 
-  getPreviewPlacementNodeIds(
-    placedNodeIds = this.getRenderTree().placedNodeIds,
-    preview = this.selectionDragPreview
-  ) {
-    return getEditorPreviewPlacementNodeIds(this, placedNodeIds, preview);
+  // The moving presentation roots of a transform preview, and the layers
+  // they carry or affect; cached for a gesture's membership.
+  getPreviewPresentationPlan(preview = this.selectionDragPreview) {
+    return getEditorPreviewPresentationPlan(this, preview);
   }
 
   getPrimaryStrokeStyle(nodeIds = this.selectedNodeIds) {

@@ -62,6 +62,7 @@ export const PERF_SPANS = {
 
   renderCanvasReact: "render.canvas.react",
   renderPlacementDurable: "render.placement.durable",
+  renderPlacementHandoff: "render.placement.handoff",
   renderPlacementPreview: "render.placement.preview",
 
   rasterStrokeApplyDabs: "raster.stroke.applyDabs",
@@ -106,9 +107,15 @@ export const PERF_COUNTERS = {
   renderCanvasNodeArt: "render.canvasNodeArt.count",
   renderCanvasOverlay: "render.canvasOverlay.count",
   renderCanvasStageOverlay: "render.canvasStageOverlay.count",
+  // Render layers (groups and artboards) that re-rendered.
+  renderLayerComposite: "render.layerComposite.count",
   renderPanelLayerRow: "render.panelLayerRow.count",
   renderPanelLayers: "render.panelLayers.count",
   renderPanelProperties: "render.panelProperties.count",
+  // Moving presentation roots a transform preview promoted (once per
+  // gesture), and the root writes it made per preview frame.
+  renderPlacementPreviewRoots: "render.placementPreviewRoots.count",
+  renderPlacementPreviewWrites: "render.placementPreviewWrites.count",
   // Properties panel parts below the panel root: sections (one per titled
   // block), rows (one per stack layer or selection color), and fields (one
   // per value control).

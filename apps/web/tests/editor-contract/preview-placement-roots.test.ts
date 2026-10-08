@@ -1,5 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { createSolidAppearance, Editor } from "@punchpress/engine";
+import {
+  createSolidAppearance,
+  Editor,
+  type PreviewPresentationPlan,
+} from "@punchpress/engine";
+
+const describeTargets = (plan: PreviewPresentationPlan) => {
+  return plan.targets.map((target) => `${target.kind}:${target.nodeId}`);
+};
 
 describe("preview placement roots", () => {
   test("maps a single-child vector preview onto the rendered vector node", () => {
@@ -59,10 +67,12 @@ describe("preview placement roots", () => {
     ]);
 
     expect(
-      editor.getPreviewPlacementNodeIds(["vector-1"], {
-        nodeIds: ["path-1"],
-      })
-    ).toEqual(["vector-1"]);
+      describeTargets(
+        editor.getPreviewPresentationPlan({
+          nodeIds: ["path-1"],
+        })
+      )
+    ).toEqual(["shell:vector-1"]);
   });
 
   test("maps vector child preview ids onto the rendered vector node when the full vector is previewing", () => {
@@ -158,10 +168,12 @@ describe("preview placement roots", () => {
     ]);
 
     expect(
-      editor.getPreviewPlacementNodeIds(["vector-1"], {
-        nodeIds: ["path-1", "path-2"],
-      })
-    ).toEqual(["vector-1"]);
+      describeTargets(
+        editor.getPreviewPresentationPlan({
+          nodeIds: ["path-1", "path-2"],
+        })
+      )
+    ).toEqual(["shell:vector-1"]);
   });
 
   test("does not map a path-editing child drag onto the vector shell", () => {
@@ -259,9 +271,11 @@ describe("preview placement roots", () => {
     editor.startPathEditing("vector-1");
 
     expect(
-      editor.getPreviewPlacementNodeIds(["vector-1"], {
-        nodeIds: ["path-1"],
-      })
+      describeTargets(
+        editor.getPreviewPresentationPlan({
+          nodeIds: ["path-1"],
+        })
+      )
     ).toEqual([]);
   });
 
@@ -308,13 +322,15 @@ describe("preview placement roots", () => {
     ]);
 
     expect(
-      editor.getPreviewPlacementNodeIds(["path-1"], {
-        nodeIds: ["path-1"],
-      })
-    ).toEqual(["path-1"]);
+      describeTargets(
+        editor.getPreviewPresentationPlan({
+          nodeIds: ["path-1"],
+        })
+      )
+    ).toEqual(["shell:path-1"]);
   });
 
-  test("maps a selected container preview onto visible descendants", () => {
+  test("maps a selected container resize preview onto visible descendants", () => {
     const editor = new Editor();
 
     editor.getState().loadNodes([
@@ -371,10 +387,22 @@ describe("preview placement roots", () => {
     ]);
 
     expect(
-      editor.getPreviewPlacementNodeIds(["path-1"], {
-        effectiveNodeIdSet: new Set(["path-1"]),
-        nodeIds: ["group-1"],
-      })
-    ).toEqual(["path-1"]);
+      describeTargets(
+        editor.getPreviewPresentationPlan({
+          effectiveNodeIdSet: new Set(["path-1"]),
+          nodeIds: ["group-1"],
+        })
+      )
+    ).toEqual(["shell:path-1"]);
+    // A translation moves the fully covered group as one layer instead.
+    expect(
+      describeTargets(
+        editor.getPreviewPresentationPlan({
+          delta: { x: 4, y: 0 },
+          effectiveNodeIdSet: new Set(["path-1"]),
+          nodeIds: ["group-1"],
+        })
+      )
+    ).toEqual(["layer:group-1"]);
   });
 });

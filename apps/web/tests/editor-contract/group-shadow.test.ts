@@ -111,17 +111,24 @@ describe("group shadows", () => {
     expect(ink?.maxX).toBeGreaterThanOrEqual(370);
   });
 
-  test("an artboard holding a shadowed group clips that layer", () => {
+  test("every artboard clips its layer at its frame; groups never clip", () => {
     const editor = load([
       artboard("art"),
       group("g", "art", { effects: [shadow()] }),
       square("a", "g", 100, 100),
+      { ...artboard("bare"), transform: { ...IDENTITY, x: 2000 } },
+      square("c", "bare", 2100, 100),
       group("plain", "root"),
       square("b", "plain", 1000, 100),
     ]);
     const tree = editor.getRenderTree().items;
 
     expect(findLayer(tree, "art")?.clip).toMatchObject({ width: 800 });
+    expect(findLayer(tree, "bare")?.clip).toMatchObject({
+      minX: 2000,
+      width: 800,
+    });
+    expect(findLayer(tree, "g")?.clip).toBe(null);
     expect(findLayer(tree, "plain")?.clip).toBe(null);
     expect(findLayer(tree, "plain")?.effects).toBe(null);
   });
