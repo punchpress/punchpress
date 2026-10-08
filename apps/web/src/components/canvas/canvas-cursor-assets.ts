@@ -310,7 +310,17 @@ export const getCanvasRotateCursor = (rotationDegrees = 0) => {
   return createRotateCursor({ rotateDegrees: rotationDegrees });
 };
 
-export const getCanvasCursorStyle = () =>
+// Cursor configs are static, so the style is serialized once. A stable object
+// also keeps EditorShell from re-installing root custom properties per render.
+let canvasCursorStyle: CSSProperties | null = null;
+
+export const getCanvasCursorStyle = () => {
+  canvasCursorStyle ??= createCanvasCursorStyle();
+
+  return canvasCursorStyle;
+};
+
+const createCanvasCursorStyle = () =>
   ({
     "--canvas-cursor-add": createCanvasCursorFromConfig(CURSOR_CONFIGS.add),
     "--canvas-cursor-default": createCanvasCursorFromConfig(

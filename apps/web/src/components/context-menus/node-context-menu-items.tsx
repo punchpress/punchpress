@@ -211,9 +211,25 @@ interface NodeContextMenuItemsProps {
   onStartRenaming?: (() => void) | null;
 }
 
+// The popup portal mounts its children only while the menu is open, so the
+// menu's store subscription and eligibility checks run only for an open menu.
 export const NodeContextMenuItems = ({
   nodeId,
   onStartRenaming = null,
+}: NodeContextMenuItemsProps) => {
+  return (
+    <ContextMenuPopup>
+      <NodeContextMenuContent
+        nodeId={nodeId}
+        onStartRenaming={onStartRenaming}
+      />
+    </ContextMenuPopup>
+  );
+};
+
+const NodeContextMenuContent = ({
+  nodeId,
+  onStartRenaming,
 }: NodeContextMenuItemsProps) => {
   const editor = useEditor();
   const contextMenuState = useEditorValue((nextEditor, state) => {
@@ -226,7 +242,7 @@ export const NodeContextMenuItems = ({
   });
 
   return (
-    <ContextMenuPopup>
+    <>
       <GroupNodeContextMenuItems
         canGroupSelection={contextMenuState.canGroupSelection}
         canUngroup={contextMenuState.canUngroup}
@@ -307,6 +323,6 @@ export const NodeContextMenuItems = ({
         <LayerGlyph icon={Delete02Icon} size={17} strokeWidth={1.7} />
         Delete
       </ContextMenuItem>
-    </ContextMenuPopup>
+    </>
   );
 };
