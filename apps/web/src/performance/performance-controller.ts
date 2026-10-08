@@ -84,6 +84,14 @@ export interface PerformanceNodeStats {
   visibleTextNodeCount: number;
 }
 
+export interface PerformanceSampleSummary {
+  count: number;
+  label: string;
+  max: number;
+  p50: number;
+  p95: number;
+}
+
 export interface PerformanceBenchmarkResult {
   benchmarkId: string;
   counters: FrameCounters;
@@ -94,11 +102,15 @@ export interface PerformanceBenchmarkResult {
   flameSpans: PerformanceFlameSpan[];
   frames: PerformanceFrameSample[];
   label: string;
+  // Benchmark-recorded samples such as action-to-settled-frame latency.
+  metrics: PerformanceSampleSummary[];
   nodeStats: PerformanceNodeStats;
   options: ResolvedPerformanceBenchmarkOptions;
   spans: Array<{
+    count: number;
     label: string;
     maxMs: number;
+    p50Ms: number;
     p95Ms: number;
     totalMs: number;
   }>;
@@ -261,25 +273,48 @@ const toTimelineScripts = (entry: PerformanceEntry) => {
   }));
 };
 
+const getPercentile = (sortedValues: number[], percentile: number) => {
+  const index = Math.min(
+    sortedValues.length - 1,
+    Math.floor((sortedValues.length - 1) * percentile)
+  );
+
+  return sortedValues[index] || 0;
+};
+
 const toSpanSummary = (samples: Map<string, number[]>) => {
   return [...samples.entries()]
     .map(([label, durations]) => {
       const sortedDurations = [...durations].sort(
         (left, right) => left - right
       );
-      const p95Index = Math.min(
-        sortedDurations.length - 1,
-        Math.floor((sortedDurations.length - 1) * 0.95)
-      );
 
       return {
+        count: sortedDurations.length,
         label,
         maxMs: sortedDurations.at(-1) || 0,
-        p95Ms: sortedDurations[p95Index] || 0,
+        p50Ms: getPercentile(sortedDurations, 0.5),
+        p95Ms: getPercentile(sortedDurations, 0.95),
         totalMs: sortedDurations.reduce((sum, duration) => sum + duration, 0),
       };
     })
     .sort((left, right) => right.totalMs - left.totalMs);
+};
+
+const toSampleSummary = (
+  samples: Map<string, number[]>
+): PerformanceSampleSummary[] => {
+  return [...samples.entries()].map(([label, values]) => {
+    const sortedValues = [...values].sort((left, right) => left - right);
+
+    return {
+      count: sortedValues.length,
+      label,
+      max: sortedValues.at(-1) || 0,
+      p50: getPercentile(sortedValues, 0.5),
+      p95: getPercentile(sortedValues, 0.95),
+    };
+  });
 };
 
 const getFrameOverlappingSpans = (
@@ -348,6 +383,7 @@ export class PerformanceController {
     counters: FrameCounters;
     flameSpans: PerformanceFlameSpan[];
     frames: PerformanceFrameSample[];
+    metricSamples: Map<string, number[]>;
     options: ResolvedPerformanceBenchmarkOptions;
     spanSamples: Map<string, number[]>;
     startedAtIso: string;
@@ -906,6 +942,16 @@ export class PerformanceController {
     }
   };
 
+  recordMetric = (label: string, value: number) => {
+    if (!this.activeCollection) {
+      return;
+    }
+
+    const values = this.activeCollection.metricSamples.get(label) || [];
+    values.push(value);
+    this.activeCollection.metricSamples.set(label, values);
+  };
+
   incrementCounter = (name: string, amount = 1) => {
     this.pendingCounters.set(
       name,
@@ -945,6 +991,7 @@ export class PerformanceController {
       counters: {},
       flameSpans: [],
       frames: [],
+      metricSamples: new Map(),
       options,
       spanSamples: new Map(),
       startedAtIso: new Date().toISOString(),
@@ -974,6 +1021,7 @@ export class PerformanceController {
       frames,
       flameSpans: collection.flameSpans,
       label: collection.benchmark.label,
+      metrics: toSampleSummary(collection.metricSamples),
       nodeStats: this.state.nodeStats,
       options: collection.options,
       spans: toSpanSummary(collection.spanSamples),
@@ -1005,6 +1053,7 @@ export class PerformanceController {
     const context: PerformanceBenchmarkContext = {
       editor,
       options: resolvedOptions,
+      recordMetric: this.recordMetric,
       waitForFrame: this.waitForFrame,
       waitForFrames: this.waitForFrames,
     };

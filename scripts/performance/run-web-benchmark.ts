@@ -66,6 +66,7 @@ const toCliResult = (
     error: result.error,
     counters: result.counters,
     flameSpans: result.flameSpans,
+    metrics: result.metrics,
     nodeStats: result.nodeStats,
     options: result.options,
     spans: result.spans,
@@ -291,7 +292,9 @@ const run = async () => {
   console.log(`${benchmark.label}`);
   console.log(formatSummary(result.summary));
   console.log(`result: ${path.relative(process.cwd(), resultArtifactPath)}`);
-  console.log(`snapshot: ${path.relative(process.cwd(), snapshotArtifactPath)}`);
+  console.log(
+    `snapshot: ${path.relative(process.cwd(), snapshotArtifactPath)}`
+  );
   if (options.trace) {
     console.log(`trace: ${path.relative(process.cwd(), traceArtifactPath)}`);
   }

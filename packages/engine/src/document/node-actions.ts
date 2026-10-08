@@ -1,5 +1,7 @@
 import { duplicateClipboardContent } from "../clipboard/clipboard-actions";
 import { finishEditingIfNeeded } from "../editing/editing-actions";
+import { measurePerf } from "../perf/perf-hooks";
+import { PERF_SPANS } from "../perf/perf-labels";
 import { isSelected } from "../selection/selection-actions";
 import { getImageLocalClipBounds } from "../tools/brush-target";
 
@@ -55,75 +57,83 @@ export const duplicateForDrag = (editor, nodeId) => {
 };
 
 export const groupSelected = (editor) => {
-  finishEditingIfNeeded(editor);
-  if (editor.selectedNodeIds.length < 2) {
-    return;
-  }
+  measurePerf(PERF_SPANS.documentGroupApply, () => {
+    finishEditingIfNeeded(editor);
+    if (editor.selectedNodeIds.length < 2) {
+      return;
+    }
 
-  editor.run(() => {
-    editor.getState().groupSelectedNodes();
+    editor.run(() => {
+      editor.getState().groupSelectedNodes();
+    });
   });
 };
 
 export const ungroup = (editor, nodeId) => {
-  finishEditingIfNeeded(editor);
-  const targetNodeId =
-    nodeId && editor.isGroupNode(nodeId) ? nodeId : editor.selectedNodeId;
+  measurePerf(PERF_SPANS.documentUngroupApply, () => {
+    finishEditingIfNeeded(editor);
+    const targetNodeId =
+      nodeId && editor.isGroupNode(nodeId) ? nodeId : editor.selectedNodeId;
 
-  if (!(targetNodeId && editor.isGroupNode(targetNodeId))) {
-    return;
-  }
+    if (!(targetNodeId && editor.isGroupNode(targetNodeId))) {
+      return;
+    }
 
-  editor.run(() => {
-    editor.getState().ungroupNodeById(targetNodeId);
+    editor.run(() => {
+      editor.getState().ungroupNodeById(targetNodeId);
+    });
   });
 };
 
 export const setNodeOrder = (editor, nodeIds, parentId) => {
-  finishEditingIfNeeded(editor);
-  editor.run(() => {
-    editor.getState().setNodeOrder(nodeIds, parentId);
+  measurePerf(PERF_SPANS.documentReorderApply, () => {
+    finishEditingIfNeeded(editor);
+    editor.run(() => {
+      editor.getState().setNodeOrder(nodeIds, parentId);
+    });
   });
 };
 
 export const moveNodeToParent = (editor, nodeId, parentId, beforeNodeId) => {
-  finishEditingIfNeeded(editor);
-  editor.run(() => {
-    const node = editor.getNode(nodeId);
-    const previousFrameBounds =
-      node?.type === "image" ? getImageLocalClipBounds(editor, node) : null;
+  measurePerf(PERF_SPANS.documentReparentApply, () => {
+    finishEditingIfNeeded(editor);
+    editor.run(() => {
+      const node = editor.getNode(nodeId);
+      const previousFrameBounds =
+        node?.type === "image" ? getImageLocalClipBounds(editor, node) : null;
 
-    editor.getState().moveNodeToParent(nodeId, parentId, beforeNodeId);
+      editor.getState().moveNodeToParent(nodeId, parentId, beforeNodeId);
 
-    const movedNode = editor.getNode(nodeId);
-    const remainsFrameOwned =
-      movedNode?.type === "image"
-        ? getImageLocalClipBounds(editor, movedNode)
-        : null;
+      const movedNode = editor.getNode(nodeId);
+      const remainsFrameOwned =
+        movedNode?.type === "image"
+          ? getImageLocalClipBounds(editor, movedNode)
+          : null;
 
-    if (
-      !(
-        movedNode?.type === "image" &&
-        previousFrameBounds &&
-        !remainsFrameOwned
-      )
-    ) {
-      return;
-    }
+      if (
+        !(
+          movedNode?.type === "image" &&
+          previousFrameBounds &&
+          !remainsFrameOwned
+        )
+      ) {
+        return;
+      }
 
-    editor.getState().updateNodeById(nodeId, (currentNode) =>
-      currentNode.type === "image"
-        ? {
-            ...currentNode,
-            writableHeight:
-              previousFrameBounds.maxY - previousFrameBounds.minY,
-            writableWidth:
-              previousFrameBounds.maxX - previousFrameBounds.minX,
-            writableX: previousFrameBounds.minX,
-            writableY: previousFrameBounds.minY,
-          }
-        : currentNode
-    );
+      editor.getState().updateNodeById(nodeId, (currentNode) =>
+        currentNode.type === "image"
+          ? {
+              ...currentNode,
+              writableHeight:
+                previousFrameBounds.maxY - previousFrameBounds.minY,
+              writableWidth:
+                previousFrameBounds.maxX - previousFrameBounds.minX,
+              writableX: previousFrameBounds.minX,
+              writableY: previousFrameBounds.minY,
+            }
+          : currentNode
+      );
+    });
   });
 };
 
@@ -170,23 +180,25 @@ export const toggleVisibility = (editor, nodeId) => {
 };
 
 export const sendToBack = (editor, nodeId) => {
-  finishEditingIfNeeded(editor);
-  if (
-    !nodeId ||
-    (isSelected(editor, nodeId) && editor.selectedNodeIds.length > 1)
-  ) {
-    if (editor.selectedNodeIds.length === 0) {
+  measurePerf(PERF_SPANS.documentReorderApply, () => {
+    finishEditingIfNeeded(editor);
+    if (
+      !nodeId ||
+      (isSelected(editor, nodeId) && editor.selectedNodeIds.length > 1)
+    ) {
+      if (editor.selectedNodeIds.length === 0) {
+        return;
+      }
+
+      editor.run(() => {
+        editor.getState().sendSelectedNodesToBack();
+      });
       return;
     }
 
     editor.run(() => {
-      editor.getState().sendSelectedNodesToBack();
+      editor.getState().sendNodeToBack(nodeId);
     });
-    return;
-  }
-
-  editor.run(() => {
-    editor.getState().sendNodeToBack(nodeId);
   });
 };
 
@@ -234,22 +246,24 @@ export const addEmptyLayer = (editor) => {
 };
 
 export const bringToFront = (editor, nodeId) => {
-  finishEditingIfNeeded(editor);
-  if (
-    !nodeId ||
-    (isSelected(editor, nodeId) && editor.selectedNodeIds.length > 1)
-  ) {
-    if (editor.selectedNodeIds.length === 0) {
+  measurePerf(PERF_SPANS.documentReorderApply, () => {
+    finishEditingIfNeeded(editor);
+    if (
+      !nodeId ||
+      (isSelected(editor, nodeId) && editor.selectedNodeIds.length > 1)
+    ) {
+      if (editor.selectedNodeIds.length === 0) {
+        return;
+      }
+
+      editor.run(() => {
+        editor.getState().bringSelectedNodesToFront();
+      });
       return;
     }
 
     editor.run(() => {
-      editor.getState().bringSelectedNodesToFront();
+      editor.getState().bringNodeToFront(nodeId);
     });
-    return;
-  }
-
-  editor.run(() => {
-    editor.getState().bringNodeToFront(nodeId);
   });
 };

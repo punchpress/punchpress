@@ -234,10 +234,7 @@ import {
   buildNodeCapabilityGeometry,
   getNodeFrameFromGeometry,
 } from "./nodes/node-capabilities";
-import {
-  isArtboardNode,
-  isGroupNode,
-} from "./nodes/node-tree";
+import { isArtboardNode, isGroupNode } from "./nodes/node-tree";
 import { getVectorPathEditingChildId } from "./nodes/vector/vector-path-composition";
 import { measurePerf } from "./perf/perf-hooks";
 import { PERF_SPANS } from "./perf/perf-labels";
@@ -1156,7 +1153,10 @@ export class Editor {
     return setEditorAppearance(this, appearance, nodeIds);
   }
 
-  addEffect(kind: Effect["kind"] = "drop-shadow", nodeIds = this.selectedNodeIds) {
+  addEffect(
+    kind: Effect["kind"] = "drop-shadow",
+    nodeIds = this.selectedNodeIds
+  ) {
     return addEditorEffect(this, kind, nodeIds);
   }
 
@@ -2428,29 +2428,33 @@ export class Editor {
   }
 
   redo() {
-    const historyTool = this.currentTool;
-    this.cancelRasterResize();
-    this.cancelRasterStroke();
-    const didRedo = this.history.redo();
+    return measurePerf(PERF_SPANS.historyRedoApply, () => {
+      const historyTool = this.currentTool;
+      this.cancelRasterResize();
+      this.cancelRasterStroke();
+      const didRedo = this.history.redo();
 
-    if (didRedo) {
-      historyTool.onHistoryChanged?.("redo");
-    }
+      if (didRedo) {
+        historyTool.onHistoryChanged?.("redo");
+      }
 
-    return didRedo;
+      return didRedo;
+    });
   }
 
   undo() {
-    const historyTool = this.currentTool;
-    this.cancelRasterResize();
-    this.cancelRasterStroke();
-    const didUndo = this.history.undo();
+    return measurePerf(PERF_SPANS.historyUndoApply, () => {
+      const historyTool = this.currentTool;
+      this.cancelRasterResize();
+      this.cancelRasterStroke();
+      const didUndo = this.history.undo();
 
-    if (didUndo) {
-      historyTool.onHistoryChanged?.("undo");
-    }
+      if (didUndo) {
+        historyTool.onHistoryChanged?.("undo");
+      }
 
-    return didUndo;
+      return didUndo;
+    });
   }
 
   resetHistory() {

@@ -19,6 +19,9 @@ export interface ResolvedPerformanceBenchmarkOptions {
 export interface PerformanceBenchmarkContext {
   editor: Editor;
   options: ResolvedPerformanceBenchmarkOptions;
+  // Records one benchmark-level sample (for example action-to-settled-frame
+  // latency); the result summarizes count, p50, p95, and max per label.
+  recordMetric: (label: string, value: number) => void;
   waitForFrame: () => Promise<number>;
   waitForFrames: (count?: number) => Promise<void>;
 }

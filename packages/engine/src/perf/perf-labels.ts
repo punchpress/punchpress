@@ -49,6 +49,12 @@ export const PERF_SPANS = {
 
   importSvgParse: "import.svg.parse",
   documentLoadApply: "document.load.apply",
+  documentGroupApply: "document.group.apply",
+  documentUngroupApply: "document.ungroup.apply",
+  documentReorderApply: "document.reorder.apply",
+  documentReparentApply: "document.reparent.apply",
+  historyUndoApply: "history.undo.apply",
+  historyRedoApply: "history.redo.apply",
 
   pathPointMove: "path.point.move",
   pathContoursUpdate: "path.contours.update",
@@ -79,6 +85,14 @@ export const PERF_SPANS = {
 } as const;
 
 export const PERF_COUNTERS = {
+  groupActionsAffectedLeaves: "fixture.groupActions.affectedLeaves",
+  groupActionsContours: "fixture.groupActions.contours",
+  groupActionsDepth: "fixture.groupActions.depth",
+  groupActionsFilterOwners: "fixture.groupActions.filterOwners",
+  groupActionsGroupNodes: "fixture.groupActions.groupNodes",
+  groupActionsLeafNodes: "fixture.groupActions.leafNodes",
+  groupActionsPlacedSurfaces: "fixture.groupActions.placedSurfaces",
+  groupActionsTotalNodes: "fixture.groupActions.totalNodes",
   largeSvgCanvasNodes: "fixture.largeSvg.canvasNodes",
   largeSvgGroupNodes: "fixture.largeSvg.groupNodes",
   largeSvgImageSurfaces: "fixture.largeSvg.imageSurfaces",

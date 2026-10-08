@@ -273,7 +273,7 @@ const loadMaxStackScene = async ({
   editor,
   options,
   waitForFrame,
-}: PerformanceBenchmarkContext) => {
+}: Omit<PerformanceBenchmarkContext, "recordMetric">) => {
   const { children } = await loadAppearanceBenchmarkScene(
     editor,
     options.nodeCount,

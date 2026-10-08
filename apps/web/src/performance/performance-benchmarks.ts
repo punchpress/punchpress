@@ -6,6 +6,7 @@ import {
 } from "./benchmarks/appearance-benchmark";
 import { compoundVectorDragBenchmark } from "./benchmarks/compound-vector-drag-benchmark";
 import { dropShadowBenchmarks } from "./benchmarks/drop-shadow-benchmark";
+import { groupActionBenchmarks } from "./benchmarks/group-action-benchmark";
 import { idleSoakBenchmark } from "./benchmarks/idle-soak-benchmark";
 import {
   largeSvgDeselectBenchmark,
@@ -72,6 +73,7 @@ export const performanceBenchmarks = [
   appearanceNestedGroupsDraggingBenchmark,
   ...strokeAlignmentBenchmarks,
   ...dropShadowBenchmarks,
+  ...groupActionBenchmarks,
   idleSoakBenchmark,
   shapeDragBenchmarkLarge,
   textDragBenchmark,
