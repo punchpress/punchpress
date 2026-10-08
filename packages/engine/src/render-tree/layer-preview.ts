@@ -77,22 +77,51 @@ const withSelectionColorPreview = (
       const previewEffect = previewById.get(effect.id);
 
       return previewEffect
-        ? { ...effect, color: previewEffect.color, opacity: previewEffect.opacity }
+        ? {
+            ...effect,
+            color: previewEffect.color,
+            opacity: previewEffect.opacity,
+          }
         : effect;
     }),
   };
 };
 
 const previewTouches = (editor, preview, layerId: string) => {
-  const ids: Iterable<string> = preview.nodeIdSet ?? preview.nodeIds ?? [];
+  return getPreviewedLayerIds(editor, preview).has(layerId);
+};
+
+const previewedLayerIdsCache = new WeakMap<
+  object,
+  { layerIds: Set<string>; nodes: unknown }
+>();
+
+// Previewed nodes and all their ancestors. A gesture keeps one previewed id
+// collection, so this is built once per gesture instead of once per layer
+// per frame.
+const getPreviewedLayerIds = (editor, preview) => {
+  const ids: Iterable<string> & object =
+    preview.nodeIdSet ?? preview.nodeIds ?? [];
+  const cached = previewedLayerIdsCache.get(ids);
+
+  if (cached?.nodes === editor.nodes) {
+    return cached.layerIds;
+  }
+
+  const layerIds = new Set<string>();
 
   for (const nodeId of ids) {
-    if (nodeId === layerId || editor.isDescendantOf(nodeId, layerId)) {
-      return true;
+    let current = editor.getNode(nodeId);
+
+    while (current && !layerIds.has(current.id)) {
+      layerIds.add(current.id);
+      current = editor.getNode(current.parentId);
     }
   }
 
-  return false;
+  previewedLayerIdsCache.set(ids, { layerIds, nodes: editor.nodes });
+
+  return layerIds;
 };
 
 // Where the layer's ink could be during this preview: moved by a drag delta,

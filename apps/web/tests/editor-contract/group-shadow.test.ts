@@ -146,6 +146,41 @@ describe("group shadows", () => {
     editor.setSelectionDragPreview(null);
   });
 
+  test("a preview widens shadowed ancestors of moved leaves only", () => {
+    const editor = load([
+      group("outer", "root", { effects: [shadow()] }),
+      group("inner", "outer"),
+      square("a", "inner", 100, 100),
+      group("still", "root", { effects: [shadow()] }),
+      square("b", "still", 400, 100),
+    ]);
+    const items = editor.getRenderTree().items;
+    const outer = findLayer(items, "outer")?.effects ?? null;
+    const still = findLayer(items, "still")?.effects ?? null;
+    const nodeIdSet = new Set(["a"]);
+    const drag = (x: number) => {
+      editor.setSelectionDragPreview({
+        delta: { x, y: 0 },
+        effectiveNodeIdSet: nodeIdSet,
+        nodeIdSet,
+        nodeIds: ["a"],
+      });
+    };
+
+    drag(500);
+    expect(editor.getLayerPreviewEffects("outer", outer)?.ink.maxX).toBe(
+      (outer?.ink.maxX ?? 0) + 512
+    );
+    expect(editor.getLayerPreviewEffects("still", still)).toBe(still);
+
+    // Later frames of the same gesture reuse the previewed ancestry.
+    drag(1100);
+    expect(editor.getLayerPreviewEffects("outer", outer)?.ink.maxX).toBe(
+      (outer?.ink.maxX ?? 0) + 1536
+    );
+    editor.setSelectionDragPreview(null);
+  });
+
   test("export applies a group's filter with its opacity, once", async () => {
     const editor = load([
       group("g", "root", { effects: [shadow()], opacity: 0.5 }),
