@@ -176,3 +176,29 @@ test("a failed flush is reported so a tab switch can stay on Scratchpad", async 
   await autosave.dispose();
   expect(attempts).toBe(2);
 });
+
+test("continuous edits after a timed write wait for the next quiet period", async () => {
+  const { editor, edit } = createEditor();
+  const saved: string[] = [];
+  const autosave = createScratchpadAutosave(
+    editor,
+    async (contents) => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      saved.push(contents);
+    },
+    20
+  );
+
+  edit("first");
+  await new Promise((resolve) => setTimeout(resolve, 25));
+
+  for (let index = 0; index < 20; index += 1) {
+    edit(`edit-${index}`);
+    await new Promise((resolve) => setTimeout(resolve, 4));
+  }
+
+  expect(saved).toEqual(["first"]);
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  expect(saved).toEqual(["first", "edit-19"]);
+  await autosave.dispose();
+});
