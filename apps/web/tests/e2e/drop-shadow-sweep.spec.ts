@@ -3,6 +3,7 @@ import {
   SHADOW_ARTBOARD_ID,
   SHADOW_CLIPPED_POINT,
   SHADOW_DOCUMENT,
+  SHADOW_DRAGGED_GROUP_IDS,
   SHADOW_SAMPLES,
 } from "./drop-shadow-scene";
 import {
@@ -79,6 +80,65 @@ const expectExportParity = async (page: Page, dpr: number) => {
   }
 };
 
+// Mid-drag, the dragged groups move as presentation roots (one fractional
+// translation each); their shadows, nested and multi-shadow filters included,
+// paint at the moved positions, and cancel restores them.
+const DRAG_DELTA = { x: 30.5, y: -20.25 };
+const DRAGGED_PREFIXES = ["group:", "soft group:", "nested:"];
+
+const expectDraggedShadows = async (page: Page, dpr: number) => {
+  await page.evaluate(
+    ({ delta, ids }) => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
+      const holder = window as never as { dragSession: unknown };
+
+      editor?.setSelectedNodes(ids);
+      holder.dragSession = editor?.beginSelectionDrag({ nodeIds: ids });
+      editor?.updateSelectionDrag(holder.dragSession, { delta });
+    },
+    { delta: DRAG_DELTA, ids: SHADOW_DRAGGED_GROUP_IDS }
+  );
+
+  expect(
+    await page.evaluate(() => {
+      return [
+        ...document.querySelectorAll<HTMLElement>(
+          "[data-presentation-node-id]"
+        ),
+      ]
+        .filter((element) => element.style.transform)
+        .map((element) => element.dataset.presentationNodeId)
+        .sort();
+    })
+  ).toEqual([...SHADOW_DRAGGED_GROUP_IDS].sort());
+
+  for (const sample of SHADOW_SAMPLES) {
+    if (!DRAGGED_PREFIXES.some((prefix) => sample.name.startsWith(prefix))) {
+      continue;
+    }
+
+    const point = {
+      x: sample.point.x + DRAG_DELTA.x,
+      y: sample.point.y + DRAG_DELTA.y,
+    };
+
+    await centerOn(page, point, 1);
+    expectColor(
+      await readPixel(page, await toScreen(page, point)),
+      sample.color,
+      `dragging DPR ${dpr} ${sample.name}`
+    );
+  }
+
+  await page.evaluate(() => {
+    window.__PUNCHPRESS_EDITOR__?.endSelectionDrag(
+      (window as never as { dragSession: unknown }).dragSession,
+      { cancel: true }
+    );
+    window.__PUNCHPRESS_EDITOR__?.setSelectedNodes([]);
+  });
+};
+
 for (const dpr of [2, 1]) {
   test.describe(`drop shadow sweep @ DPR ${dpr}`, () => {
     test.use({
@@ -95,6 +155,8 @@ for (const dpr of [2, 1]) {
       await sweep(page, dpr, "loaded");
       await expectClippedAtArtboard(page, "loaded");
       await expectExportParity(page, dpr);
+      await expectDraggedShadows(page, dpr);
+      await sweep(page, dpr, "after drag");
 
       const saved = await page.evaluate(() => {
         return window.__PUNCHPRESS_EDITOR__?.serializeDocument();

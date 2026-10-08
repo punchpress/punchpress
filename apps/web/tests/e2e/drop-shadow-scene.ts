@@ -144,6 +144,25 @@ export const SHADOW_DOCUMENT = JSON.stringify({
       { height: 100, width: 100, x: 500, y: 610 },
       "#1f6feb"
     ),
+    // G: a two-shadow group (SVG filter graph) around a shadowed group. The
+    // square spans 1150..1230 × 570..650; the inner shadow covers 1190..1270;
+    // the outer shadows offset that union 40 left and 40 down.
+    group("shadow-multi", {
+      effects: [
+        shadow({ id: "multi-left", x: -40, y: 0 }),
+        shadow({ id: "multi-down", x: 0, y: 40 }),
+      ],
+    }),
+    group("shadow-nested", {
+      effects: [shadow({ x: 40, y: 0 })],
+      parentId: "shadow-multi",
+    }),
+    rect(
+      "shadow-nested-square",
+      "shadow-nested",
+      { height: 80, width: 80, x: 1190, y: 610 },
+      "#1f6feb"
+    ),
   ],
   version: "1.12",
 });
@@ -161,6 +180,14 @@ const sample = (
   point: { x, y },
 });
 
+// Groups the sweep drags as moving presentation roots, and the samples they
+// carry.
+export const SHADOW_DRAGGED_GROUP_IDS = [
+  "shadow-group",
+  "shadow-soft",
+  "shadow-multi",
+];
+
 export const SHADOW_SAMPLES = [
   sample("hard: fill", 300, 300, BLUE, 40),
   sample("hard: shadow past the corner", 415, 365, BLACK, 10),
@@ -173,6 +200,10 @@ export const SHADOW_SAMPLES = [
   sample("group: half shadow", 265, 665, HALF_BLACK, 10),
   sample("edge: shadow inside the artboard", 1570, 600, BLACK, 10),
   sample("soft group: shadow core", 650, 610, BLACK, 15),
+  sample("nested: inner shadow", 1250, 610, BLACK, 10),
+  sample("nested: outer left shadow", 1130, 610, BLACK, 10),
+  sample("nested: outer down shadow", 1250, 680, BLACK, 10),
+  sample("nested: clear past every shadow", 1295, 600, WHITE, 10),
 ];
 
 // Just outside the artboard, where the unclipped shadow would continue.

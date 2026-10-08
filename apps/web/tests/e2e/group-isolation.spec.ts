@@ -76,7 +76,7 @@ const SAMPLE_POINTS = [
   { name: "b only", x: 460, y: 300 },
 ];
 
-const sampleCanvas = async (page: Page) => {
+const sampleCanvas = async (page: Page, offset = { x: 0, y: 0 }) => {
   await setViewport(page, { x: 0, y: 0, zoom: 1 });
   await page.evaluate(async () => {
     for (let index = 0; index < 3; index += 1) {
@@ -87,16 +87,19 @@ const sampleCanvas = async (page: Page) => {
   const values: number[] = [];
 
   for (const point of SAMPLE_POINTS) {
-    const screen = await page.evaluate((world) => {
-      const editor = window.__PUNCHPRESS_EDITOR__;
-      const viewer = editor?.viewerRef;
-      const host = editor?.hostRef?.getBoundingClientRect();
+    const screen = await page.evaluate(
+      (world) => {
+        const editor = window.__PUNCHPRESS_EDITOR__;
+        const viewer = editor?.viewerRef;
+        const host = editor?.hostRef?.getBoundingClientRect();
 
-      return {
-        x: (host?.left ?? 0) + (world.x - (viewer?.getScrollLeft() ?? 0)),
-        y: (host?.top ?? 0) + (world.y - (viewer?.getScrollTop() ?? 0)),
-      };
-    }, point);
+        return {
+          x: (host?.left ?? 0) + (world.x - (viewer?.getScrollLeft() ?? 0)),
+          y: (host?.top ?? 0) + (world.y - (viewer?.getScrollTop() ?? 0)),
+        };
+      },
+      { x: point.x + offset.x, y: point.y + offset.y }
+    );
     const image = decodePng(
       await page.screenshot({
         clip: { height: 1, width: 1, x: screen.x, y: screen.y },
@@ -129,6 +132,28 @@ for (const [label, fillerCount] of [
     expect(Math.abs(left - 128)).toBeLessThanOrEqual(6);
     expect(Math.abs(overlap - left)).toBeLessThanOrEqual(3);
     expect(Math.abs(right - left)).toBeLessThanOrEqual(3);
+
+    // Dragged as one presentation root by a fractional delta, the group
+    // still composites once.
+    const delta = { x: 40.5, y: 20.25 };
+
+    await page.evaluate((step) => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
+      const holder = window as never as { dragSession: unknown };
+
+      editor?.setSelectedNodes(["g"]);
+      holder.dragSession = editor?.beginSelectionDrag({ nodeIds: ["g"] });
+      editor?.updateSelectionDrag(holder.dragSession, { delta: step });
+    }, delta);
+
+    const [movedLeft, movedOverlap, movedRight] = await sampleCanvas(
+      page,
+      delta
+    );
+
+    expect(Math.abs(movedLeft - 128)).toBeLessThanOrEqual(6);
+    expect(Math.abs(movedOverlap - movedLeft)).toBeLessThanOrEqual(3);
+    expect(Math.abs(movedRight - movedLeft)).toBeLessThanOrEqual(3);
   });
 }
 
