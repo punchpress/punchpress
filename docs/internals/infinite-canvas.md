@@ -11,23 +11,58 @@ The web canvas integrates `react-infinite-viewer` with engine viewport state.
 
 ## Owners
 
-- React owns viewer refs, DOM host refs, pointer events, and canvas coordinate
-  conversion. It also prevents browser page zoom for pinch-wheel events inside
+- Engine owns camera policy: viewport state, clamping, zoom anchoring,
+  pending focus, interaction state, and publication
+  (`packages/engine/src/viewport/`).
+- The canvas viewer adapter (`use-canvas-viewer.ts`) attaches
+  react-infinite-viewer to the engine, reports native viewer scrolls as
+  gestures, ends gestures after a short idle, and routes wheel pinch to the
+  engine. It also prevents browser page zoom for pinch-wheel events inside
   the editor shell.
-- Engine owns viewport state, zoom helpers, pending focus, and tool dispatch.
-- Canvas components render artboards, nodes, overlays, text editor, toolbar, and
-  grid in the current viewport.
+- Canvas components render artboards, nodes, overlays, text editor, toolbar,
+  and grid, and convert client points through the live camera.
 
 ## Rules
 
-- Convert client coordinates to canvas/world coordinates before engine dispatch.
+- Convert client coordinates to canvas/world coordinates before engine
+  dispatch, reading `editor.zoom` and the viewer at call time.
 - Viewport pan and zoom are session state.
-- Discrete zoom commands publish immediately. Scrub zoom keeps live viewer
-  state transient during pointer movement and publishes once at pointer release.
-- First-add focus may schedule viewport movement; ordinary later placement does
-  not.
-- Programmatic camera moves go through `Editor.moveViewportTo`, which cancels
-  pending focus, moves the viewer, writes the store, and ends the echo-only
-  interaction the viewer's scroll event starts. Viewport focus uses the same
-  path, so a stale store zoom cannot replay into the controlled viewer.
+- Every camera change goes through `viewport-move.ts`. Programmatic moves,
+  focus, discrete zoom, and wheel pinch call `applyViewport`, which moves the
+  viewer (`scrollTo` when zoom is unchanged, nothing when the camera is
+  identical), ignores the viewer's own scroll echoes, reads back the camera
+  the viewer applied, and publishes it once. Native wheel pans and hand drags
+  reach the engine through `syncViewportFromViewer`, which starts a gesture.
+- The live camera (`editor.viewport`, `editor.zoom`) and the viewport
+  presentation channel update on every change. The store's `viewport` only
+  changes outside a viewport interaction; an interaction settles it once
+  when it ends. An interaction is an explicit hold (`setViewportInteracting`,
+  used by zoom scrubs and scripted motion) or a gesture
+  (`setViewportGestureActive`, ended by the adapter's idle timer). Gesture
+  idle never ends a hold; releasing a hold settles everything.
+- Discrete zoom commands keep the viewport center fixed and publish
+  immediately.
+- Components that draw camera-dependent chrome (dot grid, artboard labels,
+  raster sampling, pixel-grid gates, crop handles, selection overlays) read
+  the live camera with `useEditorViewportValue`. Canvas itself does not
+  subscribe to zoom; node art and durable placement never follow the camera.
+- InfiniteViewer takes no controlled `zoom` prop: its React wrapper replays
+  supplied props on every update, which would snap the camera back.
+- `Editor.moveViewportTo` cancels pending focus. First-add focus may schedule
+  viewport movement; ordinary later placement does not.
 - Stage bounds are an interaction surface, not document size.
+
+## Layers
+
+- Durable node shells use `translate3d`, so every shell is its own
+  composited layer. Translation pans only move layers. A continuous pinch
+  re-rasters every visible layer at each scale, and with 200 shells that GPU
+  raster work, not JavaScript, sets the frame time.
+- 2D shell transforms collapse those layers into the viewport layer (plain
+  200-node pinch drops from about 11.5 to 8.3 ms average), but moving shells
+  then overlap stationary 2D content and force per-frame layer promotion: a
+  section drag on the 4,000-leaf group fixture went from 20 to 139 ms per
+  frame. Layer policy belongs with moving presentation layers, not shells.
+- `will-change: transform` on the stage freezes the raster scale of the
+  80,000-unit stage and produced multi-second frames; do not promote it.
+

@@ -16,6 +16,7 @@ React is a client of the editor.
 - `EditorContext` and `EditorProvider` expose the active editor.
 - `useEditor()` reads the current editor object.
 - `useEditorValue()` subscribes to selected editor state.
+- `useEditorViewportValue()` subscribes to the live camera.
 - `useEditorClipboardEvents()` connects browser clipboard events to editor
   clipboard commands.
 
@@ -61,5 +62,11 @@ document.
   the slot when they dispatch; lists remount when the selection changes,
   because different nodes can reuse the same ids. The
   `node-property-edit-render-path` performance spec gates these counts.
+- Camera reads use `useEditorViewportValue(selector)`, which follows the live
+  camera through the viewport presentation channel, including mid-gesture
+  changes the store only receives when the gesture settles. Its selector
+  returns a primitive, so a component re-renders only when that value
+  changes (a threshold crossing, a new zoom). Never read `state.viewport` for
+  presentation.
 - Providers above the editor shell must not re-render on every store update;
   subscribe to the narrow signal they need, such as `subscribeDirtyState`.

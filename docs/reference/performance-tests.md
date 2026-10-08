@@ -211,6 +211,23 @@ action affects.
 `drag-render-path.spec.ts` gates that a section drag in the expanded fixture
 re-renders only the moved leaves' art.
 
+Viewport scenarios come in three workloads per appearance variant (plain,
+hard and blur-24 shadows, nested 60% groups and their opacity-1 twin):
+
+| Scenario | Workload |
+| --- | --- |
+| `appearance-pan-200-*` | Fixed-zoom translation at 21%, a constant screen-space ellipse. |
+| `appearance-viewport-200-*`, `appearance-nested-groups-viewport-200` | Continuous anchored pinch down the 100→1% ladder and back; the middle frame lands on 1%. |
+| `appearance-zoom-stops-200-*` | Discrete jumps to each ladder stop with dwell frames; records `zoomStop.settleMs`. |
+| `large-svg-viewport`, `large-svg-pan` | Mixed pan and zoom (18%→10%) and fixed-zoom pan on the large SVG with its root selected. |
+| `appearance-max-stack` | Pinch 1%→6400%→1% on one node's edge; reaches both extremes. |
+
+Viewport setups move the camera with `editor.moveViewportTo` and assert,
+outside the timed loop, that the viewer, the engine camera, and the projected
+stage landed on sampled trajectory frames (`viewport-motion.ts`). Runs measure
+the host once before the loop. `slowFrameCount` counts frames over 16.7 ms;
+report frames over one 120 Hz interval (missed 120 Hz deadlines) alongside it.
+
 Raster adapter gates:
 
 | Scenario | Contract |

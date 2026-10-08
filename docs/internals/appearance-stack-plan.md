@@ -90,24 +90,32 @@ drop shadow.
 
 | Scenario | Gate |
 | --- | --- |
-| `appearance-viewport-200-plain` | baseline for the gates below |
-| `appearance-viewport-200` (hard and blur 24 variants) | p95 ≤ 1.25 × plain p95; max frame ≤ 1.25 × plain max |
+| `appearance-viewport-200-plain` (pinch), `appearance-pan-200-plain`, `appearance-zoom-stops-200-plain` | baselines for the gates below |
+| `appearance-viewport-200-*`, `appearance-pan-200-*`, `appearance-zoom-stops-200-*` (hard and blur 24 variants) | p95 ≤ 1.25 × the matching plain workload's p95; max frame ≤ 1.25 × its max |
 | `appearance-dragging-200-plain` | baseline |
 | `appearance-dragging-200` | p95 ≤ 1.1 × plain p95; slow frames ≤ 2 × plain; `renderCanvasNode` ≤ 5 during the drag |
 | `appearance-shadow-scrub` | p95 ≤ 8.33 ms; ≤ 1 node-art render per frame, including color preview |
-| `appearance-nested-groups-viewport-200`, `appearance-nested-groups-dragging-200` | 200 nodes in 20 stacks of three nested 60% groups; viewport ladder, and a drag of all 20 stacks. Gate: viewport p95 ≤ 1.25 × plain; drag ≤ 1.1 × the same scene at opacity 1 (isolation cost only) |
+| `appearance-nested-groups-viewport-200`, `-pan-200`, `-dragging-200` | 200 nodes in 20 stacks of three nested 60% groups; pinch, pan, and a drag of all 20 stacks. Gate: viewport p95 ≤ 1.25 × the opacity-1 twin (`appearance-nested-groups-opaque-*`); drag ≤ 1.1 × the same scene at opacity 1 (isolation cost only) |
 | `appearance-shadowed-groups` | 20 shadowed groups of 10 nodes. Variants: whole-group drag (gate p95 ≤ 1.1 × plain drag p95) and single-child drag inside a group (records the per-frame group re-filter cost; gate p95 ≤ 16.7 ms) |
 | `appearance-representation-thresholds` | groups crossing the dense thresholds (300↔301 leaves, 24↔25 leaves plus area); nested drill-in; opacity and effect toggles; hidden-child insertion. Gate: no frame > 50 ms and no resident raster remount |
 | `appearance-max-stack` | 20 nodes with 8/8/4 stacks and blur 500, zoomed 1% → 6400% → 1%; max frame ≤ 100 ms; export SVG + PNG latency recorded |
 | `appearance-stroke-scrub-*`, `appearance-stroke-type-text-500-warped` (each with a `-center` twin) | Every frame sets a new width on an inside and an outside stroke (or types one character), on one of 200 nodes, all 200, and 500-glyph flat, circle, and arch text. Gate: aligned p95 ≤ 1.25 × the center twin for the single-node, flat, circle, and typing scenarios; all-200 and arch text recorded |
 
-Viewport scenarios zoom along the ladder `[1, 0.5, 0.35, 0.21, 0.1, 0.05, 0.01]`
-while panning around the artboard center.
+Viewport workloads use the ladder `[1, 0.5, 0.35, 0.21, 0.1, 0.05, 0.01]`:
+the pinch zooms continuously down and back up (landing on 1% at the middle
+frame) with a small screen-space wobble, the pan translates at a fixed 21%,
+and the zoom stops jump to each stop and dwell. Setups assert the viewer,
+engine camera, and projected stage at sampled frames.
 
 Absolute 8.33 ms gates don't apply to drags: the plain 200-node drag already
 runs at p95 16.7 ms. Drag gates are therefore relative to the plain control.
 
 ### Stage 0 Baseline (2026-10-07)
+
+> **Invalid for the viewport workload (corrected 2026-10-08).** The viewport
+> loop wrote engine viewport state without moving the viewer, so these
+> viewport columns timed a stationary camera. The go decision does not rest
+> on them; see "Corrected Viewport Measurements" below.
 
 Run on the pinned Chromium 145 (Playwright 1208), full browser with GPU
 raster, 1440 × 900.
@@ -144,6 +152,10 @@ The pre-existing `shape-nodes-dragging-500` runs at p50 16.7 ms and p95 25 ms
 on the same machine, so the drag baseline is not caused by appearance.
 
 ### Stage 3 Measurements (2026-10-07)
+
+> The two viewport rows timed a stationary camera and are invalid; see
+> "Corrected Viewport Measurements". The drag rows ran at the initial 100%
+> zoom, not 21%, because setup never moved the viewer.
 
 | Scenario | p50 / p95 / max (ms) |
 | --- | --- |
@@ -186,6 +198,12 @@ the twin uses two center strokes.
 
 ### Stage 6 Drop Shadows (2026-10-07)
 
+> The viewport and max-stack rows timed a stationary camera, and every drag
+> row ran at 100% instead of 21%; all are invalid. The headless shell used
+> here rasterizes on the CPU, which also inflates drag frames: at the real
+> 21% the whole-group drag runs avg 17 / p95 25 ms there and 8.3 / 9 ms with
+> GPU raster. See "Corrected Viewport Measurements".
+
 DPR 1, dev build, ms (p50 / p95 / max).
 
 | Scenario | Shadowed | Control | Gate |
@@ -206,6 +224,51 @@ DPR 1, dev build, ms (p50 / p95 / max).
 - A whole-group drag still re-filters each shadowed group every frame, since
   children move under a stationary layer. Moving presentation layers would
   make it compositor-only; deferred because the p95 gate holds.
+
+### Corrected Viewport Measurements (2026-10-08)
+
+Production build (`--prod`), full Chromium with GPU raster
+(`--browser chromium`), 1280 × 720, after the camera publication rework.
+Two runs each; ms as avg / p95 / max, then frames over 16.7 ms and over one
+120 Hz interval, out of 283 (pinch), 242 (pan, max stack), or 146 (stops).
+
+| Scenario, DPR 1 | avg / p95 / max | slow / missed 120 Hz | vs plain p95 | Gate |
+| --- | --- | --- | --- | --- |
+| pinch, plain | 11.2–11.4 / 16.8 / 17.6 | 38–42 / 99–103 | 1.0× | baseline |
+| pinch, hard shadow | 23.1–23.6 / 41.6 / 49.9 | 184–186 / 227–228 | 2.5× | **fails** 1.25× |
+| pinch, blur 24 | 35.5–35.7 / 58.3 / 66.7 | 230–235 / 261–263 | 3.5× | **fails** 1.25× |
+| pinch, nested 60% groups | 11.9–12.8 / 17.1–25.0 / 33.3 | 53–65 / 114–130 | 1.0–1.5× opaque twin | borderline |
+| pinch, nested opaque twin | 11.6 / 17.0 / 25.0 | 44–58 / 110–111 | 1.0× | control |
+| pan at 21%, every variant | 8.3 / 8.9–9.3 / 9.4 | 0 / 0 | 1.0× | pass |
+| zoom stops, plain and blur 24 | 8.3 / 9.3 / 9.4–16.6 | 0 / 0–2 | 1.0× | pass; `zoomStop.settleMs` p50 16.7 |
+| max stack 1% → 6400% | 17.1–20.9 / 25–33 / 42 | 119–154 / 168–192 | — | pass (max ≤ 100) |
+| large SVG pan and mixed pan/zoom | 8.3 / 9.0 / 9.3 | 0 / 0 | — | — |
+| drags at 21% (plain, shadowed whole and child, plain twins) | 8.3 / 8.6–9.2 / 9.4 | 0 / 0 | 1.0× | pass |
+
+DPR 2 matches DPR 1 within noise: pinch plain 12.1 / 17.3, hard 24.4–24.9 /
+41.7, blur 24 36.3–38.3 / 58.3–59.0, nested 13.0 / 25.0, max stack max 49.
+
+- **Shadows are not free on viewport.** Translation and discrete stops cost
+  nothing, but a continuous pinch re-rasterizes every shadow filter at each
+  scale. The GPU thread is 95% busy for blur 24, against 87% for plain; the
+  main thread stays near 4 ms per frame. Shadowed pinch fails the 1.25× gate
+  by 2.5–3.5×. Fixing it means rasterizing less per scale step (for example a
+  temporary cached-scale raster during pinch), which is a product tradeoff
+  and has not been made.
+- **Plain pinch is GPU-bound too.** Every durable shell is its own
+  composited layer (`translate3d`), and all 200 re-raster per frame. Before
+  the camera rework the main thread spent about 5.4 ms per frame (rAF 2.8,
+  JavaScript 1.8, async 1.2); after, 3.8 ms (rAF 0.7, JavaScript 0.5, async
+  0.25), with no store write, Canvas render, or placement pass per frame.
+  Frame time did not move because GPU raster sets it. 2D shell transforms
+  bring plain pinch to 8.3 / 9.0 with no missed 120 Hz frames, but a section
+  drag on the 4,000-leaf group fixture then rises from 20 to 139 ms per
+  frame (overlap promotion), so layer policy waits for moving presentation
+  layers.
+- The earlier dev headless-shell numbers (plain pinch avg 15–25, large SVG
+  12–16, whole-group drag 17) come from CPU raster in that browser; they
+  reproduce unchanged after the rework. Use `--browser chromium` for
+  raster-sensitive gates.
 
 ## Browser Checks
 

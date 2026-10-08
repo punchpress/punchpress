@@ -498,4 +498,9 @@ lands with stage 6:
 - Aligned strokes show an antialiased seam at the shape edge (see Stroke
   alignment).
 - Many-filter zoom cost depends on Chromium raster-scale behavior. Stage 0
-  measures it before the schema lands.
+  meant to measure it before the schema landed, but its viewport loop never
+  moved the camera. Measured with real motion (plan, "Corrected Viewport
+  Measurements"): translation, zoom stops, and drags cost nothing extra,
+  while a continuous pinch over 200 shadowed nodes runs 2.5× (hard) to 3.5×
+  (blur 24) the plain p95 and fails the 1.25× gate. SVG shadows stay; pinch
+  cost needs a raster-reuse policy, which is a product decision.
