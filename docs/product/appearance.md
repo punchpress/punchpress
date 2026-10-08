@@ -16,12 +16,17 @@ white outline.
 ## In The Product
 
 - **Layers.** Each fill or stroke layer has its own paint, opacity, and
-  visibility. Strokes also have width, cap, join, and miter limit.
+  visibility. Strokes also have alignment, width, cap, join, and miter limit.
+- **Alignment.** A stroke paints centered on the edge, inside the shape, or
+  outside it, always at its full width. An outside stroke never shows through
+  a translucent fill. Each letter of straight or circle text aligns against
+  its own outline; warped text aligns against its merged outline.
 - **Paint.** A layer paints a solid color or a linear gradient. A gradient has
   an angle and 2–8 stops, each with its own color and opacity. The ramp spans
   the whole object, including every letter of a text.
-- **Order.** Fills paint under strokes. Within each list, the row at the top
-  of the panel paints on top. Dragging rows reorders the stack.
+- **Order.** Outside strokes paint under fills; center and inside strokes
+  paint over them. Within each group, the row at the top of the panel paints
+  on top. Dragging rows reorders the stack.
 - **Add and remove.** "Add fill" copies the top fill's color; "Add stroke"
   adds a 2 px black stroke. Removing the last layer leaves the node unpainted
   but still selectable by its area.
@@ -39,7 +44,11 @@ white outline.
   opacity.
 - Switching a solid layer to linear fades its color out left to right;
   switching back keeps the first stop.
-- Strokes are center-aligned.
+- Inside and outside are measured against the area the fill paints. A path
+  made only of open contours has no inside, so its strokes paint centered and
+  the panel says so.
+- The edge where an aligned stroke meets its shape can show a faint
+  antialiasing seam.
 - Open contours fill with SVG's implicit closure on canvas and in export.
 - Multi-selections edit together only when their stacks match (apart from
   internal layer ids). Otherwise the panel shows **Mixed** with **Use first**,
@@ -52,8 +61,9 @@ white outline.
 ## Intentionally Missing
 
 - Radial gradients and on-canvas gradient handles.
-- Inside/outside stroke alignment and drop shadows (staged; see the
+- Drop shadows (staged; see the
   [appearance stack decision](../decisions/appearance-stack.md)).
+- Offset Path / Outline Stroke (baking an offset or outlined shape).
 - Blend modes, dashes, and per-character styling.
 
 ## Related

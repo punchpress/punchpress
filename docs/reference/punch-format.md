@@ -15,7 +15,7 @@ read_when:
 | --- | --- |
 | Extension | `.punch` |
 | MIME type | `application/vnd.punchpress.document` |
-| Current version | `1.10` |
+| Current version | `1.11` |
 | Root parent id | `root` |
 | Default basename | `untitled-design` |
 
@@ -23,7 +23,7 @@ read_when:
 
 ```ts
 type DesignDocument = {
-  version: "1.10";
+  version: "1.11";
   assets: Record<string, DocumentAsset>;
   nodes: Node[];
 };
@@ -70,7 +70,7 @@ type FillLayer = {
 };
 type StrokeLayer = FillLayer & {
   width: number; // >= 0, node-local units
-  align: "center";
+  align: "center" | "inside" | "outside";
   cap: "butt" | "round" | "square";
   join: "miter" | "round" | "bevel";
   miterLimit: number; // >= 1

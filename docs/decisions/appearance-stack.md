@@ -172,21 +172,39 @@ The fixed order is:
 
 Within each band, layers paint in list order.
 
-Outside strokes go below fills because that is the only placement that keeps an outside ring
-from eating into the fill, and a semi-transparent fill reveals at most a sliver
-of overlap.
+Outside strokes still go below fills even though each is masked to its own
+shape's outside: an object with several paths (text glyphs) masks each path
+separately, so one glyph's ring can overlap a neighboring glyph, and painting
+rings first keeps every fill on top. Under a translucent neighbor the ring
+shows through, as it would in any stacked artwork.
 
 #### Stroke alignment
 
-Inside and outside strokes compile to engine-generated offset-outline
-geometry, cached per (geometry, width, join, miter).
+Aligned strokes are SVG-native, as in Figma; there is no offset geometry in
+the render path. Canvas and export render the same engine element tree
+(`buildAppearanceElements`), so they cannot drift.
 
-- **Outside:** `offset(+w)` minus `offset(-min(w, 0.5))`. It paints under the
-  fill, so the fill and the ring never share an antialiased edge.
-- **Inside:** the geometry minus `offset(-w)`.
-- **Open contours:** fall back to center, and the panel says so.
-
-Clip and mask rejected (below).
+- **Inside:** a `2w` center stroke clipped (`clipPath`, `clip-rule` = the
+  path's fill rule) to the path's own fill region.
+- **Outside:** a `2w` center stroke under a luminance `mask`: white over the
+  reach box, black over the path's fill region (honoring its fill rule). The
+  reach box is the path's local bounds grown by `w × miterLimit` (miter),
+  `w·√2` (square caps), or `w`, plus slack for flattened bounds. A
+  translucent fill never shows the stroke's inner half.
+- **Per path.** The clip or mask sits on the element that carries the path
+  transform, so its geometry is path-local. Each glyph or vector child aligns
+  against its own shape; warped text, which is one merged outline, aligns
+  against the merged shape.
+- **Open contours.** Inside and outside are relative to the region the fill
+  paints, so open contours in a path that also has a closed contour close
+  implicitly, as SVG fills them. An object whose paths have no closed contour
+  at all strokes on center, and the panel says so.
+- **Accepted artifact.** Only the antialiased edge. With edge coverage `c`, an
+  outside ring meets its fill at `c + (1 − c)²` coverage, a faint background
+  seam of at most 25% at half-covered pixels. An inside ring over its fill
+  reaches `2c − c²`, a slightly firmer edge with a fill-colored fringe.
+- **Gradients** on aligned strokes keep the unstroked paint box; only the
+  stroke width doubles.
 
 #### Shadow filter
 
@@ -333,10 +351,13 @@ settle frames are measured in the shipped Chromium.
 - **Uses of ink bounds:** filter regions, dense-surface frames, and export
   extents. Shells do not grow. Shadows paint through the `overflow-visible`
   `<svg>`, so the transform pivot and the shell hit button stay on the frame.
-- **Hit testing:** follows alignment.
-  - center: `|d| ≤ w/2`
-  - outside: outside the shape and `d ≤ w`
-  - inside: inside the shape and `d ≤ w`
+- **Hit testing:** follows alignment. Each hit region carries an inside and
+  an outside reach (center contributes `w/2` to each, aligned strokes `w` to
+  their side); a point inside the fill region tests the inside reach and a
+  point outside tests the outside reach, as a distance band. Joins and caps
+  are approximated by that band. A 3-unit interaction tolerance applies on
+  both sides so thin and aligned strokes stay grabbable. The fill region
+  closes open contours, as SVG fills them.
   - fills: any enabled fill counts, at any opacity
   - no enabled paint: the node falls back to its paint box
   - shadows: never hit
@@ -370,8 +391,14 @@ lands with stage 6:
 
 ## Rejected Alternatives
 
-- **Clip or mask over a doubled center stroke for alignment.** Antialiased
-  edges composite to `1 - c(1 - c)` coverage and leave a background hairline.
+- **Compiled offset outlines for alignment.** Exact rings with no edge seam,
+  but measured far too slow for live width scrubs and typing (offset only,
+  system fonts at 100 px, a 36–41 glyph line): paperjs-offset 2.2.1 took
+  120–420 ms outward and up to 1.7 s inward per line, and its 0.5-unit tuck
+  70–217 ms per glyph (2.7–8 s for an outside stroke); clipper2-ts 2.0.1 took
+  55–275 ms per line and 2–17 s for ~430 glyphs, or 0.4–4 ms per unique
+  glyph (10–115 ms per novel width) with per-glyph caching, which warped text
+  cannot reuse. Product chose the SVG-native seam instead.
 - **World-space ("global light") shadows.** Under non-uniform scale they need
   a skewed Gaussian, and a rotation preview would rebuild the filter every
   frame.
@@ -388,11 +415,23 @@ lands with stage 6:
   center, so shadow edits would move rotated art.
 - **`<use>` in export.** It is SVG2 `href` and breaks SVG 1.1 tooling.
 
+## Non-goals
+
+- **Offset Path / Outline Stroke command.** An explicit command that bakes
+  offset or outlined geometry (die-cut and sticker contours) is future work.
+  It would use the measurements above to pick a library (clipper2-ts per
+  glyph is the fastest candidate; paperjs-offset keeps curves) and runs once
+  on demand, so the per-frame cost that ruled out rendering with it does not
+  apply.
+
 ## Consequences
 
 - One plan builder replaces four paint renderers, and canvas/export parity is
   tested.
 - Paint, color, and shadow edits never rebuild geometry or recompile vectors.
-- Straight text with overlapping glyphs paints strokes above every fill.
+- Straight text with overlapping glyphs paints center and inside strokes above
+  every fill, and outside rings below every fill.
+- Aligned strokes show an antialiased seam at the shape edge (see Stroke
+  alignment).
 - Many-filter zoom cost depends on Chromium raster-scale behavior. Stage 0
   measures it before the schema lands.

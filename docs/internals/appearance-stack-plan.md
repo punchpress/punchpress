@@ -67,9 +67,10 @@ Every stage goes through the same sequence:
    matrices, userSpace defs, kind/angle/stop commands, a gradient ramp and
    stops panel, stop colors in selection colors, and a field-targeted
    selection-color preview.
-5. **Stroke alignment.** Offset-outline compiler (chosen against the
-   dependency checklist), alignment-aware ink bounds and hit testing, and
-   outside strokes below fills.
+5. **Stroke alignment (1.11).** SVG-native inside (clip) and outside (mask)
+   strokes from one engine element tree shared by canvas and export,
+   open-contour fallback, sided reaches for frames and hit testing, an Align
+   control, and the stroke-width scrub gate. Offset geometry is a non-goal.
 6. **Drop shadow on nodes and groups.**
    - Effects list and one branched filter graph per effect owner.
    - Stationary artboard clip layers, so group shadows clip to the artboard.
@@ -98,6 +99,7 @@ drop shadow.
 | `appearance-shadowed-groups` | 20 shadowed groups of 10 nodes. Variants: whole-group drag (gate p95 ≤ 1.1 × plain drag p95) and single-child drag inside a group (records the per-frame group re-filter cost; gate p95 ≤ 16.7 ms) |
 | `appearance-representation-thresholds` | groups crossing the dense thresholds (300↔301 leaves, 24↔25 leaves plus area); nested drill-in; opacity and effect toggles; hidden-child insertion. Gate: no frame > 50 ms and no resident raster remount |
 | `appearance-max-stack` | 20 nodes with 8/8/4 stacks and blur 500, zoomed 1% → 6400% → 1%; max frame ≤ 100 ms; export SVG + PNG latency recorded |
+| `appearance-stroke-scrub-*`, `appearance-stroke-type-text-500-warped` (each with a `-center` twin) | Every frame sets a new width on an inside and an outside stroke (or types one character), on one of 200 nodes, all 200, and 500-glyph flat, circle, and arch text. Gate: aligned p95 ≤ 1.25 × the center twin for the single-node, flat, circle, and typing scenarios; all-200 and arch text recorded |
 
 Viewport scenarios zoom along the ladder `[1, 0.5, 0.35, 0.21, 0.1, 0.05, 0.01]`
 while panning around the artboard center.
@@ -158,13 +160,41 @@ Isolation adds no measurable cost. Dragging 20 selected group stacks is slow
 `editor.getPreviewPlacementNodeIds`) brings `nested-groups-dragging-200` to
 p50 8.4 / p95 16.7 ms, level with the leaf control.
 
+### Stage 5 Stroke Scrub (2026-10-07)
+
+DPR 1, dev build, ms. Aligned strokes: one inside and one outside per node;
+the twin uses two center strokes.
+
+| Scenario | Aligned p50 / p95 / max | Center p50 / p95 / max | p95 ratio |
+| --- | --- | --- | --- |
+| scrub one of 200 | 33.3 / 41.7 / 108.7 | 33.1 / 34.1 / 100.8 | 1.22 (0.97 on an earlier run) |
+| scrub all 200 | 133.4 / 241.7 / 258.4 | 91.6 / 183.3 / 200.5 | 1.32 |
+| scrub 500-glyph flat text | 41.7 / 83.5 / 109.1 | 40.8 / 75.7 / 101.0 | 1.10 |
+| scrub 500-glyph circle text | 50.0 / 91.8 / 108.8 | 41.6 / 75.0 / 100.2 | 1.22 |
+| scrub 500-glyph arch text | 25.0 / 49.9 / 58.4 | 16.7 / 33.2 / 42.5 | 1.50 |
+| type into 500-glyph arch text | 24.9 / 41.7 / 50.6 | 16.7 / 41.1 / 50.7 | 1.01 |
+
+- The gate holds. Repeated glyphs share one clip and one mask (keyed by
+  outline); before that, flat and circle text ran 2.2× their twins. Arch text
+  is one merged outline, so its single mask spans the whole text.
+- Painting aligned objects costs about 0.5 ms per frame in the one-of-200
+  profile. Neither alignment meets an absolute 8.33 ms budget: every node
+  update re-runs app-wide work (store selectors, the node context menu state,
+  including a shape-to-path conversion check, a full node-map rebuild per
+  selection-target query, and canvas cursor assets). That predates stage 5
+  and is tracked separately.
+
 ## Browser Checks
 
 - **Visual sweep** (`appearance-visual-sweep.spec.ts`): DPR 2 and DPR 1, the
   same ladder, decoded in-page. Asserts:
   - the shadow band is present and unclipped
-  - outside and inside strokes have full width with no background hairline
-    on dark grounds
+  - outside and inside strokes have full width on their side, a translucent
+    fill hides the outside stroke's inner half, holes follow even-odd and
+    nonzero, open paths stroke on center, miter vs round corners, gradient
+    rings, a 50% group, and stroked circle and arch text
+    (`stroke-alignment-sweep.spec.ts`); the antialiased edge seam is the only
+    accepted artifact
   - gradient luminance is monotonic
   - results are identical after serialize → reload
 - **Export parity:** a canvas screenshot at DPR 1 and 100% zoom against
@@ -183,7 +213,7 @@ Seeded command sequences in the engine. After every step, check:
 - undo restores the exact prior document
 - every export ref resolves
 - isolated group layers on the canvas match isolated groups in export
-- paint box ⊆ selection frame ⊆ ink bounds
+- paint box ⊆ selection frame ⊆ ink bounds, for visible paint
 - no vector child has effects
 
 A short seeded Playwright walk over the panel also runs.

@@ -19,7 +19,7 @@ and future clients should converge here instead of inventing parallel behavior.
 | Nodes | `addTextNode`, `addShapeNode`, `addArtboardNode`, `insertNodes`, `updateNode`, `deleteSelected`, `duplicate`, `groupSelected`, `ungroup`. |
 | Active layer and selection | `activeLayerId`, `activeLayer`, `select`, `setSelectedNodes`, `toggleSelection`, `clearSelection`, `ensureSelected`, `isSelected`. |
 | Layering | `bringToFront`, `sendToBack`, `setNodeOrder`, `moveNodeToParent`, `toggleVisibility`. |
-| Appearance | `addFill`, `addStroke`, `updateAppearanceLayer(slot, patch)`, `removeAppearanceLayer(slot)`, `moveAppearanceLayer(slot, toIndex)`, `setAppearance(appearance)`, `setPaintKind(slot, kind)`, `setGradientAngle(slot, degrees)`, `getGradientAngle(slot)`; `updateAppearanceLayer` also accepts a whole `paint`; `slot` is `{ list, index }`, `nodeIds` defaults to the selection, and each call is one undo step. |
+| Appearance | `addFill`, `addStroke`, `updateAppearanceLayer(slot, patch)`, `removeAppearanceLayer(slot)`, `moveAppearanceLayer(slot, toIndex)`, `setAppearance(appearance)`, `setPaintKind(slot, kind)`, `setGradientAngle(slot, degrees)`, `getGradientAngle(slot)`, `canAlignStrokes()` (false when a target has only open contours); `updateAppearanceLayer` also accepts a whole `paint`; `slot` is `{ list, index }`, `nodeIds` defaults to the selection, and each call is one undo step. |
 | Editing modes | `setActiveTool`, `startEditing`, `commitEditing`, `cancelEditing`, `startPathEditing`, `stopPathEditing`. |
 | Vector/path | point movement, point deletion, topology operations, curve merge/separate/join, compound paths, boolean operations. |
 | Transform | move, resize, rotate, selection drag, text path positioning. |
