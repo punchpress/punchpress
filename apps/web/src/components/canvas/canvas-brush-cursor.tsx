@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -43,19 +44,60 @@ const getBrushCursorPosition = (
   };
 };
 
+interface RestingPointer {
+  event: PointerEvent;
+  target: EventTarget | null;
+}
+
 interface BrushCursorProps {
   hostElement: HTMLDivElement | null;
+  restingPointerRef: { current: RestingPointer | null };
 }
 
 // Only raster tools pay for the cursor's camera, pointer, and target
-// subscriptions.
-export const CanvasBrushCursor = ({ hostElement }: BrushCursorProps) => {
+// subscriptions. A ref-only pointer tracker stays mounted so switching to
+// Brush or Eraser over a resting pointer shows the cursor at once.
+export const CanvasBrushCursor = ({
+  hostElement,
+}: {
+  hostElement: HTMLDivElement | null;
+}) => {
   const isActive = useEditorValue((_, state) => isRasterTool(state.activeTool));
+  const restingPointerRef = useRef<RestingPointer | null>(null);
 
-  return isActive ? <ActiveBrushCursor hostElement={hostElement} /> : null;
+  useEffect(() => {
+    if (!hostElement) {
+      return;
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      restingPointerRef.current = { event, target: event.target };
+    };
+    const handlePointerLeave = () => {
+      restingPointerRef.current = null;
+    };
+
+    hostElement.addEventListener("pointermove", handlePointerMove, true);
+    hostElement.addEventListener("pointerleave", handlePointerLeave);
+
+    return () => {
+      hostElement.removeEventListener("pointermove", handlePointerMove, true);
+      hostElement.removeEventListener("pointerleave", handlePointerLeave);
+    };
+  }, [hostElement]);
+
+  return isActive ? (
+    <ActiveBrushCursor
+      hostElement={hostElement}
+      restingPointerRef={restingPointerRef}
+    />
+  ) : null;
 };
 
-const ActiveBrushCursor = ({ hostElement }: BrushCursorProps) => {
+const ActiveBrushCursor = ({
+  hostElement,
+  restingPointerRef,
+}: BrushCursorProps) => {
   const editor = useEditor();
   const {
     x: viewportX,
@@ -73,7 +115,22 @@ const ActiveBrushCursor = ({ hostElement }: BrushCursorProps) => {
       };
     }
   );
-  const [position, setPosition] = useState<BrushCursorPosition | null>(null);
+  const [position, setPosition] = useState<BrushCursorPosition | null>(() => {
+    const resting = restingPointerRef.current;
+
+    return resting && hostElement
+      ? getBrushCursorPosition(
+          hostElement,
+          resting.event,
+          isBrushCursorTarget(resting.target)
+            ? resting.target
+            : document.elementFromPoint(
+                resting.event.clientX,
+                resting.event.clientY
+              )
+        )
+      : null;
+  });
 
   useEffect(() => {
     if (!hostElement) {
