@@ -32,6 +32,7 @@ import {
   rasterFrameBrushStablePlaneBenchmark,
 } from "./benchmarks/raster-frame-brush-benchmark";
 import { shapeDragBenchmarkLarge } from "./benchmarks/square-drag-benchmark";
+import { strokeAlignmentBenchmarks } from "./benchmarks/stroke-alignment-benchmark";
 import {
   textDragBenchmark,
   textDragBenchmarkLarge,
@@ -68,6 +69,7 @@ export const performanceBenchmarks = [
   appearanceDraggingPlainBenchmark,
   appearanceNestedGroupsViewportBenchmark,
   appearanceNestedGroupsDraggingBenchmark,
+  ...strokeAlignmentBenchmarks,
   idleSoakBenchmark,
   shapeDragBenchmarkLarge,
   textDragBenchmark,
