@@ -1,5 +1,6 @@
 import { buildAppearanceObjects } from "../appearance/appearance-render-plan";
 import {
+  createPaintIdAllocator,
   serializeAppearanceObjects,
   wrapSvgOpacity,
 } from "../appearance/appearance-svg";
@@ -97,6 +98,7 @@ export const buildSvgExport = (
   ];
 
   const layers = createLayerWriter(body, getNode);
+  const makePaintId = createPaintIdAllocator();
 
   for (const node of nodes) {
     if (node.visible === false || node.type === "artboard") {
@@ -134,7 +136,8 @@ export const buildSvgExport = (
     body.push(
       wrapSvgOpacity(
         serializeAppearanceObjects(
-          buildAppearanceObjects(node, geometry.paths, getNode)
+          buildAppearanceObjects(node, geometry, getNode),
+          makePaintId
         ),
         node.opacity ?? 1
       )

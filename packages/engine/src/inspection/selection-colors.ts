@@ -15,9 +15,10 @@ const createSelectionColorFieldId = (nodeId, fieldKey) => {
   return `${nodeId}:${fieldKey}`;
 };
 
-// Every color a node paints with: an artboard background, or each enabled
-// layer of a paint node's stack. Values are canonical colors so equal paints
-// group; writers replace only that field.
+// Every color a node paints with: an artboard background, each enabled solid
+// layer, and each stop of an enabled gradient layer. Values are canonical
+// colors (with the layer or stop opacity as alpha) so equal paints group;
+// writers replace only that field.
 const getNodeColorFields = (node) => {
   if (supportsNodeProperty(node, "background")) {
     const color = parseColor(node.background)?.color;
@@ -42,12 +43,27 @@ const getNodeColorFields = (node) => {
   return (["fills", "strokes"] as const).flatMap((list) => {
     return appearance[list]
       .filter((layer) => layer.enabled)
-      .map((layer) => ({
-        key: `${list}.${layer.id}`,
-        setValue: (currentNode, value) =>
-          setLayerColor(currentNode, list, layer.id, value),
-        value: formatPaintValue(layer.paint.color, layer.opacity),
-      }));
+      .flatMap((layer) => {
+        const { paint } = layer;
+
+        if (paint.kind === "linear-gradient") {
+          return paint.stops.map((stop) => ({
+            key: `${list}.${layer.id}.${stop.id}`,
+            setValue: (currentNode, value) =>
+              setStopColor(currentNode, list, layer.id, stop.id, value),
+            value: formatPaintValue(stop.color, stop.opacity),
+          }));
+        }
+
+        return [
+          {
+            key: `${list}.${layer.id}`,
+            setValue: (currentNode, value) =>
+              setLayerColor(currentNode, list, layer.id, value),
+            value: formatPaintValue(paint.color, layer.opacity),
+          },
+        ];
+      });
   });
 };
 
@@ -85,6 +101,60 @@ const setLayerColor = (node, list, layerId, value) => {
       }),
     },
   };
+};
+
+const setStopColor = (node, list, layerId, stopId, value) => {
+  const parsed = parseColor(value);
+  const appearance = getNodeAppearance(node);
+
+  if (!parsed) {
+    return {};
+  }
+
+  return {
+    appearance: {
+      ...appearance,
+      [list]: appearance[list].map((layer) => {
+        if (layer.id !== layerId || layer.paint.kind !== "linear-gradient") {
+          return layer;
+        }
+
+        return {
+          ...layer,
+          paint: {
+            ...layer.paint,
+            stops: layer.paint.stops.map((stop) => {
+              return stop.id === stopId
+                ? { ...stop, color: parsed.color, opacity: parsed.opacity }
+                : stop;
+            }),
+          },
+        };
+      }),
+    },
+  };
+};
+
+// The node as the live selection-color preview shows it: every previewed
+// field rewritten to the preview value. Geometry is unaffected, so only paint
+// re-renders. Returns the node itself when no preview targets it.
+export const getSelectionColorPreviewNode = (editor, node) => {
+  const preview = editor.selectionColorPreviewState;
+  const fieldKeys = node && preview?.targetFieldKeysByNodeId.get(node.id);
+
+  if (!fieldKeys) {
+    return node;
+  }
+
+  let nextNode = node;
+
+  for (const field of getNodeColorFields(node)) {
+    if (fieldKeys.includes(field.key) && field.value === preview.baseValue) {
+      nextNode = { ...nextNode, ...field.setValue(nextNode, preview.value) };
+    }
+  }
+
+  return nextNode;
 };
 
 const getSelectionColorTargetNodeIds = (editor, nodeIds) => {
@@ -177,7 +247,10 @@ const resolveSelectionColorTargetFields = (editor, selectionColor, nodeIds) => {
   return targetFieldKeysByNodeId;
 };
 
-export const getSelectionColors = (editor, nodeIds = editor.selectedNodeIds) => {
+export const getSelectionColors = (
+  editor,
+  nodeIds = editor.selectedNodeIds
+) => {
   return measurePerf(PERF_SPANS.selectionAppearanceAggregate, () => {
     if (!shouldExposeSelectionColors(editor, nodeIds)) {
       return [];
@@ -185,8 +258,9 @@ export const getSelectionColors = (editor, nodeIds = editor.selectedNodeIds) => 
 
     const colorsById = new Map();
 
-    for (const nodeId of measurePerf(PERF_SPANS.selectionAppearanceTargets, () =>
-      getSelectionColorTargetNodeIds(editor, nodeIds)
+    for (const nodeId of measurePerf(
+      PERF_SPANS.selectionAppearanceTargets,
+      () => getSelectionColorTargetNodeIds(editor, nodeIds)
     )) {
       const node = editor.getNode(nodeId);
 
@@ -211,7 +285,10 @@ export const getSelectionColors = (editor, nodeIds = editor.selectedNodeIds) => 
         });
 
         if (colorsById.size > MAX_VISIBLE_SELECTION_COLORS) {
-          return [...colorsById.values()].slice(0, MAX_VISIBLE_SELECTION_COLORS);
+          return [...colorsById.values()].slice(
+            0,
+            MAX_VISIBLE_SELECTION_COLORS
+          );
         }
       }
     }
@@ -226,8 +303,9 @@ export const beginSelectionColorChange = (
   nodeIds = editor.selectedNodeIds
 ) => {
   return measurePerf(PERF_SPANS.selectionAppearanceChangeBegin, () => {
-    const selectionColor = measurePerf(PERF_SPANS.selectionAppearanceChangeResolve, () =>
-      resolveSelectionColor(editor, selectionColorId, nodeIds)
+    const selectionColor = measurePerf(
+      PERF_SPANS.selectionAppearanceChangeResolve,
+      () => resolveSelectionColor(editor, selectionColorId, nodeIds)
     );
 
     if (!selectionColor) {
@@ -270,7 +348,10 @@ export const commitSelectionColorChange = (editor, session, value) => {
       let patch = {};
 
       for (const field of getNodeColorFields(node)) {
-        if (!fieldKeys.includes(field.key) || field.value !== session.baseValue) {
+        if (
+          !fieldKeys.includes(field.key) ||
+          field.value !== session.baseValue
+        ) {
           continue;
         }
 
@@ -374,7 +455,7 @@ export const isSelectionColorPreviewAffectingNode = (editor, nodeId) => {
 export const getSelectionColorPreviewForNode = (editor, nodeId) => {
   const preview = editor.selectionColorPreviewState;
 
-  if (!preview || !isSelectionColorPreviewAffectingNode(editor, nodeId)) {
+  if (!(preview && isSelectionColorPreviewAffectingNode(editor, nodeId))) {
     return null;
   }
 

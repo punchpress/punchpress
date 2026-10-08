@@ -1,5 +1,5 @@
 import { PERF_COUNTERS, PERF_SPANS } from "@punchpress/engine";
-import { memo, type ReactNode, useMemo } from "react";
+import { memo, type ReactNode, useId, useMemo } from "react";
 import { NodeContextMenuItems } from "@/components/context-menus/node-context-menu-items";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
@@ -36,7 +36,7 @@ import {
   shouldStartNodeDrag,
   startCanvasNodeDragSession,
 } from "./node-interactions";
-import { CanvasNodeRenderTree, getPaintPreviewStyle } from "./node-render-tree";
+import { CanvasNodeRenderTree } from "./node-render-tree";
 
 const CanvasNodeShell = ({ children, isReady, nodeId }) => {
   usePerformanceRenderCounter(PERF_COUNTERS.renderCanvasNode);
@@ -343,10 +343,11 @@ const CanvasStandardNodeArt = ({ nodeId }) => {
     editor.getSelectionColorPreviewForNode(nodeId)
   );
   const editor = useEditor();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: paintPreview re-derives paint from live preview state
   const artState = useMemo(
     () =>
       getMemoizedNodeArtState(editor, nodeId, artInputs, 0, resizePreviewNode),
-    [artInputs, editor, nodeId, resizePreviewNode]
+    [artInputs, editor, nodeId, paintPreview, resizePreviewNode]
   );
 
   if (!artState) {
@@ -385,7 +386,6 @@ const CanvasStandardNodeArt = ({ nodeId }) => {
       isInteractionProxy={artState.isInteractionProxy}
       objects={artState.objects}
       opacity={artState.opacity}
-      paintPreview={paintPreview}
       renderRootNodeId={nodeId}
       renderTree={artState.renderTree}
       width={Math.max(1, presentationBounds.width)}
@@ -404,9 +404,10 @@ const CanvasVectorNodeArt = ({ nodeId }) => {
     editor.getSelectionColorPreviewForNode(nodeId)
   );
   const editor = useEditor();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: paintPreview re-derives paint from live preview state
   const artState = useMemo(
     () => getMemoizedNodeArtState(editor, nodeId, artInputs, previewRevision),
-    [artInputs, editor, nodeId, previewRevision]
+    [artInputs, editor, nodeId, paintPreview, previewRevision]
   );
 
   return artState ? (
@@ -420,7 +421,6 @@ const CanvasVectorNodeArt = ({ nodeId }) => {
       isInteractionProxy={artState.isInteractionProxy}
       objects={artState.objects}
       opacity={artState.opacity}
-      paintPreview={paintPreview}
       renderRootNodeId={nodeId}
       renderTree={artState.renderTree}
       width={Math.max(1, artState.bbox.width)}
@@ -474,11 +474,12 @@ const CanvasNodeArt = memo(
     image,
     objects,
     opacity,
-    paintPreview,
     renderRootNodeId,
     renderTree,
     width,
   }) => {
+    // Gradient ids are scoped to this mounted SVG.
+    const idPrefix = `pp${useId().replace(/[^a-zA-Z0-9_-]/g, "")}-`;
     let renderedContent: ReactNode = null;
 
     if (!isInteractionProxy) {
@@ -499,6 +500,7 @@ const CanvasNodeArt = memo(
       } else if (renderTree) {
         renderedContent = (
           <CanvasNodeRenderTree
+            idPrefix={idPrefix}
             isEditing={isEditing}
             items={renderTree}
             renderRootNodeId={renderRootNodeId}
@@ -514,7 +516,11 @@ const CanvasNodeArt = memo(
         );
       } else {
         renderedContent = (
-          <CanvasAppearanceObjects isEditing={isEditing} objects={objects} />
+          <CanvasAppearanceObjects
+            idPrefix={idPrefix}
+            isEditing={isEditing}
+            objects={objects}
+          />
         );
       }
     }
@@ -529,7 +535,6 @@ const CanvasNodeArt = memo(
         data-testid={isEditingText ? "canvas-text-preview" : undefined}
         height={height}
         role="img"
-        style={getPaintPreviewStyle(paintPreview)}
         viewBox={`0 0 ${width} ${height}`}
         width={width}
       >

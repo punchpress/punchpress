@@ -39,8 +39,16 @@ export const migrateDocument = (value: unknown) => {
     return normalizeDocumentRecord(value);
   }
 
-  // 1.8 → 1.9 is the one supported upgrade: flat fill/stroke fields fold into
-  // appearance stacks. Older versions stay unsupported.
+  // 1.9 → 1.10 only widens paint to gradients; the data is unchanged.
+  if (value.version === "1.9") {
+    return normalizeDocumentRecord({
+      ...value,
+      version: PUNCH_DOCUMENT_VERSION,
+    });
+  }
+
+  // 1.8 → 1.9 is the one data-reshaping upgrade: flat fill/stroke fields fold
+  // into appearance stacks. Older versions stay unsupported.
   if (value.version === "1.8") {
     return normalizeDocumentRecord({
       ...value,

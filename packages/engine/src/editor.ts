@@ -8,6 +8,9 @@ import {
 import {
   type AppearanceSlot,
   addFill as addEditorFill,
+  getAppearanceGradientAngle as getEditorAppearanceGradientAngle,
+  setGradientAngle as setEditorGradientAngle,
+  setPaintKind as setEditorPaintKind,
   addStroke as addEditorStroke,
   moveAppearanceLayer as moveEditorAppearanceLayer,
   removeAppearanceLayer as removeEditorAppearanceLayer,
@@ -161,6 +164,7 @@ import {
   cancelSelectionColorChange as cancelEditorSelectionColorChange,
   commitSelectionColorChange as commitEditorSelectionColorChange,
   getSelectionColorPreviewForNode as getEditorSelectionColorPreviewForNode,
+  getSelectionColorPreviewNode as getEditorSelectionColorPreviewNode,
   getSelectionColorPreviewValue as getEditorSelectionColorPreviewValue,
   isSelectionColorPreviewAffectingNode as isEditorSelectionColorPreviewAffectingNode,
   updateSelectionColorChange as updateEditorSelectionColorChange,
@@ -1042,6 +1046,26 @@ export class Editor {
     return getEditorPrimaryStrokeStyle(this, nodeIds);
   }
 
+  setPaintKind(
+    slot: AppearanceSlot,
+    kind: "solid" | "linear-gradient",
+    nodeIds = this.selectedNodeIds
+  ) {
+    return setEditorPaintKind(this, slot, kind, nodeIds);
+  }
+
+  setGradientAngle(
+    slot: AppearanceSlot,
+    angle: number,
+    nodeIds = this.selectedNodeIds
+  ) {
+    return setEditorGradientAngle(this, slot, angle, nodeIds);
+  }
+
+  getGradientAngle(slot: AppearanceSlot, nodeIds = this.selectedNodeIds) {
+    return getEditorAppearanceGradientAngle(this, slot, nodeIds);
+  }
+
   setAppearance(appearance: Appearance, nodeIds = this.selectedNodeIds) {
     return setEditorAppearance(this, appearance, nodeIds);
   }
@@ -1088,6 +1112,12 @@ export class Editor {
 
   getSelectionColorPreviewForNode(nodeId) {
     return getEditorSelectionColorPreviewForNode(this, nodeId);
+  }
+
+  // The node as rendering should paint it right now: durable state with any
+  // live selection-color preview applied.
+  getPaintNode(nodeId) {
+    return getEditorSelectionColorPreviewNode(this, this.getNode(nodeId));
   }
 
   getSelectionBooleanOperations(nodeIds = this.selectedNodeIds) {

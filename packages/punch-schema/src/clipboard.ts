@@ -22,7 +22,10 @@ export const clipboardContentSchema = z
     addParentCycleIssues(content.nodes, context);
   });
 
-// Payloads copied from a 1.8 build upgrade the same way 1.8 documents do.
+// Payloads copied from older builds upgrade the same way documents do: 1.8
+// folds flat paint into stacks, 1.9 passes through.
+const UPGRADABLE_CLIPBOARD_VERSIONS = new Set(["1.8", "1.9"]);
+
 export const parseClipboardContent = (value) => {
   const content = JSON.parse(value);
   const nodes =
@@ -32,10 +35,9 @@ export const parseClipboardContent = (value) => {
 
   return clipboardContentSchema.parse({
     ...content,
-    documentVersion:
-      content?.documentVersion === "1.8"
-        ? PUNCH_DOCUMENT_VERSION
-        : content?.documentVersion,
+    documentVersion: UPGRADABLE_CLIPBOARD_VERSIONS.has(content?.documentVersion)
+      ? PUNCH_DOCUMENT_VERSION
+      : content?.documentVersion,
     nodes: canonicalizeTreeOrder(
       normalizeNodesForSchema(nodes) as unknown as { id: string }[]
     ),

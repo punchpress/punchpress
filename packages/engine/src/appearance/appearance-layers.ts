@@ -81,7 +81,8 @@ export const createSolidStroke = (
         enabled: true,
         id,
         join,
-        miterLimit: miterLimit >= 1 ? miterLimit : DEFAULT_VECTOR_STROKE_MITER_LIMIT,
+        miterLimit:
+          miterLimit >= 1 ? miterLimit : DEFAULT_VECTOR_STROKE_MITER_LIMIT,
         opacity: parsed.opacity,
         paint: { color: parsed.color, kind: "solid" },
         width: Math.max(0, width),
@@ -138,8 +139,19 @@ const sortKeys = (_key: string, value: unknown) => {
 };
 
 const stripLayerIds = (appearance: Appearance) => {
+  const strip = ({ id: _id, paint, ...layer }: FillLayer | StrokeLayer) => ({
+    ...layer,
+    paint:
+      paint.kind === "linear-gradient"
+        ? {
+            ...paint,
+            stops: paint.stops.map(({ id: _stopId, ...stop }) => stop),
+          }
+        : paint,
+  });
+
   return {
-    fills: appearance.fills.map(({ id: _id, ...layer }) => layer),
-    strokes: appearance.strokes.map(({ id: _id, ...layer }) => layer),
+    fills: appearance.fills.map(strip),
+    strokes: appearance.strokes.map(strip),
   };
 };

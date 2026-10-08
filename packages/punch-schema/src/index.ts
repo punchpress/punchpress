@@ -1,4 +1,25 @@
 // biome-ignore lint/performance/noBarrelFile: package root public API
+
+export type {
+  AppearanceDocument,
+  FillLayerDocument,
+  GradientStopDocument,
+  LinearGradientPaintDocument,
+  PaintDocument,
+  StrokeLayerDocument,
+} from "./appearance-schema";
+export {
+  appearanceSchema,
+  colorSchema,
+  fillLayerSchema,
+  gradientStopSchema,
+  linearGradientPaintSchema,
+  MAX_APPEARANCE_LAYERS,
+  MAX_GRADIENT_STOPS,
+  paintSchema,
+  strokeLayerSchema,
+} from "./appearance-schema";
+export type { ClipboardContent } from "./clipboard";
 export {
   clipboardContentSchema,
   PUNCH_CLIPBOARD_HTML_ATTRIBUTE,
@@ -6,7 +27,8 @@ export {
   parseClipboardContent,
   serializeClipboardContent,
 } from "./clipboard";
-export type { ClipboardContent } from "./clipboard";
+export type { ParsedColor } from "./color";
+export { formatColor, isCanonicalColor, parseColor, toRgb } from "./color";
 export {
   DEFAULT_DOCUMENT_BASE_NAME,
   PUNCH_DOCUMENT_EXTENSION,
@@ -18,18 +40,7 @@ export {
   PUNCH_SVG_MIME_TYPE,
   ROOT_PARENT_ID,
 } from "./constants";
-export {
-  DEFAULT_VECTOR_STROKE_LINE_CAP,
-  DEFAULT_VECTOR_STROKE_LINE_JOIN,
-  DEFAULT_VECTOR_STROKE_MITER_LIMIT,
-  VECTOR_STROKE_LINE_CAP_VALUES,
-  VECTOR_STROKE_LINE_JOIN_VALUES,
-} from "./vector-stroke-style";
-export {
-  getMissingDocumentFonts,
-} from "./document-fonts";
-export { normalizeNodeForSchema, normalizeNodesForSchema } from "./normalize";
-export { createRasterAssetId } from "./normalize";
+export { getMissingDocumentFonts } from "./document-fonts";
 export {
   DocumentParseError,
   DocumentValidationError,
@@ -37,10 +48,6 @@ export {
   UnsupportedDocumentVersionError,
 } from "./errors";
 export { loadDesignDocument, parseDesignDocument } from "./load";
-export {
-  extractEmbeddedDocumentJson,
-  parseEmbeddedDesignDocument,
-} from "./svg-embedded-document";
 export type {
   LocalFontCatalogResult,
   LocalFontCatalogState,
@@ -57,24 +64,12 @@ export {
   getLocalFontSearchText,
 } from "./local-fonts";
 export { migrateDocument } from "./migrate";
-export { canonicalizeTreeOrder, findParentCycleIds } from "./tree-order";
 export { upgradeNodeAppearance1_8 } from "./migrate-appearance";
 export {
-  appearanceSchema,
-  colorSchema,
-  fillLayerSchema,
-  MAX_APPEARANCE_LAYERS,
-  paintSchema,
-  strokeLayerSchema,
-} from "./appearance-schema";
-export type {
-  AppearanceDocument,
-  FillLayerDocument,
-  PaintDocument,
-  StrokeLayerDocument,
-} from "./appearance-schema";
-export { formatColor, isCanonicalColor, parseColor, toRgb } from "./color";
-export type { ParsedColor } from "./color";
+  createRasterAssetId,
+  normalizeNodeForSchema,
+  normalizeNodesForSchema,
+} from "./normalize";
 export {
   createPunchPackage,
   isPunchPackageBytes,
@@ -91,8 +86,8 @@ export type {
   DocumentAsset,
   EmptyNodeDocument,
   GroupNodeDocument,
-  ImageNodeDocument,
   ImageMimeTypeDocument,
+  ImageNodeDocument,
   LocalFontDocument,
   NodeDocument,
   PathNodeDocument,
@@ -117,8 +112,8 @@ export {
   documentAssetSchema,
   emptyNodeSchema,
   groupNodeSchema,
-  imageNodeSchema,
   imageMimeTypeSchema,
+  imageNodeSchema,
   localFontSchema,
   nodeSchema,
   pathNodeSchema,
@@ -137,3 +132,15 @@ export {
   vectorStrokeLineJoinSchema,
   warpSchema,
 } from "./schema";
+export {
+  extractEmbeddedDocumentJson,
+  parseEmbeddedDesignDocument,
+} from "./svg-embedded-document";
+export { canonicalizeTreeOrder, findParentCycleIds } from "./tree-order";
+export {
+  DEFAULT_VECTOR_STROKE_LINE_CAP,
+  DEFAULT_VECTOR_STROKE_LINE_JOIN,
+  DEFAULT_VECTOR_STROKE_MITER_LIMIT,
+  VECTOR_STROKE_LINE_CAP_VALUES,
+  VECTOR_STROKE_LINE_JOIN_VALUES,
+} from "./vector-stroke-style";

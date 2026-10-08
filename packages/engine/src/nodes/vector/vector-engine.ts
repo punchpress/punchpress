@@ -1,9 +1,9 @@
 import { getPaintHitStyle } from "../../appearance/paint-extent";
-import { commandsToContours, getBounds } from "../../primitives/path-geometry";
 import {
   createPaintedHitRegion,
   withNodeGeometryBehavior,
 } from "../../primitives/node-geometry";
+import { commandsToContours, getBounds } from "../../primitives/path-geometry";
 import { getVectorContourCommands } from "./vector-corners";
 
 const formatCoordinate = (value) => {
@@ -115,6 +115,7 @@ export const buildVectorNodeGeometry = (node) => {
 
   return withNodeGeometryBehavior({
     bbox,
+    paintBox: rawBounds,
     guide: null,
     hitRegions,
     id: node.id,
@@ -122,4 +123,14 @@ export const buildVectorNodeGeometry = (node) => {
     ready: true,
     selectionBounds: bbox,
   });
+};
+
+// Unstroked bounds of editable contours, flattened exactly as vector geometry
+// is, so live shapes and the paths they convert into share one paint box.
+export const getContoursPaintBox = (contours) => {
+  const points = contours.flatMap((contour) => {
+    return commandsToContours(getVectorContourCommands(contour), 1.5);
+  });
+
+  return points.length > 0 ? getBounds(points) : null;
 };

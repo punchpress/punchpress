@@ -399,6 +399,12 @@ export const buildCircleTextGeometry = (layout, node) => {
     paths.push({
       key: `glyph-${index}`,
       d: glyph.path,
+      layoutMatrix: getGlyphLayoutMatrix(
+        Number(format(point.x)),
+        Number(format(point.y)),
+        Number(format(rotationDeg)),
+        Number(format(-glyph.centerX))
+      ),
       transform: `translate(${format(point.x)} ${format(point.y)}) rotate(${format(
         rotationDeg
       )}) translate(${format(-glyph.centerX)} 0)`,
@@ -430,5 +436,27 @@ export const buildCircleTextGeometry = (layout, node) => {
     guide,
     paths,
     selectionBounds: unionBounds(bbox, guide.bounds),
+  };
+};
+
+// translate(x y) rotate(deg) translate(shift 0), from the same rounded values
+// the glyph's transform string uses, so paint servers can undo it exactly.
+const getGlyphLayoutMatrix = (
+  x: number,
+  y: number,
+  deg: number,
+  shift: number
+) => {
+  const radians = (deg * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+
+  return {
+    a: cos,
+    b: sin,
+    c: -sin,
+    d: cos,
+    e: x + cos * shift,
+    f: y + sin * shift,
   };
 };

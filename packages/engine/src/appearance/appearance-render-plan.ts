@@ -6,9 +6,15 @@ import type {
   AppearancePath,
 } from "./appearance-types";
 import { getNodeAppearance } from "./node-appearance";
+import { getPaintPrimaryColor } from "./paint";
 
 interface GeometryPath extends AppearancePath {
   styleNodeId?: string;
+}
+
+interface PaintGeometry {
+  paintBox?: AppearanceObject["paintBox"];
+  paths?: readonly GeometryPath[] | null;
 }
 
 interface CachedObjects {
@@ -33,9 +39,11 @@ const separatePassesByDraws = new WeakMap<
 // object's group opacity. Node opacity is applied by the caller.
 export const buildAppearanceObjects = (
   node,
-  paths: readonly GeometryPath[] | null | undefined,
+  geometry: PaintGeometry | null | undefined,
   getNode: (nodeId: string) => unknown
 ): readonly AppearanceObject[] => {
+  const paths = geometry?.paths;
+
   if (!(node && paths?.length)) {
     return [];
   }
@@ -60,6 +68,7 @@ export const buildAppearanceObjects = (
 
     const objectPaths = pathsByStyleNodeId.get(styleNodeId) ?? [];
     const draws = getAppearanceDraws(getNodeAppearance(styleNode));
+    const childPaintBox = objectPaths.find((path) => path.paintBox)?.paintBox;
 
     return [
       {
@@ -71,6 +80,8 @@ export const buildAppearanceObjects = (
             : typeof styleNode.opacity === "number"
               ? styleNode.opacity
               : 1,
+        paintBox: childPaintBox ?? geometry?.paintBox ?? null,
+        paintSpace: childPaintBox ? ("path" as const) : ("node" as const),
         passes: getAppearancePasses(draws, objectPaths.length === 1),
         paths: objectPaths,
         styleNodeId,
@@ -98,10 +109,10 @@ export const getAppearanceDraws = (
   for (const layer of appearance.fills) {
     if (layer.enabled && layer.opacity > 0) {
       draws.push({
-        color: layer.paint.color,
         kind: "fill",
         layerId: layer.id,
         opacity: layer.opacity,
+        paint: layer.paint,
       });
     }
   }
@@ -110,12 +121,12 @@ export const getAppearanceDraws = (
     if (layer.enabled && layer.opacity > 0 && layer.width > 0) {
       draws.push({
         cap: layer.cap,
-        color: layer.paint.color,
         join: layer.join,
         kind: "stroke",
         layerId: layer.id,
         miterLimit: layer.miterLimit,
         opacity: layer.opacity,
+        paint: layer.paint,
         width: layer.width,
       });
     }
@@ -169,17 +180,18 @@ export const getAppearancePasses = (
   return passes;
 };
 
-// The first enabled solid fill and stroke, for surfaces that can only paint one
-// of each (the unavailable-font `<text>` fallback).
+// The first enabled fill and stroke as plain colors (a gradient shows its first
+// stop), for surfaces that can only paint one color each: the
+// unavailable-font `<text>` fallback.
 export const getPrimaryPaint = (appearance: Appearance) => {
   const draws = getAppearanceDraws(appearance);
   const fill = draws.find((draw) => draw.kind === "fill");
   const stroke = draws.find((draw) => draw.kind === "stroke");
 
   return {
-    fill: fill ? fill.color : "none",
+    fill: fill ? getPaintPrimaryColor(fill.paint) : "none",
     fillOpacity: fill?.opacity ?? 1,
-    stroke: stroke ? stroke.color : "none",
+    stroke: stroke ? getPaintPrimaryColor(stroke.paint) : "none",
     strokeOpacity: stroke?.opacity ?? 1,
     strokeWidth: stroke?.kind === "stroke" ? stroke.width : 0,
   };

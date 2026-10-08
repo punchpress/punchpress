@@ -5,13 +5,13 @@ import {
   ViewIcon,
   ViewOffIcon,
 } from "@hugeicons-pro/core-stroke-rounded";
-import { parseColor } from "@punchpress/punch-schema";
 import { Button } from "@/components/ui/button";
 import { SortableItem } from "@/components/ui/sortable-list";
 import { cn } from "@/lib/utils";
 import { useEditor } from "../../../../editor-react/use-editor";
-import { ColorField } from "../field-primitives";
 import { useAppearanceLayer, useAppearanceList } from "./appearance-context";
+import { AppearancePaintFields } from "./appearance-paint-fields";
+import { AppearancePaintSwatch } from "./appearance-paint-swatch";
 
 // One layer row: drag handle, visibility, paint color with opacity, remove.
 // Stroke rows add their geometry controls beneath through `children`.
@@ -68,23 +68,7 @@ export const AppearanceItem = ({
               />
             </Button>
             <div className={cn("min-w-0", !layer.enabled && "opacity-50")}>
-              <ColorField
-                onChange={(value) => {
-                  const parsed = parseColor(value);
-
-                  if (parsed) {
-                    editor.updateAppearanceLayer(slot, {
-                      color: parsed.color,
-                      opacity: parsed.opacity,
-                    });
-                  }
-                }}
-                onInteractionEnd={undefined}
-                onInteractionStart={undefined}
-                placeholder={undefined}
-                stateKey={`appearance-${list}-${layerId}`}
-                value={formatLayerColor(layer.paint.color, layer.opacity)}
-              />
+              <AppearancePaintSwatch layerId={layerId} />
             </div>
             <Button
               aria-label={`Remove ${label}`}
@@ -97,20 +81,10 @@ export const AppearanceItem = ({
               <HugeiconsIcon icon={Delete02Icon} size={14} strokeWidth={1.8} />
             </Button>
           </div>
+          <AppearancePaintFields layerId={layerId} />
           {children}
         </div>
       )}
     </SortableItem>
   );
-};
-
-// The picker edits color and alpha together; alpha is the layer opacity.
-const formatLayerColor = (color: string, opacity: number) => {
-  if (opacity >= 1) {
-    return color;
-  }
-
-  const value = Number.parseInt(color.slice(1), 16);
-
-  return `rgba(${Math.floor(value / 65_536)}, ${Math.floor(value / 256) % 256}, ${value % 256}, ${Number(opacity.toFixed(3))})`;
 };

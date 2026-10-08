@@ -13,8 +13,20 @@ import {
   createSolidFill,
   createSolidStroke,
 } from "./appearance-layers";
-import type { Appearance, FillLayer, StrokeLayer } from "./appearance-types";
+import { buildAppearanceObjects } from "./appearance-render-plan";
+import type {
+  Appearance,
+  FillLayer,
+  Paint,
+  StrokeLayer,
+} from "./appearance-types";
 import { getNodeAppearance } from "./node-appearance";
+import {
+  convertPaint,
+  getGradientAngle,
+  normalizeLinearGradient,
+  rotateGradientTo,
+} from "./paint";
 
 export type AppearanceList = "fills" | "strokes";
 
@@ -25,8 +37,10 @@ export interface AppearanceSlot {
 
 type LayerPatch = Partial<Omit<StrokeLayer, "id" | "paint">> & {
   // A CSS color for a solid paint. Its alpha is ignored: layer opacity is
-  // patched separately through `opacity`.
+  // patched separately through `opacity`. Rejected for gradient layers.
   color?: string;
+  // A whole paint; gradients are normalized (clamped, sorted, ids kept).
+  paint?: Paint;
 };
 
 const MAX_STROKE_WIDTH = 1000;
@@ -65,10 +79,11 @@ export const addFill = (editor, nodeIds = editor.selectedNodeIds) => {
     }
 
     const topFill = appearance.fills.at(-1);
-    const layer = createSolidFill(
-      topFill?.paint.color ?? "#000000",
-      createLayerId(appearance, "fill")
-    );
+    const id = createLayerId(appearance, "fill");
+    // A new fill copies the top fill's paint (solid or gradient).
+    const layer = topFill
+      ? { ...topFill, enabled: true, id }
+      : createSolidFill("#000000", id);
 
     return layer
       ? { ...appearance, fills: [...appearance.fills, layer] }
@@ -163,6 +178,72 @@ export const moveAppearanceLayer = (
   });
 };
 
+// Switches a layer between solid and linear paint (see convertPaint): solid →
+// linear fades the color out left to right; linear → solid keeps the first
+// stop and folds its opacity into the layer.
+export const setPaintKind = (
+  editor,
+  slot: AppearanceSlot,
+  kind: Paint["kind"],
+  nodeIds = editor.selectedNodeIds
+) => {
+  return updateLayers(editor, slot, nodeIds, (layer) => {
+    const converted = convertPaint(layer.paint, kind);
+
+    return converted.paint === layer.paint
+      ? null
+      : {
+          ...layer,
+          opacity: clamp(layer.opacity * converted.opacityScale, 0, 1),
+          paint: converted.paint,
+        };
+  });
+};
+
+// Points a linear gradient along `angle` degrees in each node's own units
+// (0 = left to right, 90 = top to bottom), measured through its paint box.
+export const setGradientAngle = (
+  editor,
+  slot: AppearanceSlot,
+  angle: number,
+  nodeIds = editor.selectedNodeIds
+) => {
+  if (!Number.isFinite(angle)) {
+    return false;
+  }
+
+  return updateLayers(editor, slot, nodeIds, (layer, nodeId) => {
+    const box = getRenderedPaintBox(editor, nodeId);
+
+    return layer.paint.kind === "linear-gradient" && box
+      ? { ...layer, paint: rotateGradientTo(layer.paint, angle, box) }
+      : null;
+  });
+};
+
+// The first gradient target's angle, for display.
+export const getAppearanceGradientAngle = (
+  editor,
+  slot: AppearanceSlot,
+  nodeIds = editor.selectedNodeIds
+) => {
+  for (const nodeId of getAppearanceTargetNodeIds(editor, nodeIds)) {
+    const layer = getNodeAppearance(editor.getNode(nodeId))[slot.list][
+      slot.index
+    ];
+    const box =
+      layer?.paint.kind === "linear-gradient"
+        ? getRenderedPaintBox(editor, nodeId)
+        : null;
+
+    if (layer?.paint.kind === "linear-gradient" && box) {
+      return getGradientAngle(layer.paint, box);
+    }
+  }
+
+  return null;
+};
+
 // Replaces whole stacks (automation, paste style, resolving mixed stacks).
 // The input must validate; each node keeps the given layer ids.
 export const setAppearance = (
@@ -177,6 +258,40 @@ export const setAppearance = (
   }
 
   return updateAppearances(editor, nodeIds, () => result.data);
+};
+
+const updateLayers = (
+  editor,
+  slot: AppearanceSlot,
+  nodeIds: string[],
+  update: (
+    layer: FillLayer | StrokeLayer,
+    nodeId: string
+  ) => FillLayer | StrokeLayer | null
+) => {
+  const nextById = new Map<string, Appearance>();
+
+  for (const nodeId of getAppearanceTargetNodeIds(editor, nodeIds)) {
+    const appearance = getNodeAppearance(editor.getNode(nodeId));
+    const layers = appearance[slot.list];
+
+    if (!isIndex(slot.index, layers.length)) {
+      continue;
+    }
+
+    const next = update(layers[slot.index], nodeId);
+
+    if (next) {
+      nextById.set(nodeId, {
+        ...appearance,
+        [slot.list]: layers.map((layer, index) => {
+          return index === slot.index ? next : layer;
+        }),
+      });
+    }
+  }
+
+  return applyAppearances(editor, nextById);
 };
 
 // One history step for the whole selection. Nodes the update cannot apply to
@@ -197,6 +312,10 @@ const updateAppearances = (
     }
   }
 
+  return applyAppearances(editor, nextById);
+};
+
+const applyAppearances = (editor, nextById: Map<string, Appearance>) => {
   if (nextById.size === 0) {
     return false;
   }
@@ -211,18 +330,28 @@ const updateAppearances = (
 const applyLayerPatch = (
   list: AppearanceList,
   layer: FillLayer | StrokeLayer,
-  { color, ...patch }: LayerPatch
+  { color, paint, ...patch }: LayerPatch
 ) => {
   const next = { ...layer } as FillLayer & Partial<StrokeLayer>;
+
+  if (paint !== undefined) {
+    const normalized = normalizePaint(paint);
+
+    if (!normalized) {
+      return null;
+    }
+
+    next.paint = normalized;
+  }
 
   if (color !== undefined) {
     const parsed = parseColor(color);
 
-    if (!parsed) {
+    if (!parsed || next.paint.kind !== "solid") {
       return null;
     }
 
-    next.paint = { ...layer.paint, color: parsed.color };
+    next.paint = { color: parsed.color, kind: "solid" };
   }
 
   if (typeof patch.enabled === "boolean") {
@@ -254,6 +383,16 @@ const applyLayerPatch = (
   return next;
 };
 
+const normalizePaint = (paint: Paint): Paint | null => {
+  if (paint?.kind === "linear-gradient") {
+    return normalizeLinearGradient(paint);
+  }
+
+  const color = paint?.kind === "solid" ? parseColor(paint.color)?.color : null;
+
+  return color ? { color, kind: "solid" } : null;
+};
+
 const isIndex = (value: number, length: number) => {
   return Number.isInteger(value) && value >= 0 && value < length;
 };
@@ -264,4 +403,27 @@ const isFiniteNumber = (value: unknown): value is number => {
 
 const clamp = (value: number, min: number, max: number) => {
   return Math.min(max, Math.max(min, value));
+};
+
+// The box the node's layers actually paint through. A compound or boolean
+// vector paints its compiled result with a child's stack, through the
+// result's bounds, so the parent vector's objects are checked first.
+const getRenderedPaintBox = (editor, nodeId: string) => {
+  const node = editor.getNode(nodeId);
+  const parent = node ? editor.getNode(node.parentId) : null;
+  const ownerIds = parent?.type === "vector" ? [parent.id, nodeId] : [nodeId];
+
+  for (const ownerId of ownerIds) {
+    const object = buildAppearanceObjects(
+      editor.getNode(ownerId),
+      editor.getNodeRenderGeometry(ownerId),
+      (id) => editor.getNode(id)
+    ).find((candidate) => candidate.styleNodeId === nodeId);
+
+    if (object?.paintBox) {
+      return object.paintBox;
+    }
+  }
+
+  return editor.getNodeRenderGeometry(nodeId)?.paintBox ?? null;
 };

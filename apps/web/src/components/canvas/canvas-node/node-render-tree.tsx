@@ -11,45 +11,9 @@ import {
   getNodeY,
   getPrimaryPaint,
 } from "@punchpress/engine";
-import { parseColor } from "@punchpress/punch-schema";
 import { CanvasRasterImage } from "../raster/canvas-raster-image";
 import { CanvasAppearanceObjects } from "./canvas-appearance-objects";
 import { CanvasFallbackText } from "./canvas-fallback-text";
-
-const getPaintVariableName = (value) => {
-  if (
-    typeof value !== "string" ||
-    value === "none" ||
-    value.startsWith("url(")
-  ) {
-    return null;
-  }
-
-  let hash = 0;
-
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (Math.imul(31, hash) + value.charCodeAt(index)) % 2_147_483_647;
-  }
-
-  return `--pp-paint-${Math.abs(hash).toString(36)}`;
-};
-
-export const getCanvasPaintValue = (value) => {
-  const variableName = getPaintVariableName(value);
-
-  return variableName ? `var(${variableName}, ${value})` : value;
-};
-
-// Paint draws key their variable by canonical color, so the preview's base and
-// target colors are canonicalized the same way (alpha stays on the layer).
-export const getPaintPreviewStyle = (preview) => {
-  const baseColor = parseColor(preview?.baseValue)?.color ?? preview?.baseValue;
-  const variableName = getPaintVariableName(baseColor);
-
-  return variableName
-    ? { [variableName]: parseColor(preview.value)?.color ?? preview.value }
-    : undefined;
-};
 
 export const getNodeOpacity = (node) => {
   return typeof node?.opacity === "number" ? node.opacity : 1;
@@ -144,8 +108,10 @@ export const getGroupNodeRenderTree = (
     return [
       {
         key: childNode.id,
-        objects: buildAppearanceObjects(childNode, geometry.paths, (id) =>
-          editor.getNode(id)
+        objects: buildAppearanceObjects(
+          editor.getPaintNode(childNode.id),
+          geometry,
+          (id) => editor.getPaintNode(id)
         ),
         opacity: getNodeOpacity(childNode),
         transform: getSvgNodeTransform(childNode, geometry.bbox),
@@ -180,6 +146,7 @@ export const getGroupNodeArtState = (editor, state, nodeId) => {
 };
 
 export const CanvasNodeRenderTree = ({
+  idPrefix,
   isEditing,
   items,
   renderRootNodeId,
@@ -193,6 +160,7 @@ export const CanvasNodeRenderTree = ({
           transform={item.transform || undefined}
         >
           <CanvasNodeRenderTree
+            idPrefix={idPrefix}
             isEditing={isEditing}
             items={item.children || []}
             renderRootNodeId={renderRootNodeId}
@@ -241,7 +209,10 @@ export const CanvasNodeRenderTree = ({
         opacity={isEditing ? 0 : (item.opacity ?? 1)}
         transform={item.transform || undefined}
       >
-        <CanvasAppearanceObjects objects={item.objects} />
+        <CanvasAppearanceObjects
+          idPrefix={`${idPrefix}${item.key}-`}
+          objects={item.objects}
+        />
       </g>
     );
   });

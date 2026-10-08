@@ -6,6 +6,19 @@ export {
   DEFAULT_VECTOR_STROKE_MITER_LIMIT,
 } from "@punchpress/punch-schema";
 export {
+  formatPaintNumber,
+  type GradientDef,
+  resolveDrawPaint,
+} from "./appearance/appearance-paint-servers";
+export {
+  convertPaint,
+  getGradientAngle,
+  insertGradientStop,
+  removeGradientStop,
+  sampleGradient,
+  rotateGradientTo,
+} from "./appearance/paint";
+export {
   buildAppearanceObjects,
   getAppearanceDraws,
   getAppearancePasses,
@@ -17,7 +30,9 @@ export type {
   AppearanceObject,
   AppearancePass,
   AppearancePath,
+  Bounds,
   FillLayer,
+  Paint,
   StrokeLayer,
 } from "./appearance/appearance-types";
 export type {

@@ -7,6 +7,7 @@ import {
   withNodeGeometryBehavior,
 } from "../../primitives/node-geometry";
 import { toTransformedWorldFrame, toWorldFrame } from "../node-frame-utils";
+import { getContoursPaintBox } from "../vector/vector-engine";
 import { createDefaultShapeNode } from "./model";
 import {
   buildShapeNodePath,
@@ -24,6 +25,7 @@ export const shapeNodeCapabilities = {
     return withNodeGeometryBehavior({
       bbox,
       guide: null,
+      paintBox: getContoursPaintBox(contours),
       hitRegions: [
         createPaintedHitRegion({
           contours,

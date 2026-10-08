@@ -153,6 +153,7 @@ const buildArchGeometry = (layout, node) => {
     ),
     paths: [{ key: "shape-0", d: contoursToPath(warpedContours) }],
     bbox: getStrokeInflatedBounds(node, warpedBounds),
+    paintBox: warpedBounds,
     ready: true,
     selectionBounds: null,
   };
@@ -188,6 +189,7 @@ const buildWaveGeometry = (layout, node) => {
     ),
     paths: [{ key: "shape-0", d: contoursToPath(warpedContours) }],
     bbox: getStrokeInflatedBounds(node, warpedBounds),
+    paintBox: warpedBounds,
     ready: true,
     selectionBounds: null,
   };
@@ -210,6 +212,7 @@ const buildSlantGeometry = (layout, node) => {
     ),
     paths: [{ key: "shape-0", d: contoursToPath(warpedContours) }],
     bbox: getStrokeInflatedBounds(node, warpedBounds),
+    paintBox: warpedBounds,
     ready: true,
     selectionBounds: null,
   };
@@ -227,6 +230,7 @@ const buildCircleGeometry = (layout, node) => {
     hitRegions: createTextHitRegions(node, geometry.contours, bridgeContours),
     paths: geometry.paths,
     bbox: getStrokeInflatedBounds(node, geometry.bbox),
+    paintBox: geometry.bbox,
     ready: true,
     selectionBounds: getStrokeInflatedBounds(node, geometry.selectionBounds),
   };
@@ -239,18 +243,24 @@ const buildFlatGeometry = (layout, node) => {
   const bridgeContours = buildWordBridgeContours(layout, node);
 
   for (const [index, glyph] of layout.glyphs.entries()) {
+    const x = Number(format(glyph.baseX));
+
     paths.push({
       key: `glyph-${index}`,
       d: glyph.path,
+      layoutMatrix: { a: 1, b: 0, c: 0, d: 1, e: x, f: 0 },
       transform: `translate(${format(glyph.baseX)} 0)`,
     });
   }
+
+  const paintBox = getBounds(mergedContours);
 
   return {
     guide: null,
     hitRegions: createTextHitRegions(node, mergedContours, bridgeContours),
     paths,
-    bbox: getStrokeInflatedBounds(node, getBounds(mergedContours)),
+    bbox: getStrokeInflatedBounds(node, paintBox),
+    paintBox,
     ready: true,
     selectionBounds: null,
   };

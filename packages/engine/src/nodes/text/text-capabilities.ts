@@ -120,6 +120,7 @@ export const textNodeCapabilities = {
       guide: geometry.guide || null,
       hitRegions: geometry.hitRegions || [],
       id: node.id,
+      paintBox: ("paintBox" in geometry ? geometry.paintBox : null) ?? null,
       paths: geometry.paths,
       ready: geometry.ready,
       selectionBounds: geometry.selectionBounds || null,

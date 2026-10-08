@@ -1,4 +1,5 @@
 import { getNodeAppearance } from "./appearance/node-appearance";
+import { getPaintPrimaryColor } from "./appearance/paint";
 export const getEditorDebugDump = (editor) => {
   const state = editor.getState();
   const serializedDocument = editor.serializeDocument();
@@ -229,8 +230,8 @@ const getDumpPaint = (node) => {
 
   return {
     appearance,
-    fill: fill?.paint.color ?? null,
-    stroke: stroke?.paint.color ?? null,
+    fill: fill ? getPaintPrimaryColor(fill.paint) : null,
+    stroke: stroke ? getPaintPrimaryColor(stroke.paint) : null,
     strokeLineCap: stroke?.cap ?? null,
     strokeLineJoin: stroke?.join ?? null,
     strokeMiterLimit: stroke?.miterLimit ?? null,

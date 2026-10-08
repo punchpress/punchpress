@@ -1,6 +1,7 @@
 import type {
   AppearanceDocument,
   FillLayerDocument,
+  PaintDocument,
   StrokeLayerDocument,
 } from "@punchpress/punch-schema";
 
@@ -8,21 +9,23 @@ export type Appearance = AppearanceDocument;
 export type FillLayer = FillLayerDocument;
 export type StrokeLayer = StrokeLayerDocument;
 
+export type Paint = PaintDocument;
+
 export interface AppearanceFillDraw {
-  color: string;
   kind: "fill";
   layerId: string;
   opacity: number;
+  paint: Paint;
 }
 
 export interface AppearanceStrokeDraw {
   cap: StrokeLayer["cap"];
-  color: string;
   join: StrokeLayer["join"];
   kind: "stroke";
   layerId: string;
   miterLimit: number;
   opacity: number;
+  paint: Paint;
   width: number;
 }
 
@@ -37,11 +40,35 @@ export interface AppearancePass {
   stroke: AppearanceStrokeDraw | null;
 }
 
+export interface Bounds {
+  height: number;
+  maxX: number;
+  maxY: number;
+  minX: number;
+  minY: number;
+  width: number;
+}
+
+// 2D affine matrix [a b c d e f], the same layout as SVG matrix().
+export interface Matrix {
+  a: number;
+  b: number;
+  c: number;
+  d: number;
+  e: number;
+  f: number;
+}
+
 export interface AppearancePath {
   closed?: boolean;
   d: string;
   fillRule?: "evenodd" | "nonzero";
   key: string;
+  // Glyph layout transform as numbers, equal to `transform`; paint servers in
+  // node space undo it so one gradient spans every glyph.
+  layoutMatrix?: Matrix;
+  // Unstroked bounds of a vector child's geometry in its own local space.
+  paintBox?: Bounds | null;
   transform?: string | null;
 }
 
@@ -51,6 +78,11 @@ export interface AppearanceObject {
   draws: readonly AppearanceDraw[];
   key: string;
   opacity: number;
+  // Unstroked bounds gradients normalize against, in `paintSpace`: "node" for
+  // leaf art (path transforms are glyph layout and are undone), "path" for
+  // vector children and compiled results (path transforms are placement).
+  paintBox: Bounds | null;
+  paintSpace: "node" | "path";
   passes: readonly AppearancePass[];
   paths: readonly AppearancePath[];
   styleNodeId: string;

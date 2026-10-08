@@ -128,6 +128,9 @@ const toRenderEntries = (pathNode, geometry) => {
     d: path.d,
     fillRule: pathNode.fillRule,
     key: `${pathNode.id}-${index}`,
+    // Gradients normalize against the child's own unstroked box, in the
+    // child's local space (the entry transform only places it).
+    paintBox: geometry.paintBox ?? null,
     styleNodeId: pathNode.id,
     transform,
   }));
@@ -304,8 +307,9 @@ const buildCompoundFillEntries = (vectorNode, pathNodes, getPathGeometry) => {
       getPaperResultPaths(item)
     );
     const styleNode = pathNodes.at(-1) || pathNodes[0];
+    const paintBox = toBounds(boundsItem.bounds);
     const bounds = expandBounds(
-      toBounds(boundsItem.bounds),
+      paintBox,
       getPaintExtent(styleNode).strokeWidth
     );
 
@@ -323,6 +327,7 @@ const buildCompoundFillEntries = (vectorNode, pathNodes, getPathGeometry) => {
             .join(" "),
           fillRule: styleNode.fillRule,
           key: `${vectorNode.id}-compound-fill`,
+          paintBox,
           styleNodeId: styleNode.id,
           transform: null,
         },
@@ -364,8 +369,9 @@ const buildBooleanCompoundEntries = (
       return currentItem[methodName](item);
     }, firstItem);
     const styleNode = pathNodes.at(-1) || pathNodes[0];
+    const paintBox = toBounds(resultItem.bounds);
     const bounds = expandBounds(
-      toBounds(resultItem.bounds),
+      paintBox,
       getPaintExtent(styleNode).strokeWidth
     );
     const entries = getPaperResultPaths(resultItem).map((path, index) => ({
@@ -373,6 +379,7 @@ const buildBooleanCompoundEntries = (
       d: path.pathData || path.getPathData(),
       fillRule: styleNode.fillRule,
       key: `${vectorNode.id}-boolean-${index}`,
+      paintBox,
       styleNodeId: styleNode.id,
       transform: null,
     }));
@@ -485,10 +492,7 @@ export const buildVectorRenderGeometry = (
   return withNodeGeometryBehavior({
     bbox,
     guide: null,
-    hitRegions: getDefaultRenderHitRegions(
-      visiblePathNodes,
-      getPathGeometry
-    ),
+    hitRegions: getDefaultRenderHitRegions(visiblePathNodes, getPathGeometry),
     paths: readyEntries,
     ready: true,
     selectionBounds: bbox,

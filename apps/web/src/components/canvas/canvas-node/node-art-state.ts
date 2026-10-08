@@ -61,7 +61,7 @@ export const selectNodeArtState = (
   return {
     bbox,
     fallbackPaint: fallbackText
-      ? getPrimaryPaint(getNodeAppearance(node))
+      ? getPrimaryPaint(getNodeAppearance(editor.getPaintNode(nodeId) || node))
       : null,
     fallbackText,
     image: node.type === "image" ? node : null,
@@ -69,8 +69,10 @@ export const selectNodeArtState = (
     isEditing: state.editingNodeId === nodeId && !isEditingText,
     isEditingText,
     isInteractionProxy: false,
-    objects: buildAppearanceObjects(node, geometry?.paths, (id) =>
-      editor.getNode(id)
+    objects: buildAppearanceObjects(
+      previewNode ? node : editor.getPaintNode(nodeId) || node,
+      geometry,
+      (id) => editor.getPaintNode(id)
     ),
     // Ancestor opacity lives on the group and artboard layers.
     opacity: getNodeOpacity(node),
@@ -93,6 +95,8 @@ export const selectNodeArtInputs = (editor, state, nodeId) => {
   };
 };
 
+// Inputs, preview revision, and paint preview are memo keys for the caller;
+// the derivation reads live editor state.
 export const getMemoizedNodeArtState = (
   editor,
   nodeId,
