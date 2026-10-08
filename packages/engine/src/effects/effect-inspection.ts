@@ -9,6 +9,7 @@ export interface SelectionEffects {
 }
 
 interface CachedSelectionEffects {
+  nodeIdList: readonly string[];
   nodeIdsKey: string;
   nodes: unknown;
   result: SelectionEffects;
@@ -25,16 +26,29 @@ export const getSelectionEffects = (
   nodeIds: string[]
 ): SelectionEffects => {
   const nodes = editor.getState().nodes;
-  const nodeIdsKey = nodeIds.join("\0");
   const cached = cacheByEditor.get(editor);
 
+  // Callers usually pass the stored selection array, so identity skips the
+  // key on unrelated store updates.
+  if (cached?.nodes === nodes && cached.nodeIdList === nodeIds) {
+    return cached.result;
+  }
+
+  const nodeIdsKey = nodeIds.join("\0");
+
   if (cached?.nodes === nodes && cached.nodeIdsKey === nodeIdsKey) {
+    cacheByEditor.set(editor, { ...cached, nodeIdList: nodeIds });
     return cached.result;
   }
 
   const result = buildSelectionEffects(editor, nodeIds);
 
-  cacheByEditor.set(editor, { nodeIdsKey, nodes, result });
+  cacheByEditor.set(editor, {
+    nodeIdList: nodeIds,
+    nodeIdsKey,
+    nodes,
+    result,
+  });
 
   return result;
 };

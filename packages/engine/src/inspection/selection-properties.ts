@@ -320,15 +320,22 @@ export const getCachedSelectionPropertiesSnapshot = (
   nodeIds = editor.selectedNodeIds
 ) => {
   const state = editor.getState();
-  const nodeIdsKey = nodeIds.join("\0");
   const cachedSnapshot = editor.selectionPropertiesSnapshotCache;
-
-  if (
+  const isCurrent =
     cachedSnapshot &&
     cachedSnapshot.fontRevision === state.fontRevision &&
-    cachedSnapshot.nodeIdsKey === nodeIdsKey &&
-    cachedSnapshot.nodes === state.nodes
-  ) {
+    cachedSnapshot.nodes === state.nodes;
+
+  // Callers usually pass the stored selection array, so identity skips the
+  // key on unrelated store updates.
+  if (isCurrent && cachedSnapshot.nodeIdList === nodeIds) {
+    return cachedSnapshot.snapshot;
+  }
+
+  const nodeIdsKey = nodeIds.join("\0");
+
+  if (isCurrent && cachedSnapshot.nodeIdsKey === nodeIdsKey) {
+    cachedSnapshot.nodeIdList = nodeIds;
     return cachedSnapshot.snapshot;
   }
 
@@ -336,6 +343,7 @@ export const getCachedSelectionPropertiesSnapshot = (
 
   editor.selectionPropertiesSnapshotCache = {
     fontRevision: state.fontRevision,
+    nodeIdList: nodeIds,
     nodeIdsKey,
     nodes: state.nodes,
     snapshot,
