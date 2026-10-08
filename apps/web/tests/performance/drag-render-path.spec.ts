@@ -48,3 +48,22 @@ test("500-node drag does not rerender node wrappers during motion", async ({
   expect(result?.nodeStats.selectedNodeCount).toBe(500);
   expect(nodeRenderCount).toBeLessThanOrEqual(20);
 });
+
+test("group drag re-renders only the moved group's art", async ({ page }) => {
+  const result = await runBenchmark(
+    page,
+    "group-actions-drag-section-expanded"
+  );
+  const artRenderCount =
+    result?.counters[PERF_COUNTERS.renderCanvasNodeArt] ?? 0;
+  const placedCount =
+    result?.counters[PERF_COUNTERS.groupActionsPlacedSurfaces] ?? 0;
+  const movedLeafCount =
+    result?.counters[PERF_COUNTERS.groupActionsAffectedLeaves] ?? 0;
+
+  // Thousands of placed shells; only the moved leaves re-render, once per
+  // committed drag (the benchmark drags four times).
+  expect(placedCount).toBeGreaterThan(3000);
+  expect(movedLeafCount).toBeLessThan(placedCount / 10);
+  expect(artRenderCount).toBeLessThanOrEqual(4 * movedLeafCount);
+});

@@ -4,6 +4,7 @@ import { NodeContextMenuItems } from "@/components/context-menus/node-context-me
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
 import { useEditor } from "../../../editor-react/use-editor";
+import { useEditorSurfaceSelection } from "../../../editor-react/use-editor-surface-selection";
 import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
 import {
@@ -338,10 +339,10 @@ const CanvasStandardNodeArt = ({ nodeId }) => {
   const artInputs = useEditorValue((editor, state) =>
     selectNodeArtInputs(editor, state, nodeId)
   );
-  const resizePreviewNode = useEditorSurfaceValue((editor) =>
+  const resizePreviewNode = useEditorSurfaceSelection((editor) =>
     getResizePreviewNode(editor, nodeId)
   );
-  const paintPreview = useEditorSurfaceValue((editor) =>
+  const paintPreview = useEditorSurfaceSelection((editor) =>
     editor.getSelectionColorPreviewForNode(nodeId)
   );
   const editor = useEditor();
