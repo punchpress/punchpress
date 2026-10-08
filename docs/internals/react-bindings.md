@@ -40,5 +40,13 @@ document.
 - Tree queries such as `getSelectionTargetNodeId` use the cached node-tree
   index; selectors must not rebuild node maps.
 - Menu content subscribes inside its popup so closed menus do no work.
+- The properties panel root subscribes to its layout only (inspected node,
+  section availability, path-editing mode, raster tool). Each section, row,
+  and value control subscribes to its own primitives, so a scrub re-renders
+  only the scrubbed control. Lists subscribe to ordered id arrays returned
+  directly from the selector. Controls hold layer or effect ids and resolve
+  the slot when they dispatch; lists remount when the selection changes,
+  because different nodes can reuse the same ids. The
+  `node-property-edit-render-path` performance spec gates these counts.
 - Providers above the editor shell must not re-render on every store update;
   subscribe to the narrow signal they need, such as `subscribeDirtyState`.

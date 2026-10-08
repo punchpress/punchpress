@@ -19,8 +19,8 @@ and future clients should converge here instead of inventing parallel behavior.
 | Nodes | `addTextNode`, `addShapeNode`, `addArtboardNode`, `insertNodes`, `updateNode`, `deleteSelected`, `duplicate`, `groupSelected`, `ungroup`. |
 | Active layer and selection | `activeLayerId`, `activeLayer`, `select`, `setSelectedNodes`, `toggleSelection`, `clearSelection`, `ensureSelected`, `isSelected`. |
 | Layering | `bringToFront`, `sendToBack`, `setNodeOrder`, `moveNodeToParent`, `toggleVisibility`. |
-| Appearance | `addFill`, `addStroke`, `updateAppearanceLayer(slot, patch)`, `removeAppearanceLayer(slot)`, `moveAppearanceLayer(slot, toIndex)`, `setAppearance(appearance)`, `setPaintKind(slot, kind)`, `setGradientAngle(slot, degrees)`, `getGradientAngle(slot)`, `canAlignStrokes()` (false when a target has only open contours); `updateAppearanceLayer` also accepts a whole `paint`; `slot` is `{ list, index }`, `nodeIds` defaults to the selection, and each call is one undo step. |
-| Effects | `addEffect(kind?)`, `updateEffect(index, patch)` (`color`, `opacity`, `x`, `y`, `blur`, `enabled`; validated and clamped), `removeEffect(index)`, `moveEffect(index, toIndex)`, `setEffects(effects)`, `getSelectionEffects()`; targets are effect owners (a path inside a vector routes to the vector), `nodeIds` defaults to the selection, and each call is one undo step. |
+| Appearance | `addFill`, `addStroke`, `updateAppearanceLayer(slot, patch)`, `removeAppearanceLayer(slot)`, `moveAppearanceLayer(slot, toIndex)`, `setAppearance(appearance)`, `setPaintKind(slot, kind)`, `setGradientAngle(slot, degrees)`, `getGradientAngle(slot)`, `canAlignStrokes()` (false when a target has only open contours); `updateAppearanceLayer` also accepts a whole `paint`; `slot` is `{ list, index }`, `nodeIds` defaults to the selection, and each call is one undo step. Reads: `getSelectionAppearance()` (shared stack, or the first stack when mixed), `getAppearanceLayerIds(list)`, `getAppearanceLayer(list, layerId)` (layer and current slot; ids differ between equal stacks, so controls resolve the slot when they dispatch). |
+| Effects | `addEffect(kind?)`, `updateEffect(index, patch)` (`color`, `opacity`, `x`, `y`, `blur`, `enabled`; validated and clamped), `removeEffect(index)`, `moveEffect(index, toIndex)`, `setEffects(effects)`, `getSelectionEffects()`, `getEffectIds()`, `getEffect(effectId)` (effect and current index); targets are effect owners (a path inside a vector routes to the vector), `nodeIds` defaults to the selection, and each call is one undo step. |
 | Editing modes | `setActiveTool`, `startEditing`, `commitEditing`, `cancelEditing`, `startPathEditing`, `stopPathEditing`. |
 | Vector/path | point movement, point deletion, topology operations, curve merge/separate/join, compound paths, boolean operations. |
 | Transform | move, resize, rotate, selection drag, text path positioning. |
@@ -28,7 +28,7 @@ and future clients should converge here instead of inventing parallel behavior.
 | Fonts | initialize/request local fonts, preload fonts, set last used font. |
 | Clipboard | `copySelection`, `pasteClipboardContent`, `pasteText`. |
 | History | undo, redo, commit or cancel a gesture, dirty/saved marks. |
-| Inspection | debug dump, selection properties, overlay state, node geometry, layer rows. |
+| Inspection | debug dump, selection properties (`getSelectionInspection()` for panel structure, `getSelectionProperty(id)`, `getSelectionColors()`), path corner inspection, overlay state, node geometry, layer rows. |
 | Raster host | Constructor-injected `RasterSurfaceResolver` for finite browser or headless Raster targets. |
 | Raster editing | Raster aspect lock and async resize session commands; `getRasterTargetState`; Crop start, update, commit, cancel, and preview. |
 
