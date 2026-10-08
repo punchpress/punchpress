@@ -178,6 +178,78 @@ test("a stroke width scrub is one undo step", async ({ page }) => {
     .toBe(2);
 });
 
+test("a selection change mid-scrub ends the scrub on the first node", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(page, PANEL_DOCUMENT);
+  await selectShape(page);
+  await page
+    .getByTestId("appearance-strokes")
+    .getByRole("button", { name: "Add stroke" })
+    .click();
+  // A second node whose stroke reuses the first node's layer id.
+  await page.evaluate((nodeId) => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    const node = editor?.getNode(nodeId);
+
+    editor?.insertNodes([
+      {
+        ...node,
+        id: "panel-shape-2",
+        transform: { ...node.transform, x: 900 },
+      },
+    ]);
+    editor?.setSelectedNodes([nodeId]);
+  }, SHAPE_ID);
+
+  const getSecondWidth = () => {
+    return page.evaluate(() => {
+      return window.__PUNCHPRESS_EDITOR__?.getNode("panel-shape-2")?.appearance
+        .strokes[0].width;
+    });
+  };
+  const slider = page.getByRole("slider", { name: "Stroke width" });
+  const box = await slider.boundingBox();
+
+  if (!box) {
+    throw new Error("Expected stroke width slider");
+  }
+
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+
+  for (let step = 1; step <= 3; step += 1) {
+    await page.mouse.move(
+      box.x + box.width / 2 + step * 12,
+      box.y + box.height / 2
+    );
+  }
+
+  await page.evaluate(() => {
+    window.__PUNCHPRESS_EDITOR__?.setSelectedNodes(["panel-shape-2"]);
+  });
+
+  for (let step = 4; step <= 6; step += 1) {
+    await page.mouse.move(
+      box.x + box.width / 2 + step * 12,
+      box.y + box.height / 2
+    );
+  }
+
+  await page.mouse.up();
+
+  expect((await getAppearance(page))?.strokes[0].width).toBeGreaterThan(2);
+  expect(await getSecondWidth()).toBe(2);
+
+  // The interrupted scrub is still one undo step.
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect
+    .poll(async () => (await getAppearance(page))?.strokes[0]?.width)
+    .toBe(2);
+  expect(await getSecondWidth()).toBe(2);
+});
+
 test("differing stacks show Mixed until Use first copies the first stack", async ({
   page,
 }) => {
