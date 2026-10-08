@@ -87,6 +87,7 @@ export const PERF_COUNTERS = {
   largeSvgRenderedPaths: "fixture.largeSvg.renderedPaths",
   largeSvgTotalNodes: "fixture.largeSvg.totalNodes",
   renderCanvasNode: "render.canvasNode.count",
+  renderCanvasNodeArt: "render.canvasNodeArt.count",
   renderCanvasOverlay: "render.canvasOverlay.count",
   renderCanvasStageOverlay: "render.canvasStageOverlay.count",
   renderPanelLayerRow: "render.panelLayerRow.count",

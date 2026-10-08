@@ -334,6 +334,7 @@ const CanvasNodeShell = ({ children, isReady, nodeId }) => {
 };
 
 const CanvasStandardNodeArt = ({ nodeId }) => {
+  usePerformanceRenderCounter(PERF_COUNTERS.renderCanvasNodeArt);
   const artInputs = useEditorValue((editor, state) =>
     selectNodeArtInputs(editor, state, nodeId)
   );
@@ -396,6 +397,7 @@ const CanvasStandardNodeArt = ({ nodeId }) => {
 };
 
 const CanvasVectorNodeArt = ({ nodeId }) => {
+  usePerformanceRenderCounter(PERF_COUNTERS.renderCanvasNodeArt);
   const artInputs = useEditorValue((editor, state) =>
     selectNodeArtInputs(editor, state, nodeId)
   );
