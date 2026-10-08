@@ -389,6 +389,60 @@ lands with stage 6:
   drags, and expanding exact-raster presentation by effect support. Raster
   pixel-grid chrome already renders outside node art.
 
+### Drop shadows as built (stage 6)
+
+- **One filter graph per owner** (`buildEffectFilter`): each enabled shadow
+  branches from `SourceAlpha` (offset, blur only when > 0, flood, composite)
+  and merges in list order under `SourceGraphic`, in sRGB. The region is the
+  owner's conservative ink plus each shadow's offset ink grown by 4σ, in
+  `userSpaceOnUse` coordinates.
+- **Leaf owners** (text, shapes, standalone paths, vectors) wrap their art in
+  `<g filter>` inside the shell SVG and inside node opacity, so the shadow
+  fades with the art. Canvas shells, dense-surface items, the text-edit
+  preview, and export all ask `getLeafEffectPresentation`, so they agree.
+  Leaf ink is the geometry frame (which holds the outside stroke reach) grown
+  by miter tips and square caps.
+- **Group owners** composite on their render layer: a zero-size, stage-origin
+  `div`. One shadow uses CSS `drop-shadow()`, which is exactly the same shadow
+  (same blur-radius semantics) and much cheaper to re-filter while children
+  move; several shadows use CSS `filter: url()` over a stage-space SVG filter
+  (Chromium resolves numeric `userSpaceOnUse` regions on zero-size boxes),
+  since chained `drop-shadow()` would shadow the earlier shadows. Export always
+  writes the SVG graph. The ink is the
+  union of the children's world output ink, including their own shadows,
+  computed by one reader shared with export. CSS applies the filter before
+  opacity. A group holding shadowed groups never collapses into a dense
+  surface, since dense surfaces paint nested groups as plain SVG groups.
+- **Artboard clips.** An artboard holding a shadowed group clips its render
+  layer with `clip-path: path()` in stage coordinates. Shells inside a
+  shadowed group skip their own artboard clip, so content outside the
+  artboard still casts shadows back inside before the layer clips the result.
+  Other shells keep per-shell clips.
+- **Previews.** Group layers and artboard clips stay put while previews move
+  leaf shells, so a group's filter ink widens (in 512-unit steps) to cover a
+  drag delta or resize preview of its descendants, a group resized as a whole
+  previews its scaled shadows, and an artboard clip moves with its own drag.
+  Only composited layers subscribe to previews, cached per preview revision.
+- **Vector ink** unions each entry's ink placed through its transform, so
+  scaled children stay inside the vector's filter.
+- **Transform bakes.** Aggregate resize scales shape and text shadows (their
+  size bakes into width, height, and font size) and the shadows of groups and
+  child-backed vectors whose children take the scale; offsets scale by the
+  signed scale and blur by its magnitude. Aggregate rotation rotates container
+  shadow offsets, live and at commit. Paths and leaf vectors keep scale and
+  rotation in their transform, so their shadows follow without rewriting.
+- **Vector children** never hold effects: the schema rejects them, every store
+  write strips them, and effect commands route a vector child to its vector.
+- **Deferred:**
+  - Exact raster presentation still crops raster pixels to the viewport, so
+    an offscreen part of a raster image inside a shadowed group casts no
+    shadow until it scrolls into view.
+  - Moving presentation layers: a whole-group drag still re-filters each
+    shadowed group every frame (see the stage 6 measurements).
+  - A group's filter ink does not follow live text edits inside it until the
+    edit commits.
+  - Selection colors do not list shadow colors.
+
 ## Rejected Alternatives
 
 - **Compiled offset outlines for alignment.** Exact rings with no edge seam,

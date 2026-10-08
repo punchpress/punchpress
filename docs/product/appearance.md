@@ -34,6 +34,11 @@ white outline.
   fades the whole node, all layers together.
 - **Vectors.** Selecting a multi-path vector edits its child paths' stacks
   together.
+- **Effects.** Text, shapes, paths, vectors, and groups take up to 4 drop
+  shadows, each with color, opacity, X/Y offset, and blur. A new shadow is a
+  hard 8/8 black shadow. Shadows paint in list order (top row first, under the
+  object), rotate and scale with the object, and never take clicks. Selecting
+  a path inside a vector edits the vector's shadows.
 - **Selection colors.** Group and multi-selections list every distinct layer
   and gradient-stop color with its opacity; editing one recolors every visible
   layer or stop that uses it.
@@ -61,8 +66,6 @@ white outline.
 ## Intentionally Missing
 
 - Radial gradients and on-canvas gradient handles.
-- Drop shadows (staged; see the
-  [appearance stack decision](../decisions/appearance-stack.md)).
 - Offset Path / Outline Stroke (baking an offset or outlined shape).
 - Blend modes, dashes, and per-character styling.
 

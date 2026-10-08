@@ -71,14 +71,14 @@ Every stage goes through the same sequence:
    strokes from one engine element tree shared by canvas and export,
    open-contour fallback, sided reaches for frames and hit testing, an Align
    control, and the stroke-width scrub gate. Offset geometry is a non-goal.
-6. **Drop shadow on nodes and groups.**
+6. **Drop shadow on nodes and groups (1.12).**
    - Effects list and one branched filter graph per effect owner.
    - Stationary artboard clip layers, so group shadows clip to the artboard.
-   - Moving presentation layers during whole-group drags, with disjoint preview
-     roots, if the shadow drag gate needs them.
-   - Exact-raster presentation expanded by effect support.
+   - Group filter ink widened to follow previews; moving presentation layers
+     only if the shadow drag gate needs them.
    - Vector-container and group effects, including resize and baked
      group-transform scaling.
+   - Deferred: exact-raster presentation expanded by effect support.
 
 The schema version bumps at each stage that widens it.
 
@@ -184,6 +184,29 @@ the twin uses two center strokes.
   selection-target query, and canvas cursor assets). That predates stage 5
   and is tracked separately.
 
+### Stage 6 Drop Shadows (2026-10-07)
+
+DPR 1, dev build, ms (p50 / p95 / max).
+
+| Scenario | Shadowed | Control | Gate |
+| --- | --- | --- | --- |
+| viewport 200, hard 8/8 | 8.3 / 9.0 / 66.7 | plain 8.3 / 9.1 / 66.8 | pass (0.99×, 1.0×) |
+| viewport 200, blur 24 | 8.3 / 9.0 / 66.7 | plain 8.3 / 9.1 / 66.8 | pass |
+| dragging 200, blur 24 | 8.4 / 17.1 / 33.1 | plain 8.4 / 16.8 / 33.3 | pass (1.02×) |
+| shadow scrub, one of 200 | 25.0 / 33.5 / 100 | stroke-width scrub 25.0 / 33.5 / 100 | fails 8.33 absolute; identical to its control (per-update overhead, tracked separately) |
+| shadowed groups, whole-group drag | 16.5 / 17.0–17.2 / 25–58 | plain 8.3 / 16.7 / 25 | pass on p95 (1.02–1.03×); p50 doubles |
+| shadowed groups, child drag | 8.4 / 16.8 / 25 | plain 8.3 / 9.1 / 33 | at the 16.7 gate (+0.1, one vsync); 20–23 slow frames vs 3–5 |
+| max stack, 1% → 6400% → 1% | 8.3 / 8.9 / 25.0 | — | pass (max ≤ 100) |
+| max stack export | about 17 ms including two trailing frames | — | recorded |
+
+- Group drags first ran 1.5× on p95: every composited layer re-rendered on
+  every preview frame, and group shadows used SVG `url()` filters. Layers now
+  subscribe only when composited, cached per preview revision, and a single
+  group shadow uses CSS `drop-shadow()`.
+- A whole-group drag still re-filters each shadowed group every frame, since
+  children move under a stationary layer. Moving presentation layers would
+  make it compositor-only; deferred because the p95 gate holds.
+
 ## Browser Checks
 
 - **Visual sweep** (`appearance-visual-sweep.spec.ts`): DPR 2 and DPR 1, the
@@ -200,6 +223,9 @@ the twin uses two center strokes.
 - **Export parity:** a canvas screenshot at DPR 1 and 100% zoom against
   `renderSvgToPngBlob`, within a per-channel tolerance. Overlapping
   translucent siblings are included.
+- **Shadow sweep** (`drop-shadow-sweep.spec.ts`): hard, blurred, and rotated
+  leaf shadows, a 50% shadowed group, and a group shadow clipped at the
+  artboard edge, at DPR 2 and 1 down the ladder, after reload, and in export.
 - **Panel and hit specs:**
   - layer add, reorder, toggle, and remove; a scrub is one undo step
   - a control closes when its layer disappears

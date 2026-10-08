@@ -15,7 +15,7 @@ read_when:
 | --- | --- |
 | Extension | `.punch` |
 | MIME type | `application/vnd.punchpress.document` |
-| Current version | `1.11` |
+| Current version | `1.12` |
 | Root parent id | `root` |
 | Default basename | `untitled-design` |
 
@@ -23,7 +23,7 @@ read_when:
 
 ```ts
 type DesignDocument = {
-  version: "1.11";
+  version: "1.12";
   assets: Record<string, DocumentAsset>;
   nodes: Node[];
 };
@@ -75,6 +75,24 @@ type StrokeLayer = FillLayer & {
   join: "miter" | "round" | "bevel";
   miterLimit: number; // >= 1
 };
+```
+
+Text, shape, standalone path, vector, and group nodes may store `effects`
+(absent means none). Paths inside a vector never do; the vector owns the
+shadow.
+
+```ts
+type Effect = {
+  id: string; // unique within the node
+  kind: "drop-shadow";
+  enabled: boolean;
+  color: string; // canonical #rrggbb
+  opacity: number; // 0..1
+  x: number; // offset in the owner's local units (group space for groups)
+  y: number;
+  blur: number; // >= 0, CSS box-shadow blur radius (stdDeviation = blur / 2)
+};
+// effects: Effect[] — at most 4, painted in list order under the owner
 ```
 
 Image nodes store logical Raster bounds and an optional finite standalone
