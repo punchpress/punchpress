@@ -77,8 +77,8 @@ export const getPreviewPresentationPlan = (
     cached &&
     cached.tree === tree &&
     cached.nodes === editor.nodes &&
-    cached.previewNodeIds === previewNodeIds &&
-    cached.effectiveNodeIdSet === preview?.effectiveNodeIdSet &&
+    haveSameIds(cached.previewNodeIds, previewNodeIds) &&
+    haveSameIdSet(cached.effectiveNodeIdSet, preview?.effectiveNodeIdSet) &&
     cached.pathEditingNodeId === pathEditingNodeId &&
     cached.isMove === isMove
   ) {
@@ -102,6 +102,38 @@ export const getPreviewPresentationPlan = (
   });
 
   return plan;
+};
+
+// Move previews keep their membership collections for a gesture; resize
+// and placement previews rebuild them every tick, so equal membership also
+// reuses the plan instead of re-resolving every placed shell per tick.
+const haveSameIds = (left: readonly string[], right: readonly string[]) => {
+  return (
+    left === right ||
+    (left.length === right.length &&
+      left.every((nodeId, position) => nodeId === right[position]))
+  );
+};
+
+const haveSameIdSet = (
+  left: ReadonlySet<string> | undefined,
+  right: ReadonlySet<string> | undefined
+) => {
+  if (left === right) {
+    return true;
+  }
+
+  if (!(left && right) || left.size !== right.size) {
+    return false;
+  }
+
+  for (const nodeId of left) {
+    if (!right.has(nodeId)) {
+      return false;
+    }
+  }
+
+  return true;
 };
 
 interface PlanInputs {

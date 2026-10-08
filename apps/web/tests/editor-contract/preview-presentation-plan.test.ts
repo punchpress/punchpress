@@ -479,4 +479,27 @@ describe("preview presentation plan", () => {
 
     editor.setSelectionDragPreview(null);
   });
+
+  test("resize ticks with rebuilt membership collections reuse one plan", () => {
+    const editor = loadStackScene();
+    const tick = (scale: number) => {
+      return editor.getPreviewPresentationPlan({
+        effectiveNodeIdSet: new Set(["a", "b", "c"]),
+        nodeIdSet: new Set(["s0", "a", "b", "c"]),
+        nodeIds: ["s0"],
+        resize: { anchorCanvas: { x: 0, y: 0 }, scale },
+      });
+    };
+    const first = tick(1.1);
+
+    expect(tick(1.2)).toBe(first);
+    expect(tick(1.3)).toBe(first);
+    expect(
+      editor.getPreviewPresentationPlan({
+        effectiveNodeIdSet: new Set(["a", "b"]),
+        nodeIds: ["s0"],
+        resize: { anchorCanvas: { x: 0, y: 0 }, scale: 1.3 },
+      })
+    ).not.toBe(first);
+  });
 });

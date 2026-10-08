@@ -55,6 +55,35 @@ export const beginPreviewSession = (
   };
 };
 
+// Whether a preview's plan keeps this session's roots. Resize previews
+// rebuild their plan on membership changes that resolve to the same roots;
+// those keep the promoted session instead of restarting it every tick.
+export const continuePreviewSession = (
+  session: PreviewSession,
+  plan: PreviewPresentationPlan
+) => {
+  if (session.plan === plan) {
+    return true;
+  }
+
+  const { targets } = session.plan;
+
+  if (
+    targets.length !== plan.targets.length ||
+    targets.some((target, position) => {
+      const next = plan.targets[position];
+
+      return target.kind !== next.kind || target.nodeId !== next.nodeId;
+    })
+  ) {
+    return false;
+  }
+
+  session.plan = plan;
+
+  return true;
+};
+
 // Writes the preview to the moving roots only. A layer root takes a single
 // translation; its descendants' transforms and filters stay untouched.
 export const applyPreviewSession = (

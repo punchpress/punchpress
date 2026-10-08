@@ -9,6 +9,7 @@ import {
 import {
   applyPreviewSession,
   beginPreviewSession,
+  continuePreviewSession,
   endPreviewSession,
   type PreviewSession,
 } from "./preview-presentation";
@@ -98,11 +99,12 @@ export const useCanvasNodePlacement = (placedNodeIds: readonly string[]) => {
         return;
       }
 
-      // A new gesture (or a changed membership) retires the previous roots
-      // first, including one still waiting for its handoff frame.
+      // A new gesture (or changed roots) retires the previous roots first,
+      // including ones still waiting for their handoff frame.
       if (
         handoffFrameId ||
-        (sessionRef.current && sessionRef.current.plan !== plan)
+        (sessionRef.current &&
+          !continuePreviewSession(sessionRef.current, plan))
       ) {
         handOff();
       }
