@@ -307,6 +307,9 @@ export const handleSpaceUp = (editor, event) => {
 };
 
 export const handleWindowBlur = (editor) => {
+  // A pointer released outside the window never ends a held viewport
+  // interaction (zoom scrub), so blur settles the camera.
+  editor.setViewportInteracting(false);
   editor.getState().setPenDirectSelectionModifierPressed(false);
   editor.getState().setPenPointTypeToggleModifierPressed(false);
   editor.getState().setSpacePressed(false);

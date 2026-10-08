@@ -195,4 +195,17 @@ describe("viewport camera publication", () => {
     expect(presentations.count).toBe(1);
     expect(overlayRefreshes).toBe(1);
   });
+
+  test("window blur settles a held interaction whose release never arrived", () => {
+    const editor = new Editor();
+    mountViewer(editor);
+
+    editor.setViewportInteracting(true);
+    editor.zoomTo(2);
+    editor.handleWindowBlur();
+
+    expect(editor.viewportInteracting).toBe(false);
+    expect(editor.getState().viewport).toEqual(editor.viewport);
+    expect(editor.getState().viewport.zoom).toBe(2);
+  });
 });

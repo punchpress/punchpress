@@ -1,5 +1,5 @@
 import { MAX_ZOOM, MIN_ZOOM } from "@punchpress/engine";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorViewportValue } from "../../editor-react/use-editor-viewport-value";
@@ -22,6 +22,25 @@ export const CanvasZoomControl = () => {
     setIsScrubbing(false);
     editor.setViewportInteracting(false);
   };
+
+  // A release outside the window sends no pointer end; the editor settles
+  // the camera on blur, and the scrub drops its drag here.
+  useEffect(() => {
+    if (!isScrubbing) {
+      return;
+    }
+
+    const cancelScrub = () => {
+      dragRef.current = null;
+      setIsScrubbing(false);
+    };
+
+    window.addEventListener("blur", cancelScrub);
+
+    return () => {
+      window.removeEventListener("blur", cancelScrub);
+    };
+  }, [isScrubbing]);
 
   return (
     <Button

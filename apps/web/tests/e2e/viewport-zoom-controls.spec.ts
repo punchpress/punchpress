@@ -70,3 +70,45 @@ test("dragging the zoom percentage horizontally scrubs zoom", async ({
   await expect.poll(() => getViewportZoom(page)).toBeCloseTo(2, 2);
   await expect(zoom).toHaveAttribute("aria-valuenow", "200");
 });
+
+test("a zoom scrub interrupted by window blur settles the camera", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await resetViewport(page);
+
+  const zoom = page.getByRole("slider", { name: "Canvas zoom" });
+  const box = await zoom.boundingBox();
+
+  if (!box) {
+    throw new Error("Missing canvas zoom scrub control");
+  }
+
+  const start = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + 120, start.y, { steps: 8 });
+  await expect(zoom).toHaveAttribute("data-scrubbing", "true");
+
+  // The pointer is released outside the window: no pointer end arrives.
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event("blur"));
+  });
+
+  await expect(zoom).not.toHaveAttribute("data-scrubbing", "true");
+  const settled = await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    return {
+      interacting: editor?.viewportInteracting,
+      live: editor?.viewport.zoom,
+      store: editor?.getState().viewport.zoom,
+    };
+  });
+
+  expect(settled.interacting).toBe(false);
+  expect(settled.store).toBe(settled.live);
+  expect(settled.live).toBeCloseTo(2, 2);
+  await page.mouse.up();
+});
