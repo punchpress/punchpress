@@ -4,6 +4,7 @@ import { Popover } from "@base-ui/react/popover";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditor } from "@/editor-react/use-editor";
 import { cn } from "@/lib/utils";
+import { expireClickGuard } from "../select";
 import { ColorPicker } from "./color-picker";
 import { formatStorageValue, parseColorValue } from "./color-picker-value";
 
@@ -289,6 +290,7 @@ const ColorPickerField = ({
         isPopupDismissSuppressedRef.current = false;
         popupDismissSuppressionTimeoutRef.current = null;
       }, 120);
+      expireClickGuard(handleSuppressedClick);
       window.removeEventListener(
         "pointercancel",
         handlePointerInteractionEnd,

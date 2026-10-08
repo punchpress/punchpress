@@ -168,6 +168,7 @@ function SelectPopup({
       popupDismissSuppressionTimeoutRef.current = window.setTimeout(() => {
         popupDismissSuppressionTimeoutRef.current = null;
       }, 120);
+      expireClickGuard(handleSuppressedClick);
       window.removeEventListener(
         "pointercancel",
         handlePointerInteractionEnd,
@@ -319,4 +320,14 @@ export {
   SelectGroup,
   SelectGroupLabel,
   SelectPrimitive,
+};
+
+// Choosing an item closes the popup, so the browser may never send the
+// click-through a guard waits for. Each guard expires on its own timer, kept
+// apart from the popup's lifecycle (which unmounts first), so it can never
+// swallow the user's next, unrelated click.
+export const expireClickGuard = (guard: (event: MouseEvent) => void) => {
+  window.setTimeout(() => {
+    document.removeEventListener("click", guard, true);
+  }, 120);
 };
