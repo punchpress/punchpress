@@ -52,6 +52,33 @@ The web canvas integrates `react-infinite-viewer` with engine viewport state.
   viewport movement; ordinary later placement does not.
 - Stage bounds are an interaction surface, not document size.
 
+## Continuous Zoom
+
+- A continuous zoom is one trackpad pinch or ctrl-wheel burst, or a
+  zoom-control scrub. The engine owns its session
+  (`viewport/continuous-zoom.ts`): `beginContinuousZoom(owner)` returns a
+  token, `endContinuousZoom(token, reason)` ignores stale tokens, and
+  `interruptContinuousZoom(reason)` ends whatever is active. It is separate
+  from the camera interaction that governs store publication.
+- While it is active, the canvas (`use-canvas-zoom-raster.ts`) puts
+  `will-change: transform` on each top-level art root (artboard and
+  top-level group presentation wrappers, loose top-level shells), so
+  Chromium scales the existing raster with the camera instead of
+  re-rastering art and filters. The viewer host carries
+  `data-zoom-raster-mode="reuse"`. Grids, labels, overlays, and text input
+  sit outside those roots and stay exact; exact raster keeps live sampling.
+- Ending removes the hints in the same task, which requests one exact raster
+  at the final camera, and re-notifies placement consumers. Pans, discrete
+  zoom commands (which interrupt), and editing stay exact.
+- Wheel events have no gesture end, so the wheel adapter ends reuse after
+  two quiet frames: settle starts on the third frame after the last zoom
+  event, and 60 Hz input on a 120 Hz display stays one burst. Sparse wheel
+  input can split one physical gesture into several bursts. The scrub ends
+  on pointer release.
+- Window blur, a hidden tab, viewer detach, any pointer-down, a drag
+  preview, discrete zoom, and document or editing-state store changes
+  interrupt reuse immediately.
+
 ## Layers
 
 - Idle shells translate in 2D and paint into their parent layer; only shells

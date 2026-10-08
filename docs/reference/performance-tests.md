@@ -223,7 +223,7 @@ hard and blur-24 shadows, nested 60% groups and their opacity-1 twin):
 | Scenario | Workload |
 | --- | --- |
 | `appearance-pan-200-*` | Fixed-zoom translation at 21%, a constant screen-space ellipse. |
-| `appearance-viewport-200-*`, `appearance-nested-groups-viewport-200` | Continuous anchored pinch down the 100→1% ladder and back; the middle frame lands on 1%. |
+| `appearance-viewport-200-*`, `appearance-nested-groups-viewport-200` | Continuous anchored pinch down the 100→1% ladder and back inside one continuous-zoom session (raster reuse); the middle frame lands on 1%. Records `zoom.settleMs` from the session end to the second following frame. |
 | `appearance-zoom-stops-200-*` | Discrete jumps to each ladder stop with dwell frames; records `zoomStop.settleMs`. |
 | `large-svg-viewport`, `large-svg-pan` | Mixed pan and zoom (18%→10%) and fixed-zoom pan on the large SVG with its root selected. |
 | `appearance-max-stack` | Pinch 1%→6400%→1% on one node's edge; reaches both extremes. |

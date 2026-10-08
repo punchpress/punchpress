@@ -66,8 +66,10 @@ const createPinchBenchmark = (
       );
       await context.waitForFrames(4);
     },
-    run: async ({ editor, options, waitForFrame }) => {
+    run: async ({ editor, options, recordMetric, waitForFrame }) => {
       const host = captureViewportHost(editor);
+      // A pinch is a continuous zoom: art reuses its raster until it ends.
+      const session = editor.beginContinuousZoom("pinch");
 
       editor.setViewportInteracting(true);
 
@@ -77,7 +79,13 @@ const createPinchBenchmark = (
           editor.moveViewportTo(getPinchCamera(host, index, options.frames));
         }
       } finally {
+        const endedAt = performance.now();
+
+        editor.endContinuousZoom(session, "end");
         editor.setViewportInteracting(false);
+        await waitForFrame();
+        await waitForFrame();
+        recordMetric("zoom.settleMs", performance.now() - endedAt);
       }
     },
     usesScratchDocument: true,
