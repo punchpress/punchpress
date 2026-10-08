@@ -3,6 +3,11 @@ import { useCallback, useLayoutEffect, useRef } from "react";
 import { useEditor } from "../../editor-react/use-editor";
 
 const GESTURE_IDLE_MS = 120;
+// Wheel events carry no gesture end, so raster reuse ends once this many
+// frames pass without a zoom update: prompt enough that art sharpens within
+// about two frames, and long enough that 60 Hz input on a 120 Hz display
+// stays one burst. Camera publication keeps its own idle timeout.
+const ZOOM_QUIET_FRAMES = 2;
 
 // Canvas adapter for react-infinite-viewer. It attaches the viewer to the
 // engine, reports native viewer scrolls (wheel pan, hand drag) as viewport
@@ -13,6 +18,36 @@ export const useCanvasViewer = (hostElement: HTMLDivElement | null) => {
   const viewerRef = useRef(null);
   const idleTimeoutRef = useRef<number | null>(null);
   const wheelGestureModeRef = useRef<"pan" | "zoom" | null>(null);
+  const zoomQuietRef = useRef({ frameId: 0, quietFrames: 0 });
+
+  // Ends the wheel's continuous zoom after ZOOM_QUIET_FRAMES quiet frames.
+  const markZoomUpdate = useCallback(() => {
+    const quiet = zoomQuietRef.current;
+    quiet.quietFrames = 0;
+
+    if (quiet.frameId || editor.continuousZoom?.owner !== "wheel") {
+      return;
+    }
+
+    const tick = () => {
+      quiet.quietFrames += 1;
+
+      if (quiet.quietFrames > ZOOM_QUIET_FRAMES) {
+        quiet.frameId = 0;
+
+        const session = editor.continuousZoom;
+
+        if (session?.owner === "wheel") {
+          editor.endContinuousZoom(session, "idle");
+        }
+        return;
+      }
+
+      quiet.frameId = window.requestAnimationFrame(tick);
+    };
+
+    quiet.frameId = window.requestAnimationFrame(tick);
+  }, [editor]);
 
   const markGesture = useCallback(() => {
     editor.setViewportGestureActive(true);
@@ -44,6 +79,8 @@ export const useCanvasViewer = (hostElement: HTMLDivElement | null) => {
       }
 
       wheelGestureModeRef.current = null;
+      window.cancelAnimationFrame(zoomQuietRef.current.frameId);
+      zoomQuietRef.current.frameId = 0;
       editor.detachViewport(viewer);
     };
   }, [editor, hostElement]);
@@ -98,13 +135,17 @@ export const useCanvasViewer = (hostElement: HTMLDivElement | null) => {
         return;
       }
 
-      editor.zoomViewportFromWheel({
-        clientX: event.clientX,
-        clientY: event.clientY,
-        deltaY: event.deltaY,
-      });
+      if (
+        editor.zoomViewportFromWheel({
+          clientX: event.clientX,
+          clientY: event.clientY,
+          deltaY: event.deltaY,
+        })
+      ) {
+        markZoomUpdate();
+      }
     },
-    [editor, markGesture]
+    [editor, markGesture, markZoomUpdate]
   );
 
   return { handlePanEnd, handleScroll, handleWheel, viewerRef };

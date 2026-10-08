@@ -274,6 +274,11 @@ export {
 export type { RasterStroke } from "./raster/stroke";
 export { createRasterStroke } from "./raster/stroke";
 export type {
+  ContinuousZoomEndReason,
+  ContinuousZoomOwner,
+  ContinuousZoomSession,
+} from "./viewport/continuous-zoom";
+export type {
   PreviewPresentationPlan,
   PreviewTarget,
 } from "./render-tree/preview-placement";

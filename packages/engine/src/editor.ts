@@ -360,6 +360,18 @@ import {
   getViewportCenter as getEditorViewportCenter,
   setViewport as setEditorViewport,
 } from "./viewport/viewport-queries";
+import {
+  beginContinuousZoom as beginEditorContinuousZoom,
+  type ContinuousZoomEndReason,
+  type ContinuousZoomOwner,
+  type ContinuousZoomSession,
+  type ContinuousZoomState,
+  createContinuousZoomState,
+  endContinuousZoom as endEditorContinuousZoom,
+  interruptContinuousZoom as interruptEditorContinuousZoom,
+  isEditingStoreChange,
+  subscribeContinuousZoom as subscribeEditorContinuousZoom,
+} from "./viewport/continuous-zoom";
 import { zoomViewportFromWheel as zoomEditorViewportFromWheel } from "./viewport/viewport-wheel-zoom";
 
 // Intentional facade: keep the public editor API and durable subsystem wiring
@@ -411,6 +423,7 @@ export interface Editor {
   viewerRef: any;
   viewportFocusRequest: any;
   viewportApplyDepth: number;
+  continuousZoomState: ContinuousZoomState;
   viewportGestureActive: boolean;
   viewportHeld: boolean;
   viewportPresentationListeners: any;
@@ -443,6 +456,16 @@ export class Editor {
       resolveDefaultFont: () => this.defaultFont,
     });
     this.viewportState = { ...this.getState().viewport };
+    this.continuousZoomState = createContinuousZoomState();
+    // Editing during a continuous zoom ends raster reuse first.
+    this.store.subscribe((state, previousState) => {
+      if (
+        this.continuousZoomState.active &&
+        isEditingStoreChange(state, previousState)
+      ) {
+        this.interruptContinuousZoom("edit");
+      }
+    });
     this.fonts = new FontManager({
       onChange: () => this.store.getState().bumpFontRevision(),
     });
@@ -1742,6 +1765,10 @@ export class Editor {
   }
 
   setSelectionDragPreview(selectionDragPreview) {
+    if (selectionDragPreview) {
+      this.interruptContinuousZoom("edit");
+    }
+
     const previousPreview = this.selectionDragPreviewState;
     this.selectionDragPreviewState = selectionDragPreview || null;
     this.notifySelectionDragPreviewChanged();
@@ -1829,6 +1856,10 @@ export class Editor {
   }
 
   detachViewport(viewer) {
+    if (this.viewerRef === viewer) {
+      this.interruptContinuousZoom("unmount");
+    }
+
     detachEditorViewport(this, viewer);
   }
 
@@ -2551,15 +2582,50 @@ export class Editor {
   }
 
   zoomIn() {
+    this.interruptContinuousZoom("discrete-zoom");
     zoomEditorIn(this);
   }
 
   zoomOut() {
+    this.interruptContinuousZoom("discrete-zoom");
     zoomEditorOut(this);
   }
 
-  zoomTo(zoom) {
+  // Discrete zoom stops end a continuous zoom; a zoom-control scrub passes
+  // `continuous` while its own session drives the camera.
+  zoomTo(zoom, { continuous = false } = {}) {
+    if (!continuous) {
+      this.interruptContinuousZoom("discrete-zoom");
+    }
+
     return zoomEditorTo(this, zoom);
+  }
+
+  get continuousZoom(): ContinuousZoomSession | null {
+    return this.continuousZoomState.active;
+  }
+
+  getContinuousZoomExactRenderRevision() {
+    return this.continuousZoomState.exactRenderRevision;
+  }
+
+  beginContinuousZoom(owner: ContinuousZoomOwner) {
+    return beginEditorContinuousZoom(this.continuousZoomState, owner);
+  }
+
+  endContinuousZoom(
+    session: ContinuousZoomSession | null,
+    reason: ContinuousZoomEndReason = "end"
+  ) {
+    return endEditorContinuousZoom(this.continuousZoomState, session, reason);
+  }
+
+  interruptContinuousZoom(reason: ContinuousZoomEndReason) {
+    return interruptEditorContinuousZoom(this.continuousZoomState, reason);
+  }
+
+  subscribeContinuousZoom(listener: () => void) {
+    return subscribeEditorContinuousZoom(this.continuousZoomState, listener);
   }
 
   moveViewportTo(viewport) {

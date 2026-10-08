@@ -1,4 +1,8 @@
-import { MAX_ZOOM, MIN_ZOOM } from "@punchpress/engine";
+import {
+  type ContinuousZoomSession,
+  MAX_ZOOM,
+  MIN_ZOOM,
+} from "@punchpress/engine";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useEditor } from "../../editor-react/use-editor";
@@ -11,6 +15,7 @@ export const CanvasZoomControl = () => {
   const zoom = useEditorViewportValue((activeEditor) => activeEditor.zoom);
   const dragRef = useRef<{
     pointerId: number;
+    session: ContinuousZoomSession;
     startX: number;
     startZoom: number;
   } | null>(null);
@@ -18,6 +23,8 @@ export const CanvasZoomControl = () => {
   const percent = Math.round(zoom * 100);
 
   const stopScrubbing = () => {
+    // Release asks for the exact render at the final camera.
+    editor.endContinuousZoom(dragRef.current?.session ?? null, "end");
     dragRef.current = null;
     setIsScrubbing(false);
     editor.setViewportInteracting(false);
@@ -78,6 +85,7 @@ export const CanvasZoomControl = () => {
         event.currentTarget.setPointerCapture(event.pointerId);
         dragRef.current = {
           pointerId: event.pointerId,
+          session: editor.beginContinuousZoom("scrub"),
           startX: event.clientX,
           startZoom: zoom,
         };
@@ -93,7 +101,8 @@ export const CanvasZoomControl = () => {
 
         editor.zoomTo(
           drag.startZoom *
-            2 ** ((event.clientX - drag.startX) / ZOOM_DOUBLE_DISTANCE)
+            2 ** ((event.clientX - drag.startX) / ZOOM_DOUBLE_DISTANCE),
+          { continuous: true }
         );
       }}
       onPointerUp={stopScrubbing}

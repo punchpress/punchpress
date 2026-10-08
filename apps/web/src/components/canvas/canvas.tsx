@@ -38,6 +38,7 @@ import {
   useCanvasPenHover,
 } from "./use-canvas-pen-hover";
 import { useCanvasViewer } from "./use-canvas-viewer";
+import { useCanvasZoomRaster } from "./use-canvas-zoom-raster";
 
 const CANVAS_STAGE_MARGIN = 80_000;
 
@@ -220,6 +221,7 @@ export const Canvas = () => {
   const [hostElement, setHostElement] = useState<HTMLDivElement | null>(null);
   const { handlePanEnd, handleScroll, handleWheel, viewerRef } =
     useCanvasViewer(hostElement);
+  useCanvasZoomRaster(hostElement);
   const penHover = useCanvasPenHover({
     activeTool,
     hostRef,

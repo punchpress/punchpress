@@ -81,5 +81,8 @@ export const zoomViewportFromWheel = (editor, { clientX, clientY, deltaY }) => {
     return false;
   }
 
+  // Reuse begins before the camera moves, so the first scaled frame reuses.
+  editor.beginContinuousZoom("wheel");
+
   return applyViewport(editor, nextViewport);
 };

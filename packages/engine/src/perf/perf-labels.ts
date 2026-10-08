@@ -116,6 +116,8 @@ export const PERF_COUNTERS = {
   // gesture), and the root writes it made per preview frame.
   renderPlacementPreviewRoots: "render.placementPreviewRoots.count",
   renderPlacementPreviewWrites: "render.placementPreviewWrites.count",
+  // Art roots hinted for raster reuse when a continuous zoom begins.
+  renderZoomReuseRoots: "render.zoomReuseRoots.count",
   // Properties panel parts below the panel root: sections (one per titled
   // block), rows (one per stack layer or selection color), and fields (one
   // per value control).
