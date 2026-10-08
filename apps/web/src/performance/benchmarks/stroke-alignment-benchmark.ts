@@ -109,10 +109,12 @@ const createTextTypingBenchmark = (
 };
 
 // Mirrors the stroke-width ScrubSlider: one history step around the scrub and
-// one `updateAppearanceLayer` per scrubbed stroke per frame on the selection.
+// one `updateAppearanceLayer` per scrubbed stroke per frame, on the selection
+// unless `nodeIds` names other nodes.
 const scrubSelectedStrokeWidths = async (
   { editor, options, waitForFrame }: PerformanceBenchmarkContext,
-  strokeIndexes: readonly number[] = [0, 1]
+  strokeIndexes: readonly number[] = [0, 1],
+  nodeIds: string[] = editor.selectedNodeIds
 ) => {
   const historyMark = editor.markHistoryStep("edit stroke width");
 
@@ -125,7 +127,8 @@ const scrubSelectedStrokeWidths = async (
       for (const strokeIndex of strokeIndexes) {
         editor.updateAppearanceLayer(
           { index: strokeIndex, list: "strokes" },
-          { width }
+          { width },
+          nodeIds
         );
       }
     }
@@ -144,6 +147,31 @@ const singleStrokeScrubBenchmark: PerformanceBenchmarkDefinition = {
   id: "appearance-stroke-scrub-one-of-200-single",
   label: "Stroke Width Scrub (1 of 200, one stroke)",
   run: (context) => scrubSelectedStrokeWidths(context, [0]),
+};
+
+// Broad-invalidation guard: one node stays selected while another node's
+// stroke width is scrubbed, so the properties panel has nothing to show.
+const unselectedStrokeScrubBenchmark: PerformanceBenchmarkDefinition = {
+  ...createSceneScrubBenchmark("one", true),
+  description:
+    "The 200-node appearance scene with outside + inside strokes on every node; one node stays selected while another node's first stroke width scrubs 1→40→1 each frame at 100% zoom.",
+  id: "appearance-stroke-scrub-unselected",
+  label: "Stroke Width Scrub (unselected node)",
+  run: (context) => {
+    const { editor } = context;
+    const target = editor.nodes.find((node) => {
+      return (
+        node.appearance?.strokes?.length === 2 &&
+        !editor.selectedNodeIds.includes(node.id)
+      );
+    });
+
+    if (!target) {
+      throw new Error("The stroke scene has no unselected stroked node.");
+    }
+
+    return scrubSelectedStrokeWidths(context, [0], [target.id]);
+  },
 };
 
 const setupStrokeText = async (
@@ -169,4 +197,5 @@ export const strokeAlignmentBenchmarks = [
     createTextTypingBenchmark(aligned),
   ]),
   singleStrokeScrubBenchmark,
+  unselectedStrokeScrubBenchmark,
 ];

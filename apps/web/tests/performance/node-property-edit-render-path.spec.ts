@@ -59,6 +59,13 @@ const expectScrubRenderPath = (
   );
   // Each scrubbed control renders about once per frame; untouched controls
   // do not render at all.
+  if (scrubbedFieldCount === 0) {
+    expect(count(PERF_COUNTERS.renderPanelPropertiesField)).toBeLessThanOrEqual(
+      STRUCTURAL_RENDER_LIMIT
+    );
+    return;
+  }
+
   expect(count(PERF_COUNTERS.renderPanelPropertiesField)).toBeGreaterThan(
     FRAMES / 2
   );
@@ -98,4 +105,12 @@ test("a shadow blur scrub re-renders only the blur field", async ({ page }) => {
   const count = await runScrub(page, "appearance-shadow-scrub-blur");
 
   expectScrubRenderPath(count, 1);
+});
+
+test("a scrub on an unselected node leaves the properties panel alone", async ({
+  page,
+}) => {
+  const count = await runScrub(page, "appearance-stroke-scrub-unselected");
+
+  expectScrubRenderPath(count, 0);
 });
