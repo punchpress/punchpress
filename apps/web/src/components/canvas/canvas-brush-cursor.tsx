@@ -43,11 +43,19 @@ const getBrushCursorPosition = (
   };
 };
 
-export const CanvasBrushCursor = ({
-  hostElement,
-}: {
+interface BrushCursorProps {
   hostElement: HTMLDivElement | null;
-}) => {
+}
+
+// Only raster tools pay for the cursor's camera, pointer, and target
+// subscriptions.
+export const CanvasBrushCursor = ({ hostElement }: BrushCursorProps) => {
+  const isActive = useEditorValue((_, state) => isRasterTool(state.activeTool));
+
+  return isActive ? <ActiveBrushCursor hostElement={hostElement} /> : null;
+};
+
+const ActiveBrushCursor = ({ hostElement }: BrushCursorProps) => {
   const editor = useEditor();
   const {
     x: viewportX,

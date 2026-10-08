@@ -522,7 +522,12 @@ export const useCanvasNodePlacement = (nodeIds) => {
     syncDurablePlacement();
     syncPreviewPlacement();
 
-    const unsubscribeStore = editor.store.subscribe(scheduleDurableSync);
+    // Shells sit in world space, so a camera-only store write moves none.
+    const unsubscribeStore = editor.store.subscribe((state, previousState) => {
+      if (!isCameraOnlyChange(state, previousState)) {
+        scheduleDurableSync();
+      }
+    });
     const unsubscribePreview =
       editor.subscribeSelectionDragPreview(syncPreviewPlacement);
 
@@ -560,4 +565,14 @@ export const useCanvasNodePlacement = (nodeIds) => {
       window.cancelAnimationFrame(frameId);
     };
   }, [editor, nodeIds]);
+};
+
+const isCameraOnlyChange = (state, previousState) => {
+  for (const key in state) {
+    if (key !== "viewport" && state[key] !== previousState[key]) {
+      return false;
+    }
+  }
+
+  return true;
 };
