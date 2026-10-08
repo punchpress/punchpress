@@ -449,4 +449,34 @@ describe("preview presentation plan", () => {
     expect(editor.getNode("a")?.transform.x).toBe(100);
     expect(editor.undo()).toBeFalsy();
   });
+
+  test("a vector child drag re-filters its stationary shadowed group", () => {
+    const editor = new Editor();
+
+    editor
+      .getState()
+      .loadNodes([
+        group("g", "root", { effects: [shadow, { ...shadow, id: "s2" }] }),
+        vector("v", "g"),
+        { ...createDefaultPathNode("v"), id: "p1" },
+        { ...createDefaultPathNode("v"), id: "p2" },
+      ] as never);
+
+    const layer = findLayer(editor.getRenderTree().items, "g")?.effects ?? null;
+    const preview = { ...move(["p1"], ["p1"]), delta: { x: 900, y: 0 } };
+    const plan = editor.getPreviewPresentationPlan(preview);
+
+    // The contour moves inside the vector shell, so nothing is placed...
+    expect(plan.targets).toEqual([]);
+    // ...but the group's filter input still changes.
+    expect([...plan.affectedLayerIds]).toEqual(["g"]);
+
+    editor.setSelectionDragPreview(preview);
+
+    expect(
+      editor.getLayerPreviewEffects("g", layer)?.ink.maxX
+    ).toBeGreaterThanOrEqual((layer?.ink.maxX ?? 0) + 900);
+
+    editor.setSelectionDragPreview(null);
+  });
 });

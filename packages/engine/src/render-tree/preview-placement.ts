@@ -149,10 +149,6 @@ const resolvePlan = (
     movedPlacedNodeIds.add(nodeId);
   }
 
-  if (targets.length === 0) {
-    return EMPTY_PLAN;
-  }
-
   targets.sort((left, right) => {
     return (
       (index.order.get(getTargetKey(left)) ?? 0) -
@@ -171,7 +167,50 @@ const resolvePlan = (
     }
   }
 
+  // Previewed content can change rendered geometry without moving a placed
+  // target (a vector child dragged inside its vector), so its stationary
+  // ancestor layers re-filter too.
+  for (const nodeId of [...previewNodeIds, ...committedNodeIdSet]) {
+    addContentAncestorLayers(
+      editor,
+      nodeId,
+      index,
+      carriedLayerIds,
+      affectedLayerIds
+    );
+  }
+
+  if (targets.length === 0 && affectedLayerIds.size === 0) {
+    return EMPTY_PLAN;
+  }
+
   return { affectedLayerIds, carriedLayerIds, movedPlacedNodeIds, targets };
+};
+
+const addContentAncestorLayers = (
+  editor,
+  nodeId: string,
+  index: ReturnType<typeof getRenderTreeIndex>,
+  carriedLayerIds: ReadonlySet<string>,
+  affectedLayerIds: Set<string>
+) => {
+  let node = editor.getNode(nodeId);
+
+  while (node) {
+    if (
+      !carriedLayerIds.has(node.id) &&
+      index.parentLayerIds.has(`layer:${node.id}`)
+    ) {
+      // Ancestors above an already affected layer are affected as well.
+      if (affectedLayerIds.has(node.id)) {
+        return;
+      }
+
+      affectedLayerIds.add(node.id);
+    }
+
+    node = node.parentId ? editor.getNode(node.parentId) : null;
+  }
 };
 
 // Walks the tree in paint order and keeps the highest layer that is a
