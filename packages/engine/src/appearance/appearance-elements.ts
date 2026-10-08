@@ -22,6 +22,13 @@ export interface SvgElement {
   tag:
     | "clipPath"
     | "defs"
+    | "feComposite"
+    | "feFlood"
+    | "feGaussianBlur"
+    | "feMerge"
+    | "feMergeNode"
+    | "feOffset"
+    | "filter"
     | "g"
     | "linearGradient"
     | "mask"

@@ -68,6 +68,9 @@ export interface AppearancePath {
   closed?: boolean;
   d: string;
   fillRule?: "evenodd" | "nonzero";
+  // Vector entries: conservative ink in the vector's space (after the entry
+  // transform), so the vector's shadow filter covers scaled children.
+  ink?: Bounds | null;
   // False when every contour is open; inside and outside strokes then paint
   // on center. Missing means closed (glyphs, shapes).
   hasClosedContour?: boolean;

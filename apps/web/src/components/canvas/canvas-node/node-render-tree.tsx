@@ -1,6 +1,7 @@
 import {
   buildAppearanceObjects,
   format,
+  getLeafEffectPresentation,
   getNodeAppearance,
   getNodeLocalMatrix,
   getNodeLocalTransformBounds,
@@ -13,6 +14,7 @@ import {
 } from "@punchpress/engine";
 import { CanvasRasterImage } from "../raster/canvas-raster-image";
 import { CanvasAppearanceObjects } from "./canvas-appearance-objects";
+import { CanvasEffectOwner } from "./canvas-effect-owner";
 import { CanvasFallbackText } from "./canvas-fallback-text";
 
 export const getNodeOpacity = (node) => {
@@ -74,6 +76,12 @@ export const getGroupNodeRenderTree = (
         {
           ...fallbackText,
           ...getPrimaryPaint(getNodeAppearance(childNode)),
+          effects: getLeafEffectPresentation(
+            childNode,
+            geometry ?? {
+              bbox: editor.getNodeRenderFrame(childNode.id)?.bounds,
+            }
+          ),
           key: childNode.id,
           opacity: getNodeOpacity(childNode),
           transform: getSvgNodeTransform(childNode, geometry?.bbox),
@@ -107,6 +115,7 @@ export const getGroupNodeRenderTree = (
 
     return [
       {
+        effects: getLeafEffectPresentation(childNode, geometry),
         key: childNode.id,
         objects: buildAppearanceObjects(
           editor.getPaintNode(childNode.id),
@@ -134,6 +143,7 @@ export const getGroupNodeArtState = (editor, state, nodeId) => {
     fallbackPaint: null,
     fallbackText: null,
     image: null,
+    effects: null,
     isEditing: state.editingNodeId === nodeId,
     isInteractionProxy: false,
     objects: [],
@@ -198,8 +208,16 @@ export const CanvasNodeRenderTree = ({
     }
 
     if (item.type === "fallback-text") {
+      const { effects, ...text } = item;
+
       return (
-        <CanvasFallbackText {...item} isEditing={isEditing} key={item.key} />
+        <CanvasEffectOwner
+          effects={effects}
+          idPrefix={`${idPrefix}${item.key}-`}
+          key={item.key}
+        >
+          <CanvasFallbackText {...text} isEditing={isEditing} />
+        </CanvasEffectOwner>
       );
     }
 
@@ -209,10 +227,15 @@ export const CanvasNodeRenderTree = ({
         opacity={isEditing ? 0 : (item.opacity ?? 1)}
         transform={item.transform || undefined}
       >
-        <CanvasAppearanceObjects
+        <CanvasEffectOwner
+          effects={item.effects}
           idPrefix={`${idPrefix}${item.key}-`}
-          objects={item.objects}
-        />
+        >
+          <CanvasAppearanceObjects
+            idPrefix={`${idPrefix}${item.key}-`}
+            objects={item.objects}
+          />
+        </CanvasEffectOwner>
       </g>
     );
   });

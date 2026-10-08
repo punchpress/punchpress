@@ -16,6 +16,7 @@ import { openCanvasNodeEditingMode } from "../canvas-node-editing";
 import { startCanvasToolPlacementSession } from "../canvas-tool-placement-session";
 import { CanvasRasterImage } from "../raster/canvas-raster-image";
 import { CanvasAppearanceObjects } from "./canvas-appearance-objects";
+import { CanvasEffectOwner } from "./canvas-effect-owner";
 import { CanvasFallbackText } from "./canvas-fallback-text";
 import {
   getMemoizedNodeArtState,
@@ -377,6 +378,7 @@ const CanvasStandardNodeArt = ({ nodeId }) => {
         artState.image && parentNode?.type === "artboard"
       )}
       bbox={presentationBounds}
+      effects={artState.effects}
       fallbackPaint={artState.fallbackPaint}
       fallbackText={artState.fallbackText}
       height={Math.max(1, presentationBounds.height)}
@@ -413,6 +415,7 @@ const CanvasVectorNodeArt = ({ nodeId }) => {
   return artState ? (
     <CanvasNodeArt
       bbox={artState.bbox}
+      effects={artState.effects}
       fallbackPaint={artState.fallbackPaint}
       fallbackText={artState.fallbackText}
       height={Math.max(1, artState.bbox.height)}
@@ -465,6 +468,7 @@ const CanvasNodeArt = memo(
   ({
     allowImageOverflow,
     bbox,
+    effects,
     fallbackPaint,
     fallbackText,
     height,
@@ -508,19 +512,23 @@ const CanvasNodeArt = memo(
         );
       } else if (fallbackText) {
         renderedContent = (
-          <CanvasFallbackText
-            {...fallbackText}
-            {...fallbackPaint}
-            isEditing={isEditing}
-          />
+          <CanvasEffectOwner effects={effects} idPrefix={idPrefix}>
+            <CanvasFallbackText
+              {...fallbackText}
+              {...fallbackPaint}
+              isEditing={isEditing}
+            />
+          </CanvasEffectOwner>
         );
       } else {
         renderedContent = (
-          <CanvasAppearanceObjects
-            idPrefix={idPrefix}
-            isEditing={isEditing}
-            objects={objects}
-          />
+          <CanvasEffectOwner effects={effects} idPrefix={idPrefix}>
+            <CanvasAppearanceObjects
+              idPrefix={idPrefix}
+              isEditing={isEditing}
+              objects={objects}
+            />
+          </CanvasEffectOwner>
         );
       }
     }

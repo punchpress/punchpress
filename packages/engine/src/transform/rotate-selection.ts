@@ -1,4 +1,8 @@
 import {
+  getBakedEffectContainers,
+  rotateEffects,
+} from "../effects/effect-transform";
+import {
   getLocalBoundsCenter,
   getRotatedNodeUpdate,
   rotatePointAround,
@@ -193,6 +197,12 @@ const beginRotateSelectionMeasured = (editor, { nodeId = undefined, nodeIds = un
 
   return {
     baseNodes,
+    // Containers whose children bake the rotation rotate their shadows too.
+    effectContainers: getBakedEffectContainers(
+      editor,
+      requestedNodeIds,
+      resolvedNodeIds
+    ),
     mode: "aggregate",
     nodeIds: [...resolvedNodeIds],
     previewDeltaRotation: 0,
@@ -215,22 +225,7 @@ export const updateRotateSelection = (
       session.previewDeltaRotation = deltaRotation;
       const previewNodeIds = session.previewNodeIds || session.nodeIds;
 
-      editor.updateNodes(session.nodeIds, (node) => {
-        const baseNode = session.baseNodes.get(node.id);
-
-        if (!baseNode) {
-          return node;
-        }
-
-        return getWorldRotateNodeUpdate(
-          editor,
-          baseNode,
-          baseNode.bbox,
-          session.baseNodes,
-          session.selectionCenter,
-          deltaRotation
-        );
-      });
+      applyAggregateRotation(editor, session, deltaRotation);
       editor.setSelectionDragPreview(null);
 
       return previewNodeIds;
@@ -273,24 +268,36 @@ export const commitRotateSelection = (editor, session) => {
       return [];
     }
 
-    editor.updateNodes(session.nodeIds, (node) => {
-      const baseNode = session.baseNodes.get(node.id);
-
-      if (!baseNode) {
-        return node;
-      }
-
-      return getWorldRotateNodeUpdate(
-        editor,
-        baseNode,
-        baseNode.bbox,
-        session.baseNodes,
-        session.selectionCenter,
-        deltaRotation
-      );
-    });
+    applyAggregateRotation(editor, session, deltaRotation);
 
     return session.nodeIds;
+  });
+};
+
+const applyAggregateRotation = (editor, session, deltaRotation: number) => {
+  const containers = session.effectContainers ?? new Map();
+
+  editor.updateNodes([...session.nodeIds, ...containers.keys()], (node) => {
+    const containerEffects = containers.get(node.id);
+
+    if (containerEffects) {
+      return { effects: rotateEffects(containerEffects, deltaRotation) };
+    }
+
+    const baseNode = session.baseNodes.get(node.id);
+
+    if (!baseNode) {
+      return node;
+    }
+
+    return getWorldRotateNodeUpdate(
+      editor,
+      baseNode,
+      baseNode.bbox,
+      session.baseNodes,
+      session.selectionCenter,
+      deltaRotation
+    );
   });
 };
 

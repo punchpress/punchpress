@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { appearanceSchema } from "./appearance-schema";
+import { addVectorChildEffectIssues, effectsSchema } from "./effects-schema";
 import { PUNCH_DOCUMENT_VERSION, ROOT_PARENT_ID } from "./constants";
 import { findParentCycleIds } from "./tree-order";
 import {
@@ -94,12 +95,14 @@ export const textNodeSchema = baseNodeSchema
     fontSize: finiteNumber,
     tracking: finiteNumber,
     appearance: appearanceSchema,
+    effects: effectsSchema.optional(),
     warp: warpSchema,
   })
   .strict();
 
 export const groupNodeSchema = baseNodeSchema
   .extend({
+    effects: effectsSchema.optional(),
     name: z.string().min(1),
     type: z.literal("group"),
     transform: transformSchema,
@@ -139,6 +142,7 @@ export const shapeNodeSchema = baseNodeSchema
     cornerRadii: z.array(finiteNumber).optional(),
     cornerRadius: finiteNumber.optional(),
     appearance: appearanceSchema,
+    effects: effectsSchema.optional(),
     height: finiteNumber,
     points: z.array(shapePointSchema).min(3).optional(),
     shape: shapeKindSchema,
@@ -239,6 +243,7 @@ export const vectorStrokeLineJoinSchema = z.enum(
 export const vectorNodeSchema = baseNodeSchema
   .extend({
     compoundWrapper: z.boolean().optional(),
+    effects: effectsSchema.optional(),
     name: z.string().min(1),
     pathComposition: vectorPathCompositionSchema.optional(),
     transform: transformSchema,
@@ -249,6 +254,7 @@ export const vectorNodeSchema = baseNodeSchema
 export const pathNodeSchema = baseNodeSchema
   .extend({
     appearance: appearanceSchema,
+    effects: effectsSchema.optional(),
     contours: z.array(vectorContourSchema).min(1),
     fillRule: vectorFillRuleSchema,
     transform: transformSchema,
@@ -373,6 +379,7 @@ export const designDocumentSchema = z
     }
 
     addParentCycleIssues(document.nodes, context);
+    addVectorChildEffectIssues(document.nodes, context);
   });
 
 export const addParentCycleIssues = (

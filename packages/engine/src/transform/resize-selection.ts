@@ -1,3 +1,7 @@
+import {
+  getBakedEffectContainers,
+  scaleEffects,
+} from "../effects/effect-transform";
 import { isArtboardNode, isContainerNode } from "../nodes/node-tree";
 import {
   buildNodeCapabilityGeometry,
@@ -504,7 +508,20 @@ export const commitResizeSelection = (editor, session) => {
       return [];
     }
 
-    editor.updateNodes(session.nodeIds, (node) => {
+    // Containers whose children bake the scale carry their shadows along.
+    const containers = getBakedEffectContainers(
+      editor,
+      editor.selectedNodeIds,
+      session.nodeIds
+    );
+
+    editor.updateNodes([...session.nodeIds, ...containers.keys()], (node) => {
+      const containerEffects = containers.get(node.id);
+
+      if (containerEffects) {
+        return { effects: scaleEffects(containerEffects, scale) };
+      }
+
       const baseNode = session.baseNodes.get(node.id);
 
       if (!baseNode) {

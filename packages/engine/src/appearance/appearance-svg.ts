@@ -1,9 +1,5 @@
 import { format } from "../primitives/math";
-import {
-  buildAppearanceElements,
-  type SvgElement,
-} from "./appearance-elements";
-import type { AppearanceObject } from "./appearance-types";
+import type { SvgElement } from "./appearance-elements";
 
 // Allocates export-unique definition ids for one whole document export; the
 // same key always maps to the same id.
@@ -22,17 +18,12 @@ export const createPaintIdAllocator = () => {
   };
 };
 
-// Serializes painted objects as SVG 1.1 markup from the same element tree the
-// canvas renders: concrete <path>s (no <use>), alpha in opacity attributes
-// rather than rgba(), and gradients, clips and masks as userSpaceOnUse
-// definitions inside each object's group.
-export const serializeAppearanceObjects = (
-  objects: readonly AppearanceObject[],
-  makeId: (key: string) => string
-) => {
-  return buildAppearanceElements(objects, makeId)
-    .map(serializeElement)
-    .join("");
+// Serializes the engine element tree (the same tree the canvas renders) as
+// SVG 1.1 markup: concrete <path>s (no <use>), alpha in opacity attributes
+// rather than rgba(), and gradients, clips, masks, and filters as
+// userSpaceOnUse definitions inside their owner's group.
+export const serializeSvgElements = (elements: readonly SvgElement[]) => {
+  return elements.map(serializeElement).join("");
 };
 
 export const wrapSvgOpacity = (markup: string, opacity: number) => {

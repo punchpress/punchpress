@@ -1,5 +1,6 @@
 import {
   buildAppearanceObjects,
+  getLeafEffectPresentation,
   getNodeAppearance,
   getPrimaryPaint,
 } from "@punchpress/engine";
@@ -60,6 +61,11 @@ export const selectNodeArtState = (
 
   return {
     bbox,
+    // Shadows follow whatever geometry paints, including the live text edit.
+    effects:
+      node.type === "image"
+        ? null
+        : getLeafEffectPresentation(node, geometry ?? { bbox }),
     fallbackPaint: fallbackText
       ? getPrimaryPaint(getNodeAppearance(editor.getPaintNode(nodeId) || node))
       : null,

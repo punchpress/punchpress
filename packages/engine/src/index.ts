@@ -19,6 +19,17 @@ export {
 } from "./appearance/appearance-layers";
 export { resolveDrawPaint } from "./appearance/appearance-paint-servers";
 export {
+  buildEffectFilter,
+  type EffectPresentation,
+  getEffectRegion,
+} from "./effects/effect-filter";
+export type { SelectionEffects } from "./effects/effect-inspection";
+export type { DropShadow, Effect } from "./effects/effect-model";
+export {
+  getLeafEffectPresentation,
+  wrapEffectElements,
+} from "./effects/effect-owner";
+export {
   buildAppearanceObjects,
   getAppearanceDraws,
   getAppearancePasses,

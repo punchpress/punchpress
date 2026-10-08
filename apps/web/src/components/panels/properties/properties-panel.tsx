@@ -7,6 +7,7 @@ import { usePerformanceRenderCounter } from "../../../performance/use-performanc
 import { AppearancePanel } from "./appearance/appearance";
 import { ArtboardFields } from "./artboard-fields";
 import { BrushFields } from "./brush-fields";
+import { EffectsPanel } from "./effects/effects";
 import { ImageFields } from "./image-fields";
 import { PathCornerFields } from "./path-corner-fields";
 import { PathPointFields } from "./path-point-fields";
@@ -138,6 +139,8 @@ export const PropertiesPanel = () => {
         ) : null}
 
         {hasAppearanceFields ? <AppearancePanel /> : null}
+
+        <EffectsPanel />
 
         {hasSelectionColors ? (
           <SelectionColorsFields

@@ -21,6 +21,16 @@ export {
   strokeLayerSchema,
 } from "./appearance-schema";
 export type { ClipboardContent } from "./clipboard";
+export type {
+  DropShadowDocument,
+  EffectDocument,
+} from "./effects-schema";
+export {
+  dropShadowSchema,
+  effectSchema,
+  effectsSchema,
+  MAX_EFFECTS,
+} from "./effects-schema";
 export {
   clipboardContentSchema,
   PUNCH_CLIPBOARD_HTML_ATTRIBUTE,

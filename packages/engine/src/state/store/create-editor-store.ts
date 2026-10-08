@@ -14,6 +14,7 @@ import { createEditingStoreActions } from "./create-editing-store-actions";
 import { createFontStoreActions } from "./create-font-store-actions";
 import { createSelectionStoreActions } from "./create-selection-store-actions";
 import { getActiveLayerIdAfterDeletion } from "./node-tree-state";
+import { withoutVectorChildEffects } from "../../effects/vector-child-effects";
 
 export const createEditorStore = ({
   initialZoom = 1,
@@ -167,7 +168,8 @@ export const createEditorStore = ({
 };
 
 // Every document write keeps each group's descendants contiguous in paint
-// order; renderers and export rely on it. Canonical arrays pass through
+// order (renderers and export rely on it) and drops effects from vector
+// children. Canonical arrays pass through
 // unchanged, so caches keyed on the nodes array survive.
 const withCanonicalTreeOrder = (state, patch) => {
   if (
@@ -178,7 +180,7 @@ const withCanonicalTreeOrder = (state, patch) => {
     return patch;
   }
 
-  const nodes = canonicalizeTreeOrder(patch.nodes);
+  const nodes = withoutVectorChildEffects(canonicalizeTreeOrder(patch.nodes));
 
   return nodes === patch.nodes ? patch : { ...patch, nodes };
 };

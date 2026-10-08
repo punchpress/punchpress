@@ -1,7 +1,23 @@
+import { buildAppearanceElements } from "../appearance/appearance-elements";
+import type { Bounds } from "../appearance/appearance-types";
 import { buildAppearanceObjects } from "../appearance/appearance-render-plan";
 import {
+  buildEffectFilter,
+  getEffectPresentation,
+} from "../effects/effect-filter";
+import { getNodeEffects } from "../effects/effect-model";
+import {
+  getLeafEffectPresentation,
+  wrapEffectElements,
+} from "../effects/effect-owner";
+import {
+  createOutputInkReader,
+  getDocumentInkSource,
+  unionBounds,
+} from "../render-tree/output-ink";
+import {
   createPaintIdAllocator,
-  serializeAppearanceObjects,
+  serializeSvgElements,
   wrapSvgOpacity,
 } from "../appearance/appearance-svg";
 import { ARTBOARD_HEIGHT, ARTBOARD_WIDTH } from "../constants";
@@ -97,8 +113,20 @@ export const buildSvgExport = (
       : "",
   ];
 
-  const layers = createLayerWriter(body, getNode);
   const makePaintId = createPaintIdAllocator();
+  // Groups are not exported nodes, so walk the whole document graph.
+  const inkSource = getDocumentInkSource(
+    [...nodeById.values()],
+    geometryById,
+    getNode
+  );
+  const layers = createLayerWriter(body, getNode, {
+    inkSource,
+    makeId: makePaintId,
+    offsetX,
+    offsetY,
+    readInk: createOutputInkReader(inkSource),
+  });
 
   for (const node of nodes) {
     if (node.visible === false || node.type === "artboard") {
@@ -133,14 +161,19 @@ export const buildSvgExport = (
       body.push(`<g transform="${localTransform}">`);
     }
 
+    // Filter, then opacity: the shadow fades with its content.
+    const elements = wrapEffectElements(
+      buildAppearanceElements(
+        buildAppearanceObjects(node, geometry, getNode),
+        makePaintId
+      ),
+      getLeafEffectPresentation(node, geometry),
+      makePaintId,
+      node.id
+    );
+
     body.push(
-      wrapSvgOpacity(
-        serializeAppearanceObjects(
-          buildAppearanceObjects(node, geometry, getNode),
-          makePaintId
-        ),
-        node.opacity ?? 1
-      )
+      wrapSvgOpacity(serializeSvgElements(elements), node.opacity ?? 1)
     );
 
     if (localTransform) {
@@ -155,12 +188,57 @@ export const buildSvgExport = (
   return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${format(width)}" height="${format(height)}" viewBox="0 0 ${format(width)} ${format(height)}">${body.join("")}</svg>`;
 };
 
-// Groups and artboards are compositing layers: their opacity applies once to
-// their flattened content, never multiplied into leaves. Nodes arrive in
-// canonical paint order (each subtree contiguous), so layers open and close
-// as the walk enters and leaves each container's subtree.
-const createLayerWriter = (body: string[], getNode) => {
+// Groups and artboards are compositing layers: their opacity (and a group's
+// shadows) apply once to their flattened content, never multiplied into
+// leaves. Nodes arrive in canonical paint order (each subtree contiguous), so
+// layers open and close as the walk enters and leaves each container's
+// subtree. SVG applies a group's filter before its opacity.
+const createLayerWriter = (
+  body: string[],
+  getNode,
+  { inkSource, makeId, offsetX, offsetY, readInk }
+) => {
   const open: { closes: boolean; id: string }[] = [];
+
+  // The group's shadows over its children's stage ink, moved into export
+  // coordinates once.
+  const getGroupFilterMarkup = (groupId: string) => {
+    const group = getNode(groupId);
+
+    if (group?.type !== "group") {
+      return null;
+    }
+
+    const content = unionBounds(
+      inkSource
+        .getChildNodeIds(groupId)
+        .map(readInk)
+        .filter(Boolean) as Bounds[]
+    );
+    const presentation = getEffectPresentation(getNodeEffects(group), content);
+
+    if (!presentation) {
+      return null;
+    }
+
+    const id = makeId(JSON.stringify(["filter", groupId]));
+    const ink = presentation.ink;
+    const shifted = {
+      ...presentation,
+      ink: {
+        ...ink,
+        maxX: ink.maxX - offsetX,
+        maxY: ink.maxY - offsetY,
+        minX: ink.minX - offsetX,
+        minY: ink.minY - offsetY,
+      },
+    };
+
+    return {
+      defs: `<defs>${serializeSvgElements([buildEffectFilter(shifted, id)])}</defs>`,
+      id,
+    };
+  };
 
   const getLayerChain = (node) => {
     const chain: { id: string; opacity: number }[] = [];
@@ -204,10 +282,18 @@ const createLayerWriter = (body: string[], getNode) => {
       }
 
       for (const layer of chain.slice(shared)) {
-        const closes = layer.opacity < 1;
+        const filter = getGroupFilterMarkup(layer.id);
+        const closes = layer.opacity < 1 || Boolean(filter);
 
         if (closes) {
-          body.push(`<g opacity="${format(layer.opacity)}">`);
+          const opacity =
+            layer.opacity < 1 ? ` opacity="${format(layer.opacity)}"` : "";
+
+          body.push(
+            filter
+              ? `${filter.defs}<g filter="url(#${filter.id})"${opacity}>`
+              : `<g${opacity}>`
+          );
         }
 
         open.push({ closes, id: layer.id });

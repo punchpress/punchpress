@@ -2,6 +2,7 @@ import { z } from "zod";
 import { PUNCH_DOCUMENT_VERSION } from "./constants";
 import { upgradeNodesAppearance1_8 } from "./migrate";
 import { normalizeNodesForSchema } from "./normalize";
+import { addVectorChildEffectIssues } from "./effects-schema";
 import { addParentCycleIssues, nodeSchema } from "./schema";
 import { canonicalizeTreeOrder } from "./tree-order";
 
@@ -20,11 +21,12 @@ export const clipboardContentSchema = z
   .strict()
   .superRefine((content, context) => {
     addParentCycleIssues(content.nodes, context);
+    addVectorChildEffectIssues(content.nodes, context);
   });
 
 // Payloads copied from older builds upgrade the same way documents do: 1.8
-// folds flat paint into stacks, 1.9 and 1.10 pass through.
-const UPGRADABLE_CLIPBOARD_VERSIONS = new Set(["1.8", "1.9", "1.10"]);
+// folds flat paint into stacks; 1.9 through 1.11 pass through.
+const UPGRADABLE_CLIPBOARD_VERSIONS = new Set(["1.8", "1.9", "1.10", "1.11"]);
 
 export const parseClipboardContent = (value) => {
   const content = JSON.parse(value);

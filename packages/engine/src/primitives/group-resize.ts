@@ -1,5 +1,6 @@
 import { scaleAppearanceStrokes } from "../appearance/appearance-layers";
 import { getNodeAppearance } from "../appearance/node-appearance";
+import { getScaledEffectsUpdate } from "../effects/effect-transform";
 import {
   getNodeRotation,
   getNodeScaleX,
@@ -67,6 +68,7 @@ export const getResizeAnchorFromBounds = (bounds, direction) => {
 export const getScaledGroupNodeUpdate = (node, bbox, anchor, scale) => {
   if (node.type === "shape") {
     return {
+      ...getScaledEffectsUpdate(node, scale),
       height: round(Math.max(1, node.height * scale), 2),
       appearance: scaleAppearanceStrokes(getNodeAppearance(node), scale),
       transform: {
@@ -119,6 +121,7 @@ export const getScaledGroupNodeUpdate = (node, bbox, anchor, scale) => {
   }
 
   return {
+    ...getScaledEffectsUpdate(node, scale),
     fontSize: round(Math.max(1, node.fontSize * scale), 2),
     appearance: scaleAppearanceStrokes(getNodeAppearance(node), scale),
     tracking: node.tracking,
@@ -176,6 +179,7 @@ export const getResizedNodeUpdate = (node, bbox, anchor, scale, direction) => {
 
   if (node.type === "shape") {
     return {
+      ...getScaledEffectsUpdate(node, scale),
       height: round(Math.max(1, node.height * scale), 2),
       appearance: scaleAppearanceStrokes(getNodeAppearance(node), scale),
       transform,
@@ -212,6 +216,7 @@ export const getResizedNodeUpdate = (node, bbox, anchor, scale, direction) => {
   }
 
   return {
+    ...getScaledEffectsUpdate(node, scale),
     fontSize: round(Math.max(1, node.fontSize * scale), 2),
     appearance: scaleAppearanceStrokes(getNodeAppearance(node), scale),
     tracking: node.tracking,

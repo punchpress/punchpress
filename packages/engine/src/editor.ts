@@ -18,6 +18,15 @@ import {
   updateAppearanceLayer as updateEditorAppearanceLayer,
 } from "./appearance/appearance-commands";
 import {
+  addEffect as addEditorEffect,
+  moveEffect as moveEditorEffect,
+  removeEffect as removeEditorEffect,
+  setEffects as setEditorEffects,
+  updateEffect as updateEditorEffect,
+} from "./effects/effect-commands";
+import { getSelectionEffects as getEditorSelectionEffects } from "./effects/effect-inspection";
+import type { Effect } from "./effects/effect-model";
+import {
   canAlignStrokes as canEditorAlignStrokes,
   getPrimaryStrokeStyle as getEditorPrimaryStrokeStyle,
 } from "./appearance/appearance-inspection";
@@ -262,6 +271,10 @@ import {
   updateRasterResize as updateEditorRasterResize,
 } from "./raster/resize";
 import { getPreviewPlacementNodeIds as getEditorPreviewPlacementNodeIds } from "./render-tree/preview-placement";
+import {
+  getLayerPreviewClip as getEditorLayerPreviewClip,
+  getLayerPreviewEffects as getEditorLayerPreviewEffects,
+} from "./render-tree/layer-preview";
 import { getRenderTree as getEditorRenderTree } from "./render-tree/render-tree";
 import {
   clearSelection as clearEditorSelection,
@@ -1044,6 +1057,16 @@ export class Editor {
     return getEditorRenderTree(this);
   }
 
+  // A render layer's filter ink and clip, widened or moved for the current
+  // selection preview (layers themselves never move during previews).
+  getLayerPreviewEffects(layerId: string, effects) {
+    return getEditorLayerPreviewEffects(this, layerId, effects);
+  }
+
+  getLayerPreviewClip(layerId: string, clip) {
+    return getEditorLayerPreviewClip(this, layerId, clip);
+  }
+
   getPreviewPlacementNodeIds(
     placedNodeIds = this.getRenderTree().placedNodeIds,
     preview = this.selectionDragPreview
@@ -1081,6 +1104,34 @@ export class Editor {
 
   setAppearance(appearance: Appearance, nodeIds = this.selectedNodeIds) {
     return setEditorAppearance(this, appearance, nodeIds);
+  }
+
+  addEffect(kind: Effect["kind"] = "drop-shadow", nodeIds = this.selectedNodeIds) {
+    return addEditorEffect(this, kind, nodeIds);
+  }
+
+  updateEffect(
+    index: number,
+    patch: Parameters<typeof updateEditorEffect>[2],
+    nodeIds = this.selectedNodeIds
+  ) {
+    return updateEditorEffect(this, index, patch, nodeIds);
+  }
+
+  removeEffect(index: number, nodeIds = this.selectedNodeIds) {
+    return removeEditorEffect(this, index, nodeIds);
+  }
+
+  moveEffect(index: number, toIndex: number, nodeIds = this.selectedNodeIds) {
+    return moveEditorEffect(this, index, toIndex, nodeIds);
+  }
+
+  setEffects(effects: readonly Effect[], nodeIds = this.selectedNodeIds) {
+    return setEditorEffects(this, effects, nodeIds);
+  }
+
+  getSelectionEffects(nodeIds = this.selectedNodeIds) {
+    return getEditorSelectionEffects(this, nodeIds);
   }
 
   setSelectionColor(selectionColorId, value, nodeIds = this.selectedNodeIds) {

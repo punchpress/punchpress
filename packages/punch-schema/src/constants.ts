@@ -1,4 +1,4 @@
-export const PUNCH_DOCUMENT_VERSION = "1.11";
+export const PUNCH_DOCUMENT_VERSION = "1.12";
 export const PUNCH_DOCUMENT_EXTENSION = ".punch";
 export const PUNCH_DOCUMENT_MIME_TYPE = "application/vnd.punchpress.document";
 export const PUNCH_SVG_EXTENSION = ".svg";

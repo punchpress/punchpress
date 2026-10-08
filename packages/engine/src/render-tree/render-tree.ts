@@ -1,4 +1,15 @@
 import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
+import type { Bounds } from "../appearance/appearance-types";
+import {
+  type EffectPresentation,
+  getEffectPresentation,
+} from "../effects/effect-filter";
+import { getNodeEffects } from "../effects/effect-model";
+import {
+  createOutputInkReader,
+  getEditorInkSource,
+  unionBounds,
+} from "./output-ink";
 
 const DENSE_GROUP_LEAF_THRESHOLD = 300;
 const LARGE_GROUP_AREA_THRESHOLD = 3_000_000;
@@ -8,6 +19,11 @@ const LARGE_GROUP_LEAF_THRESHOLD = 24;
 // even at opacity 1, so toggling opacity never re-parents its descendants.
 export interface RenderLayer {
   children: RenderItem[];
+  // Artboards holding a shadowed group clip here, in stage coordinates, so
+  // group shadows stop at the artboard edge.
+  clip: Bounds | null;
+  // A group's own shadows, composited over its children's stage-space ink.
+  effects: EffectPresentation | null;
   kind: "layer";
   nodeId: string;
   opacity: number;
@@ -75,6 +91,28 @@ export const getRenderTree = (editor): RenderTree => {
 const buildRenderTree = (editor, inputs: RenderTreeInputs): RenderTree => {
   const expandedGroupIds = getExpandedGroupIds(editor, inputs);
   const placedNodeIds: string[] = [];
+  const readInk = createOutputInkReader(getEditorInkSource(editor));
+  const getLayerEffects = (node) => {
+    const effects = getNodeEffects(node);
+
+    if (node.type !== "group" || !hasActiveEffects(effects)) {
+      return null;
+    }
+
+    const content = unionBounds(
+      editor
+        .getChildNodeIds(node.id)
+        .map(readInk)
+        .filter(Boolean) as Bounds[]
+    );
+
+    return getEffectPresentation(effects, content);
+  };
+  const getLayerClip = (node) => {
+    return node.type === "artboard" && hasShadowedGroup(editor, node.id)
+      ? (editor.getNodeRenderFrame(node.id)?.bounds ?? null)
+      : null;
+  };
 
   const visit = (parentId: string): RenderItem[] => {
     return editor.getChildNodeIds(parentId).flatMap((nodeId) => {
@@ -85,16 +123,21 @@ const buildRenderTree = (editor, inputs: RenderTreeInputs): RenderTree => {
       }
 
       if (node.type === "group" || node.type === "artboard") {
+        // A dense surface paints nested groups as plain SVG groups, so a
+        // group holding shadowed groups stays expanded.
         if (
           node.type === "group" &&
           !expandedGroupIds.has(node.id) &&
-          isDenseGroup(editor, node.id)
+          isDenseGroup(editor, node.id) &&
+          !hasShadowedGroup(editor, node.id)
         ) {
           placedNodeIds.push(node.id);
 
           return [
             {
               children: [{ kind: "surface", nodeId: node.id }],
+              clip: null,
+              effects: getLayerEffects(node),
               kind: "layer",
               nodeId: node.id,
               opacity: getOpacity(node),
@@ -105,6 +148,8 @@ const buildRenderTree = (editor, inputs: RenderTreeInputs): RenderTree => {
         return [
           {
             children: visit(node.id),
+            clip: getLayerClip(node),
+            effects: getLayerEffects(node),
             kind: "layer",
             nodeId: node.id,
             opacity: getOpacity(node),
@@ -174,4 +219,21 @@ const isDenseGroup = (editor, nodeId: string) => {
 
 const getOpacity = (node) => {
   return typeof node.opacity === "number" ? node.opacity : 1;
+};
+
+const hasActiveEffects = (effects) => {
+  return effects.some((effect) => effect.enabled && effect.opacity > 0);
+};
+
+// Whether any group strictly below `nodeId` has shadows.
+export const hasShadowedGroup = (editor, nodeId: string): boolean => {
+  return editor.getChildNodeIds(nodeId).some((childId) => {
+    const child = editor.getNode(childId);
+
+    return (
+      child?.type === "group" &&
+      (hasActiveEffects(getNodeEffects(child)) ||
+        hasShadowedGroup(editor, childId))
+    );
+  });
 };

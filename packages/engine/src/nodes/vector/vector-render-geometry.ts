@@ -1,4 +1,6 @@
 import { getPaintExtent } from "../../appearance/paint-extent";
+import { getLeafEffectInk } from "../../effects/effect-ink";
+import { getBounds } from "../../primitives/path-geometry";
 import { createHeadlessPaperCompiler } from "../../primitives/headless-paper-compiler";
 import { format } from "../../primitives/math";
 import { withNodeGeometryBehavior } from "../../primitives/node-geometry";
@@ -123,9 +125,12 @@ const toRenderEntries = (pathNode, geometry) => {
 
   const transform = buildNodeSvgTransform(pathNode, geometry.bbox);
 
+  const ink = getTransformedInk(pathNode, geometry);
+
   return geometry.paths.map((path, index) => ({
     // The child's own coordinates, before the entry transform places it.
     bounds: geometry.paintBox ?? null,
+    ink,
     closed: path.closed,
     d: path.d,
     fillRule: pathNode.fillRule,
@@ -327,6 +332,7 @@ const buildCompoundFillEntries = (vectorNode, pathNodes, getPathGeometry) => {
       entries: [
         {
           bounds: paintBox,
+          ink: getLeafEffectInk(styleNode, { bbox: bounds }),
           closed: resultPaths.every((path) => path.closed),
           d: resultPaths
             .map((path) => path.pathData || path.getPathData())
@@ -392,6 +398,7 @@ const buildBooleanCompoundEntries = (
         ? [
             {
               bounds: paintBox,
+              ink: getLeafEffectInk(styleNode, { bbox: bounds }),
               closed: resultPaths.every((path) => path.closed),
               d: resultPaths
                 .map((path) => path.pathData || path.getPathData())
@@ -519,4 +526,23 @@ export const buildVectorRenderGeometry = (
     ready: true,
     selectionBounds: bbox,
   });
+};
+
+// A child's ink (frame plus miter and cap reach) placed into the vector's
+// space through the child's own transform, as an axis-aligned box.
+const getTransformedInk = (pathNode, geometry) => {
+  const ink = getLeafEffectInk(pathNode, geometry);
+
+  if (!(ink && geometry?.bbox)) {
+    return null;
+  }
+
+  const corners = [
+    { x: ink.minX, y: ink.minY },
+    { x: ink.maxX, y: ink.minY },
+    { x: ink.maxX, y: ink.maxY },
+    { x: ink.minX, y: ink.maxY },
+  ].map((point) => getTransformedPathPoint(pathNode, geometry.bbox, point));
+
+  return getBounds([{ points: corners }]);
 };

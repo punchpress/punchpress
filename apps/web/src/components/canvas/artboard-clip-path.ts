@@ -12,11 +12,30 @@ const offsetBounds = (bounds, delta) => {
   };
 };
 
+const hasActiveEffects = (node) => {
+  return Boolean(
+    node?.effects?.some((effect) => effect.enabled && effect.opacity > 0)
+  );
+};
+
+// The artboard a shell clips to itself, or null. Shells inside a shadowed
+// group skip their own clip: clipping before the group's filter would drop
+// shadows cast back into the artboard, so the artboard's render layer clips
+// the composited result instead.
 const getAncestorArtboardId = (editor, nodeId) => {
   let currentNode = nodeId ? editor.getNode(nodeId) : null;
 
+  // A dense group surface that owns a shadow is itself the filtered content.
+  if (currentNode?.type === "group" && hasActiveEffects(currentNode)) {
+    return null;
+  }
+
   while (currentNode?.parentId && currentNode.parentId !== "root") {
     const parentNode = editor.getNode(currentNode.parentId);
+
+    if (parentNode?.type === "group" && hasActiveEffects(parentNode)) {
+      return null;
+    }
 
     if (parentNode?.type === "artboard") {
       return parentNode.id;
