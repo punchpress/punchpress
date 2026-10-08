@@ -257,3 +257,34 @@ test("switches a fill to a linear gradient and edits its stops", async ({
   await page.keyboard.press("ControlOrMeta+z");
   await expect(page.getByTestId("appearance-gradient-stop")).toHaveCount(3);
 });
+
+test("aligns a stroke inside and outside through the panel", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(page, PANEL_DOCUMENT);
+  await selectShape(page);
+  await page
+    .getByTestId("appearance-strokes")
+    .getByRole("button", { name: "Add stroke" })
+    .click();
+
+  const align = page.getByRole("combobox", { name: "Stroke alignment" });
+  const art = page.locator(`.canvas-node[data-node-id="${SHAPE_ID}"]`);
+
+  await align.click();
+  await page.getByRole("option", { name: "Outside" }).click();
+  await expect
+    .poll(async () => (await getAppearance(page))?.strokes[0].align)
+    .toBe("outside");
+  await expect(art.locator("mask")).toHaveCount(1);
+
+  // Let the dropdown's click-through guard expire, as a person would.
+  await page.waitForTimeout(150);
+  await align.click();
+  await page.getByRole("option", { name: "Inside" }).click();
+  await expect
+    .poll(async () => (await getAppearance(page))?.strokes[0].align)
+    .toBe("inside");
+  await expect(art.locator("clipPath")).toHaveCount(1);
+});

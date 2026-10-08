@@ -385,7 +385,7 @@ describe("linear gradients", () => {
     ] as never);
 
     const body = (await editor.exportDocument()).split("<metadata>")[0];
-    const ids = [...body.matchAll(/<linearGradient id="([^"]+)"/g)].map(
+    const ids = [...body.matchAll(/<linearGradient[^>]* id="([^"]+)"/g)].map(
       (match) => match[1]
     );
     const refs = [...body.matchAll(/url\(#([^)]+)\)/g)].map(

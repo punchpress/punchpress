@@ -1,6 +1,14 @@
 import { expect, type Page, test } from "@playwright/test";
-import { gotoEditor, loadDocument, setViewport } from "./helpers/editor";
-import { decodePng } from "./helpers/png";
+import {
+  centerOn,
+  expectColor,
+  MIN_RESOLVABLE_DEVICE_PX,
+  readExportPixels,
+  readPixel,
+  toScreen,
+  ZOOM_LADDER,
+} from "./helpers/appearance-sweep";
+import { gotoEditor, loadDocument } from "./helpers/editor";
 
 // DPR-matched zoom-ladder sweep for appearance stacks. A rectangle paints a blue
 // fill under a wide black stroke under a thin yellow stroke; samples across its
@@ -12,7 +20,6 @@ import { decodePng } from "./helpers/png";
 // Full Chromium with GPU raster, like the raster sweep.
 test.use({ channel: "chromium" });
 
-const ZOOM_LADDER = [1, 0.5, 0.35, 0.21, 0.1, 0.05, 0.01];
 const NODE_ID = "sweep-shape";
 const ARTBOARD = { height: 1200, width: 1600, x: 0, y: 0 };
 const WIDE = 60;
@@ -23,8 +30,6 @@ const COLORS = {
   thin: [255, 204, 0],
   wide: [0, 0, 0],
 };
-const MIN_RESOLVABLE_DEVICE_PX = 4;
-const CHANNEL_TOLERANCE = 48;
 
 const stroke = (id: string, color: string, width: number) => ({
   align: "center",
@@ -121,66 +126,6 @@ const getEdgeWorld = (page: Page) => {
   }, NODE_ID);
 };
 
-const centerOn = async (page: Page, point, zoom: number) => {
-  const host = await page.evaluate(() => {
-    const rect = window.__PUNCHPRESS_EDITOR__?.hostRef?.getBoundingClientRect();
-
-    return { height: rect?.height ?? 0, width: rect?.width ?? 0 };
-  });
-
-  await setViewport(page, {
-    x: point.x - host.width / (2 * zoom),
-    y: point.y - host.height / (2 * zoom),
-    zoom,
-  });
-  await page.evaluate(async () => {
-    for (let index = 0; index < 3; index += 1) {
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-    }
-  });
-};
-
-const toScreen = (page: Page, world: { x: number; y: number }) => {
-  return page.evaluate((point) => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
-    const viewer = editor?.viewerRef;
-    const host = editor?.hostRef?.getBoundingClientRect();
-
-    if (!(editor && viewer && host)) {
-      throw new Error("Expected viewport projection");
-    }
-
-    return {
-      x: host.left + (point.x - viewer.getScrollLeft()) * editor.zoom,
-      y: host.top + (point.y - viewer.getScrollTop()) * editor.zoom,
-    };
-  }, world);
-};
-
-const readPixel = async (page: Page, screen: { x: number; y: number }) => {
-  const clip = { height: 3, width: 3, x: screen.x - 1, y: screen.y - 1 };
-
-  // A first capture forces pending raster; the second is asserted.
-  await page.screenshot({ clip });
-
-  const image = decodePng(await page.screenshot({ clip }));
-  const center =
-    (Math.floor(image.height / 2) * image.width + Math.floor(image.width / 2)) *
-    4;
-
-  return [image.data[center], image.data[center + 1], image.data[center + 2]];
-};
-
-const expectColor = (actual: number[], expected: readonly number[], label) => {
-  const delta = Math.max(
-    ...actual.map((channel, index) => Math.abs(channel - expected[index]))
-  );
-
-  expect
-    .soft(delta, `${label}: got rgb(${actual.join(", ")})`)
-    .toBeLessThanOrEqual(CHANNEL_TOLERANCE);
-};
-
 const sweepLadder = async (page: Page, dpr: number, phase: string) => {
   const edge = await getEdgeWorld(page);
 
@@ -242,48 +187,13 @@ test.describe("appearance export parity", () => {
     await loadDocument(page, SWEEP_DOCUMENT);
 
     const edge = await getEdgeWorld(page);
-    const exported = await page.evaluate(
-      async ({ points }) => {
-        const editor = window.__PUNCHPRESS_EDITOR__;
-        const svg = await editor?.exportSelectedArtboardSvg("sweep-artboard");
-
-        if (!svg) {
-          throw new Error("Expected artboard export");
-        }
-
-        const image = new Image();
-
-        image.src = URL.createObjectURL(
-          new Blob([svg], { type: "image/svg+xml" })
-        );
-        await image.decode();
-
-        const canvas = document.createElement("canvas");
-
-        canvas.width = image.width;
-        canvas.height = image.height;
-
-        const context = canvas.getContext("2d", { willReadFrequently: true });
-
-        context?.drawImage(image, 0, 0);
-
-        return points.map((point) => {
-          const data = context?.getImageData(
-            Math.round(point.x),
-            Math.round(point.y),
-            1,
-            1
-          ).data;
-
-          return data ? [data[0], data[1], data[2]] : [];
-        });
-      },
-      {
-        points: SAMPLES.map((sample) => ({
-          x: edge.x + sample.offset - ARTBOARD.x,
-          y: edge.y - ARTBOARD.y,
-        })),
-      }
+    const exported = await readExportPixels(
+      page,
+      "sweep-artboard",
+      SAMPLES.map((sample) => ({
+        x: edge.x + sample.offset - ARTBOARD.x,
+        y: edge.y - ARTBOARD.y,
+      }))
     );
 
     await centerOn(page, edge, 1);
@@ -437,38 +347,11 @@ test.describe("gradient export parity", () => {
     await gotoEditor(page);
     await loadDocument(page, GRADIENT_DOCUMENT);
 
-    const exported = await page.evaluate(async (points) => {
-      const svg =
-        await window.__PUNCHPRESS_EDITOR__?.exportSelectedArtboardSvg(
-          "sweep-artboard"
-        );
-      const image = new Image();
-
-      image.src = URL.createObjectURL(
-        new Blob([svg ?? ""], { type: "image/svg+xml" })
-      );
-      await image.decode();
-
-      const canvas = document.createElement("canvas");
-
-      canvas.width = image.width;
-      canvas.height = image.height;
-
-      const context = canvas.getContext("2d", { willReadFrequently: true });
-
-      context?.drawImage(image, 0, 0);
-
-      return points.map((point) => {
-        const data = context?.getImageData(
-          Math.round(point.x),
-          Math.round(point.y),
-          1,
-          1
-        ).data;
-
-        return data ? [data[0], data[1], data[2]] : [];
-      });
-    }, GRADIENT_SAMPLES.map(getGradientPoint));
+    const exported = await readExportPixels(
+      page,
+      "sweep-artboard",
+      GRADIENT_SAMPLES.map(getGradientPoint)
+    );
 
     await centerOn(page, getGradientPoint(0.5), 1);
 
