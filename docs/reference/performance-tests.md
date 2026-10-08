@@ -48,6 +48,22 @@ Default scenario options are the baseline. Diagnostic overrides are still
 first-class CLI support: use them to narrow slowness, and include the options
 shown in the result artifact when comparing runs.
 
+### Browser and Build Options
+
+| Option | Use |
+| --- | --- |
+| `--prod` | Measure a production build: `vite build` into `apps/web/dist/perf`, served by `vite preview`. No dev React and no StrictMode double effects. Primary numbers for frame-cost work. |
+| `--browser chromium` | Full Chromium with GPU raster instead of the default headless shell, which rasterizes on the CPU and overstates raster cost for zoom and filter work. |
+| `--dpr <scale>` | Device pixel ratio, for DPR 1 and 2 comparisons. |
+| `--viewport <width>x<height>` | Page size; the default is Playwright's Desktop Chrome 1280 × 720. |
+
+The perf build sets `VITE_PUNCHPRESS_PERF_BUILD=1`, which keeps the
+`window.__PUNCHPRESS_EDITOR__` automation handle that dev builds expose.
+Shipped builds never have it. Perf specs use the same switch:
+`PUNCHPRESS_PERF_PROD=1 bunx playwright test --config playwright.performance.config.ts <spec>`.
+Production mode never reuses a server already running on the port. Record
+the mode, browser, DPR, and viewport with every comparison.
+
 ## Agent Workflow
 
 Use the CLI for normal performance work. Do not open or click around in the app

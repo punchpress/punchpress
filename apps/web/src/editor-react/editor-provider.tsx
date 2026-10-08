@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { exposesEditorAutomationHandle } from "@/platform/editor-automation-handle";
 import { createConfiguredEditor } from "./create-configured-editor";
 import { EditorContext } from "./editor-context";
 import { useEditorClipboardEvents } from "./use-editor-clipboard-events";
@@ -17,7 +18,7 @@ export const EditorProvider = ({ children }) => {
   }, [editor]);
 
   useEffect(() => {
-    if (!(import.meta.env.DEV && typeof window !== "undefined")) {
+    if (!(exposesEditorAutomationHandle && typeof window !== "undefined")) {
       return;
     }
 

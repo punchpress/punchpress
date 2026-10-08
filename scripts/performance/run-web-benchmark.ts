@@ -26,7 +26,7 @@ const listBenchmarks = (json = false) => {
 
 const printUsage = () => {
   console.log(
-    "Usage: bun run perf [--headed] [--json] [--flame] [--trace] [--frames <count>] [--node-count <count>] [--timeout-ms <ms>] [--dpr <scale>] [--browser chromium] [--viewport <width>x<height>] <benchmark-id>"
+    "Usage: bun run perf [--headed] [--json] [--flame] [--trace] [--frames <count>] [--node-count <count>] [--timeout-ms <ms>] [--dpr <scale>] [--browser chromium] [--viewport <width>x<height>] [--prod] <benchmark-id>"
   );
   console.log(
     "Usage: bun run perf:json <benchmark-id> | bun run perf:flame <benchmark-id> | bun run perf:trace <benchmark-id>"
@@ -90,6 +90,7 @@ const parseArgs = (args: string[]) => {
   let dpr: number | null = null;
   let browser: string | null = null;
   let viewport: string | null = null;
+  let production = false;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -133,6 +134,11 @@ const parseArgs = (args: string[]) => {
       }
 
       index += 1;
+      continue;
+    }
+
+    if (arg === "--prod") {
+      production = true;
       continue;
     }
 
@@ -213,6 +219,7 @@ const parseArgs = (args: string[]) => {
     json,
     list,
     nodeCount,
+    production,
     trace,
     timeoutMs,
     viewport,
@@ -284,6 +291,7 @@ const run = async () => {
         ...(options.nodeCount
           ? { PUNCHPRESS_BENCHMARK_NODE_COUNT: String(options.nodeCount) }
           : {}),
+        ...(options.production ? { PUNCHPRESS_PERF_PROD: "1" } : {}),
         ...(options.dpr
           ? { PUNCHPRESS_BENCHMARK_DPR: String(options.dpr) }
           : {}),

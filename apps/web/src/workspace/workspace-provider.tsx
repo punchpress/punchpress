@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createConfiguredEditor } from "@/editor-react/create-configured-editor";
 import { EditorContext } from "@/editor-react/editor-context";
 import { useEditorClipboardEvents } from "@/editor-react/use-editor-clipboard-events";
+import { exposesEditorAutomationHandle } from "@/platform/editor-automation-handle";
 import { getDocumentBaseName } from "@/platform/web-document-files";
 import { createScratchpadAutosave } from "./scratchpad-autosave";
 import {
@@ -120,7 +121,7 @@ export const WorkspaceProvider = ({ children }) => {
     activeEditor.mount();
     mountedEditorRef.current = activeEditor;
 
-    if (import.meta.env.DEV && typeof window !== "undefined") {
+    if (exposesEditorAutomationHandle && typeof window !== "undefined") {
       window.__PUNCHPRESS_EDITOR__ = activeEditor;
     }
 
@@ -131,7 +132,7 @@ export const WorkspaceProvider = ({ children }) => {
       }
 
       if (
-        import.meta.env.DEV &&
+        exposesEditorAutomationHandle &&
         typeof window !== "undefined" &&
         window.__PUNCHPRESS_EDITOR__ === activeEditor
       ) {
