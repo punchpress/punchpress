@@ -19,6 +19,8 @@ export interface AppearanceFillDraw {
 }
 
 export interface AppearanceStrokeDraw {
+  // Effective alignment: "center" whenever the object has an open-only path.
+  align: StrokeLayer["align"];
   cap: StrokeLayer["cap"];
   join: StrokeLayer["join"];
   kind: "stroke";
@@ -60,9 +62,15 @@ export interface Matrix {
 }
 
 export interface AppearancePath {
+  // Conservative bounds of `d` in the path's own coordinates (before
+  // `transform`); sizes the inverse mask of outside strokes.
+  bounds?: Bounds | null;
   closed?: boolean;
   d: string;
   fillRule?: "evenodd" | "nonzero";
+  // False when every contour is open; inside and outside strokes then paint
+  // on center. Missing means closed (glyphs, shapes).
+  hasClosedContour?: boolean;
   key: string;
   // Glyph layout transform as numbers, equal to `transform`; paint servers in
   // node space undo it so one gradient spans every glyph.

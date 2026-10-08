@@ -17,6 +17,7 @@ export {
   MAX_APPEARANCE_LAYERS,
   MAX_GRADIENT_STOPS,
   paintSchema,
+  STROKE_ALIGN_VALUES,
   strokeLayerSchema,
 } from "./appearance-schema";
 export type { ClipboardContent } from "./clipboard";

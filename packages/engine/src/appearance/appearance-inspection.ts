@@ -1,6 +1,8 @@
 import { getAppearanceTargetNodeIds } from "./appearance-commands";
 import type { StrokeLayer } from "./appearance-types";
+import { canAlignPaths } from "./appearance-render-plan";
 import { getNodeAppearance } from "./node-appearance";
+import { getRenderedAppearanceObject } from "./rendered-appearance";
 
 interface PrimaryStrokeStyle {
   cap: StrokeLayer["cap"] | null;
@@ -34,4 +36,14 @@ export const getPrimaryStrokeStyle = (
     isJoinMixed,
     join: isJoinMixed ? null : first.join,
   };
+};
+
+// Whether every paint target renders where inside and outside strokes can
+// align (the renderer's own rule); open-only paths stroke on center.
+export const canAlignStrokes = (editor, nodeIds: string[]) => {
+  return getAppearanceTargetNodeIds(editor, nodeIds).every((nodeId) => {
+    const object = getRenderedAppearanceObject(editor, nodeId);
+
+    return !object || canAlignPaths(object.paths);
+  });
 };

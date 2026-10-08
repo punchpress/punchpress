@@ -36,15 +36,18 @@ const commandsToPathData = (commands) => {
 };
 
 // Contours carry only what geometry needs: the fill rule plus paint presence and
-// stroke width for bounds and hit testing (see getPaintHitStyle).
+// stroke reach for bounds and hit testing (see getPaintHitStyle).
 const getContourStyle = (contour) => {
-  const paint = contour.appearance ? getPaintHitStyle(contour) : contour;
+  const paint = contour.appearance
+    ? getPaintHitStyle(contour, contour.closed !== false)
+    : contour;
 
   return {
     fill: paint.fill ?? null,
     fillRule: contour.fillRule ?? "nonzero",
+    insideReach: paint.insideReach ?? 0,
+    outsideReach: paint.outsideReach ?? 0,
     stroke: paint.stroke ?? null,
-    strokeWidth: paint.strokeWidth ?? 0,
   };
 };
 
@@ -62,9 +65,10 @@ export const buildVectorNodeGeometry = (node) => {
       d: commandsToPathData(commands),
       fill: style.fill,
       fillRule: style.fillRule,
+      insideReach: style.insideReach,
       key: contour.id || `vector-${index}`,
+      outsideReach: style.outsideReach,
       stroke: style.stroke,
-      strokeWidth: style.strokeWidth,
     };
   });
 
@@ -72,7 +76,7 @@ export const buildVectorNodeGeometry = (node) => {
     return commandsToContours(path.commands, 1.5);
   });
   const strokeInset = visibleContours.reduce((maxStrokeInset, contour) => {
-    return Math.max(maxStrokeInset, getContourStyle(contour).strokeWidth / 2);
+    return Math.max(maxStrokeInset, getContourStyle(contour).outsideReach);
   }, 0);
   const sourceBoundsPoints =
     flattenedContours.length > 0
@@ -101,8 +105,9 @@ export const buildVectorNodeGeometry = (node) => {
       contours: commandsToContours(path.commands, 1.5),
       fill: path.fill,
       fillRule: path.fillRule,
+      insideReach: path.insideReach,
+      outsideReach: path.outsideReach,
       stroke: path.stroke,
-      strokeWidth: path.strokeWidth,
     })
   );
   // Rendered paths are geometry only; the appearance plan supplies paint.
@@ -110,6 +115,7 @@ export const buildVectorNodeGeometry = (node) => {
     closed,
     d,
     fillRule,
+    hasClosedContour: Boolean(closed),
     key,
   }));
 

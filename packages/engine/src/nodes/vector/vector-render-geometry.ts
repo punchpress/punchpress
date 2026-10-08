@@ -124,9 +124,12 @@ const toRenderEntries = (pathNode, geometry) => {
   const transform = buildNodeSvgTransform(pathNode, geometry.bbox);
 
   return geometry.paths.map((path, index) => ({
+    // The child's own coordinates, before the entry transform places it.
+    bounds: geometry.paintBox ?? null,
     closed: path.closed,
     d: path.d,
     fillRule: pathNode.fillRule,
+    hasClosedContour: path.hasClosedContour,
     key: `${pathNode.id}-${index}`,
     // Gradients normalize against the child's own unstroked box, in the
     // child's local space (the entry transform only places it).
@@ -153,7 +156,8 @@ const toRenderHitRegions = (pathNode, geometry) => {
         getTransformedPathPoint(pathNode, geometry.bbox, point)
       ),
     })),
-    strokeWidth: (region.strokeWidth || 0) * strokeScale,
+    strokeInsideReach: (region.strokeInsideReach || 0) * strokeScale,
+    strokeOutsideReach: (region.strokeOutsideReach || 0) * strokeScale,
   }));
 };
 
@@ -206,12 +210,12 @@ const createPaperItemFromPathNode = (scope, pathNode, geometry) => {
   return item;
 };
 
-const expandBounds = (bounds, strokeWidth = 0) => {
+const expandBounds = (bounds, reach = 0) => {
   if (!bounds) {
     return null;
   }
 
-  const strokeInset = Math.max(0, strokeWidth) / 2;
+  const strokeInset = Math.max(0, reach);
 
   return {
     height: bounds.height + strokeInset * 2,
@@ -308,9 +312,10 @@ const buildCompoundFillEntries = (vectorNode, pathNodes, getPathGeometry) => {
     );
     const styleNode = pathNodes.at(-1) || pathNodes[0];
     const paintBox = toBounds(boundsItem.bounds);
+    const hasClosedContour = resultPaths.some((path) => path.closed);
     const bounds = expandBounds(
       paintBox,
-      getPaintExtent(styleNode).strokeWidth
+      getPaintExtent(styleNode, hasClosedContour).outsideReach
     );
 
     if (!(bounds && resultPaths.length > 0)) {
@@ -321,11 +326,13 @@ const buildCompoundFillEntries = (vectorNode, pathNodes, getPathGeometry) => {
       bounds,
       entries: [
         {
+          bounds: paintBox,
           closed: resultPaths.every((path) => path.closed),
           d: resultPaths
             .map((path) => path.pathData || path.getPathData())
             .join(" "),
           fillRule: styleNode.fillRule,
+          hasClosedContour,
           key: `${vectorNode.id}-compound-fill`,
           paintBox,
           styleNodeId: styleNode.id,
@@ -370,19 +377,34 @@ const buildBooleanCompoundEntries = (
     }, firstItem);
     const styleNode = pathNodes.at(-1) || pathNodes[0];
     const paintBox = toBounds(resultItem.bounds);
+    const resultPaths = getPaperResultPaths(resultItem);
     const bounds = expandBounds(
       paintBox,
-      getPaintExtent(styleNode).strokeWidth
+      getPaintExtent(
+        styleNode,
+        resultPaths.some((path) => path.closed)
+      ).outsideReach
     );
-    const entries = getPaperResultPaths(resultItem).map((path, index) => ({
-      closed: path.closed,
-      d: path.pathData || path.getPathData(),
-      fillRule: styleNode.fillRule,
-      key: `${vectorNode.id}-boolean-${index}`,
-      paintBox,
-      styleNodeId: styleNode.id,
-      transform: null,
-    }));
+    // One compound path, so fills, clips, and masks all see the result's
+    // holes as holes.
+    const entries =
+      resultPaths.length > 0
+        ? [
+            {
+              bounds: paintBox,
+              closed: resultPaths.every((path) => path.closed),
+              d: resultPaths
+                .map((path) => path.pathData || path.getPathData())
+                .join(" "),
+              fillRule: styleNode.fillRule,
+              hasClosedContour: resultPaths.some((path) => path.closed),
+              key: `${vectorNode.id}-boolean`,
+              paintBox,
+              styleNodeId: styleNode.id,
+              transform: null,
+            },
+          ]
+        : [];
     const selectionPoints = getPaperPathSelectionPoints(
       getPaperResultPaths(resultItem)
     );

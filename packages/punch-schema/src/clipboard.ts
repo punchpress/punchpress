@@ -23,8 +23,8 @@ export const clipboardContentSchema = z
   });
 
 // Payloads copied from older builds upgrade the same way documents do: 1.8
-// folds flat paint into stacks, 1.9 passes through.
-const UPGRADABLE_CLIPBOARD_VERSIONS = new Set(["1.8", "1.9"]);
+// folds flat paint into stacks, 1.9 and 1.10 pass through.
+const UPGRADABLE_CLIPBOARD_VERSIONS = new Set(["1.8", "1.9", "1.10"]);
 
 export const parseClipboardContent = (value) => {
   const content = JSON.parse(value);

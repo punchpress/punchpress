@@ -39,8 +39,9 @@ export const migrateDocument = (value: unknown) => {
     return normalizeDocumentRecord(value);
   }
 
-  // 1.9 → 1.10 only widens paint to gradients; the data is unchanged.
-  if (value.version === "1.9") {
+  // 1.9 → 1.10 widened paint to gradients and 1.10 → 1.11 widened stroke
+  // alignment; neither changes existing data.
+  if (value.version === "1.9" || value.version === "1.10") {
     return normalizeDocumentRecord({
       ...value,
       version: PUNCH_DOCUMENT_VERSION,

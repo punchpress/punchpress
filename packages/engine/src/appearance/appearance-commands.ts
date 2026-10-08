@@ -2,6 +2,7 @@ import {
   appearanceSchema,
   MAX_APPEARANCE_LAYERS,
   parseColor,
+  STROKE_ALIGN_VALUES,
 } from "@punchpress/punch-schema";
 import {
   getVectorAggregatePropertyNodes,
@@ -13,7 +14,6 @@ import {
   createSolidFill,
   createSolidStroke,
 } from "./appearance-layers";
-import { buildAppearanceObjects } from "./appearance-render-plan";
 import type {
   Appearance,
   FillLayer,
@@ -21,6 +21,7 @@ import type {
   StrokeLayer,
 } from "./appearance-types";
 import { getNodeAppearance } from "./node-appearance";
+import { getRenderedAppearanceObject } from "./rendered-appearance";
 import {
   convertPaint,
   getGradientAngle,
@@ -371,6 +372,10 @@ const applyLayerPatch = (
       next.miterLimit = Math.max(1, patch.miterLimit);
     }
 
+    if (patch.align && STROKE_ALIGN_VALUES.includes(patch.align)) {
+      next.align = patch.align;
+    }
+
     if (patch.cap) {
       next.cap = patch.cap;
     }
@@ -405,25 +410,11 @@ const clamp = (value: number, min: number, max: number) => {
   return Math.min(max, Math.max(min, value));
 };
 
-// The box the node's layers actually paint through. A compound or boolean
-// vector paints its compiled result with a child's stack, through the
-// result's bounds, so the parent vector's objects are checked first.
+// The box the node's layers actually paint through.
 const getRenderedPaintBox = (editor, nodeId: string) => {
-  const node = editor.getNode(nodeId);
-  const parent = node ? editor.getNode(node.parentId) : null;
-  const ownerIds = parent?.type === "vector" ? [parent.id, nodeId] : [nodeId];
-
-  for (const ownerId of ownerIds) {
-    const object = buildAppearanceObjects(
-      editor.getNode(ownerId),
-      editor.getNodeRenderGeometry(ownerId),
-      (id) => editor.getNode(id)
-    ).find((candidate) => candidate.styleNodeId === nodeId);
-
-    if (object?.paintBox) {
-      return object.paintBox;
-    }
-  }
-
-  return editor.getNodeRenderGeometry(nodeId)?.paintBox ?? null;
+  return (
+    getRenderedAppearanceObject(editor, nodeId)?.paintBox ??
+    editor.getNodeRenderGeometry(nodeId)?.paintBox ??
+    null
+  );
 };

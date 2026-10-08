@@ -23,7 +23,14 @@ interface CachedObjects {
 }
 
 const objectsByPaths = new WeakMap<readonly GeometryPath[], CachedObjects>();
-const drawsByAppearance = new WeakMap<Appearance, readonly AppearanceDraw[]>();
+const alignedDrawsByAppearance = new WeakMap<
+  Appearance,
+  readonly AppearanceDraw[]
+>();
+const centeredDrawsByAppearance = new WeakMap<
+  Appearance,
+  readonly AppearanceDraw[]
+>();
 const pairedPassesByDraws = new WeakMap<
   readonly AppearanceDraw[],
   readonly AppearancePass[]
@@ -67,7 +74,10 @@ export const buildAppearanceObjects = (
     }
 
     const objectPaths = pathsByStyleNodeId.get(styleNodeId) ?? [];
-    const draws = getAppearanceDraws(getNodeAppearance(styleNode));
+    const draws = getAppearanceDraws(
+      getNodeAppearance(styleNode),
+      canAlignPaths(objectPaths)
+    );
     const childPaintBox = objectPaths.find((path) => path.paintBox)?.paintBox;
 
     return [
@@ -94,21 +104,30 @@ export const buildAppearanceObjects = (
   return objects;
 };
 
-// Enabled, visible layers in paint order: fills bottom→top, then strokes.
+// Enabled, visible layers in paint order: outside strokes, then fills, then
+// center and inside strokes, each band in list order. Outside strokes sit
+// under every fill so one glyph's ring never paints over a neighbor's fill.
+// Objects that cannot align (`alignable` false) paint every stroke on center.
 export const getAppearanceDraws = (
-  appearance: Appearance
+  appearance: Appearance,
+  alignable = true
 ): readonly AppearanceDraw[] => {
-  const cached = drawsByAppearance.get(appearance);
+  const cache = alignable
+    ? alignedDrawsByAppearance
+    : centeredDrawsByAppearance;
+  const cached = cache.get(appearance);
 
   if (cached) {
     return cached;
   }
 
-  const draws: AppearanceDraw[] = [];
+  const fills: AppearanceDraw[] = [];
+  const outside: AppearanceDraw[] = [];
+  const strokes: AppearanceDraw[] = [];
 
   for (const layer of appearance.fills) {
     if (layer.enabled && layer.opacity > 0) {
-      draws.push({
+      fills.push({
         kind: "fill",
         layerId: layer.id,
         opacity: layer.opacity,
@@ -119,26 +138,41 @@ export const getAppearanceDraws = (
 
   for (const layer of appearance.strokes) {
     if (layer.enabled && layer.opacity > 0 && layer.width > 0) {
-      draws.push({
+      const align = alignable ? layer.align : "center";
+      const draw = {
+        align,
         cap: layer.cap,
         join: layer.join,
-        kind: "stroke",
+        kind: "stroke" as const,
         layerId: layer.id,
         miterLimit: layer.miterLimit,
         opacity: layer.opacity,
         paint: layer.paint,
         width: layer.width,
-      });
+      };
+
+      (align === "outside" ? outside : strokes).push(draw);
     }
   }
 
-  drawsByAppearance.set(appearance, draws);
+  const draws = [...outside, ...fills, ...strokes];
+
+  cache.set(appearance, draws);
 
   return draws;
 };
 
-// A fill may share an element with the stroke right after it only when the
-// object paints a single geometry path. With several paths (text glyphs,
+// Strokes align only when every painted path has a closed contour; an
+// open-only path has no inside, so the whole object strokes on center.
+export const canAlignPaths = (paths: readonly AppearancePath[]) => {
+  return paths.every(
+    (path) => path.d === "" || path.hasClosedContour !== false
+  );
+};
+
+// A fill may share an element with the center stroke right after it only when
+// the object paints a single geometry path; aligned strokes need their own
+// clipped or masked element. With several paths (text glyphs,
 // multi-contour vectors), every fill must paint under every stroke, so each
 // draw gets its own pass across all paths.
 export const getAppearancePasses = (
@@ -160,6 +194,7 @@ export const getAppearancePasses = (
     if (
       canPair &&
       draw.kind === "stroke" &&
+      draw.align === "center" &&
       previous?.fill &&
       !previous.stroke
     ) {

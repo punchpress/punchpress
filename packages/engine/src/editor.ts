@@ -8,16 +8,19 @@ import {
 import {
   type AppearanceSlot,
   addFill as addEditorFill,
-  getAppearanceGradientAngle as getEditorAppearanceGradientAngle,
-  setGradientAngle as setEditorGradientAngle,
-  setPaintKind as setEditorPaintKind,
   addStroke as addEditorStroke,
+  getAppearanceGradientAngle as getEditorAppearanceGradientAngle,
   moveAppearanceLayer as moveEditorAppearanceLayer,
   removeAppearanceLayer as removeEditorAppearanceLayer,
   setAppearance as setEditorAppearance,
+  setGradientAngle as setEditorGradientAngle,
+  setPaintKind as setEditorPaintKind,
   updateAppearanceLayer as updateEditorAppearanceLayer,
 } from "./appearance/appearance-commands";
-import { getPrimaryStrokeStyle as getEditorPrimaryStrokeStyle } from "./appearance/appearance-inspection";
+import {
+  canAlignStrokes as canEditorAlignStrokes,
+  getPrimaryStrokeStyle as getEditorPrimaryStrokeStyle,
+} from "./appearance/appearance-inspection";
 import type { Appearance } from "./appearance/appearance-types";
 import {
   copySelection as copyEditorSelection,
@@ -1070,6 +1073,10 @@ export class Editor {
 
   getGradientAngle(slot: AppearanceSlot, nodeIds = this.selectedNodeIds) {
     return getEditorAppearanceGradientAngle(this, slot, nodeIds);
+  }
+
+  canAlignStrokes(nodeIds = this.selectedNodeIds) {
+    return canEditorAlignStrokes(this, nodeIds);
   }
 
   setAppearance(appearance: Appearance, nodeIds = this.selectedNodeIds) {

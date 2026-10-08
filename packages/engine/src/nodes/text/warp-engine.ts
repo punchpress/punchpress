@@ -24,7 +24,7 @@ import {
 import { estimateBounds, inflateBounds, layoutGlyphs } from "./warp-layout";
 
 const getStrokeInflatedBounds = (node, bbox) => {
-  const strokeInset = getPaintExtent(node).strokeWidth / 2;
+  const strokeInset = getPaintExtent(node).outsideReach;
   if (strokeInset === 0) {
     return bbox;
   }
@@ -151,7 +151,13 @@ const buildArchGeometry = (layout, node) => {
       warpedContours,
       warpedBridgeContours
     ),
-    paths: [{ key: "shape-0", d: contoursToPath(warpedContours) }],
+    paths: [
+      {
+        bounds: warpedBounds,
+        d: contoursToPath(warpedContours),
+        key: "shape-0",
+      },
+    ],
     bbox: getStrokeInflatedBounds(node, warpedBounds),
     paintBox: warpedBounds,
     ready: true,
@@ -187,7 +193,13 @@ const buildWaveGeometry = (layout, node) => {
       warpedContours,
       warpedBridgeContours
     ),
-    paths: [{ key: "shape-0", d: contoursToPath(warpedContours) }],
+    paths: [
+      {
+        bounds: warpedBounds,
+        d: contoursToPath(warpedContours),
+        key: "shape-0",
+      },
+    ],
     bbox: getStrokeInflatedBounds(node, warpedBounds),
     paintBox: warpedBounds,
     ready: true,
@@ -210,7 +222,13 @@ const buildSlantGeometry = (layout, node) => {
       warpedContours,
       warpedBridgeContours
     ),
-    paths: [{ key: "shape-0", d: contoursToPath(warpedContours) }],
+    paths: [
+      {
+        bounds: warpedBounds,
+        d: contoursToPath(warpedContours),
+        key: "shape-0",
+      },
+    ],
     bbox: getStrokeInflatedBounds(node, warpedBounds),
     paintBox: warpedBounds,
     ready: true,
@@ -246,6 +264,8 @@ const buildFlatGeometry = (layout, node) => {
     const x = Number(format(glyph.baseX));
 
     paths.push({
+      // Glyph-local, like `d`; sizes outside-stroke masks per glyph.
+      bounds: glyph.bounds ?? null,
       key: `glyph-${index}`,
       d: glyph.path,
       layoutMatrix: { a: 1, b: 0, c: 0, d: 1, e: x, f: 0 },

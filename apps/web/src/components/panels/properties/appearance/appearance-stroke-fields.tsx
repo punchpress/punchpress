@@ -8,6 +8,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useEditor } from "../../../../editor-react/use-editor";
+import { useEditorValue } from "../../../../editor-react/use-editor-value";
 import { FieldRow } from "../field-primitives";
 import { usePropertyScrubHistory } from "../use-property-scrub-history";
 import { useAppearanceLayer } from "./appearance-context";
@@ -15,6 +16,12 @@ import { useAppearanceLayer } from "./appearance-context";
 const WIDTH_RANGE = { max: 1000, min: 0 };
 const WIDTH_SCRUB_RANGE = { max: 50, min: 0 };
 const MITER_RANGE = { max: 100, min: 1 };
+
+const ALIGN_OPTIONS = [
+  { label: "Center", value: "center" },
+  { label: "Inside", value: "inside" },
+  { label: "Outside", value: "outside" },
+];
 
 const CAP_OPTIONS = [
   { label: "Butt", value: "butt" },
@@ -28,10 +35,13 @@ const JOIN_OPTIONS = [
   { label: "Bevel", value: "bevel" },
 ];
 
-// Width, cap, join, and (for miter joins) miter limit of one stroke layer.
-// Each scrub is one undo step.
+// Alignment, width, cap, join, and (for miter joins) miter limit of one
+// stroke layer. Each scrub is one undo step.
 export const AppearanceStrokeFields = ({ layerId }: { layerId: string }) => {
   const editor = useEditor();
+  const canAlign = useEditorValue((currentEditor) =>
+    currentEditor.canAlignStrokes()
+  );
   const widthHistory = usePropertyScrubHistory("edit stroke width");
   const miterHistory = usePropertyScrubHistory("edit stroke miter");
   const resolved = useAppearanceLayer(layerId);
@@ -45,6 +55,19 @@ export const AppearanceStrokeFields = ({ layerId }: { layerId: string }) => {
 
   return (
     <div className="grid gap-2 pl-[44px]">
+      <FieldRow label="Align">
+        <StrokeSelect
+          ariaLabel="Stroke alignment"
+          onChange={(align) => editor.updateAppearanceLayer(slot, { align })}
+          options={ALIGN_OPTIONS}
+          value={layer.align}
+        />
+      </FieldRow>
+      {layer.align !== "center" && !canAlign ? (
+        <p className="text-muted-foreground text-xs">
+          Open paths stroke on center.
+        </p>
+      ) : null}
       <FieldRow label="Width">
         <ScrubSlider
           ariaLabel="Stroke width"

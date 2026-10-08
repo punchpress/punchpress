@@ -1,21 +1,45 @@
 const DEFAULT_STROKE_HIT_WIDTH = 6;
 
+// A stroke reaches `insideReach` into the fill region and `outsideReach` out
+// of it (aligned strokes are one-sided); `strokeWidth` is shorthand for a
+// center band of that width.
 export const createPaintedHitRegion = ({
   contours,
   fill = null,
   fillRule = "nonzero",
+  insideReach = null,
+  outsideReach = null,
   stroke = null,
   strokeWidth = 0,
+}: {
+  contours;
+  fill?: string | null;
+  fillRule?: string;
+  insideReach?: number | null;
+  outsideReach?: number | null;
+  stroke?: string | null;
+  strokeWidth?: number;
 }) => {
+  const strokeInsideReach = insideReach ?? strokeWidth / 2;
+  const strokeOutsideReach = outsideReach ?? strokeWidth / 2;
+
   return {
     contours: (contours || []).map((contour) => ({
       closed: contour.closed,
-      points: contour.points || contour.segments?.map((segment) => segment.point) || [],
+      points:
+        contour.points ||
+        contour.segments?.map((segment) => segment.point) ||
+        [],
     })),
     filled: Boolean(fill && fill !== "none"),
     fillRule,
-    stroked: Boolean(stroke && stroke !== "none" && strokeWidth > 0),
-    strokeWidth,
+    strokeInsideReach,
+    strokeOutsideReach,
+    stroked: Boolean(
+      stroke &&
+        stroke !== "none" &&
+        (strokeInsideReach > 0 || strokeOutsideReach > 0)
+    ),
   };
 };
 
@@ -67,7 +91,11 @@ const distanceToContour = (point, contour) => {
   for (let index = 0; index < lastSegmentIndex; index += 1) {
     distance = Math.min(
       distance,
-      distanceToSegment(point, points[index], points[(index + 1) % points.length])
+      distanceToSegment(
+        point,
+        points[index],
+        points[(index + 1) % points.length]
+      )
     );
   }
 
@@ -78,7 +106,11 @@ const isPointInContourEvenOdd = (point, contour) => {
   const points = contour.points || [];
   let inside = false;
 
-  for (let index = 0, previousIndex = points.length - 1; index < points.length; previousIndex = index, index += 1) {
+  for (
+    let index = 0, previousIndex = points.length - 1;
+    index < points.length;
+    previousIndex = index, index += 1
+  ) {
     const current = points[index];
     const previous = points[previousIndex];
     const intersects =
@@ -123,9 +155,10 @@ const isPointLeftOfSegment = (point, a, b) => {
   return (b.x - a.x) * (point.y - a.y) - (point.x - a.x) * (b.y - a.y);
 };
 
+// SVG fills open contours as if closed, so every contour with an area counts.
 const isPointInRegionFill = (point, region) => {
   const closedContours = (region.contours || []).filter(
-    (contour) => contour.closed && contour.points.length >= 3
+    (contour) => contour.points.length >= 3
   );
 
   if (region.fillRule === "evenodd") {
@@ -144,29 +177,39 @@ const isPointInRegionFill = (point, region) => {
 const hitTestRegion = (region, point, options) => {
   const margin = options.margin || 0;
 
-  if (
-    (region.filled || options.hitInside) &&
-    isPointInRegionFill(point, region)
-  ) {
+  const isInside = isPointInRegionFill(point, region);
+
+  if ((region.filled || options.hitInside) && isInside) {
     return true;
   }
 
-  const strokeHitWidth = Math.max(
-    region.stroked ? region.strokeWidth || 0 : 0,
-    margin > 0 || region.stroked ? margin : 0,
-    region.stroked ? DEFAULT_STROKE_HIT_WIDTH : 0
+  // Strokes hit on the side they paint. The minimum interaction band (and any
+  // margin) applies to both sides so thin and aligned strokes stay grabbable.
+  const tolerance = Math.max(
+    margin > 0 || region.stroked ? margin / 2 : 0,
+    region.stroked ? DEFAULT_STROKE_HIT_WIDTH / 2 : 0
+  );
+  const reach = Math.max(
+    tolerance,
+    region.stroked
+      ? (isInside ? region.strokeInsideReach : region.strokeOutsideReach) || 0
+      : 0
   );
 
-  if (strokeHitWidth <= 0) {
+  if (reach <= 0) {
     return false;
   }
 
   return (region.contours || []).some((contour) => {
-    return distanceToContour(point, contour) <= strokeHitWidth / 2;
+    return distanceToContour(point, contour) <= reach;
   });
 };
 
-const hitTestGeometryPoint = (geometry, point, options: { margin?: number; hitInside?: boolean } = {}) => {
+const hitTestGeometryPoint = (
+  geometry,
+  point,
+  options: { margin?: number; hitInside?: boolean } = {}
+) => {
   const margin = options.margin || 0;
 
   if (!isPointInBounds(point, geometry?.bbox, margin)) {
@@ -190,7 +233,8 @@ export const withNodeGeometryBehavior = (geometry) => {
   Object.defineProperty(geometry, "hitTestPoint", {
     configurable: true,
     enumerable: false,
-    value: (point, options = {}) => hitTestGeometryPoint(geometry, point, options),
+    value: (point, options = {}) =>
+      hitTestGeometryPoint(geometry, point, options),
   });
 
   return geometry;

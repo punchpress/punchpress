@@ -397,6 +397,7 @@ export const buildCircleTextGeometry = (layout, node) => {
     const point = getCirclePoint(guide.radius, angleDeg);
 
     paths.push({
+      bounds: glyph.bounds ?? null,
       key: `glyph-${index}`,
       d: glyph.path,
       layoutMatrix: getGlyphLayoutMatrix(

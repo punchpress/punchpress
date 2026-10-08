@@ -71,10 +71,13 @@ export const resolveDrawPaint = (
     };
   }
 
+  // A JSON tuple keeps keys unambiguous whatever characters ids contain.
   const id = makeId(
-    ownTransform
-      ? `${object.key}|${draw.layerId}|${path.key}`
-      : `${object.key}|${draw.layerId}`
+    JSON.stringify(
+      ownTransform
+        ? ["gradient", object.key, draw.layerId, path.key]
+        : ["gradient", object.key, draw.layerId]
+    )
   );
 
   return {

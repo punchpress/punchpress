@@ -70,6 +70,8 @@ export const paintSchema = z.discriminatedUnion("kind", [
   linearGradientPaintSchema,
 ]);
 
+export const STROKE_ALIGN_VALUES = ["center", "inside", "outside"] as const;
+
 const layerBase = {
   enabled: z.boolean(),
   id: z.string().min(1),
@@ -82,8 +84,7 @@ export const fillLayerSchema = z.object(layerBase).strict();
 export const strokeLayerSchema = z
   .object({
     ...layerBase,
-    // Stage 1 renders center strokes only; stroke alignment widens this enum.
-    align: z.enum(["center"]),
+    align: z.enum(STROKE_ALIGN_VALUES),
     cap: z.enum(VECTOR_STROKE_LINE_CAP_VALUES),
     join: z.enum(VECTOR_STROKE_LINE_JOIN_VALUES),
     miterLimit: finiteNumber.refine((value) => value >= 1, {

@@ -12,7 +12,7 @@ const isCornerHandle = (handle) => {
 };
 
 const getStrokeInset = (node) => {
-  return getPaintExtent(node).strokeWidth / 2;
+  return getPaintExtent(node).outsideReach;
 };
 
 const getMinimumOuterSize = (node) => {
@@ -179,13 +179,7 @@ export const getResizedShapeNodeUpdate = (
   const resizeHandle = rawBounds.handle;
   const nextBounds =
     preserveAspectRatio && isCornerHandle(handle)
-      ? getAspectLockedBounds(
-          bounds,
-          rawBounds,
-          handle,
-          resizeHandle,
-          node
-        )
+      ? getAspectLockedBounds(bounds, rawBounds, handle, resizeHandle, node)
       : rawBounds;
   const strokeInset = getStrokeInset(node);
   const width = round(

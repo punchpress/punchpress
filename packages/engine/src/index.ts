@@ -5,19 +5,19 @@ export {
   DEFAULT_VECTOR_STROKE_LINE_JOIN,
   DEFAULT_VECTOR_STROKE_MITER_LIMIT,
 } from "@punchpress/punch-schema";
+export type {
+  AppearanceList,
+  AppearanceSlot,
+} from "./appearance/appearance-commands";
 export {
-  formatPaintNumber,
-  type GradientDef,
-  resolveDrawPaint,
-} from "./appearance/appearance-paint-servers";
+  buildAppearanceElements,
+  type SvgElement,
+} from "./appearance/appearance-elements";
 export {
-  convertPaint,
-  getGradientAngle,
-  insertGradientStop,
-  removeGradientStop,
-  sampleGradient,
-  rotateGradientTo,
-} from "./appearance/paint";
+  areAppearancesEqual,
+  createSolidAppearance,
+} from "./appearance/appearance-layers";
+export { resolveDrawPaint } from "./appearance/appearance-paint-servers";
 export {
   buildAppearanceObjects,
   getAppearanceDraws,
@@ -35,15 +35,15 @@ export type {
   Paint,
   StrokeLayer,
 } from "./appearance/appearance-types";
-export type {
-  AppearanceList,
-  AppearanceSlot,
-} from "./appearance/appearance-commands";
-export {
-  areAppearancesEqual,
-  createSolidAppearance,
-} from "./appearance/appearance-layers";
 export { getNodeAppearance } from "./appearance/node-appearance";
+export {
+  convertPaint,
+  getGradientAngle,
+  insertGradientStop,
+  removeGradientStop,
+  rotateGradientTo,
+  sampleGradient,
+} from "./appearance/paint";
 export {
   ARTBOARD_HEIGHT,
   ARTBOARD_WIDTH,
@@ -74,12 +74,6 @@ export {
   recipeToComponentNodes,
 } from "./document/recipe-component-nodes";
 export { Editor } from "./editor";
-export type {
-  RenderItem,
-  RenderLayer,
-  RenderLeaf,
-  RenderTree,
-} from "./render-tree/render-tree";
 export {
   getNodePropertySupport,
   getSelectionProperties,
@@ -269,6 +263,12 @@ export {
 } from "./raster/presentation";
 export type { RasterStroke } from "./raster/stroke";
 export { createRasterStroke } from "./raster/stroke";
+export type {
+  RenderItem,
+  RenderLayer,
+  RenderLeaf,
+  RenderTree,
+} from "./render-tree/render-tree";
 export {
   includesPathPoint,
   isSamePathPoint,
