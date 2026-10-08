@@ -1,4 +1,5 @@
-import type { Appearance } from "./appearance-types";
+import { getAppearanceDraws } from "./appearance-render-plan";
+import type { Appearance, Paint } from "./appearance-types";
 import { getNodeAppearance } from "./node-appearance";
 
 export interface PaintExtent {
@@ -12,6 +13,8 @@ export interface PaintExtent {
 
 const alignedExtents = new WeakMap<Appearance, PaintExtent>();
 const centeredExtents = new WeakMap<Appearance, PaintExtent>();
+const alignedVisibleExtents = new WeakMap<Appearance, PaintExtent>();
+const centeredVisibleExtents = new WeakMap<Appearance, PaintExtent>();
 
 // The only appearance facts geometry may depend on: whether any fill paints
 // (hit testing) and how far strokes reach on each side (bounds and hit
@@ -62,6 +65,55 @@ export const getPaintExtent = (node, alignable = true): PaintExtent => {
   return extent;
 };
 
+// The extent of what actually paints: enabled layers with non-zero opacity
+// whose paint is not fully transparent. Hit regions use getPaintExtent so
+// invisible layers stay grabbable; click-through asks what is visible.
+export const getVisiblePaintExtent = (
+  node,
+  alignable = true
+): PaintExtent => {
+  const appearance = getNodeAppearance(node);
+  const cache = alignable ? alignedVisibleExtents : centeredVisibleExtents;
+  const cached = cache.get(appearance);
+
+  if (cached) {
+    return cached;
+  }
+
+  const extent = { filled: false, insideReach: 0, outsideReach: 0 };
+
+  for (const draw of getAppearanceDraws(appearance, alignable)) {
+    if (!isPaintVisible(draw.paint)) {
+      continue;
+    }
+
+    if (draw.kind === "fill") {
+      extent.filled = true;
+      continue;
+    }
+
+    const inside =
+      draw.align === "center"
+        ? draw.width / 2
+        : draw.align === "inside"
+          ? draw.width
+          : 0;
+    const outside =
+      draw.align === "center"
+        ? draw.width / 2
+        : draw.align === "outside"
+          ? draw.width
+          : 0;
+
+    extent.insideReach = Math.max(extent.insideReach, inside);
+    extent.outsideReach = Math.max(extent.outsideReach, outside);
+  }
+
+  cache.set(appearance, extent);
+
+  return extent;
+};
+
 // Inputs for createPaintedHitRegion, which only tests presence and reach. A
 // node with no enabled paint hit-tests by its geometry area so it can never
 // become unselectable.
@@ -73,8 +125,18 @@ export const getPaintHitStyle = (node, alignable = true) => {
     fill: filled || !stroked ? "paint" : null,
     insideReach,
     outsideReach,
+    // Marks the region as this node's paint rather than an interaction
+    // affordance, so a hit test may substitute a stricter extent.
+    paints: true,
     stroke: stroked ? "paint" : null,
   };
+};
+
+const isPaintVisible = (paint: Paint) => {
+  return (
+    paint.kind !== "linear-gradient" ||
+    paint.stops.some((stop) => stop.opacity > 0)
+  );
 };
 
 export const getPaintSignature = (node, alignable = true) => {

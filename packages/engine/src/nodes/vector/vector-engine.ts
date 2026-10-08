@@ -47,6 +47,7 @@ const getContourStyle = (contour) => {
     fillRule: contour.fillRule ?? "nonzero",
     insideReach: paint.insideReach ?? 0,
     outsideReach: paint.outsideReach ?? 0,
+    paints: paint.paints ?? false,
     stroke: paint.stroke ?? null,
   };
 };
@@ -68,6 +69,7 @@ export const buildVectorNodeGeometry = (node) => {
       insideReach: style.insideReach,
       key: contour.id || `vector-${index}`,
       outsideReach: style.outsideReach,
+      paints: style.paints,
       stroke: style.stroke,
     };
   });
@@ -107,6 +109,7 @@ export const buildVectorNodeGeometry = (node) => {
       fillRule: path.fillRule,
       insideReach: path.insideReach,
       outsideReach: path.outsideReach,
+      paints: path.paints,
       stroke: path.stroke,
     })
   );

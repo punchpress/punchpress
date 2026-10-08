@@ -9,6 +9,7 @@ export const createPaintedHitRegion = ({
   fillRule = "nonzero",
   insideReach = null,
   outsideReach = null,
+  paints = false,
   stroke = null,
   strokeWidth = 0,
 }: {
@@ -17,6 +18,7 @@ export const createPaintedHitRegion = ({
   fillRule?: string;
   insideReach?: number | null;
   outsideReach?: number | null;
+  paints?: boolean;
   stroke?: string | null;
   strokeWidth?: number;
 }) => {
@@ -33,6 +35,7 @@ export const createPaintedHitRegion = ({
     })),
     filled: Boolean(fill && fill !== "none"),
     fillRule,
+    paints,
     strokeInsideReach,
     strokeOutsideReach,
     stroked: Boolean(
@@ -174,25 +177,25 @@ const isPointInRegionFill = (point, region) => {
   );
 };
 
-const hitTestRegion = (region, point, options) => {
+const hitTestRegion = (region, point, options: HitTestOptions) => {
   const margin = options.margin || 0;
+  const paint = withPaintOverride(region, options.paint);
+  const isInside = isPointInRegionFill(point, paint);
 
-  const isInside = isPointInRegionFill(point, region);
-
-  if ((region.filled || options.hitInside) && isInside) {
+  if ((paint.filled || options.hitInside) && isInside) {
     return true;
   }
 
   // Strokes hit on the side they paint. The minimum interaction band (and any
   // margin) applies to both sides so thin and aligned strokes stay grabbable.
   const tolerance = Math.max(
-    margin > 0 || region.stroked ? margin / 2 : 0,
-    region.stroked ? DEFAULT_STROKE_HIT_WIDTH / 2 : 0
+    margin > 0 || paint.stroked ? margin / 2 : 0,
+    paint.stroked ? DEFAULT_STROKE_HIT_WIDTH / 2 : 0
   );
   const reach = Math.max(
     tolerance,
-    region.stroked
-      ? (isInside ? region.strokeInsideReach : region.strokeOutsideReach) || 0
+    paint.stroked
+      ? (isInside ? paint.strokeInsideReach : paint.strokeOutsideReach) || 0
       : 0
   );
 
@@ -205,10 +208,34 @@ const hitTestRegion = (region, point, options) => {
   });
 };
 
+// `paint` replaces the extent of the node's own paint regions (never its
+// interaction affordances, such as text bridges), for callers that ask what
+// visibly paints rather than what is grabbable. It applies to geometry that
+// paints one node's stack.
+const withPaintOverride = (region, paint: HitTestOptions["paint"]) => {
+  if (!(paint && region.paints)) {
+    return region;
+  }
+
+  return {
+    ...region,
+    filled: paint.filled,
+    strokeInsideReach: paint.insideReach,
+    strokeOutsideReach: paint.outsideReach,
+    stroked: paint.insideReach > 0 || paint.outsideReach > 0,
+  };
+};
+
+interface HitTestOptions {
+  hitInside?: boolean;
+  margin?: number;
+  paint?: { filled: boolean; insideReach: number; outsideReach: number };
+}
+
 const hitTestGeometryPoint = (
   geometry,
   point,
-  options: { margin?: number; hitInside?: boolean } = {}
+  options: HitTestOptions = {}
 ) => {
   const margin = options.margin || 0;
 

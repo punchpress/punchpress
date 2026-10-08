@@ -2,9 +2,10 @@ import {
   getVectorChildPathNodes,
   getVectorPathComposition,
 } from "../nodes/vector/vector-path-composition";
-import { createHeadlessPaperCompiler } from "../primitives/headless-paper-compiler";
-
-const paperCompiler = createHeadlessPaperCompiler();
+import {
+  isComposedVectorPaintedAt,
+  isNodePaintedAt,
+} from "./painted-hit-test";
 
 // Figma-style presses inside an existing selection's bounds. The bounds of an
 // already-selected object are its hit area: pressing anywhere inside drags the
@@ -68,9 +69,10 @@ const getSelectableNodeIdAtPoint = (editor, point) => {
     : null;
 };
 
-// Canvas artwork paints in flat document order, so walk it topmost-first.
-// Containers paint nothing themselves; frames clip their content; a vector
-// paints its children as one composed result unless the user has drilled in.
+// Group contiguity makes the flat document order the canvas paint order, so
+// walk it topmost-first. Containers paint nothing themselves (their effects
+// never hit); frames clip their content; a vector paints its children as one
+// composed result unless the user has drilled in.
 const findPaintedNodeIdAtPoint = (editor, point) => {
   const nodes = editor.nodes;
 
@@ -82,13 +84,14 @@ const findPaintedNodeIdAtPoint = (editor, point) => {
       node.type === "artboard" ||
       editor.getNode(node.parentId)?.type === "vector" ||
       !editor.isNodeEffectivelyVisible(node.id) ||
+      isComposedTransparent(editor, node) ||
       isClippedByFrame(editor, node, point)
     ) {
       continue;
     }
 
     if (node.type !== "vector") {
-      if (editor.hitTestNodePoint(node.id, point)) {
+      if (isNodePaintedAt(editor, node.id, point)) {
         return node.id;
       }
 
@@ -96,7 +99,7 @@ const findPaintedNodeIdAtPoint = (editor, point) => {
     }
 
     if (!isDrilledVector(editor, node)) {
-      if (isComposedVectorHit(editor, node, point)) {
+      if (isUndrilledVectorHit(editor, node, point)) {
         return node.id;
       }
 
@@ -105,12 +108,7 @@ const findPaintedNodeIdAtPoint = (editor, point) => {
 
     const childHitNodeId = getVectorChildPathNodes(editor, node.id)
       .reverse()
-      .find((pathNode) => {
-        return (
-          editor.isNodeEffectivelyVisible(pathNode.id) &&
-          editor.hitTestNodePoint(pathNode.id, point)
-        );
-      })?.id;
+      .find((pathNode) => isVisibleChildPaintedAt(editor, pathNode, point))?.id;
 
     if (childHitNodeId) {
       return childHitNodeId;
@@ -118,6 +116,22 @@ const findPaintedNodeIdAtPoint = (editor, point) => {
   }
 
   return null;
+};
+
+// Node opacity composes through every ancestor layer (isolated groups and
+// artboards), so a fully transparent ancestor hides its whole subtree.
+const isComposedTransparent = (editor, node) => {
+  let current = node;
+
+  while (current) {
+    if (typeof current.opacity === "number" && current.opacity <= 0) {
+      return true;
+    }
+
+    current = editor.getNode(current.parentId);
+  }
+
+  return false;
 };
 
 // Frames (artboards) clip their content to their bounds.
@@ -141,66 +155,26 @@ const isClippedByFrame = (editor, node, point) => {
 // Composed vectors (boolean results, compound fills) hit-test their rendered
 // result so clicks pass through cutouts and fill-rule holes. Independent
 // vectors are the union of their child paths.
-const isComposedVectorHit = (editor, vectorNode, point) => {
+const isUndrilledVectorHit = (editor, vectorNode, point) => {
   if (getVectorPathComposition(vectorNode) === "independent") {
-    return getVectorChildPathNodes(editor, vectorNode.id).some((pathNode) => {
-      return (
-        editor.isNodeEffectivelyVisible(pathNode.id) &&
-        editor.hitTestNodePoint(pathNode.id, point)
-      );
-    });
+    return getVectorChildPathNodes(editor, vectorNode.id).some((pathNode) =>
+      isVisibleChildPaintedAt(editor, pathNode, point)
+    );
   }
 
-  const entries = editor.getNodeRenderGeometry(vectorNode.id)?.paths || [];
+  return isComposedVectorPaintedAt(editor, vectorNode.id, point);
+};
 
-  // An empty result (e.g. a disjoint intersection) paints nothing.
-  if (!entries.some((entry) => entry.d)) {
-    return false;
-  }
-
-  // Boolean results can arrive as several contour entries that together form
-  // one compound shape (outer contour plus reversed holes), so test them as one.
-  const [firstEntry] = entries;
-
-  return paperCompiler.run((scope) => {
-    const scopePoint = new scope.Point(point.x, point.y);
-    const item = scope.PathItem.create(
-      entries
-        .map((entry) => entry.d)
-        .filter(Boolean)
-        .join(" ")
-    );
-    item.fillRule = firstEntry.fillRule === "evenodd" ? "evenodd" : "nonzero";
-
-    if (isPaint(firstEntry.fill) && item.contains(scopePoint)) {
-      return true;
-    }
-
-    const strokeWidth = isPaint(firstEntry.stroke)
-      ? firstEntry.strokeWidth || 0
-      : 0;
-
-    if (strokeWidth <= 0) {
-      return false;
-    }
-
-    // Paper only hit-tests strokes on styled items; the stroke width already
-    // spans the painted band, so no extra tolerance.
-    item.strokeColor = new scope.Color(0, 0, 0);
-    item.strokeWidth = strokeWidth;
-    item.strokeCap = firstEntry.strokeLineCap || "butt";
-    item.strokeJoin = firstEntry.strokeLineJoin || "miter";
-
-    return Boolean(
-      item.hitTest(scopePoint, { fill: false, stroke: true, tolerance: 0 })
-    );
-  });
+const isVisibleChildPaintedAt = (editor, pathNode, point) => {
+  return (
+    editor.isNodeEffectivelyVisible(pathNode.id) &&
+    !(typeof pathNode.opacity === "number" && pathNode.opacity <= 0) &&
+    isNodePaintedAt(editor, pathNode.id, point)
+  );
 };
 
 // Inside the drilled-in group (or a drilled vector), pointer targeting resolves
 // vector children directly, then maps them through the focused-group target.
-const isPaint = (paint) => Boolean(paint && paint !== "none");
-
 const isDrilledVector = (editor, node) => {
   const focusedGroupId = editor.focusedGroupId;
 
@@ -227,14 +201,14 @@ const isInsideFrame = (editor, frameNodeId, point) => {
 
 const isSelectionInkHit = (editor, point) => {
   return editor.selectedNodeIds.some((nodeId) => {
-    if (editor.hitTestNodePoint(nodeId, point)) {
+    if (isNodePaintedAt(editor, nodeId, point)) {
       return true;
     }
 
     return editor.getDescendantLeafNodeIds(nodeId).some((leafNodeId) => {
       return (
         editor.isNodeEffectivelyVisible(leafNodeId) &&
-        editor.hitTestNodePoint(leafNodeId, point)
+        isNodePaintedAt(editor, leafNodeId, point)
       );
     });
   });
