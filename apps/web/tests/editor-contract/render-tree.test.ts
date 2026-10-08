@@ -189,6 +189,32 @@ describe("render tree", () => {
     expect(editor.getRenderTree().placedNodeIds).toEqual(["a"]);
   });
 
+  test("a dense group's layer survives an unrelated edit", () => {
+    const editor = new Editor();
+    const leaves = Array.from({ length: 301 }, (_, index) =>
+      shape(`d${index}`, "dense")
+    );
+
+    editor
+      .getState()
+      .loadNodes([
+        group("dense"),
+        ...leaves,
+        group("other"),
+        shape("x", "other"),
+      ] as never);
+
+    const tree = editor.getRenderTree();
+    const [denseLayer] = tree.items;
+
+    editor.updateNode("other", { opacity: 0.5 });
+
+    const next = editor.getRenderTree();
+
+    expect(next).not.toBe(tree);
+    expect(next.items[0]).toBe(denseLayer);
+  });
+
   test("a structural change keeps unchanged layers and the placed ids", () => {
     const editor = new Editor();
 

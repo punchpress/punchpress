@@ -102,7 +102,7 @@ const shareRenderTree = (
 
   const index = (items: RenderItem[]) => {
     for (const item of items) {
-      previousItems.set(item.nodeId, item);
+      previousItems.set(getItemKey(item), item);
 
       if (item.kind === "layer") {
         index(item.children);
@@ -134,7 +134,7 @@ const shareItems = (
   previousItems: Map<string, RenderItem>
 ): RenderItem[] => {
   const items = next.map((item) => {
-    return shareItem(previousItems.get(item.nodeId), item, previousItems);
+    return shareItem(previousItems.get(getItemKey(item)), item, previousItems);
   });
 
   return previous.length === items.length &&
@@ -174,6 +174,10 @@ const shareItem = (
 
   return { ...next, children };
 };
+
+// A dense group is both a layer and its own surface, so items are keyed by
+// kind as well as node id.
+const getItemKey = (item: RenderItem) => `${item.kind}:${item.nodeId}`;
 
 const haveSameIds = (previous: string[], next: string[]) => {
   return (
