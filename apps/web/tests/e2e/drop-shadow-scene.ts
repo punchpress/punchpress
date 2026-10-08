@@ -1,5 +1,6 @@
 // Scene for the drop-shadow sweep: hard, blurred, and rotated leaf shadows, a
-// translucent shadowed group, and a group shadow clipped by its artboard.
+// translucent shadowed group, a blurred group shadow, and a group shadow
+// clipped by its artboard.
 
 export const SHADOW_ARTBOARD_ID = "shadow-artboard";
 
@@ -133,6 +134,16 @@ export const SHADOW_DOCUMENT = JSON.stringify({
       { height: 100, width: 100, x: 1490, y: 600 },
       "#1f6feb"
     ),
+    // F: a single blurred group shadow (blur 40 → σ 20, the CSS drop-shadow
+    // path) 150 right of a square at 450..550 × 560..660. Its core at
+    // 600..700 stays dark; σ 40 would wash it out to ~60% black.
+    group("shadow-soft", { effects: [shadow({ blur: 40, x: 150, y: 0 })] }),
+    rect(
+      "shadow-soft-square",
+      "shadow-soft",
+      { height: 100, width: 100, x: 500, y: 610 },
+      "#1f6feb"
+    ),
   ],
   version: "1.12",
 });
@@ -161,6 +172,7 @@ export const SHADOW_SAMPLES = [
   sample("group: half fill", 200, 600, HALF_RED, 30),
   sample("group: half shadow", 265, 665, HALF_BLACK, 10),
   sample("edge: shadow inside the artboard", 1570, 600, BLACK, 10),
+  sample("soft group: shadow core", 650, 610, BLACK, 15),
 ];
 
 // Just outside the artboard, where the unclipped shadow would continue.

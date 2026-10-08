@@ -408,9 +408,10 @@ lands with stage 6:
   Leaf ink is the geometry frame (which holds the outside stroke reach) grown
   by miter tips and square caps.
 - **Group owners** composite on their render layer: a zero-size, stage-origin
-  `div`. One shadow uses CSS `drop-shadow()`, which is exactly the same shadow
-  (same blur-radius semantics) and much cheaper to re-filter while children
-  move; several shadows use CSS `filter: url()` over a stage-space SVG filter
+  `div`. One shadow uses CSS `drop-shadow()`, which is much cheaper to
+  re-filter while children move; its length is the Gaussian deviation, so it
+  takes `blur / 2`, like the SVG graph. Several shadows use CSS
+  `filter: url()` over a stage-space SVG filter
   (Chromium resolves numeric `userSpaceOnUse` regions on zero-size boxes),
   since chained `drop-shadow()` would shadow the earlier shadows. Export always
   writes the SVG graph. The ink is the

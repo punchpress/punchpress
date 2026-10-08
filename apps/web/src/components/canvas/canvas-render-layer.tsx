@@ -1,13 +1,12 @@
 import {
   buildEffectFilter,
-  type EffectPresentation,
   type RenderItem,
   type RenderLayer,
 } from "@punchpress/engine";
-import { toRgb } from "@punchpress/punch-schema";
 import { type CSSProperties, memo, useId } from "react";
 import { CanvasNode } from "./canvas-node/canvas-node";
 import { renderSvgElement } from "./canvas-node/svg-element";
+import { getCssDropShadow } from "./css-drop-shadow";
 import { useLayerComposite } from "./use-layer-composite";
 
 // One compositing boundary per group or artboard: a zero-size div at the
@@ -34,10 +33,8 @@ const CanvasRenderLayer = memo(function CanvasRenderLayer({
     style.opacity = layer.opacity;
   }
 
-  // One shadow is exactly a CSS drop-shadow() (same blur-radius semantics),
-  // which Chromium can composite without repainting the group's subtree;
-  // several shadows need the branched SVG graph, since chained drop-shadow()
-  // would shadow the earlier shadows.
+  // One shadow is a CSS drop-shadow(), which Chromium can composite without
+  // repainting the group's subtree; several need the branched SVG graph.
   const cssShadow = effects ? getCssDropShadow(effects) : null;
 
   if (cssShadow) {
@@ -70,17 +67,6 @@ const CanvasRenderLayer = memo(function CanvasRenderLayer({
     </div>
   );
 });
-
-const getCssDropShadow = ({ effects }: EffectPresentation) => {
-  if (effects.length !== 1) {
-    return null;
-  }
-
-  const [{ blur, color, opacity, x, y }] = effects;
-  const { b, g, r } = toRgb(color);
-
-  return `drop-shadow(${x}px ${y}px ${blur}px rgba(${r}, ${g}, ${b}, ${opacity}))`;
-};
 
 export const CanvasRenderItems = ({ items }: { items: RenderItem[] }) => {
   return items.map((item) => {
