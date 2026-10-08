@@ -826,7 +826,7 @@ test("selected vector container shows transform overlay", async ({ page }) => {
   await expectVectorTransformOverlay(page);
 });
 
-test("clicking unpainted space inside a selected vector clears selection", async ({
+test("clicking unpainted space inside a selected vector keeps it selected", async ({
   page,
 }) => {
   await gotoEditor(page);
@@ -860,6 +860,7 @@ test("clicking unpainted space inside a selected vector clears selection", async
     return;
   }
 
+  // The selection bounds are the selected object's hit area (Figma-style).
   await page.mouse.click(blankPoint.x, blankPoint.y);
 
   await expect
@@ -868,7 +869,7 @@ test("clicking unpainted space inside a selected vector clears selection", async
         return window.__PUNCHPRESS_EDITOR__?.selectedNodeIds || [];
       });
     })
-    .toEqual([]);
+    .toEqual(["vector-container"]);
 });
 
 test("clicking the vector row in layers shows transform overlay", async ({

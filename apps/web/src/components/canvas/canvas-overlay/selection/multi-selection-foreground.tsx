@@ -179,44 +179,6 @@ const getRotatePreviewDelta = (editor, nodeIds) => {
   return Number.isFinite(rotate.deltaRotation) ? rotate.deltaRotation : 0;
 };
 
-const isNodeOrDescendantHit = (editor, nodeId, canvasPoint) => {
-  if (editor.hitTestNodePoint(nodeId, canvasPoint)) {
-    return true;
-  }
-
-  return editor.getDescendantLeafNodeIds(nodeId).some((descendantNodeId) => {
-    return (
-      editor.isNodeEffectivelyVisible(descendantNodeId) &&
-      editor.hitTestNodePoint(descendantNodeId, canvasPoint)
-    );
-  });
-};
-
-const isNodeElementBoundsHit = (editor, nodeId, point) => {
-  const element =
-    editor.getNodeTransformElement(nodeId) || editor.getNodeElement(nodeId);
-  const rect = element?.getBoundingClientRect?.();
-
-  if (!rect) {
-    return false;
-  }
-
-  return (
-    point.x >= rect.left &&
-    point.x <= rect.right &&
-    point.y >= rect.top &&
-    point.y <= rect.bottom
-  );
-};
-
-const canDragFromNodeElementBounds = (editor, nodeId, nodeIds) => {
-  if (nodeIds.length > 1) {
-    return true;
-  }
-
-  return Boolean(editor.getNodeEditCapabilities(nodeId)?.hasExpandedHitBounds);
-};
-
 export const CanvasMultiSelectionForeground = ({
   isDraggable,
   isResizable,
@@ -309,25 +271,6 @@ export const CanvasMultiSelectionForeground = ({
       x: event.clientX,
       y: event.clientY,
     };
-    const didPressSelectedNode = nodeIds.some((nodeId) => {
-      return (
-        (startCanvasPoint &&
-          isNodeOrDescendantHit(editor, nodeId, startCanvasPoint)) ||
-        (canDragFromNodeElementBounds(editor, nodeId, nodeIds) &&
-          isNodeElementBoundsHit(editor, nodeId, startClientPoint))
-      );
-    });
-
-    if (!didPressSelectedNode) {
-      if (editor.activeTool === "pointer") {
-        event.preventDefault();
-        event.stopPropagation();
-        editor.clearSelection();
-      }
-
-      return;
-    }
-
     event.preventDefault();
     event.stopPropagation();
 
@@ -403,6 +346,12 @@ export const CanvasMultiSelectionForeground = ({
 
       if (dragSession) {
         editor.endSelectionDrag(dragSession, { cancel: cancel || !didMove });
+      }
+
+      if (!(cancel || didMove)) {
+        editor.clickInsideSelection(startCanvasPoint, {
+          shiftKey: event.shiftKey,
+        });
       }
     };
 

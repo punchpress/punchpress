@@ -41,8 +41,7 @@ export const clickEmptyCanvas = async (page) => {
   await page.mouse.click(point.x, point.y);
 };
 
-// Returns a painted point on the node, preferring its frame center.
-export const getNodeCenter = async (page, nodeId) => {
+const getNodeCenter = async (page, nodeId) => {
   const candidateNodeIds = await page.evaluate((requestedNodeId) => {
     const editor = window.__PUNCHPRESS_EDITOR__;
     const visualOwnerNodeId =

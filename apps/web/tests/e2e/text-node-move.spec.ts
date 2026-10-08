@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-import { getNodeCenter } from "./helpers/canvas";
 import {
   dragNodeBy,
   expectCoordinateShift,
@@ -299,14 +298,18 @@ test("keeps the selection box aligned after dropping a newly created text node",
 
   expect(nodeId).not.toBeNull();
 
-  await waitForNodeReady(page, nodeId);
+  const before = await waitForNodeReady(page, nodeId);
 
-  // The frame center can fall between glyphs, which is not a node hit.
-  const start = await getNodeCenter(page, nodeId);
-
-  await page.mouse.move(start.x, start.y);
+  await page.mouse.move(
+    before.elementRect.x + before.elementRect.width / 2,
+    before.elementRect.y + before.elementRect.height / 2
+  );
   await page.mouse.down();
-  await page.mouse.move(start.x + 140, start.y + 80, { steps: 12 });
+  await page.mouse.move(
+    before.elementRect.x + before.elementRect.width / 2 + 140,
+    before.elementRect.y + before.elementRect.height / 2 + 80,
+    { steps: 12 }
+  );
   await page.mouse.up();
 
   const samples = await samplePostDropSelectionFrames(
@@ -420,18 +423,22 @@ test("keeps a rotated selection preview aligned while dragging a text node", asy
 
   await page.locator(`[data-node-id="${nodeId}"]`).click();
 
-  await waitForNodeReady(page, nodeId);
+  const before = await waitForNodeReady(page, nodeId);
   const beforeHandles = await getMoveableHandleCenters(
     page,
     ".moveable-control-box.canvas-moveable"
   );
 
-  // The frame center can fall between glyphs, which is not a node hit.
-  const start = await getNodeCenter(page, nodeId);
-
-  await page.mouse.move(start.x, start.y);
+  await page.mouse.move(
+    before.elementRect.x + before.elementRect.width / 2,
+    before.elementRect.y + before.elementRect.height / 2
+  );
   await page.mouse.down();
-  await page.mouse.move(start.x + 140, start.y + 80, { steps: 12 });
+  await page.mouse.move(
+    before.elementRect.x + before.elementRect.width / 2 + 140,
+    before.elementRect.y + before.elementRect.height / 2 + 80,
+    { steps: 12 }
+  );
 
   await expect
     .poll(async () => {

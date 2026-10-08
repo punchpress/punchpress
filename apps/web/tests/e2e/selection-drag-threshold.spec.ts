@@ -152,8 +152,17 @@ test("multi-selection prewarm keeps sub-threshold motion inert", async ({
   await page.screenshot({
     path: testInfo.outputPath("multi-after-sub-threshold.png"),
   });
+  // A sub-threshold release is a click, which selects the clicked member.
+  await expect
+    .poll(async () => (await getSelectionSnapshot(page)).selectedNodeIds)
+    .toEqual(["shape-node"]);
 
-  await page.evaluate(() => window.__PUNCHPRESS_EDITOR__?.resetHistory());
+  await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    editor?.select("text-node");
+    editor?.toggleSelection("shape-node");
+    editor?.resetHistory();
+  });
   const beforeDragText = await getNodeSnapshot(page, "text-node");
   const beforeDragShape = await getNodeSnapshot(page, "shape-node");
 

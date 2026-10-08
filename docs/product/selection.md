@@ -24,7 +24,8 @@ tools.
 
 ## Targeting
 
-- Selection follows visible artwork under the pointer, not stale bounds.
+- Selection follows visible artwork under the pointer, not stale bounds,
+  except inside an existing selection (see below).
 - Hit testing respects transforms, visibility, layer order, focused groups, and
   active tool scope.
 - When visible objects overlap, the topmost eligible object wins.
@@ -33,6 +34,25 @@ tools.
 - Already-selected hidden vector child geometry may show edit chrome without
   changing normal hit priority.
 - PunchPress does not expose Auto-select modes or select-under cycling.
+
+## Pressing Inside a Selection
+
+Already-selected objects use their selection bounds as a hit area, as in
+Figma. Unselected objects keep visible-artwork hit testing.
+
+- Pressing anywhere inside the selection bounds and dragging moves the whole
+  selection, even from empty space (such as the middle of circle text) or from a
+  smaller unselected object drawn on top.
+- A press released without moving acts as a click on the visible artwork under
+  the pointer: an unselected object on top becomes the selection, a member of a
+  multi-selection becomes the only selection, and empty space keeps the current
+  selection.
+- Shift-click inside the bounds toggles the clicked object; Shift-click on empty
+  space keeps the selection. Shift-drag still moves the selection.
+- A selected group drags from anywhere inside its bounds; clicking a child keeps
+  the group selected until the group is drilled into.
+- Path editing stays a direct-edit mode: only the edited artwork drags, and a
+  press on empty space leaves path editing.
 
 ## Marquee
 

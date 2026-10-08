@@ -338,6 +338,10 @@ import {
 } from "./viewport/viewport-focus";
 import { moveViewportTo as moveEditorViewportTo } from "./viewport/viewport-move";
 import {
+  clickInsideSelection as clickEditorInsideSelection,
+  getSelectionPressIntent as getEditorSelectionPressIntent,
+} from "./selection/selection-press";
+import {
   getViewportCenter as getEditorViewportCenter,
   setViewport as setEditorViewport,
 } from "./viewport/viewport-queries";
@@ -1604,6 +1608,14 @@ export class Editor {
       this.commitCrop();
     }
     setEditorSelectedNodes(this, nodeIds);
+  }
+
+  getSelectionPressIntent(point) {
+    return getEditorSelectionPressIntent(this, point);
+  }
+
+  clickInsideSelection(point, options) {
+    return clickEditorInsideSelection(this, point, options);
   }
 
   toggleSelection(nodeId) {

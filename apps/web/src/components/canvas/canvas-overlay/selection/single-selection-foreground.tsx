@@ -49,19 +49,6 @@ const getResizePreviewFrame = (editor, nodeId) => {
 };
 const ROTATION_ZONE_SIZE = 56;
 
-const isNodeOrDescendantHit = (editor, nodeId, canvasPoint) => {
-  if (editor.hitTestNodePoint(nodeId, canvasPoint)) {
-    return true;
-  }
-
-  return editor.getDescendantLeafNodeIds(nodeId).some((descendantNodeId) => {
-    return (
-      editor.isNodeEffectivelyVisible(descendantNodeId) &&
-      editor.hitTestNodePoint(descendantNodeId, canvasPoint)
-    );
-  });
-};
-
 const getCanvasPoint = (editor, clientX, clientY) => {
   const host = editor.hostRef;
   const viewer = editor.viewerRef;
@@ -487,12 +474,13 @@ export const CanvasSingleSelectionForeground = ({
       event.clientX,
       event.clientY
     );
-    const didPressSelectedNode = Boolean(
-      startCanvasPoint &&
-        isNodeOrDescendantHit(editor, nodeId, startCanvasPoint)
-    );
+    if (!startCanvasPoint) {
+      return;
+    }
 
-    if (isPathEditing && !didPressSelectedNode) {
+    if (
+      editor.getSelectionPressIntent(startCanvasPoint) === "exit-path-editing"
+    ) {
       event.preventDefault();
       event.stopPropagation();
 
@@ -502,16 +490,6 @@ export const CanvasSingleSelectionForeground = ({
       }
 
       editor.stopPathEditing();
-      return;
-    }
-
-    if (!didPressSelectedNode) {
-      if (editor.activeTool === "pointer") {
-        event.preventDefault();
-        event.stopPropagation();
-        editor.clearSelection();
-      }
-
       return;
     }
 
@@ -602,6 +580,12 @@ export const CanvasSingleSelectionForeground = ({
 
       if (dragSession) {
         editor.endSelectionDrag(dragSession, { cancel: cancel || !didMove });
+      }
+
+      if (!(cancel || didMove)) {
+        editor.clickInsideSelection(startCanvasPoint, {
+          shiftKey: event.shiftKey,
+        });
       }
     };
 
