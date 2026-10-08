@@ -23,7 +23,6 @@ import {
   getMemoizedNodeArtState,
   getResizePreviewNode,
   selectNodeArtInputs,
-  selectNodeReadyState,
 } from "./node-art-state";
 import {
   clearSelectionFromUnpaintedNodeHit,
@@ -40,19 +39,21 @@ import {
 } from "./node-interactions";
 import { CanvasNodeRenderTree } from "./node-render-tree";
 
-const CanvasNodeShell = ({ children, isReady, nodeId }) => {
+// Every mounted shell runs its selectors on every store write, so a shell
+// subscribes only to what it renders; handlers read tool state when called.
+const CanvasNodeShell = ({ children, nodeId }) => {
   usePerformanceRenderCounter(PERF_COUNTERS.renderCanvasNode);
   const editor = useEditor();
-  const activeTool = useEditorValue((_, state) => state.activeTool);
-  const contextMenuNodeId = useEditorValue((editor) => {
-    return editor.getSelectionTargetNodeId(nodeId) || nodeId;
-  });
-  const spacePressed = useEditorValue((_, state) => state.spacePressed);
-  const isSelectionTargetSelected = useEditorValue((editor) => {
-    const targetNodeId = editor.getSelectionTargetNodeId(nodeId) || nodeId;
+  const { contextMenuNodeId, isSelectionTargetSelected } = useEditorValue(
+    (editor) => {
+      const targetNodeId = editor.getSelectionTargetNodeId(nodeId) || nodeId;
 
-    return editor.isSelected(targetNodeId);
-  });
+      return {
+        contextMenuNodeId: targetNodeId,
+        isSelectionTargetSelected: editor.isSelected(targetNodeId),
+      };
+    }
+  );
   const rasterHitArea = useEditorValue((editor) => {
     const node = editor.getNode(nodeId);
     const writableBounds = editor.getRasterWritableBounds(nodeId);
@@ -80,10 +81,7 @@ const CanvasNodeShell = ({ children, isReady, nodeId }) => {
         }}
       >
         <div
-          className={cn(
-            "canvas-node pointer-events-none absolute h-full w-full",
-            !isReady && "opacity-50"
-          )}
+          className="canvas-node pointer-events-none absolute h-full w-full"
           data-node-id={nodeId}
           data-selected={isSelectionTargetSelected ? "true" : "false"}
           ref={(element) => {
@@ -107,6 +105,7 @@ const CanvasNodeShell = ({ children, isReady, nodeId }) => {
                   cursorClassName
                 )}
                 onDoubleClick={(event) => {
+                  const { activeTool } = editor.getState();
                   const interactionNodeId = getCanvasInteractionNodeId(
                     editor,
                     activeTool,
@@ -122,6 +121,7 @@ const CanvasNodeShell = ({ children, isReady, nodeId }) => {
                   });
                 }}
                 onPointerDown={(event) => {
+                  const { activeTool, spacePressed } = editor.getState();
                   const pointerHandleStartedAt = performance.now();
 
                   try {
@@ -279,6 +279,8 @@ const CanvasNodeShell = ({ children, isReady, nodeId }) => {
                   }
                 }}
                 onPointerEnter={(event) => {
+                  const { activeTool, spacePressed } = editor.getState();
+
                   if (spacePressed || activeTool !== "pointer") {
                     return;
                   }
@@ -302,6 +304,8 @@ const CanvasNodeShell = ({ children, isReady, nodeId }) => {
                   editor.setHoveredNode(null);
                 }}
                 onPointerMove={(event) => {
+                  const { activeTool, spacePressed } = editor.getState();
+
                   if (
                     spacePressed ||
                     activeTool !== "pointer" ||
@@ -447,9 +451,6 @@ const CanvasNodeArtContent = ({ nodeId }) => {
 };
 
 const CanvasNodeComponent = ({ nodeId }) => {
-  const isReady = useEditorValue((editor, state) => {
-    return selectNodeReadyState(editor, state, nodeId);
-  });
   const nodeExists = useEditorValue((editor) => {
     return Boolean(editor.getNode(nodeId));
   });
@@ -459,7 +460,7 @@ const CanvasNodeComponent = ({ nodeId }) => {
   }
 
   return (
-    <CanvasNodeShell isReady={isReady} nodeId={nodeId}>
+    <CanvasNodeShell nodeId={nodeId}>
       <CanvasNodeArtContent nodeId={nodeId} />
     </CanvasNodeShell>
   );

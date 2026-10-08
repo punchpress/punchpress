@@ -86,10 +86,6 @@ export const selectNodeArtState = (
   };
 };
 
-export const selectNodeReadyState = (editor, _state, nodeId) => {
-  return Boolean(editor.getNode(nodeId));
-};
-
 export const selectNodeArtInputs = (editor, state, nodeId) => {
   return {
     editingNodeId: state.editingNodeId,
