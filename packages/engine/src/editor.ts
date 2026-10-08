@@ -222,7 +222,6 @@ import {
   getNodeFrameFromGeometry,
 } from "./nodes/node-capabilities";
 import {
-  getSelectionTargetNodeId,
   isArtboardNode,
   isGroupNode,
 } from "./nodes/node-tree";
@@ -850,8 +849,18 @@ export class Editor {
     return this.nodeTree.getEffectiveSelectionNodeIds(this.nodes, nodeIds);
   }
 
+  // Changes whenever the node's durable art inputs in the document change:
+  // the node, its subtree, or an ancestor.
+  getNodeArtRevision(nodeId) {
+    return this.nodeTree.getArtRevision(this.nodes, nodeId);
+  }
+
   getSelectionTargetNodeId(nodeId) {
-    return getSelectionTargetNodeId(this.nodes, nodeId, this.focusedGroupId);
+    return this.nodeTree.getSelectionTargetNodeId(
+      this.nodes,
+      nodeId,
+      this.focusedGroupId
+    );
   }
 
   getPathEditingTargetNodeId(nodeId = this.selectedNodeId) {

@@ -2,9 +2,11 @@ import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
 import {
   getNodeParentId,
   hasEditableVectorContours,
+  isArtboardNode,
   isContainerNode,
   isContentContainerNode,
 } from "../nodes/node-tree";
+import { NodeRevisionIndex } from "./node-revision-index";
 
 const getGeneratedLayerLabelKey = (node) => {
   if (!node) {
@@ -28,6 +30,7 @@ export interface NodeTreeManager {
   layerMetaById: any;
   nodes: any;
   nodesById: any;
+  revisions: NodeRevisionIndex;
 }
 
 export class NodeTreeManager {
@@ -39,6 +42,7 @@ export class NodeTreeManager {
     this.layerMetaById = new Map();
     this.nodes = null;
     this.nodesById = new Map();
+    this.revisions = new NodeRevisionIndex();
   }
 
   sync(nodes) {
@@ -96,6 +100,12 @@ export class NodeTreeManager {
       });
     }
 
+    this.revisions.update({
+      childIdsByParent,
+      nodesById,
+      previousChildIdsByParent: this.childIdsByParent,
+      previousNodesById: this.nodesById,
+    });
     this.childIdsByParent = childIdsByParent;
     this.layerMetaById = layerMetaById;
     this.nodes = nodes;
@@ -196,10 +206,74 @@ export class NodeTreeManager {
     return [...new Set(effectiveNodeIds)];
   }
 
+  // Inside a focused group, its descendants are their own targets and
+  // outside nodes resolve to their root ancestor. Otherwise a click targets
+  // the top-level ancestor, stopping beneath an artboard.
+  getSelectionTargetNodeId(nodes, nodeId, focusedGroupId) {
+    if (!nodeId) {
+      return null;
+    }
+
+    this.sync(nodes);
+
+    const targetNode = this.nodesById.get(nodeId);
+
+    if (!targetNode) {
+      return null;
+    }
+
+    if (focusedGroupId) {
+      return nodeId === focusedGroupId ||
+        this.isDescendantOf(nodes, nodeId, focusedGroupId)
+        ? nodeId
+        : this.getRootAncestorId(targetNode);
+    }
+
+    let currentNode = targetNode;
+
+    while (getNodeParentId(currentNode) !== ROOT_PARENT_ID) {
+      const parentNode = this.nodesById.get(getNodeParentId(currentNode));
+
+      if (!parentNode) {
+        break;
+      }
+
+      if (isArtboardNode(parentNode)) {
+        return currentNode.id;
+      }
+
+      currentNode = parentNode;
+    }
+
+    return currentNode.id;
+  }
+
+  getArtRevision(nodes, nodeId) {
+    this.sync(nodes);
+
+    return this.revisions.getArtRevision(this.nodesById, nodeId);
+  }
+
   getLayerMeta(nodes, nodeId) {
     this.sync(nodes);
 
     return this.layerMetaById.get(nodeId) || null;
+  }
+
+  getRootAncestorId(node) {
+    let currentNode = node;
+
+    while (getNodeParentId(currentNode) !== ROOT_PARENT_ID) {
+      const parentNode = this.nodesById.get(getNodeParentId(currentNode));
+
+      if (!parentNode) {
+        break;
+      }
+
+      currentNode = parentNode;
+    }
+
+    return currentNode.id;
   }
 
   resetGeneratedLayerLabels() {

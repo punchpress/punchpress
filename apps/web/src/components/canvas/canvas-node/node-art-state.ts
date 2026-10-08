@@ -96,8 +96,7 @@ export const selectNodeArtInputs = (editor, state, nodeId) => {
     editingNodeId: state.editingNodeId,
     editingText: state.editingNodeId === nodeId ? state.editingText : null,
     fontRevision: state.fontRevision,
-    node: editor.getNode(nodeId),
-    nodes: state.nodes,
+    revision: editor.getNodeArtRevision(nodeId),
   };
 };
 

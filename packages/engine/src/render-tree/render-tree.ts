@@ -81,7 +81,13 @@ export const getRenderTree = (editor): RenderTree => {
     return cached.tree;
   }
 
-  const tree = buildRenderTree(editor, inputs);
+  const builtTree = buildRenderTree(editor, inputs);
+  // Most document edits change a node's content, not paint order or layer
+  // opacity. Keeping the tree identity lets the canvas skip re-placing shells.
+  const tree =
+    cached && haveSameItems(cached.tree.items, builtTree.items)
+      ? cached.tree
+      : builtTree;
 
   cacheByEditor.set(editor, { inputs, tree });
 
@@ -100,10 +106,7 @@ const buildRenderTree = (editor, inputs: RenderTreeInputs): RenderTree => {
     }
 
     const content = unionBounds(
-      editor
-        .getChildNodeIds(node.id)
-        .map(readInk)
-        .filter(Boolean) as Bounds[]
+      editor.getChildNodeIds(node.id).map(readInk).filter(Boolean) as Bounds[]
     );
 
     return getEffectPresentation(effects, content);
@@ -236,4 +239,37 @@ export const hasShadowedGroup = (editor, nodeId: string): boolean => {
         hasShadowedGroup(editor, childId))
     );
   });
+};
+
+const haveSameItems = (previous: RenderItem[], next: RenderItem[]) => {
+  if (previous.length !== next.length) {
+    return false;
+  }
+
+  return next.every((item, index) => {
+    const previousItem = previous[index];
+
+    if (
+      previousItem.kind !== item.kind ||
+      previousItem.nodeId !== item.nodeId
+    ) {
+      return false;
+    }
+
+    if (item.kind !== "layer" || previousItem.kind !== "layer") {
+      return true;
+    }
+
+    return (
+      previousItem.opacity === item.opacity &&
+      haveSameValue(previousItem.clip, item.clip) &&
+      haveSameValue(previousItem.effects, item.effects) &&
+      haveSameItems(previousItem.children, item.children)
+    );
+  });
+};
+
+// Clips and effect presentations are small plain values rebuilt per build.
+const haveSameValue = (previous: unknown, next: unknown) => {
+  return previous === next || JSON.stringify(previous) === JSON.stringify(next);
 };

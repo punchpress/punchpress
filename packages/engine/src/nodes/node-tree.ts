@@ -109,65 +109,6 @@ export const getTreeScopeParentId = (focusedGroupId) => {
   return focusedGroupId || ROOT_PARENT_ID;
 };
 
-const getRootAncestorId = (nodesById, node) => {
-  let currentNode = node;
-
-  while (currentNode && getNodeParentId(currentNode) !== ROOT_PARENT_ID) {
-    const parentNode = nodesById.get(getNodeParentId(currentNode)) || null;
-
-    if (!parentNode) {
-      break;
-    }
-
-    currentNode = parentNode;
-  }
-
-  return currentNode?.id || node?.id || null;
-};
-
-export const getSelectionTargetNodeId = (nodes, nodeId, focusedGroupId) => {
-  if (!nodeId) {
-    return null;
-  }
-
-  const nodesById = createNodeMap(nodes);
-  const targetNode = nodesById.get(nodeId) || null;
-
-  if (!targetNode) {
-    return null;
-  }
-
-  const scopeParentId = getTreeScopeParentId(focusedGroupId);
-  const isInsideFocusedGroup = focusedGroupId
-    ? nodeId === focusedGroupId || isDescendantOf(nodes, nodeId, focusedGroupId)
-    : false;
-
-  if (focusedGroupId && !isInsideFocusedGroup) {
-    return getRootAncestorId(nodesById, targetNode) || targetNode.id;
-  }
-
-  if (focusedGroupId && isInsideFocusedGroup) {
-    return targetNode.id;
-  }
-
-  let currentNode = targetNode;
-
-  while (currentNode && getNodeParentId(currentNode) !== scopeParentId) {
-    const parentNode = nodesById.get(getNodeParentId(currentNode)) || null;
-    if (!parentNode) {
-      break;
-    }
-
-    if (isArtboardNode(parentNode)) {
-      return currentNode.id;
-    }
-
-    currentNode = parentNode;
-  }
-
-  return currentNode?.id || targetNode.id;
-};
-
 export const getSubtreeNodeIds = (nodes, nodeId) => {
   const childIdsByParent = getChildIdsByParent(nodes);
   const subtreeNodeIds: string[] = [];

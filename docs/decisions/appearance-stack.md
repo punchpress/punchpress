@@ -313,7 +313,9 @@ group stays one surface unless it is the focused group, or the text or path
 being edited sits inside it; then every group on that path expands. Focus
 alone keeps dense ancestors collapsed, since deep hit testing reaches into
 surfaces. Previews never write the store, so the tree stays referentially
-stable through gestures.
+stable through gestures. Durable edits that leave paint order, visibility,
+and layer opacity unchanged also keep the tree's identity, so a property
+edit does not re-place every shell.
 
 **Editing artwork.** The text-edit preview renders in its node's tree slot,
 so group opacity and effects apply. Caret and input chrome stay outside the

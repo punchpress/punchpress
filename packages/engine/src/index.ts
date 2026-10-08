@@ -103,7 +103,6 @@ export {
   getChildNodeIds,
   getChildNodes,
   getDescendantLeafNodeIds,
-  getSelectionTargetNodeId,
   getSubtreeNodeIds,
   getTreeScopeParentId,
   isArtboardNode,

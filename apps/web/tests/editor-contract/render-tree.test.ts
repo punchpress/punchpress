@@ -124,17 +124,28 @@ describe("render tree", () => {
     expect(editing.placedNodeIds).not.toContain("outer");
   });
 
-  test("the tree keeps its identity until its inputs change", () => {
+  test("the tree keeps its identity until its structure changes", () => {
     const editor = new Editor();
 
-    editor.getState().loadNodes([group("g"), shape("a", "g")] as never);
+    editor
+      .getState()
+      .loadNodes([group("g"), shape("a", "g"), shape("b", "g")] as never);
 
     const tree = editor.getRenderTree();
 
     editor.setHoveredNode("a");
     expect(editor.getRenderTree()).toBe(tree);
 
+    // Leaf content edits repaint the leaf without re-placing every shell.
     editor.updateNode("a", { opacity: 0.4 });
-    expect(editor.getRenderTree()).not.toBe(tree);
+    expect(editor.getRenderTree()).toBe(tree);
+
+    editor.updateNode("g", { opacity: 0.5 });
+    const layerOpacityTree = editor.getRenderTree();
+    expect(layerOpacityTree).not.toBe(tree);
+
+    editor.updateNode("b", { visible: false });
+    expect(editor.getRenderTree()).not.toBe(layerOpacityTree);
+    expect(editor.getRenderTree().placedNodeIds).toEqual(["a"]);
   });
 });
