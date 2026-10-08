@@ -27,7 +27,12 @@ export const createDocumentChange = (beforeNodes, afterNodes) => {
       return [];
     }
 
-    if (getNodeSignature(beforeNode) === getNodeSignature(afterNode)) {
+    // Writes are immutable, so an identical reference is an unchanged node;
+    // distinct references still compare by value.
+    if (
+      beforeNode === afterNode ||
+      getNodeSignature(beforeNode) === getNodeSignature(afterNode)
+    ) {
       return [];
     }
 

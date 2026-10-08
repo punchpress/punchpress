@@ -480,8 +480,9 @@ export class Editor {
       applyState: (nodes) => {
         const previousSelectedNodeIds = this.selectedNodeIds;
         this.getState().loadNodes(nodes);
+        const restoredNodeIds = new Set(nodes.map((node) => node.id));
         const nextSelectedNodeIds = previousSelectedNodeIds.filter((nodeId) => {
-          return nodes.some((node) => node.id === nodeId);
+          return restoredNodeIds.has(nodeId);
         });
 
         if (nextSelectedNodeIds.length > 0) {

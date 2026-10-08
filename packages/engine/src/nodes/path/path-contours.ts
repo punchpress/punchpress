@@ -41,13 +41,25 @@ export const normalizePathNodeContours = (node) => {
     return node;
   }
 
-  const primaryContour = Array.isArray(node.contours)
-    ? node.contours[0]
-    : null;
+  const primaryContour = Array.isArray(node.contours) ? node.contours[0] : null;
+
+  // Already normalized: keep the object so undo, load, and unrelated writes
+  // preserve node identity (and every cache keyed on it).
+  if (
+    primaryContour &&
+    Array.isArray(node.segments) &&
+    node.segments === primaryContour.segments &&
+    typeof node.closed === "boolean" &&
+    node.closed === primaryContour.closed
+  ) {
+    return node;
+  }
+
   const hasLegacyContourPatch =
     Array.isArray(node.segments) &&
     (node.segments !== primaryContour?.segments ||
-      (typeof node.closed === "boolean" && node.closed !== primaryContour.closed));
+      (typeof node.closed === "boolean" &&
+        node.closed !== primaryContour.closed));
   const contours = hasLegacyContourPatch
     ? [
         {
