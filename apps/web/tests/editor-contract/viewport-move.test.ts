@@ -30,12 +30,11 @@ const installFakeRaf = () => {
 };
 
 // Mirrors the canvas: react-infinite-viewer echoes programmatic moves through
-// its scroll handler, which marks the viewport as interacting before syncing.
+// its scroll handler, which hands the camera to the engine.
 const mountEchoingViewport = (editor: Editor) => {
   let current = { x: 0, y: 0, zoom: 1 };
   const echo = () => {
-    editor.setViewportInteracting(true);
-    editor.setViewport(current);
+    editor.syncViewportFromViewer();
   };
 
   (editor as any).viewerRef = {
@@ -62,7 +61,7 @@ const mountEchoingViewport = (editor: Editor) => {
 };
 
 describe("programmatic viewport moves", () => {
-  test("moving the viewport writes the store and ends the echoed interaction", () => {
+  test("moving the viewport writes the store and ignores its own echoes", () => {
     const editor = new Editor();
 
     mountEchoingViewport(editor);

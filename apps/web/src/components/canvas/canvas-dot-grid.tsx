@@ -1,4 +1,5 @@
 import { useId } from "react";
+import { useEditorViewportValue } from "../../editor-react/use-editor-viewport-value";
 import {
   DOT_GRID_STEPS,
   getCanvasDotGridBucketProgress,
@@ -11,16 +12,15 @@ interface CanvasDotGridProps {
   originX: number;
   originY: number;
   stageMargin: number;
-  zoom: number;
 }
 
 export const CanvasDotGrid = ({
   originX,
   originY,
   stageMargin,
-  zoom,
 }: CanvasDotGridProps) => {
   const id = useId().replace(/:/g, "_");
+  const zoom = useEditorViewportValue((editor) => editor.zoom);
 
   const activeStepIndex = getCanvasDotGridStepIndex(zoom);
   const activeProgress = getCanvasDotGridBucketProgress(zoom, activeStepIndex);

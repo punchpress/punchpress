@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorSurfaceValue } from "../../../editor-react/use-editor-surface-value";
+import { useEditorViewportValue } from "../../../editor-react/use-editor-viewport-value";
 import { getCanvas2dRasterDisplay } from "../../../platform/raster/canvas2d-raster-runtime";
 import {
   CanvasExactRaster,
@@ -23,7 +24,6 @@ export const CanvasRasterImage = (props) => {
   const editor = useEditor();
   const activeClipId = useId();
   const residentSurface = useResidentRasterSurface(props);
-  const zoom = useEditorSurfaceValue((_, state) => state.viewport.zoom);
   const activePresentationViewport = useEditorSurfaceValue((activeEditor) =>
     activeEditor.rasterStrokeRuntime.getActivePresentationViewport(props.nodeId)
   );
@@ -51,16 +51,20 @@ export const CanvasRasterImage = (props) => {
     residentSurface?.canvas.height ?? Math.max(1, Math.round(display.height));
   const sampleWidth =
     residentSurface?.canvas.width ?? Math.max(1, Math.round(display.width));
-  const sampling = getRasterSampling(
-    getRasterPresentationFootprint(editor, {
-      displayedHeight: display.height,
-      displayedWidth: display.width,
-      nodeId: props.nodeId,
-      renderRootNodeId: props.renderRootNodeId ?? props.nodeId,
-      sampleHeight,
-      sampleWidth,
-      zoom,
-    })
+  // Smooth and exact sampling switch as the live camera crosses the
+  // magnification threshold, mid-gesture included.
+  const sampling = useEditorViewportValue((activeEditor) =>
+    getRasterSampling(
+      getRasterPresentationFootprint(activeEditor, {
+        displayedHeight: display.height,
+        displayedWidth: display.width,
+        nodeId: props.nodeId,
+        renderRootNodeId: props.renderRootNodeId ?? props.nodeId,
+        sampleHeight,
+        sampleWidth,
+        zoom: activeEditor.zoom,
+      })
+    )
   );
   const pixelGridProps = {
     baseHeight: props.baseHeight,

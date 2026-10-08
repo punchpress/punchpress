@@ -3,6 +3,7 @@ import { useCallback, useSyncExternalStore } from "react";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorSelectionDragPreviewValue } from "../../../editor-react/use-editor-selection-drag-preview-value";
 import { useEditorSelectionDragSurfaceValue } from "../../../editor-react/use-editor-selection-drag-surface-value";
+import { useEditorViewportValue } from "../../../editor-react/use-editor-viewport-value";
 import { CanvasPixelGridLines } from "../canvas-pixel-grid-lines";
 import {
   getPixelGridPlane,
@@ -75,7 +76,6 @@ export const CanvasRasterPixelGrid = ({
       devicePixelRatio:
         typeof window === "undefined" ? 1 : window.devicePixelRatio,
       node: shouldRender ? getPixelGridPreviewNode(target.node, preview) : null,
-      zoom: store.viewport.zoom,
     };
   });
   const runtimeSampleSize = useRasterSampleSize(
@@ -89,10 +89,6 @@ export const CanvasRasterPixelGrid = ({
     }
   );
 
-  if (!(state.bounds && state.node)) {
-    return null;
-  }
-
   const sampleSize = {
     height: sampleHeight || runtimeSampleSize.height,
     width: sampleWidth || runtimeSampleSize.width,
@@ -100,17 +96,25 @@ export const CanvasRasterPixelGrid = ({
   const presentedPlane = htmlHost ?? displayPlane;
   const displayedHeight = presentedPlane?.height ?? baseHeight ?? height;
   const displayedWidth = presentedPlane?.width ?? baseWidth ?? width;
-  const footprint = getRasterPresentationFootprint(editor, {
-    displayedHeight,
-    displayedWidth,
-    nodeId,
-    renderRootNodeId,
-    sampleHeight: sampleSize.height,
-    sampleWidth: sampleSize.width,
-    zoom: state.zoom,
-  });
+  const isGridTarget = Boolean(state.bounds && state.node);
+  // Re-renders only when the live camera crosses the grid threshold.
+  const showPixelGrid = useEditorViewportValue((activeEditor) =>
+    isGridTarget
+      ? shouldShowPixelGrid(
+          getRasterPresentationFootprint(activeEditor, {
+            displayedHeight,
+            displayedWidth,
+            nodeId,
+            renderRootNodeId,
+            sampleHeight: sampleSize.height,
+            sampleWidth: sampleSize.width,
+            zoom: activeEditor.zoom,
+          })
+        )
+      : false
+  );
 
-  if (!shouldShowPixelGrid(footprint)) {
+  if (!(isGridTarget && showPixelGrid)) {
     return null;
   }
 

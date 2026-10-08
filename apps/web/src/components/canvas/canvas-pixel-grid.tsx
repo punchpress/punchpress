@@ -9,6 +9,7 @@ import {
   shouldShowPixelGrid,
 } from "@punchpress/engine";
 import { useEditorSelectionDragSurfaceValue } from "../../editor-react/use-editor-selection-drag-surface-value";
+import { useEditorViewportValue } from "../../editor-react/use-editor-viewport-value";
 import { CanvasPixelGridLines } from "./canvas-pixel-grid-lines";
 import {
   getPixelGridPreviewNode,
@@ -22,36 +23,35 @@ export const CanvasPixelGrid = () => {
     const node = frameTarget
       ? getPixelGridPreviewNode(frameTarget.node, editor.selectionDragPreview)
       : null;
-    const showPixelGrid =
-      node &&
-      shouldShowPixelGrid(
-        getRasterPixelFootprint({
-          displayedHeight: 1,
-          displayedWidth: 1,
-          sampleHeight: 1,
-          sampleWidth: 1,
-          scaleX: getNodeScaleX(node) ?? 1,
-          scaleY: getNodeScaleY(node) ?? 1,
-          zoom: store.viewport.zoom,
-        })
-      );
 
     return {
       cropActive: Boolean(store.rasterCropSession),
       devicePixelRatio:
         typeof window === "undefined" ? 1 : window.devicePixelRatio,
-      target:
-        frameTarget && node && showPixelGrid
-          ? {
-              ...frameTarget,
-              node,
-            }
-          : null,
-      zoom: store.viewport.zoom,
+      target: frameTarget && node ? { ...frameTarget, node } : null,
     };
   });
+  const targetNode = state.target?.node;
+  // The grid appears and disappears as the live camera crosses the pixel
+  // footprint threshold, mid-gesture included.
+  const showPixelGrid = useEditorViewportValue((editor) =>
+    Boolean(
+      targetNode &&
+        shouldShowPixelGrid(
+          getRasterPixelFootprint({
+            displayedHeight: 1,
+            displayedWidth: 1,
+            sampleHeight: 1,
+            sampleWidth: 1,
+            scaleX: getNodeScaleX(targetNode) ?? 1,
+            scaleY: getNodeScaleY(targetNode) ?? 1,
+            zoom: editor.zoom,
+          })
+        )
+    )
+  );
 
-  if (!state.target) {
+  if (!(state.target && showPixelGrid)) {
     return null;
   }
 

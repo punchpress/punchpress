@@ -9,6 +9,7 @@ import { type PointerEvent as ReactPointerEvent, useId } from "react";
 import { Button } from "@/components/ui/button";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
+import { useEditorViewportValue } from "../../../editor-react/use-editor-viewport-value";
 import { CanvasRasterImage } from "../raster/canvas-raster-image";
 
 type CropHandle = "move" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "nw";
@@ -178,16 +179,19 @@ export const CanvasRasterCropOverlay = () => {
       node: node?.type === "image" ? node : null,
       previewNode: previewNode?.type === "image" ? previewNode : null,
       rect: session?.rect || null,
-      zoom: store.viewport.zoom,
     };
   });
+  const isCropping = Boolean(state.node);
+  const zoom = useEditorViewportValue((activeEditor) =>
+    isCropping ? activeEditor.zoom : 1
+  );
   const clipId = `raster-crop-${useId().replaceAll(":", "")}`;
 
   if (!(state.node && state.previewNode && state.frame && state.rect)) {
     return null;
   }
 
-  const { frame, node, previewNode, rect, zoom } = state;
+  const { frame, node, previewNode, rect } = state;
   const handleSize = 12 / zoom;
   const sideLength = 24 / zoom;
   const previewRect = { ...rect, x: 0, y: 0 };

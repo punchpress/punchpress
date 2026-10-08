@@ -63,4 +63,6 @@ export const setViewport = (editor, viewport) => {
   ) {
     editor.getState().setViewport(nextViewport);
   }
+
+  return didChange;
 };

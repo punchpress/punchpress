@@ -1,6 +1,7 @@
 import { hasPointerMovedAtLeast, round } from "@punchpress/engine";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorSelectionDragSurfaceValue } from "../../editor-react/use-editor-selection-drag-surface-value";
+import { useEditorViewportValue } from "../../editor-react/use-editor-viewport-value";
 
 const ARTBOARD_LABEL_GAP_PX = 28;
 const MIN_LABEL_ZOOM = 0.01;
@@ -25,16 +26,28 @@ const getCanvasPoint = (editor, clientX, clientY) => {
   };
 };
 
-// Primitive per-artboard values keep unrelated document edits from
-// re-rendering artboard chrome.
+// Visible artboard ids depend only on the node list, so one scan serves every
+// store update and preview render until the nodes change.
+const artboardIdsByNodes = new WeakMap();
+
 const selectArtboardIds = (editor) => {
-  return editor.nodes
-    .filter((node) => node.type === "artboard")
-    .filter((node) => editor.isNodeEffectivelyVisible(node.id))
-    .map((node) => node.id);
+  const nodes = editor.nodes;
+  let artboardIds = artboardIdsByNodes.get(nodes);
+
+  if (!artboardIds) {
+    artboardIds = nodes
+      .filter((node) => node.type === "artboard")
+      .filter((node) => editor.isNodeEffectivelyVisible(node.id))
+      .map((node) => node.id);
+    artboardIdsByNodes.set(nodes, artboardIds);
+  }
+
+  return artboardIds;
 };
 
-const selectArtboard = (editor, state, nodeId) => {
+// Primitive per-artboard values keep unrelated document edits from
+// re-rendering artboard chrome.
+const selectArtboard = (editor, nodeId) => {
   const node = editor.getNode(nodeId);
   const bounds = editor.getNodeRenderFrame(nodeId)?.bounds;
 
@@ -42,7 +55,6 @@ const selectArtboard = (editor, state, nodeId) => {
     return null;
   }
 
-  const zoom = Math.max(state.viewport.zoom, MIN_LABEL_ZOOM);
   const previewDelta = editor.selectionDragPreview?.nodeIds?.includes(nodeId)
     ? editor.selectionDragPreview.delta
     : { x: 0, y: 0 };
@@ -50,8 +62,6 @@ const selectArtboard = (editor, state, nodeId) => {
   return {
     background: node.background,
     height: bounds.height,
-    labelScale: 1 / zoom,
-    labelYOffset: ARTBOARD_LABEL_GAP_PX / zoom,
     minX: bounds.minX + previewDelta.x,
     minY: bounds.minY + previewDelta.y,
     name: node.name,
@@ -61,8 +71,8 @@ const selectArtboard = (editor, state, nodeId) => {
 };
 
 const useArtboard = (nodeId) => {
-  return useEditorSelectionDragSurfaceValue((editor, state) =>
-    selectArtboard(editor, state, nodeId)
+  return useEditorSelectionDragSurfaceValue((editor) =>
+    selectArtboard(editor, nodeId)
   );
 };
 
@@ -208,6 +218,10 @@ const CanvasArtboardBody = ({ nodeId }) => {
 const CanvasArtboardLabel = ({ nodeId }) => {
   const editor = useEditor();
   const artboard = useArtboard(nodeId);
+  // Labels keep a constant screen size, so they follow the live camera.
+  const zoom = useEditorViewportValue((activeEditor) =>
+    Math.max(activeEditor.zoom, MIN_LABEL_ZOOM)
+  );
 
   if (!artboard) {
     return null;
@@ -229,8 +243,8 @@ const CanvasArtboardLabel = ({ nodeId }) => {
       }
       style={{
         left: `${artboard.minX}px`,
-        top: `${artboard.minY - artboard.labelYOffset}px`,
-        transform: `scale(${artboard.labelScale})`,
+        top: `${artboard.minY - ARTBOARD_LABEL_GAP_PX / zoom}px`,
+        transform: `scale(${1 / zoom})`,
         transformOrigin: "top left",
       }}
       title={`${artboard.name} - ${sizeLabel}`}

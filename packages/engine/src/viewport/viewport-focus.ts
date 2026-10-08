@@ -35,20 +35,37 @@ export const zoomTo = (editor, zoom) => {
   return true;
 };
 
+// Discrete zoom keeps the viewport center fixed.
 const applyDiscreteZoom = (editor, zoom) => {
-  const viewer = editor.viewerRef;
-  const wasInteracting = editor.viewportInteracting;
+  const size = getViewportSize(editor);
+  const { x, y, zoom: currentZoom } = editor.viewport;
 
-  viewer.setZoom(zoom);
-  editor.setViewport({
-    x: viewer.getScrollLeft?.() ?? editor.viewport.x ?? 0,
-    y: viewer.getScrollTop?.() ?? editor.viewport.y ?? 0,
-    zoom: viewer.getZoom?.() ?? zoom,
-  });
-  if (!wasInteracting) {
-    editor.setViewportInteracting(false);
+  if (!size) {
+    applyViewport(editor, { zoom });
+    return;
   }
-  editor.onViewportChange?.();
+
+  applyViewport(editor, {
+    x: x + size.width / 2 / currentZoom - size.width / 2 / zoom,
+    y: y + size.height / 2 / currentZoom - size.height / 2 / zoom,
+    zoom,
+  });
+};
+
+const getViewportSize = (editor) => {
+  const viewer = editor.viewerRef;
+  const width = viewer?.getContainerWidth?.();
+  const height = viewer?.getContainerHeight?.();
+
+  if (width > 0 && height > 0) {
+    return { height, width };
+  }
+
+  const rect = editor.hostRef?.getBoundingClientRect?.();
+
+  return rect?.width > 0 && rect?.height > 0
+    ? { height: rect.height, width: rect.width }
+    : null;
 };
 
 export const cancelPendingViewportFocus = (editor) => {
@@ -162,7 +179,16 @@ const hasRenderedElement = (editor, node) => {
   return false;
 };
 
-export const focusCanvasBoundsInViewport = (editor, bounds, options: { paddingX?: number; paddingY?: number; padding?: number; maxZoom?: number } = {}) => {
+export const focusCanvasBoundsInViewport = (
+  editor,
+  bounds,
+  options: {
+    paddingX?: number;
+    paddingY?: number;
+    padding?: number;
+    maxZoom?: number;
+  } = {}
+) => {
   const viewer = editor.viewerRef;
   const host = editor.hostRef;
 

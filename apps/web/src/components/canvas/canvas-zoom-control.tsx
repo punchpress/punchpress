@@ -1,21 +1,14 @@
 import { MAX_ZOOM, MIN_ZOOM } from "@punchpress/engine";
-import { useCallback, useRef, useState, useSyncExternalStore } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useEditor } from "../../editor-react/use-editor";
+import { useEditorViewportValue } from "../../editor-react/use-editor-viewport-value";
 
 const ZOOM_DOUBLE_DISTANCE = 120;
 
 export const CanvasZoomControl = () => {
   const editor = useEditor();
-  useSyncExternalStore(
-    useCallback(
-      (listener) => editor.subscribeViewportPresentation(listener),
-      [editor]
-    ),
-    useCallback(() => editor.getViewportPresentationRevision(), [editor]),
-    () => 0
-  );
-  const zoom = editor.zoom;
+  const zoom = useEditorViewportValue((activeEditor) => activeEditor.zoom);
   const dragRef = useRef<{
     pointerId: number;
     startX: number;

@@ -1,5 +1,6 @@
 import { MAX_ZOOM, MIN_ZOOM } from "../constants";
 import { clamp } from "../primitives/math";
+import { applyViewport } from "./viewport-move";
 
 const MAX_WHEEL_ZOOM_STEP = 10;
 const WHEEL_ZOOM_DIVISOR = 100;
@@ -80,15 +81,5 @@ export const zoomViewportFromWheel = (editor, { clientX, clientY, deltaY }) => {
     return false;
   }
 
-  if (viewer.setTo) {
-    viewer.setTo(nextViewport);
-  } else {
-    viewer.scrollTo?.(nextViewport.x, nextViewport.y);
-    viewer.setZoom?.(nextViewport.zoom);
-  }
-
-  editor.setViewport(nextViewport);
-  editor.onViewportChange?.();
-
-  return true;
+  return applyViewport(editor, nextViewport);
 };

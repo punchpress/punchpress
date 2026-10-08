@@ -5,6 +5,7 @@ import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { useEditor } from "../../../../editor-react/use-editor";
 import { useEditorSelectionDragPreviewValue } from "../../../../editor-react/use-editor-selection-drag-preview-value";
 import { useEditorValue } from "../../../../editor-react/use-editor-value";
+import { useEditorViewportValue } from "../../../../editor-react/use-editor-viewport-value";
 import {
   getCanvasRotateCursor,
   getCanvasScaleCursor,
@@ -219,7 +220,12 @@ export const CanvasMultiSelectionForeground = ({
     };
   });
   const overlayRotationDegrees = getTransformRotationDegrees(frame?.transform);
+  // Overlay geometry projects through the live camera.
+  const cameraRevision = useEditorViewportValue((activeEditor) =>
+    activeEditor.getViewportPresentationRevision()
+  );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the camera moves the projected rect
   const overlayRect = useMemo(() => {
     const hostRect = selectionPreview.resizeBounds
       ? getHostRectFromCanvasBounds(editor, selectionPreview.resizeBounds)
@@ -241,7 +247,7 @@ export const CanvasMultiSelectionForeground = ({
       top: hostRect.top + selectionPreview.delta.y * editor.zoom,
       transform: previewTransform,
     };
-  }, [editor, frame, overlayRotationDegrees, selectionPreview]);
+  }, [cameraRevision, editor, frame, overlayRotationDegrees, selectionPreview]);
   const activeTransformCursor =
     activeRotateCursor ??
     (activeResizeCorner !== null

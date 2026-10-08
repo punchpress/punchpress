@@ -346,7 +346,12 @@ import {
   zoomOut as zoomEditorOut,
   zoomTo as zoomEditorTo,
 } from "./viewport/viewport-focus";
-import { moveViewportTo as moveEditorViewportTo } from "./viewport/viewport-move";
+import {
+  attachViewport as attachEditorViewport,
+  detachViewport as detachEditorViewport,
+  moveViewportTo as moveEditorViewportTo,
+  syncViewportFromViewer as syncEditorViewportFromViewer,
+} from "./viewport/viewport-move";
 import {
   clickInsideSelection as clickEditorInsideSelection,
   getSelectionPressIntent as getEditorSelectionPressIntent,
@@ -405,7 +410,9 @@ export interface Editor {
   vectorRenderSurfaces: any;
   viewerRef: any;
   viewportFocusRequest: any;
-  viewportInteracting: any;
+  viewportApplyDepth: number;
+  viewportGestureActive: boolean;
+  viewportHeld: boolean;
   viewportPresentationListeners: any;
   viewportPresentationRevision: any;
   viewportState: any;
@@ -472,7 +479,9 @@ export class Editor {
     this.pathEditingPreviewRevision = 0;
     this.selectionColorPreviewState = null;
     this.placementSurfaceListeners = new Set();
-    this.viewportInteracting = false;
+    this.viewportApplyDepth = 0;
+    this.viewportGestureActive = false;
+    this.viewportHeld = false;
     this.viewportPresentationListeners = new Set();
     this.viewportPresentationRevision = 0;
     this.history = new HistoryManager({
@@ -783,6 +792,13 @@ export class Editor {
 
   get viewport() {
     return this.viewportState;
+  }
+
+  // A viewport interaction is an explicit hold (zoom scrub, scripted motion)
+  // or a viewer gesture (wheel pan or pinch, hand drag) until it goes idle.
+  // Camera changes inside one stay off the store until it ends.
+  get viewportInteracting() {
+    return this.viewportHeld || this.viewportGestureActive;
   }
 
   preloadFonts(nodes = this.nodes) {
@@ -1760,18 +1776,64 @@ export class Editor {
     return commitEditorPathEditingPreview(this, nodeId);
   }
 
+  // Holds the viewport interaction open; releasing it settles everything,
+  // including an active gesture.
   setViewportInteracting(isViewportInteracting) {
-    if (this.viewportInteracting === isViewportInteracting) {
+    const wasInteracting = this.viewportInteracting;
+
+    this.viewportHeld = isViewportInteracting;
+
+    if (!isViewportInteracting) {
+      this.viewportGestureActive = false;
+    }
+
+    this.syncViewportInteraction(wasInteracting);
+  }
+
+  // Gesture idle never ends an explicit hold.
+  setViewportGestureActive(isGestureActive) {
+    const wasInteracting = this.viewportInteracting;
+
+    this.viewportGestureActive = isGestureActive;
+    this.syncViewportInteraction(wasInteracting);
+  }
+
+  syncViewportInteraction(wasInteracting) {
+    const isInteracting = this.viewportInteracting;
+
+    if (wasInteracting === isInteracting) {
       return;
     }
 
-    this.viewportInteracting = isViewportInteracting;
+    const storeViewport = this.getState().viewport;
+    const viewport = this.viewportState;
 
-    if (!isViewportInteracting) {
-      this.getState().setViewport(this.viewportState);
+    if (
+      !isInteracting &&
+      (storeViewport.x !== viewport.x ||
+        storeViewport.y !== viewport.y ||
+        storeViewport.zoom !== viewport.zoom)
+    ) {
+      this.getState().setViewport(viewport);
     }
 
     this.notifyInteractionPreviewChanged();
+  }
+
+  isApplyingViewport() {
+    return this.viewportApplyDepth > 0;
+  }
+
+  attachViewport(refs) {
+    attachEditorViewport(this, refs);
+  }
+
+  detachViewport(viewer) {
+    detachEditorViewport(this, viewer);
+  }
+
+  syncViewportFromViewer() {
+    return syncEditorViewportFromViewer(this);
   }
 
   notifyViewportPresentationChanged() {
@@ -2230,7 +2292,7 @@ export class Editor {
   }
 
   setViewport(viewport) {
-    setEditorViewport(this, viewport);
+    return setEditorViewport(this, viewport);
   }
 
   startPathEditing(nodeId = this.selectedNodeId) {

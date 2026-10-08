@@ -7,6 +7,7 @@ import { useEditorPreviewValue } from "../../../../editor-react/use-editor-previ
 import { useEditorSelectionDragPreviewValue } from "../../../../editor-react/use-editor-selection-drag-preview-value";
 import { useEditorSurfaceValue } from "../../../../editor-react/use-editor-surface-value";
 import { useEditorValue } from "../../../../editor-react/use-editor-value";
+import { useEditorViewportValue } from "../../../../editor-react/use-editor-viewport-value";
 import {
   getCanvasRotateCursor,
   getCanvasScaleCursor,
@@ -386,6 +387,12 @@ export const CanvasSingleSelectionForeground = ({
     };
   });
 
+  // Overlay geometry projects through the live camera.
+  const cameraRevision = useEditorViewportValue((activeEditor) =>
+    activeEditor.getViewportPresentationRevision()
+  );
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the camera moves the projected rect
   const overlayRect = useMemo(() => {
     if (
       isPathEditing &&
@@ -434,6 +441,7 @@ export const CanvasSingleSelectionForeground = ({
       transform: previewTransform,
     };
   }, [
+    cameraRevision,
     editor,
     frame,
     isPathEditing,

@@ -20,8 +20,9 @@ describe("Editor.zoomViewportFromWheel", () => {
       getContainer: () => ({
         getBoundingClientRect: () => viewerRect,
       }),
-      getScrollLeft: () => 320,
-      getScrollTop: () => 180,
+      // The engine reads back the camera the viewer applied.
+      getScrollLeft: () => nextViewport?.x ?? 320,
+      getScrollTop: () => nextViewport?.y ?? 180,
       setTo: (options) => {
         nextViewport = options;
       },
