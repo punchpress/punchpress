@@ -54,15 +54,14 @@ The web canvas integrates `react-infinite-viewer` with engine viewport state.
 
 ## Layers
 
-- Durable node shells use `translate3d`, so every shell is its own
-  composited layer. Translation pans only move layers. A continuous pinch
-  re-rasters every visible layer at each scale, and with 200 shells that GPU
-  raster work, not JavaScript, sets the frame time.
-- 2D shell transforms collapse those layers into the viewport layer (plain
-  200-node pinch drops from about 11.5 to 8.3 ms average), but moving shells
-  then overlap stationary 2D content and force per-frame layer promotion: a
-  section drag on the 4,000-leaf group fixture went from 20 to 139 ms per
-  frame. Layer policy belongs with moving presentation layers, not shells.
+- Idle shells translate in 2D and paint into their parent layer; only shells
+  whose own art has active effects stay on `translate3d` layers. Plain
+  200-node pinch runs at about 8.3 ms per frame (production, GPU raster).
+- A transform preview promotes only its resolved presentation roots, once
+  per gesture: a whole-group drag moves one presentation wrapper, so the
+  promotion that made 2D shells expensive during the Phase 2d experiment
+  (every moving shell over stationary 2D content) no longer occurs.
+- Artboards clip with an `overflow: clip` box at their frame, which the
+  compositor applies as a plain rect clip; shells carry no clips.
 - `will-change: transform` on the stage freezes the raster scale of the
   80,000-unit stage and produced multi-second frames; do not promote it.
-

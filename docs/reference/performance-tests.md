@@ -211,7 +211,11 @@ action affects.
 | `group-actions-<action>-<fixture>` | Times `group`, `ungroup`, `reorder` (bring to front), or `reparent` plus undo and redo on the dense, expanded, and shadow fixtures. |
 
 `drag-render-path.spec.ts` gates that a section drag in the expanded fixture
-re-renders only the moved leaves' art.
+re-renders only the moved leaves' art, and that root drags in the `shadow`
+and `shadows` fixtures promote one presentation root per drag
+(`render.placementPreviewRoots.count`), write at most one root per held
+frame (`render.placementPreviewWrites.count`), and re-render render layers
+(`render.layerComposite.count`) only when a drag commits.
 
 Viewport scenarios come in three workloads per appearance variant (plain,
 hard and blur-24 shadows, nested 60% groups and their opacity-1 twin):

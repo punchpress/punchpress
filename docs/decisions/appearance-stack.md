@@ -378,9 +378,46 @@ lands with stage 6:
   reuses every previous layer and leaf that is unchanged, and the previous
   placed-id array when paint order is unchanged, so canvas clients re-render
   and re-place only what changed.
-- A layer is a zero-size `div` with no node markers. CSS `opacity` below 1
-  isolates its subtree. Layers never move: previews keep moving leaf shells, so
-  preview roots stay disjoint without a placement rewrite.
+- A layer renders as stable nested parts with no node markers, outermost
+  first: a zero-size, stage-origin presentation wrapper
+  (`data-presentation-node-id`); for artboards, a clip box at the artboard
+  frame with `overflow: clip`; and the effect element (`data-render-layer`)
+  holding opacity and the group filter. CSS `opacity` below 1 isolates the
+  subtree. Every artboard clips there, so shells never carry artboard clips.
+- **Moving presentation roots (2e).** `editor.getPreviewPresentationPlan()`
+  resolves a transform preview into disjoint typed targets (`layer`, `shell`,
+  `surface`) in paint order, plus the layers they carry and the stationary
+  layers whose content moves. A translation moves the highest fully covered
+  requested group (or a group beneath one) as one `layer` target: every shell
+  and surface beneath it is committed by the gesture. An artboard moves as a
+  layer only when it is dragged itself. Partial coverage, vectors, dense
+  surfaces, and contour edits keep the per-shell fallback; leaves selected
+  independently never infer their parent. Resize and rotation keep per-shell
+  previews. The plan is cached per tree, document, membership, path-edit
+  state, and transform kind, so delta-only updates reuse it.
+- The canvas promotes each target once per gesture (`will-change`) and
+  writes only `transform: translate(dx, dy)` to a layer target's wrapper;
+  descendants, effect layers, and filter definitions are untouched. Carried
+  layers keep their effects by identity; stationary ancestors with moving
+  content widen their filter ink; the engine keeps equal widened values'
+  identity. Commit keeps the last preview until a pre-paint handoff writes
+  committed placement and clears the roots in one step; durable syncs never
+  touch shells under an active root; cancel restores the captured targets.
+- Idle shells translate in 2D and paint into their parent layer; only shells
+  whose own art has active effects stay on `translate3d` layers.
+- Exact raster measures its screen matrix after roots move, so it samples
+  through a moving ancestor. Its viewport crop changes as pixels enter, which
+  legitimately re-filters an enclosing group: changing exact-raster content
+  is excluded from the no-refilter guarantee.
+- Measured (production, GPU raster, DPR 1, held p50/p95 ms; begin settle):
+  the 16-shadowed-section wrapper drag went from 25–33/50 (310–350 ms) to
+  16.6/17.7 (30 ms), its two-shadow (SVG filter) counterpart from 42–50/84–108
+  (520–650 ms) to 16.6/18–25 (29 ms), and the dense control from 17/25 to
+  8.3/9.2. Traces show Chromium reuses the carried filter output: raster
+  tasks fell from 25,606 to 1,211 and GPU-thread time from 2.9 s to 0.5 s.
+  The remaining held cost is main-thread layerization of the expanded
+  fixture's thousands of paint chunks (about 11 ms per frame), which the
+  dense control also pays (about 7 ms).
 - Leaf art and dense-surface roots carry only their own opacity. Ancestor
   opacity lives on the layers, and export nests one `<g opacity>` per
   translucent group or artboard.
@@ -388,10 +425,7 @@ lands with stage 6:
 - The text-edit preview paints in its node's shell, sized from the live
   preview frame, so group compositing applies while editing. The input and
   caret stay outside.
-- Deferred to stage 6, where shadows make them necessary and measurable:
-  stationary artboard clip layers (per-shell clips stay; their rotation-preview
-  inaccuracy predates this work), moving presentation layers during whole-group
-  drags, and expanding exact-raster presentation by effect support. Raster
+- Deferred: expanding exact-raster presentation by effect support. Raster
   pixel-grid chrome already renders outside node art.
 
 ### Drop shadows as built (stage 6)
@@ -419,16 +453,14 @@ lands with stage 6:
   computed by one reader shared with export. CSS applies the filter before
   opacity. A group holding shadowed groups never collapses into a dense
   surface, since dense surfaces paint nested groups as plain SVG groups.
-- **Artboard clips.** An artboard holding a shadowed group clips its render
-  layer with `clip-path: path()` in stage coordinates. Shells inside a
-  shadowed group skip their own artboard clip, so content outside the
-  artboard still casts shadows back inside before the layer clips the result.
-  Other shells keep per-shell clips.
-- **Previews.** Group layers and artboard clips stay put while previews move
-  leaf shells, so a group's filter ink widens (in 512-unit steps) to cover a
-  drag delta or resize preview of its descendants, a group resized as a whole
-  previews its scaled shadows, and an artboard clip moves with its own drag.
-  Only composited layers subscribe to previews, cached per preview revision.
+- **Artboard clips.** Every artboard clips its render layer at its frame
+  (see the render tree above), after its groups' filters, so content outside
+  the artboard still casts shadows back inside before the clip.
+- **Previews.** A whole-group drag carries its shadowed layers unchanged on
+  one moving root. Stationary layers whose content moves (partial
+  selections, resize and rotation previews) widen their filter ink in
+  512-unit steps; a group resized as a whole previews its scaled shadows.
+  Only composited layers subscribe to previews.
 - **Vector ink** unions each entry's ink placed through its transform, so
   scaled children stay inside the vector's filter.
 - **Transform bakes.** Aggregate resize scales shape and text shadows (their
@@ -443,8 +475,8 @@ lands with stage 6:
   - Exact raster presentation still crops raster pixels to the viewport, so
     an offscreen part of a raster image inside a shadowed group casts no
     shadow until it scrolls into view.
-  - Moving presentation layers: a whole-group drag still re-filters each
-    shadowed group every frame (see the stage 6 measurements).
+  - Group resize and rotation previews still move shells under stationary
+    filtered layers, so they re-filter per frame.
   - A group's filter ink does not follow live text edits inside it until the
     edit commits.
 - **Selection colors** list enabled shadow colors like gradient stops (color

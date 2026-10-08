@@ -51,6 +51,11 @@ document.
 - Render layers memoize on the engine's layer object. The engine keeps an
   unchanged layer (and the placed-id array) across rebuilds, so a structural
   edit re-renders only the layers it changed.
+- Render layers subscribe to transform previews through
+  `useLayerComposite`, which returns the engine's preview effects by
+  identity: layers a moving root carries, and unrelated layers, never
+  re-render during a drag. Canvas placement (`canvas/placement/`) writes
+  shell and presentation-wrapper styles directly, outside React renders.
 - Tree queries such as `getSelectionTargetNodeId` use the cached node-tree
   index; selectors must not rebuild node maps.
 - Menu content subscribes inside its popup so closed menus do no work.
