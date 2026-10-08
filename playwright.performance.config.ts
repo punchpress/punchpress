@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const port = Number(process.env.PUNCHPRESS_TEST_PORT ?? 4173);
+
 export default defineConfig({
   testDir: "./apps/web/tests/performance",
   testIgnore: "**/unit/**",
@@ -7,7 +9,7 @@ export default defineConfig({
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
   retries: 0,
   use: {
-    baseURL: "http://127.0.0.1:4173",
+    baseURL: `http://127.0.0.1:${port}`,
     trace: "retain-on-failure",
   },
   projects: [
@@ -19,8 +21,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "bun run --cwd apps/web dev --host 127.0.0.1 --port 4173",
-    port: 4173,
+    command: `bun run --cwd apps/web dev --host 127.0.0.1 --port ${port}`,
+    port,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
   },
