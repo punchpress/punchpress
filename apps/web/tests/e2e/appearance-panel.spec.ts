@@ -209,3 +209,51 @@ test("differing stacks show Mixed until Use first copies the first stack", async
     .toBe("#ff0000");
   await expect(page.getByTestId("appearance-fills-item")).toHaveCount(1);
 });
+
+test("switches a fill to a linear gradient and edits its stops", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(page, PANEL_DOCUMENT);
+  await selectShape(page);
+
+  const fill = page.getByTestId("appearance-fills-item").first();
+
+  await fill.getByRole("combobox", { name: "Paint kind" }).click();
+  await page.getByRole("option", { name: "Linear" }).click();
+
+  await expect
+    .poll(async () => (await getAppearance(page))?.fills[0].paint.kind)
+    .toBe("linear-gradient");
+  await expect(page.getByTestId("appearance-gradient-stop")).toHaveCount(2);
+  await expect(page.getByRole("listbox")).toHaveCount(0);
+
+  // Regression: the dropdown's click-through guard used to outlive its
+  // 120 ms window and swallow this first click. A person cannot click again
+  // inside that window, so wait it out like they would.
+  await page.waitForTimeout(150);
+  await fill.getByRole("button", { name: "Add stop" }).click();
+  await expect
+    .poll(async () => {
+      return (await getAppearance(page))?.fills[0].paint.stops.map(
+        (stop) => stop.offset
+      );
+    })
+    .toEqual([0, 0.5, 1]);
+
+  await page
+    .getByTestId("appearance-gradient-stop")
+    .nth(1)
+    .getByRole("button", { name: "Remove stop" })
+    .click();
+  await expect(page.getByTestId("appearance-gradient-stop")).toHaveCount(2);
+  await expect(
+    page
+      .getByTestId("appearance-gradient-stop")
+      .first()
+      .getByRole("button", { name: "Remove stop" })
+  ).toBeDisabled();
+
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(page.getByTestId("appearance-gradient-stop")).toHaveCount(3);
+});

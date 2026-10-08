@@ -57,7 +57,7 @@ const createPath = (id: string, parentId: string, appearance, contour) => {
 const getObjects = (editor: Editor, nodeId: string) => {
   return buildAppearanceObjects(
     editor.getNode(nodeId),
-    editor.getNodeRenderGeometry(nodeId)?.paths,
+    editor.getNodeRenderGeometry(nodeId),
     (id) => editor.getNode(id)
   );
 };
@@ -154,7 +154,9 @@ describe("appearance render plan", () => {
       ["red", 1],
       ["blue", 0.25],
     ]);
-    expect(objects[1].draws[0]).toMatchObject({ color: "#0000ff" });
+    expect(objects[1].draws[0]).toMatchObject({
+      paint: { color: "#0000ff" },
+    });
   });
 
   test("compound vectors paint the compiled result with the last child stack", () => {
@@ -191,10 +193,9 @@ describe("appearance render plan", () => {
 
     expect(objects).toHaveLength(1);
     expect(objects[0].styleNodeId).toBe("last");
-    expect(objects[0].draws.map((draw) => draw.color)).toEqual([
-      "#00aa00",
-      "#000000",
-    ]);
+    expect(
+      objects[0].draws.map((draw) => (draw.paint as { color: string }).color)
+    ).toEqual(["#00aa00", "#000000"]);
   });
 
   test("open contours fill with SVG implicit closure, matching the canvas", () => {
@@ -246,7 +247,7 @@ describe("appearance render plan", () => {
       appearance: { fills: [solidFill("f", "#0000ff")], strokes: [] },
     });
     expect(getObjects(editor, "shape")[0].draws[0]).toMatchObject({
-      color: "#0000ff",
+      paint: { color: "#0000ff" },
     });
   });
 
