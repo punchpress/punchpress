@@ -34,6 +34,10 @@ objects or arrays re-renders its component on every edit anywhere in the
 document.
 
 - Return primitives, store references, or engine-cached values from selectors.
+- An inline selector re-runs on every render. A component that re-renders on
+  every preview frame passes a module-level or memoized selector when the
+  selector walks many nodes; `useEditorValue` then runs it once per store
+  state.
 - Per-node canvas art keys on `editor.getNodeArtRevision(nodeId)`, which changes
   only when that node, its subtree, or an ancestor changes. Never key node art
   on `state.nodes`.
