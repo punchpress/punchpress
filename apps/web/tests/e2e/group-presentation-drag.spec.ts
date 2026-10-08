@@ -384,6 +384,59 @@ test.describe("group presentation drag", () => {
     expect((await readCanvasDom(page)).moving).toEqual([]);
   });
 
+  for (const [label, nodeId] of [
+    ["group", "wrap"],
+    ["leaf", "loose"],
+  ] as const) {
+    test(`an alt-drag ${label} copy moves on the event that creates it`, async ({
+      page,
+    }) => {
+      const probeId = nodeId === "wrap" ? "a" : "loose";
+      const before = await readRect(page, probeId);
+
+      // Duplicate and first movement in one task, before React mounts the copy.
+      const copyId = await page.evaluate((id) => {
+        const editor = window.__PUNCHPRESS_EDITOR__;
+        const holder = window as never as { dragSession: unknown };
+
+        editor?.setSelectedNodes([id]);
+        holder.dragSession = editor?.beginSelectionDrag({
+          duplicate: true,
+          nodeId: id,
+        });
+        editor?.updateSelectionDrag(holder.dragSession, {
+          delta: { x: 0, y: 150 },
+        });
+
+        const [copy] = editor?.selectedNodeIds ?? [];
+
+        return copy === id || !copy
+          ? null
+          : (editor?.getDescendantLeafNodeIds(copy)[0] ?? copy);
+      }, nodeId);
+
+      expect(copyId).not.toBeNull();
+
+      const firstFrame = await page.evaluate(async (id) => {
+        await new Promise((resolve) =>
+          requestAnimationFrame(() => setTimeout(resolve))
+        );
+
+        const rect = window.__PUNCHPRESS_EDITOR__
+          ?.getNodeElement(id)
+          ?.getBoundingClientRect();
+
+        return rect ? { height: rect.height, x: rect.x, y: rect.y } : null;
+      }, copyId ?? "");
+
+      expect(firstFrame?.height ?? 0).toBeGreaterThan(0);
+      expectAt(firstFrame, offset(before, { x: 0, y: 150 }), "first frame");
+      expectAt(await readRect(page, probeId), before, "original");
+
+      await releaseAndTrack(page, copyId ?? "", true);
+    });
+  }
+
   test("a leaf drag moves only its shell", async ({ page }) => {
     await beginDrag(page, ["loose"]);
     await moveDrag(page, { x: 5, y: 5 });

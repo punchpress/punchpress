@@ -22,6 +22,7 @@ export const useCanvasNodePlacement = (placedNodeIds: readonly string[]) => {
   const placedNodeIdsRef = useRef(placedNodeIds);
   const placementStateRef = useRef(createPlacementState());
   const sessionRef = useRef<PreviewSession | null>(null);
+  const syncPreviewRef = useRef<() => void>(() => undefined);
 
   placedNodeIdsRef.current = placedNodeIds;
 
@@ -125,6 +126,7 @@ export const useCanvasNodePlacement = (placedNodeIds: readonly string[]) => {
       }
     };
 
+    syncPreviewRef.current = syncPreviewPlacement;
     syncDurablePlacement();
     syncPreviewPlacement();
 
@@ -147,6 +149,12 @@ export const useCanvasNodePlacement = (placedNodeIds: readonly string[]) => {
   }, [editor]);
 
   useLayoutEffect(() => {
+    // Targets that mounted after the gesture began (an alt-drag copy whose
+    // first movement arrived in the same event) join before paint.
+    if (sessionRef.current?.pending.length) {
+      syncPreviewRef.current();
+    }
+
     const frameId = window.requestAnimationFrame(() => {
       measurePerf(PERF_SPANS.renderPlacementDurable, () => {
         syncDurableNodeShells(
