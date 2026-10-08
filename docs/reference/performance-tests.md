@@ -61,7 +61,9 @@ The perf build sets `VITE_PUNCHPRESS_PERF_BUILD=1`, which keeps the
 `window.__PUNCHPRESS_EDITOR__` automation handle that dev builds expose.
 Shipped builds never have it. Perf specs use the same switch:
 `PUNCHPRESS_PERF_PROD=1 bunx playwright test --config playwright.performance.config.ts <spec>`.
-Production mode never reuses a server already running on the port. Record
+Production mode never reuses a server already running on the port. Specs
+that import app source modules in the page (`large-svg-held-drag`) run in
+dev mode only. Record
 the mode, browser, DPR, and viewport with every comparison.
 
 ## Agent Workflow
