@@ -446,7 +446,9 @@ lands with stage 6:
 - **Selection colors** list enabled shadow colors like gradient stops (color
   with shadow opacity as alpha), including group and vector shadows. The live
   preview recolors leaf shadows through `getPaintNode` and group-layer shadows
-  through `getLayerPreviewEffects`; color never changes filter ink.
+  through `getLayerPreviewEffects`; color never changes filter ink. Deferred:
+  raising a 0% shadow's alpha previews without that shadow in group layers
+  and ancestor filter ink until the edit commits.
 
 ## Rejected Alternatives
 
