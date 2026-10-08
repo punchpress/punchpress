@@ -225,3 +225,51 @@ test("a timed write waits for an open gesture to commit", async () => {
   expect(saved).toEqual(["during gesture"]);
   await autosave.dispose();
 });
+
+test("a timed write queued behind a slow save waits for a gesture that opened meanwhile", async () => {
+  const { editor, edit } = createEditor();
+  const serialize = editor.serializeDocumentAsync;
+  const serialized: string[] = [];
+  const gestureEditor = {
+    ...editor,
+    hasOpenHistoryStep: false,
+    serializeDocumentAsync: async () => {
+      const contents = await serialize();
+      serialized.push(contents);
+      return contents;
+    },
+  };
+  const saved: string[] = [];
+  let releaseFirstSave!: () => void;
+  const firstSaveBlocked = new Promise<void>((resolve) => {
+    releaseFirstSave = resolve;
+  });
+  const autosave = createScratchpadAutosave(
+    gestureEditor,
+    async (contents) => {
+      if (contents === "first") {
+        await firstSaveBlocked;
+      }
+      saved.push(contents);
+    },
+    10
+  );
+
+  edit("first");
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  edit("second");
+  await new Promise((resolve) => setTimeout(resolve, 25));
+
+  // The second timed write is queued behind the slow first save; a gesture
+  // starts before that save completes.
+  gestureEditor.hasOpenHistoryStep = true;
+  releaseFirstSave();
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  expect(serialized).toEqual(["first"]);
+
+  gestureEditor.hasOpenHistoryStep = false;
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  expect(serialized).toEqual(["first", "second"]);
+  expect(saved).toEqual(["first", "second"]);
+  await autosave.dispose();
+});

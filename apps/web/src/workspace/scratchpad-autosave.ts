@@ -16,7 +16,7 @@ export const createScratchpadAutosave = (
   let queuedRevision = 0;
   let savedRevision = 0;
 
-  const write = () => {
+  const write = ({ timed = false } = {}) => {
     clearTimeout(timeoutId);
     timeoutId = undefined;
 
@@ -24,10 +24,25 @@ export const createScratchpadAutosave = (
       const writeRevision = revision;
       queuedRevision = writeRevision;
       latestWrite = pendingWrite
-        .then(async () => save(await editor.serializeDocumentAsync()))
+        .then(async () => {
+          // A timed write queued behind a slow save can start after a gesture
+          // opened; hand it back to the timer instead of serializing now.
+          if (timed && editor.hasOpenHistoryStep) {
+            if (queuedRevision === writeRevision) {
+              queuedRevision = savedRevision;
+            }
+            arm();
+            return false;
+          }
+
+          await save(await editor.serializeDocumentAsync());
+          return true;
+        })
         .then(
-          () => {
-            savedRevision = writeRevision;
+          (didSave) => {
+            if (didSave) {
+              savedRevision = writeRevision;
+            }
           },
           (error) => {
             if (queuedRevision === writeRevision) {
@@ -64,7 +79,7 @@ export const createScratchpadAutosave = (
         return;
       }
 
-      write().catch(console.error);
+      write({ timed: true }).catch(console.error);
     }, delayMs);
   };
 
