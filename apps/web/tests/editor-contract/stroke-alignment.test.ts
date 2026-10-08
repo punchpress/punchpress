@@ -509,9 +509,7 @@ describe("stroke alignment", () => {
     expect(body).toMatch(EXPORT_MASK_REF);
   });
 
-  test("schema 1.11 accepts alignment and 1.10 documents pass through", () => {
-    expect(PUNCH_DOCUMENT_VERSION).toBe("1.11");
-
+  test("alignment survives a 1.10 document upgrade", () => {
     const document = parseDesignDocument(
       JSON.stringify({
         assets: {},
@@ -528,7 +526,7 @@ describe("stroke alignment", () => {
       })
     );
 
-    expect(document.version).toBe("1.11");
+    expect(document.version).toBe(PUNCH_DOCUMENT_VERSION);
     expect(document.nodes[0].appearance.strokes[0].align).toBe("outside");
   });
 });
