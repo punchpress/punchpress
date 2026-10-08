@@ -72,12 +72,16 @@ export const loadAppearanceBenchmarkScene = async (
   editor: Editor,
   nodeCount: number,
   waitForFrame: () => Promise<number>,
-  { nestedGroups = false } = {}
+  { flatGroups = false, nestedGroups = false } = {}
 ) => {
   const { artboard, children } = createAppearanceBenchmarkNodes(nodeCount);
-  const groups = nestedGroups
-    ? nestInTranslucentGroups(artboard.id, children)
-    : [];
+  let groups: ReturnType<typeof createDefaultGroupNode>[] = [];
+
+  if (nestedGroups) {
+    groups = nestInGroups(artboard.id, children, GROUP_DEPTH, GROUP_OPACITY);
+  } else if (flatGroups) {
+    groups = nestInGroups(artboard.id, children, 1, 1);
+  }
 
   editor.loadDocument(
     saveDesignDocument([artboard, ...groups, ...children]).contents
@@ -102,21 +106,26 @@ const GROUP_COUNT = 20;
 const GROUP_DEPTH = 3;
 const GROUP_OPACITY = 0.6;
 
-// Splits the children into GROUP_COUNT stacks of GROUP_DEPTH nested groups,
-// every level at GROUP_OPACITY, so each stack is three isolated layers deep.
+// Splits the children into GROUP_COUNT stacks of `depth` nested groups, every
+// level at `opacity` (nested scenes: three isolated 60% layers deep).
 // Reparents the children in place; the store canonicalizes paint order.
-const nestInTranslucentGroups = (artboardId: string, children) => {
+const nestInGroups = (
+  artboardId: string,
+  children,
+  depth: number,
+  opacity: number
+) => {
   const groups: ReturnType<typeof createDefaultGroupNode>[] = [];
   const perGroup = Math.ceil(children.length / GROUP_COUNT);
 
   for (let stack = 0; stack < GROUP_COUNT; stack += 1) {
     let parentId = artboardId;
 
-    for (let level = 0; level < GROUP_DEPTH; level += 1) {
+    for (let level = 0; level < depth; level += 1) {
       const group = {
         ...createDefaultGroupNode(),
         name: `Stack ${stack} level ${level}`,
-        opacity: GROUP_OPACITY,
+        opacity,
         parentId,
       };
 
@@ -147,6 +156,36 @@ export const getCenteredViewport = (editor: Editor, zoom: number) => {
     y: APPEARANCE_ARTBOARD_SIZE.height / 2 - height / zoom / 2,
     zoom,
   };
+};
+
+// The node nearest the artboard center is on screen at 100% zoom.
+export const getCenterNodeId = (editor: Editor, nodeIds: string[]) => {
+  const viewport = getCenteredViewport(editor, 1);
+  const rect = editor.hostRef?.getBoundingClientRect();
+  const centerX = viewport.x + (rect?.width ?? 1280) / 2;
+  const centerY = viewport.y + (rect?.height ?? 800) / 2;
+  let best = nodeIds[0];
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (const nodeId of nodeIds) {
+    const bounds = editor.getSelectionBounds([nodeId]);
+
+    if (!bounds) {
+      continue;
+    }
+
+    const distance = Math.hypot(
+      (bounds.minX + bounds.maxX) / 2 - centerX,
+      (bounds.minY + bounds.maxY) / 2 - centerY
+    );
+
+    if (distance < bestDistance) {
+      best = nodeId;
+      bestDistance = distance;
+    }
+  }
+
+  return best;
 };
 
 const waitForGeometryReady = async (

@@ -1,10 +1,10 @@
-import type { Editor } from "@punchpress/engine";
 import type {
   PerformanceBenchmarkContext,
   PerformanceBenchmarkDefinition,
 } from "../performance-benchmark-types";
 import {
   getCenteredViewport,
+  getCenterNodeId,
   loadAppearanceBenchmarkScene,
 } from "./appearance-benchmark-scene";
 import {
@@ -142,36 +142,6 @@ const setupStrokeText = async (
   editor.setSelectedNodes([node.id]);
   editor.setViewport(getFittedViewport(editor, [node.id]));
   await waitForFrames(4);
-};
-
-// The node nearest the artboard center is on screen at 100% zoom.
-const getCenterNodeId = (editor: Editor, nodeIds: string[]) => {
-  const viewport = getCenteredViewport(editor, 1);
-  const rect = editor.hostRef?.getBoundingClientRect();
-  const centerX = viewport.x + (rect?.width ?? 1280) / 2;
-  const centerY = viewport.y + (rect?.height ?? 800) / 2;
-  let best = nodeIds[0];
-  let bestDistance = Number.POSITIVE_INFINITY;
-
-  for (const nodeId of nodeIds) {
-    const bounds = editor.getSelectionBounds([nodeId]);
-
-    if (!bounds) {
-      continue;
-    }
-
-    const distance = Math.hypot(
-      (bounds.minX + bounds.maxX) / 2 - centerX,
-      (bounds.minY + bounds.maxY) / 2 - centerY
-    );
-
-    if (distance < bestDistance) {
-      best = nodeId;
-      bestDistance = distance;
-    }
-  }
-
-  return best;
 };
 
 export const strokeAlignmentBenchmarks = [true, false].flatMap((aligned) => [
