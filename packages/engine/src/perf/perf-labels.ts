@@ -61,6 +61,8 @@ export const PERF_SPANS = {
   pathEditPreviewSet: "path.edit.preview.set",
 
   renderCanvasReact: "render.canvas.react",
+  renderPlacementDurable: "render.placement.durable",
+  renderPlacementPreview: "render.placement.preview",
 
   rasterStrokeApplyDabs: "raster.stroke.applyDabs",
   rasterStrokeBegin: "raster.stroke.begin",

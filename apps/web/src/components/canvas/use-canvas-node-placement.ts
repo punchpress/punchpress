@@ -1,3 +1,4 @@
+import { measurePerf, PERF_SPANS } from "@punchpress/engine";
 import { useLayoutEffect, useRef } from "react";
 import { useEditor } from "../../editor-react/use-editor";
 import { getArtboardClipPath } from "./artboard-clip-path";
@@ -477,11 +478,13 @@ export const useCanvasNodePlacement = (nodeIds) => {
         return;
       }
 
-      syncDurableNodeShells(
-        editor,
-        nodeIdsRef.current,
-        placementStateRef.current
-      );
+      measurePerf(PERF_SPANS.renderPlacementDurable, () => {
+        syncDurableNodeShells(
+          editor,
+          nodeIdsRef.current,
+          placementStateRef.current
+        );
+      });
       editor.notifyPlacementSurfaceApplied();
     };
 
@@ -491,11 +494,15 @@ export const useCanvasNodePlacement = (nodeIds) => {
       }
 
       const preview = editor.selectionDragPreview;
-      const didSyncPreview = syncPreviewNodeShells(
-        editor,
-        placementStateRef.current,
-        preview,
-        nodeIdsRef.current
+      const didSyncPreview = measurePerf(
+        PERF_SPANS.renderPlacementPreview,
+        () =>
+          syncPreviewNodeShells(
+            editor,
+            placementStateRef.current,
+            preview,
+            nodeIdsRef.current
+          )
       );
 
       if (!didSyncPreview) {
@@ -532,13 +539,21 @@ export const useCanvasNodePlacement = (nodeIds) => {
       const { appliedElements, appliedKeys, shellStates } =
         placementStateRef.current;
 
-      pruneNodeShells(nodeIds, placementStateRef.current);
+      measurePerf(PERF_SPANS.renderPlacementDurable, () => {
+        pruneNodeShells(nodeIds, placementStateRef.current);
 
-      for (const nodeId of nodeIds) {
-        const shellState = getNodeShellState(editor, nodeId);
-        shellStates.set(nodeId, shellState);
-        syncNodeShell(editor, nodeId, shellState, appliedElements, appliedKeys);
-      }
+        for (const nodeId of nodeIds) {
+          const shellState = getNodeShellState(editor, nodeId);
+          shellStates.set(nodeId, shellState);
+          syncNodeShell(
+            editor,
+            nodeId,
+            shellState,
+            appliedElements,
+            appliedKeys
+          );
+        }
+      });
     });
 
     return () => {
