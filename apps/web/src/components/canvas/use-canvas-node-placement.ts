@@ -318,14 +318,17 @@ const canReusePreviewEntries = (preview, nodeIds) => {
   });
 };
 
-const pruneNodeShells = (
-  visibleNodeIds,
-  appliedElements,
-  appliedKeys,
-  shellStates
-) => {
-  for (const nodeId of [...appliedKeys.keys()]) {
-    if (!visibleNodeIds.includes(nodeId)) {
+// Forgets placement for shells that left the placed list. Keys are checked
+// against a set: placed lists hold thousands of shells in large imports.
+const pruneNodeShells = (placedNodeIds, placementState) => {
+  const { appliedElements, appliedKeys, shellStates } = placementState;
+  const placedNodeIdSet = new Set(placedNodeIds);
+
+  for (const nodeId of new Set([
+    ...appliedKeys.keys(),
+    ...shellStates.keys(),
+  ])) {
+    if (!placedNodeIdSet.has(nodeId)) {
       appliedElements.delete(nodeId);
       appliedKeys.delete(nodeId);
       shellStates.delete(nodeId);
@@ -339,7 +342,7 @@ const syncDurableNodeShells = (editor, visibleNodeIds, placementState) => {
     editor.getPreviewPlacementNodeIds(visibleNodeIds, preview)
   );
 
-  pruneNodeShells(visibleNodeIds, appliedElements, appliedKeys, shellStates);
+  pruneNodeShells(visibleNodeIds, placementState);
 
   for (const nodeId of visibleNodeIds) {
     const shellState = getNodeShellState(editor, nodeId);
@@ -529,13 +532,7 @@ export const useCanvasNodePlacement = (nodeIds) => {
       const { appliedElements, appliedKeys, shellStates } =
         placementStateRef.current;
 
-      for (const nodeId of [...shellStates.keys()]) {
-        if (!nodeIds.includes(nodeId)) {
-          appliedElements.delete(nodeId);
-          shellStates.delete(nodeId);
-          appliedKeys.delete(nodeId);
-        }
-      }
+      pruneNodeShells(nodeIds, placementStateRef.current);
 
       for (const nodeId of nodeIds) {
         const shellState = getNodeShellState(editor, nodeId);
