@@ -6,21 +6,16 @@ export const getSelectedNodeIds = (state, nodeIds = state.selectedNodeIds) => {
   }
 
   const availableNodeIds = new Set(state.nodes.map((node) => node.id));
-  const selectedNodeIds = /** @type {string[]} */ ([]);
+  // Insertion-ordered: keeps the first occurrence of each available id.
+  const selectedNodeIds = new Set<string>();
 
   for (const nodeId of nodeIds) {
-    if (!(nodeId && availableNodeIds.has(nodeId))) {
-      continue;
+    if (nodeId && availableNodeIds.has(nodeId)) {
+      selectedNodeIds.add(nodeId);
     }
-
-    if (selectedNodeIds.includes(nodeId)) {
-      continue;
-    }
-
-    selectedNodeIds.push(nodeId);
   }
 
-  return selectedNodeIds;
+  return [...selectedNodeIds];
 };
 
 export const moveNodesToBoundaryState = (state, nodeIds, edge) => {

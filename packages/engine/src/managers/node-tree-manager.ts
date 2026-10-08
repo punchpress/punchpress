@@ -79,23 +79,10 @@ export class NodeTreeManager {
     const layerMetaById = new Map();
 
     for (const childIds of childIdsByParent.values()) {
-      const containerIds = childIds.filter((nodeId) => {
-        return isContainerNode(nodesById.get(nodeId));
-      });
-
       childIds.forEach((nodeId, siblingIndex) => {
-        const containerIndex = containerIds.indexOf(nodeId);
-
         layerMetaById.set(nodeId, {
-          containerIndex,
-          containerLayerIndex:
-            containerIndex >= 0
-              ? containerIds.length - 1 - containerIndex
-              : -1,
           isBackmost: siblingIndex === 0,
           isFrontmost: siblingIndex === childIds.length - 1,
-          layerIndex: childIds.length - 1 - siblingIndex,
-          siblingIndex,
         });
       });
     }

@@ -10,7 +10,6 @@ import {
   getSubtreeNodeIds,
   getTreeOrderedNodes,
   isContainerNode,
-  isDescendantOf,
   isArtboardNode,
   isGroupNode,
   isVectorNode,
@@ -28,30 +27,70 @@ const cloneChildIdsByParent = (childIdsByParent) => {
   );
 };
 
+// Walks parents through an existing node map instead of rebuilding one.
+const hasAncestor = (nodesById, nodeId, ancestorId) => {
+  let node = nodesById.get(nodeId);
+
+  while (node && getNodeParentId(node) !== ROOT_PARENT_ID) {
+    if (getNodeParentId(node) === ancestorId) {
+      return true;
+    }
+
+    node = nodesById.get(getNodeParentId(node));
+  }
+
+  return false;
+};
+
 const rebuildNodesFromMaps = (nodesById, childIdsByParent) => {
   return getTreeOrderedNodes(nodesById, childIdsByParent, ROOT_PARENT_ID);
 };
 
+const isRemovableWhenEmpty = (node) => {
+  return isGroupNode(node) || isVectorNode(node);
+};
+
+// Removes empty groups and vectors, then any ancestors they leave empty, in
+// one pass over child counts.
 const cleanupEmptyGroups = (nodes) => {
-  let nextNodes = [...nodes];
+  const nodesById = createNodeMap(nodes);
+  const childCounts = new Map<string, number>();
 
-  while (true) {
-    const childIdsByParent = getChildIdsByParent(nextNodes);
-    const emptyGroupIds = nextNodes
-      .filter(
-        (node) =>
-          (isGroupNode(node) || isVectorNode(node)) &&
-          (childIdsByParent.get(node.id) || []).length === 0
-      )
-      .map((node) => node.id);
-
-    if (emptyGroupIds.length === 0) {
-      return nextNodes;
-    }
-
-    const emptyGroupIdSet = new Set(emptyGroupIds);
-    nextNodes = nextNodes.filter((node) => !emptyGroupIdSet.has(node.id));
+  for (const node of nodes) {
+    const parentId = getNodeParentId(node);
+    childCounts.set(parentId, (childCounts.get(parentId) || 0) + 1);
   }
+
+  const emptyNodes = nodes.filter((node) => {
+    return isRemovableWhenEmpty(node) && !childCounts.get(node.id);
+  });
+  const removedNodeIds = new Set<string>();
+
+  while (emptyNodes.length > 0) {
+    const node = emptyNodes.pop();
+    removedNodeIds.add(node.id);
+
+    const parentId = getNodeParentId(node);
+    const remainingCount = (childCounts.get(parentId) || 0) - 1;
+    const parentNode = nodesById.get(parentId);
+
+    childCounts.set(parentId, remainingCount);
+
+    if (remainingCount === 0 && isRemovableWhenEmpty(parentNode)) {
+      emptyNodes.push(parentNode);
+    }
+  }
+
+  return removedNodeIds.size === 0
+    ? nodes
+    : nodes.filter((node) => !removedNodeIds.has(node.id));
+};
+
+// Ids that exist in the document, deduplicated in first-seen order.
+const getExistingNodeIds = (state, nodeIds: string[]) => {
+  const availableNodeIds = new Set(state.nodes.map((node) => node.id));
+
+  return dedupeIds(nodeIds).filter((nodeId) => availableNodeIds.has(nodeId));
 };
 
 const removeNodeSubtreesWithoutCleanup = (nodes, nodeIds) => {
@@ -114,8 +153,7 @@ export const getActiveLayerIdAfterDeletion = (state, nextNodes) => {
       return parentId;
     }
 
-    deletedNodeId =
-      parentId === ROOT_PARENT_ID ? null : parentId;
+    deletedNodeId = parentId === ROOT_PARENT_ID ? null : parentId;
   }
 
   return nextNodes.at(-1)?.id || null;
@@ -139,9 +177,7 @@ export const deleteNodeTreeState = (state, nodeIds) => {
 };
 
 export const groupNodeTreeState = (state, nodeIds) => {
-  const selectedNodeIds = dedupeIds(nodeIds).filter((nodeId) => {
-    return state.nodes.some((node) => node.id === nodeId);
-  });
+  const selectedNodeIds = getExistingNodeIds(state, nodeIds);
 
   if (selectedNodeIds.length < 2) {
     return {};
@@ -268,9 +304,7 @@ export const ungroupNodeTreeState = (state, groupNodeId) => {
 };
 
 export const moveNodeBlocksToBoundaryState = (state, nodeIds, edge) => {
-  const selectedNodeIds = dedupeIds(nodeIds).filter((nodeId) => {
-    return state.nodes.some((node) => node.id === nodeId);
-  });
+  const selectedNodeIds = getExistingNodeIds(state, nodeIds);
 
   if (selectedNodeIds.length === 0) {
     return {};
@@ -321,9 +355,7 @@ export const moveNodeBlocksState = (
   targetParentId = ROOT_PARENT_ID,
   beforeNodeId = null
 ) => {
-  const movedNodeIds = dedupeIds(nodeIds).filter((nodeId) => {
-    return state.nodes.some((node) => node.id === nodeId);
-  });
+  const movedNodeIds = getExistingNodeIds(state, nodeIds);
 
   if (movedNodeIds.length === 0) {
     return {};
@@ -351,7 +383,7 @@ export const moveNodeBlocksState = (
       return (
         nodeId === targetParentId ||
         (targetParentId !== ROOT_PARENT_ID &&
-          isDescendantOf(state.nodes, targetParentId, nodeId))
+          hasAncestor(nodesById, targetParentId, nodeId))
       );
     })
   ) {
@@ -446,9 +478,7 @@ export const moveNodeBlocksState = (
 };
 
 export const replaceNodeBlocksState = (state, nodeIds, insertedNodes) => {
-  const replacedNodeIds = dedupeIds(nodeIds).filter((nodeId) => {
-    return state.nodes.some((node) => node.id === nodeId);
-  });
+  const replacedNodeIds = getExistingNodeIds(state, nodeIds);
 
   if (!(replacedNodeIds.length > 0 && insertedNodes.length > 0)) {
     return {};

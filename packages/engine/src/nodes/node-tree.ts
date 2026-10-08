@@ -144,24 +144,27 @@ export const getDescendantLeafNodeIds = (nodes, nodeId) => {
   return descendantLeafNodeIds;
 };
 
+// Preorder, siblings in their stored order, emitted into one accumulator.
 export const getTreeOrderedNodes = (
   nodesById,
   childIdsByParent,
   parentId = ROOT_PARENT_ID
 ) => {
   const orderedNodes: NonNullable<ReturnType<typeof nodesById.get>>[] = [];
+  const visit = (currentParentId) => {
+    for (const childId of childIdsByParent.get(currentParentId) || []) {
+      const node = nodesById.get(childId);
 
-  for (const childId of childIdsByParent.get(parentId) || []) {
-    const node = nodesById.get(childId);
-    if (!node) {
-      continue;
+      if (!node) {
+        continue;
+      }
+
+      orderedNodes.push(node);
+      visit(childId);
     }
+  };
 
-    orderedNodes.push(node);
-    orderedNodes.push(
-      ...getTreeOrderedNodes(nodesById, childIdsByParent, childId)
-    );
-  }
+  visit(parentId);
 
   return orderedNodes;
 };
