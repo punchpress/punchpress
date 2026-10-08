@@ -241,12 +241,11 @@ export const largeSvgViewportBenchmark: PerformanceBenchmarkDefinition = {
         const progress = index / Math.max(1, options.frames - 1);
         const zoom = 0.18 - progress * 0.08;
 
-        editor.setViewport({
+        editor.moveViewportTo({
           x: startViewport.x + point.x,
           y: startViewport.y + point.y,
           zoom,
         });
-        editor.onViewportChange?.();
       }
     } finally {
       editor.setViewportInteracting(false);

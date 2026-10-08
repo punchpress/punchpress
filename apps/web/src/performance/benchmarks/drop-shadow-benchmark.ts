@@ -211,14 +211,13 @@ const appearanceMaxStackBenchmark: PerformanceBenchmarkDefinition = {
     try {
       for (let index = 0; index < options.frames; index += 1) {
         await waitForFrame();
-        editor.setViewport(
+        editor.moveViewportTo(
           getFocusedViewport(
             editor,
             focusId,
             getMaxStackZoom(index, options.frames)
           )
         );
-        editor.onViewportChange?.();
       }
     } finally {
       editor.setViewportInteracting(false);

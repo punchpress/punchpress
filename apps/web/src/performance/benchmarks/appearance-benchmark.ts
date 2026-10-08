@@ -47,7 +47,7 @@ export const appearanceViewportPlainBenchmark: PerformanceBenchmarkDefinition =
           );
           const phase = (index / options.frames) * Math.PI * 4;
 
-          editor.setViewport({
+          editor.moveViewportTo({
             x:
               viewport.x +
               (Math.sin(phase) * options.stepX * 10) / viewport.zoom,
@@ -56,7 +56,6 @@ export const appearanceViewportPlainBenchmark: PerformanceBenchmarkDefinition =
               (Math.cos(phase) * options.stepY * 10) / viewport.zoom,
             zoom: viewport.zoom,
           });
-          editor.onViewportChange?.();
         }
       } finally {
         editor.setViewportInteracting(false);
