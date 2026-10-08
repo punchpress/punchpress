@@ -2,7 +2,6 @@ import { PERF_COUNTERS } from "@punchpress/engine";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useEditor } from "../../../editor-react/use-editor";
-import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
 import { AppearancePanel } from "./appearance/appearance";
 import { ArtboardFields } from "./artboard-fields";
@@ -15,58 +14,20 @@ import { SelectionColorsFields } from "./selection-colors-fields";
 import { ShapeFields } from "./shape-fields";
 import { TextFields } from "./text-fields";
 import { TextWarpFields } from "./text-warp-fields";
-import { usePropertiesPanelState } from "./use-properties-panel-state";
+import { usePropertiesPanelLayout } from "./use-properties-panel-layout";
 
+// Lays out the sections for the current selection. Sections read their own
+// values, so a value edit re-renders only the controls that show it.
 export const PropertiesPanel = () => {
   usePerformanceRenderCounter(PERF_COUNTERS.renderPanelProperties);
   const editor = useEditor();
-  const {
-    bootstrapError,
-    bootstrapState,
-    pathCornerRadiusSummary,
-    pathCornerRadiusStableMax,
-    pathPointCornerMax,
-    pathPointCornerRadius,
-    selectedNode: pointSelectedNode,
-    selectedPathPoint,
-    selectionProperties,
-    showsPathPointCornerRadius,
-  } = usePropertiesPanelState();
-  const rasterToolState = useEditorValue((editor, state) => {
-    const settings = editor.getBrushToolSettings(state.activeTool);
-
-    return {
-      presetId: editor.getBrushToolPresetId(state.activeTool),
-      settings,
-      tool: settings ? state.activeTool : null,
-    };
-  });
-  const hasAppearanceFields = Boolean(
-    selectionProperties.properties.appearance ||
-      selectionProperties.properties.opacity
-  );
-  const hasSelectionColors = selectionProperties.selectionColors.length > 0;
-  const hasRasterToolFields = Boolean(rasterToolState.settings);
-  const selectedNode = selectionProperties.selectedNode;
-  const showsPathCornerRadiusSummary = Boolean(
-    pointSelectedNode?.type === "path" &&
-      !showsPathPointCornerRadius &&
-      pathCornerRadiusSummary
-  );
-  const hasFieldsBeforeAppearance = Boolean(
-    selectedNode?.type === "artboard" ||
-      selectedNode?.type === "image" ||
-      selectedNode?.type === "text" ||
-      selectedNode?.type === "shape" ||
-      hasRasterToolFields ||
-      showsPathPointCornerRadius ||
-      showsPathCornerRadiusSummary
-  );
+  const layout = usePropertiesPanelLayout();
+  const { nodeId, nodeType, pathNodeId } = layout;
 
   if (
-    selectionProperties.selectionKind === "none" &&
-    bootstrapState !== "error" &&
-    !hasRasterToolFields
+    layout.selectionKind === "none" &&
+    layout.bootstrapState !== "error" &&
+    !layout.rasterTool
   ) {
     return null;
   }
@@ -74,89 +35,44 @@ export const PropertiesPanel = () => {
   return (
     <div className="flex max-h-full flex-col rounded-2xl border border-[var(--designer-border)] bg-[var(--designer-surface)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.06)]">
       <div className="min-h-0 flex-1 overflow-y-auto px-3.5 pt-3 pb-3.5">
-        {bootstrapState === "error" && (
+        {layout.bootstrapState === "error" && (
           <Alert variant="error">
             <AlertDescription>
-              Bootstrap failed: {bootstrapError || "Unknown error"}
+              Bootstrap failed: {layout.bootstrapError || "Unknown error"}
             </AlertDescription>
           </Alert>
         )}
 
-        {hasRasterToolFields ? (
-          <BrushFields
-            presetId={rasterToolState.presetId}
-            settings={rasterToolState.settings}
-            tool={rasterToolState.tool}
-          />
+        {layout.rasterTool ? <BrushFields tool={layout.rasterTool} /> : null}
+
+        {nodeId ? <NodeFields nodeId={nodeId} nodeType={nodeType} /> : null}
+
+        {pathNodeId && layout.showsPathPointCorner ? (
+          <PathPointFields nodeId={pathNodeId} />
         ) : null}
 
-        {selectedNode?.type === "text" ? (
-          <TextFields node={selectedNode} />
+        {pathNodeId && layout.showsPathCorners ? (
+          <PathCornerFields nodeId={pathNodeId} />
         ) : null}
 
-        {selectedNode?.type === "artboard" ? (
-          <ArtboardFields
-            background={selectionProperties.properties.background}
-            height={selectionProperties.properties.height}
-            node={selectedNode}
-            width={selectionProperties.properties.width}
-          />
-        ) : null}
-
-        {selectedNode?.type === "shape" ? (
-          <ShapeFields
-            cornerRadius={selectionProperties.properties.cornerRadius}
-            height={selectionProperties.properties.height}
-            node={selectedNode}
-            shape={selectionProperties.properties.shape}
-            width={selectionProperties.properties.width}
-          />
-        ) : null}
-
-        {selectedNode?.type === "image" ? (
-          <ImageFields
-            height={selectionProperties.properties.height}
-            node={selectedNode}
-            width={selectionProperties.properties.width}
-          />
-        ) : null}
-
-        {showsPathPointCornerRadius ? (
-          <PathPointFields
-            cornerMax={pathPointCornerMax}
-            cornerRadius={pathPointCornerRadius}
-            selectedNode={pointSelectedNode}
-            selectedPathPoint={selectedPathPoint}
-          />
-        ) : null}
-
-        {showsPathCornerRadiusSummary ? (
-          <PathCornerFields
-            cornerStableMax={pathCornerRadiusStableMax}
-            cornerSummary={pathCornerRadiusSummary}
-            selectedNode={pointSelectedNode}
-          />
-        ) : null}
-
-        {hasAppearanceFields ? <AppearancePanel /> : null}
+        {layout.hasAppearance ? <AppearancePanel /> : null}
 
         <EffectsPanel />
 
-        {hasSelectionColors ? (
+        {layout.hasSelectionColors ? (
           <SelectionColorsFields
-            selectionColors={selectionProperties.selectionColors}
-            withTopBorder={hasFieldsBeforeAppearance || hasAppearanceFields}
+            withTopBorder={layout.hasLeadingFields || layout.hasAppearance}
           />
         ) : null}
 
-        {selectedNode?.type === "text" ? (
+        {nodeId && nodeType === "text" ? (
           <TextWarpFields
-            node={selectedNode}
-            withTopBorder={hasAppearanceFields || hasSelectionColors}
+            nodeId={nodeId}
+            withTopBorder={layout.hasAppearance || layout.hasSelectionColors}
           />
         ) : null}
 
-        {selectionProperties.canDelete ? (
+        {layout.canDelete ? (
           <div className="border-black/4 border-t pt-4 [&_[data-slot=button]]:w-full">
             <Button
               onClick={() => editor.deleteSelected()}
@@ -171,4 +87,27 @@ export const PropertiesPanel = () => {
       </div>
     </div>
   );
+};
+
+// The inspected node's own section, by node type.
+const NodeFields = ({
+  nodeId,
+  nodeType,
+}: {
+  nodeId: string;
+  nodeType: string | null;
+}) => {
+  if (nodeType === "text") {
+    return <TextFields nodeId={nodeId} />;
+  }
+
+  if (nodeType === "artboard") {
+    return <ArtboardFields nodeId={nodeId} />;
+  }
+
+  if (nodeType === "shape") {
+    return <ShapeFields nodeId={nodeId} />;
+  }
+
+  return nodeType === "image" ? <ImageFields nodeId={nodeId} /> : null;
 };

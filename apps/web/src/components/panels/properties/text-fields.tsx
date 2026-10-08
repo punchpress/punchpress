@@ -1,4 +1,4 @@
-import { TEXT_TRACKING_RANGE } from "@punchpress/engine";
+import { PERF_COUNTERS, TEXT_TRACKING_RANGE } from "@punchpress/engine";
 import {
   createLocalFontDescriptor,
   createLocalFontOption,
@@ -8,35 +8,51 @@ import { Input } from "@/components/ui/input";
 import { ScrubSlider } from "@/components/ui/scrub-slider";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
+import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
 import { FieldRow, Section } from "./field-primitives";
 
 const FONT_SIZE_RANGE = { min: 1, max: 2000 };
 const TRACKING_SCRUB_RANGE = { min: -500, max: 500 };
-export const TextFields = ({ node }) => {
+const FONT_STATUS_MESSAGES = {
+  "action-required":
+    "Enable local font access to render this saved font accurately.",
+  error: "Local font access failed. The saved font is unchanged.",
+  loading: "Checking local fonts. The saved font is unchanged.",
+  "load-error":
+    "This font was found but could not be loaded. The saved font is unchanged.",
+  missing:
+    "This font is not installed. The saved font is unchanged until you choose another.",
+  "permission-denied":
+    "Local font access was denied. The saved font is unchanged.",
+  unsupported:
+    "This browser cannot access local fonts. The saved font is unchanged.",
+};
+
+export const TextFields = ({ nodeId }: { nodeId: string }) => {
+  usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesSection);
   const editor = useEditor();
   const availableFonts = useEditorValue((editor) => editor.availableFonts);
   const fontCatalogState = useEditorValue((editor) => editor.fontCatalogState);
   const fontCatalogError = useEditorValue((editor) => editor.bootstrapError);
+  // The node's text fields only; appearance and effect edits on the same
+  // node leave them unchanged.
+  const text = useEditorValue((editor) => {
+    const node = editor.getNode(nodeId);
 
-  if (!node) {
+    return {
+      font: node?.font ?? null,
+      fontAvailability: node ? editor.getFontAvailability(node.font) : null,
+      fontSize: node?.fontSize,
+      text: node?.text,
+      tracking: node?.tracking,
+    };
+  });
+
+  if (!text.font) {
     return null;
   }
 
-  const fontAvailability = editor.getFontAvailability(node.font);
-  const fontStatus = {
-    "action-required":
-      "Enable local font access to render this saved font accurately.",
-    error: "Local font access failed. The saved font is unchanged.",
-    loading: "Checking local fonts. The saved font is unchanged.",
-    "load-error":
-      "This font was found but could not be loaded. The saved font is unchanged.",
-    missing:
-      "This font is not installed. The saved font is unchanged until you choose another.",
-    "permission-denied":
-      "Local font access was denied. The saved font is unchanged.",
-    unsupported:
-      "This browser cannot access local fonts. The saved font is unchanged.",
-  }[fontAvailability];
+  const fontStatus = FONT_STATUS_MESSAGES[text.fontAvailability];
 
   return (
     <Section title="Text">
@@ -46,7 +62,7 @@ export const TextFields = ({ node }) => {
           onChange={(event) =>
             editor.setSelectionProperty("text", event.target.value)
           }
-          value={node.text}
+          value={text.text}
         />
       </FieldRow>
 
@@ -66,7 +82,7 @@ export const TextFields = ({ node }) => {
             }}
             state={fontCatalogState}
             stateMessage={fontCatalogError}
-            value={createLocalFontOption(node.font)}
+            value={createLocalFontOption(text.font)}
           />
           {fontStatus ? (
             <output className="mt-2 block text-muted-foreground text-xs">
@@ -84,7 +100,7 @@ export const TextFields = ({ node }) => {
           onValueChange={(nextFontSize) => {
             editor.setSelectionProperty("fontSize", nextFontSize);
           }}
-          value={node.fontSize}
+          value={text.fontSize}
         />
       </FieldRow>
 
@@ -98,7 +114,7 @@ export const TextFields = ({ node }) => {
           }}
           scrubMax={TRACKING_SCRUB_RANGE.max}
           scrubMin={TRACKING_SCRUB_RANGE.min}
-          value={node.tracking}
+          value={text.tracking}
         />
       </FieldRow>
     </Section>

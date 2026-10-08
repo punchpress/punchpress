@@ -1,6 +1,9 @@
+import { PERF_COUNTERS } from "@punchpress/engine";
 import { useRef } from "react";
 import { ScrubSlider } from "@/components/ui/scrub-slider";
 import { useEditor } from "../../../editor-react/use-editor";
+import { useEditorValue } from "../../../editor-react/use-editor-value";
+import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
 import { FieldRow, Section } from "./field-primitives";
 
 const CORNER_RADIUS_RANGE = { min: 0 };
@@ -10,16 +13,22 @@ const formatCornerRadiusDisplay = (value: number) => {
   return Math.round(value).toString();
 };
 
-export const PathPointFields = ({
-  cornerMax,
-  cornerRadius,
-  selectedNode,
-  selectedPathPoint,
-}) => {
+// Corner radius of the one selected path point on the path-editing target.
+export const PathPointFields = ({ nodeId }: { nodeId: string }) => {
+  usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesSection);
   const editor = useEditor();
   const scrubSourceNodeRef = useRef(null);
+  const corner = useEditorValue((editor) => {
+    const inspector = editor.getPathEditingInspectorState(nodeId);
 
-  if (!(selectedNode && selectedPathPoint)) {
+    return {
+      max: inspector.pathPointCornerMax,
+      point: inspector.selectedPathPoint,
+      radius: inspector.pathPointCornerRadius,
+    };
+  });
+
+  if (!corner.point) {
     return null;
   }
 
@@ -30,24 +39,24 @@ export const PathPointFields = ({
           ariaLabel="Point corner radius"
           formatValue={formatCornerRadiusDisplay}
           keyboardStep={CORNER_RADIUS_KEYBOARD_STEP}
-          max={cornerMax}
+          max={corner.max}
           min={CORNER_RADIUS_RANGE.min}
           onScrubEnd={() => {
             scrubSourceNodeRef.current = null;
           }}
           onScrubStart={() => {
-            scrubSourceNodeRef.current = editor.getNode(selectedNode.id);
+            scrubSourceNodeRef.current = editor.getNode(nodeId);
           }}
           onValueChange={(nextCornerRadius) => {
             editor.setPathPointCornerRadius(
               nextCornerRadius,
-              selectedNode.id,
-              selectedPathPoint,
+              nodeId,
+              corner.point,
               scrubSourceNodeRef.current
             );
           }}
           step={CORNER_RADIUS_STEP}
-          value={cornerRadius ?? 0}
+          value={corner.radius ?? 0}
         />
       </FieldRow>
     </Section>

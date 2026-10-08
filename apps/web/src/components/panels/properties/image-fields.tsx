@@ -1,3 +1,4 @@
+import { PERF_COUNTERS } from "@punchpress/engine";
 import { Link2Icon, Loader2Icon, UnlinkIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Label } from "@/components/ui/label";
@@ -5,38 +6,54 @@ import { ScrubSlider } from "@/components/ui/scrub-slider";
 import { Toggle } from "@/components/ui/toggle";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorPreviewValue } from "../../../editor-react/use-editor-preview-value";
+import { useEditorValue } from "../../../editor-react/use-editor-value";
+import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
 import { Section } from "./field-primitives";
 
 const IMAGE_SIZE_RANGE = { min: 1, max: 16_384 };
 const RESIZE_STATUS_DELAY_MS = 150;
 
-export const ImageFields = ({ height, node, width }) => {
+export const ImageFields = ({ nodeId }: { nodeId: string }) => {
+  usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesSection);
   const editor = useEditor();
   const resizeSessionRef = useRef<ReturnType<
     typeof editor.beginRasterResize
   > | null>(null);
+  const size = useEditorValue((editor, state) => {
+    const node = editor.getNode(nodeId);
+    const width = editor.getSelectionProperty("width", state.selectedNodeIds);
+    const height = editor.getSelectionProperty("height", state.selectedNodeIds);
+
+    return {
+      available: Boolean(node && width && height),
+      height: node?.height ?? height?.value,
+      width: node?.width ?? width?.value,
+    };
+  });
+  // Resize sessions, aspect locks, and drag previews notify through the
+  // interaction preview, not the store.
   const resize = useEditorPreviewValue((activeEditor) => {
-    const state = activeEditor.getRasterResizeState(node?.id);
+    const state = activeEditor.getRasterResizeState(nodeId);
     const preview = activeEditor.selectionDragPreview;
-    const previewUpdate = preview?.nodeIds?.includes(node?.id)
+    const previewUpdate = preview?.nodeIds?.includes(nodeId)
       ? preview.resize?.nodeUpdate
       : null;
 
     return {
-      height: state?.targetHeight ?? previewUpdate?.height ?? node?.height,
-      locked: node?.id ? activeEditor.isRasterAspectRatioLocked(node.id) : true,
+      height: state?.targetHeight ?? previewUpdate?.height ?? size.height,
+      locked: activeEditor.isRasterAspectRatioLocked(nodeId),
       pending: Boolean(state),
-      width: state?.targetWidth ?? previewUpdate?.width ?? node?.width,
+      width: state?.targetWidth ?? previewUpdate?.width ?? size.width,
     };
   });
   const showsStatus = useDelayedResizeStatus(resize.pending);
 
-  if (!(node && width && height)) {
+  if (!size.available) {
     return null;
   }
 
   const beginResize = () => {
-    resizeSessionRef.current ??= editor.beginRasterResize(node.id);
+    resizeSessionRef.current ??= editor.beginRasterResize(nodeId);
   };
   const updateResize = (size) => {
     const session = resizeSessionRef.current;
@@ -46,7 +63,7 @@ export const ImageFields = ({ height, node, width }) => {
       return;
     }
 
-    return editor.resizeRaster(node.id, size);
+    return editor.resizeRaster(nodeId, size);
   };
   const commitResize = () => {
     const session = resizeSessionRef.current;
@@ -79,7 +96,7 @@ export const ImageFields = ({ height, node, width }) => {
             className="size-6 min-w-6 p-0"
             disabled={resize.pending}
             onPressedChange={(locked) => {
-              editor.setRasterAspectRatioLocked(node.id, locked);
+              editor.setRasterAspectRatioLocked(nodeId, locked);
             }}
             pressed={resize.locked}
             size="sm"
@@ -102,7 +119,7 @@ export const ImageFields = ({ height, node, width }) => {
             onScrubEnd={commitResize}
             onScrubStart={beginResize}
             onValueChange={(nextWidth) => updateResize({ width: nextWidth })}
-            value={resize.width ?? width.value ?? node.width}
+            value={resize.width}
           />
         </div>
 
@@ -118,7 +135,7 @@ export const ImageFields = ({ height, node, width }) => {
             onScrubEnd={commitResize}
             onScrubStart={beginResize}
             onValueChange={(nextHeight) => updateResize({ height: nextHeight })}
-            value={resize.height ?? height.value ?? node.height}
+            value={resize.height}
           />
         </div>
       </fieldset>

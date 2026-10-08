@@ -4,6 +4,7 @@ import {
   ARCH_BEND_LIMIT,
   clamp,
   getDefaultWarp,
+  PERF_COUNTERS,
   toNumber,
   WAVE_CYCLES_MAX,
   WAVE_CYCLES_MIN,
@@ -25,6 +26,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
+import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
 import { FieldRow, Section } from "./field-primitives";
 import { warpIcons } from "./warp-icons";
 
@@ -46,16 +48,35 @@ const startPathEditing = (editor, nodeId) => {
   }
 };
 
-export const TextWarpFields = ({ node, withTopBorder = true }) => {
+export const TextWarpFields = ({
+  nodeId,
+  withTopBorder = true,
+}: {
+  nodeId: string;
+  withTopBorder?: boolean;
+}) => {
+  usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesSection);
   const editor = useEditor();
+  // The warp and its font readiness only; other edits to the node leave
+  // these unchanged.
+  const { warp, warpAvailable } = useEditorValue((editor) => {
+    const textNode = editor.getNode(nodeId);
 
-  if (!node) {
+    return {
+      warp: textNode?.warp ?? null,
+      warpAvailable: Boolean(
+        textNode &&
+          editor.getFontAvailability(textNode.font) === "available" &&
+          editor.getFontPreviewState(textNode.font) === "ready"
+      ),
+    };
+  });
+
+  if (!warp) {
     return null;
   }
 
-  const warpAvailable =
-    editor.getFontAvailability(node.font) === "available" &&
-    editor.getFontPreviewState(node.font) === "ready";
+  const node = { id: nodeId, warp };
 
   return (
     <Section
@@ -74,7 +95,7 @@ export const TextWarpFields = ({ node, withTopBorder = true }) => {
           onValueChange={(values) => {
             const nextKind = values[0] ?? "none";
             editor.updateSelectedNode({
-              warp: getDefaultWarp(nextKind, node),
+              warp: getDefaultWarp(nextKind, editor.getNode(nodeId)),
             });
 
             if (nextKind === "circle") {

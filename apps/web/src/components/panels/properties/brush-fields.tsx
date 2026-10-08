@@ -1,4 +1,4 @@
-import { RASTER_BRUSH_PRESETS } from "@punchpress/engine";
+import { PERF_COUNTERS, RASTER_BRUSH_PRESETS } from "@punchpress/engine";
 import { ScrubSlider } from "@/components/ui/scrub-slider";
 import {
   Select,
@@ -8,6 +8,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useEditor } from "../../../editor-react/use-editor";
+import { useEditorValue } from "../../../editor-react/use-editor-value";
+import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
 import { ColorField, FieldRow, Section } from "./field-primitives";
 
 const BRUSH_ANGLE_RANGE = { max: 180, min: -180 };
@@ -19,8 +21,16 @@ const BRUSH_SPACING_RANGE = { max: 200, min: 0 };
 const formatPercent = (value) => `${Math.round(value)}%`;
 const formatAngle = (value) => `${Math.round(value)}°`;
 
-export const BrushFields = ({ presetId, settings, tool }) => {
+export const BrushFields = ({ tool }: { tool: string }) => {
+  usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesSection);
   const editor = useEditor();
+  // Stored settings and preset id, both stable until a brush edit.
+  const { presetId, settings } = useEditorValue((editor) => {
+    return {
+      presetId: editor.getBrushToolPresetId(tool),
+      settings: editor.getBrushToolSettings(tool),
+    };
+  });
   const selectedPreset = RASTER_BRUSH_PRESETS.find(
     (preset) => preset.id === presetId
   );

@@ -1,3 +1,4 @@
+import { PERF_COUNTERS } from "@punchpress/engine";
 import { ScrubSlider } from "@/components/ui/scrub-slider";
 import {
   ToggleGroup,
@@ -5,6 +6,7 @@ import {
 } from "@/components/ui/toggle-group";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
+import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
 import { useCornerSliderPresentation } from "./corner-slider-presentation";
 import { FieldRow, Section } from "./field-primitives";
 
@@ -22,26 +24,23 @@ const SHAPE_OPTIONS = [
   { label: "Star", value: "star" },
 ];
 
-export const ShapeFields = ({ cornerRadius, height, node, shape, width }) => {
+export const ShapeFields = ({ nodeId }: { nodeId: string }) => {
+  usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesSection);
   const editor = useEditor();
-  const cornerSummary = useEditorValue((editor) => {
-    return node ? editor.getPathCornerRadiusSummary(node.id) : null;
-  });
-  const currentCornerValue =
-    cornerSummary?.value ?? cornerRadius?.value ?? node?.cornerRadius ?? 0;
+  const fields = useShapeFieldValues(nodeId);
   const {
     displayValue,
     preserveDisplayValueWhileDragging,
     valueBadge,
     visualMax,
   } = useCornerSliderPresentation({
-    currentValue: currentCornerValue,
+    currentValue: fields.cornerValue,
     formatValue: formatCornerRadiusDisplay,
-    isMixed: Boolean(cornerSummary?.isMixed || cornerRadius?.isMixed),
-    max: cornerSummary?.max ?? 0,
+    isMixed: fields.cornerIsMixed,
+    max: fields.cornerMax,
   });
 
-  if (!(node && shape && width && height)) {
+  if (!fields.available) {
     return null;
   }
 
@@ -59,7 +58,7 @@ export const ShapeFields = ({ cornerRadius, height, node, shape, width }) => {
             editor.setSelectionProperty("shape", nextShape);
             editor.setNextShapeKind(nextShape);
           }}
-          value={shape.value ? [shape.value] : []}
+          value={fields.shape ? [fields.shape] : []}
         >
           {SHAPE_OPTIONS.map((option) => {
             return (
@@ -79,7 +78,7 @@ export const ShapeFields = ({ cornerRadius, height, node, shape, width }) => {
           onValueChange={(nextWidth) => {
             editor.setSelectionProperty("width", nextWidth);
           }}
-          value={width.value ?? node.width}
+          value={fields.width}
         />
       </FieldRow>
 
@@ -91,18 +90,18 @@ export const ShapeFields = ({ cornerRadius, height, node, shape, width }) => {
           onValueChange={(nextHeight) => {
             editor.setSelectionProperty("height", nextHeight);
           }}
-          value={height.value ?? node.height}
+          value={fields.height}
         />
       </FieldRow>
 
-      {cornerRadius && cornerSummary ? (
+      {fields.hasCorners ? (
         <FieldRow label="Corners">
           <ScrubSlider
             ariaLabel="Shape corner radius"
             displayValue={displayValue}
             formatValue={formatCornerRadiusDisplay}
             keyboardStep={CORNER_RADIUS_KEYBOARD_STEP}
-            max={visualMax || cornerSummary.max}
+            max={visualMax || fields.cornerMax}
             min={CORNER_RADIUS_RANGE.min}
             onValueChange={(nextCornerRadius) => {
               editor.setSelectionProperty("cornerRadius", nextCornerRadius);
@@ -111,11 +110,42 @@ export const ShapeFields = ({ cornerRadius, height, node, shape, width }) => {
               preserveDisplayValueWhileDragging
             }
             step={CORNER_RADIUS_STEP}
-            value={currentCornerValue}
+            value={fields.cornerValue}
             valueBadge={valueBadge}
           />
         </FieldRow>
       ) : null}
     </Section>
   );
+};
+
+// Primitive shape values, so appearance or effect edits on the shape leave
+// this section alone.
+const useShapeFieldValues = (nodeId: string) => {
+  return useEditorValue((editor, state) => {
+    const node = editor.getNode(nodeId);
+    const read = (propertyId: string) => {
+      return editor.getSelectionProperty(propertyId, state.selectedNodeIds);
+    };
+    const shape = read("shape");
+    const width = read("width");
+    const height = read("height");
+    const cornerRadius = read("cornerRadius");
+    const cornerSummary = editor.getPathCornerRadiusSummary(nodeId);
+
+    return {
+      available: Boolean(node && shape && width && height),
+      cornerIsMixed: Boolean(cornerSummary?.isMixed || cornerRadius?.isMixed),
+      cornerMax: (cornerSummary?.max as number | undefined) ?? 0,
+      cornerValue:
+        (cornerSummary?.value as number | undefined) ??
+        cornerRadius?.value ??
+        node?.cornerRadius ??
+        0,
+      hasCorners: Boolean(cornerRadius && cornerSummary),
+      height: height?.value ?? node?.height,
+      shape: (shape?.value as string | null | undefined) ?? null,
+      width: width?.value ?? node?.width,
+    };
+  });
 };

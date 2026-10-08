@@ -1,11 +1,32 @@
+import { PERF_COUNTERS } from "@punchpress/engine";
 import { useEditor } from "../../../editor-react/use-editor";
+import { useEditorValue } from "../../../editor-react/use-editor-value";
+import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
 import { ColorField, FieldRow, Section } from "./field-primitives";
 import { NumberField } from "./number-field";
 
-export const ArtboardFields = ({ background, height, node, width }) => {
+export const ArtboardFields = ({ nodeId }: { nodeId: string }) => {
+  usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesSection);
   const editor = useEditor();
+  const fields = useEditorValue((editor, state) => {
+    const node = editor.getNode(nodeId);
+    const read = (propertyId: string) => {
+      return editor.getSelectionProperty(propertyId, state.selectedNodeIds);
+    };
+    const width = read("width");
+    const height = read("height");
+    const background = read("background");
 
-  if (!(node && width && height && background)) {
+    return {
+      available: Boolean(node && width && height && background),
+      background: background?.isMixed ? null : background?.value,
+      height: height?.value ?? node?.height,
+      isBackgroundMixed: Boolean(background?.isMixed),
+      width: width?.value ?? node?.width,
+    };
+  });
+
+  if (!fields.available) {
     return null;
   }
 
@@ -17,7 +38,7 @@ export const ArtboardFields = ({ background, height, node, width }) => {
           onValueChange={(nextWidth) => {
             editor.setSelectionProperty("width", nextWidth);
           }}
-          value={width.value ?? node.width}
+          value={fields.width}
         />
       </FieldRow>
 
@@ -27,7 +48,7 @@ export const ArtboardFields = ({ background, height, node, width }) => {
           onValueChange={(nextHeight) => {
             editor.setSelectionProperty("height", nextHeight);
           }}
-          value={height.value ?? node.height}
+          value={fields.height}
         />
       </FieldRow>
 
@@ -36,9 +57,9 @@ export const ArtboardFields = ({ background, height, node, width }) => {
           onChange={(nextBackground) => {
             editor.setSelectionProperty("background", nextBackground);
           }}
-          placeholder={background.isMixed ? "Mixed" : undefined}
+          placeholder={fields.isBackgroundMixed ? "Mixed" : undefined}
           stateKey="artboard-background"
-          value={background.isMixed ? null : background.value}
+          value={fields.background}
         />
       </FieldRow>
     </Section>

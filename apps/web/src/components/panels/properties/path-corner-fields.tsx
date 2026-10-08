@@ -1,6 +1,9 @@
+import { PERF_COUNTERS } from "@punchpress/engine";
 import { useRef } from "react";
 import { ScrubSlider } from "@/components/ui/scrub-slider";
 import { useEditor } from "../../../editor-react/use-editor";
+import { useEditorValue } from "../../../editor-react/use-editor-value";
+import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
 import { useCornerSliderPresentation } from "./corner-slider-presentation";
 import { FieldRow, Section } from "./field-primitives";
 
@@ -11,27 +14,36 @@ const formatCornerRadiusDisplay = (value: number) => {
   return Math.round(value).toString();
 };
 
-export const PathCornerFields = ({
-  cornerStableMax,
-  cornerSummary,
-  selectedNode,
-}) => {
+// Corner radius across the path-editing target's eligible corners.
+export const PathCornerFields = ({ nodeId }: { nodeId: string }) => {
+  usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesSection);
   const editor = useEditor();
   const scrubSourceNodeRef = useRef(null);
-  const currentValue = cornerSummary?.value ?? 0;
+  const corner = useEditorValue((editor) => {
+    const inspector = editor.getPathEditingInspectorState(nodeId);
+    const summary = inspector.pathCornerRadiusSummary;
+
+    return {
+      available: Boolean(summary),
+      isMixed: Boolean(summary?.isMixed),
+      max: (summary?.max as number | undefined) ?? 0,
+      stableMax: inspector.pathCornerRadiusStableMax,
+      value: (summary?.value as number | undefined) ?? 0,
+    };
+  });
   const {
     displayValue,
     preserveDisplayValueWhileDragging,
     valueBadge,
     visualMax,
   } = useCornerSliderPresentation({
-    currentValue,
+    currentValue: corner.value,
     formatValue: formatCornerRadiusDisplay,
-    isMixed: Boolean(cornerSummary?.isMixed),
-    max: cornerStableMax || cornerSummary?.max || 0,
+    isMixed: corner.isMixed,
+    max: corner.stableMax || corner.max,
   });
 
-  if (!(selectedNode && cornerSummary)) {
+  if (!corner.available) {
     return null;
   }
 
@@ -43,24 +55,24 @@ export const PathCornerFields = ({
           displayValue={displayValue}
           formatValue={formatCornerRadiusDisplay}
           keyboardStep={CORNER_RADIUS_KEYBOARD_STEP}
-          max={visualMax || cornerSummary.max}
+          max={visualMax || corner.max}
           min={CORNER_RADIUS_RANGE.min}
           onScrubEnd={() => {
             scrubSourceNodeRef.current = null;
           }}
           onScrubStart={() => {
-            scrubSourceNodeRef.current = editor.getNode(selectedNode.id);
+            scrubSourceNodeRef.current = editor.getNode(nodeId);
           }}
           onValueChange={(nextCornerRadius) => {
             editor.setPathCornerRadius(
               nextCornerRadius,
-              selectedNode.id,
+              nodeId,
               scrubSourceNodeRef.current
             );
           }}
           preserveDisplayValueWhileDragging={preserveDisplayValueWhileDragging}
           step={CORNER_RADIUS_STEP}
-          value={currentValue}
+          value={corner.value}
           valueBadge={valueBadge}
         />
       </FieldRow>
