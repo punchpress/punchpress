@@ -1,10 +1,12 @@
 import {
   buildEffectFilter,
   type EffectPresentation,
+  type RenderItem,
   type RenderLayer,
 } from "@punchpress/engine";
 import { toRgb } from "@punchpress/punch-schema";
-import { type CSSProperties, memo, type ReactNode, useId } from "react";
+import { type CSSProperties, memo, useId } from "react";
+import { CanvasNode } from "./canvas-node/canvas-node";
 import { renderSvgElement } from "./canvas-node/svg-element";
 import { useLayerComposite } from "./use-layer-composite";
 
@@ -17,11 +19,11 @@ import { useLayerComposite } from "./use-layer-composite";
 // shape whether or not a layer is composited, so toggling a shadow never
 // remounts the subtree. It carries no node markers, so hit testing and
 // selection never target it.
-export const CanvasRenderLayer = memo(function CanvasRenderLayer({
-  children,
+// The engine keeps an unchanged layer's object across rebuilds, so memoizing
+// on `layer` skips its whole subtree when a structural edit lands elsewhere.
+const CanvasRenderLayer = memo(function CanvasRenderLayer({
   layer,
 }: {
-  children: ReactNode;
   layer: RenderLayer;
 }) {
   const filterId = `pp${useId().replace(/[^a-zA-Z0-9_-]/g, "")}-fx`;
@@ -54,7 +56,7 @@ export const CanvasRenderLayer = memo(function CanvasRenderLayer({
       data-render-layer={layer.nodeId}
       style={style}
     >
-      {children}
+      <CanvasRenderItems items={layer.children} />
       {effects && !cssShadow ? (
         <svg
           aria-hidden="true"
@@ -78,4 +80,14 @@ const getCssDropShadow = ({ effects }: EffectPresentation) => {
   const { b, g, r } = toRgb(color);
 
   return `drop-shadow(${x}px ${y}px ${blur}px rgba(${r}, ${g}, ${b}, ${opacity}))`;
+};
+
+export const CanvasRenderItems = ({ items }: { items: RenderItem[] }) => {
+  return items.map((item) => {
+    if (item.kind === "layer") {
+      return <CanvasRenderLayer key={item.nodeId} layer={item} />;
+    }
+
+    return <CanvasNode key={item.nodeId} nodeId={item.nodeId} />;
+  });
 };
