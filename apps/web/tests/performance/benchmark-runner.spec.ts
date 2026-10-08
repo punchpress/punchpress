@@ -42,7 +42,24 @@ const benchmarkOptions = {
     : {}),
 };
 
+const [viewportWidth, viewportHeight] = (
+  process.env.PUNCHPRESS_BENCHMARK_VIEWPORT || ""
+)
+  .split("x")
+  .map(Number);
+
 test.describe.configure({ mode: "serial" });
+test.use({
+  ...(process.env.PUNCHPRESS_BENCHMARK_BROWSER === "chromium"
+    ? { channel: "chromium" }
+    : {}),
+  ...(process.env.PUNCHPRESS_BENCHMARK_DPR
+    ? { deviceScaleFactor: Number(process.env.PUNCHPRESS_BENCHMARK_DPR) }
+    : {}),
+  ...(viewportWidth && viewportHeight
+    ? { viewport: { height: viewportHeight, width: viewportWidth } }
+    : {}),
+});
 
 test(benchmarkId || "performance-benchmark", async ({ page }, testInfo) => {
   test.skip(!benchmarkId, "Use bun run perf:* to run a specific benchmark.");

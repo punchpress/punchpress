@@ -1,9 +1,8 @@
 import {
   appearanceDraggingPlainBenchmark,
   appearanceNestedGroupsDraggingBenchmark,
-  appearanceNestedGroupsViewportBenchmark,
-  appearanceViewportPlainBenchmark,
 } from "./benchmarks/appearance-benchmark";
+import { appearanceViewportBenchmarks } from "./benchmarks/appearance-viewport-benchmark";
 import { compoundVectorDragBenchmark } from "./benchmarks/compound-vector-drag-benchmark";
 import { dropShadowBenchmarks } from "./benchmarks/drop-shadow-benchmark";
 import { groupActionBenchmarks } from "./benchmarks/group-action-benchmark";
@@ -11,6 +10,7 @@ import { idleSoakBenchmark } from "./benchmarks/idle-soak-benchmark";
 import {
   largeSvgDeselectBenchmark,
   largeSvgHoverBenchmark,
+  largeSvgPanBenchmark,
   largeSvgPointerDeselectBenchmark,
   largeSvgPointerDragBenchmark,
   largeSvgResizeBenchmark,
@@ -47,6 +47,7 @@ import {
 export const performanceBenchmarks = [
   largeSvgPointerDragBenchmark,
   largeSvgViewportBenchmark,
+  largeSvgPanBenchmark,
   largeSvgResizeBenchmark,
   largeSvgRotateBenchmark,
   largeSvgSelectBenchmark,
@@ -67,9 +68,8 @@ export const performanceBenchmarks = [
   rasterHighZoomBenchmark,
   rasterLargestSupportedPlaneBenchmark,
   compoundVectorDragBenchmark,
-  appearanceViewportPlainBenchmark,
+  ...appearanceViewportBenchmarks,
   appearanceDraggingPlainBenchmark,
-  appearanceNestedGroupsViewportBenchmark,
   appearanceNestedGroupsDraggingBenchmark,
   ...strokeAlignmentBenchmarks,
   ...dropShadowBenchmarks,

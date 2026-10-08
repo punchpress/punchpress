@@ -7,6 +7,12 @@ import {
 import { saveDesignDocument } from "@punchpress/punch-schema";
 import { importSvgToNodes } from "../../platform/svg-import-document";
 import type { PerformanceBenchmarkDefinition } from "../performance-benchmark-types";
+import {
+  captureViewportHost,
+  getPanCamera,
+  positionViewport,
+  probeViewportTrajectory,
+} from "./viewport-motion";
 
 const LARGE_SVG_URL = "/performance/large-svg.svg";
 
@@ -109,7 +115,7 @@ const setupLargeSvgDocument = async (
     editor.setSelectedNodes([rootId]);
   }
 
-  editor.moveViewportTo(viewport);
+  positionViewport(editor, viewport);
   await waitForFrames(warmupFrames);
 
   return rootId;
@@ -209,6 +215,20 @@ export const largeSvgPointerDragBenchmark: PerformanceBenchmarkDefinition = {
   usesScratchDocument: true,
 };
 
+const LARGE_SVG_VIEWPORT = { x: 550, y: 1000, zoom: 0.18 };
+
+// Mixed pan and pinch: pans a world-space path while zooming 18% -> 10%.
+const getLargeSvgViewportCamera = (index: number, options) => {
+  const point = getDragPathPoint(index, options);
+  const progress = index / Math.max(1, options.frames - 1);
+
+  return {
+    x: LARGE_SVG_VIEWPORT.x + point.x,
+    y: LARGE_SVG_VIEWPORT.y + point.y,
+    zoom: LARGE_SVG_VIEWPORT.zoom - progress * 0.08,
+  };
+};
+
 export const largeSvgViewportBenchmark: PerformanceBenchmarkDefinition = {
   defaultOptions: {
     frames: 160,
@@ -218,40 +238,93 @@ export const largeSvgViewportBenchmark: PerformanceBenchmarkDefinition = {
     warmupFrames: 12,
   },
   description:
-    "Loads the large SVG fixture and changes viewport pan and zoom for a deterministic 160-frame pass.",
+    "Loads the large SVG fixture with its root selected and pans while zooming 18% -> 10% for a deterministic 160-frame pass.",
   id: "large-svg-viewport",
   label: "Large SVG Viewport",
-  setup: (context) =>
-    setupLargeSvgDocument(context, {
+  setup: async (context) => {
+    await setupLargeSvgDocument(context, {
       selectRoot: true,
-      viewport: { x: 550, y: 1000, zoom: 0.18 },
-    }),
+      viewport: LARGE_SVG_VIEWPORT,
+    });
+    probeViewportTrajectory(
+      context.editor,
+      (index) => getLargeSvgViewportCamera(index, context.options),
+      [0, Math.floor(context.options.frames / 2), context.options.frames - 1]
+    );
+  },
   run: async ({ editor, options, waitForFrame }) => {
     recordLargeSvgStats(editor);
-
-    const startViewport = editor.viewport;
-
     editor.setViewportInteracting(true);
 
     try {
       for (let index = 0; index < options.frames; index += 1) {
         await waitForFrame();
-
-        const point = getDragPathPoint(index, options);
-        const progress = index / Math.max(1, options.frames - 1);
-        const zoom = 0.18 - progress * 0.08;
-
-        editor.moveViewportTo({
-          x: startViewport.x + point.x,
-          y: startViewport.y + point.y,
-          zoom,
-        });
+        editor.moveViewportTo(getLargeSvgViewportCamera(index, options));
       }
     } finally {
       editor.setViewportInteracting(false);
     }
   },
   usesScratchDocument: true,
+};
+
+const LARGE_SVG_PAN_RADIUS_PX = { x: 240, y: 160 };
+
+const getLargeSvgPanCamera = (host, index: number, frames: number) => {
+  const zoom = LARGE_SVG_VIEWPORT.zoom;
+
+  return getPanCamera(
+    host,
+    {
+      x: LARGE_SVG_VIEWPORT.x + host.width / zoom / 2,
+      y: LARGE_SVG_VIEWPORT.y + host.height / zoom / 2,
+    },
+    zoom,
+    { frames, index, radiusPx: LARGE_SVG_PAN_RADIUS_PX }
+  );
+};
+
+// Fixed-zoom translation twin of `large-svg-viewport`.
+export const largeSvgPanBenchmark: PerformanceBenchmarkDefinition = {
+  ...largeSvgViewportBenchmark,
+  defaultOptions: { ...largeSvgViewportBenchmark.defaultOptions, frames: 240 },
+  description:
+    "Loads the large SVG fixture with its root selected and pans a 240 x 160 px screen-space ellipse at a fixed 18% zoom.",
+  id: "large-svg-pan",
+  label: "Large SVG Pan",
+  setup: async (context) => {
+    await setupLargeSvgDocument(context, {
+      selectRoot: true,
+      viewport: LARGE_SVG_VIEWPORT,
+    });
+
+    const host = captureViewportHost(context.editor);
+    const frames = context.options.frames;
+
+    probeViewportTrajectory(
+      context.editor,
+      (index) => getLargeSvgPanCamera(host, index, frames),
+      [0, Math.floor(frames / 4), Math.floor(frames / 2)]
+    );
+  },
+  run: async ({ editor, options, waitForFrame }) => {
+    recordLargeSvgStats(editor);
+
+    const host = captureViewportHost(editor);
+
+    editor.setViewportInteracting(true);
+
+    try {
+      for (let index = 1; index <= options.frames; index += 1) {
+        await waitForFrame();
+        editor.moveViewportTo(
+          getLargeSvgPanCamera(host, index, options.frames)
+        );
+      }
+    } finally {
+      editor.setViewportInteracting(false);
+    }
+  },
 };
 
 export const largeSvgResizeBenchmark: PerformanceBenchmarkDefinition = {

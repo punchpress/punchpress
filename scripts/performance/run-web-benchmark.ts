@@ -26,7 +26,7 @@ const listBenchmarks = (json = false) => {
 
 const printUsage = () => {
   console.log(
-    "Usage: bun run perf [--headed] [--json] [--flame] [--trace] [--frames <count>] [--node-count <count>] [--timeout-ms <ms>] <benchmark-id>"
+    "Usage: bun run perf [--headed] [--json] [--flame] [--trace] [--frames <count>] [--node-count <count>] [--timeout-ms <ms>] [--dpr <scale>] [--browser chromium] [--viewport <width>x<height>] <benchmark-id>"
   );
   console.log(
     "Usage: bun run perf:json <benchmark-id> | bun run perf:flame <benchmark-id> | bun run perf:trace <benchmark-id>"
@@ -87,6 +87,9 @@ const parseArgs = (args: string[]) => {
   let frames: number | null = null;
   let nodeCount: number | null = null;
   let timeoutMs = 300_000;
+  let dpr: number | null = null;
+  let browser: string | null = null;
+  let viewport: string | null = null;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -133,6 +136,39 @@ const parseArgs = (args: string[]) => {
       continue;
     }
 
+    if (arg === "--dpr") {
+      dpr = Number(args[index + 1]);
+
+      if (!(Number.isFinite(dpr) && dpr > 0)) {
+        throw new Error(`Invalid --dpr value: ${args[index + 1]}`);
+      }
+
+      index += 1;
+      continue;
+    }
+
+    if (arg === "--browser") {
+      browser = args[index + 1] || "";
+
+      if (browser !== "chromium") {
+        throw new Error(`Unsupported --browser value: ${browser}`);
+      }
+
+      index += 1;
+      continue;
+    }
+
+    if (arg === "--viewport") {
+      viewport = args[index + 1] || "";
+
+      if (!/^\d+x\d+$/.test(viewport)) {
+        throw new Error(`Invalid --viewport value: ${viewport}`);
+      }
+
+      index += 1;
+      continue;
+    }
+
     if (arg === "--frames" || arg === "--node-count") {
       const value = args[index + 1];
 
@@ -169,6 +205,8 @@ const parseArgs = (args: string[]) => {
 
   return {
     benchmarkId,
+    browser,
+    dpr,
     flame,
     frames,
     headed,
@@ -177,6 +215,7 @@ const parseArgs = (args: string[]) => {
     nodeCount,
     trace,
     timeoutMs,
+    viewport,
   };
 };
 
@@ -244,6 +283,15 @@ const run = async () => {
           : {}),
         ...(options.nodeCount
           ? { PUNCHPRESS_BENCHMARK_NODE_COUNT: String(options.nodeCount) }
+          : {}),
+        ...(options.dpr
+          ? { PUNCHPRESS_BENCHMARK_DPR: String(options.dpr) }
+          : {}),
+        ...(options.browser
+          ? { PUNCHPRESS_BENCHMARK_BROWSER: options.browser }
+          : {}),
+        ...(options.viewport
+          ? { PUNCHPRESS_BENCHMARK_VIEWPORT: options.viewport }
           : {}),
         ...(options.flame || options.trace
           ? { PUNCHPRESS_CAPTURE_FLAME_SPANS: "1" }

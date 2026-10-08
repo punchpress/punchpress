@@ -1,4 +1,5 @@
 import type { Editor, Effect } from "@punchpress/engine";
+import { getPingPongProgress } from "./viewport-motion";
 
 type StrokeAlign = "center" | "inside" | "outside";
 
@@ -103,38 +104,22 @@ export const applyMaxStack = (editor: Editor, nodeIds: string[]) => {
 
 // Zoom 1% → 6400% → 1%, geometric so every decade gets equal time.
 export const getMaxStackZoom = (index: number, frames: number) => {
-  const progress = index / Math.max(1, frames - 1);
-  const pingPong = progress <= 0.5 ? progress * 2 : (1 - progress) * 2;
   const minZoom = 0.01;
   const maxZoom = 64;
 
-  return minZoom * (maxZoom / minZoom) ** pingPong;
+  return minZoom * (maxZoom / minZoom) ** getPingPongProgress(index, frames);
 };
 
 // Keeps a node's left edge (fills, all stroke alignments, and shadows) in view
 // at every zoom, including 6400%.
-export const getFocusedViewport = (
-  editor: Editor,
-  nodeId: string,
-  zoom: number
-) => {
+export const getMaxStackFocus = (editor: Editor, nodeId: string) => {
   const bounds = editor.getSelectionBounds([nodeId]);
 
   if (!bounds) {
     throw new Error(`Max-stack focus node ${nodeId} has no bounds.`);
   }
 
-  const rect = editor.hostRef?.getBoundingClientRect();
-  const width = rect?.width ?? 1280;
-  const height = rect?.height ?? 800;
-  const focusX = bounds.minX;
-  const focusY = (bounds.minY + bounds.maxY) / 2;
-
-  return {
-    x: focusX - width / zoom / 2,
-    y: focusY - height / zoom / 2,
-    zoom,
-  };
+  return { x: bounds.minX, y: (bounds.minY + bounds.maxY) / 2 };
 };
 
 const createFillLayer = (index: number, color: string) => {

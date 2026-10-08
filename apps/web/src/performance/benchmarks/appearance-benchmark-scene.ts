@@ -10,8 +10,14 @@ import {
   DEFAULT_LOCAL_FONT,
   saveDesignDocument,
 } from "@punchpress/punch-schema";
+import { captureViewportHost, getCameraCenteredOn } from "./viewport-motion";
 
 const APPEARANCE_ARTBOARD_SIZE = { height: 5400, width: 4500 };
+
+export const APPEARANCE_ARTBOARD_CENTER = {
+  x: APPEARANCE_ARTBOARD_SIZE.width / 2,
+  y: APPEARANCE_ARTBOARD_SIZE.height / 2,
+};
 
 const SHAPE_KINDS = ["polygon", "ellipse", "star"] as const;
 
@@ -72,13 +78,22 @@ export const loadAppearanceBenchmarkScene = async (
   editor: Editor,
   nodeCount: number,
   waitForFrame: () => Promise<number>,
-  { flatGroups = false, nestedGroups = false } = {}
+  {
+    flatGroups = false,
+    nestedGroupOpacity = GROUP_OPACITY,
+    nestedGroups = false,
+  } = {}
 ) => {
   const { artboard, children } = createAppearanceBenchmarkNodes(nodeCount);
   let groups: ReturnType<typeof createDefaultGroupNode>[] = [];
 
   if (nestedGroups) {
-    groups = nestInGroups(artboard.id, children, GROUP_DEPTH, GROUP_OPACITY);
+    groups = nestInGroups(
+      artboard.id,
+      children,
+      GROUP_DEPTH,
+      nestedGroupOpacity
+    );
   } else if (flatGroups) {
     groups = nestInGroups(artboard.id, children, 1, 1);
   }
@@ -144,26 +159,17 @@ const nestInGroups = (
   return groups;
 };
 
-// Viewport x/y is the world-space top-left, so keeping the artboard center
-// fixed while zooming means recomputing the corner for every zoom.
 export const getCenteredViewport = (editor: Editor, zoom: number) => {
-  const rect = editor.hostRef?.getBoundingClientRect();
-  const width = rect?.width ?? 1280;
-  const height = rect?.height ?? 800;
-
-  return {
-    x: APPEARANCE_ARTBOARD_SIZE.width / 2 - width / zoom / 2,
-    y: APPEARANCE_ARTBOARD_SIZE.height / 2 - height / zoom / 2,
-    zoom,
-  };
+  return getCameraCenteredOn(
+    captureViewportHost(editor),
+    APPEARANCE_ARTBOARD_CENTER,
+    zoom
+  );
 };
 
 // The node nearest the artboard center is on screen at 100% zoom.
 export const getCenterNodeId = (editor: Editor, nodeIds: string[]) => {
-  const viewport = getCenteredViewport(editor, 1);
-  const rect = editor.hostRef?.getBoundingClientRect();
-  const centerX = viewport.x + (rect?.width ?? 1280) / 2;
-  const centerY = viewport.y + (rect?.height ?? 800) / 2;
+  const { x: centerX, y: centerY } = APPEARANCE_ARTBOARD_CENTER;
   let best = nodeIds[0];
   let bestDistance = Number.POSITIVE_INFINITY;
 

@@ -1,12 +1,9 @@
-import type { Effect } from "@punchpress/engine";
+import type { Editor } from "@punchpress/engine";
 import type {
   PerformanceBenchmarkContext,
   PerformanceBenchmarkDefinition,
 } from "../performance-benchmark-types";
-import {
-  appearanceDraggingPlainBenchmark,
-  appearanceViewportPlainBenchmark,
-} from "./appearance-benchmark";
+import { appearanceDraggingPlainBenchmark } from "./appearance-benchmark";
 import {
   getCenteredViewport,
   getCenterNodeId,
@@ -17,43 +14,18 @@ import {
   applyEffects,
   applyMaxStack,
   blurShadow,
-  getFocusedViewport,
+  getMaxStackFocus,
   getMaxStackZoom,
   getShadowScrubPatch,
-  hardShadow,
 } from "./drop-shadow-benchmark-scene";
+import {
+  captureViewportHost,
+  getCameraCenteredOn,
+  positionViewport,
+  probeViewportTrajectory,
+} from "./viewport-motion";
 
 const MAX_STACK_NODE_COUNT = 20;
-
-// Viewport ladder twins of `appearance-viewport-200-plain`: same scene, ladder,
-// and frames, with one drop shadow on every node.
-const createShadowViewportBenchmark = (
-  variant: "hard" | "blur24",
-  shadow: () => Effect
-): PerformanceBenchmarkDefinition => {
-  return {
-    ...appearanceViewportPlainBenchmark,
-    description: `The 200-node appearance scene with one ${variant === "hard" ? "hard 8/8" : "blur-24 8/8"} drop shadow on every node, zoomed down the 100→1% ladder and back while panning.`,
-    id: `appearance-viewport-200-shadow-${variant}`,
-    label: `Appearance Viewport (200, shadow ${variant})`,
-    setup: async ({ editor, options, waitForFrame, waitForFrames }) => {
-      const { children } = await loadAppearanceBenchmarkScene(
-        editor,
-        options.nodeCount,
-        waitForFrame
-      );
-
-      applyEffects(
-        editor,
-        children.map((node) => node.id),
-        [shadow()]
-      );
-      editor.clearSelection();
-      editor.moveViewportTo(getCenteredViewport(editor, 1));
-      await waitForFrames(4);
-    },
-  };
-};
 
 const appearanceDraggingShadowBenchmark: PerformanceBenchmarkDefinition = {
   ...appearanceDraggingPlainBenchmark,
@@ -70,7 +42,7 @@ const appearanceDraggingShadowBenchmark: PerformanceBenchmarkDefinition = {
     const nodeIds = children.map((node) => node.id);
 
     applyEffects(editor, nodeIds, [blurShadow()]);
-    editor.moveViewportTo(getCenteredViewport(editor, 0.21));
+    positionViewport(editor, getCenteredViewport(editor, 0.21));
     editor.setSelectedNodes(nodeIds);
     await waitForFrames(4);
   },
@@ -107,7 +79,7 @@ const createShadowScrubBenchmark = (
 
       applyEffects(editor, nodeIds, [blurShadow()]);
       addScrubStroke(editor, targetId);
-      editor.moveViewportTo(getCenteredViewport(editor, 1));
+      positionViewport(editor, getCenteredViewport(editor, 1));
       editor.setSelectedNodes([targetId]);
       await waitForFrames(4);
     },
@@ -194,7 +166,7 @@ const createShadowedGroupsDragBenchmark = (
         applyEffects(editor, rootGroupIds, [blurShadow()]);
       }
 
-      editor.moveViewportTo(getCenteredViewport(editor, 0.21));
+      positionViewport(editor, getCenteredViewport(editor, 0.21));
       editor.setSelectedNodes(
         target === "whole" ? rootGroupIds : [children[0].id]
       );
@@ -217,18 +189,27 @@ const appearanceMaxStackBenchmark: PerformanceBenchmarkDefinition = {
   label: "Appearance Max Stack (20, zoom 1–6400%)",
   setup: async ({ editor, options, waitForFrame, waitForFrames }) => {
     await loadMaxStackScene({ editor, options, waitForFrame, waitForFrames });
-    editor.moveViewportTo(
-      getFocusedViewport(editor, editor.selectedNodeIds[0], 0.01)
-    );
     editor.clearSelection();
+
+    const host = captureViewportHost(editor);
+    const focus = getMaxStackFocus(editor, getMaxStackFocusId(editor));
+    const middle = Math.floor((options.frames - 1) / 2);
+
+    probeViewportTrajectory(
+      editor,
+      (index) =>
+        getCameraCenteredOn(
+          host,
+          focus,
+          getMaxStackZoom(index, options.frames)
+        ),
+      [0, middle, options.frames - 1]
+    );
     await waitForFrames(4);
   },
   run: async ({ editor, options, waitForFrame }) => {
-    const focusId = editor.nodes.find((node) => node.type === "shape")?.id;
-
-    if (!focusId) {
-      throw new Error("Max-stack scene has no shape to focus.");
-    }
+    const host = captureViewportHost(editor);
+    const focus = getMaxStackFocus(editor, getMaxStackFocusId(editor));
 
     editor.setViewportInteracting(true);
 
@@ -236,9 +217,9 @@ const appearanceMaxStackBenchmark: PerformanceBenchmarkDefinition = {
       for (let index = 0; index < options.frames; index += 1) {
         await waitForFrame();
         editor.moveViewportTo(
-          getFocusedViewport(
-            editor,
-            focusId,
+          getCameraCenteredOn(
+            host,
+            focus,
             getMaxStackZoom(index, options.frames)
           )
         );
@@ -269,6 +250,16 @@ const appearanceMaxStackExportBenchmark: PerformanceBenchmarkDefinition = {
   },
 };
 
+const getMaxStackFocusId = (editor: Editor) => {
+  const focusId = editor.nodes.find((node) => node.type === "shape")?.id;
+
+  if (!focusId) {
+    throw new Error("Max-stack scene has no shape to focus.");
+  }
+
+  return focusId;
+};
+
 const loadMaxStackScene = async ({
   editor,
   options,
@@ -288,8 +279,6 @@ const loadMaxStackScene = async ({
 };
 
 export const dropShadowBenchmarks = [
-  createShadowViewportBenchmark("hard", hardShadow),
-  createShadowViewportBenchmark("blur24", blurShadow),
   appearanceDraggingShadowBenchmark,
   createShadowScrubBenchmark(false),
   createShadowScrubBenchmark(true),
