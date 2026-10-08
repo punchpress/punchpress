@@ -12,20 +12,21 @@ import {
   DialogPopup,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useEditorValue } from "../../editor-react/use-editor-value";
 
 interface MissingFontsExportDialogProps {
-  catalogState: LocalFontCatalogState;
   missingFonts: LocalFontDescriptor[];
   onOpenChange: (open: boolean) => void;
   open: boolean;
 }
 
 export const MissingFontsExportDialog = ({
-  catalogState,
   missingFonts,
   onOpenChange,
   open,
 }: MissingFontsExportDialogProps) => {
+  const catalogState = useEditorValue((editor) => editor.fontCatalogState);
+
   return (
     <Dialog modal onOpenChange={onOpenChange} open={open}>
       <DialogPopup

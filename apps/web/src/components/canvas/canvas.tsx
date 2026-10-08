@@ -733,7 +733,7 @@ export const Canvas = () => {
         <CanvasCursorCompanion hostElement={hostElement} />
         <CanvasBrushCursor hostElement={hostElement} />
 
-        {shouldRenderOverlay ? <CanvasHostOverlays /> : null}
+        {shouldRenderOverlay && hostElement ? <CanvasHostOverlays /> : null}
       </div>
     </DesignerFrame>
   );

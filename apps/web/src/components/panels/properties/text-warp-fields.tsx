@@ -24,6 +24,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useEditor } from "../../../editor-react/use-editor";
+import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { FieldRow, Section } from "./field-primitives";
 import { warpIcons } from "./warp-icons";
 
@@ -140,6 +141,9 @@ const WarpOptionPlaceholder = () => {
 
 const TextWarpKindFields = ({ disabled, node }) => {
   const editor = useEditor();
+  const isPathEditing = useEditorValue((editor) =>
+    editor.isPathEditing(node.id)
+  );
   const update = (warpPatch) => {
     editor.updateSelectedNode({
       warp: {
@@ -222,7 +226,6 @@ const TextWarpKindFields = ({ disabled, node }) => {
   }
 
   if (node.warp.kind === "circle") {
-    const isPathEditing = editor.isPathEditing(node.id);
     const setSide = (values) => {
       const nextSide = values[0] ?? "outside";
       update({ inverted: nextSide === "inside" });

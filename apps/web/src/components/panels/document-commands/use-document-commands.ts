@@ -407,7 +407,6 @@ export const useDocumentCommands = () => {
     clearRecentDocumentsSafely,
     closeTabSafely,
     missingFontsExportDialogProps: {
-      catalogState: editor.fontCatalogState,
       missingFonts: missingFontsForExport,
       onOpenChange: setIsMissingFontsExportDialogOpen,
       open: isMissingFontsExportDialogOpen,

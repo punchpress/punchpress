@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Selecto from "react-selecto";
 import { useEditor } from "../../../../editor-react/use-editor";
 import { useEditorValue } from "../../../../editor-react/use-editor-value";
@@ -336,7 +336,7 @@ export const CanvasSelectionMarquee = () => {
       .filter(Boolean);
   });
 
-  const hostElement = editor.hostRef;
+  const hostElement = useCanvasHostElement(editor);
   const keyContainer = typeof window === "undefined" ? undefined : window;
   const suppressHover = () => {
     editor.setHoveringSuppressed(true);
@@ -508,4 +508,16 @@ export const CanvasSelectionMarquee = () => {
       <MarqueeCandidatePreviews nodeIds={candidateNodeIds} />
     </>
   );
+};
+
+// Canvas assigns hostRef in its own layout effect, after this child renders;
+// a passive effect reads it once it exists.
+const useCanvasHostElement = (editor) => {
+  const [hostElement, setHostElement] = useState(editor.hostRef);
+
+  useEffect(() => {
+    setHostElement(editor.hostRef);
+  }, [editor]);
+
+  return hostElement;
 };

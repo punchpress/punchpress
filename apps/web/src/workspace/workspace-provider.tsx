@@ -9,6 +9,7 @@ import {
   loadScratchpadDocument,
   saveScratchpadDocument,
 } from "./scratchpad-storage";
+import { useDirtyTabIds } from "./use-dirty-tab-ids";
 import { WorkspaceContext } from "./workspace-context";
 import {
   createFileOpenQueue,
@@ -55,14 +56,6 @@ const createFileTab = ({ baseName = DEFAULT_DOCUMENT_BASE_NAME, editor }) => ({
   kind: "file",
 });
 
-const getTabIsDirty = (tab) => {
-  if (tab.kind === "scratchpad") {
-    return false;
-  }
-
-  return tab.editor.isDirty || !tab.fileHandle;
-};
-
 export const WorkspaceProvider = ({ children }) => {
   const [tabs, setTabs] = useState(() => [createScratchpadTab()]);
   const tabsRef = useRef(tabs);
@@ -90,6 +83,8 @@ export const WorkspaceProvider = ({ children }) => {
   const scratchpadEditor = tabs[0].editor;
   const activeTab = tabs.find((tab) => tab.id === activeTabId) || tabs[0];
   const activeEditor = activeTab.editor;
+
+  const dirtyTabIds = useDirtyTabIds(tabs);
 
   useEditorClipboardEvents(activeEditor);
 
@@ -144,14 +139,6 @@ export const WorkspaceProvider = ({ children }) => {
       }
     };
   }, [activeEditor]);
-
-  useEffect(() => {
-    const unsubscribe = activeEditor.store.subscribe(() => {
-      updateTabs((currentTabs) => [...currentTabs]);
-    });
-
-    return unsubscribe;
-  }, [activeEditor, updateTabs]);
 
   useEffect(() => {
     const autosave = createScratchpadAutosave(
@@ -325,14 +312,14 @@ export const WorkspaceProvider = ({ children }) => {
         id: tab.id,
         isActive: tab.id === activeTabId,
         isClosable: tab.kind !== "scratchpad",
-        isDirty: getTabIsDirty(tab),
+        isDirty: dirtyTabIds.has(tab.id),
         kind: tab.kind,
         title: getTabTitle(tab),
         baseName: tab.baseName,
         editor: tab.editor,
         fileHandle: tab.fileHandle,
       })),
-    [activeTabId, tabs]
+    [activeTabId, dirtyTabIds, tabs]
   );
 
   const value = useMemo(
@@ -343,7 +330,7 @@ export const WorkspaceProvider = ({ children }) => {
         editor: activeTab.editor,
         fileHandle: activeTab.fileHandle,
         id: activeTab.id,
-        isDirty: getTabIsDirty(activeTab),
+        isDirty: dirtyTabIds.has(activeTab.id),
         kind: activeTab.kind,
         title: getTabTitle(activeTab),
       },
@@ -358,6 +345,7 @@ export const WorkspaceProvider = ({ children }) => {
     [
       activeEditor,
       activeTab,
+      dirtyTabIds,
       closeTab,
       createNewFileTab,
       focusTab,

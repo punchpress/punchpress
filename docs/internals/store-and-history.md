@@ -24,7 +24,10 @@ state.
 - History tracks logical document changes.
 - Gesture previews remain transient until commit.
 - Undo/redo restores document state and relevant editor mode state.
-- Dirty state compares current document state to the last saved mark.
+- Dirty state compares current document state to the last saved mark. The
+  serialized comparison is cached per nodes snapshot.
+- `subscribeDirtyState` notifies after store updates and after history, save,
+  undo, and redo transitions, once `isDirty` holds its final value.
 
 Do not store hover, viewport, cursor, Paper sessions, or render caches in saved
 documents.

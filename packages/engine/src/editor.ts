@@ -381,6 +381,7 @@ export interface Editor {
   selectionBoundsCache: any;
   selectionColorPreviewState: any;
   selectionDragPreviewListeners: any;
+  dirtyStateListeners: Set<() => void>;
   selectionDragPreviewRevision: any;
   selectionDragPreviewState: any;
   selectionPropertiesSnapshotCache: any;
@@ -451,6 +452,7 @@ export class Editor {
     this.interactionPreviewListeners = new Set();
     this.interactionPreviewRevision = 0;
     this.selectionDragPreviewListeners = new Set();
+    this.dirtyStateListeners = new Set();
     this.selectionDragPreviewRevision = 0;
     this.pathEditingPreviewListeners = new Set();
     this.pathEditingPreviewRevision = 0;
@@ -484,6 +486,11 @@ export class Editor {
       captureState: () => this.nodes,
       captureSnapshot: () => this.serializeDocument(),
       createChange: createDocumentChange,
+      onChange: () => {
+        for (const listener of this.dirtyStateListeners) {
+          listener();
+        }
+      },
     });
     this.handleWindowKeyDown = this.handleWindowKeyDown.bind(this);
     this.handlePenDirectSelectionModifierDown =
@@ -1740,6 +1747,18 @@ export class Editor {
         listener();
       }
     });
+  }
+
+  // Fires after document edits and history or save transitions; read
+  // `isDirty` in the listener.
+  subscribeDirtyState(listener) {
+    const unsubscribeStore = this.store.subscribe(listener);
+    this.dirtyStateListeners.add(listener);
+
+    return () => {
+      unsubscribeStore();
+      this.dirtyStateListeners.delete(listener);
+    };
   }
 
   subscribeSelectionDragPreview(listener) {

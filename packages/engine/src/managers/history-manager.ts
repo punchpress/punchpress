@@ -9,10 +9,12 @@ export interface HistoryManager {
   createChange: any;
   currentRevision: any;
   currentStateId: any;
+  dirtyCheck: { isDirty: boolean; savedSnapshot: any; state: any } | null;
   isApplying: any;
   limit: any;
   nextMarkId: any;
   nextStateId: any;
+  onChange: (() => void) | null;
   redoStack: any;
   savedSnapshot: any;
   savedStateId: any;
@@ -27,6 +29,7 @@ export class HistoryManager {
     captureSnapshot,
     createChange,
     limit = DEFAULT_HISTORY_LIMIT,
+    onChange = null,
   }) {
     this.applyChange = applyChange;
     this.applyState = applyState;
@@ -36,10 +39,12 @@ export class HistoryManager {
     this.createChange = createChange;
     this.currentRevision = 0;
     this.currentStateId = 0;
+    this.dirtyCheck = null;
     this.isApplying = false;
     this.limit = limit;
     this.nextMarkId = 0;
     this.nextStateId = 1;
+    this.onChange = onChange;
     this.redoStack = [];
     this.savedSnapshot = captureSnapshot();
     this.savedStateId = this.currentStateId;
@@ -55,10 +60,23 @@ export class HistoryManager {
   }
 
   get isDirty() {
-    return (
-      this.currentStateId !== this.savedStateId ||
-      this.captureSnapshot() !== this.savedSnapshot
-    );
+    if (this.currentStateId !== this.savedStateId) {
+      return true;
+    }
+
+    // Serializing is the expensive path; reuse it until state or the saved
+    // checkpoint changes.
+    const state = this.captureState();
+    const cached = this.dirtyCheck;
+
+    if (cached?.state === state && cached.savedSnapshot === this.savedSnapshot) {
+      return cached.isDirty;
+    }
+
+    const isDirty = this.captureSnapshot() !== this.savedSnapshot;
+    this.dirtyCheck = { isDirty, savedSnapshot: this.savedSnapshot, state };
+
+    return isDirty;
   }
 
   captureSaveCheckpoint() {
@@ -71,6 +89,7 @@ export class HistoryManager {
   markSaved(checkpoint = this.captureSaveCheckpoint()) {
     this.savedSnapshot = checkpoint.snapshot;
     this.savedStateId = checkpoint.stateId;
+    this.onChange?.();
   }
 
   mark(name) {
@@ -132,6 +151,7 @@ export class HistoryManager {
     this.undoStack.push(change);
     this.trimStack(this.undoStack);
     this.redoStack = [];
+    this.onChange?.();
     return true;
   }
 
@@ -158,6 +178,7 @@ export class HistoryManager {
     this.savedSnapshot = this.captureSnapshot();
     this.savedStateId = this.currentStateId;
     this.undoStack = [];
+    this.onChange?.();
   }
 
   run(runChange) {
@@ -219,6 +240,7 @@ export class HistoryManager {
       return true;
     } finally {
       this.isApplying = false;
+      this.onChange?.();
     }
   }
 
