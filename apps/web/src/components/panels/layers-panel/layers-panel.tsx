@@ -1,8 +1,4 @@
-import {
-  getPathNodeContours,
-  PERF_COUNTERS,
-  PERF_SPANS,
-} from "@punchpress/engine";
+import { PERF_COUNTERS, PERF_SPANS } from "@punchpress/engine";
 import { ROOT_PARENT_ID } from "@punchpress/punch-schema";
 import { PlusIcon } from "lucide-react";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -13,8 +9,12 @@ import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
 import { SettingsDialog } from "../../settings-dialog";
+import {
+  getLayerEditableContours,
+  LayerContourListRow,
+} from "./layer-contour-list-row";
 import { LayerTreeDragGhost } from "./layer-tree-drag-ghost";
-import { LayerContourRow, LayerTreeRow } from "./layer-tree-row";
+import { LayerTreeRow } from "./layer-tree-row";
 import { LayersMainMenu } from "./layers-main-menu";
 import { getDuplicateRecentDocumentNames } from "./recent-documents";
 import { RecentDocumentsMenu } from "./recent-documents-menu";
@@ -42,18 +42,6 @@ const getEditableContourCount = (node) => {
   return getLayerEditableContours(node).length;
 };
 
-const getLayerEditableContours = (node) => {
-  if (node?.type === "path") {
-    return getPathNodeContours(node);
-  }
-
-  if (node?.type === "vector") {
-    return node.contours || [];
-  }
-
-  return [];
-};
-
 const getLayerContourRows = (editor, nodeId, depth) => {
   const node = editor.getNode(nodeId);
   const childNodeIds = editor.getChildNodeIds(nodeId);
@@ -69,12 +57,26 @@ const getLayerContourRows = (editor, nodeId, depth) => {
     return [];
   }
 
-  return Array.from({ length: contourCount }, (_, index) => ({
-    contourIndex: index,
-    depth,
-    kind: "contour",
-    nodeId,
-  }));
+  return Array.from({ length: contourCount }, (_, index) =>
+    encodeLayerRow({ contourIndex: index, depth, kind: "contour", nodeId })
+  );
+};
+
+// Rows are selected as primitive keys so the panel re-renders only when the
+// row list itself changes, not on every document edit.
+const encodeLayerRow = ({ contourIndex = -1, depth, kind, nodeId }) => {
+  return `${kind}|${depth}|${contourIndex}|${nodeId}`;
+};
+
+const decodeLayerRow = (key: string) => {
+  const [kind, depth, contourIndex, ...nodeIdParts] = key.split("|");
+
+  return {
+    contourIndex: Number(contourIndex),
+    depth: Number(depth),
+    kind,
+    nodeId: nodeIdParts.join("|"),
+  };
 };
 
 const getVisibleLayerRowKeys = (
@@ -96,11 +98,11 @@ const getVisibleLayerRowKeys = (
         (!isDenseContainer || expandedDenseGroupIds.has(nodeId))
       )
     ) {
-      return [{ depth, kind: "node", nodeId }];
+      return [encodeLayerRow({ depth, kind: "node", nodeId })];
     }
 
     return [
-      { depth, kind: "node", nodeId },
+      encodeLayerRow({ depth, kind: "node", nodeId }),
       ...getLayerContourRows(editor, nodeId, depth + 1),
       ...getVisibleLayerRowKeys(
         editor,
@@ -262,7 +264,7 @@ export const LayersPanel = ({ documentCommands }) => {
     );
   }, PERF_SPANS.layersSelectorVisibleNodeIds);
   const visibleLayerRows = useMemo(
-    () => visibleLayerRowKeys,
+    () => visibleLayerRowKeys.map(decodeLayerRow),
     [visibleLayerRowKeys]
   );
   const {
@@ -327,33 +329,12 @@ export const LayersPanel = ({ documentCommands }) => {
   );
   const layerRows = renderedLayerRows.map((row) => {
     if (row.kind === "contour") {
-      const node = editor.getNode(row.nodeId);
-      const contours = getLayerEditableContours(node);
-      const contour = contours[row.contourIndex];
-      const isSelected =
-        editor.pathEditingNodeId === row.nodeId &&
-        editor.pathEditingPoint?.contourIndex === row.contourIndex;
-
       return (
-        <LayerContourRow
+        <LayerContourListRow
+          contourIndex={row.contourIndex}
           depth={row.depth}
-          isSelected={isSelected}
           key={`${row.nodeId}:contour:${row.contourIndex}`}
-          label={`Contour ${row.contourIndex + 1}`}
-          onSelect={() => {
-            editor.select(row.nodeId);
-            if (editor.startPathEditing(row.nodeId)) {
-              editor.setActiveTool("node");
-            }
-
-            if (contour?.segments.length > 0) {
-              editor.setPathEditingPoint({
-                contourIndex: row.contourIndex,
-                segmentIndex: 0,
-              });
-            }
-          }}
-          tone={contour?.closed ? "closed" : "open"}
+          nodeId={row.nodeId}
         />
       );
     }

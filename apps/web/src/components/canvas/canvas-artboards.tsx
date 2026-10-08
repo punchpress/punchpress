@@ -25,44 +25,45 @@ const getCanvasPoint = (editor, clientX, clientY) => {
   };
 };
 
-const selectArtboards = (editor, state) => {
+// Primitive per-artboard values keep unrelated document edits from
+// re-rendering artboard chrome.
+const selectArtboardIds = (editor) => {
+  return editor.nodes
+    .filter((node) => node.type === "artboard")
+    .filter((node) => editor.isNodeEffectivelyVisible(node.id))
+    .map((node) => node.id);
+};
+
+const selectArtboard = (editor, state, nodeId) => {
+  const node = editor.getNode(nodeId);
+  const bounds = editor.getNodeRenderFrame(nodeId)?.bounds;
+
+  if (!(node && bounds)) {
+    return null;
+  }
+
   const zoom = Math.max(state.viewport.zoom, MIN_LABEL_ZOOM);
+  const previewDelta = editor.selectionDragPreview?.nodeIds?.includes(nodeId)
+    ? editor.selectionDragPreview.delta
+    : { x: 0, y: 0 };
 
   return {
-    artboards: editor.nodes
-      .filter((node) => node.type === "artboard")
-      .filter((node) => editor.isNodeEffectivelyVisible(node.id))
-      .map((node) => {
-        const frame = editor.getNodeRenderFrame(node.id);
-        const previewDelta = editor.selectionDragPreview?.nodeIds?.includes(
-          node.id
-        )
-          ? editor.selectionDragPreview.delta
-          : { x: 0, y: 0 };
-
-        return {
-          frame: frame
-            ? {
-                ...frame,
-                bounds: {
-                  ...frame.bounds,
-                  maxX: frame.bounds.maxX + previewDelta.x,
-                  maxY: frame.bounds.maxY + previewDelta.y,
-                  minX: frame.bounds.minX + previewDelta.x,
-                  minY: frame.bounds.minY + previewDelta.y,
-                },
-              }
-            : null,
-          id: node.id,
-          name: node.name,
-          background: node.background,
-          selected: editor.isSelected(node.id),
-        };
-      })
-      .filter((entry) => entry.frame?.bounds),
+    background: node.background,
+    height: bounds.height,
     labelScale: 1 / zoom,
     labelYOffset: ARTBOARD_LABEL_GAP_PX / zoom,
+    minX: bounds.minX + previewDelta.x,
+    minY: bounds.minY + previewDelta.y,
+    name: node.name,
+    selected: editor.isSelected(nodeId),
+    width: bounds.width,
   };
+};
+
+const useArtboard = (nodeId) => {
+  return useEditorSelectionDragSurfaceValue((editor, state) =>
+    selectArtboard(editor, state, nodeId)
+  );
 };
 
 const startArtboardLabelDrag = ({ editor, event, nodeId }) => {
@@ -163,68 +164,82 @@ const startArtboardLabelDrag = ({ editor, event, nodeId }) => {
 };
 
 export const CanvasArtboards = () => {
-  const editor = useEditor();
-  const { artboards, labelScale, labelYOffset } =
-    useEditorSelectionDragSurfaceValue(selectArtboards);
+  const artboardIds = useEditorSelectionDragSurfaceValue(selectArtboardIds);
 
   return (
     <>
       <div className="pointer-events-none absolute inset-0">
-        {artboards.map((artboard) => {
-          const bounds = artboard.frame.bounds;
-
-          return (
-            <div
-              className="pointer-events-auto absolute border border-[var(--designer-border)] shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
-              data-artboard-body={artboard.id}
-              key={artboard.id}
-              style={{
-                backgroundColor: artboard.background || "transparent",
-                height: `${bounds.height}px`,
-                left: `${bounds.minX}px`,
-                top: `${bounds.minY}px`,
-                width: `${bounds.width}px`,
-              }}
-            />
-          );
-        })}
+        {artboardIds.map((nodeId) => (
+          <CanvasArtboardBody key={nodeId} nodeId={nodeId} />
+        ))}
       </div>
 
       <div className="pointer-events-none absolute inset-0 z-10">
-        {artboards.map((artboard) => {
-          const bounds = artboard.frame.bounds;
-          const sizeLabel = formatArtboardSize(bounds);
-
-          return (
-            <button
-              className="canvas-node canvas-cursor-grab group pointer-events-auto absolute flex h-6 max-w-96 appearance-none items-center gap-2 rounded-[3px] bg-transparent px-1 py-0 text-left font-medium text-[12px] text-foreground/64 leading-none outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[selected=true]:text-foreground"
-              data-node-id={artboard.id}
-              data-selected={artboard.selected ? "true" : "false"}
-              key={artboard.id}
-              onPointerDown={(event) =>
-                startArtboardLabelDrag({
-                  editor,
-                  event,
-                  nodeId: artboard.id,
-                })
-              }
-              style={{
-                left: `${bounds.minX}px`,
-                top: `${bounds.minY - labelYOffset}px`,
-                transform: `scale(${labelScale})`,
-                transformOrigin: "top left",
-              }}
-              title={`${artboard.name} - ${sizeLabel}`}
-              type="button"
-            >
-              <span className="truncate">{artboard.name}</span>
-              <span className="shrink-0 font-normal text-foreground/38 group-data-[selected=true]:text-foreground/52">
-                {sizeLabel}
-              </span>
-            </button>
-          );
-        })}
+        {artboardIds.map((nodeId) => (
+          <CanvasArtboardLabel key={nodeId} nodeId={nodeId} />
+        ))}
       </div>
     </>
+  );
+};
+
+const CanvasArtboardBody = ({ nodeId }) => {
+  const artboard = useArtboard(nodeId);
+
+  if (!artboard) {
+    return null;
+  }
+
+  return (
+    <div
+      className="pointer-events-auto absolute border border-[var(--designer-border)] shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
+      data-artboard-body={nodeId}
+      style={{
+        backgroundColor: artboard.background || "transparent",
+        height: `${artboard.height}px`,
+        left: `${artboard.minX}px`,
+        top: `${artboard.minY}px`,
+        width: `${artboard.width}px`,
+      }}
+    />
+  );
+};
+
+const CanvasArtboardLabel = ({ nodeId }) => {
+  const editor = useEditor();
+  const artboard = useArtboard(nodeId);
+
+  if (!artboard) {
+    return null;
+  }
+
+  const sizeLabel = formatArtboardSize(artboard);
+
+  return (
+    <button
+      className="canvas-node canvas-cursor-grab group pointer-events-auto absolute flex h-6 max-w-96 appearance-none items-center gap-2 rounded-[3px] bg-transparent px-1 py-0 text-left font-medium text-[12px] text-foreground/64 leading-none outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[selected=true]:text-foreground"
+      data-node-id={nodeId}
+      data-selected={artboard.selected ? "true" : "false"}
+      onPointerDown={(event) =>
+        startArtboardLabelDrag({
+          editor,
+          event,
+          nodeId,
+        })
+      }
+      style={{
+        left: `${artboard.minX}px`,
+        top: `${artboard.minY - artboard.labelYOffset}px`,
+        transform: `scale(${artboard.labelScale})`,
+        transformOrigin: "top left",
+      }}
+      title={`${artboard.name} - ${sizeLabel}`}
+      type="button"
+    >
+      <span className="truncate">{artboard.name}</span>
+      <span className="shrink-0 font-normal text-foreground/38 group-data-[selected=true]:text-foreground/52">
+        {sizeLabel}
+      </span>
+    </button>
   );
 };

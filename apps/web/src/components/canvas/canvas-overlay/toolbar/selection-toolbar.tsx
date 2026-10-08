@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useEditor } from "../../../../editor-react/use-editor";
 import { resolveSelectionToolbarActions } from "./actions";
+import { useToolbarAnchorLayout } from "./use-toolbar-anchor-layout";
 import { useSelectionToolbarPresence } from "./use-toolbar-presence";
 import { useSelectionToolbarState } from "./use-toolbar-state";
 
@@ -51,6 +52,7 @@ export const getRenderedSelectionToolbarActions = (actions, presenceState) => {
 
 export const CanvasSelectionToolbar = memo(function CanvasSelectionToolbar() {
   const editor = useEditor();
+  useToolbarAnchorLayout(editor);
   const toolbarState = useSelectionToolbarState();
   const actions = resolveSelectionToolbarActions(editor, toolbarState);
   const presenceKey = `${toolbarState?.selectionKey || "hidden"}:${actions

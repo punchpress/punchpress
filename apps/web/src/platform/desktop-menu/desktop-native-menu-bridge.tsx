@@ -85,13 +85,20 @@ const PRIMARY_STROKE = { index: 0, list: "strokes" } as const;
 export const DesktopNativeMenuBridge = () => {
   const editor = useEditor();
   const mergeCurves = useMergeCurves();
-  const menuState = useEditorValue((editor, state) =>
-    getDesktopAppMenuState(editor, state.selectedNodeIds)
+  // A serialized snapshot only changes when the menu state does, so document
+  // edits do not re-render the bridge or send IPC every frame. Browsers have
+  // no native menu to update.
+  const menuStateJson = useEditorValue((editor, state) =>
+    window.electron?.appMenu
+      ? JSON.stringify(getDesktopAppMenuState(editor, state.selectedNodeIds))
+      : null
   );
 
   useEffect(() => {
-    window.electron?.appMenu?.updateState(menuState);
-  }, [menuState]);
+    if (menuStateJson) {
+      window.electron?.appMenu?.updateState(JSON.parse(menuStateJson));
+    }
+  }, [menuStateJson]);
 
   const handleEditorCommand = useEffectEvent(
     (command: DesktopEditorCommand) => {
