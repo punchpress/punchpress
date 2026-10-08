@@ -6,7 +6,43 @@ import {
   getPathPointCornerRadius as getEditorPathPointCornerRadius,
 } from "../../document/path/path-corner-actions";
 
-export const getPathEditingInspectorState = (editor, nodeId) => {
+type PathEditingInspectorState = ReturnType<typeof buildInspectorState>;
+
+interface CachedInspectorState {
+  inputs: unknown[];
+  state: PathEditingInspectorState;
+}
+
+// Corner inspection derives contours and summaries. Every inspector read in
+// one store update shares one result until the inspected node or the
+// path-editing point selection changes.
+const cacheByEditor = new WeakMap<object, CachedInspectorState>();
+
+export const getPathEditingInspectorState = (
+  editor,
+  nodeId: string | null
+): PathEditingInspectorState => {
+  const inputs = [
+    nodeId,
+    nodeId ? editor.getNode(nodeId) : null,
+    editor.pathEditingNodeId,
+    editor.pathEditingPoint,
+    editor.pathEditingPoints,
+  ];
+  const cached = cacheByEditor.get(editor);
+
+  if (cached?.inputs.every((input, index) => input === inputs[index])) {
+    return cached.state;
+  }
+
+  const state = buildInspectorState(editor, nodeId);
+
+  cacheByEditor.set(editor, { inputs, state });
+
+  return state;
+};
+
+const buildInspectorState = (editor, nodeId: string | null) => {
   const selectedPathPoint =
     nodeId &&
     editor.pathEditingNodeId === nodeId &&
@@ -19,12 +55,13 @@ export const getPathEditingInspectorState = (editor, nodeId) => {
       selectedPathPoint &&
       canEditorRoundPathPoint(editor, nodeId, selectedPathPoint)
   );
+  const pathCornerRadiusSummary =
+    nodeId && !showsPathPointCornerRadius
+      ? getEditorPathCornerRadiusSummary(editor, nodeId)
+      : null;
 
   return {
-    pathCornerRadiusSummary:
-      nodeId && !showsPathPointCornerRadius
-        ? getEditorPathCornerRadiusSummary(editor, nodeId)
-        : null,
+    pathCornerRadiusSummary,
     pathCornerRadiusStableMax:
       nodeId && !showsPathPointCornerRadius
         ? getEditorPathCornerRadiusStableMax(editor, nodeId)

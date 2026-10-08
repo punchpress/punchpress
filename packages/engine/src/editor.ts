@@ -6,6 +6,7 @@ import {
   ROOT_PARENT_ID,
 } from "@punchpress/punch-schema";
 import {
+  type AppearanceList,
   type AppearanceSlot,
   addFill as addEditorFill,
   addStroke as addEditorStroke,
@@ -24,12 +25,24 @@ import {
   setEffects as setEditorEffects,
   updateEffect as updateEditorEffect,
 } from "./effects/effect-commands";
-import { getSelectionEffects as getEditorSelectionEffects } from "./effects/effect-inspection";
+import {
+  getEffect as getEditorEffect,
+  getEffectIds as getEditorEffectIds,
+  getSelectionEffects as getEditorSelectionEffects,
+} from "./effects/effect-inspection";
 import type { Effect } from "./effects/effect-model";
 import {
   canAlignStrokes as canEditorAlignStrokes,
+  getAppearanceLayer as getEditorAppearanceLayer,
+  getAppearanceLayerIds as getEditorAppearanceLayerIds,
   getPrimaryStrokeStyle as getEditorPrimaryStrokeStyle,
+  getSelectionAppearance as getEditorSelectionAppearance,
 } from "./appearance/appearance-inspection";
+import {
+  getSelectionColorList as getEditorSelectionColorList,
+  getSelectionInspection as getEditorSelectionInspection,
+  getSelectionProperty as getEditorSelectionProperty,
+} from "./inspection/selection-inspection";
 import type { Appearance } from "./appearance/appearance-types";
 import {
   copySelection as copyEditorSelection,
@@ -1123,6 +1136,22 @@ export class Editor {
     return canEditorAlignStrokes(this, nodeIds);
   }
 
+  getSelectionAppearance(nodeIds = this.selectedNodeIds) {
+    return getEditorSelectionAppearance(this, nodeIds);
+  }
+
+  getAppearanceLayerIds(list: AppearanceList, nodeIds = this.selectedNodeIds) {
+    return getEditorAppearanceLayerIds(this, list, nodeIds);
+  }
+
+  getAppearanceLayer(
+    list: AppearanceList,
+    layerId: string,
+    nodeIds = this.selectedNodeIds
+  ) {
+    return getEditorAppearanceLayer(this, list, layerId, nodeIds);
+  }
+
   setAppearance(appearance: Appearance, nodeIds = this.selectedNodeIds) {
     return setEditorAppearance(this, appearance, nodeIds);
   }
@@ -1153,6 +1182,14 @@ export class Editor {
 
   getSelectionEffects(nodeIds = this.selectedNodeIds) {
     return getEditorSelectionEffects(this, nodeIds);
+  }
+
+  getEffectIds(nodeIds = this.selectedNodeIds) {
+    return getEditorEffectIds(this, nodeIds);
+  }
+
+  getEffect(effectId: string, nodeIds = this.selectedNodeIds) {
+    return getEditorEffect(this, effectId, nodeIds);
   }
 
   setSelectionColor(selectionColorId, value, nodeIds = this.selectedNodeIds) {
@@ -1417,6 +1454,18 @@ export class Editor {
 
   getSelectionPropertiesSnapshot(nodeIds = this.selectedNodeIds) {
     return getEditorCachedSelectionPropertiesSnapshot(this, nodeIds);
+  }
+
+  getSelectionInspection(nodeIds = this.selectedNodeIds) {
+    return getEditorSelectionInspection(this, nodeIds);
+  }
+
+  getSelectionProperty(propertyId: string, nodeIds = this.selectedNodeIds) {
+    return getEditorSelectionProperty(this, propertyId, nodeIds);
+  }
+
+  getSelectionColors(nodeIds = this.selectedNodeIds) {
+    return getEditorSelectionColorList(this, nodeIds);
   }
 
   getDebugDump() {

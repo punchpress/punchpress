@@ -303,9 +303,14 @@ export const getSelectionPropertiesSnapshot = (
   nodeIds = editor.selectedNodeIds
 ) => {
   const selectionProperties = buildSelectionProperties(editor, nodeIds);
+  let key: string | null = null;
 
   return {
-    key: getSelectionPropertiesKeyFromState(selectionProperties),
+    // Serialized on first read: most readers only need the properties.
+    get key() {
+      key ??= getSelectionPropertiesKeyFromState(selectionProperties);
+      return key;
+    },
     selectionProperties,
   };
 };
