@@ -202,3 +202,26 @@ test("continuous edits after a timed write wait for the next quiet period", asyn
   expect(saved).toEqual(["first", "edit-19"]);
   await autosave.dispose();
 });
+
+test("a timed write waits for an open gesture to commit", async () => {
+  const { editor, edit } = createEditor();
+  const gestureEditor = { ...editor, hasOpenHistoryStep: true };
+  const saved: string[] = [];
+  const autosave = createScratchpadAutosave(
+    gestureEditor,
+    (contents) => {
+      saved.push(contents);
+      return Promise.resolve();
+    },
+    10
+  );
+
+  edit("during gesture");
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  expect(saved).toEqual([]);
+
+  gestureEditor.hasOpenHistoryStep = false;
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  expect(saved).toEqual(["during gesture"]);
+  await autosave.dispose();
+});

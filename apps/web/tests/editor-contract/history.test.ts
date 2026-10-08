@@ -109,11 +109,15 @@ describe("Editor history", () => {
       throw new Error("Expected a move session and frame");
     }
 
+    expect(editor.hasOpenHistoryStep).toBe(false);
+
     const historyMark = editor.markHistoryStep("move selection");
 
     if (!historyMark) {
       throw new Error("Expected a history mark");
     }
+
+    expect(editor.hasOpenHistoryStep).toBe(true);
 
     editor.updateMoveSelection(moveSession, {
       left: beforeNode.frame.bounds.minX + 70,
@@ -125,6 +129,7 @@ describe("Editor history", () => {
     });
     editor.commitMoveSelection(moveSession);
     editor.commitHistoryStep(historyMark);
+    expect(editor.hasOpenHistoryStep).toBe(false);
 
     const afterDrag = getDebugNode(editor.getDebugDump(), nodeId);
 

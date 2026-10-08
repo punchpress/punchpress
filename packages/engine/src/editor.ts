@@ -706,6 +706,11 @@ export class Editor {
     return this.history.isDirty;
   }
 
+  // True while a gesture (drag, scrub, stroke) holds an open history step.
+  get hasOpenHistoryStep() {
+    return this.history.activeMarks.size > 0;
+  }
+
   get isHoveringSuppressed() {
     return this.getState().isHoveringSuppressed;
   }

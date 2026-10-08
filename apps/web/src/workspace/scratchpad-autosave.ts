@@ -1,4 +1,5 @@
 interface ScratchpadEditor {
+  hasOpenHistoryStep?: boolean;
   serializeDocumentAsync: () => Promise<string>;
   store: { subscribe: (listener: () => void) => () => void };
 }
@@ -53,12 +54,23 @@ export const createScratchpadAutosave = (
     }
   };
 
-  const schedule = () => {
-    revision += 1;
+  // Serializing a large document takes long enough to stall a frame, so a
+  // timed write waits until the open gesture commits.
+  const arm = () => {
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => {
+      if (editor.hasOpenHistoryStep) {
+        arm();
+        return;
+      }
+
       write().catch(console.error);
     }, delayMs);
+  };
+
+  const schedule = () => {
+    revision += 1;
+    arm();
   };
 
   const unsubscribe = editor.store.subscribe(schedule);
