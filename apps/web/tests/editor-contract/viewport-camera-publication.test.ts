@@ -164,4 +164,35 @@ describe("viewport camera publication", () => {
     expect(editor.viewerRef).toBeNull();
     expect(editor.getState().viewport).toEqual({ x: 80, y: 40, zoom: 1 });
   });
+
+  test("reattaching a viewer with an unchanged camera refreshes camera readers", () => {
+    const editor = new Editor();
+    const { viewer } = mountViewer(editor);
+    let overlayRefreshes = 0;
+
+    editor.moveViewportTo({ x: 30, y: 20, zoom: 1 });
+    // Returning to a tab: the canvas detaches, then a viewer already at the
+    // stored camera reattaches.
+    editor.detachViewport(viewer);
+    editor.onViewportChange = () => {
+      overlayRefreshes += 1;
+    };
+    const presentations = countPresentations(editor);
+
+    editor.attachViewport({
+      host: {
+        getBoundingClientRect: () => ({
+          height: 800,
+          left: 0,
+          top: 0,
+          width: 1200,
+        }),
+      },
+      viewer,
+    });
+
+    expect(editor.viewport).toEqual({ x: 30, y: 20, zoom: 1 });
+    expect(presentations.count).toBe(1);
+    expect(overlayRefreshes).toBe(1);
+  });
 });

@@ -75,6 +75,11 @@ export const attachViewport = (editor, { host, viewer }) => {
   editor.viewerRef = viewer;
   editor.hostRef = host;
   applyViewport(editor, editor.viewport);
+  // Overlay geometry needs the viewer, so attaching changes what camera
+  // readers can draw even when the camera itself is unchanged (returning to
+  // a tab restores the same camera).
+  editor.notifyViewportPresentationChanged();
+  editor.onViewportChange?.();
 };
 
 export const detachViewport = (editor, viewer) => {
