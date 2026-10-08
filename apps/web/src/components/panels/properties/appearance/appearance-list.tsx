@@ -1,10 +1,12 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { PlusSignIcon } from "@hugeicons-pro/core-stroke-rounded";
 import type { AppearanceList as AppearanceListId } from "@punchpress/engine";
+import { PERF_COUNTERS } from "@punchpress/engine";
 import { MAX_APPEARANCE_LAYERS } from "@punchpress/punch-schema";
 import { Button } from "@/components/ui/button";
 import { SortableList } from "@/components/ui/sortable-list";
 import { useEditor } from "../../../../editor-react/use-editor";
+import { usePerformanceRenderCounter } from "../../../../performance/use-performance-render-counter";
 import { AppearanceListContext, useAppearance } from "./appearance-context";
 
 const LIST_TITLES = { fills: "Fill", strokes: "Stroke" };
@@ -18,6 +20,7 @@ export const AppearanceListSection = ({
   children: (layerId: string) => React.ReactNode;
   list: AppearanceListId;
 }) => {
+  usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesSection);
   const editor = useEditor();
   const appearance = useAppearance();
   const layers = appearance[list];

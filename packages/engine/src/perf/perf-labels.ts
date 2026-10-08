@@ -93,6 +93,12 @@ export const PERF_COUNTERS = {
   renderPanelLayerRow: "render.panelLayerRow.count",
   renderPanelLayers: "render.panelLayers.count",
   renderPanelProperties: "render.panelProperties.count",
+  // Properties panel parts below the panel root: sections (one per titled
+  // block), rows (one per stack layer or selection color), and fields (one
+  // per value control).
+  renderPanelPropertiesField: "render.panelPropertiesField.count",
+  renderPanelPropertiesRow: "render.panelPropertiesRow.count",
+  renderPanelPropertiesSection: "render.panelPropertiesSection.count",
   rasterStrokeDabs: "raster.stroke.dabs",
   rasterStrokeDirtyAreaPixels: "raster.stroke.dirtyAreaPixels",
   rasterStrokeDirectPresentation: "raster.stroke.directPresentation",
@@ -105,5 +111,6 @@ export const PERF_COUNTERS = {
   rasterResizeTransientBytes: "raster.resize.transientBytes",
 } as const;
 
-export type PerfCounterName = (typeof PERF_COUNTERS)[keyof typeof PERF_COUNTERS];
+export type PerfCounterName =
+  (typeof PERF_COUNTERS)[keyof typeof PERF_COUNTERS];
 export type PerfSpanLabel = (typeof PERF_SPANS)[keyof typeof PERF_SPANS];

@@ -1,5 +1,7 @@
+import { PERF_COUNTERS } from "@punchpress/engine";
 import { ScrubSlider } from "@/components/ui/scrub-slider";
 import { useEditor } from "../../../../editor-react/use-editor";
+import { usePerformanceRenderCounter } from "../../../../performance/use-performance-render-counter";
 import { FieldRow } from "../field-primitives";
 import { usePropertyScrubHistory } from "../use-property-scrub-history";
 import { useEffectSlot } from "./effects-context";
@@ -12,6 +14,7 @@ const BLUR_SCRUB_RANGE = { max: 50, min: 0 };
 // Offset and blur of one drop shadow, in the owner's local units. Each scrub
 // is one undo step.
 export const EffectsShadowFields = ({ effectId }: { effectId: string }) => {
+  usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesField);
   const editor = useEditor();
   const xHistory = usePropertyScrubHistory("edit shadow x");
   const yHistory = usePropertyScrubHistory("edit shadow y");

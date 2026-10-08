@@ -116,6 +116,30 @@ const createShadowScrubBenchmark = (
   };
 };
 
+// Isolation twin of `appearance-shadow-scrub`: scrubs only the blur, so render
+// counts separate the scrubbed field from the untouched offset fields.
+const shadowBlurScrubBenchmark: PerformanceBenchmarkDefinition = {
+  ...createShadowScrubBenchmark(false),
+  description:
+    "The 200-node scene with blur-24 shadows on every node; scrubs only the selected center node's shadow blur 0→40→0 each frame at 100% zoom.",
+  id: "appearance-shadow-scrub-blur",
+  label: "Shadow Blur Scrub (1 of 200)",
+  run: async ({ editor, options, waitForFrame }) => {
+    const historyMark = editor.markHistoryStep("edit shadow blur");
+
+    try {
+      for (let index = 0; index < options.frames; index += 1) {
+        await waitForFrame();
+        editor.updateEffect(0, {
+          blur: getShadowScrubPatch(index, options.frames).blur,
+        });
+      }
+    } finally {
+      editor.commitHistoryStep(historyMark);
+    }
+  },
+};
+
 // Mirrors the panel ScrubSlider: one history step around the whole scrub.
 const scrubSelected = async (
   { editor, options, waitForFrame }: PerformanceBenchmarkContext,
@@ -269,6 +293,7 @@ export const dropShadowBenchmarks = [
   appearanceDraggingShadowBenchmark,
   createShadowScrubBenchmark(false),
   createShadowScrubBenchmark(true),
+  shadowBlurScrubBenchmark,
   createShadowedGroupsDragBenchmark("whole", true),
   createShadowedGroupsDragBenchmark("whole", false),
   createShadowedGroupsDragBenchmark("child", true),

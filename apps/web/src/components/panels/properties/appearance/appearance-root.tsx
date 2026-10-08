@@ -1,7 +1,9 @@
 import type { Appearance } from "@punchpress/engine";
+import { PERF_COUNTERS } from "@punchpress/engine";
 import { Button } from "@/components/ui/button";
 import { useEditor } from "../../../../editor-react/use-editor";
 import { useEditorValue } from "../../../../editor-react/use-editor-value";
+import { usePerformanceRenderCounter } from "../../../../performance/use-performance-render-counter";
 import { FieldRow, Section } from "../field-primitives";
 import { AppearanceContext } from "./appearance-context";
 
@@ -9,6 +11,7 @@ import { AppearanceContext } from "./appearance-context";
 // every stack is equal apart from layer ids; otherwise the lists are replaced by
 // a mixed row that can copy the first stack onto the whole selection.
 export const AppearanceRoot = ({ children }) => {
+  usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesSection);
   const property = useEditorValue((editor, state) => {
     return editor.getSelectionPropertiesSnapshot(state.selectedNodeIds)
       .selectionProperties.properties.appearance;

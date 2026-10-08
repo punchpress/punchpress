@@ -1,9 +1,11 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { PlusSignIcon } from "@hugeicons-pro/core-stroke-rounded";
+import { PERF_COUNTERS } from "@punchpress/engine";
 import { MAX_EFFECTS } from "@punchpress/punch-schema";
 import { Button } from "@/components/ui/button";
 import { useEditor } from "../../../../editor-react/use-editor";
 import { useEditorValue } from "../../../../editor-react/use-editor-value";
+import { usePerformanceRenderCounter } from "../../../../performance/use-performance-render-counter";
 import { FieldRow } from "../field-primitives";
 import { EffectsContext } from "./effects-context";
 
@@ -12,6 +14,7 @@ import { EffectsContext } from "./effects-context";
 // from effect ids; otherwise the list is replaced by a mixed row that can copy
 // the first stack onto the whole selection.
 export const EffectsRoot = ({ children }) => {
+  usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesSection);
   const editor = useEditor();
   // `effects` is the owner's stored array, so the shallow compare stays stable.
   const selection = useEditorValue((currentEditor, state) => {

@@ -1,4 +1,5 @@
 import type { StrokeLayer } from "@punchpress/engine";
+import { PERF_COUNTERS } from "@punchpress/engine";
 import { ScrubSlider } from "@/components/ui/scrub-slider";
 import {
   Select,
@@ -9,6 +10,7 @@ import {
 } from "@/components/ui/select";
 import { useEditor } from "../../../../editor-react/use-editor";
 import { useEditorValue } from "../../../../editor-react/use-editor-value";
+import { usePerformanceRenderCounter } from "../../../../performance/use-performance-render-counter";
 import { FieldRow } from "../field-primitives";
 import { usePropertyScrubHistory } from "../use-property-scrub-history";
 import { useAppearanceLayer } from "./appearance-context";
@@ -38,6 +40,7 @@ const JOIN_OPTIONS = [
 // Alignment, width, cap, join, and (for miter joins) miter limit of one
 // stroke layer. Each scrub is one undo step.
 export const AppearanceStrokeFields = ({ layerId }: { layerId: string }) => {
+  usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesField);
   const editor = useEditor();
   const canAlign = useEditorValue((currentEditor) =>
     currentEditor.canAlignStrokes()

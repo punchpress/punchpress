@@ -55,7 +55,7 @@ const createSceneScrubBenchmark = (
       );
       await waitForFrames(4);
     },
-    run: scrubSelectedStrokeWidths,
+    run: (context) => scrubSelectedStrokeWidths(context),
     usesScratchDocument: true,
   };
 };
@@ -70,7 +70,7 @@ const createTextScrubBenchmark = (
     id: `appearance-stroke-scrub-text-500-${warp}${aligned ? "" : "-center"}`,
     label: `Stroke Width Scrub (500-glyph ${warp} text, ${aligned ? "aligned" : "center"})`,
     setup: (context) => setupStrokeText(context, warp, aligned),
-    run: scrubSelectedStrokeWidths,
+    run: (context) => scrubSelectedStrokeWidths(context),
     usesScratchDocument: true,
   };
 };
@@ -109,12 +109,11 @@ const createTextTypingBenchmark = (
 };
 
 // Mirrors the stroke-width ScrubSlider: one history step around the scrub and
-// one `updateAppearanceLayer` per stroke per frame on the selection.
-const scrubSelectedStrokeWidths = async ({
-  editor,
-  options,
-  waitForFrame,
-}: PerformanceBenchmarkContext) => {
+// one `updateAppearanceLayer` per scrubbed stroke per frame on the selection.
+const scrubSelectedStrokeWidths = async (
+  { editor, options, waitForFrame }: PerformanceBenchmarkContext,
+  strokeIndexes: readonly number[] = [0, 1]
+) => {
   const historyMark = editor.markHistoryStep("edit stroke width");
 
   try {
@@ -123,12 +122,28 @@ const scrubSelectedStrokeWidths = async ({
 
       const width = getScrubWidth(index, options.frames);
 
-      editor.updateAppearanceLayer({ index: 0, list: "strokes" }, { width });
-      editor.updateAppearanceLayer({ index: 1, list: "strokes" }, { width });
+      for (const strokeIndex of strokeIndexes) {
+        editor.updateAppearanceLayer(
+          { index: strokeIndex, list: "strokes" },
+          { width }
+        );
+      }
     }
   } finally {
     editor.commitHistoryStep(historyMark);
   }
+};
+
+// Isolation twin of `appearance-stroke-scrub-one-of-200`: scrubs only the
+// first stroke width, so render counts separate the scrubbed field from its
+// untouched sibling.
+const singleStrokeScrubBenchmark: PerformanceBenchmarkDefinition = {
+  ...createSceneScrubBenchmark("one", true),
+  description:
+    "The 200-node appearance scene with outside + inside strokes on every node; scrubs only the first stroke width 1→40→1 on one selected node each frame at 100% zoom.",
+  id: "appearance-stroke-scrub-one-of-200-single",
+  label: "Stroke Width Scrub (1 of 200, one stroke)",
+  run: (context) => scrubSelectedStrokeWidths(context, [0]),
 };
 
 const setupStrokeText = async (
@@ -144,11 +159,14 @@ const setupStrokeText = async (
   await waitForFrames(4);
 };
 
-export const strokeAlignmentBenchmarks = [true, false].flatMap((aligned) => [
-  createSceneScrubBenchmark("one", aligned),
-  createSceneScrubBenchmark("all", aligned),
-  createTextScrubBenchmark("flat", aligned),
-  createTextScrubBenchmark("circle", aligned),
-  createTextScrubBenchmark("warped", aligned),
-  createTextTypingBenchmark(aligned),
-]);
+export const strokeAlignmentBenchmarks = [
+  ...[true, false].flatMap((aligned) => [
+    createSceneScrubBenchmark("one", aligned),
+    createSceneScrubBenchmark("all", aligned),
+    createTextScrubBenchmark("flat", aligned),
+    createTextScrubBenchmark("circle", aligned),
+    createTextScrubBenchmark("warped", aligned),
+    createTextTypingBenchmark(aligned),
+  ]),
+  singleStrokeScrubBenchmark,
+];

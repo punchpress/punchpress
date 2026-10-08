@@ -5,11 +5,13 @@ import {
   ViewIcon,
   ViewOffIcon,
 } from "@hugeicons-pro/core-stroke-rounded";
+import { PERF_COUNTERS } from "@punchpress/engine";
 import { parseColor } from "@punchpress/punch-schema";
 import { Button } from "@/components/ui/button";
 import { SortableItem } from "@/components/ui/sortable-list";
 import { cn } from "@/lib/utils";
 import { useEditor } from "../../../../editor-react/use-editor";
+import { usePerformanceRenderCounter } from "../../../../performance/use-performance-render-counter";
 import { formatColorWithOpacity } from "../appearance/appearance-paint-swatch";
 import { ColorField } from "../field-primitives";
 import { usePropertyScrubHistory } from "../use-property-scrub-history";
@@ -24,6 +26,7 @@ export const EffectsItem = ({
   children?: React.ReactNode;
   effectId: string;
 }) => {
+  usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesRow);
   const editor = useEditor();
   const colorHistory = usePropertyScrubHistory("edit shadow color");
   const resolved = useEffectSlot(effectId);

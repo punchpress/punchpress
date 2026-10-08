@@ -5,10 +5,12 @@ import {
   ViewIcon,
   ViewOffIcon,
 } from "@hugeicons-pro/core-stroke-rounded";
+import { PERF_COUNTERS } from "@punchpress/engine";
 import { Button } from "@/components/ui/button";
 import { SortableItem } from "@/components/ui/sortable-list";
 import { cn } from "@/lib/utils";
 import { useEditor } from "../../../../editor-react/use-editor";
+import { usePerformanceRenderCounter } from "../../../../performance/use-performance-render-counter";
 import { useAppearanceLayer, useAppearanceList } from "./appearance-context";
 import { AppearancePaintFields } from "./appearance-paint-fields";
 import { AppearancePaintSwatch } from "./appearance-paint-swatch";
@@ -22,6 +24,7 @@ export const AppearanceItem = ({
   children?: React.ReactNode;
   layerId: string;
 }) => {
+  usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesRow);
   const editor = useEditor();
   const list = useAppearanceList();
   const resolved = useAppearanceLayer(layerId);
