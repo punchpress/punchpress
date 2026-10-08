@@ -188,4 +188,45 @@ describe("render tree", () => {
     expect(editor.getRenderTree()).not.toBe(layerOpacityTree);
     expect(editor.getRenderTree().placedNodeIds).toEqual(["a"]);
   });
+
+  test("a structural change keeps unchanged layers and the placed ids", () => {
+    const editor = new Editor();
+
+    editor
+      .getState()
+      .loadNodes([
+        group("g1"),
+        shape("a", "g1"),
+        shape("b", "g1"),
+        group("g2"),
+        shape("c", "g2"),
+        shape("d", "g2"),
+      ] as never);
+
+    const tree = editor.getRenderTree();
+    const [g1, g2] = tree.items;
+
+    editor.setFocusedGroup("g2");
+    editor.setSelectedNodes(["c", "d"]);
+    editor.groupSelected();
+
+    const grouped = editor.getRenderTree();
+
+    expect(grouped).not.toBe(tree);
+    expect(grouped.items[0]).toBe(g1);
+    expect(grouped.items[1]).not.toBe(g2);
+    expect(grouped.placedNodeIds).toBe(tree.placedNodeIds);
+
+    editor.undo();
+
+    const restored = editor.getRenderTree();
+
+    expect(restored.items[0]).toBe(g1);
+    expect(describeItems(restored.items)).toEqual(describeItems(tree.items));
+
+    // Paint order changes replace the placed ids.
+    editor.bringToFront("g1");
+    expect(editor.getRenderTree().placedNodeIds).toEqual(["c", "d", "a", "b"]);
+    expect(editor.getRenderTree().items[1]).toBe(g1);
+  });
 });

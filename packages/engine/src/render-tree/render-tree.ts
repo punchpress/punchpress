@@ -84,15 +84,102 @@ export const getRenderTree = (editor): RenderTree => {
 
   const builtTree = buildRenderTree(editor, inputs);
   // Most document edits change a node's content, not paint order or layer
-  // opacity. Keeping the tree identity lets the canvas skip re-placing shells.
-  const tree =
-    cached && haveSameItems(cached.tree.items, builtTree.items)
-      ? cached.tree
-      : builtTree;
+  // opacity. Keeping the tree identity lets the canvas skip re-placing shells,
+  // and keeping each unchanged layer and the placed ids lets a structural
+  // edit re-render and re-place only what changed.
+  const tree = cached ? shareRenderTree(cached.tree, builtTree) : builtTree;
 
   cacheByEditor.set(editor, { inputs, tree });
 
   return tree;
+};
+
+const shareRenderTree = (
+  previous: RenderTree,
+  next: RenderTree
+): RenderTree => {
+  const previousItems = new Map<string, RenderItem>();
+
+  const index = (items: RenderItem[]) => {
+    for (const item of items) {
+      previousItems.set(item.nodeId, item);
+
+      if (item.kind === "layer") {
+        index(item.children);
+      }
+    }
+  };
+
+  index(previous.items);
+
+  const items = shareItems(previous.items, next.items, previousItems);
+
+  if (items === previous.items) {
+    return previous;
+  }
+
+  return {
+    items,
+    placedNodeIds: haveSameIds(previous.placedNodeIds, next.placedNodeIds)
+      ? previous.placedNodeIds
+      : next.placedNodeIds,
+  };
+};
+
+// Replaces each built item with the previous item for the same node when
+// they are equivalent, so unchanged subtrees keep their identity.
+const shareItems = (
+  previous: RenderItem[],
+  next: RenderItem[],
+  previousItems: Map<string, RenderItem>
+): RenderItem[] => {
+  const items = next.map((item) => {
+    return shareItem(previousItems.get(item.nodeId), item, previousItems);
+  });
+
+  return previous.length === items.length &&
+    items.every((item, position) => item === previous[position])
+    ? previous
+    : items;
+};
+
+const shareItem = (
+  previous: RenderItem | undefined,
+  next: RenderItem,
+  previousItems: Map<string, RenderItem>
+): RenderItem => {
+  if (!previous || previous.kind !== next.kind) {
+    return next.kind === "layer"
+      ? {
+          ...next,
+          children: shareItems([], next.children, previousItems),
+        }
+      : next;
+  }
+
+  if (previous.kind !== "layer" || next.kind !== "layer") {
+    return previous;
+  }
+
+  const children = shareItems(previous.children, next.children, previousItems);
+
+  if (
+    children === previous.children &&
+    previous.opacity === next.opacity &&
+    haveSameValue(previous.clip, next.clip) &&
+    haveSameValue(previous.effects, next.effects)
+  ) {
+    return previous;
+  }
+
+  return { ...next, children };
+};
+
+const haveSameIds = (previous: string[], next: string[]) => {
+  return (
+    previous.length === next.length &&
+    next.every((nodeId, position) => nodeId === previous[position])
+  );
 };
 
 const buildRenderTree = (editor, inputs: RenderTreeInputs): RenderTree => {
@@ -273,34 +360,6 @@ const createSubtreeFacts = (editor) => {
   };
 
   return { getLeafCount, hasShadowedGroup };
-};
-
-const haveSameItems = (previous: RenderItem[], next: RenderItem[]) => {
-  if (previous.length !== next.length) {
-    return false;
-  }
-
-  return next.every((item, index) => {
-    const previousItem = previous[index];
-
-    if (
-      previousItem.kind !== item.kind ||
-      previousItem.nodeId !== item.nodeId
-    ) {
-      return false;
-    }
-
-    if (item.kind !== "layer" || previousItem.kind !== "layer") {
-      return true;
-    }
-
-    return (
-      previousItem.opacity === item.opacity &&
-      haveSameValue(previousItem.clip, item.clip) &&
-      haveSameValue(previousItem.effects, item.effects) &&
-      haveSameItems(previousItem.children, item.children)
-    );
-  });
 };
 
 // Clips and effect presentations are small plain values rebuilt per build.
