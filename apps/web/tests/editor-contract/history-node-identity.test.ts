@@ -145,8 +145,24 @@ describe("history node identity", () => {
     const editor = loadScene();
 
     editor.updateNodes(LEAF_IDS, () => ({}));
+    editor.updateNode("a1", (node) => ({
+      contours: node.contours.map((entry) => ({ ...entry })),
+    }));
 
     expect(editor.canUndo).toBe(false);
+  });
+
+  test("a change nested inside a shared-shape field is recorded", () => {
+    const editor = loadScene();
+    const before = editor.getNode("a1");
+
+    editor.updateNode("a1", (node) => ({
+      contours: [{ ...node.contours[0], closed: false }, node.contours[1]],
+    }));
+
+    expect(editor.canUndo).toBe(true);
+    editor.undo();
+    expect(editor.getNode("a1")).toBe(before);
   });
 
   test("undo restores the surviving part of the selection", () => {

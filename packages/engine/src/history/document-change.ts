@@ -1,5 +1,18 @@
-const getNodeSignature = (node) => {
-  return JSON.stringify(node);
+// Compares field by field so fields that share a reference (contours,
+// appearance) skip serialization; a moved path serializes only its transform.
+const haveSameNodeValue = (beforeNode, afterNode) => {
+  const keys = new Set([...Object.keys(beforeNode), ...Object.keys(afterNode)]);
+
+  for (const key of keys) {
+    const before = beforeNode[key];
+    const after = afterNode[key];
+
+    if (before !== after && JSON.stringify(before) !== JSON.stringify(after)) {
+      return false;
+    }
+  }
+
+  return true;
 };
 
 const orderNodesByIds = (nodes, orderedIds) => {
@@ -29,10 +42,7 @@ export const createDocumentChange = (beforeNodes, afterNodes) => {
 
     // Writes are immutable, so an identical reference is an unchanged node;
     // distinct references still compare by value.
-    if (
-      beforeNode === afterNode ||
-      getNodeSignature(beforeNode) === getNodeSignature(afterNode)
-    ) {
+    if (beforeNode === afterNode || haveSameNodeValue(beforeNode, afterNode)) {
       return [];
     }
 
