@@ -132,11 +132,18 @@ export const getPaintHitStyle = (node, alignable = true) => {
   };
 };
 
+// A zero-length gradient paints only its last stop (see resolveDrawPaint).
+// A vector that collapses only through a degenerate paint box is ignored.
 const isPaintVisible = (paint: Paint) => {
-  return (
-    paint.kind !== "linear-gradient" ||
-    paint.stops.some((stop) => stop.opacity > 0)
-  );
+  if (paint.kind !== "linear-gradient") {
+    return true;
+  }
+
+  if (paint.start.x === paint.end.x && paint.start.y === paint.end.y) {
+    return (paint.stops.at(-1)?.opacity ?? 1) > 0;
+  }
+
+  return paint.stops.some((stop) => stop.opacity > 0);
 };
 
 export const getPaintSignature = (node, alignable = true) => {

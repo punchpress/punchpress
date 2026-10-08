@@ -597,4 +597,53 @@ describe("click-through follows visible appearance", () => {
     editor.clickInsideSelection({ x: 262, y: 300 });
     expect(editor.selectedNodeIds).toEqual(["outline"]);
   });
+
+  test("a zero-length gradient paints only its last stop", () => {
+    const zeroLength = (lastOpacity) => ({
+      fills: [
+        {
+          enabled: true,
+          id: "fill",
+          opacity: 1,
+          paint: {
+            end: { x: 0.5, y: 0.5 },
+            kind: "linear-gradient",
+            start: { x: 0.5, y: 0.5 },
+            stops: [
+              { color: "#ff0000", id: "a", offset: 0, opacity: 1 },
+              { color: "#ff0000", id: "b", offset: 1, opacity: lastOpacity },
+            ],
+          },
+        },
+      ],
+      strokes: [],
+    });
+
+    expect(clickOnTop(zeroLength(0), CENTER)).toBe("below");
+    expect(clickOnTop(zeroLength(1), CENTER)).toBe("top");
+  });
+
+  test("a boolean result whose style child is 0% paints nothing", () => {
+    const editor = createEditor([
+      {
+        ...createSquareNode("below", 300, 300),
+        transform: { rotation: 0, scaleX: 6, scaleY: 6, x: 300, y: 300 },
+      },
+      {
+        id: "united",
+        name: "United",
+        parentId: "root",
+        pathComposition: "unite",
+        transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+        type: "vector",
+        visible: true,
+      },
+      createSquareNode("united-a", 290, 300, "united"),
+      { ...createSquareNode("united-b", 310, 300, "united"), opacity: 0 },
+    ]);
+
+    editor.select("below");
+    editor.clickInsideSelection({ x: 300, y: 300 });
+    expect(editor.selectedNodeIds).toEqual(["below"]);
+  });
 });

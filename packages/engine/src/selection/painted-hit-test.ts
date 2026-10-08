@@ -71,7 +71,8 @@ export const isComposedVectorPaintedAt = (editor, vectorNodeId, point) => {
       entry.hasClosedContour !== false
     );
 
-    if (!(styleNode && hasPaint(paint))) {
+    // The compiled result paints at the style child's opacity.
+    if (!(styleNode && hasPaint(paint)) || styleNode.opacity === 0) {
       return false;
     }
 
