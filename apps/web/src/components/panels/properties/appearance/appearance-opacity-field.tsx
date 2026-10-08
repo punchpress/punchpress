@@ -1,7 +1,9 @@
+import { PERF_COUNTERS } from "@punchpress/engine";
 import { useState } from "react";
 import { ScrubSlider } from "@/components/ui/scrub-slider";
 import { useEditor } from "../../../../editor-react/use-editor";
 import { useEditorValue } from "../../../../editor-react/use-editor-value";
+import { usePerformanceRenderCounter } from "../../../../performance/use-performance-render-counter";
 import { FieldRow, Section } from "../field-primitives";
 import { NumberField } from "../number-field";
 import { usePropertyScrubHistory } from "../use-property-scrub-history";
@@ -9,6 +11,7 @@ import { usePropertyScrubHistory } from "../use-property-scrub-history";
 // Node opacity in percent; it applies to the composited node, every layer at
 // once.
 export const AppearanceOpacityField = () => {
+  usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesSection);
   const editor = useEditor();
   const history = usePropertyScrubHistory("edit opacity");
   // A selection that opened as mixed keeps the numeric field until the
@@ -21,8 +24,14 @@ export const AppearanceOpacityField = () => {
     return state.selectedNodeIds.join("\0");
   });
   const property = useEditorValue((editor, state) => {
-    return editor.getSelectionPropertiesSnapshot(state.selectedNodeIds)
-      .selectionProperties.properties.opacity;
+    const opacity = editor.getSelectionProperty(
+      "opacity",
+      state.selectedNodeIds
+    );
+
+    return opacity
+      ? { isMixed: opacity.isMixed, value: opacity.value as number }
+      : null;
   });
 
   if (property?.isMixed && mixedSelectionKey !== selectionKey) {

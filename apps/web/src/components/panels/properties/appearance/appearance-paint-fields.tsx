@@ -3,6 +3,7 @@ import { Delete02Icon, PlusSignIcon } from "@hugeicons-pro/core-stroke-rounded";
 import {
   insertGradientStop,
   type Paint,
+  PERF_COUNTERS,
   removeGradientStop,
 } from "@punchpress/engine";
 import { MAX_GRADIENT_STOPS, parseColor } from "@punchpress/punch-schema";
@@ -17,10 +18,15 @@ import {
 } from "@/components/ui/select";
 import { useEditor } from "../../../../editor-react/use-editor";
 import { useEditorValue } from "../../../../editor-react/use-editor-value";
+import { usePerformanceRenderCounter } from "../../../../performance/use-performance-render-counter";
 import { ColorField, FieldRow } from "../field-primitives";
 import { NumberField } from "../number-field";
 import { usePropertyScrubHistory } from "../use-property-scrub-history";
-import { useAppearanceLayer, useAppearanceList } from "./appearance-context";
+import {
+  useAppearanceLayerSlot,
+  useAppearanceLayerValue,
+  useAppearanceList,
+} from "./appearance-context";
 import { formatColorWithOpacity } from "./appearance-paint-swatch";
 
 type LinearGradient = Extract<Paint, { kind: "linear-gradient" }>;
@@ -32,26 +38,37 @@ const KIND_OPTIONS = [
 
 // Paint kind for one layer, plus angle and stops when it is a gradient.
 export const AppearancePaintFields = ({ layerId }: { layerId: string }) => {
+  usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesField);
   const editor = useEditor();
-  const resolved = useAppearanceLayer(layerId);
+  const resolveSlot = useAppearanceLayerSlot(layerId);
+  // A stored gradient paint, or just the kind for a solid paint.
+  const paint = useAppearanceLayerValue(layerId, (layer) => {
+    return layer.paint.kind === "linear-gradient"
+      ? layer.paint
+      : layer.paint.kind;
+  });
 
-  if (!resolved) {
+  if (paint === null) {
     return null;
   }
 
-  const { layer, slot } = resolved;
+  const kind = typeof paint === "string" ? paint : paint.kind;
   const selectedLabel = KIND_OPTIONS.find(
-    (option) => option.value === layer.paint.kind
+    (option) => option.value === kind
   )?.label;
 
   return (
     <div className="grid gap-2 pl-[44px]">
       <FieldRow label="Paint">
         <Select
-          onValueChange={(kind) => {
-            editor.setPaintKind(slot, kind as Paint["kind"]);
+          onValueChange={(nextKind) => {
+            const slot = resolveSlot();
+
+            if (slot) {
+              editor.setPaintKind(slot, nextKind as Paint["kind"]);
+            }
           }}
-          value={layer.paint.kind}
+          value={kind}
         >
           <SelectTrigger aria-label="Paint kind" size="sm">
             <SelectValue>{() => selectedLabel}</SelectValue>
@@ -65,9 +82,9 @@ export const AppearancePaintFields = ({ layerId }: { layerId: string }) => {
           </SelectContent>
         </Select>
       </FieldRow>
-      {layer.paint.kind === "linear-gradient" ? (
-        <GradientFields layerId={layerId} paint={layer.paint} />
-      ) : null}
+      {typeof paint === "string" ? null : (
+        <GradientFields layerId={layerId} paint={paint} />
+      )}
     </div>
   );
 };
@@ -81,29 +98,37 @@ const GradientFields = ({
 }) => {
   const editor = useEditor();
   const list = useAppearanceList();
-  const resolved = useAppearanceLayer(layerId);
+  const resolveSlot = useAppearanceLayerSlot(layerId);
   const angleHistory = usePropertyScrubHistory("edit gradient angle");
-  const slot = resolved?.slot;
-  const angle = useEditorValue((editor) => {
-    return slot ? editor.getGradientAngle(slot) : null;
+  const angle = useEditorValue((editor, state) => {
+    const slot = editor.getAppearanceLayer(
+      list,
+      layerId,
+      state.selectedNodeIds
+    )?.slot;
+
+    return slot ? editor.getGradientAngle(slot, state.selectedNodeIds) : null;
   });
 
-  if (!slot) {
-    return null;
-  }
+  // Stop edits rewrite the layer's current gradient, read at dispatch.
+  const updatePaint = (
+    update: (current: LinearGradient) => LinearGradient | null
+  ) => {
+    const resolved = editor.getAppearanceLayer(list, layerId);
+    const current = resolved?.layer.paint;
+    const next = current?.kind === "linear-gradient" ? update(current) : null;
 
-  const setPaint = (next: LinearGradient | null) => {
-    if (next) {
-      editor.updateAppearanceLayer(slot, { paint: next });
+    if (resolved && next) {
+      editor.updateAppearanceLayer(resolved.slot, { paint: next });
     }
   };
   const setStop = (stopId: string, patch) => {
-    setPaint({
-      ...paint,
-      stops: paint.stops.map((stop) => {
+    updatePaint((current) => ({
+      ...current,
+      stops: current.stops.map((stop) => {
         return stop.id === stopId ? { ...stop, ...patch } : stop;
       }),
-    });
+    }));
   };
 
   return (
@@ -116,7 +141,13 @@ const GradientFields = ({
           min={0}
           onScrubEnd={angleHistory.onScrubEnd}
           onScrubStart={angleHistory.onScrubStart}
-          onValueChange={(value) => editor.setGradientAngle(slot, value)}
+          onValueChange={(value) => {
+            const slot = resolveSlot();
+
+            if (slot) {
+              editor.setGradientAngle(slot, value);
+            }
+          }}
           value={Math.round(angle ?? 0)}
         />
       </FieldRow>
@@ -154,7 +185,9 @@ const GradientFields = ({
           <Button
             aria-label="Remove stop"
             disabled={paint.stops.length <= 2}
-            onClick={() => setPaint(removeGradientStop(paint, stop.id))}
+            onClick={() => {
+              updatePaint((current) => removeGradientStop(current, stop.id));
+            }}
             size="icon-xs"
             variant="ghost"
           >
@@ -165,9 +198,11 @@ const GradientFields = ({
       <div>
         <Button
           disabled={paint.stops.length >= MAX_GRADIENT_STOPS}
-          onClick={() =>
-            setPaint(insertGradientStop(paint, getWidestGapMiddle(paint)))
-          }
+          onClick={() => {
+            updatePaint((current) => {
+              return insertGradientStop(current, getWidestGapMiddle(current));
+            });
+          }}
           size="xs"
           variant="ghost"
         >

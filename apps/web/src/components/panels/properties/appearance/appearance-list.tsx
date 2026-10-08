@@ -1,18 +1,23 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { PlusSignIcon } from "@hugeicons-pro/core-stroke-rounded";
-import type { AppearanceList as AppearanceListId } from "@punchpress/engine";
-import { PERF_COUNTERS } from "@punchpress/engine";
+import {
+  type AppearanceList as AppearanceListId,
+  PERF_COUNTERS,
+} from "@punchpress/engine";
 import { MAX_APPEARANCE_LAYERS } from "@punchpress/punch-schema";
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { SortableList } from "@/components/ui/sortable-list";
 import { useEditor } from "../../../../editor-react/use-editor";
+import { useEditorValue } from "../../../../editor-react/use-editor-value";
 import { usePerformanceRenderCounter } from "../../../../performance/use-performance-render-counter";
-import { AppearanceListContext, useAppearance } from "./appearance-context";
+import { AppearanceListContext } from "./appearance-context";
 
 const LIST_TITLES = { fills: "Fill", strokes: "Stroke" };
 
 // One section per stack list. Rows show the topmost paint first, so the
-// displayed order is the reverse of the stored bottom-to-top order.
+// displayed order is the reverse of the stored bottom-to-top order. The
+// section re-renders only when the list's layer ids change.
 export const AppearanceListSection = ({
   children,
   list,
@@ -22,13 +27,17 @@ export const AppearanceListSection = ({
 }) => {
   usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesSection);
   const editor = useEditor();
-  const appearance = useAppearance();
-  const layers = appearance[list];
-  const displayIds = layers.map((layer) => layer.id).reverse();
+  // The selector returns a fresh array; the shallow compare keeps the
+  // previous one while the ids match, so the sortable rows stay put.
+  const layerIds = useEditorValue((editor, state) => {
+    return editor.getAppearanceLayerIds(list, state.selectedNodeIds);
+  });
+  const displayIds = useMemo(() => [...layerIds].reverse(), [layerIds]);
+  const context = useMemo(() => ({ list }), [list]);
   const title = LIST_TITLES[list];
 
   return (
-    <AppearanceListContext.Provider value={{ list }}>
+    <AppearanceListContext.Provider value={context}>
       <section
         className="border-black/4 border-t py-4 last:pb-0"
         data-testid={`appearance-${list}`}
@@ -39,7 +48,7 @@ export const AppearanceListSection = ({
           </h3>
           <Button
             aria-label={`Add ${title.toLowerCase()}`}
-            disabled={layers.length >= MAX_APPEARANCE_LAYERS}
+            disabled={layerIds.length >= MAX_APPEARANCE_LAYERS}
             onClick={() => {
               if (list === "fills") {
                 editor.addFill();
@@ -57,12 +66,13 @@ export const AppearanceListSection = ({
           <SortableList
             items={displayIds}
             onMove={({ activeId, overId }) => {
-              // Stored order is bottom-to-top; moving onto a row takes its slot.
-              const index = layers.findIndex((layer) => layer.id === activeId);
-              const toIndex = layers.findIndex((layer) => layer.id === overId);
+              // Stored order is bottom-to-top; moving onto a row takes its
+              // slot. Both resolve against the current stack.
+              const slot = editor.getAppearanceLayer(list, activeId)?.slot;
+              const target = editor.getAppearanceLayer(list, overId)?.slot;
 
-              if (index >= 0 && toIndex >= 0) {
-                editor.moveAppearanceLayer({ index, list }, toIndex);
+              if (slot && target) {
+                editor.moveAppearanceLayer(slot, target.index);
               }
             }}
           >

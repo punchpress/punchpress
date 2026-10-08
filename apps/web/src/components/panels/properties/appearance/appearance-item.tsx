@@ -11,12 +11,19 @@ import { SortableItem } from "@/components/ui/sortable-list";
 import { cn } from "@/lib/utils";
 import { useEditor } from "../../../../editor-react/use-editor";
 import { usePerformanceRenderCounter } from "../../../../performance/use-performance-render-counter";
-import { useAppearanceLayer, useAppearanceList } from "./appearance-context";
+import {
+  useAppearanceLayerSlot,
+  useAppearanceLayerValue,
+  useAppearanceList,
+  useUpdateAppearanceLayer,
+} from "./appearance-context";
 import { AppearancePaintFields } from "./appearance-paint-fields";
 import { AppearancePaintSwatch } from "./appearance-paint-swatch";
 
 // One layer row: drag handle, visibility, paint color with opacity, remove.
-// Stroke rows add their geometry controls beneath through `children`.
+// Stroke rows add their geometry controls beneath through `children`. The
+// row chrome subscribes to visibility only; paint and geometry controls
+// subscribe to their own values.
 export const AppearanceItem = ({
   children,
   layerId,
@@ -27,13 +34,14 @@ export const AppearanceItem = ({
   usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesRow);
   const editor = useEditor();
   const list = useAppearanceList();
-  const resolved = useAppearanceLayer(layerId);
+  const enabled = useAppearanceLayerValue(layerId, (layer) => layer.enabled);
+  const resolveSlot = useAppearanceLayerSlot(layerId);
+  const updateLayer = useUpdateAppearanceLayer(layerId);
 
-  if (!resolved) {
+  if (enabled === null) {
     return null;
   }
 
-  const { layer, slot } = resolved;
   const label = list === "fills" ? "fill" : "stroke";
 
   return (
@@ -56,27 +64,29 @@ export const AppearanceItem = ({
               <HugeiconsIcon icon={DragDropVerticalIcon} size={14} />
             </button>
             <Button
-              aria-label={layer.enabled ? `Hide ${label}` : `Show ${label}`}
-              aria-pressed={layer.enabled}
-              onClick={() => {
-                editor.updateAppearanceLayer(slot, { enabled: !layer.enabled });
-              }}
+              aria-label={enabled ? `Hide ${label}` : `Show ${label}`}
+              aria-pressed={enabled}
+              onClick={() => updateLayer({ enabled: !enabled })}
               size="icon-xs"
               variant="ghost"
             >
               <HugeiconsIcon
-                icon={layer.enabled ? ViewIcon : ViewOffIcon}
+                icon={enabled ? ViewIcon : ViewOffIcon}
                 size={14}
                 strokeWidth={1.8}
               />
             </Button>
-            <div className={cn("min-w-0", !layer.enabled && "opacity-50")}>
+            <div className={cn("min-w-0", !enabled && "opacity-50")}>
               <AppearancePaintSwatch layerId={layerId} />
             </div>
             <Button
               aria-label={`Remove ${label}`}
               onClick={() => {
-                editor.removeAppearanceLayer(slot);
+                const slot = resolveSlot();
+
+                if (slot) {
+                  editor.removeAppearanceLayer(slot);
+                }
               }}
               size="icon-xs"
               variant="ghost"

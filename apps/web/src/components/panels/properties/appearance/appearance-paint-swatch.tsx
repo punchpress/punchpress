@@ -1,26 +1,33 @@
-import type { Paint } from "@punchpress/engine";
+import { type Paint, PERF_COUNTERS } from "@punchpress/engine";
 import { parseColor, toRgb } from "@punchpress/punch-schema";
-import { useEditor } from "../../../../editor-react/use-editor";
+import { usePerformanceRenderCounter } from "../../../../performance/use-performance-render-counter";
 import { ColorField } from "../field-primitives";
-import { useAppearanceLayer, useAppearanceList } from "./appearance-context";
+import {
+  useAppearanceLayerValue,
+  useAppearanceList,
+  useUpdateAppearanceLayer,
+} from "./appearance-context";
 
 // The layer's paint at a glance: a color field for solid paint, or the ramp
 // drawn with the same SVG stops the canvas uses for a gradient.
 export const AppearancePaintSwatch = ({ layerId }: { layerId: string }) => {
-  const editor = useEditor();
+  usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesField);
   const list = useAppearanceList();
-  const resolved = useAppearanceLayer(layerId);
+  const updateLayer = useUpdateAppearanceLayer(layerId);
+  // A solid paint reads as one color string; a gradient keeps its stored
+  // paint so the ramp re-renders only when the gradient changes.
+  const swatch = useAppearanceLayerValue(layerId, (layer) => {
+    return layer.paint.kind === "linear-gradient"
+      ? layer.paint
+      : formatColorWithOpacity(layer.paint.color, layer.opacity);
+  });
 
-  if (!resolved) {
+  if (swatch === null) {
     return null;
   }
 
-  const { layer, slot } = resolved;
-
-  if (layer.paint.kind === "linear-gradient") {
-    return (
-      <GradientRamp paint={layer.paint} testId={`gradient-ramp-${layerId}`} />
-    );
+  if (typeof swatch !== "string") {
+    return <GradientRamp paint={swatch} testId={`gradient-ramp-${layerId}`} />;
   }
 
   return (
@@ -29,17 +36,14 @@ export const AppearancePaintSwatch = ({ layerId }: { layerId: string }) => {
         const parsed = parseColor(value);
 
         if (parsed) {
-          editor.updateAppearanceLayer(slot, {
-            color: parsed.color,
-            opacity: parsed.opacity,
-          });
+          updateLayer({ color: parsed.color, opacity: parsed.opacity });
         }
       }}
       onInteractionEnd={undefined}
       onInteractionStart={undefined}
       placeholder={undefined}
       stateKey={`appearance-${list}-${layerId}`}
-      value={formatColorWithOpacity(layer.paint.color, layer.opacity)}
+      value={swatch}
     />
   );
 };

@@ -1,34 +1,21 @@
 import type {
-  Appearance,
   AppearanceList,
+  AppearanceSlot,
   FillLayer,
   StrokeLayer,
 } from "@punchpress/engine";
-import { createContext, useContext } from "react";
-
-interface AppearanceContextValue {
-  appearance: Appearance;
-}
+import { createContext, useCallback, useContext } from "react";
+import { useEditor } from "../../../../editor-react/use-editor";
+import { useEditorValue } from "../../../../editor-react/use-editor-value";
 
 interface AppearanceListContextValue {
   list: AppearanceList;
 }
 
-export const AppearanceContext = createContext<AppearanceContextValue | null>(
-  null
-);
+// Carries only which list a row belongs to. Rows and fields read their layer
+// from the editor, so a value edit re-renders only the controls that show it.
 export const AppearanceListContext =
   createContext<AppearanceListContextValue | null>(null);
-
-export const useAppearance = () => {
-  const value = useContext(AppearanceContext);
-
-  if (!value) {
-    throw new Error("Appearance parts must render inside Appearance.Root.");
-  }
-
-  return value.appearance;
-};
 
 export const useAppearanceList = () => {
   const value = useContext(AppearanceListContext);
@@ -40,17 +27,49 @@ export const useAppearanceList = () => {
   return value.list;
 };
 
-// Controls hold layer ids; commands address layers by index. The id resolves to
-// its current index at dispatch so reorder and undo never retarget a control.
-export const useAppearanceLayer = (layerId: string) => {
-  const appearance = useAppearance();
+// Subscribes to one value of a row's layer. `read` must return a primitive or
+// a stored reference; null when the layer is gone.
+export const useAppearanceLayerValue = <T>(
+  layerId: string,
+  read: (layer: FillLayer | StrokeLayer) => T
+): T | null => {
   const list = useAppearanceList();
-  const index = appearance[list].findIndex((layer) => layer.id === layerId);
 
-  return index < 0
-    ? null
-    : {
-        layer: appearance[list][index] as FillLayer | StrokeLayer,
-        slot: { index, list },
-      };
+  return useEditorValue((editor, state) => {
+    const resolved = editor.getAppearanceLayer(
+      list,
+      layerId,
+      state.selectedNodeIds
+    );
+
+    return resolved ? read(resolved.layer) : null;
+  });
+};
+
+// Controls hold layer ids; commands address layers by index. The id resolves
+// to its current slot when the control dispatches, so reorder, remove, and
+// undo never retarget a mounted control.
+export const useAppearanceLayerSlot = (layerId: string) => {
+  const editor = useEditor();
+  const list = useAppearanceList();
+
+  return useCallback((): AppearanceSlot | null => {
+    return editor.getAppearanceLayer(list, layerId)?.slot ?? null;
+  }, [editor, layerId, list]);
+};
+
+export const useUpdateAppearanceLayer = (layerId: string) => {
+  const editor = useEditor();
+  const resolveSlot = useAppearanceLayerSlot(layerId);
+
+  return useCallback(
+    (patch: Parameters<typeof editor.updateAppearanceLayer>[1]) => {
+      const slot = resolveSlot();
+
+      if (slot) {
+        editor.updateAppearanceLayer(slot, patch);
+      }
+    },
+    [editor, resolveSlot]
+  );
 };

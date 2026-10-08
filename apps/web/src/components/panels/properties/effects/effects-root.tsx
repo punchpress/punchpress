@@ -2,34 +2,39 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { PlusSignIcon } from "@hugeicons-pro/core-stroke-rounded";
 import { PERF_COUNTERS } from "@punchpress/engine";
 import { MAX_EFFECTS } from "@punchpress/punch-schema";
+import { Fragment } from "react";
 import { Button } from "@/components/ui/button";
 import { useEditor } from "../../../../editor-react/use-editor";
 import { useEditorValue } from "../../../../editor-react/use-editor-value";
 import { usePerformanceRenderCounter } from "../../../../performance/use-performance-render-counter";
 import { FieldRow } from "../field-primitives";
-import { EffectsContext } from "./effects-context";
 
-// Reads the selection's effect owners (a vector child path routes to its
+// Shows the selection's effect owners (a vector child path routes to its
 // vector). Multi-selections share a stack only when every stack is equal apart
 // from effect ids; otherwise the list is replaced by a mixed row that can copy
-// the first stack onto the whole selection.
+// the first stack onto the whole selection. Subscribes to structure only.
 export const EffectsRoot = ({ children }) => {
   usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesSection);
   const editor = useEditor();
-  // `effects` is the owner's stored array, so the shallow compare stays stable.
-  const selection = useEditorValue((currentEditor, state) => {
-    const { effects, isMixed, targetCount } = currentEditor.getSelectionEffects(
+  const selection = useEditorValue((editor, state) => {
+    const { effects, isMixed, targetCount } = editor.getSelectionEffects(
       state.selectedNodeIds
     );
 
-    return targetCount > 0 ? { effects, isMixed } : { effects: null };
+    return {
+      available: targetCount > 0,
+      count: effects.length,
+      isMixed,
+      // Different owners can reuse the same effect ids, so the list remounts
+      // when the selection changes; a control never carries a gesture or
+      // picker state over to another node's effect.
+      scopeKey: state.selectedNodeIds.join("\0"),
+    };
   });
 
-  if (!selection.effects) {
+  if (!selection.available) {
     return null;
   }
-
-  const { effects, isMixed } = selection;
 
   return (
     <section
@@ -42,7 +47,7 @@ export const EffectsRoot = ({ children }) => {
         </h3>
         <Button
           aria-label="Add effect"
-          disabled={isMixed || effects.length >= MAX_EFFECTS}
+          disabled={selection.isMixed || selection.count >= MAX_EFFECTS}
           onClick={() => {
             editor.addEffect("drop-shadow");
           }}
@@ -52,11 +57,11 @@ export const EffectsRoot = ({ children }) => {
           <HugeiconsIcon icon={PlusSignIcon} size={14} strokeWidth={1.8} />
         </Button>
       </div>
-      {isMixed ? (
+      {selection.isMixed ? (
         <FieldRow label="Mixed">
           <Button
             onClick={() => {
-              editor.setEffects(effects);
+              editor.setEffects(editor.getSelectionEffects().effects);
             }}
             size="xs"
             variant="outline"
@@ -65,9 +70,7 @@ export const EffectsRoot = ({ children }) => {
           </Button>
         </FieldRow>
       ) : (
-        <EffectsContext.Provider value={{ effects }}>
-          {children}
-        </EffectsContext.Provider>
+        <Fragment key={selection.scopeKey}>{children}</Fragment>
       )}
     </section>
   );

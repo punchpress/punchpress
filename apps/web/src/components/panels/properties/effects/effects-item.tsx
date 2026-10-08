@@ -15,10 +15,16 @@ import { usePerformanceRenderCounter } from "../../../../performance/use-perform
 import { formatColorWithOpacity } from "../appearance/appearance-paint-swatch";
 import { ColorField } from "../field-primitives";
 import { usePropertyScrubHistory } from "../use-property-scrub-history";
-import { useEffectSlot } from "./effects-context";
+import {
+  useEffectIndex,
+  useEffectValue,
+  useUpdateEffect,
+} from "./use-effect-controls";
 
 // One effect row: drag handle, visibility, shadow color with opacity, remove.
-// Kind-specific fields render beneath through `children`.
+// Kind-specific fields render beneath through `children`. The row chrome
+// subscribes to visibility only; the color and fields subscribe to their own
+// values.
 export const EffectsItem = ({
   children,
   effectId,
@@ -28,14 +34,13 @@ export const EffectsItem = ({
 }) => {
   usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesRow);
   const editor = useEditor();
-  const colorHistory = usePropertyScrubHistory("edit shadow color");
-  const resolved = useEffectSlot(effectId);
+  const enabled = useEffectValue(effectId, (effect) => effect.enabled);
+  const resolveIndex = useEffectIndex(effectId);
+  const updateEffect = useUpdateEffect(effectId);
 
-  if (!resolved) {
+  if (enabled === null) {
     return null;
   }
-
-  const { effect, index } = resolved;
 
   return (
     <SortableItem id={effectId}>
@@ -57,43 +62,29 @@ export const EffectsItem = ({
               <HugeiconsIcon icon={DragDropVerticalIcon} size={14} />
             </button>
             <Button
-              aria-label={effect.enabled ? "Hide effect" : "Show effect"}
-              aria-pressed={effect.enabled}
-              onClick={() => {
-                editor.updateEffect(index, { enabled: !effect.enabled });
-              }}
+              aria-label={enabled ? "Hide effect" : "Show effect"}
+              aria-pressed={enabled}
+              onClick={() => updateEffect({ enabled: !enabled })}
               size="icon-xs"
               variant="ghost"
             >
               <HugeiconsIcon
-                icon={effect.enabled ? ViewIcon : ViewOffIcon}
+                icon={enabled ? ViewIcon : ViewOffIcon}
                 size={14}
                 strokeWidth={1.8}
               />
             </Button>
-            <div className={cn("min-w-0", !effect.enabled && "opacity-50")}>
-              <ColorField
-                onChange={(value) => {
-                  const parsed = parseColor(value);
-
-                  if (parsed) {
-                    editor.updateEffect(index, {
-                      color: parsed.color,
-                      opacity: parsed.opacity,
-                    });
-                  }
-                }}
-                onInteractionEnd={colorHistory.onScrubEnd}
-                onInteractionStart={colorHistory.onScrubStart}
-                placeholder={undefined}
-                stateKey={`effect-${effectId}`}
-                value={formatColorWithOpacity(effect.color, effect.opacity)}
-              />
+            <div className={cn("min-w-0", !enabled && "opacity-50")}>
+              <EffectColorField effectId={effectId} />
             </div>
             <Button
               aria-label="Remove effect"
               onClick={() => {
-                editor.removeEffect(index);
+                const index = resolveIndex();
+
+                if (index !== null) {
+                  editor.removeEffect(index);
+                }
               }}
               size="icon-xs"
               variant="ghost"
@@ -105,5 +96,31 @@ export const EffectsItem = ({
         </div>
       )}
     </SortableItem>
+  );
+};
+
+const EffectColorField = ({ effectId }: { effectId: string }) => {
+  usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesField);
+  const history = usePropertyScrubHistory("edit shadow color");
+  const updateEffect = useUpdateEffect(effectId);
+  const color = useEffectValue(effectId, (effect) => {
+    return formatColorWithOpacity(effect.color, effect.opacity);
+  });
+
+  return (
+    <ColorField
+      onChange={(value) => {
+        const parsed = parseColor(value);
+
+        if (parsed) {
+          updateEffect({ color: parsed.color, opacity: parsed.opacity });
+        }
+      }}
+      onInteractionEnd={history.onScrubEnd}
+      onInteractionStart={history.onScrubStart}
+      placeholder={undefined}
+      stateKey={`effect-${effectId}`}
+      value={color}
+    />
   );
 };
