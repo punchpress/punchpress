@@ -77,7 +77,7 @@ export const getGroupNodeRenderTree = (
           ...fallbackText,
           ...getPrimaryPaint(getNodeAppearance(childNode)),
           effects: getLeafEffectPresentation(
-            childNode,
+            editor.getPaintNode(childNode.id) || childNode,
             geometry ?? {
               bbox: editor.getNodeRenderFrame(childNode.id)?.bounds,
             }
@@ -115,7 +115,10 @@ export const getGroupNodeRenderTree = (
 
     return [
       {
-        effects: getLeafEffectPresentation(childNode, geometry),
+        effects: getLeafEffectPresentation(
+          editor.getPaintNode(childNode.id) || childNode,
+          geometry
+        ),
         key: childNode.id,
         objects: buildAppearanceObjects(
           editor.getPaintNode(childNode.id),

@@ -1,9 +1,14 @@
-import { parseColor, toRgb } from "@punchpress/punch-schema";
+import { parseColor } from "@punchpress/punch-schema";
 import { getNodeAppearance } from "../appearance/node-appearance";
+import { canOwnEffects } from "../effects/effect-model";
 import { supportsNodeProperty } from "../nodes/node-property-support";
 import { isContainerNode } from "../nodes/node-tree";
 import { measurePerf } from "../perf/perf-hooks";
 import { PERF_SPANS } from "../perf/perf-labels";
+import {
+  formatPaintValue,
+  getEffectColorFields,
+} from "./effect-color-fields";
 
 const MAX_VISIBLE_SELECTION_COLORS = 12;
 
@@ -16,10 +21,14 @@ const createSelectionColorFieldId = (nodeId, fieldKey) => {
 };
 
 // Every color a node paints with: an artboard background, each enabled solid
-// layer, and each stop of an enabled gradient layer. Values are canonical
-// colors (with the layer or stop opacity as alpha) so equal paints group;
-// writers replace only that field.
+// layer, each stop of an enabled gradient layer, and each enabled shadow.
+// Values are canonical colors (with the layer, stop, or shadow opacity as
+// alpha) so equal paints group; writers replace only that field.
 const getNodeColorFields = (node) => {
+  return [...getPaintColorFields(node), ...getEffectColorFields(node)];
+};
+
+const getPaintColorFields = (node) => {
   if (supportsNodeProperty(node, "background")) {
     const color = parseColor(node.background)?.color;
 
@@ -65,18 +74,6 @@ const getNodeColorFields = (node) => {
         ];
       });
   });
-};
-
-// Selection colors group layers by color *and* opacity, so a swatch's alpha is
-// the exact layer opacity it stands for and editing it is lossless.
-const formatPaintValue = (color: string, opacity: number) => {
-  if (opacity >= 1) {
-    return color;
-  }
-
-  const { b, g, r } = toRgb(color);
-
-  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 };
 
 const setLayerColor = (node, list, layerId, value) => {
@@ -167,12 +164,12 @@ const getSelectionColorTargetNodeIds = (editor, nodeIds) => {
       continue;
     }
 
-    if (supportsSelectionColor(node)) {
+    if (supportsSelectionColor(editor, node)) {
       targetNodeIds.push(node.id);
     }
 
     if (isContainerNode(node)) {
-      targetNodeIds.push(...editor.getDescendantLeafNodeIds(node.id));
+      targetNodeIds.push(...getDescendantNodeIds(editor, node.id));
       continue;
     }
 
@@ -183,16 +180,16 @@ const getSelectionColorTargetNodeIds = (editor, nodeIds) => {
       continue;
     }
 
-    if (supportsSelectionColor(targetNode)) {
+    if (supportsSelectionColor(editor, targetNode)) {
       targetNodeIds.push(targetNode.id);
     }
 
     if (isContainerNode(targetNode)) {
-      targetNodeIds.push(...editor.getDescendantLeafNodeIds(targetNode.id));
+      targetNodeIds.push(...getDescendantNodeIds(editor, targetNode.id));
       continue;
     }
 
-    if (!supportsSelectionColor(targetNode)) {
+    if (!supportsSelectionColor(editor, targetNode)) {
       targetNodeIds.push(targetNode.id);
     }
   }
@@ -200,11 +197,28 @@ const getSelectionColorTargetNodeIds = (editor, nodeIds) => {
   return [...new Set(targetNodeIds)];
 };
 
-const supportsSelectionColor = (node) => {
+const supportsSelectionColor = (editor, node) => {
   return (
     supportsNodeProperty(node, "background") ||
-    supportsNodeProperty(node, "appearance")
+    supportsNodeProperty(node, "appearance") ||
+    canOwnEffects(node, editor.getNode(node.parentId))
   );
+};
+
+// Every node below a container, nested containers included: groups and
+// vectors own shadows of their own.
+const getDescendantNodeIds = (editor, nodeId) => {
+  const descendantNodeIds: string[] = [];
+  const visit = (parentId) => {
+    for (const childNodeId of editor.getChildNodeIds(parentId)) {
+      descendantNodeIds.push(childNodeId);
+      visit(childNodeId);
+    }
+  };
+
+  visit(nodeId);
+
+  return descendantNodeIds;
 };
 
 const shouldExposeSelectionColors = (editor, nodeIds) => {

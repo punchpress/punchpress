@@ -443,7 +443,10 @@ lands with stage 6:
     shadowed group every frame (see the stage 6 measurements).
   - A group's filter ink does not follow live text edits inside it until the
     edit commits.
-  - Selection colors do not list shadow colors.
+- **Selection colors** list enabled shadow colors like gradient stops (color
+  with shadow opacity as alpha), including group and vector shadows. The live
+  preview recolors leaf shadows through `getPaintNode` and group-layer shadows
+  through `getLayerPreviewEffects`; color never changes filter ink.
 
 ## Rejected Alternatives
 

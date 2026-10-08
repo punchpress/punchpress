@@ -40,6 +40,6 @@ Groups organize multiple layers and let users manipulate them as one object.
 - Groups appear as expandable rows in layers.
 - Reordering respects group structure.
 - Selecting a group exposes object-level controls.
-- Selection colors aggregate distinct descendant fill and stroke colors.
+- Selection colors aggregate distinct descendant fill, stroke, and shadow colors, plus the group's own shadows.
 - Editing a selection color updates every selected descendant paint that uses
   that exact color.

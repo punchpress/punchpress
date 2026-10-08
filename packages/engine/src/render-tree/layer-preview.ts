@@ -1,5 +1,6 @@
 import type { Bounds } from "../appearance/appearance-types";
 import type { EffectPresentation } from "../effects/effect-filter";
+import { getNodeEffects } from "../effects/effect-model";
 import { scaleEffects } from "../effects/effect-transform";
 import { unionBounds } from "./output-ink";
 
@@ -11,8 +12,9 @@ import { unionBounds } from "./output-ink";
 export const getLayerPreviewEffects = (
   editor,
   layerId: string,
-  effects: EffectPresentation | null
+  layerEffects: EffectPresentation | null
 ): EffectPresentation | null => {
+  const effects = withSelectionColorPreview(editor, layerId, layerEffects);
   const preview = editor.selectionDragPreview;
 
   if (!(effects && preview && previewTouches(editor, preview, layerId))) {
@@ -45,6 +47,40 @@ export const getLayerPreviewClip = (
   }
 
   return translate(clip, preview.delta.x || 0, preview.delta.y || 0);
+};
+
+// A live selection-color edit recolors the layer's shadows; colors never
+// change the filter region, so the ink stays.
+const withSelectionColorPreview = (
+  editor,
+  layerId: string,
+  effects: EffectPresentation | null
+): EffectPresentation | null => {
+  if (!(effects && editor.selectionColorPreviewState)) {
+    return effects;
+  }
+
+  const node = editor.getNode(layerId);
+  const paintNode = editor.getPaintNode(layerId);
+
+  if (!node || paintNode === node) {
+    return effects;
+  }
+
+  const previewById = new Map(
+    getNodeEffects(paintNode).map((effect) => [effect.id, effect])
+  );
+
+  return {
+    ...effects,
+    effects: effects.effects.map((effect) => {
+      const previewEffect = previewById.get(effect.id);
+
+      return previewEffect
+        ? { ...effect, color: previewEffect.color, opacity: previewEffect.opacity }
+        : effect;
+    }),
+  };
 };
 
 const previewTouches = (editor, preview, layerId: string) => {

@@ -27,7 +27,7 @@ Vector nodes group child path nodes that need one object identity.
 - During path editing, the focused child path row becomes active when the vector
   has child paths.
 - Selecting a vector exposes object-level controls and aggregate appearance.
-- Selection colors list distinct child fill and stroke colors.
+- Selection colors list distinct child fill and stroke colors and the vector's shadow colors.
 - Path-specific geometry and appearance stay on direct child path selection.
 
 ## Export

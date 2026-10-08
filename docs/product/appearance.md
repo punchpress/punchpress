@@ -39,9 +39,10 @@ white outline.
   hard 8/8 black shadow. Shadows paint in list order (top row first, under the
   object), rotate and scale with the object, and never take clicks. Selecting
   a path inside a vector edits the vector's shadows.
-- **Selection colors.** Group and multi-selections list every distinct layer
-  and gradient-stop color with its opacity; editing one recolors every visible
-  layer or stop that uses it.
+- **Selection colors.** Group and multi-selections list every distinct layer,
+  gradient-stop, and shadow color with its opacity, including the selected
+  groups' own shadows; editing one recolors every enabled layer, stop, or
+  shadow that uses it, live while dragging the picker.
 
 ## Rules
 

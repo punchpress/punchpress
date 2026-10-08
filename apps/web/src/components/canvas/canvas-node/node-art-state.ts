@@ -58,6 +58,7 @@ export const selectNodeArtState = (
       width: 0,
     };
   const fallbackText = editor.getTextFallbackPreview(node, geometry);
+  const paintNode = previewNode ? node : editor.getPaintNode(nodeId) || node;
 
   return {
     bbox,
@@ -65,9 +66,9 @@ export const selectNodeArtState = (
     effects:
       node.type === "image"
         ? null
-        : getLeafEffectPresentation(node, geometry ?? { bbox }),
+        : getLeafEffectPresentation(paintNode, geometry ?? { bbox }),
     fallbackPaint: fallbackText
-      ? getPrimaryPaint(getNodeAppearance(editor.getPaintNode(nodeId) || node))
+      ? getPrimaryPaint(getNodeAppearance(paintNode))
       : null,
     fallbackText,
     image: node.type === "image" ? node : null,
@@ -75,10 +76,8 @@ export const selectNodeArtState = (
     isEditing: state.editingNodeId === nodeId && !isEditingText,
     isEditingText,
     isInteractionProxy: false,
-    objects: buildAppearanceObjects(
-      previewNode ? node : editor.getPaintNode(nodeId) || node,
-      geometry,
-      (id) => editor.getPaintNode(id)
+    objects: buildAppearanceObjects(paintNode, geometry, (id) =>
+      editor.getPaintNode(id)
     ),
     // Ancestor opacity lives on the group and artboard layers.
     opacity: getNodeOpacity(node),
