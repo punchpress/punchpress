@@ -26,6 +26,14 @@ state.
 - Undo/redo restores document state and relevant editor mode state.
 - Dirty state compares current document state to the last saved mark. The
   serialized comparison is cached per nodes snapshot.
+- Writes are immutable. A history entry records a node only when its value
+  changed: identical references are skipped and distinct versions compare
+  field by field, so shared fields such as contours are never serialized.
+- Undo and redo load the recorded node objects back. Loading keeps an already
+  normalized node (path normalization is idempotent), so untouched nodes keep
+  their identity, geometry cache entries, and art revisions.
+- `hasOpenHistoryStep` is true while a gesture holds an open mark; deferred
+  whole-document work such as scratchpad autosave waits for it to close.
 - `subscribeDirtyState` notifies after store updates and after history, save,
   undo, and redo transitions, once `isDirty` holds its final value.
 

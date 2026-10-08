@@ -374,7 +374,10 @@ lands with stage 6:
 
 - `editor.getRenderTree()` returns layers (every group and artboard, always
   present so opacity changes never re-parent descendants), shells, and dense
-  surfaces, plus the flat list of placed shell and surface ids.
+  surfaces, plus the flat list of placed shell and surface ids. A rebuild
+  reuses every previous layer and leaf that is unchanged, and the previous
+  placed-id array when paint order is unchanged, so canvas clients re-render
+  and re-place only what changed.
 - A layer is a zero-size `div` with no node markers. CSS `opacity` below 1
   isolates its subtree. Layers never move: previews keep moving leaf shells, so
   preview roots stay disjoint without a placement rewrite.

@@ -10,7 +10,9 @@ read_when:
 The scratchpad is the default local workspace.
 
 - It is always present.
-- It autosaves without prompting.
+- It autosaves without prompting, a short pause after each edit. A write
+  waits for an in-progress gesture (drag, scrub, stroke) to commit, so
+  autosave never stalls the gesture.
 - Leaving its tab writes any pending edit immediately; the latest content is
   restored when PunchPress reopens.
 - It has a tab and cannot be closed.

@@ -37,6 +37,15 @@ document.
 - Per-node canvas art keys on `editor.getNodeArtRevision(nodeId)`, which changes
   only when that node, its subtree, or an ancestor changes. Never key node art
   on `state.nodes`.
+- `useEditorSurfaceValue` re-renders on every interaction preview; components
+  that read live previews in their render body rely on that. Per-node art uses
+  `useEditorSurfaceSelection`, which re-renders only when its selected preview
+  value changes, so a drag re-renders only the moved nodes. Each mounted node
+  shell subscribes only to values it renders; handlers read tool state when
+  they run.
+- Render layers memoize on the engine's layer object. The engine keeps an
+  unchanged layer (and the placed-id array) across rebuilds, so a structural
+  edit re-renders only the layers it changed.
 - Tree queries such as `getSelectionTargetNodeId` use the cached node-tree
   index; selectors must not rebuild node maps.
 - Menu content subscribes inside its popup so closed menus do no work.

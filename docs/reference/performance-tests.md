@@ -55,7 +55,8 @@ unless the task is specifically about the performance pane UI.
 
 1. Discover scenarios with `bun run perf --list --json`.
 2. Run the target scenario with `bun run perf:json <id>`.
-3. Inspect `summary`, `spans`, `counters`, `nodeStats`, and artifact paths.
+3. Inspect `summary`, `spans`, `metrics`, `counters`, `nodeStats`, and
+   artifact paths.
 4. Re-run with `bun run perf:flame <id>` when frame summaries say a scenario is
    slow and span timing is needed.
 5. Re-run with `bun run perf:trace <id>` only when app spans do not explain the
@@ -81,6 +82,7 @@ slow frame.
 | Frame sample | One rendered frame with duration, counters, and span buckets |
 | Span | One timed product or architecture boundary with `startMs`, `endMs`, `durationMs`, and nesting depth |
 | Counter | A counted value such as rendered canvas nodes or visible layer rows |
+| Metric | A benchmark-recorded sample, such as action-to-settled-frame latency, summarized as count, p50, p95, and max |
 | Flame span | A timestamped span retained so the pane or JSON artifact can draw a flame chart |
 | Measured PunchPress Work | A derived flame-chart row covering the app spans retained for the selected frame |
 | Unattributed Time | Frame time not covered by retained PunchPress spans |
@@ -109,6 +111,9 @@ Span labels use dot-separated, lower-camel architecture names:
 | `store.selection.reduce` | Store update and reducer work |
 | `import.svg.parse` | SVG import normalization work |
 | `document.load.apply` | Document load or insertion work |
+| `document.group.apply` | Structural document commands (group, ungroup, reorder, reparent) |
+| `history.undo.apply` | Undo and redo |
+| `render.placement.durable` | Canvas shell placement after store writes and during previews |
 
 The table above is a reader guide to the naming scheme, not the full list. Add
 new labels to the registry first, then use the registry constant at the call
@@ -125,8 +130,8 @@ Performance capture records:
 - frame samples with duration, counters, and span buckets
 - timestamped spans with `label`, `startMs`, `endMs`, `durationMs`, `depth`,
   and optional `frameId`
-- benchmark results with summaries, counters, node stats, span summaries, and
-  flame spans
+- benchmark results with summaries, counters, node stats, span summaries
+  (count, p50, p95, max, total), metrics, and flame spans
 - browser trace marks when browser trace capture is enabled
 
 Aggregated summaries are for quick pass/fail and comparison. Timestamped spans
@@ -157,6 +162,38 @@ Benchmark code should call editor/product operations and let instrumentation
 inside those operations emit spans. If a benchmark needs to wrap a whole
 operation because no architectural span exists, add the span at the operation
 boundary instead.
+
+Discrete-command scenarios measure the command with its engine span and record
+`<action>.settleMs`: the time from the command to the second following frame,
+which covers the React and placement work the command scheduled. Prepare the
+fixture and selection outside each sample, assert that the command changed the
+document, and measure undo and redo as their own operations. Drag scenarios
+record `drag.begin.settleMs`, `drag.heldFrameMs`, and `drag.release.settleMs`,
+and every drag ends displaced, because a drag that returns to its origin
+commits nothing.
+
+Group action scenarios run on an imported-SVG tree near 4,000 nodes
+(`--node-count` scales it): an import wrapper group, sections, 4 subgroups per
+section, 6 clusters per subgroup, and three-contour path leaves, all in one
+print artboard. `fixture.groupActions.*` counters report total nodes, leaves,
+groups, contours, depth, placed surfaces, filter owners, and the leaves the
+action affects.
+
+| Fixture | Shape |
+| --- | --- |
+| `dense` | 4 large sections; unfocused, the wrapper paints as one dense surface |
+| `expanded` | 16 small sections directly in the artboard; every leaf is its own shell |
+| `shadow` | the 16-section wrapper layout with one CSS drop shadow per section |
+| `shadows` | the same with two shadows per section (SVG filter graph) |
+
+| Scenario | Contract |
+| --- | --- |
+| `group-actions-drag-root-dense`, `-drag-root-shadow` | Drags the whole import wrapper four times. |
+| `group-actions-drag-section-<fixture>` | Drags one section (dense, expanded, shadow, shadows) four times. |
+| `group-actions-<action>-<fixture>` | Times `group`, `ungroup`, `reorder` (bring to front), or `reparent` plus undo and redo on the dense, expanded, and shadow fixtures. |
+
+`drag-render-path.spec.ts` gates that a section drag in the expanded fixture
+re-renders only the moved leaves' art.
 
 Raster adapter gates:
 
