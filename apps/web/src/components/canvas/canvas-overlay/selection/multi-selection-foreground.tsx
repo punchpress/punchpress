@@ -1,5 +1,5 @@
 import { clamp, hasPointerMovedAtLeast } from "@punchpress/engine";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { NodeContextMenuItems } from "@/components/context-menus/node-context-menu-items";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { useEditor } from "../../../../editor-react/use-editor";
@@ -200,11 +200,17 @@ export const CanvasMultiSelectionForeground = ({
   const [activeRotateCursor, setActiveRotateCursor] = useState<string | null>(
     null
   );
-  const frame = useEditorValue((editor) => {
-    return editor.getSelectionTransformFrame(nodeIds, {
-      includePreview: false,
-    });
-  });
+  // Stable per node ids: the frame walks every selected leaf, and this
+  // component re-renders on every drag frame.
+  const selectFrame = useCallback(
+    (activeEditor) => {
+      return activeEditor.getSelectionTransformFrame(nodeIds, {
+        includePreview: false,
+      });
+    },
+    [nodeIds]
+  );
+  const frame = useEditorValue(selectFrame);
   const selectionPreview = useEditorSelectionDragPreviewValue((editor) => {
     return {
       delta: editor.getSelectionPreviewDelta(nodeIds) || { x: 0, y: 0 },

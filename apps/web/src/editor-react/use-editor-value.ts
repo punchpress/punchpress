@@ -1,13 +1,14 @@
 import { measurePerf } from "@punchpress/engine";
+import { useCallback } from "react";
 import { useStore } from "zustand";
 import shallow from "zustand/shallow";
 import { useEditor } from "./use-editor";
 
+// A stable selector (module-level or memoized) is evaluated once per store
+// state, so re-renders driven by other subscriptions do not re-run it.
 export const useEditorValue = (selector, perfLabel = null) => {
   const editor = useEditor();
-
-  return useStore(
-    editor.store,
+  const selectState = useCallback(
     (state) => {
       if (!perfLabel) {
         return selector(editor, state);
@@ -15,6 +16,8 @@ export const useEditorValue = (selector, perfLabel = null) => {
 
       return measurePerf(perfLabel, () => selector(editor, state));
     },
-    shallow
+    [editor, perfLabel, selector]
   );
+
+  return useStore(editor.store, selectState, shallow);
 };
