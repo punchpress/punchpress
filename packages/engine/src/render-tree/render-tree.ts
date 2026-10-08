@@ -5,6 +5,7 @@ import {
   getEffectPresentation,
 } from "../effects/effect-filter";
 import { getNodeEffects } from "../effects/effect-model";
+import { isContainerNode } from "../nodes/node-tree";
 import {
   createOutputInkReader,
   getEditorInkSource,
@@ -96,6 +97,7 @@ export const getRenderTree = (editor): RenderTree => {
 
 const buildRenderTree = (editor, inputs: RenderTreeInputs): RenderTree => {
   const expandedGroupIds = getExpandedGroupIds(editor, inputs);
+  const facts = createSubtreeFacts(editor);
   const placedNodeIds: string[] = [];
   const readInk = createOutputInkReader(getEditorInkSource(editor));
   const getLayerEffects = (node) => {
@@ -112,7 +114,7 @@ const buildRenderTree = (editor, inputs: RenderTreeInputs): RenderTree => {
     return getEffectPresentation(effects, content);
   };
   const getLayerClip = (node) => {
-    return node.type === "artboard" && hasShadowedGroup(editor, node.id)
+    return node.type === "artboard" && facts.hasShadowedGroup(node.id)
       ? (editor.getNodeRenderFrame(node.id)?.bounds ?? null)
       : null;
   };
@@ -131,8 +133,8 @@ const buildRenderTree = (editor, inputs: RenderTreeInputs): RenderTree => {
         if (
           node.type === "group" &&
           !expandedGroupIds.has(node.id) &&
-          isDenseGroup(editor, node.id) &&
-          !hasShadowedGroup(editor, node.id)
+          isDenseGroup(editor, facts.getLeafCount(node.id), node.id) &&
+          !facts.hasShadowedGroup(node.id)
         ) {
           placedNodeIds.push(node.id);
 
@@ -202,9 +204,7 @@ const getExpandedGroupIds = (editor, inputs: RenderTreeInputs) => {
   return expanded;
 };
 
-const isDenseGroup = (editor, nodeId: string) => {
-  const leafCount = editor.getDescendantLeafNodeIds(nodeId).length;
-
+const isDenseGroup = (editor, leafCount: number, nodeId: string) => {
   if (leafCount > DENSE_GROUP_LEAF_THRESHOLD) {
     return true;
   }
@@ -228,17 +228,51 @@ const hasActiveEffects = (effects) => {
   return effects.some((effect) => effect.enabled && effect.opacity > 0);
 };
 
-// Whether any group strictly below `nodeId` has shadows.
-export const hasShadowedGroup = (editor, nodeId: string): boolean => {
-  return editor.getChildNodeIds(nodeId).some((childId) => {
-    const child = editor.getNode(childId);
+// Per-build subtree facts, memoized so nested groups are walked once instead
+// of once per ancestor.
+const createSubtreeFacts = (editor) => {
+  const leafCounts = new Map<string, number>();
+  const shadowedGroups = new Map<string, boolean>();
 
-    return (
-      child?.type === "group" &&
-      (hasActiveEffects(getNodeEffects(child)) ||
-        hasShadowedGroup(editor, childId))
-    );
-  });
+  // Descendants that are not containers, matching getDescendantLeafNodeIds.
+  const getLeafCount = (nodeId: string): number => {
+    let count = leafCounts.get(nodeId);
+
+    if (count === undefined) {
+      count = 0;
+
+      for (const childId of editor.getChildNodeIds(nodeId)) {
+        count += isContainerNode(editor.getNode(childId))
+          ? getLeafCount(childId)
+          : 1;
+      }
+
+      leafCounts.set(nodeId, count);
+    }
+
+    return count;
+  };
+
+  // Whether any group strictly below `nodeId` has shadows.
+  const hasShadowedGroup = (nodeId: string): boolean => {
+    let shadowed = shadowedGroups.get(nodeId);
+
+    if (shadowed === undefined) {
+      shadowed = editor.getChildNodeIds(nodeId).some((childId) => {
+        const child = editor.getNode(childId);
+
+        return (
+          child?.type === "group" &&
+          (hasActiveEffects(getNodeEffects(child)) || hasShadowedGroup(childId))
+        );
+      });
+      shadowedGroups.set(nodeId, shadowed);
+    }
+
+    return shadowed;
+  };
+
+  return { getLeafCount, hasShadowedGroup };
 };
 
 const haveSameItems = (previous: RenderItem[], next: RenderItem[]) => {

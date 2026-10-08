@@ -124,6 +124,46 @@ describe("render tree", () => {
     expect(editing.placedNodeIds).not.toContain("outer");
   });
 
+  test("density counts leaves through nested groups; shadows below keep a group expanded", () => {
+    const editor = new Editor();
+    const shadow = {
+      blur: 4,
+      color: "#000000",
+      enabled: true,
+      id: "shadow",
+      kind: "drop-shadow",
+      opacity: 0.5,
+      x: 2,
+      y: 2,
+    };
+    const leaves = (parentId: string, count: number) =>
+      Array.from({ length: count }, (_, index) =>
+        shape(`${parentId}-${index}`, parentId)
+      );
+
+    editor
+      .getState()
+      .loadNodes([
+        group("dense"),
+        group("dense-a", "dense"),
+        ...leaves("dense-a", 151),
+        group("dense-b", "dense"),
+        ...leaves("dense-b", 150),
+        group("held"),
+        group("held-shadowed", "held", { effects: [shadow] }),
+        ...leaves("held-shadowed", 2),
+        ...leaves("held", 300),
+      ] as never);
+
+    const tree = editor.getRenderTree();
+
+    expect(describeItems(tree.items).slice(0, 1)).toEqual([
+      "dense@1[surface:dense]",
+    ]);
+    expect(tree.placedNodeIds).toHaveLength(1 + 2 + 300);
+    expect(tree.placedNodeIds).not.toContain("held");
+  });
+
   test("the tree keeps its identity until its structure changes", () => {
     const editor = new Editor();
 
