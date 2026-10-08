@@ -103,3 +103,83 @@ test("switching to Brush over a resting pointer shows the brush cursor", async (
   expect((box?.x ?? 0) + (box?.width ?? 0) / 2).toBeCloseTo(center.x + 1, 0);
   expect((box?.y ?? 0) + (box?.height ?? 0) / 2).toBeCloseTo(center.y + 1, 0);
 });
+
+const createSolidRasterDocument = (src: string) =>
+  JSON.stringify({
+    nodes: [
+      {
+        assetId: "asset-resting-pointer-raster",
+        baseHeight: 200,
+        baseWidth: 200,
+        baseX: 0,
+        baseY: 0,
+        height: 200,
+        id: "resting-raster",
+        mimeType: "image/png",
+        name: "Resting Pointer Raster",
+        opacity: 1,
+        parentId: "root",
+        src,
+        transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 100, y: 100 },
+        type: "image",
+        visible: true,
+        width: 200,
+      },
+    ],
+    version: "1.8",
+  });
+
+test("switching to Brush over a selected Raster's overlay shows the brush cursor", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  const src = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+
+    canvas.width = 200;
+    canvas.height = 200;
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      throw new Error("Expected Canvas2D");
+    }
+
+    context.fillStyle = "#3366cc";
+    context.fillRect(0, 0, 200, 200);
+    return canvas.toDataURL("image/png");
+  });
+
+  await loadDocument(page, createSolidRasterDocument(src));
+  await setViewport(page, { x: 0, y: 0, zoom: 1 });
+  await page.evaluate(() => {
+    window.__PUNCHPRESS_EDITOR__?.select("resting-raster");
+  });
+
+  const overlay = page.locator(".canvas-single-selection");
+
+  await expect(overlay).toBeVisible();
+  const box = await overlay.boundingBox();
+
+  if (!box) {
+    throw new Error("Expected the selection overlay");
+  }
+
+  const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+
+  await page.mouse.move(point.x - 1, point.y - 1);
+  await page.mouse.move(point.x, point.y);
+  // The resting pointer starts over selection chrome, not the canvas.
+  expect(
+    await page.evaluate(
+      ({ x, y }) =>
+        Boolean(document.elementFromPoint(x, y)?.closest(".canvas-moveable")),
+      point
+    )
+  ).toBe(true);
+
+  await page.evaluate(() => {
+    window.__PUNCHPRESS_EDITOR__?.setActiveTool("brush");
+  });
+
+  await expect(page.getByTestId("brush-cursor")).toBeVisible();
+});

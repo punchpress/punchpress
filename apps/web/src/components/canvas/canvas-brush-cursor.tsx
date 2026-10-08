@@ -115,22 +115,25 @@ const ActiveBrushCursor = ({
       };
     }
   );
-  const [position, setPosition] = useState<BrushCursorPosition | null>(() => {
+  const [position, setPosition] = useState<BrushCursorPosition | null>(null);
+
+  // Resolve the resting pointer after the tool switch commits: chrome under
+  // it (a selection overlay) only leaves the DOM in that commit.
+  useLayoutEffect(() => {
     const resting = restingPointerRef.current;
 
-    return resting && hostElement
-      ? getBrushCursorPosition(
-          hostElement,
-          resting.event,
-          isBrushCursorTarget(resting.target)
-            ? resting.target
-            : document.elementFromPoint(
-                resting.event.clientX,
-                resting.event.clientY
-              )
-        )
-      : null;
-  });
+    if (!(resting && hostElement)) {
+      return;
+    }
+
+    setPosition(
+      getBrushCursorPosition(
+        hostElement,
+        resting.event,
+        document.elementFromPoint(resting.event.clientX, resting.event.clientY)
+      )
+    );
+  }, [hostElement, restingPointerRef]);
 
   useEffect(() => {
     if (!hostElement) {
