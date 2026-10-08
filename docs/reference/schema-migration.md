@@ -12,7 +12,8 @@ PunchPress documents are versioned and validated on load.
 
 ## Rules
 
-- The current schema version is `1.9`.
+- The current schema version is `1.10`. `1.9` documents and clipboard
+  payloads pass through unchanged.
 - `1.8` documents and clipboard payloads upgrade on load: flat `fill`,
   `stroke`, `strokeWidth`, and path stroke style fold into a one-layer
   appearance stack (text and shape strokes take round cap/join and miter 4;

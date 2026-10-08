@@ -64,7 +64,9 @@ Paint fields feed geometry signatures (`shape-capabilities.ts`,
   - `opacity`
   - `paint`, which is either `solid` or `linear-gradient`
 - Gradient start and end points are normalized to the paint box. Gradient
-  stops are `{ id, offset, color }`.
+  stops are `{ id, offset, color, opacity }`: 2–8, sorted by offset (equal
+  offsets make hard edges), ids unique within the gradient and ignored by
+  stack equality.
 - Strokes add `width`, `align`, `join`, `cap`, and `miterLimit`.
 - `text`, `shape`, standalone `path`, `vector`, and `group` nodes own
   `effects: Effect[]`. Groups own effects only, with no fills or strokes.
@@ -191,6 +193,31 @@ Clip and mask rejected (below).
 - Region: the paint ink plus a 4σ band around each offset shadow.
 - `color-interpolation-filters="sRGB"`.
 - Blur 0 skips `feGaussianBlur`.
+
+#### Gradients (stage 4)
+
+- **Paint box.** Every geometry output carries `paintBox`, its unstroked
+  bounds: text layout bounds, a shape's flattened contour bounds (the same
+  algorithm paths use, so converting a shape keeps its gradient), a path's raw
+  bounds. Vector entries carry their child's box in the child's local space;
+  compiled compound and boolean results carry the result's bounds.
+- **Paint space.** Leaf art paints in node space: glyph layout transforms are
+  undone per glyph with a `gradientTransform` built from numeric layout
+  matrices, so one ramp spans the whole text. Vector children paint in their
+  own local space, where the entry transform only places them.
+- **Mapping.** `userSpaceOnUse` coordinates are `minX + u × width`, likewise
+  for y; a collapsed axis maps to its minimum. A zero-length vector paints the
+  last stop's color and opacity.
+- **Angle.** The angle is measured in node-local units through the paint box,
+  so a 45° gradient on a 200 × 100 box looks 45°.
+- **Conversion.** Solid → linear fades the color from opacity 1 to 0, left to
+  right. Linear → solid keeps the first stop and folds its opacity into the
+  layer. Add fill copies the top fill's paint.
+- **Live color preview.** The engine derives a preview copy of each targeted
+  node with only the previewed fields rewritten (`editor.getPaintNode`), and
+  only those nodes re-render. It targets exact fields, layers, and stops, and
+  carries alpha. The earlier CSS-variable preview is removed.
+- **Fallback text** (font not loaded) paints a gradient's first stop.
 
 #### Def ids
 

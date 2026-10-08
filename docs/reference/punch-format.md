@@ -15,7 +15,7 @@ read_when:
 | --- | --- |
 | Extension | `.punch` |
 | MIME type | `application/vnd.punchpress.document` |
-| Current version | `1.9` |
+| Current version | `1.10` |
 | Root parent id | `root` |
 | Default basename | `untitled-design` |
 
@@ -23,7 +23,7 @@ read_when:
 
 ```ts
 type DesignDocument = {
-  version: "1.9";
+  version: "1.10";
   assets: Record<string, DocumentAsset>;
   nodes: Node[];
 };
@@ -59,7 +59,14 @@ type FillLayer = {
   id: string; // unique within the node
   enabled: boolean;
   opacity: number; // 0..1
-  paint: { kind: "solid"; color: string }; // canonical #rrggbb
+  paint:
+    | { kind: "solid"; color: string } // canonical #rrggbb
+    | {
+        kind: "linear-gradient";
+        start: { x: number; y: number }; // normalized to the paint box
+        end: { x: number; y: number };
+        stops: { id: string; offset: number; color: string; opacity: number }[]; // 2–8, sorted
+      };
 };
 type StrokeLayer = FillLayer & {
   width: number; // >= 0, node-local units

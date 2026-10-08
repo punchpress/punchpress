@@ -15,8 +15,11 @@ white outline.
 
 ## In The Product
 
-- **Layers.** Each fill or stroke layer has its own color, opacity, and
+- **Layers.** Each fill or stroke layer has its own paint, opacity, and
   visibility. Strokes also have width, cap, join, and miter limit.
+- **Paint.** A layer paints a solid color or a linear gradient. A gradient has
+  an angle and 2–8 stops, each with its own color and opacity. The ramp spans
+  the whole object, including every letter of a text.
 - **Order.** Fills paint under strokes. Within each list, the row at the top
   of the panel paints on top. Dragging rows reorders the stack.
 - **Add and remove.** "Add fill" copies the top fill's color; "Add stroke"
@@ -27,11 +30,15 @@ white outline.
 - **Vectors.** Selecting a multi-path vector edits its child paths' stacks
   together.
 - **Selection colors.** Group and multi-selections list every distinct layer
-  color; editing one recolors every visible layer that uses it.
+  and gradient-stop color with its opacity; editing one recolors every visible
+  layer or stop that uses it.
 
 ## Rules
 
-- Colors are stored as opaque `#rrggbb`; transparency is layer opacity.
+- Colors are stored as opaque `#rrggbb`; transparency is layer or stop
+  opacity.
+- Switching a solid layer to linear fades its color out left to right;
+  switching back keeps the first stop.
 - Strokes are center-aligned.
 - Open contours fill with SVG's implicit closure on canvas and in export.
 - Multi-selections edit together only when their stacks match (apart from
@@ -44,7 +51,8 @@ white outline.
 
 ## Intentionally Missing
 
-- Gradients, inside/outside stroke alignment, and drop shadows (staged; see the
+- Radial gradients and on-canvas gradient handles.
+- Inside/outside stroke alignment and drop shadows (staged; see the
   [appearance stack decision](../decisions/appearance-stack.md)).
 - Blend modes, dashes, and per-character styling.
 

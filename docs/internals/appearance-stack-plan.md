@@ -63,8 +63,10 @@ Every stage goes through the same sequence:
    - Layer `div`s with CSS opacity; leaf and surface art carry own opacity only.
    - Text-edit preview painted in its node's shell.
    - Hierarchical export with one `<g opacity>` per translucent container.
-4. **Linear gradients.** Paint union, userSpace defs, a gradient strip with
-   stop ids, and stop colors in selection colors.
+4. **Linear gradients (1.10).** Paint union, paint boxes and glyph layout
+   matrices, userSpace defs, kind/angle/stop commands, a gradient ramp and
+   stops panel, stop colors in selection colors, and a field-targeted
+   selection-color preview.
 5. **Stroke alignment.** Offset-outline compiler (chosen against the
    dependency checklist), alignment-aware ink bounds and hit testing, and
    outside strokes below fills.
@@ -151,8 +153,10 @@ on the same machine, so the drag baseline is not caused by appearance.
 | drag nested groups, before stage 3 | 33.4 / 41.7 / 50.0 |
 
 Isolation adds no measurable cost. Dragging 20 selected group stacks is slow
-(p50 33 ms) on the code before stage 3 too; that predates appearance work and
-is tracked separately.
+(p50 33 ms) on the code before stage 3 too; that predates appearance work. The
+`perf/group-drag` fix (cached tree queries, engine-owned
+`editor.getPreviewPlacementNodeIds`) brings `nested-groups-dragging-200` to
+p50 8.4 / p95 16.7 ms, level with the leaf control.
 
 ## Browser Checks
 
