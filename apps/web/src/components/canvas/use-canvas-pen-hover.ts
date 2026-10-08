@@ -6,7 +6,7 @@ import { getCanvasClientPoint } from "./canvas-client-point";
 import { resolveVectorPenHoverAction } from "./canvas-overlay/vector-path/pen-hover";
 
 // Pen hover feedback for a resting pointer: re-dispatches the last hover point
-// when the pen modifiers change or the settled camera moves under it.
+// when the pen modifiers change or the live camera moves under it.
 export const useCanvasPenHover = ({
   activeTool,
   hostRef,
@@ -17,10 +17,8 @@ export const useCanvasPenHover = ({
   const penPointTypeToggleModifierPressed = useEditorValue(
     (_, state) => state.penPointTypeToggleModifierPressed
   );
-  const settledViewport = useEditorValue((_, state) => state.viewport);
   const lastClientPointRef = useRef<{ x: number; y: number } | null>(null);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a settled camera move re-dispatches the resting hover point
   useEffect(() => {
     syncHostPenCursorMode(
       hostRef.current,
@@ -60,9 +58,33 @@ export const useCanvasPenHover = ({
     hostRef,
     penDirectSelectionMode,
     penPointTypeToggleModifierPressed,
-    settledViewport,
     spacePressed,
   ]);
+
+  // Pans and pinches move the canvas under a resting pointer.
+  useEffect(() => {
+    if (activeTool !== "pen" || penDirectSelectionMode || spacePressed) {
+      return;
+    }
+
+    return editor.subscribeViewportPresentation(() => {
+      const lastClientPoint = lastClientPointRef.current;
+
+      if (!lastClientPoint) {
+        return;
+      }
+
+      dispatchPenHover(editor, lastClientPoint, {
+        altKey: editor.getState().penPointTypeToggleModifierPressed,
+      });
+      syncHostPenCursorMode(
+        hostRef.current,
+        activeTool,
+        editor,
+        penDirectSelectionMode
+      );
+    });
+  }, [activeTool, editor, hostRef, penDirectSelectionMode, spacePressed]);
 
   const handlePointerLeave = useCallback(() => {
     lastClientPointRef.current = null;
