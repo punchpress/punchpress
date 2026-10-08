@@ -130,4 +130,5 @@ export const groupDragBenchmarks = [
   createDragBenchmark("section", "shadow"),
   createDragBenchmark("section", "shadows"),
   createDragBenchmark("root", "shadow"),
+  createDragBenchmark("root", "shadows"),
 ];

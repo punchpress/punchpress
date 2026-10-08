@@ -206,7 +206,7 @@ action affects.
 
 | Scenario | Contract |
 | --- | --- |
-| `group-actions-drag-root-dense`, `-drag-root-shadow` | Drags the whole import wrapper four times. |
+| `group-actions-drag-root-dense`, `-drag-root-shadow`, `-drag-root-shadows` | Drags the whole import wrapper four times. `-shadows` checks SVG `url()` filters, which CSS `drop-shadow()` results do not cover. |
 | `group-actions-drag-section-<fixture>` | Drags one section (dense, expanded, shadow, shadows) four times. |
 | `group-actions-<action>-<fixture>` | Times `group`, `ungroup`, `reorder` (bring to front), or `reparent` plus undo and redo on the dense, expanded, and shadow fixtures. |
 
