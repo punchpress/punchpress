@@ -225,10 +225,7 @@ const setViewport = (editor) => {
     zoom: 0.12,
   };
 
-  editor.viewerRef?.setTo?.(viewport);
-  editor.setViewport(viewport);
-  editor.getState().setViewport(viewport);
-  editor.onViewportChange?.();
+  editor.moveViewportTo(viewport);
 };
 
 const createFrameDocument = () =>

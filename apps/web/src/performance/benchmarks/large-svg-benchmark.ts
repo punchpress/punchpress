@@ -109,7 +109,7 @@ const setupLargeSvgDocument = async (
     editor.setSelectedNodes([rootId]);
   }
 
-  editor.setViewport(viewport);
+  editor.moveViewportTo(viewport);
   await waitForFrames(warmupFrames);
 
   return rootId;

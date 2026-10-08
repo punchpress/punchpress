@@ -445,10 +445,7 @@ const setBenchmarkViewport = (
   editor: PerformanceBenchmarkContext["editor"],
   viewport: { x: number; y: number; zoom: number }
 ) => {
-  editor.viewerRef?.setTo?.(viewport);
-  editor.setViewport(viewport);
-  editor.getState().setViewport(viewport);
-  editor.onViewportChange?.();
+  editor.moveViewportTo(viewport);
 };
 
 const assertHighZoomPresentation = (
@@ -502,8 +499,7 @@ const runCase = async (
   }
 ) => {
   if (!preserveViewport) {
-    editor.setViewport({ x: 0, y: 0, zoom });
-    editor.onViewportChange?.();
+    editor.moveViewportTo({ x: 0, y: 0, zoom });
   }
   editor.setActiveTool(operation);
   editor.setBrushSettings(

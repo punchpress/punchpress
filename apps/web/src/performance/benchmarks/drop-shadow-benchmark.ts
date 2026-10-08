@@ -49,7 +49,7 @@ const createShadowViewportBenchmark = (
         [shadow()]
       );
       editor.clearSelection();
-      editor.setViewport(getCenteredViewport(editor, 1));
+      editor.moveViewportTo(getCenteredViewport(editor, 1));
       await waitForFrames(4);
     },
   };
@@ -70,7 +70,7 @@ const appearanceDraggingShadowBenchmark: PerformanceBenchmarkDefinition = {
     const nodeIds = children.map((node) => node.id);
 
     applyEffects(editor, nodeIds, [blurShadow()]);
-    editor.setViewport(getCenteredViewport(editor, 0.21));
+    editor.moveViewportTo(getCenteredViewport(editor, 0.21));
     editor.setSelectedNodes(nodeIds);
     await waitForFrames(4);
   },
@@ -107,7 +107,7 @@ const createShadowScrubBenchmark = (
 
       applyEffects(editor, nodeIds, [blurShadow()]);
       addScrubStroke(editor, targetId);
-      editor.setViewport(getCenteredViewport(editor, 1));
+      editor.moveViewportTo(getCenteredViewport(editor, 1));
       editor.setSelectedNodes([targetId]);
       await waitForFrames(4);
     },
@@ -170,7 +170,7 @@ const createShadowedGroupsDragBenchmark = (
         applyEffects(editor, rootGroupIds, [blurShadow()]);
       }
 
-      editor.setViewport(getCenteredViewport(editor, 0.21));
+      editor.moveViewportTo(getCenteredViewport(editor, 0.21));
       editor.setSelectedNodes(
         target === "whole" ? rootGroupIds : [children[0].id]
       );
@@ -193,7 +193,7 @@ const appearanceMaxStackBenchmark: PerformanceBenchmarkDefinition = {
   label: "Appearance Max Stack (20, zoom 1–6400%)",
   setup: async ({ editor, options, waitForFrame, waitForFrames }) => {
     await loadMaxStackScene({ editor, options, waitForFrame, waitForFrames });
-    editor.setViewport(
+    editor.moveViewportTo(
       getFocusedViewport(editor, editor.selectedNodeIds[0], 0.01)
     );
     editor.clearSelection();

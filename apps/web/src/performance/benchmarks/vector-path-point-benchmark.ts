@@ -166,7 +166,7 @@ export const simpleVectorPathPointDragBenchmark: PerformanceBenchmarkDefinition 
       const scene = createSimpleVectorScene();
 
       editor.loadDocument(saveDesignDocument(scene.nodes).contents);
-      editor.setViewport({ x: 1650, y: 2100, zoom: 1 });
+      editor.moveViewportTo({ x: 1650, y: 2100, zoom: 1 });
       await setupPathPointDrag({
         editor,
         nodeId: scene.vectorNodeId,
@@ -196,7 +196,7 @@ export const largeSvgPathPointDragBenchmark: PerformanceBenchmarkDefinition = {
 
     const pathNodeId = getLargeSvgPathNodeId(editor);
 
-    editor.setViewport({ x: 550, y: 1000, zoom: 0.35 });
+    editor.moveViewportTo({ x: 550, y: 1000, zoom: 0.35 });
     await setupPathPointDrag({
       editor,
       nodeId: pathNodeId,

@@ -49,7 +49,7 @@ const createSceneScrubBenchmark = (
       const nodeIds = children.map((node) => node.id);
 
       applyStrokePair(editor, nodeIds, aligned);
-      editor.setViewport(getCenteredViewport(editor, 1));
+      editor.moveViewportTo(getCenteredViewport(editor, 1));
       editor.setSelectedNodes(
         scope === "one" ? [getCenterNodeId(editor, nodeIds)] : nodeIds
       );
@@ -140,7 +140,7 @@ const setupStrokeText = async (
 
   applyStrokePair(editor, [node.id], aligned);
   editor.setSelectedNodes([node.id]);
-  editor.setViewport(getFittedViewport(editor, [node.id]));
+  editor.moveViewportTo(getFittedViewport(editor, [node.id]));
   await waitForFrames(4);
 };
 

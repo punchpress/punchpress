@@ -29,7 +29,7 @@ export const appearanceViewportPlainBenchmark: PerformanceBenchmarkDefinition =
         waitForFrame
       );
       editor.clearSelection();
-      editor.setViewport(
+      editor.moveViewportTo(
         getCenteredViewport(editor, APPEARANCE_ZOOM_LADDER[0])
       );
       await waitForFrames(4);
@@ -85,7 +85,7 @@ export const appearanceDraggingPlainBenchmark: PerformanceBenchmarkDefinition =
         waitForFrame
       );
 
-      editor.setViewport(getCenteredViewport(editor, 0.21));
+      editor.moveViewportTo(getCenteredViewport(editor, 0.21));
       editor.setSelectedNodes(children.map((node) => node.id));
       await waitForFrames(4);
     },
@@ -169,7 +169,7 @@ export const appearanceNestedGroupsViewportBenchmark: PerformanceBenchmarkDefini
         }
       );
       editor.clearSelection();
-      editor.setViewport(
+      editor.moveViewportTo(
         getCenteredViewport(editor, APPEARANCE_ZOOM_LADDER[0])
       );
       await waitForFrames(4);
@@ -191,7 +191,7 @@ export const appearanceNestedGroupsDraggingBenchmark: PerformanceBenchmarkDefini
         { nestedGroups: true }
       );
 
-      editor.setViewport(getCenteredViewport(editor, 0.21));
+      editor.moveViewportTo(getCenteredViewport(editor, 0.21));
       editor.setSelectedNodes(rootGroupIds);
       await waitForFrames(4);
     },
