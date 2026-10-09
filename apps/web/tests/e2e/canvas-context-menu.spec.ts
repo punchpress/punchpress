@@ -258,3 +258,34 @@ test("canvas node context menu exposes compound actions from the shared node men
     page.getByRole("menuitem", { name: "Make Compound Path" })
   ).toBeVisible();
 });
+
+test("canvas node context menu uses chrome menu density and fits the viewport", async ({
+  page,
+}) => {
+  await gotoEditor(page);
+  await loadDocument(page, CANVAS_CONTEXT_MENU_DOCUMENT);
+
+  await getCanvasNode(page, "shape-c").click({ button: "right" });
+  const popup = page.locator('[data-slot="context-menu-popup"]');
+  await expect(popup).toBeVisible();
+
+  const itemHeights = await popup
+    .getByRole("menuitem")
+    .evaluateAll((items) =>
+      items.map((item) => item.getBoundingClientRect().height)
+    );
+  expect(itemHeights.length).toBeGreaterThan(0);
+  for (const height of itemHeights) {
+    expect(height).toBe(24);
+  }
+
+  const box = await popup.boundingBox();
+  const viewport = page.viewportSize();
+  if (!(box && viewport)) {
+    throw new Error("Context menu popup or viewport has no size");
+  }
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+  expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+});
