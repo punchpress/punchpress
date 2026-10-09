@@ -53,6 +53,29 @@ takes an optional trailing `action` such as an aspect lock. Stacked fill,
 stroke, and shadow rows use `panels/properties/layer-row.tsx`; their secondary
 settings open in `LayerRow.Settings`, a popover beside the panel.
 
+## Chrome Density
+
+Everything outside the inspector uses the same Pro scale through the
+"Chrome density" tokens in `src/styles/global.css`: `--chrome-text` (12px),
+`--chrome-text-sm` (11px), `--chrome-icon` (14px), `--chrome-radius` (4px) for
+controls, and `--surface-radius` (8px) for floating surfaces.
+
+- Menus, context menus, and the command menu share the class constants in
+  `ui/menu.tsx`: 24px rows (`--menu-item-height`), `--menu-pad` popups, and
+  group labels in the section-header style.
+- `PopoverContent` pads with `--popover-pad`; `variant="flush"` drops it for
+  popups with edge-to-edge sections. `PopoverTitle` is a section header.
+- Tooltips are 20px, 11px text; dialogs use `--dialog-radius`, `--dialog-pad`,
+  a 13px title, and `chrome` footer buttons.
+- The tool dock and selection toolbar are the `Toolbar` primitives:
+  `--toolbar-radius` surface, `--toolbar-pad`, and 28px `icon-toolbar` buttons
+  (`toolbar` for text actions). Tabs are `--tab-height` with `chrome` buttons.
+- Layers rows read `--layer-row-height`, `--layer-indent`, and `--layer-icon`.
+
+Button sizes: `chrome` / `icon-chrome` (24px), `toolbar` / `icon-toolbar`
+(28px), `field` / `icon-field` (22px / 20px). Toggle has `field`,
+`icon-field`, and `icon-toolbar`.
+
 ## UI Typography
 
 UI text reads `--font-sans`, `--font-features` (OpenType features), and
