@@ -18,7 +18,7 @@ export const WorkspaceTabs = ({ onCloseTab, onNewFile }) => {
   return (
     <div className="flex h-full min-w-0 flex-1" data-workspace-tabs="">
       {scratchpadTab ? (
-        <div className="no-drag flex shrink-0 border-(--tab-divider) border-l">
+        <div className="no-drag flex shrink-0">
           <Tab active={scratchpadTab.isActive} size="icon">
             <TabIconTrigger
               label={scratchpadTab.title}
@@ -27,7 +27,8 @@ export const WorkspaceTabs = ({ onCloseTab, onNewFile }) => {
               <HugeiconsIcon
                 color="currentColor"
                 icon={Home01Icon}
-                strokeWidth={1.8}
+                // Matches the 2px Lucide stroke at 14px when drawn at 16px.
+                strokeWidth={1.75}
               />
             </TabIconTrigger>
           </Tab>
@@ -50,15 +51,17 @@ export const WorkspaceTabs = ({ onCloseTab, onNewFile }) => {
         ))}
       </div>
 
-      <Button
-        aria-label="New file"
-        className="no-drag"
-        onClick={onNewFile}
-        size="icon-tab"
-        variant="tab"
-      >
-        <PlusIcon />
-      </Button>
+      <div className="flex shrink-0 items-center pt-(--titlebar-inset-top) pl-(--tab-add-gap)">
+        <Button
+          aria-label="New file"
+          className="no-drag"
+          onClick={onNewFile}
+          size="icon-chrome"
+          variant="tab"
+        >
+          <PlusIcon />
+        </Button>
+      </div>
     </div>
   );
 };

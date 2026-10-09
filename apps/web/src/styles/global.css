@@ -795,13 +795,17 @@ body[data-color-picker-open="true"] {
   --tab-bg-hover: --alpha(var(--color-black) / 4%);
   --tab-fg: var(--muted-foreground);
   --tab-fg-active: var(--foreground);
-  --tab-dirty: var(--primary);
+  --tab-dirty: color-mix(in srgb, var(--muted-foreground) 60%, transparent);
+  --tab-dirty-active: var(--muted-foreground);
   --tab-dirty-dot: 6px;
-  --tab-min-width: 120px;
+  --tab-icon: 16px;
+  --tab-min-width: 96px;
   --tab-max-width: 200px;
   --tab-px: 12px;
   --tab-slot: var(--field-icon-button);
   --tab-slot-gap: 4px;
+  --tab-add-gap: 6px;
+  --tab-add-hover: --alpha(var(--color-black) / 6%);
 }
 
 @keyframes canvas-caret-blink {
@@ -894,7 +898,9 @@ body[data-color-picker-open="true"] {
   --titlebar-bg: color-mix(in srgb, var(--background) 60%, var(--color-black));
   --titlebar-border: --alpha(var(--color-white) / 8%);
   --tab-divider: --alpha(var(--color-white) / 7%);
-  --tab-bg-hover: --alpha(var(--color-white) / 4%);
+  /* Dark hover stays well short of the active tab's canvas tone. */
+  --tab-bg-hover: --alpha(var(--color-white) / 2.5%);
+  --tab-add-hover: --alpha(var(--color-white) / 7%);
   --canvas-transform-box-lines: oklch(0.32 0 0);
   --canvas-transform-box-handles: oklch(0.32 0 0);
   --canvas-transform-box-handles-border: oklch(0.42 0 0);

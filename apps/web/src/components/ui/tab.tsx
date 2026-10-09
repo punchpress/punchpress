@@ -9,12 +9,12 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-// Title bar tabs: flat full-height segments split by hairline dividers. The
-// active tab takes the canvas background and covers the bar's bottom
-// hairline, so it reads as part of the document below. Tokens live in the
-// "Title bar" blocks of styles/global.css.
+// Title bar tabs: flat full-height segments with a hairline divider on both
+// sides (neighbors overlap theirs by 1px). The active tab takes the canvas
+// background and covers the bar's bottom hairline, so it reads as part of the
+// document below. Tokens live in the "Title bar" blocks of styles/global.css.
 const tabVariants = cva(
-  "group text-(length:--chrome-text) relative flex h-full border-(--tab-divider) border-r",
+  "group text-(length:--chrome-text) relative flex h-full border-(--tab-divider) border-x",
   {
     defaultVariants: {
       active: false,
@@ -26,7 +26,10 @@ const tabVariants = cva(
         true: "z-[1] bg-(--designer-bg) font-medium text-(--tab-fg-active)",
       },
       size: {
-        default: "w-(--tab-max-width) min-w-(--tab-min-width)",
+        // Content-fit: padding, title, and the reserved status slot,
+        // clamped; overflow shrinks tabs toward the min before scrolling.
+        // Text tabs always follow another tab; -ml-px shares the divider.
+        default: "-ml-px min-w-(--tab-min-width) max-w-(--tab-max-width)",
         icon: "aspect-square shrink-0",
       },
     },
@@ -115,7 +118,7 @@ export const TabIconTrigger = ({
       aria-label={label}
       className={cn(
         triggerClassName,
-        "justify-center [&_svg]:size-(--chrome-icon)"
+        "justify-center [&_svg]:size-(--tab-icon)"
       )}
       data-slot="tab-trigger"
       onClick={onSelect}
@@ -170,7 +173,10 @@ export const TabClose = ({
       </Button>
       {dirty ? (
         <span
-          className="pointer-events-none col-start-1 row-start-1 size-(--tab-dirty-dot) rounded-full bg-(--tab-dirty) pointer-coarse:opacity-0 group-hover:opacity-0 peer-focus-visible:opacity-0"
+          className={cn(
+            "pointer-events-none col-start-1 row-start-1 size-(--tab-dirty-dot) rounded-full pointer-coarse:opacity-0 group-hover:opacity-0 peer-focus-visible:opacity-0",
+            active ? "bg-(--tab-dirty-active)" : "bg-(--tab-dirty)"
+          )}
           data-slot="tab-dirty-dot"
         />
       ) : null}
