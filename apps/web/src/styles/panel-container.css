@@ -8,7 +8,7 @@
 [data-editor-shell-root] {
   --pane-width: 240px;
   --pane-inset: 8px;
-  --pane-top: calc(var(--desktop-chrome-height, 0px) + 4px);
+  --pane-top: calc(var(--desktop-chrome-height, 0px) + var(--pane-inset));
   --pane-bottom: 8px;
   --pane-radius: 8px;
   --panel-px: 8px;

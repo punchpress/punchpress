@@ -25,13 +25,11 @@ const SHELL_CHROME_VARS = {
   desktop: {
     "--desktop-chrome-height": "40px",
     "--desktop-drag-left-inset": "88px",
-    "--desktop-panel-top-gap": "4px",
     "--shell-logo-offset-x": "-7px",
   },
   web: {
     "--desktop-chrome-height": "40px",
     "--desktop-drag-left-inset": "0px",
-    "--desktop-panel-top-gap": "16px",
     "--shell-logo-offset-x": "-7px",
   },
 };

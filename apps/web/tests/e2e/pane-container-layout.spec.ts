@@ -65,8 +65,8 @@ test("panes float 8px inside the window over a full-window canvas", async ({
   expect(layout.canvas).toEqual({ bottom: 720, left: 0, right: 1280, top: 0 });
   expect(layout.left?.left).toBe(PANE_INSET);
   expect(layout.right?.right).toBe(1280 - PANE_INSET);
-  expect(layout.left?.top).toBeGreaterThanOrEqual(TAB_BAR_HEIGHT);
-  expect(layout.right?.top).toBeGreaterThanOrEqual(TAB_BAR_HEIGHT);
+  expect(layout.left?.top).toBe(TAB_BAR_HEIGHT + PANE_INSET);
+  expect(layout.right?.top).toBe(TAB_BAR_HEIGHT + PANE_INSET);
   expect(layout.right?.bottom).toBeLessThanOrEqual(720 - PANE_INSET);
   expect(layout.paneRadius).toBe("8px");
   expect(layout.paneBorder).toBe("1px");
