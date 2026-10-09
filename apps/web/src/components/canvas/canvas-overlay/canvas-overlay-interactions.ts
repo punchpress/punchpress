@@ -18,6 +18,10 @@ export const shouldBlockSelectionStart = (target) => {
         "[role='button']",
         "[role='menu']",
         "[role='menuitem']",
+        // Portaled popups (settings popovers, select lists) sit outside the
+        // panels but are still app chrome, not canvas.
+        "[data-slot='popover-popup']",
+        "[data-slot='select-popup']",
       ].join(",")
     )
   );
