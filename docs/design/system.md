@@ -96,6 +96,19 @@ builds show the switchers at the bottom left of the editor.
   stack. Once picked: move the winner's tokens into `:root`, delete the folder,
   the stylesheet and its import, `ui-font-preview.spec.ts`, and `inter-ui` if
   Inter lost.
+- Pane containers (`components/panel-container-preview/`,
+  `styles/panel-container-preview.css`, Alt+Shift+P): Floating (default,
+  today's cards), Refined (flat 8px cards), Docked (full-height sidebars), and
+  Inset (docked sidebars around a rounded canvas). The shell reads only the
+  `--pane-*`, `--dock-*`, `--shell-bg`, and `--canvas-inset-*` tokens in
+  `styles/panel-container.css`: `DesignerPanel` places a sidebar slot,
+  `DesignerPane` is the card, and `DesignerCanvas` takes the insets, so a
+  direction never changes canvas coordinates, only the visible viewport size.
+  E2E specs run under a direction with `PUNCHPRESS_TEST_PANEL_CONTAINER=<id>`.
+  Once picked: copy the winner's block into `panel-container.css`, delete the
+  folder, the preview stylesheet, `panel-container-preview.spec.ts`, and the
+  env hook in `tests/e2e/helpers/editor.ts`. When both previews are gone,
+  delete `components/dev-preview/` and the switcher mount in `editor-shell.tsx`.
 
 ## Migration Guidance
 
