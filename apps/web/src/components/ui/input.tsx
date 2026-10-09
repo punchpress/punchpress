@@ -12,7 +12,7 @@ const INPUT_SIZE_CLASSES = {
   default:
     "h-8.5 px-[calc(--spacing(3)-1px)] leading-8.5 sm:h-7.5 sm:leading-7.5",
   field:
-    "h-[calc(var(--field-height)-2px)] ps-[calc(var(--field-px)+var(--field-label-inset,0px))] pe-(--field-px) leading-[calc(var(--field-height)-2px)]",
+    "h-[calc(var(--field-height)-2px)] ps-[calc(var(--field-px)+var(--field-label-inset,0px))] pe-(--field-px) leading-[calc(var(--field-height)-2px)] tabular-nums",
   lg: "h-9.5 px-[calc(--spacing(3)-1px)] leading-9.5 sm:h-8.5 sm:leading-8.5",
   sm: "h-7.5 px-[calc(--spacing(2.5)-1px)] leading-7.5 sm:h-6.5 sm:leading-6.5",
 };

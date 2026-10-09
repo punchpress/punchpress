@@ -19,6 +19,7 @@ import { MissingFontsExportDialog } from "../panels/missing-fonts-export-dialog"
 import { PropertiesPanel } from "../panels/properties/properties-panel";
 import { UnsavedDocumentDialog } from "../panels/unsaved-document-dialog";
 import { PerformanceHud } from "../performance/performance-hud";
+import { UiFontSwitcher } from "../ui-font-preview/ui-font-switcher";
 import { DesktopUpdateIndicator } from "./desktop-update-indicator";
 
 const SHELL_CHROME_VARS = {
@@ -139,6 +140,14 @@ export const EditorShell = () => {
         </DesignerPanel>
 
         <PerformanceHud />
+        {import.meta.env.DEV ? (
+          <div
+            className="pointer-events-none absolute bottom-4 left-4 z-40 grid justify-items-start gap-1"
+            data-testid="dev-preview-switchers"
+          >
+            <UiFontSwitcher />
+          </div>
+        ) : null}
         <CommandMenu />
       </DesignerContent>
       <NewFileDialog {...documentCommands.newFileDialogProps} />
