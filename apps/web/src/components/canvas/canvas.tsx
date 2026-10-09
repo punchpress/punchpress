@@ -361,9 +361,6 @@ export const Canvas = () => {
           threshold={0}
           useAutoZoom
           useMouseDrag={spacePressed || activeTool === "hand"}
-          // The canvas section can resize without a window resize (pane
-          // containers), so the viewer re-measures on element resize.
-          useResizeObserver
           useWheelPinch={false}
           useWheelScroll
           zoomRange={[MIN_ZOOM, MAX_ZOOM]}
