@@ -72,9 +72,13 @@ controls, and `--surface-radius` (8px) for floating surfaces.
   (`toolbar` for text actions). Tabs are `--tab-height` with `chrome` buttons.
 - Layers rows read `--layer-row-height`, `--layer-indent`, and `--layer-icon`.
 
-Button sizes: `chrome` / `icon-chrome` (24px), `toolbar` / `icon-toolbar`
-(28px), `field` / `icon-field` (22px / 20px). Toggle has `field`,
-`icon-field`, and `icon-toolbar`.
+Button sizes: `chrome` / `icon-chrome` (24px, the default), `toolbar` /
+`icon-toolbar` (28px), `field` / `icon-field` (22px / 20px). Toggle has
+`field`, `icon-field`, and `icon-toolbar`. `Input` has `chrome` (the default,
+for search boxes in popovers and the command menu) and `field`. `SelectTrigger`,
+`ScrubSlider`, `ColorPickerField`, and `IconSegmentedControlItem` only come in
+`field`. These are the only sizes; add a token-backed size before reaching for
+a one-off height.
 
 ## UI Typography
 
