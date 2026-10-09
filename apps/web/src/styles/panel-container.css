@@ -17,9 +17,19 @@
   --pane-shadow: 0 1px 2px rgb(0 0 0 / 0.03);
   --pane-divider: rgb(0 0 0 / 6%);
   --pane-hover: var(--surface-hover);
-  /* Selected layer rows stay on the editor accent. */
-  --pane-selected: var(--canvas-selected);
-  --pane-selected-foreground: #fff;
+  /* Selected layer rows: a quiet accent tint under normal text. The canvas
+     selection itself stays saturated. */
+  --pane-selected: color-mix(
+    in srgb,
+    var(--canvas-selected) 13%,
+    var(--pane-surface)
+  );
+  --pane-selected-hover: color-mix(
+    in srgb,
+    var(--canvas-selected) 19%,
+    var(--pane-surface)
+  );
+  --pane-selected-foreground: var(--foreground);
 }
 
 .dark [data-editor-shell-root] {
@@ -27,6 +37,16 @@
   --pane-border: rgb(255 255 255 / 9%);
   --pane-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
   --pane-divider: rgb(255 255 255 / 6%);
+  --pane-selected: color-mix(
+    in srgb,
+    var(--canvas-selected) 24%,
+    var(--pane-surface)
+  );
+  --pane-selected-hover: color-mix(
+    in srgb,
+    var(--canvas-selected) 32%,
+    var(--pane-surface)
+  );
 }
 
 @media (min-width: 1024px) {

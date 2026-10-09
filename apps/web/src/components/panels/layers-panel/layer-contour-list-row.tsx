@@ -67,7 +67,7 @@ export const LayerContourListRow = ({ contourIndex, depth, nodeId }) => {
         <LayerTreeRowParts.Label className="flex-1 text-foreground/72 group-data-selected/layer-row:text-inherit">
           {`Contour ${contourIndex + 1}`}
         </LayerTreeRowParts.Label>
-        <span className="text-(length:--section-title-text) shrink-0 font-semibold text-(--section-title-color) uppercase tracking-(--section-title-tracking) group-data-selected/layer-row:text-white/80">
+        <span className="text-(length:--section-title-text) shrink-0 font-semibold text-(--section-title-color) uppercase tracking-(--section-title-tracking)">
           {isClosed ? "closed" : "open"}
         </span>
       </button>
