@@ -27,7 +27,7 @@ export const DensitySwitcher = () => {
 
   return (
     <div
-      className="absolute bottom-4 left-4 z-30 flex items-center gap-0.5 rounded-xl border border-[var(--designer-border)] bg-[var(--designer-surface)] p-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.06)]"
+      className="absolute bottom-4 left-4 z-30 flex items-center gap-0.5 rounded-xl border border-[var(--designer-border)] bg-[var(--designer-surface)] p-0.5"
       data-testid="density-switcher"
       title="Panel density (Alt+Shift+D)"
     >
