@@ -2,7 +2,7 @@ import { expect, type Page, test } from "@playwright/test";
 import { gotoEditor } from "./helpers/editor";
 
 const BAR_HEIGHT = 40;
-const DESKTOP_LEFT_INSET = 84;
+const DESKTOP_LEFT_INSET = 96;
 // Electron trafficLightPosition y 16 plus half the 14px traffic light.
 const TRAFFIC_LIGHT_CENTER_Y = 23;
 

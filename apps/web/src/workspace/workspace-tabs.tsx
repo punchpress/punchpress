@@ -1,5 +1,5 @@
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Note01Icon } from "@hugeicons-pro/core-stroke-rounded";
+import { Home01Icon } from "@hugeicons-pro/core-stroke-rounded";
 import { PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tab, TabClose, TabIconTrigger, TabTrigger } from "@/components/ui/tab";
@@ -26,7 +26,7 @@ export const WorkspaceTabs = ({ onCloseTab, onNewFile }) => {
             >
               <HugeiconsIcon
                 color="currentColor"
-                icon={Note01Icon}
+                icon={Home01Icon}
                 strokeWidth={1.8}
               />
             </TabIconTrigger>

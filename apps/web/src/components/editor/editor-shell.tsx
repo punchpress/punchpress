@@ -24,7 +24,7 @@ import { DesktopUpdateIndicator } from "./desktop-update-indicator";
 const SHELL_CHROME_VARS = {
   desktop: {
     "--desktop-chrome-height": "40px",
-    "--desktop-drag-left-inset": "84px",
+    "--desktop-drag-left-inset": "96px",
     "--desktop-panel-top-gap": "4px",
     "--shell-logo-offset-x": "-7px",
     // Centers title bar content on the traffic lights: Electron places them
