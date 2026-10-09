@@ -17,22 +17,30 @@ const WIDTH_RANGE = { max: 1000, min: 0 };
 const WIDTH_SCRUB_RANGE = { max: 50, min: 0 };
 const MITER_RANGE = { max: 100, min: 1 };
 
-// Alignment, width, cap, join, and (for miter joins) miter limit of one
-// stroke layer. Each control subscribes to its own value, so a width scrub
-// re-renders only the width field. Each scrub is one undo step.
-export const AppearanceStrokeFields = ({ layerId }: { layerId: string }) => {
+// Alignment, cap, join, and (for miter joins) miter limit of one stroke
+// layer: the settings a stroke row tucks away at denser layouts. Each control
+// subscribes to its own value; each scrub is one undo step.
+export const AppearanceStrokeStyleFields = ({
+  layerId,
+}: {
+  layerId: string;
+}) => {
   return (
-    <div className="grid gap-2 pl-[44px]">
+    <>
       <StrokeAlignField layerId={layerId} />
-      <StrokeWidthField layerId={layerId} />
       <StrokeCapField layerId={layerId} />
       <StrokeJoinField layerId={layerId} />
       <StrokeMiterField layerId={layerId} />
-    </div>
+    </>
   );
 };
 
-const StrokeWidthField = ({ layerId }: { layerId: string }) => {
+// Stroke width stays on the row; a width scrub re-renders only this field.
+export const AppearanceStrokeWidthField = ({
+  layerId,
+}: {
+  layerId: string;
+}) => {
   usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesField);
   const history = usePropertyScrubHistory("edit stroke width");
   const updateLayer = useUpdateAppearanceLayer(layerId);
@@ -55,6 +63,7 @@ const StrokeWidthField = ({ layerId }: { layerId: string }) => {
         onValueChange={(nextWidth) => updateLayer({ width: nextWidth })}
         scrubMax={Math.max(WIDTH_SCRUB_RANGE.max, width)}
         scrubMin={WIDTH_SCRUB_RANGE.min}
+        size="field"
         value={width}
       />
     </FieldRow>
@@ -85,6 +94,7 @@ const StrokeMiterField = ({ layerId }: { layerId: string }) => {
         onScrubEnd={history.onScrubEnd}
         onScrubStart={history.onScrubStart}
         onValueChange={(nextLimit) => updateLayer({ miterLimit: nextLimit })}
+        size="field"
         value={miterLimit}
       />
     </FieldRow>

@@ -2,7 +2,7 @@ import { PERF_COUNTERS } from "@punchpress/engine";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
-import { ColorField, FieldRow, Section } from "./field-primitives";
+import { ColorField, FieldPair, FieldRow, Section } from "./field-primitives";
 import { NumberField } from "./number-field";
 
 export const ArtboardFields = ({ nodeId }: { nodeId: string }) => {
@@ -32,25 +32,27 @@ export const ArtboardFields = ({ nodeId }: { nodeId: string }) => {
 
   return (
     <Section title="Frame">
-      <FieldRow label="Width">
-        <NumberField
-          min={1}
-          onValueChange={(nextWidth) => {
-            editor.setSelectionProperty("width", nextWidth);
-          }}
-          value={fields.width}
-        />
-      </FieldRow>
+      <FieldPair label="Size">
+        <FieldRow label="Width">
+          <NumberField
+            min={1}
+            onValueChange={(nextWidth) => {
+              editor.setSelectionProperty("width", nextWidth);
+            }}
+            value={fields.width}
+          />
+        </FieldRow>
 
-      <FieldRow label="Height">
-        <NumberField
-          min={1}
-          onValueChange={(nextHeight) => {
-            editor.setSelectionProperty("height", nextHeight);
-          }}
-          value={fields.height}
-        />
-      </FieldRow>
+        <FieldRow label="Height">
+          <NumberField
+            min={1}
+            onValueChange={(nextHeight) => {
+              editor.setSelectionProperty("height", nextHeight);
+            }}
+            value={fields.height}
+          />
+        </FieldRow>
+      </FieldPair>
 
       <FieldRow label="Color">
         <ColorField

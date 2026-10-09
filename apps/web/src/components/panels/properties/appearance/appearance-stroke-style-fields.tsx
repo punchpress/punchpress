@@ -128,7 +128,7 @@ const StrokeStyleSelect = ({
         onValueChange={(nextValue) => updateLayer({ [property]: nextValue })}
         value={value}
       >
-        <SelectTrigger aria-label={ariaLabel} size="sm">
+        <SelectTrigger aria-label={ariaLabel} size="field">
           <SelectValue>{() => selectedLabel}</SelectValue>
         </SelectTrigger>
         <SelectContent>

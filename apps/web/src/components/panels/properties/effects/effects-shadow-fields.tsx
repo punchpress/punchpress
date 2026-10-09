@@ -1,7 +1,7 @@
 import { PERF_COUNTERS } from "@punchpress/engine";
 import { ScrubSlider } from "@/components/ui/scrub-slider";
 import { usePerformanceRenderCounter } from "../../../../performance/use-performance-render-counter";
-import { FieldRow } from "../field-primitives";
+import { FieldPair, FieldRow } from "../field-primitives";
 import { usePropertyScrubHistory } from "../use-property-scrub-history";
 import { useEffectValue, useUpdateEffect } from "./use-effect-controls";
 
@@ -41,11 +41,13 @@ type ShadowProperty = keyof typeof SHADOW_FIELDS;
 // field. Each scrub is one undo step.
 export const EffectsShadowFields = ({ effectId }: { effectId: string }) => {
   return (
-    <div className="grid gap-2 pl-[44px]">
-      <ShadowField effectId={effectId} property="x" />
-      <ShadowField effectId={effectId} property="y" />
+    <>
+      <FieldPair label="Offset">
+        <ShadowField effectId={effectId} property="x" />
+        <ShadowField effectId={effectId} property="y" />
+      </FieldPair>
       <ShadowField effectId={effectId} property="blur" />
-    </div>
+    </>
   );
 };
 
@@ -77,6 +79,7 @@ const ShadowField = ({
         onValueChange={(next) => updateEffect({ [property]: next })}
         scrubMax={Math.max(field.scrubRange.max, value)}
         scrubMin={Math.min(field.scrubRange.min, value)}
+        size="field"
         value={value}
       />
     </FieldRow>

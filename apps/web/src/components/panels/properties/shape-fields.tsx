@@ -8,7 +8,7 @@ import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
 import { useCornerSliderPresentation } from "./corner-slider-presentation";
-import { FieldRow, Section } from "./field-primitives";
+import { FieldPair, FieldRow, Section } from "./field-primitives";
 
 const SHAPE_SIZE_RANGE = { min: 1, max: 5000 };
 const CORNER_RADIUS_RANGE = { min: 0 };
@@ -48,7 +48,7 @@ export const ShapeFields = ({ nodeId }: { nodeId: string }) => {
     <Section title="Shape">
       <FieldRow label="Type">
         <ToggleGroup
-          className="grid grid-cols-3 gap-1.5"
+          className="grid grid-cols-3 gap-1"
           onValueChange={(values) => {
             const nextShape = values[0];
             if (!nextShape) {
@@ -62,7 +62,11 @@ export const ShapeFields = ({ nodeId }: { nodeId: string }) => {
         >
           {SHAPE_OPTIONS.map((option) => {
             return (
-              <ToggleGroupItem key={option.value} value={option.value}>
+              <ToggleGroupItem
+                key={option.value}
+                size="field"
+                value={option.value}
+              >
                 {option.label}
               </ToggleGroupItem>
             );
@@ -70,29 +74,33 @@ export const ShapeFields = ({ nodeId }: { nodeId: string }) => {
         </ToggleGroup>
       </FieldRow>
 
-      <FieldRow label="Width">
-        <ScrubSlider
-          ariaLabel="Shape width"
-          max={SHAPE_SIZE_RANGE.max}
-          min={SHAPE_SIZE_RANGE.min}
-          onValueChange={(nextWidth) => {
-            editor.setSelectionProperty("width", nextWidth);
-          }}
-          value={fields.width}
-        />
-      </FieldRow>
+      <FieldPair label="Size">
+        <FieldRow label="Width">
+          <ScrubSlider
+            ariaLabel="Shape width"
+            max={SHAPE_SIZE_RANGE.max}
+            min={SHAPE_SIZE_RANGE.min}
+            onValueChange={(nextWidth) => {
+              editor.setSelectionProperty("width", nextWidth);
+            }}
+            size="field"
+            value={fields.width}
+          />
+        </FieldRow>
 
-      <FieldRow label="Height">
-        <ScrubSlider
-          ariaLabel="Shape height"
-          max={SHAPE_SIZE_RANGE.max}
-          min={SHAPE_SIZE_RANGE.min}
-          onValueChange={(nextHeight) => {
-            editor.setSelectionProperty("height", nextHeight);
-          }}
-          value={fields.height}
-        />
-      </FieldRow>
+        <FieldRow label="Height">
+          <ScrubSlider
+            ariaLabel="Shape height"
+            max={SHAPE_SIZE_RANGE.max}
+            min={SHAPE_SIZE_RANGE.min}
+            onValueChange={(nextHeight) => {
+              editor.setSelectionProperty("height", nextHeight);
+            }}
+            size="field"
+            value={fields.height}
+          />
+        </FieldRow>
+      </FieldPair>
 
       {fields.hasCorners ? (
         <FieldRow label="Corners">
@@ -109,6 +117,7 @@ export const ShapeFields = ({ nodeId }: { nodeId: string }) => {
             preserveDisplayValueWhileDragging={
               preserveDisplayValueWhileDragging
             }
+            size="field"
             step={CORNER_RADIUS_STEP}
             value={fields.cornerValue}
             valueBadge={valueBadge}

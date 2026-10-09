@@ -7,7 +7,7 @@ import { EffectsShadowFields } from "./effects-shadow-fields";
 // <Effects.Root>
 //   <Effects.List>
 //     {(id) => (
-//       <Effects.Item effectId={id}><Effects.ShadowFields effectId={id} /></Effects.Item>
+//       <Effects.Item details={<Effects.ShadowFields effectId={id} />} effectId={id} />
 //     )}
 //   </Effects.List>
 // </Effects.Root>
@@ -23,9 +23,11 @@ export const EffectsPanel = () => {
     <Effects.Root>
       <Effects.List>
         {(effectId) => (
-          <Effects.Item effectId={effectId} key={effectId}>
-            <Effects.ShadowFields effectId={effectId} />
-          </Effects.Item>
+          <Effects.Item
+            details={<Effects.ShadowFields effectId={effectId} />}
+            effectId={effectId}
+            key={effectId}
+          />
         )}
       </Effects.List>
     </Effects.Root>

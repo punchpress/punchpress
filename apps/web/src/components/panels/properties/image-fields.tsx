@@ -119,6 +119,7 @@ export const ImageFields = ({ nodeId }: { nodeId: string }) => {
             onScrubEnd={commitResize}
             onScrubStart={beginResize}
             onValueChange={(nextWidth) => updateResize({ width: nextWidth })}
+            size="field"
             value={resize.width}
           />
         </div>
@@ -135,6 +136,7 @@ export const ImageFields = ({ nodeId }: { nodeId: string }) => {
             onScrubEnd={commitResize}
             onScrubStart={beginResize}
             onValueChange={(nextHeight) => updateResize({ height: nextHeight })}
+            size="field"
             value={resize.height}
           />
         </div>

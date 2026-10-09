@@ -1,7 +1,5 @@
 import { useEditorValue } from "../../../editor-react/use-editor-value";
 
-const NODE_SECTION_TYPES = new Set(["artboard", "image", "shape", "text"]);
-
 // Which sections the panel shows, as primitives. Value edits leave every
 // field here unchanged, so the panel root re-renders only when the selection,
 // the inspected node, the path-editing mode, or the raster tool changes; each
@@ -35,13 +33,6 @@ export const usePropertiesPanelLayout = () => {
       bootstrapState: editor.bootstrapState as string,
       canDelete: inspection.canDelete,
       hasAppearance: inspection.hasAppearance || inspection.hasOpacity,
-      // Sections above appearance; selection colors draw a divider after them.
-      hasLeadingFields: Boolean(
-        NODE_SECTION_TYPES.has(inspection.nodeType ?? "") ||
-          rasterTool ||
-          showsPathPointCorner ||
-          showsPathCorners
-      ),
       hasSelectionColors: inspection.hasSelectionColors,
       nodeId: inspection.nodeId,
       nodeType: inspection.nodeType,

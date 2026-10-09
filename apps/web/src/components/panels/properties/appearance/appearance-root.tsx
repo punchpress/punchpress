@@ -44,7 +44,7 @@ const AppearanceMixed = () => {
   });
 
   return (
-    <Section className="border-black/4 border-t" title="Appearance">
+    <Section title="Appearance">
       <FieldRow label="Mixed">
         <Button
           disabled={!canUseFirst}
@@ -55,7 +55,7 @@ const AppearanceMixed = () => {
               editor.setAppearance(first);
             }
           }}
-          size="xs"
+          size="field"
           variant="outline"
         >
           Use first

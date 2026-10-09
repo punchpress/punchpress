@@ -16,7 +16,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { selectTriggerVariants } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
 import { FontPickerOptionList } from "./font-picker-option-list";
@@ -109,7 +108,7 @@ export const FontPicker = ({
   return (
     <Popover onOpenChange={setIsOpen} open={isOpen}>
       <PopoverTrigger
-        className={cn(selectTriggerVariants(), "min-w-0")}
+        className={selectTriggerVariants({ size: "field" })}
         type="button"
       >
         <span
@@ -124,7 +123,7 @@ export const FontPicker = ({
         >
           {selectedFont ? getLocalFontLabel(selectedFont) : "Choose a font"}
         </span>
-        <ChevronDownIcon className="-me-1 size-4.5 opacity-80 sm:size-4" />
+        <ChevronDownIcon className="size-3.5 opacity-80" />
       </PopoverTrigger>
 
       {isOpen ? (

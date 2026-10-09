@@ -51,7 +51,7 @@ export const BrushFields = ({ tool }: { tool: string }) => {
           }}
           value={presetId}
         >
-          <SelectTrigger aria-label="Brush preset" size="sm">
+          <SelectTrigger aria-label="Brush preset" size="field">
             <SelectValue>{() => selectedPreset?.name ?? null}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -84,6 +84,7 @@ export const BrushFields = ({ tool }: { tool: string }) => {
           }}
           scrubMax={120}
           scrubMin={BRUSH_SIZE_RANGE.min}
+          size="field"
           value={settings.size}
         />
       </FieldRow>
@@ -97,6 +98,7 @@ export const BrushFields = ({ tool }: { tool: string }) => {
           onValueChange={(opacity) => {
             editor.setBrushSettings({ opacity: opacity / 100 }, tool);
           }}
+          size="field"
           value={Math.round(settings.opacity * 100)}
         />
       </FieldRow>
@@ -110,6 +112,7 @@ export const BrushFields = ({ tool }: { tool: string }) => {
           onValueChange={(flow) => {
             editor.setBrushSettings({ flow: flow / 100 }, tool);
           }}
+          size="field"
           value={Math.round(settings.flow * 100)}
         />
       </FieldRow>
@@ -123,6 +126,7 @@ export const BrushFields = ({ tool }: { tool: string }) => {
           onValueChange={(hardness) => {
             editor.setBrushSettings({ hardness: hardness / 100 }, tool);
           }}
+          size="field"
           value={Math.round(settings.hardness * 100)}
         />
       </FieldRow>
@@ -136,6 +140,7 @@ export const BrushFields = ({ tool }: { tool: string }) => {
           onValueChange={(spacing) => {
             editor.setBrushSettings({ spacing: spacing / 100 }, tool);
           }}
+          size="field"
           value={Math.round(settings.spacing * 100)}
         />
       </FieldRow>
@@ -149,6 +154,7 @@ export const BrushFields = ({ tool }: { tool: string }) => {
           onValueChange={(angle) => {
             editor.setBrushSettings({ angle }, tool);
           }}
+          size="field"
           value={settings.angle}
         />
       </FieldRow>
@@ -162,6 +168,7 @@ export const BrushFields = ({ tool }: { tool: string }) => {
           onValueChange={(roundness) => {
             editor.setBrushSettings({ roundness: roundness / 100 }, tool);
           }}
+          size="field"
           value={Math.round(settings.roundness * 100)}
         />
       </FieldRow>
@@ -175,6 +182,7 @@ export const BrushFields = ({ tool }: { tool: string }) => {
           onValueChange={(smoothing) => {
             editor.setBrushSettings({ smoothing: smoothing / 100 }, tool);
           }}
+          size="field"
           value={Math.round(settings.smoothing * 100)}
         />
       </FieldRow>
@@ -188,6 +196,7 @@ export const BrushFields = ({ tool }: { tool: string }) => {
           onValueChange={(scatter) => {
             editor.setBrushSettings({ scatter: scatter / 100 }, tool);
           }}
+          size="field"
           value={Math.round(settings.scatter * 100)}
         />
       </FieldRow>
@@ -201,6 +210,7 @@ export const BrushFields = ({ tool }: { tool: string }) => {
           onValueChange={(sizeJitter) => {
             editor.setBrushSettings({ sizeJitter: sizeJitter / 100 }, tool);
           }}
+          size="field"
           value={Math.round(settings.sizeJitter * 100)}
         />
       </FieldRow>
@@ -214,6 +224,7 @@ export const BrushFields = ({ tool }: { tool: string }) => {
           onValueChange={(angleJitter) => {
             editor.setBrushSettings({ angleJitter: angleJitter / 100 }, tool);
           }}
+          size="field"
           value={Math.round(settings.angleJitter * 100)}
         />
       </FieldRow>

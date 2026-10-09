@@ -33,9 +33,12 @@ export const PropertiesPanel = () => {
   }
 
   return (
-    <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--designer-border)] bg-[var(--designer-surface)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.06)]">
+    <div
+      className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--designer-border)] bg-[var(--designer-surface)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.06)]"
+      data-properties-panel=""
+    >
       <div
-        className="min-h-0 flex-1 overflow-y-auto px-3.5 pt-3 pb-3.5"
+        className="min-h-0 flex-1 overflow-y-auto px-(--panel-px) pt-(--panel-pt) pb-(--panel-pb)"
         data-testid="properties-panel-body"
       >
         {layout.bootstrapState === "error" && (
@@ -62,24 +65,17 @@ export const PropertiesPanel = () => {
 
         <EffectsPanel />
 
-        {layout.hasSelectionColors ? (
-          <SelectionColorsFields
-            withTopBorder={layout.hasLeadingFields || layout.hasAppearance}
-          />
-        ) : null}
+        {layout.hasSelectionColors ? <SelectionColorsFields /> : null}
 
         {nodeId && nodeType === "text" ? (
-          <TextWarpFields
-            nodeId={nodeId}
-            withTopBorder={layout.hasAppearance || layout.hasSelectionColors}
-          />
+          <TextWarpFields nodeId={nodeId} />
         ) : null}
 
         {layout.canDelete ? (
-          <div className="border-black/4 border-t pt-4 [&_[data-slot=button]]:w-full">
+          <div className="border-border border-t pt-(--section-py) first:border-t-0 first:pt-0 [&_[data-slot=button]]:w-full">
             <Button
               onClick={() => editor.deleteSelected()}
-              size="sm"
+              size="field"
               type="button"
               variant="destructive-outline"
             >

@@ -9,7 +9,7 @@ import { ScrubSlider } from "@/components/ui/scrub-slider";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
-import { FieldRow, Section } from "./field-primitives";
+import { FieldPair, FieldRow, Section } from "./field-primitives";
 
 const FONT_SIZE_RANGE = { min: 1, max: 2000 };
 const TRACKING_SCRUB_RANGE = { min: -500, max: 500 };
@@ -58,10 +58,12 @@ export const TextFields = ({ nodeId }: { nodeId: string }) => {
     <Section title="Text">
       <FieldRow label="Text">
         <Input
+          aria-label="Text"
           nativeInput
           onChange={(event) =>
             editor.setSelectionProperty("text", event.target.value)
           }
+          size="field"
           value={text.text}
         />
       </FieldRow>
@@ -92,31 +94,35 @@ export const TextFields = ({ nodeId }: { nodeId: string }) => {
         </div>
       </FieldRow>
 
-      <FieldRow label="Size">
-        <ScrubSlider
-          ariaLabel="Font size"
-          max={FONT_SIZE_RANGE.max}
-          min={FONT_SIZE_RANGE.min}
-          onValueChange={(nextFontSize) => {
-            editor.setSelectionProperty("fontSize", nextFontSize);
-          }}
-          value={text.fontSize}
-        />
-      </FieldRow>
+      <FieldPair label="Type">
+        <FieldRow label="Size">
+          <ScrubSlider
+            ariaLabel="Font size"
+            max={FONT_SIZE_RANGE.max}
+            min={FONT_SIZE_RANGE.min}
+            onValueChange={(nextFontSize) => {
+              editor.setSelectionProperty("fontSize", nextFontSize);
+            }}
+            size="field"
+            value={text.fontSize}
+          />
+        </FieldRow>
 
-      <FieldRow label="Tracking">
-        <ScrubSlider
-          ariaLabel="Tracking"
-          max={TEXT_TRACKING_RANGE.max}
-          min={TEXT_TRACKING_RANGE.min}
-          onValueChange={(nextTracking) => {
-            editor.setSelectionProperty("tracking", nextTracking);
-          }}
-          scrubMax={TRACKING_SCRUB_RANGE.max}
-          scrubMin={TRACKING_SCRUB_RANGE.min}
-          value={text.tracking}
-        />
-      </FieldRow>
+        <FieldRow label="Tracking">
+          <ScrubSlider
+            ariaLabel="Tracking"
+            max={TEXT_TRACKING_RANGE.max}
+            min={TEXT_TRACKING_RANGE.min}
+            onValueChange={(nextTracking) => {
+              editor.setSelectionProperty("tracking", nextTracking);
+            }}
+            scrubMax={TRACKING_SCRUB_RANGE.max}
+            scrubMin={TRACKING_SCRUB_RANGE.min}
+            size="field"
+            value={text.tracking}
+          />
+        </FieldRow>
+      </FieldPair>
     </Section>
   );
 };

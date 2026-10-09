@@ -55,6 +55,7 @@ export const PathPointFields = ({ nodeId }: { nodeId: string }) => {
               scrubSourceNodeRef.current
             );
           }}
+          size="field"
           step={CORNER_RADIUS_STEP}
           value={corner.radius ?? 0}
         />

@@ -58,7 +58,7 @@ export const AppearancePaintFields = ({ layerId }: { layerId: string }) => {
   )?.label;
 
   return (
-    <div className="grid gap-2 pl-[44px]">
+    <>
       <FieldRow label="Paint">
         <Select
           onValueChange={(nextKind) => {
@@ -70,7 +70,7 @@ export const AppearancePaintFields = ({ layerId }: { layerId: string }) => {
           }}
           value={kind}
         >
-          <SelectTrigger aria-label="Paint kind" size="sm">
+          <SelectTrigger aria-label="Paint kind" size="field">
             <SelectValue>{() => selectedLabel}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -85,7 +85,7 @@ export const AppearancePaintFields = ({ layerId }: { layerId: string }) => {
       {typeof paint === "string" ? null : (
         <GradientFields layerId={layerId} paint={paint} />
       )}
-    </div>
+    </>
   );
 };
 
@@ -148,12 +148,13 @@ const GradientFields = ({
               editor.setGradientAngle(slot, value);
             }
           }}
+          size="field"
           value={Math.round(angle ?? 0)}
         />
       </FieldRow>
       {paint.stops.map((stop) => (
         <div
-          className="grid grid-cols-[minmax(0,1fr)_64px_24px] items-center gap-2"
+          className="grid grid-cols-[minmax(0,1fr)_3rem_var(--field-icon-button)] items-center gap-1"
           data-stop-id={stop.id}
           data-testid="appearance-gradient-stop"
           key={stop.id}
@@ -188,7 +189,7 @@ const GradientFields = ({
             onClick={() => {
               updatePaint((current) => removeGradientStop(current, stop.id));
             }}
-            size="icon-xs"
+            size="icon-field"
             variant="ghost"
           >
             <HugeiconsIcon icon={Delete02Icon} size={14} strokeWidth={1.8} />
@@ -203,7 +204,7 @@ const GradientFields = ({
               return insertGradientStop(current, getWidestGapMiddle(current));
             });
           }}
-          size="xs"
+          size="field"
           variant="ghost"
         >
           <HugeiconsIcon icon={PlusSignIcon} size={14} strokeWidth={1.8} />

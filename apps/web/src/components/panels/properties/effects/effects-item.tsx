@@ -1,7 +1,6 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Delete02Icon,
-  DragDropVerticalIcon,
   ViewIcon,
   ViewOffIcon,
 } from "@hugeicons-pro/core-stroke-rounded";
@@ -14,6 +13,7 @@ import { useEditor } from "../../../../editor-react/use-editor";
 import { usePerformanceRenderCounter } from "../../../../performance/use-performance-render-counter";
 import { formatColorWithOpacity } from "../appearance/appearance-paint-swatch";
 import { ColorField } from "../field-primitives";
+import { LayerRow } from "../layer-row";
 import { usePropertyScrubHistory } from "../use-property-scrub-history";
 import {
   useEffectIndex,
@@ -22,14 +22,14 @@ import {
 } from "./use-effect-controls";
 
 // One effect row: drag handle, visibility, shadow color with opacity, remove.
-// Kind-specific fields render beneath through `children`. The row chrome
-// subscribes to visibility only; the color and fields subscribe to their own
-// values.
+// Kind-specific `details` show beneath the row or in a settings popover, by
+// density. The row chrome subscribes to visibility only; the color and fields
+// subscribe to their own values.
 export const EffectsItem = ({
-  children,
+  details,
   effectId,
 }: {
-  children?: React.ReactNode;
+  details?: React.ReactNode;
   effectId: string;
 }) => {
   usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesRow);
@@ -45,27 +45,23 @@ export const EffectsItem = ({
   return (
     <SortableItem id={effectId}>
       {({ dragHandleProps, isDragging, itemStyle, setItemRef }) => (
-        <div
-          className={cn("grid gap-2", isDragging && "opacity-60")}
+        <LayerRow.Root
+          className={cn(isDragging && "opacity-60")}
           data-effect-id={effectId}
           data-testid="effects-item"
           ref={setItemRef}
           style={itemStyle}
         >
-          <div className="grid grid-cols-[16px_24px_minmax(0,1fr)_24px] items-center gap-1">
-            <button
+          <LayerRow.Header>
+            <LayerRow.DragHandle
               aria-label="Reorder effect"
-              className="flex cursor-grab items-center text-foreground/40"
-              type="button"
               {...dragHandleProps}
-            >
-              <HugeiconsIcon icon={DragDropVerticalIcon} size={14} />
-            </button>
+            />
             <Button
               aria-label={enabled ? "Hide effect" : "Show effect"}
               aria-pressed={enabled}
               onClick={() => updateEffect({ enabled: !enabled })}
-              size="icon-xs"
+              size="icon-field"
               variant="ghost"
             >
               <HugeiconsIcon
@@ -74,9 +70,12 @@ export const EffectsItem = ({
                 strokeWidth={1.8}
               />
             </Button>
-            <div className={cn("min-w-0", !enabled && "opacity-50")}>
+            <div className={cn("min-w-0 flex-1", !enabled && "opacity-50")}>
               <EffectColorField effectId={effectId} />
             </div>
+            {details ? (
+              <LayerRow.Settings title="Shadow">{details}</LayerRow.Settings>
+            ) : null}
             <Button
               aria-label="Remove effect"
               onClick={() => {
@@ -86,14 +85,14 @@ export const EffectsItem = ({
                   editor.removeEffect(index);
                 }
               }}
-              size="icon-xs"
+              size="icon-field"
               variant="ghost"
             >
               <HugeiconsIcon icon={Delete02Icon} size={14} strokeWidth={1.8} />
             </Button>
-          </div>
-          {children}
-        </div>
+          </LayerRow.Header>
+          {details ? <LayerRow.Details>{details}</LayerRow.Details> : null}
+        </LayerRow.Root>
       )}
     </SortableItem>
   );

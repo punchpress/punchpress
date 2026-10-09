@@ -25,7 +25,7 @@ export const EffectsList = ({
   }
 
   return (
-    <div className="grid gap-2">
+    <div className="grid gap-(--field-gap)">
       <SortableList
         items={ids}
         onMove={({ activeId, overId }) => {

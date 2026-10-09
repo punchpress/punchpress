@@ -47,7 +47,7 @@ export const AppearanceOpacityField = () => {
   };
 
   return (
-    <Section className="border-black/4 border-t" title="Layer">
+    <Section title="Layer">
       <FieldRow label="Opacity">
         {property.isMixed || mixedSelectionKey === selectionKey ? (
           <NumberField
@@ -65,6 +65,7 @@ export const AppearanceOpacityField = () => {
             onScrubEnd={history.onScrubEnd}
             onScrubStart={history.onScrubStart}
             onValueChange={setOpacity}
+            size="field"
             value={Math.round(property.value * 100)}
           />
         )}

@@ -7,7 +7,7 @@ import { ColorField, Section } from "./field-primitives";
 
 // The section re-renders when the set of swatches changes; each row
 // subscribes to its own color.
-export const SelectionColorsFields = ({ withTopBorder = true }) => {
+export const SelectionColorsFields = () => {
   usePerformanceRenderCounter(PERF_COUNTERS.renderPanelPropertiesSection);
   const fieldIds = useEditorValue((editor, state) => {
     return editor
@@ -20,10 +20,7 @@ export const SelectionColorsFields = ({ withTopBorder = true }) => {
   }
 
   return (
-    <Section
-      className={withTopBorder ? "border-black/4 border-t" : undefined}
-      title="Selection colors"
-    >
+    <Section title="Selection colors">
       {fieldIds.map((fieldId) => {
         return <SelectionColorRow fieldId={fieldId} key={fieldId} />;
       })}

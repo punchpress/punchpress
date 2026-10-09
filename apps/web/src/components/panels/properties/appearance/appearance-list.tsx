@@ -11,6 +11,7 @@ import { SortableList } from "@/components/ui/sortable-list";
 import { useEditor } from "../../../../editor-react/use-editor";
 import { useEditorValue } from "../../../../editor-react/use-editor-value";
 import { usePerformanceRenderCounter } from "../../../../performance/use-performance-render-counter";
+import { Section } from "../field-primitives";
 import { AppearanceListContext } from "./appearance-context";
 
 const LIST_TITLES = { fills: "Fill", strokes: "Stroke" };
@@ -38,14 +39,8 @@ export const AppearanceListSection = ({
 
   return (
     <AppearanceListContext.Provider value={context}>
-      <section
-        className="border-black/4 border-t py-4 last:pb-0"
-        data-testid={`appearance-${list}`}
-      >
-        <div className="mb-2 flex items-center justify-between">
-          <h3 className="font-semibold text-[12px] text-foreground/70 tracking-[-0.01em]">
-            {title}
-          </h3>
+      <Section
+        actions={
           <Button
             aria-label={`Add ${title.toLowerCase()}`}
             disabled={layerIds.length >= MAX_APPEARANCE_LAYERS}
@@ -56,30 +51,31 @@ export const AppearanceListSection = ({
                 editor.addStroke();
               }
             }}
-            size="icon-xs"
+            size="icon-field"
             variant="ghost"
           >
             <HugeiconsIcon icon={PlusSignIcon} size={14} strokeWidth={1.8} />
           </Button>
-        </div>
-        <div className="grid gap-2">
-          <SortableList
-            items={displayIds}
-            onMove={({ activeId, overId }) => {
-              // Stored order is bottom-to-top; moving onto a row takes its
-              // slot. Both resolve against the current stack.
-              const slot = editor.getAppearanceLayer(list, activeId)?.slot;
-              const target = editor.getAppearanceLayer(list, overId)?.slot;
+        }
+        data-testid={`appearance-${list}`}
+        title={title}
+      >
+        <SortableList
+          items={displayIds}
+          onMove={({ activeId, overId }) => {
+            // Stored order is bottom-to-top; moving onto a row takes its
+            // slot. Both resolve against the current stack.
+            const slot = editor.getAppearanceLayer(list, activeId)?.slot;
+            const target = editor.getAppearanceLayer(list, overId)?.slot;
 
-              if (slot && target) {
-                editor.moveAppearanceLayer(slot, target.index);
-              }
-            }}
-          >
-            {displayIds.map((layerId) => children(layerId))}
-          </SortableList>
-        </div>
-      </section>
+            if (slot && target) {
+              editor.moveAppearanceLayer(slot, target.index);
+            }
+          }}
+        >
+          {displayIds.map((layerId) => children(layerId))}
+        </SortableList>
+      </Section>
     </AppearanceListContext.Provider>
   );
 };

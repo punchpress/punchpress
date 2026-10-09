@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useEditor } from "../../../../editor-react/use-editor";
 import { useEditorValue } from "../../../../editor-react/use-editor-value";
 import { usePerformanceRenderCounter } from "../../../../performance/use-performance-render-counter";
-import { FieldRow } from "../field-primitives";
+import { FieldRow, Section } from "../field-primitives";
 
 // Shows the selection's effect owners (a vector child path routes to its
 // vector). Multi-selections share a stack only when every stack is equal apart
@@ -37,33 +37,30 @@ export const EffectsRoot = ({ children }) => {
   }
 
   return (
-    <section
-      className="border-black/4 border-t py-4 last:pb-0"
-      data-testid="effects"
-    >
-      <div className="mb-2 flex items-center justify-between">
-        <h3 className="font-semibold text-[12px] text-foreground/70 tracking-[-0.01em]">
-          Effects
-        </h3>
+    <Section
+      actions={
         <Button
           aria-label="Add effect"
           disabled={selection.isMixed || selection.count >= MAX_EFFECTS}
           onClick={() => {
             editor.addEffect("drop-shadow");
           }}
-          size="icon-xs"
+          size="icon-field"
           variant="ghost"
         >
           <HugeiconsIcon icon={PlusSignIcon} size={14} strokeWidth={1.8} />
         </Button>
-      </div>
+      }
+      data-testid="effects"
+      title="Effects"
+    >
       {selection.isMixed ? (
         <FieldRow label="Mixed">
           <Button
             onClick={() => {
               editor.setEffects(editor.getSelectionEffects().effects);
             }}
-            size="xs"
+            size="field"
             variant="outline"
           >
             Use first
@@ -72,6 +69,6 @@ export const EffectsRoot = ({ children }) => {
       ) : (
         <Fragment key={selection.scopeKey}>{children}</Fragment>
       )}
-    </section>
+    </Section>
   );
 };

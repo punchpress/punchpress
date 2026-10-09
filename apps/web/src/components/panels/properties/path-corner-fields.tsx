@@ -71,6 +71,7 @@ export const PathCornerFields = ({ nodeId }: { nodeId: string }) => {
             );
           }}
           preserveDisplayValueWhileDragging={preserveDisplayValueWhileDragging}
+          size="field"
           step={CORNER_RADIUS_STEP}
           value={corner.value}
           valueBadge={valueBadge}

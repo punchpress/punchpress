@@ -115,6 +115,7 @@ export const NumberField = ({
         }
       }}
       placeholder={placeholder}
+      size="field"
       type="text"
       value={draft}
     />
