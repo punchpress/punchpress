@@ -5,6 +5,7 @@ import {
   loadDocument,
   loadDocumentFixture,
 } from "./helpers/editor";
+import { openLayerSettings } from "./helpers/layer-settings";
 
 const GROUP_SELECTED_TEXT = /Group selected/i;
 const LAYERS_SELECTED_TEXT = /layers selected/i;
@@ -628,8 +629,10 @@ test("does not commit a mixed stroke stack until the mixed row is applied", asyn
     { id: "miter-path-one", miterLimit: 4 },
     { id: "miter-path-two", miterLimit: 4 },
   ]);
+  const settings = await openLayerSettings(page, "Stroke");
+
   await expect(
-    page.getByRole("slider", { name: "Stroke miter limit" })
+    settings.getByRole("slider", { name: "Stroke miter limit" })
   ).toHaveAttribute("aria-valuenow", "4");
 });
 
@@ -797,7 +800,7 @@ test("keeps selection color picker open while dragging the color area", async ({
 
   const selectionColorsSection = getSelectionColorsSection(page);
   const redSelectionColorButton = selectionColorsSection
-    .getByRole("button")
+    .locator("[data-slot='color-picker-trigger']")
     .nth(0);
 
   const redSelectionColorButtonBox =
@@ -935,13 +938,9 @@ test("shows aggregate stroke controls for a selected multi-path vector and appli
   await selectNodes(page, ["vector-container"]);
 
   const strokeSection = getStrokeSection(page);
-  const getRow = (label) => {
-    return strokeSection
-      .locator("label", { hasText: label })
-      .locator("xpath=ancestor::div[contains(@class, 'grid')][1]");
-  };
-  const capTrigger = getRow("Cap").getByRole("combobox");
-  const joinTrigger = getRow("Join").getByRole("combobox");
+  const settings = page.getByRole("dialog", { name: "Stroke" });
+  const capTrigger = settings.getByRole("combobox", { name: "Stroke cap" });
+  const joinTrigger = settings.getByRole("combobox", { name: "Stroke join" });
 
   // The child paths' stacks differ in color; unify them first so the vector
   // exposes one shared stroke stack.
@@ -949,6 +948,7 @@ test("shows aggregate stroke controls for a selected multi-path vector and appli
   await page.getByRole("button", { name: "Use first" }).click();
 
   await expect(strokeSection).toBeVisible();
+  await openLayerSettings(page, "Stroke");
   await expect(capTrigger).toContainText("Butt");
   await expect(joinTrigger).toContainText("Miter");
 
@@ -1000,14 +1000,9 @@ test("applies path stroke cap and join from the properties panel without clearin
   await loadVectorStrokeStyleDocument(page);
   await selectNodes(page, ["vector-node"]);
 
-  const fillSection = getStrokeSection(page);
-  const getRow = (label) => {
-    return fillSection
-      .locator("label", { hasText: label })
-      .locator("xpath=ancestor::div[contains(@class, 'grid')][1]");
-  };
-  const capTrigger = getRow("Cap").getByRole("combobox");
-  const joinTrigger = getRow("Join").getByRole("combobox");
+  const settings = await openLayerSettings(page, "Stroke");
+  const capTrigger = settings.getByRole("combobox", { name: "Stroke cap" });
+  const joinTrigger = settings.getByRole("combobox", { name: "Stroke join" });
   const getVectorStrokeState = () =>
     page.evaluate(() => {
       const dump = window.__PUNCHPRESS_EDITOR__?.getDebugDump();
@@ -1068,7 +1063,10 @@ test("keeps the miter scrub indicator aligned with pointer drag distance", async
     );
   });
 
-  const miterSlider = page.getByRole("slider", { name: "Stroke miter limit" });
+  const settings = await openLayerSettings(page, "Stroke");
+  const miterSlider = settings.getByRole("slider", {
+    name: "Stroke miter limit",
+  });
   const indicator = miterSlider.locator("[data-slot='scrub-slider-indicator']");
 
   await expect(miterSlider).toBeVisible();

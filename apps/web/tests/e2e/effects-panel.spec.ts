@@ -1,5 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import { gotoEditor, loadDocument } from "./helpers/editor";
+import { openLayerSettings } from "./helpers/layer-settings";
 
 const SHAPE_ID = "panel-shape";
 
@@ -140,7 +141,8 @@ test("adds, scrubs, toggles, reorders, and removes shadows through the panel", a
     .toEqual([8, 8, 0, "#000000"]);
 
   // A full X scrub is one undo step.
-  const slider = page.getByRole("slider", { name: "Shadow X" });
+  const settings = await openLayerSettings(page, "Shadow");
+  const slider = settings.getByRole("slider", { name: "Shadow X" });
   const box = await slider.boundingBox();
 
   if (!box) {
@@ -161,6 +163,8 @@ test("adds, scrubs, toggles, reorders, and removes shadows through the panel", a
   expect((await getEffects(page))[0].x).toBeGreaterThan(8);
   await page.keyboard.press("ControlOrMeta+z");
   await expect.poll(async () => (await getEffects(page))[0]?.x).toBe(8);
+  await page.keyboard.press("Escape");
+  await expect(settings).toHaveCount(0);
 
   const items = page.getByTestId("effects-item");
 

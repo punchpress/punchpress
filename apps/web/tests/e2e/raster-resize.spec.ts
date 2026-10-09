@@ -180,55 +180,31 @@ test("publishes square Raster pixels and a new backing Canvas after resize", asy
     .toEqual({ height: 75, width: 120 });
 });
 
-test("groups Width and Height around one spanning aspect control", async ({
+test("pairs Width and Height on one row with a trailing aspect lock", async ({
   page,
 }) => {
   await setupRaster(page);
 
   const dimensions = page.getByRole("group", { name: "Image dimensions" });
-  const linkColumn = dimensions.locator("[data-image-dimensions-link]");
   const width = dimensions.getByRole("slider", { name: "Image width" });
   const height = dimensions.getByRole("slider", { name: "Image height" });
+  const lock = dimensions.getByRole("button", {
+    name: "Unlock image aspect ratio",
+  });
 
   await expect(width).toBeVisible();
   await expect(height).toBeVisible();
-  await expect(
-    dimensions.getByRole("button", { name: "Unlock image aspect ratio" })
-  ).toBeVisible();
-  await expect(linkColumn).toHaveCount(1);
-  expect(
-    await linkColumn.evaluate((element) => {
-      const style = getComputedStyle(element);
+  await expect(lock).toBeVisible();
 
-      return {
-        alignSelf: style.alignSelf,
-        gridColumnStart: style.gridColumnStart,
-        gridRowEnd: style.gridRowEnd,
-        gridRowStart: style.gridRowStart,
-      };
-    })
-  ).toEqual({
-    alignSelf: "center",
-    gridColumnStart: "2",
-    gridRowEnd: "span 2",
-    gridRowStart: "1",
-  });
-  expect(
-    await Promise.all(
-      [
-        dimensions.getByText("Width", { exact: true }),
-        width.locator(".."),
-        dimensions.getByText("Height", { exact: true }),
-        height.locator(".."),
-      ].map((locator) =>
-        locator.evaluate((element) => {
-          const style = getComputedStyle(element);
+  const [widthBox, heightBox, lockBox] = await Promise.all(
+    [width, height, lock].map((locator) => locator.boundingBox())
+  );
+  const middle = (box) => (box ? box.y + box.height / 2 : Number.NaN);
 
-          return `${style.gridColumnStart}/${style.gridRowStart}`;
-        })
-      )
-    )
-  ).toEqual(["1/1", "3/1", "1/2", "3/2"]);
+  expect(Math.abs(middle(widthBox) - middle(heightBox))).toBeLessThan(1);
+  expect(Math.abs(middle(widthBox) - middle(lockBox))).toBeLessThan(1);
+  expect(widthBox?.x ?? 0).toBeLessThan(heightBox?.x ?? 0);
+  expect(heightBox?.x ?? 0).toBeLessThan(lockBox?.x ?? 0);
 });
 
 test("Shift preserves aspect ratio while handle-resizing an unlocked Raster", async ({
@@ -393,10 +369,7 @@ test("disables Raster resize controls and delays the Resizing status", async ({
   await expect(lock).toBeDisabled();
   await expect(page.getByText("Resizing…")).toHaveCount(0);
   await expect(page.getByText("Resizing…")).toBeVisible({ timeout: 500 });
-  await expect(page.locator("[data-image-resize-status]")).toHaveCSS(
-    "grid-column-start",
-    "3"
-  );
+  await expect(page.locator("[data-image-resize-status]")).toBeVisible();
 
   await page.evaluate(async () => {
     window.__PUNCHPRESS_RELEASE_RASTER_RESIZE__?.();

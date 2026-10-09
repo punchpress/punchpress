@@ -1,5 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import { gotoEditor, loadDocument } from "./helpers/editor";
+import { openLayerSettings } from "./helpers/layer-settings";
 
 const SHAPE_ID = "panel-shape";
 
@@ -289,7 +290,7 @@ test("switches a fill to a linear gradient and edits its stops", async ({
   await loadDocument(page, PANEL_DOCUMENT);
   await selectShape(page);
 
-  const fill = page.getByTestId("appearance-fills-item").first();
+  const fill = await openLayerSettings(page, "Fill");
 
   await fill.getByRole("combobox", { name: "Paint kind" }).click();
   await page.getByRole("option", { name: "Linear" }).click();
@@ -341,7 +342,8 @@ test("aligns a stroke inside and outside through the panel", async ({
     .getByRole("button", { name: "Add stroke" })
     .click();
 
-  const align = page.getByRole("combobox", { name: "Stroke alignment" });
+  const settings = await openLayerSettings(page, "Stroke");
+  const align = settings.getByRole("combobox", { name: "Stroke alignment" });
   const art = page.locator(`.canvas-node[data-node-id="${SHAPE_ID}"]`);
 
   await align.click();

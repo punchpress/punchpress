@@ -67,19 +67,45 @@ const measureControlOverflow = (page: Page) => {
   });
 };
 
-test("nested appearance controls stay inside the panel's right edge", async ({
-  page,
-}) => {
+// Groups the panel's value controls into visual rows and reports each row's
+// right edge against the content box. Every row of value controls must end
+// exactly at the content edge: nothing short, nothing past it.
+const measureRowRightEdges = (page: Page) => {
+  return page.getByTestId("properties-panel-body").evaluate((body) => {
+    const style = getComputedStyle(body);
+    const contentRight =
+      body.getBoundingClientRect().right -
+      Number.parseFloat(style.paddingRight) -
+      (body.offsetWidth - body.clientWidth);
+    const controls = body.querySelectorAll(
+      "[data-slot='select-trigger'], [data-slot='scrub-slider'], [data-slot='input-control'], [data-slot='color-picker-trigger'], [data-slot='icon-segmented-control'], button:not(h3 button, [data-slot='icon-segmented-control-item'])"
+    );
+    const rows = new Map<number, number>();
+
+    for (const control of controls) {
+      const box = control.getBoundingClientRect();
+      const top = Math.round(box.top + box.height / 2);
+
+      rows.set(top, Math.max(rows.get(top) ?? 0, box.right));
+    }
+
+    return [...rows.entries()]
+      .map(([top, right]) => ({
+        offset: Math.round(right - contentRight),
+        top,
+      }))
+      .filter((row) => Math.abs(row.offset) > 0.5);
+  });
+};
+
+test("every control stays inside the panel's right edge", async ({ page }) => {
   await page.setViewportSize({ height: 900, width: 1440 });
   await gotoEditor(page);
   await loadTallSelection(page);
 
   await expect(
-    page.getByRole("combobox", { name: "Stroke join" })
+    page.getByRole("button", { name: "Stroke settings" })
   ).toBeVisible();
-  await expect(page.getByRole("combobox", { name: "Paint kind" })).toHaveCount(
-    2
-  );
   expect(await measureControlOverflow(page)).toEqual([]);
 });
 
@@ -111,7 +137,7 @@ test("section add buttons center their icon", async ({ page }) => {
 });
 
 test("a tall panel scrolls inside the window", async ({ page }) => {
-  await page.setViewportSize({ height: 640, width: 1280 });
+  await page.setViewportSize({ height: 420, width: 1280 });
   await gotoEditor(page);
   await loadTallSelection(page);
 
@@ -128,11 +154,133 @@ test("a tall panel scrolls inside the window", async ({ page }) => {
     return element.scrollHeight > element.clientHeight;
   });
 
-  expect(panelBottom).toBeLessThanOrEqual(640);
+  expect(panelBottom).toBeLessThanOrEqual(420);
   expect(overflows).toBe(true);
   await expect(lastControl).not.toBeInViewport();
 
   await body.hover();
   await page.mouse.wheel(0, 4000);
   await expect(lastControl).toBeInViewport();
+});
+
+test("rows share one right edge and the panel fits the window", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 640, width: 1280 });
+  await gotoEditor(page);
+  await loadTallSelection(page);
+
+  const body = page.getByTestId("properties-panel-body");
+
+  await expect(body.getByRole("slider", { name: "Bend" })).toBeAttached();
+  expect(await measureRowRightEdges(page)).toEqual([]);
+
+  const bottom = await body.evaluate((element) => {
+    return element.getBoundingClientRect().bottom;
+  });
+
+  expect(bottom).toBeLessThanOrEqual(640);
+
+  // The last control in the panel is fully reachable.
+  await body.hover();
+  await page.mouse.wheel(0, 4000);
+  await expect(body.getByRole("button", { name: "Clear warp" })).toBeInViewport(
+    { ratio: 1 }
+  );
+});
+
+test("warp type icons stay legible inside their segments", async ({ page }) => {
+  await gotoEditor(page);
+  await loadTallSelection(page);
+
+  const sizes = await page
+    .getByTestId("properties-panel-body")
+    .locator("[data-slot='icon-segmented-control-item']")
+    .evaluateAll((items) => {
+      return items.map((item) => {
+        const icon = item.querySelector("svg")?.getBoundingClientRect();
+
+        return {
+          icon: icon?.width ?? 0,
+          item: item.getBoundingClientRect().height,
+        };
+      });
+    });
+
+  expect(sizes).toHaveLength(4);
+  for (const { icon, item } of sizes) {
+    expect(icon).toBeGreaterThanOrEqual(20);
+    expect(icon).toBeLessThan(item);
+  }
+});
+
+test("stroke settings open beside the panel and edit the stroke", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 900, width: 1440 });
+  await gotoEditor(page);
+  await loadTallSelection(page);
+
+  // Settings live in the popover, not inline.
+  await expect(page.getByRole("combobox", { name: "Stroke join" })).toHaveCount(
+    0
+  );
+  await page.getByRole("button", { name: "Stroke settings" }).click();
+
+  const align = page.getByRole("combobox", { name: "Stroke alignment" });
+
+  await expect(align).toBeVisible();
+
+  const [popupRight, panelLeft] = await Promise.all([
+    align.evaluate((element) => {
+      return (
+        element.closest("[data-slot='popover-popup']")?.getBoundingClientRect()
+          .right ?? Number.POSITIVE_INFINITY
+      );
+    }),
+    page
+      .locator("[data-properties-panel]")
+      .evaluate((element) => element.getBoundingClientRect().left),
+  ]);
+
+  expect(popupRight).toBeLessThanOrEqual(panelLeft);
+
+  await align.click();
+  await page.getByRole("option", { name: "Inside" }).click();
+  // Picking an option must not reach the canvas: a deselect there remounts
+  // the row and closes its settings.
+  await expect(page.getByRole("dialog", { name: "Stroke" })).toBeVisible();
+  await expect
+    .poll(() => {
+      return page.evaluate((nodeId) => {
+        const editor = window.__PUNCHPRESS_EDITOR__;
+
+        return [
+          editor?.getNode(nodeId)?.appearance?.strokes[0]?.align,
+          editor?.selectedNodeIds,
+        ];
+      }, TEXT_ID);
+    })
+    .toEqual(["inside", [TEXT_ID]]);
+
+  // Pressing the popup's own chrome keeps the selection and the popup.
+  const dialog = page.getByRole("dialog", { name: "Stroke" });
+
+  await dialog.getByText("Stroke", { exact: true }).click();
+  await expect(dialog).toBeVisible();
+  expect(
+    await page.evaluate(() => window.__PUNCHPRESS_EDITOR__?.selectedNodeIds)
+  ).toEqual([TEXT_ID]);
+});
+
+test("section headers collapse their rows", async ({ page }) => {
+  await gotoEditor(page);
+  await loadTallSelection(page);
+
+  const fills = page.getByTestId("appearance-fills");
+
+  await expect(fills.getByTestId("appearance-fills-item")).toHaveCount(1);
+  await fills.getByRole("button", { exact: true, name: "Fill" }).click();
+  await expect(fills.getByTestId("appearance-fills-item")).toHaveCount(0);
+  await expect(fills.getByRole("button", { name: "Add fill" })).toBeVisible();
 });
