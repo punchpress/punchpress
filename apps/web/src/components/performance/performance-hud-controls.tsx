@@ -33,19 +33,17 @@ export const PerformanceHudControls = () => {
   return (
     <div className="ml-auto grid min-w-[18rem] shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 py-2.5 pr-12 pl-4">
       <PerformanceScenarioSelect
-        className="h-7 min-w-0 text-xs"
         onValueChange={controller.setSelectedBenchmarkId}
         options={benchmarkOptions}
-        size="sm"
         value={selectedBenchmarkId}
       />
       <Button
-        className="h-7 shrink-0 whitespace-nowrap px-2.5 text-xs leading-none [&_svg]:mx-0"
+        className="[&_svg]:mx-0"
         disabled={!selectedBenchmark || benchmarkStatus === "running"}
         onClick={() => {
           requestBenchmarkRun(selectedBenchmark);
         }}
-        size="sm"
+        size="field"
         variant="outline"
       >
         <PlayIcon className="size-3.5 shrink-0 fill-current stroke-none" />

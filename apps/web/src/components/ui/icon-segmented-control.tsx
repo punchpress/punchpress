@@ -20,14 +20,17 @@ function IconSegmentedControl({ className, variant = "filled", ...props }) {
 }
 
 // `field` follows the density tokens in global.css.
-function IconSegmentedControlItem({ className, size = "default", ...props }) {
+const ICON_SEGMENTED_CONTROL_ITEM_SIZE_CLASSES = {
+  field:
+    "h-(--field-segment-height) rounded-(--field-radius) [&_svg]:size-(--field-segment-icon)",
+};
+
+function IconSegmentedControlItem({ className, size = "field", ...props }) {
   return (
     <BaseToggle
       className={cn(
         "inline-flex w-full cursor-pointer items-center justify-center border border-transparent p-0 text-foreground outline-none transition-[border-color,background-color] hover:bg-accent focus-visible:border-ring disabled:pointer-events-none disabled:opacity-64 data-pressed:bg-muted dark:data-pressed:bg-input/32 dark:hover:bg-input/64 [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg]:pointer-events-none [&_svg]:shrink-0",
-        size === "field"
-          ? "h-(--field-segment-height) rounded-(--field-radius) [&_svg]:size-(--field-segment-icon)"
-          : "h-8 rounded-lg [&_svg]:size-5.5",
+        ICON_SEGMENTED_CONTROL_ITEM_SIZE_CLASSES[size],
         className
       )}
       data-slot="icon-segmented-control-item"

@@ -16,8 +16,7 @@ interface ColorPickerFieldProps {
   onInteractionEnd?: () => void;
   onInteractionStart?: () => void;
   placeholder?: string;
-  // `field` follows the density tokens in global.css.
-  size?: "default" | "field";
+  size?: "field";
   stateKey?: string;
   value?: string | null;
 }
@@ -47,6 +46,15 @@ const CHECKERBOARD_STYLE = {
     "conic-gradient(var(--color-neutral-200) 0 25%, var(--color-white) 0 50%, var(--color-neutral-200) 0 75%, var(--color-white) 0)",
   backgroundSize: "8px 8px",
 } as const;
+
+// `field` follows the density tokens in global.css.
+const TRIGGER_SIZE_CLASSES = {
+  field:
+    "text-(length:--field-text) h-(--field-height) rounded-(--field-radius) ps-[calc((var(--field-height)-var(--field-swatch))/2-1px)]",
+};
+const SWATCH_SIZE_CLASSES = {
+  field: "size-(--field-swatch) rounded-(--field-swatch-radius)",
+};
 
 const HASH_PREFIX_REGEX = /^#/;
 
@@ -104,7 +112,7 @@ const ColorPickerField = ({
   onInteractionEnd,
   onInteractionStart,
   placeholder,
-  size = "default",
+  size = "field",
   stateKey = "default",
   value,
 }: ColorPickerFieldProps) => {
@@ -372,7 +380,7 @@ const ColorValueTrigger = ({
   placeholder?: string;
   setHexDraftValue: (value: string) => void;
   setOpacityDraftValue: (value: string) => void;
-  size: "default" | "field";
+  size: "field";
   value?: string | null;
 }) => {
   const hexInputRef = useRef<HTMLInputElement>(null);
@@ -426,9 +434,7 @@ const ColorValueTrigger = ({
     <Popover.Trigger
       className={cn(
         "relative inline-flex min-w-0 flex-1 cursor-pointer items-center border border-[var(--control-border)] bg-[var(--control-surface)] text-foreground outline-none transition-[border-color,background-color] hover:border-[var(--control-border-hover)] hover:bg-[var(--control-surface-hover)] focus-visible:border-[var(--control-border-focus)] data-popup-open:border-[var(--control-border-focus)]",
-        size === "field"
-          ? "text-(length:--field-text) h-(--field-height) rounded-(--field-radius) ps-[calc((var(--field-height)-var(--field-swatch))/2-1px)]"
-          : "min-h-8.5 rounded-lg ps-1.5 text-base sm:min-h-7.5 sm:text-sm"
+        TRIGGER_SIZE_CLASSES[size]
       )}
       data-slot="color-picker-trigger"
       nativeButton={false}
@@ -437,9 +443,7 @@ const ColorValueTrigger = ({
       <span
         className={cn(
           "relative -ms-px shrink-0 overflow-hidden shadow-[0_0_0_1px_rgb(0_0_0_/_0.12)] dark:shadow-[0_0_0_1px_rgb(255_255_255_/_0.14)]",
-          size === "field"
-            ? "size-(--field-swatch) rounded-(--field-swatch-radius)"
-            : "size-5.5 rounded-full"
+          SWATCH_SIZE_CLASSES[size]
         )}
       >
         <span className="absolute inset-0" style={CHECKERBOARD_STYLE} />

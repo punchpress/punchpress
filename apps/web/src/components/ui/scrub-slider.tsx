@@ -24,7 +24,7 @@ interface ScrubSliderProps {
   preserveTypedValue?: boolean;
   scrubMax?: number;
   scrubMin?: number;
-  size?: "default" | "field";
+  size?: "field";
   step?: number;
   value: number;
   valueBadge?: string | null;
@@ -32,12 +32,10 @@ interface ScrubSliderProps {
 
 // `field` follows the density tokens in global.css.
 const SCRUB_SIZE_CLASSES = {
-  default: "h-8 rounded-full px-4 text-base sm:text-sm",
   field:
     "h-(--field-height) rounded-(--field-scrub-radius) px-(--field-px) text-(length:--field-text)",
 };
 const SCRUB_INDICATOR_INSET_CLASSES = {
-  default: "top-2 bottom-2",
   field: "inset-y-1/4",
 };
 
@@ -338,7 +336,7 @@ export const ScrubSlider = (props: ScrubSliderProps) => {
     preserveDisplayValueWhileDragging = false,
     scrubMax = max,
     scrubMin = min,
-    size = "default",
+    size = "field",
     step = 1,
     value,
     valueBadge = null,

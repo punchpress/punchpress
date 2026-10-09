@@ -316,7 +316,7 @@ export const CanvasRasterCropOverlay = () => {
           data-raster-crop-overlay="true"
           data-testid="raster-crop-done"
           onClick={() => editor.commitCrop()}
-          size="sm"
+          size="chrome"
           style={{
             left: previewRect.x + previewRect.width / 2,
             top: previewRect.y + previewRect.height + 16 / zoom,

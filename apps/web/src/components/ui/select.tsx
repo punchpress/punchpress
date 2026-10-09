@@ -1,8 +1,6 @@
 "use client";
 
-import { mergeProps } from "@base-ui/react/merge-props";
 import { Select as BaseSelectPrimitive } from "@base-ui/react/select";
-import { useRender } from "@base-ui/react/use-render";
 import { cva } from "class-variance-authority";
 import {
   CheckIcon,
@@ -32,17 +30,13 @@ const selectTriggerVariants = cva(
   "relative inline-flex w-full min-w-0 select-none items-center justify-between border border-[var(--control-border)] bg-[var(--control-surface)] text-left text-foreground outline-none transition-[border-color,background-color] pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 hover:border-[var(--control-border-hover)] hover:bg-[var(--control-surface-hover)] focus-visible:border-[var(--control-border-focus)] aria-invalid:border-destructive/36 focus-visible:aria-invalid:border-destructive data-disabled:pointer-events-none data-disabled:opacity-64 data-disabled:hover:border-[var(--control-border)] [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     defaultVariants: {
-      size: "default",
+      size: "field",
     },
     variants: {
       size: {
-        default:
-          "min-h-8.5 gap-2 rounded-lg px-[calc(--spacing(3)-1px)] text-base sm:min-h-7.5 sm:text-sm",
         // Follows the density tokens in global.css.
         field:
           "text-(length:--field-text) h-(--field-height) gap-1 rounded-(--field-radius) px-(--field-px) [&_[data-slot=select-icon]_svg]:me-0 [&_[data-slot=select-icon]_svg]:size-3.5",
-        lg: "min-h-9.5 gap-2 rounded-lg px-[calc(--spacing(3)-1px)] text-base sm:min-h-8.5 sm:text-sm",
-        sm: "min-h-8 gap-1.5 rounded-lg px-[calc(--spacing(2.5)-1px)] text-base sm:min-h-7.5 sm:text-sm",
       },
     },
   }
@@ -50,31 +44,7 @@ const selectTriggerVariants = cva(
 
 const selectTriggerIconClassName = "-me-1 size-4.5 opacity-80 sm:size-4";
 
-function SelectButton({ className, size, render, children, ...props }) {
-  const typeValue = render ? undefined : "button";
-
-  const defaultProps = {
-    children: (
-      <>
-        <span className="flex-1 truncate in-data-placeholder:text-muted-foreground/72">
-          {children}
-        </span>
-        <ChevronsUpDownIcon className={selectTriggerIconClassName} />
-      </>
-    ),
-    className: cn(selectTriggerVariants({ size }), "min-w-0", className),
-    "data-slot": "select-button",
-    type: typeValue,
-  };
-
-  return useRender({
-    defaultTagName: "button",
-    props: mergeProps(defaultProps, props),
-    render,
-  });
-}
-
-function SelectTrigger({ className, size = "default", children, ...props }) {
+function SelectTrigger({ className, size = "field", children, ...props }) {
   return (
     <BaseSelectPrimitive.Trigger
       className={cn(selectTriggerVariants({ size }), className)}
@@ -314,7 +284,6 @@ function SelectGroupLabel(props) {
 export {
   Select,
   SelectTrigger,
-  SelectButton,
   selectTriggerVariants,
   SelectValue,
   SelectPopup,

@@ -26,7 +26,7 @@ export const LayersMainMenu = ({
     <Menu modal={false}>
       <Button
         aria-label="Open main menu"
-        className="group h-11 rounded-xl px-0 hover:bg-transparent data-pressed:bg-transparent"
+        className="group h-8 rounded-xl px-0 hover:bg-transparent data-pressed:bg-transparent"
         render={<MenuTrigger />}
         style={{
           marginLeft: "var(--shell-logo-offset-x, 0px)",

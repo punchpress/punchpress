@@ -168,7 +168,7 @@ const ToastCard = ({
 
         {toast.actionProps ? (
           <BaseToast.Action
-            className={cn(buttonVariants({ size: "xs" }), "shrink-0")}
+            className={cn(buttonVariants({ size: "chrome" }), "shrink-0")}
             data-slot="toast-action"
           >
             {toast.actionProps.children}

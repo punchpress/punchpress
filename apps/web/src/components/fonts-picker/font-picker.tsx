@@ -136,10 +136,10 @@ export const FontPicker = ({
         >
           <div className="border-border border-b px-2 py-2">
             <div className="relative block">
-              <SearchIcon className="pointer-events-none absolute top-1/2 left-3 z-10 size-4 -translate-y-1/2 text-muted-foreground/80" />
+              <SearchIcon className="pointer-events-none absolute start-(--menu-item-px) top-1/2 z-10 size-(--chrome-icon) -translate-y-1/2 text-muted-foreground/80" />
               <Input
                 aria-label="Search fonts"
-                className="[&_input]:px-10"
+                className="[&_input]:ps-[calc(var(--menu-item-px)+var(--chrome-icon)+--spacing(1.5))]"
                 nativeInput
                 onChange={(event) => setQuery(event.target.value)}
                 onKeyDown={(event) => {
@@ -175,7 +175,7 @@ export const FontPicker = ({
                 onClick={() => {
                   onRequestFonts();
                 }}
-                size="sm"
+                size="chrome"
                 type="button"
                 variant="outline"
               >

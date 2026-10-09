@@ -8,25 +8,20 @@ interface PerformanceScenarioOption {
 }
 
 export const PerformanceScenarioSelect = ({
-  className,
   onValueChange,
   options,
-  size = "default",
   value,
 }: {
-  className?: string;
   onValueChange: (value: string) => void;
   options: PerformanceScenarioOption[];
-  size?: "default" | "lg" | "sm";
   value: string;
 }) => {
   return (
     <div className="relative min-w-0">
       <select
         className={cn(
-          selectTriggerVariants({ size }),
-          "appearance-none pr-8",
-          className
+          selectTriggerVariants({ size: "field" }),
+          "appearance-none pe-6"
         )}
         onChange={(event) => onValueChange(event.target.value)}
         value={value}
@@ -37,7 +32,7 @@ export const PerformanceScenarioSelect = ({
           </option>
         ))}
       </select>
-      <ChevronsUpDownIcon className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 opacity-80" />
+      <ChevronsUpDownIcon className="pointer-events-none absolute end-(--field-px) top-1/2 size-3.5 -translate-y-1/2 opacity-80" />
     </div>
   );
 };

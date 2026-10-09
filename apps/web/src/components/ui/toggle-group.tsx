@@ -16,10 +16,10 @@ function ToggleGroup({ className, ...props }) {
   );
 }
 
-function Toggle({ className, variant, size, ...props }) {
+function Toggle({ className, size, ...props }) {
   return (
     <BaseToggle
-      className={cn(toggleVariants({ className, size, variant }))}
+      className={cn(toggleVariants({ className, size }))}
       data-slot="toggle"
       {...props}
     />

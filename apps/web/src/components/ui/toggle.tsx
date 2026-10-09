@@ -1,49 +1,38 @@
 "use client";
 
-import { Toggle as BaseTogglePrimitive } from "@base-ui/react/toggle";
+import { Toggle as BaseToggle } from "@base-ui/react/toggle";
 import { cva } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
-const TogglePrimitive = BaseTogglePrimitive;
-
 const toggleVariants = cva(
-  "relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg border font-medium text-base text-foreground outline-none transition-[border-color,background-color] before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 hover:bg-accent focus-visible:border-ring disabled:pointer-events-none disabled:opacity-64 data-pressed:bg-input/64 data-pressed:text-accent-foreground sm:text-sm [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:-mx-0.5 [&_svg]:shrink-0",
+  "relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-transparent font-medium text-base text-foreground outline-none transition-[border-color,background-color] before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11 hover:bg-accent focus-visible:border-ring disabled:pointer-events-none disabled:opacity-64 data-pressed:bg-input/64 data-pressed:text-accent-foreground sm:text-sm [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:-mx-0.5 [&_svg]:shrink-0",
   {
     defaultVariants: {
-      size: "default",
-      variant: "default",
+      size: "field",
     },
     variants: {
       size: {
-        default: "h-9 min-w-9 px-[calc(--spacing(2)-1px)] sm:h-8 sm:min-w-8",
         // `field` sizes follow the field tokens in global.css.
         field:
-          "text-(length:--field-text) sm:text-(length:--field-text) h-(--field-height) min-w-(--field-height) rounded-(--field-radius) px-(--field-px) before:rounded-[calc(var(--field-radius)-1px)] sm:h-(--field-height) sm:min-w-(--field-height)",
+          "text-(length:--field-text) sm:text-(length:--field-text) h-(--field-height) min-w-(--field-height) rounded-(--field-radius) px-(--field-px) before:rounded-[calc(var(--field-radius)-1px)]",
         "icon-field":
-          "size-(--field-icon-button) min-w-(--field-icon-button) rounded-(--field-radius) p-0 before:rounded-[calc(var(--field-radius)-1px)] sm:size-(--field-icon-button) sm:min-w-(--field-icon-button) [&_svg:not([class*='size-'])]:size-3.5 sm:[&_svg:not([class*='size-'])]:size-3.5",
+          "size-(--field-icon-button) min-w-(--field-icon-button) rounded-(--field-radius) p-0 before:rounded-[calc(var(--field-radius)-1px)] [&_svg:not([class*='size-'])]:size-3.5 sm:[&_svg:not([class*='size-'])]:size-3.5",
         "icon-toolbar":
-          "size-(--toolbar-button) min-w-(--toolbar-button) rounded-(--chrome-radius) p-0 before:rounded-[calc(var(--chrome-radius)-1px)] sm:size-(--toolbar-button) sm:min-w-(--toolbar-button) [&_svg:not([class*='size-'])]:size-(--toolbar-icon) sm:[&_svg:not([class*='size-'])]:size-(--toolbar-icon)",
-        lg: "h-10 min-w-10 px-[calc(--spacing(2.5)-1px)] sm:h-9 sm:min-w-9",
-        sm: "h-8 min-w-8 px-[calc(--spacing(1.5)-1px)] sm:h-7 sm:min-w-7",
-      },
-      variant: {
-        default: "border-transparent",
-        outline:
-          "border-input bg-background not-dark:bg-clip-padding shadow-xs/5 not-disabled:not-active:not-data-pressed:before:shadow-[0_1px_--theme(--color-black/4%)] dark:bg-input/32 dark:data-pressed:bg-input dark:hover:bg-input/64 dark:not-disabled:not-active:not-data-pressed:before:shadow-[0_-1px_--theme(--color-white/6%)] dark:not-disabled:not-data-pressed:before:shadow-[0_-1px_--theme(--color-white/2%)] [:disabled,:active,[data-pressed]]:shadow-none",
+          "size-(--toolbar-button) min-w-(--toolbar-button) rounded-(--chrome-radius) p-0 before:rounded-[calc(var(--chrome-radius)-1px)] [&_svg:not([class*='size-'])]:size-(--toolbar-icon) sm:[&_svg:not([class*='size-'])]:size-(--toolbar-icon)",
       },
     },
   }
 );
 
-function Toggle({ className, variant, size, ...props }) {
+function Toggle({ className, size, ...props }) {
   return (
-    <BaseTogglePrimitive
-      className={cn(toggleVariants({ className, size, variant }))}
+    <BaseToggle
+      className={cn(toggleVariants({ className, size }))}
       data-slot="toggle"
       {...props}
     />
   );
 }
 
-export { Toggle, TogglePrimitive, toggleVariants };
+export { Toggle, toggleVariants };
