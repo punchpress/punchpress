@@ -440,6 +440,7 @@ const ColorValueTrigger = ({
           ? "text-(length:--field-text) h-(--field-height) rounded-(--field-radius) ps-[calc((var(--field-height)-var(--field-swatch))/2-1px)]"
           : "min-h-8.5 rounded-lg ps-1.5 text-base sm:min-h-7.5 sm:text-sm"
       )}
+      data-slot="color-picker-trigger"
       nativeButton={false}
       render={<div />}
     >

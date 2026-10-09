@@ -155,6 +155,17 @@ export const FieldPair = ({
   );
 };
 
+// A stack that differs across the selection: says so, and offers the
+// action that unifies it. Always labeled, whatever the label placement.
+export const MixedRow = ({ children }: { children: React.ReactNode }) => {
+  return (
+    <div className="flex min-w-0 items-center justify-between gap-2">
+      <span className={LABEL_CLASS}>Mixed</span>
+      {children}
+    </div>
+  );
+};
+
 export const ColorField = ({
   onChange,
   onInteractionEnd,

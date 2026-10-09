@@ -36,6 +36,10 @@ const SCRUB_SIZE_CLASSES = {
   field:
     "h-(--field-height) rounded-(--field-scrub-radius) px-(--field-px) text-(length:--field-text)",
 };
+const SCRUB_INDICATOR_INSET_CLASSES = {
+  default: "top-2 bottom-2",
+  field: "inset-y-1/4",
+};
 
 const SCRUB_PERCENT_PADDING = 4;
 const SCRUB_PERCENT_SPAN = 100 - SCRUB_PERCENT_PADDING * 2;
@@ -505,7 +509,8 @@ export const ScrubSlider = (props: ScrubSliderProps) => {
           />
           <div
             className={cn(
-              "absolute inset-y-1/4 w-0.5 -translate-x-1/2 rounded-full",
+              "absolute w-0.5 -translate-x-1/2 rounded-full",
+              SCRUB_INDICATOR_INSET_CLASSES[size],
               isDragging
                 ? "bg-foreground/45"
                 : "bg-foreground/24 group-hover:bg-foreground/36"

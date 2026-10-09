@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
+  PopoverTitle,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -132,15 +133,15 @@ const LayerSettingsPopover = ({
       <PopoverContent
         align="start"
         anchor={anchor}
-        className="w-64 p-3 [--field-label-width:56px]"
+        className="max-h-(--available-height) w-64 overflow-y-auto p-3 [--field-label-width:56px]"
         side="left"
         sideOffset={8}
       >
         <FieldLabelsProvider labels="left">
           <div className="grid gap-(--field-gap)">
-            <p className="text-(length:--section-title-text) mb-1 font-semibold text-foreground">
+            <PopoverTitle className="text-(length:--section-title-text) mb-1">
               {title}
-            </p>
+            </PopoverTitle>
             {children}
           </div>
         </FieldLabelsProvider>

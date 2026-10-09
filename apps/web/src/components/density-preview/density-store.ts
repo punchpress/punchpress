@@ -8,7 +8,13 @@ const isDensityId = (value: unknown): value is DensityId => {
   return DENSITY_DIRECTIONS.some((direction) => direction.id === value);
 };
 
+// Production builds always render the current density; only dev builds
+// carry the switcher, so only they honor a stored choice.
 const readStoredDensity = (): DensityId => {
+  if (!import.meta.env.DEV) {
+    return "current";
+  }
+
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
 

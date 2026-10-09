@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useEditor } from "../../../../editor-react/use-editor";
 import { useEditorValue } from "../../../../editor-react/use-editor-value";
 import { usePerformanceRenderCounter } from "../../../../performance/use-performance-render-counter";
-import { FieldRow, Section } from "../field-primitives";
+import { MixedRow, Section } from "../field-primitives";
 
 // Shows the selection's effect owners (a vector child path routes to its
 // vector). Multi-selections share a stack only when every stack is equal apart
@@ -55,7 +55,7 @@ export const EffectsRoot = ({ children }) => {
       title="Effects"
     >
       {selection.isMixed ? (
-        <FieldRow label="Mixed">
+        <MixedRow>
           <Button
             onClick={() => {
               editor.setEffects(editor.getSelectionEffects().effects);
@@ -65,7 +65,7 @@ export const EffectsRoot = ({ children }) => {
           >
             Use first
           </Button>
-        </FieldRow>
+        </MixedRow>
       ) : (
         <Fragment key={selection.scopeKey}>{children}</Fragment>
       )}

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useEditor } from "../../../../editor-react/use-editor";
 import { useEditorValue } from "../../../../editor-react/use-editor-value";
 import { usePerformanceRenderCounter } from "../../../../performance/use-performance-render-counter";
-import { FieldRow, Section } from "../field-primitives";
+import { MixedRow, Section } from "../field-primitives";
 
 // Shows the selection's shared stack. Multi-selections share a stack only when
 // every stack is equal apart from layer ids; otherwise the lists are replaced
@@ -45,7 +45,7 @@ const AppearanceMixed = () => {
 
   return (
     <Section title="Appearance">
-      <FieldRow label="Mixed">
+      <MixedRow>
         <Button
           disabled={!canUseFirst}
           onClick={() => {
@@ -60,7 +60,7 @@ const AppearanceMixed = () => {
         >
           Use first
         </Button>
-      </FieldRow>
+      </MixedRow>
     </Section>
   );
 };

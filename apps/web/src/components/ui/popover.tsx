@@ -42,4 +42,14 @@ function PopoverContent({
   );
 }
 
-export { Popover, PopoverContent, PopoverTrigger };
+function PopoverTitle({ className, ...props }) {
+  return (
+    <BasePopoverPrimitive.Title
+      className={cn("font-semibold text-foreground", className)}
+      data-slot="popover-title"
+      {...props}
+    />
+  );
+}
+
+export { Popover, PopoverContent, PopoverTitle, PopoverTrigger };
