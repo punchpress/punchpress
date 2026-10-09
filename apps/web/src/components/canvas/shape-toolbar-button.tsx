@@ -7,26 +7,25 @@ import {
 import { ChevronUpIcon } from "lucide-react";
 import { useRef, useState } from "react";
 import { Menu, MenuItem, MenuPopup, MenuShortcut } from "@/components/ui/menu";
-import { cn } from "@/lib/utils";
+import { Toggle } from "@/components/ui/toggle";
+import { ToolbarButton } from "@/components/ui/toolbar";
 import { useEditor } from "../../editor-react/use-editor";
 import { useEditorValue } from "../../editor-react/use-editor-value";
 
 const SHAPE_OPTIONS = [
   {
     icon: SquareIcon,
-    iconSize: 16,
     key: "polygon",
     label: "Rectangle",
     shortcut: "R",
   },
   {
     icon: CircleIcon,
-    iconSize: 16,
     key: "ellipse",
     label: "Ellipse",
     shortcut: "O",
   },
-  { icon: StarIcon, iconSize: 16, key: "star", label: "Star", shortcut: "S" },
+  { icon: StarIcon, key: "star", label: "Star", shortcut: "S" },
 ];
 
 export const ShapeToolbarButton = () => {
@@ -63,32 +62,32 @@ export const ShapeToolbarButton = () => {
       }}
       open={open}
     >
-      <button
+      <ToolbarButton
         aria-label={`${activeOption.label} (${activeOption.shortcut})`}
-        className={cn(
-          "relative inline-flex h-9 shrink-0 cursor-pointer select-none items-center rounded-lg border border-transparent text-foreground outline-none transition-[border-color,background-color] hover:bg-accent sm:h-8",
-          isActive && "bg-input/64 text-accent-foreground"
-        )}
-        onClick={() => editor.setActiveTool("shape")}
         onMouseEnter={handleEnter}
         onMouseLeave={handleLeave}
         ref={anchorRef}
-        title={`${activeOption.label} (${activeOption.shortcut})`}
-        type="button"
-      >
-        <span className="inline-flex h-full items-center justify-center pr-0.5 pl-2">
-          <HugeiconsIcon
-            className="opacity-80"
-            color="currentColor"
-            icon={activeOption.icon}
-            size={activeOption.iconSize ?? 20}
-            strokeWidth={1.6}
+        render={
+          <Toggle
+            onPressedChange={(pressed) => {
+              if (pressed) {
+                editor.setActiveTool("shape");
+              }
+            }}
+            pressed={isActive}
+            size="icon-toolbar"
           />
-        </span>
-        <span className="inline-flex h-full items-center justify-center pr-1.5 pl-0.5">
-          <ChevronUpIcon className="size-3 opacity-60" />
-        </span>
-      </button>
+        }
+        title={`${activeOption.label} (${activeOption.shortcut})`}
+      >
+        <HugeiconsIcon
+          color="currentColor"
+          icon={activeOption.icon}
+          strokeWidth={1.6}
+        />
+        {/* Corner flyout mark; right-1 absorbs the toggle's -mx-0.5 svg margin. */}
+        <ChevronUpIcon className="absolute right-1 bottom-0.5 size-2 opacity-60" />
+      </ToolbarButton>
 
       <MenuPopup
         align="center"
@@ -110,7 +109,6 @@ export const ShapeToolbarButton = () => {
             <HugeiconsIcon
               color="currentColor"
               icon={option.icon}
-              size={option.iconSize ? option.iconSize * 0.8 : 16}
               strokeWidth={1.6}
             />
             {option.label}

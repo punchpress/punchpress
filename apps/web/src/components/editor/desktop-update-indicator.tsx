@@ -8,6 +8,7 @@ import {
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useDesktopUpdateStatus } from "@/hooks/use-desktop-update-status";
+import { cn } from "@/lib/utils";
 import type { DesktopUpdateStatus } from "@/platform/electron";
 
 export const DesktopUpdateIndicator = () => {
@@ -58,17 +59,16 @@ export const DesktopUpdateIndicator = () => {
     return (
       <output
         aria-live="polite"
-        className="no-drag pointer-events-auto flex h-full shrink-0 translate-y-[3px] items-center gap-1.5 pr-3 text-xs"
+        className="no-drag text-(length:--chrome-text) pointer-events-auto flex h-full shrink-0 translate-y-[3px] items-center gap-1.5 pr-3"
       >
         <HugeiconsIcon
-          className={
-            status.phase === "checking" || status.phase === "downloading"
-              ? "animate-spin"
-              : undefined
-          }
+          className={cn(
+            "size-(--chrome-icon)",
+            (status.phase === "checking" || status.phase === "downloading") &&
+              "animate-spin"
+          )}
           color="currentColor"
           icon={Icon}
-          size={15}
           strokeWidth={2}
         />
         <span>{label}</span>
@@ -109,14 +109,13 @@ export const DesktopUpdateIndicator = () => {
         aria-live="polite"
         disabled={actionState === "preparing"}
         onClick={handleClick}
-        size="sm"
+        size="chrome"
         variant="default"
       >
         <HugeiconsIcon
           className={actionState === "preparing" ? "animate-spin" : undefined}
           color="currentColor"
           icon={Icon}
-          size={16}
           strokeWidth={2}
         />
         <span>{label}</span>

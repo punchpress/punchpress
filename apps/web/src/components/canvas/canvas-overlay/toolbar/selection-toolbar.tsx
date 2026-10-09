@@ -1,11 +1,7 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Fragment, memo } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Toolbar,
-  ToolbarGroup,
-  ToolbarSeparator,
-} from "@/components/ui/toolbar";
+import { Toolbar, ToolbarSeparator } from "@/components/ui/toolbar";
 import {
   Tooltip,
   TooltipContent,
@@ -92,18 +88,14 @@ export const CanvasSelectionToolbar = memo(function CanvasSelectionToolbar() {
               : "pointer-events-auto"
           }
         >
-          <ToolbarGroup>
-            {renderedActions.map((action, index) => {
-              return (
-                <Fragment key={action.id}>
-                  {index > 0 ? (
-                    <ToolbarSeparator orientation="vertical" />
-                  ) : null}
-                  <SelectionToolbarActionButton action={action} />
-                </Fragment>
-              );
-            })}
-          </ToolbarGroup>
+          {renderedActions.map((action, index) => {
+            return (
+              <Fragment key={action.id}>
+                {index > 0 ? <ToolbarSeparator /> : null}
+                <SelectionToolbarActionButton action={action} />
+              </Fragment>
+            );
+          })}
         </Toolbar>
       </div>
     </div>
@@ -123,7 +115,7 @@ const SelectionToolbarActionButton = ({ action }) => {
         event.stopPropagation();
         action.onSelect();
       }}
-      size={action.isIconOnly ? "icon-sm" : "sm"}
+      size={action.isIconOnly ? "icon-toolbar" : "toolbar"}
       title={action.title}
       variant={action.variant}
     >
@@ -131,14 +123,13 @@ const SelectionToolbarActionButton = ({ action }) => {
         <HugeiconsIcon
           color="currentColor"
           icon={action.icon}
-          size={18}
           strokeWidth={1.6}
         />
       ) : (
         action.label
       )}
       {!action.isIconOnly && action.shortcutLabel ? (
-        <span className="rounded bg-foreground/8 px-1.5 py-0.5 text-[11px] text-foreground/50 leading-none">
+        <span className="text-(length:--chrome-text-sm) rounded-(--field-swatch-radius) bg-foreground/8 px-1 py-0.5 text-foreground/50 leading-none">
           {action.shortcutLabel}
         </span>
       ) : null}

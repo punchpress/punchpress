@@ -56,7 +56,7 @@ export const CanvasZoomControl = () => {
       aria-valuemin={MIN_ZOOM * 100}
       aria-valuenow={percent}
       aria-valuetext={`${percent}%`}
-      className="!cursor-ew-resize min-w-12 touch-none select-none px-2 text-muted-foreground tabular-nums"
+      className="!cursor-ew-resize min-w-12 touch-none select-none text-muted-foreground tabular-nums"
       data-scrubbing={isScrubbing ? "true" : undefined}
       onKeyDown={(event) => {
         if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
@@ -107,7 +107,7 @@ export const CanvasZoomControl = () => {
       }}
       onPointerUp={stopScrubbing}
       role="slider"
-      size="sm"
+      size="chrome"
       title="Drag horizontally to zoom"
       type="button"
       variant="ghost"

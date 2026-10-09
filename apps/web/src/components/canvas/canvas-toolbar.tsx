@@ -49,7 +49,6 @@ const PRIMARY_TOOL_CONFIG = [
 
 const TEXT_TOOL = {
   icon: TextFontIcon,
-  iconSize: 25,
   iconLibrary: "hugeicons",
   id: "text",
   label: "Text",
@@ -142,13 +141,12 @@ export const CanvasToolbar = () => {
         <ToolbarButton
           aria-label="Add artboard"
           onClick={() => addArtboardToCurrentView(editor)}
-          render={<Button size="icon-sm" variant="ghost" />}
+          render={<Button size="icon-toolbar" variant="ghost" />}
           title="Add artboard"
         >
           <HugeiconsIcon
             color="currentColor"
             icon={ArtboardToolIcon}
-            size={21}
             strokeWidth={1.6}
           />
         </ToolbarButton>
@@ -160,13 +158,12 @@ export const CanvasToolbar = () => {
         <ToolbarButton
           aria-label="Zoom out"
           onClick={() => editor.zoomOut()}
-          render={<Button size="icon-sm" variant="ghost" />}
+          render={<Button size="icon-toolbar" variant="ghost" />}
           title="Zoom out"
         >
           <HugeiconsIcon
             color="currentColor"
             icon={Remove01Icon}
-            size={18}
             strokeWidth={1.8}
           />
         </ToolbarButton>
@@ -174,13 +171,12 @@ export const CanvasToolbar = () => {
         <ToolbarButton
           aria-label="Zoom in"
           onClick={() => editor.zoomIn()}
-          render={<Button size="icon-sm" variant="ghost" />}
+          render={<Button size="icon-toolbar" variant="ghost" />}
           title="Zoom in"
         >
           <HugeiconsIcon
             color="currentColor"
             icon={Add01Icon}
-            size={18}
             strokeWidth={1.8}
           />
         </ToolbarButton>
@@ -189,7 +185,7 @@ export const CanvasToolbar = () => {
   );
 };
 
-const ToolButton = ({ icon, iconLibrary, iconSize, id, label, shortcut }) => {
+const ToolButton = ({ icon, iconLibrary, id, label, shortcut }) => {
   const editor = useEditor();
   const activeTool = useEditorValue((_, state) => state.activeTool);
   const Icon = icon;
@@ -206,19 +202,15 @@ const ToolButton = ({ icon, iconLibrary, iconSize, id, label, shortcut }) => {
             }
           }}
           pressed={activeTool === id}
+          size="icon-toolbar"
         />
       }
       title={`${label} (${shortcut})`}
     >
       {iconLibrary === "lucide" ? (
-        <Icon size={18} strokeWidth={1.8} />
+        <Icon strokeWidth={1.8} />
       ) : (
-        <HugeiconsIcon
-          color="currentColor"
-          icon={icon}
-          size={iconSize ?? 20}
-          strokeWidth={1.6}
-        />
+        <HugeiconsIcon color="currentColor" icon={icon} strokeWidth={1.6} />
       )}
     </ToolbarButton>
   );

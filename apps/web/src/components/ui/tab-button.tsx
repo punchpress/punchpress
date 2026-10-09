@@ -14,16 +14,24 @@ export const TabButton = ({
 }) => {
   return (
     <div
-      className={cn("group relative h-8 max-w-44 shrink-0 sm:h-7", className)}
+      className={cn(
+        "group relative h-(--tab-height) max-w-44 shrink-0",
+        className
+      )}
     >
       <Button
-        className="h-full w-full min-w-0 justify-start"
+        className={cn(
+          "h-full w-full min-w-0 justify-start sm:h-full",
+          active
+            ? "bg-(--workspace-tab-bg-active) text-(--workspace-tab-text-active) hover:bg-(--workspace-tab-bg-active)"
+            : "bg-(--workspace-tab-bg) text-(--workspace-tab-text) hover:bg-(--workspace-tab-bg-hover)"
+        )}
         onClick={onSelect}
-        size="sm"
+        size="chrome"
         title={title}
-        variant={active ? "secondary" : "ghost"}
+        variant="ghost"
       >
-        <span className="grid size-4 shrink-0 place-items-center">
+        <span className="grid size-(--chrome-icon) shrink-0 place-items-center">
           <span
             className={cn(
               "size-1.5 rounded-full bg-muted-foreground/40",
@@ -38,15 +46,16 @@ export const TabButton = ({
       {closable ? (
         <Button
           aria-label={`Close ${title}`}
-          className="absolute top-1/2 left-[5px] z-10 -translate-y-1/2 opacity-0 pointer-coarse:opacity-100 focus-visible:opacity-100 group-hover:opacity-100"
+          // Centers the close button over the status dot slot.
+          className="absolute top-1/2 left-[calc(var(--menu-item-px)+(var(--chrome-icon)-var(--field-icon-button))/2)] z-10 -translate-y-1/2 opacity-0 pointer-coarse:opacity-100 focus-visible:opacity-100 group-hover:opacity-100"
           onClick={(event) => {
             event.stopPropagation();
             onClose?.();
           }}
-          size="icon-xs"
+          size="icon-field"
           variant="ghost"
         >
-          <XIcon className="size-3.5" />
+          <XIcon />
         </Button>
       ) : null}
     </div>

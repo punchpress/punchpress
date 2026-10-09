@@ -11,7 +11,7 @@ export const WorkspaceTabs = ({ onCloseTab, onNewFile }) => {
   const fileTabs = workspace.tabs.filter((tab) => tab.id !== scratchpadTab?.id);
 
   return (
-    <div className="pointer-events-auto flex h-full min-w-0 flex-1 translate-y-[3px] items-center gap-2 px-2">
+    <div className="pointer-events-auto flex h-full min-w-0 flex-1 translate-y-[3px] items-center gap-1 px-2">
       {scratchpadTab ? (
         <div className="no-drag flex shrink-0 items-center">
           <WorkspaceTab onCloseTab={onCloseTab} tab={scratchpadTab} />
@@ -19,7 +19,7 @@ export const WorkspaceTabs = ({ onCloseTab, onNewFile }) => {
       ) : null}
 
       <div className="flex min-w-0 items-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="no-drag flex min-w-max items-center gap-2">
+        <div className="no-drag flex min-w-max items-center gap-1">
           {fileTabs.map((tab) => (
             <WorkspaceTab key={tab.id} onCloseTab={onCloseTab} tab={tab} />
           ))}
@@ -30,10 +30,10 @@ export const WorkspaceTabs = ({ onCloseTab, onNewFile }) => {
         aria-label="New file"
         className="no-drag shrink-0"
         onClick={onNewFile}
-        size="icon-sm"
+        size="icon-chrome"
         variant="ghost"
       >
-        <PlusIcon className="size-4" />
+        <PlusIcon />
       </Button>
     </div>
   );
