@@ -33,6 +33,22 @@ COSS UI is built on Base UI and Tailwind CSS, which matches the component model 
 4. Do not add Radix UI packages, Radix-based examples, or Radix-specific APIs for new shared UI work.
 5. Keep styling aligned with the existing Tailwind and shadcn-style token usage in the repo.
 
+## Field Density
+
+Inspector controls take `size="field"` (`Input`, `SelectTrigger`, `ScrubSlider`,
+`ColorPickerField`, `Toggle`, `IconSegmentedControlItem`, and `Button` `field` /
+`icon-field`). Field sizes read the `--field-*`, `--panel-*`, and `--section-*`
+tokens in `src/styles/global.css`, so density changes in one token block rather
+than per panel. Properties sections compose `Section`, `FieldRow`, and
+`FieldPair` from `panels/properties/field-primitives.tsx`; stacked layer rows use
+`panels/properties/layer-row.tsx`.
+
+`src/components/density-preview/` is a temporary dev-only comparison of density
+directions (switcher at the bottom left, Alt+Shift+D cycles). Once a direction
+is picked, its token block becomes the `:root` values, its layout choices
+become constants in `field-layout.tsx`, and the folder, the `[data-density]`
+blocks, and `properties-panel-density.spec.ts` are deleted.
+
 ## Migration Guidance
 
 If you find older references to Radix UI in docs, examples, or dependencies, treat them as stale unless the source code proves otherwise.

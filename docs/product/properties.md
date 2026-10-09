@@ -16,6 +16,9 @@ The properties panel edits the active selection.
 - Single selection shows controls for that node.
 - Multi-selection shows shared controls and mixed values.
 - Unsupported controls are hidden instead of guessing.
+- The panel never grows past the window; taller content scrolls inside it.
+  Every control ends at the panel's right content edge, nested layer rows
+  included.
 - Aggregate color controls edit every selected paint that uses the chosen color.
 - Frame dimensions keep empty, incomplete, and invalid drafts local; they never coerce a blank
   draft to zero or a minimum.
