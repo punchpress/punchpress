@@ -319,9 +319,9 @@ test("Frame reveals a mostly occluded Raster as it enters during a held drag", a
       () => window.__PUNCHPRESS_EDITOR__?.getDebugDump().selection.primaryId
     )
   ).toBe("raster");
-  await expect(page.locator('[data-layer-row-id="raster"]')).toHaveCSS(
-    "padding-left",
-    "24px"
+  await expect(page.locator('[data-layer-row-id="raster"]')).toHaveAttribute(
+    "data-layer-depth",
+    "1"
   );
   await expect(rasterCanvas).toHaveAttribute(
     "data-surface-identity",
@@ -408,7 +408,7 @@ test("canvas drag keeps a Raster nested and clipped by its Frame", async ({
   const rasterLayerRow = page.locator('[data-layer-row-id="raster"]');
   await expect(moveable).toBeVisible();
   await expect(rasterCanvas).toBeVisible();
-  await expect(rasterLayerRow).toHaveCSS("padding-left", "24px");
+  await expect(rasterLayerRow).toHaveAttribute("data-layer-depth", "1");
   await rasterCanvas.evaluate((canvas) => {
     canvas.dataset.surfaceIdentity = "frame-child-resident-canvas";
   });
@@ -436,7 +436,7 @@ test("canvas drag keeps a Raster nested and clipped by its Frame", async ({
       () => window.__PUNCHPRESS_EDITOR__?.getNode("raster")?.parentId
     )
   ).toBe("frame");
-  await expect(rasterLayerRow).toHaveCSS("padding-left", "24px");
+  await expect(rasterLayerRow).toHaveAttribute("data-layer-depth", "1");
   await expect(rasterCanvas).toHaveAttribute(
     "data-surface-identity",
     "frame-child-resident-canvas"
@@ -457,7 +457,7 @@ test("canvas drag keeps a Raster nested and clipped by its Frame", async ({
       () => window.__PUNCHPRESS_EDITOR__?.getNode("raster")?.parentId
     )
   ).toBe("frame");
-  await expect(rasterLayerRow).toHaveCSS("padding-left", "24px");
+  await expect(rasterLayerRow).toHaveAttribute("data-layer-depth", "1");
   await expect(rasterCanvas).toHaveAttribute(
     "data-surface-identity",
     "frame-child-resident-canvas"
