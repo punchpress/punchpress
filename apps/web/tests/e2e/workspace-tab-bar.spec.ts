@@ -2,9 +2,9 @@ import { expect, type Page, test } from "@playwright/test";
 import { gotoEditor } from "./helpers/editor";
 
 const BAR_HEIGHT = 40;
-const DESKTOP_LEFT_INSET = 96;
-// Electron trafficLightPosition y 16 plus half the 14px traffic light.
-const TRAFFIC_LIGHT_CENTER_Y = 23;
+const DESKTOP_LEFT_INSET = 88;
+// Content centers on the bar; the desktop traffic lights match it.
+const BAR_CENTER_Y = BAR_HEIGHT / 2;
 
 const fileTabs = (page: Page) =>
   page.locator("[data-slot='tab']:has([data-slot='tab-title'])");
@@ -161,16 +161,17 @@ test.describe("workspace tab bar", () => {
     await gotoEditor(page);
     await addFileTab(page);
 
-    const [title] = await centerY(page, "[data-slot='tab-title']");
-    const [plus] = await centerY(page, "button[aria-label='New file'] svg");
-    const [scratchpad] = await centerY(
-      page,
-      "button[aria-label='Scratchpad'] svg"
-    );
+    const centers = [
+      ...(await centerY(page, "[data-slot='tab-title']")),
+      ...(await centerY(page, "[data-slot='tab-dirty-dot']")),
+      ...(await centerY(page, "button[aria-label='New file'] svg")),
+      ...(await centerY(page, "button[aria-label='Scratchpad'] svg")),
+    ];
 
-    expect(Math.abs(title - BAR_HEIGHT / 2)).toBeLessThanOrEqual(1);
-    expect(Math.abs(plus - title)).toBeLessThanOrEqual(1);
-    expect(Math.abs(scratchpad - title)).toBeLessThanOrEqual(1);
+    expect(centers).toHaveLength(4);
+    for (const center of centers) {
+      expect(Math.abs(center - BAR_CENTER_Y)).toBeLessThanOrEqual(1);
+    }
   });
 
   test("the dirty dot and close share the right slot without moving the title", async ({
@@ -336,11 +337,13 @@ test.describe("desktop title bar", () => {
 
     const centers = [
       ...(await centerY(page, "[data-slot='tab-title']")),
+      ...(await centerY(page, "[data-slot='tab-dirty-dot']")),
       ...(await centerY(page, "button[aria-label='New file'] svg")),
       ...(await centerY(page, "button[aria-label='Scratchpad'] svg")),
     ];
+    expect(centers).toHaveLength(4);
     for (const center of centers) {
-      expect(Math.abs(center - TRAFFIC_LIGHT_CENTER_Y)).toBeLessThanOrEqual(1);
+      expect(Math.abs(center - BAR_CENTER_Y)).toBeLessThanOrEqual(1);
     }
     for (const tab of (await readBarLayout(page)).tabs) {
       expect(tab).toEqual({ height: BAR_HEIGHT, top: 0 });
