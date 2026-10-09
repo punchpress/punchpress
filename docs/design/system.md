@@ -43,8 +43,9 @@ than per panel. Properties sections compose `Section`, `FieldRow`, and
 `FieldPair` from `panels/properties/field-primitives.tsx`; stacked layer rows use
 `panels/properties/layer-row.tsx`.
 
-`src/components/density-preview/` is a temporary dev-only comparison of density
-directions (switcher at the bottom left, Alt+Shift+D cycles). Once a direction
+`src/components/density-preview/` is a temporary comparison of density
+directions. Dev builds show a switcher at the bottom left (Alt+Shift+D cycles)
+and remember the choice; production builds always use `current`. Once a direction
 is picked, its token block becomes the `:root` values, its layout choices
 become constants in `field-layout.tsx`, and the folder, the `[data-density]`
 blocks, and `properties-panel-density.spec.ts` are deleted.
