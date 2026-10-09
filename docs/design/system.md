@@ -37,18 +37,21 @@ COSS UI is built on Base UI and Tailwind CSS, which matches the component model 
 
 Inspector controls take `size="field"` (`Input`, `SelectTrigger`, `ScrubSlider`,
 `ColorPickerField`, `Toggle`, `IconSegmentedControlItem`, and `Button` `field` /
-`icon-field`). Field sizes read the `--field-*`, `--panel-*`, and `--section-*`
-tokens in `src/styles/global.css`, so density changes in one token block rather
-than per panel. Properties sections compose `Section`, `FieldRow`, and
-`FieldPair` from `panels/properties/field-primitives.tsx`; stacked layer rows use
-`panels/properties/layer-row.tsx`.
+`icon-field`; `Toggle` also has `icon-field`). Field sizes read the `--field-*`,
+`--panel-*`, and `--section-*` tokens in `src/styles/global.css`, so density
+changes in one token block rather than per panel.
 
-`src/components/density-preview/` is a temporary comparison of density
-directions. Dev builds show a switcher at the bottom left (Alt+Shift+D cycles)
-and remember the choice; production builds always use `current`. Once a direction
-is picked, its token block becomes the `:root` values, its layout choices
-become constants in `field-layout.tsx`, and the folder, the `[data-density]`
-blocks, and `properties-panel-density.spec.ts` are deleted.
+The density is "Pro": 22px rows, 4px radii, 11px text, a 68px left label
+column, and small uppercase muted section headers that collapse. Icon
+segmented controls run taller (`--field-segment-height`, 28px) so their glyphs
+stay legible at `--field-segment-icon`.
+
+Properties sections compose `Section`, `FieldRow`, and `FieldPair` from
+`panels/properties/field-primitives.tsx`. `FieldPair` puts related scalars
+(X/Y, W/H) on one row under its left label, labels the fields inline, and
+takes an optional trailing `action` such as an aspect lock. Stacked fill,
+stroke, and shadow rows use `panels/properties/layer-row.tsx`; their secondary
+settings open in `LayerRow.Settings`, a popover beside the panel.
 
 ## Migration Guidance
 
