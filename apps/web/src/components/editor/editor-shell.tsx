@@ -20,7 +20,6 @@ import { MissingFontsExportDialog } from "../panels/missing-fonts-export-dialog"
 import { PropertiesPanel } from "../panels/properties/properties-panel";
 import { UnsavedDocumentDialog } from "../panels/unsaved-document-dialog";
 import { PerformanceHud } from "../performance/performance-hud";
-import { UiFontSwitcher } from "../ui-font-preview/ui-font-switcher";
 import { DesktopUpdateIndicator } from "./desktop-update-indicator";
 
 const SHELL_CHROME_VARS = {
@@ -147,7 +146,6 @@ export const EditorShell = () => {
             data-testid="dev-preview-switchers"
           >
             <PanelContainerSwitcher />
-            <UiFontSwitcher />
           </div>
         ) : null}
         <CommandMenu />

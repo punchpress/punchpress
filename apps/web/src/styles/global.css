@@ -1,5 +1,3 @@
-@import "@fontsource-variable/geist";
-@import "@fontsource-variable/geist-mono";
 @import "@fontsource/source-sans-pro";
 
 @import "tailwindcss";
@@ -120,12 +118,15 @@
 }
 
 :root {
+  /* The platform UI face: SF Pro on macOS (the browser picks the Text optical
+     size and its tracking), Segoe UI Variable on Windows. */
   --font-heading:
-    "Geist Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono:
-    "Geist Mono Variable", ui-monospace, SFMono-Regular, "SF Mono", monospace;
+    -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI",
+    system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
   --font-sans:
-    "Geist Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI",
+    system-ui, sans-serif;
   /* OpenType features and tracking for UI text; the canvas resets both. */
   --font-features: normal;
   --ui-tracking: 0;
@@ -750,7 +751,7 @@ body[data-color-picker-open="true"] {
   --section-title-text: 10px;
   --section-title-gap: 4px;
   --section-title-case: uppercase;
-  --section-title-tracking: 0.06em;
+  --section-title-tracking: 0.04em;
   --section-title-color: var(--muted-foreground);
 }
 
