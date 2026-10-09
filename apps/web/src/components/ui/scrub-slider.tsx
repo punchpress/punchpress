@@ -24,10 +24,18 @@ interface ScrubSliderProps {
   preserveTypedValue?: boolean;
   scrubMax?: number;
   scrubMin?: number;
+  size?: "default" | "field";
   step?: number;
   value: number;
   valueBadge?: string | null;
 }
+
+// `field` follows the density tokens in global.css.
+const SCRUB_SIZE_CLASSES = {
+  default: "h-8 rounded-full px-4 text-base sm:text-sm",
+  field:
+    "h-(--field-height) rounded-(--field-scrub-radius) px-(--field-px) text-(length:--field-text)",
+};
 
 const SCRUB_PERCENT_PADDING = 4;
 const SCRUB_PERCENT_SPAN = 100 - SCRUB_PERCENT_PADDING * 2;
@@ -326,6 +334,7 @@ export const ScrubSlider = (props: ScrubSliderProps) => {
     preserveDisplayValueWhileDragging = false,
     scrubMax = max,
     scrubMin = min,
+    size = "default",
     step = 1,
     value,
     valueBadge = null,
@@ -419,7 +428,8 @@ export const ScrubSlider = (props: ScrubSliderProps) => {
       aria-valuenow={value}
       aria-valuetext={ariaValueText}
       className={cn(
-        "canvas-cursor-scroll-horizontal group relative flex h-8 w-full touch-none select-none items-center overflow-hidden rounded-full border border-[var(--control-border)] bg-[var(--control-surface)] px-4 text-base text-foreground outline-none transition-[border-color,background-color] hover:border-[var(--control-border-hover)] hover:bg-[var(--control-surface-hover)] focus-visible:border-[var(--control-border-focus)] sm:text-sm",
+        "canvas-cursor-scroll-horizontal group relative flex w-full touch-none select-none items-center overflow-hidden border border-[var(--control-border)] bg-[var(--control-surface)] text-foreground outline-none transition-[border-color,background-color] hover:border-[var(--control-border-hover)] hover:bg-[var(--control-surface-hover)] focus-visible:border-[var(--control-border-focus)]",
+        SCRUB_SIZE_CLASSES[size],
         disabled && "pointer-events-none opacity-64",
         isDragging &&
           "border-[var(--control-border-hover)] bg-[var(--control-surface-active)]",
@@ -481,36 +491,37 @@ export const ScrubSlider = (props: ScrubSliderProps) => {
       tabIndex={disabled ? -1 : 0}
       title="Drag horizontally to scrub. Double-click or press Enter to type a value."
     >
+      {/* The track starts after an inline label when a field row draws one. */}
       {!isEditing && (
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-y-0 left-0 bg-muted"
-          style={{
-            width: getScrubPercent(value, dragMin, dragMax),
-          }}
-        />
-      )}
-
-      {!isEditing && (
-        <div
-          aria-hidden
-          className={cn(
-            "pointer-events-none absolute top-2 bottom-2 w-0.5 -translate-x-1/2 rounded-full",
-            isDragging
-              ? "bg-foreground/45"
-              : "bg-foreground/24 group-hover:bg-foreground/36"
-          )}
-          data-slot="scrub-slider-indicator"
-          ref={scrubLineRef}
-          style={{
-            left: getScrubPercent(value, dragMin, dragMax),
-          }}
-        />
+          className="pointer-events-none absolute inset-y-0 start-[var(--field-track-start,0px)] end-0"
+        >
+          <div
+            className="absolute inset-y-0 left-0 bg-muted"
+            style={{
+              width: getScrubPercent(value, dragMin, dragMax),
+            }}
+          />
+          <div
+            className={cn(
+              "absolute inset-y-1/4 w-0.5 -translate-x-1/2 rounded-full",
+              isDragging
+                ? "bg-foreground/45"
+                : "bg-foreground/24 group-hover:bg-foreground/36"
+            )}
+            data-slot="scrub-slider-indicator"
+            ref={scrubLineRef}
+            style={{
+              left: getScrubPercent(value, dragMin, dragMax),
+            }}
+          />
+        </div>
       )}
 
       {isEditing ? (
         <input
-          className="relative z-10 h-full w-full min-w-0 bg-transparent leading-8 outline-none"
+          className="relative z-10 h-full w-full min-w-0 bg-transparent ps-(--field-label-inset) outline-none"
           inputMode="decimal"
           onBlur={commitDraftValue}
           onChange={(event) => {

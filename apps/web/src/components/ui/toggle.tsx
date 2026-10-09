@@ -17,6 +17,9 @@ const toggleVariants = cva(
     variants: {
       size: {
         default: "h-9 min-w-9 px-[calc(--spacing(2)-1px)] sm:h-8 sm:min-w-8",
+        // Follows the density tokens in global.css.
+        field:
+          "text-(length:--field-text) sm:text-(length:--field-text) h-(--field-height) min-w-(--field-height) rounded-(--field-radius) px-(--field-px) before:rounded-[calc(var(--field-radius)-1px)] sm:h-(--field-height) sm:min-w-(--field-height)",
         lg: "h-10 min-w-10 px-[calc(--spacing(2.5)-1px)] sm:h-9 sm:min-w-9",
         sm: "h-8 min-w-8 px-[calc(--spacing(1.5)-1px)] sm:h-7 sm:min-w-7",
       },

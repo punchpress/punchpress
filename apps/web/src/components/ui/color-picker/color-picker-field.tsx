@@ -15,6 +15,8 @@ interface ColorPickerFieldProps {
   onInteractionEnd?: () => void;
   onInteractionStart?: () => void;
   placeholder?: string;
+  // `field` follows the density tokens in global.css.
+  size?: "default" | "field";
   stateKey?: string;
   value?: string | null;
 }
@@ -101,6 +103,7 @@ const ColorPickerField = ({
   onInteractionEnd,
   onInteractionStart,
   placeholder,
+  size = "default",
   stateKey = "default",
   value,
 }: ColorPickerFieldProps) => {
@@ -331,6 +334,7 @@ const ColorPickerField = ({
           placeholder={placeholder}
           setHexDraftValue={setHexDraftValue}
           setOpacityDraftValue={setOpacityDraftValue}
+          size={size}
           value={value}
         />
         <Popover.Portal>
@@ -369,6 +373,7 @@ const ColorValueTrigger = ({
   placeholder,
   setHexDraftValue,
   setOpacityDraftValue,
+  size,
   value,
 }: {
   hexDraftValue: string;
@@ -377,6 +382,7 @@ const ColorValueTrigger = ({
   placeholder?: string;
   setHexDraftValue: (value: string) => void;
   setOpacityDraftValue: (value: string) => void;
+  size: "default" | "field";
   value?: string | null;
 }) => {
   const hexInputRef = useRef<HTMLInputElement>(null);
@@ -429,12 +435,22 @@ const ColorValueTrigger = ({
   return (
     <Popover.Trigger
       className={cn(
-        "relative inline-flex min-h-8.5 min-w-0 flex-1 cursor-pointer items-center rounded-lg border border-[var(--control-border)] bg-[var(--control-surface)] ps-1.5 text-base text-foreground outline-none transition-[border-color,background-color] hover:border-[var(--control-border-hover)] hover:bg-[var(--control-surface-hover)] focus-visible:border-[var(--control-border-focus)] data-popup-open:border-[var(--control-border-focus)] sm:min-h-7.5 sm:text-sm"
+        "relative inline-flex min-w-0 flex-1 cursor-pointer items-center border border-[var(--control-border)] bg-[var(--control-surface)] text-foreground outline-none transition-[border-color,background-color] hover:border-[var(--control-border-hover)] hover:bg-[var(--control-surface-hover)] focus-visible:border-[var(--control-border-focus)] data-popup-open:border-[var(--control-border-focus)]",
+        size === "field"
+          ? "text-(length:--field-text) h-(--field-height) rounded-(--field-radius) ps-[calc((var(--field-height)-var(--field-swatch))/2-1px)]"
+          : "min-h-8.5 rounded-lg ps-1.5 text-base sm:min-h-7.5 sm:text-sm"
       )}
       nativeButton={false}
       render={<div />}
     >
-      <span className="relative -ms-px size-5.5 shrink-0 overflow-hidden rounded-full shadow-[0_0_0_1px_rgb(0_0_0_/_0.12)] dark:shadow-[0_0_0_1px_rgb(255_255_255_/_0.14)]">
+      <span
+        className={cn(
+          "relative -ms-px shrink-0 overflow-hidden shadow-[0_0_0_1px_rgb(0_0_0_/_0.12)] dark:shadow-[0_0_0_1px_rgb(255_255_255_/_0.14)]",
+          size === "field"
+            ? "size-(--field-swatch) rounded-(--field-swatch-radius)"
+            : "size-5.5 rounded-full"
+        )}
+      >
         <span className="absolute inset-0" style={CHECKERBOARD_STYLE} />
         <span
           className="absolute inset-0"

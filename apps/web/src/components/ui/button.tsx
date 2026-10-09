@@ -16,7 +16,12 @@ const buttonVariants = cva(
     variants: {
       size: {
         default: "h-9 px-[calc(--spacing(3)-1px)] sm:h-8",
+        // `field` sizes follow the density tokens in global.css.
+        field:
+          "text-(length:--field-text) sm:text-(length:--field-text) h-(--field-height) gap-1 rounded-(--field-radius) px-(--field-px) sm:h-(--field-height) [&_svg:not([class*='size-'])]:size-3.5 sm:[&_svg:not([class*='size-'])]:size-3.5",
         icon: "size-9 sm:size-8",
+        "icon-field":
+          "size-(--field-icon-button) rounded-(--field-radius) sm:size-(--field-icon-button) [&_svg:not([class*='size-'])]:size-3.5 sm:[&_svg:not([class*='size-'])]:size-3.5",
         "icon-lg": "size-10 sm:size-9",
         "icon-sm": "size-8 sm:size-7",
         "icon-xl":
