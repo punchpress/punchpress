@@ -64,7 +64,7 @@ const measureRowRightEdges = (page: Page) => {
       Number.parseFloat(style.paddingRight) -
       (body.offsetWidth - body.clientWidth);
     const controls = body.querySelectorAll(
-      "[data-slot='select-trigger'], [data-slot='scrub-slider'], [data-slot='input-control'], [data-slot='icon-segmented-control'], button:not(h3 button, [data-slot='icon-segmented-control-item'])"
+      "[data-slot='select-trigger'], [data-slot='scrub-slider'], [data-slot='input-control'], [data-slot='color-picker-trigger'], [data-slot='icon-segmented-control'], button:not(h3 button, [data-slot='icon-segmented-control-item'])"
     );
     const rows = new Map<number, number>();
 
@@ -103,9 +103,20 @@ for (const density of DENSITIES) {
 
     expect(bottom).toBeLessThanOrEqual(640);
 
+    if (density === "current") {
+      const overflows = await body.evaluate((element) => {
+        return element.scrollHeight > element.clientHeight;
+      });
+
+      expect(overflows).toBe(true);
+    }
+
+    // The last control in the panel is fully reachable.
     await body.hover();
     await page.mouse.wheel(0, 4000);
-    await expect(body.getByRole("slider", { name: "Bend" })).toBeInViewport();
+    await expect(
+      body.getByRole("button", { name: "Clear warp" })
+    ).toBeInViewport({ ratio: 1 });
   });
 }
 
@@ -144,6 +155,9 @@ for (const density of DENSITIES.filter((id) => POPOVER_DENSITIES.has(id))) {
 
     await align.click();
     await page.getByRole("option", { name: "Inside" }).click();
+    // Picking an option must not reach the canvas: a deselect there remounts
+    // the row and closes its settings.
+    await expect(page.getByRole("dialog", { name: "Stroke" })).toBeVisible();
     await expect
       .poll(() => {
         return page.evaluate((nodeId) => {
@@ -156,6 +170,15 @@ for (const density of DENSITIES.filter((id) => POPOVER_DENSITIES.has(id))) {
         }, TEXT_ID);
       })
       .toEqual(["inside", [TEXT_ID]]);
+
+    // Pressing the popup's own chrome keeps the selection and the popup.
+    const dialog = page.getByRole("dialog", { name: "Stroke" });
+
+    await dialog.getByText("Stroke", { exact: true }).click();
+    await expect(dialog).toBeVisible();
+    expect(
+      await page.evaluate(() => window.__PUNCHPRESS_EDITOR__?.selectedNodeIds)
+    ).toEqual([TEXT_ID]);
   });
 }
 
