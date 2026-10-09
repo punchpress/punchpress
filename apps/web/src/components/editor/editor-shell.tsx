@@ -6,6 +6,7 @@ import { useTheme } from "../../theme/theme-provider";
 import { Canvas } from "../canvas/canvas";
 import { getCanvasCursorStyle } from "../canvas/canvas-cursor-assets";
 import { CommandMenu } from "../command-menu/command-menu";
+import { DensitySwitcher } from "../density-preview/density-switcher";
 import {
   Designer,
   DesignerCanvas,
@@ -139,6 +140,7 @@ export const EditorShell = () => {
         </DesignerPanel>
 
         <PerformanceHud />
+        {import.meta.env.DEV ? <DensitySwitcher /> : null}
         <CommandMenu />
       </DesignerContent>
       <NewFileDialog {...documentCommands.newFileDialogProps} />
