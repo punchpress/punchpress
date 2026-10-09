@@ -90,26 +90,16 @@ resets both so document text keeps its own. Uppercase section headers track
 at 0.04em. Numeric field values (`ScrubSlider`, field `Input`) use tabular
 figures.
 
-## Dev Previews
+## Pane Containers
 
-`src/components/dev-preview/` holds temporary A/B switches. Each preview sets
-a `data-*` attribute on `<html>` that a token block styles, remembers the
-choice in localStorage, and is pinned to its first option in production. Dev
-builds show the switchers at the bottom left of the editor.
-
-- Pane containers (`components/panel-container-preview/`,
-  `styles/panel-container-preview.css`, Alt+Shift+P): Floating (default,
-  today's cards), Refined (flat 8px cards), Docked (full-height sidebars), and
-  Inset (docked sidebars around a rounded canvas). The shell reads only the
-  `--pane-*`, `--dock-*`, `--shell-bg`, and `--canvas-inset-*` tokens in
-  `styles/panel-container.css`: `DesignerPanel` places a sidebar slot,
-  `DesignerPane` is the card, and `DesignerCanvas` takes the insets, so a
-  direction never changes canvas coordinates, only the visible viewport size.
-  E2E specs run under a direction with `PUNCHPRESS_TEST_PANEL_CONTAINER=<id>`.
-  Once picked: copy the winner's block into `panel-container.css`, delete the
-  folder, the preview stylesheet, `panel-container-preview.spec.ts`, and the
-  env hook in `tests/e2e/helpers/editor.ts`. When both previews are gone,
-  delete `components/dev-preview/` and the switcher mount in `editor-shell.tsx`.
+The Layers and Properties panes are flat floating cards over a full-window
+canvas: 8px from the window edges and below the tab bar, an 8px radius, a
+hairline border (9% black, 9% white in dark), an almost flat shadow, and 8px
+panel padding. The tokens live in `styles/panel-container.css` on the shell
+root (they derive from its `--desktop-*` chrome variables): `--pane-*` for
+placement and the card, `--pane-hover` / `--pane-selected` for rows.
+`DesignerPanel` places a pane slot and `DesignerPane` is the card; panes hide
+below the md breakpoint. The canvas never moves or resizes with the panes.
 
 ## Migration Guidance
 
