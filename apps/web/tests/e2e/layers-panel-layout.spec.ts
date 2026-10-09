@@ -125,6 +125,7 @@ const toRgb = (page: Page, colors: [string, string?][]) => {
         return [0, 0, 0];
       }
 
+      context.clearRect(0, 0, 1, 1);
       context.fillStyle = base ?? "#808080";
       context.fillRect(0, 0, 1, 1);
       context.fillStyle = value;
@@ -233,11 +234,14 @@ for (const colorScheme of ["light", "dark"] as const) {
     expect(distance(selectedBg, surface)).toBeGreaterThan(20);
     expect(distance(selectedBg, accent)).toBeGreaterThan(150);
     expect(selectedText).toEqual(foreground);
+    expect(distance(selectedLabel, foreground)).toBeLessThan(8);
     // Selected, hovered, and selected-hover rows read as different states.
     expect(distance(selectedBg, hoveredBg)).toBeGreaterThan(15);
     expect(distance(selectedHoverBg, selectedBg)).toBeGreaterThan(8);
     // Hidden selected rows keep the tint and dim the label.
     expect(hiddenBg).toEqual(selectedBg);
-    expect(distance(hiddenLabel, selectedLabel)).toBeGreaterThan(30);
+    expect(distance(hiddenLabel, hiddenBg)).toBeLessThan(
+      distance(selectedLabel, selectedBg) - 30
+    );
   });
 }
