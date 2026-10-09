@@ -76,8 +76,17 @@ const installLocalFontMocks = (page) => {
   );
 };
 
+// Dev-only pane container preview: runs any spec under another container
+// direction. Remove with components/panel-container-preview.
+const panelContainer = process.env.PUNCHPRESS_TEST_PANEL_CONTAINER;
+
 export const gotoEditor = async (page) => {
   await installLocalFontMocks(page);
+  if (panelContainer) {
+    await page.addInitScript((value) => {
+      window.localStorage.setItem("punchpress.panel-container-preview", value);
+    }, panelContainer);
+  }
   await page.goto("/");
   await page.evaluate(() => {
     return window.__PUNCHPRESS_EDITOR__?.requestLocalFonts();
