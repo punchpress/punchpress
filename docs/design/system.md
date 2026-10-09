@@ -82,10 +82,13 @@ a one-off height.
 
 ## UI Typography
 
-UI text reads `--font-sans`, `--font-features` (OpenType features), and
-`--ui-tracking` from `:root`; `.canvas-surface` resets features and tracking
-so document text keeps its own. Numeric field values (`ScrubSlider`, field
-`Input`) use tabular figures.
+The UI font is the platform face: SF Pro on macOS, Segoe UI Variable on
+Windows (`--font-sans`, `--font-heading`), with `ui-monospace` for mono. The
+app ships no UI web font. UI text also reads `--font-features` (OpenType
+features, `normal`) and `--ui-tracking` from `:root`; `.canvas-surface`
+resets both so document text keeps its own. Uppercase section headers track
+at 0.04em. Numeric field values (`ScrubSlider`, field `Input`) use tabular
+figures.
 
 ## Dev Previews
 
@@ -94,12 +97,6 @@ a `data-*` attribute on `<html>` that a token block styles, remembers the
 choice in localStorage, and is pinned to its first option in production. Dev
 builds show the switchers at the bottom left of the editor.
 
-- UI font (`components/ui-font-preview/`, `styles/ui-font-preview.css`,
-  Alt+Shift+F): Geist (default), Inter (`inter-ui`, the full upstream build
-  with cv11 and ss01; Fontsource's Google build strips them), and the system
-  stack. Once picked: move the winner's tokens into `:root`, delete the folder,
-  the stylesheet and its import, `ui-font-preview.spec.ts`, and `inter-ui` if
-  Inter lost.
 - Pane containers (`components/panel-container-preview/`,
   `styles/panel-container-preview.css`, Alt+Shift+P): Floating (default,
   today's cards), Refined (flat 8px cards), Docked (full-height sidebars), and
