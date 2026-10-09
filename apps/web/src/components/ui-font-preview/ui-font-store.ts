@@ -1,5 +1,10 @@
 import { createPreviewStore } from "../dev-preview/create-preview-store";
 
+// Dev builds only: production must not bundle the candidate fonts.
+if (import.meta.env.DEV) {
+  import("../../styles/ui-font-preview.css");
+}
+
 // Dev-only UI font comparison. Each option is a `[data-ui-font]` token block
 // in styles/ui-font-preview.css. Once a font is picked, its tokens become the
 // :root values and this folder and that stylesheet go away.

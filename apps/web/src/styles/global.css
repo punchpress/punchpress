@@ -14,7 +14,6 @@
 @import "./canvas/preview.css";
 @import "./canvas/guide.css";
 @import "./canvas/handles.css";
-@import "./ui-font-preview.css";
 
 @custom-variant dark (&:is(.dark *));
 

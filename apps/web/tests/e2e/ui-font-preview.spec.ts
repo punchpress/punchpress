@@ -80,33 +80,37 @@ test("numeric fields use tabular figures", async ({ page }) => {
       JSON.stringify({
         nodes: [
           {
-            appearance: { fills: [], strokes: [] },
-            cornerRadius: 0,
-            height: 200,
-            id: "font-shape",
-            opacity: 1,
+            background: "#ffffff",
+            height: 260,
+            id: "font-artboard",
+            locked: false,
+            name: "Artboard",
             parentId: "root",
-            shape: "polygon",
-            transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 400, y: 300 },
-            type: "shape",
+            transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 220, y: 160 },
+            type: "artboard",
             visible: true,
-            width: 300,
+            width: 340,
           },
         ],
         version: "1.8",
       })
     );
-    editor?.setSelectedNodes(["font-shape"]);
+    editor?.setSelectedNodes(["font-artboard"]);
   });
 
-  const width = page.getByRole("slider", { name: "Shape width" });
+  // Frame W/H are field Inputs; scrub sliders cover the other numeric fields.
+  const inputs = page
+    .getByTestId("properties-panel-body")
+    .locator("input[inputmode='decimal']");
 
-  await expect(width).toBeVisible();
+  await expect(inputs).toHaveCount(2);
   expect(
-    await width
-      .locator(".truncate")
-      .evaluate((element) => getComputedStyle(element).fontVariantNumeric)
-  ).toBe("tabular-nums");
+    await inputs.evaluateAll((elements) => {
+      return elements.map((element) => {
+        return getComputedStyle(element).fontVariantNumeric;
+      });
+    })
+  ).toEqual(["tabular-nums", "tabular-nums"]);
 });
 
 // Google Fonts builds of Inter (Fontsource) strip cv11 and ss01; the full
