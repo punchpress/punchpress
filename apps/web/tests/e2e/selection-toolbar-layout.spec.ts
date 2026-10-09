@@ -49,3 +49,66 @@ test("the selection toolbar stays centered over the bottom toolbar after a resiz
 
   await expect.poll(getOffset).toBeLessThan(2);
 });
+
+test("the tool dock uses square toolbar buttons and both toolbars fit a 1024px viewport", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 720, width: 1024 });
+  await gotoEditor(page);
+  await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+    editor.addShapeNode({ x: 200, y: 200 }, "polygon");
+    editor.setSelectedNodes(
+      editor.nodes
+        .filter((node) => node.type === "shape")
+        .map((node) => node.id)
+    );
+  });
+  await expect(page.locator(".canvas-selection-toolbar")).toBeVisible();
+
+  const layout = await page.evaluate(() => {
+    const dock = document.querySelector(".canvas-bottom-toolbar");
+    const selection = document.querySelector(
+      ".canvas-selection-toolbar [data-slot='toolbar']"
+    );
+    const buttonSize = Number.parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue(
+        "--toolbar-button"
+      )
+    );
+    const toRect = (element: Element | null) => {
+      const rect = element?.getBoundingClientRect();
+      return rect ? { left: rect.left, right: rect.right } : null;
+    };
+    // The zoom readout is a text control; every other dock button is square.
+    const iconButtons = [
+      ...(dock?.querySelectorAll("button:not([role='slider'])") ?? []),
+    ].map((button) => {
+      const rect = button.getBoundingClientRect();
+      return { height: rect.height, width: rect.width };
+    });
+
+    return {
+      buttonSize,
+      dock: toRect(dock),
+      iconButtons,
+      selection: toRect(selection),
+      viewportWidth: window.innerWidth,
+    };
+  });
+
+  expect(layout.buttonSize).toBeGreaterThan(0);
+  expect(layout.iconButtons.length).toBeGreaterThan(0);
+  for (const button of layout.iconButtons) {
+    expect(button).toEqual({
+      height: layout.buttonSize,
+      width: layout.buttonSize,
+    });
+  }
+
+  for (const rect of [layout.dock, layout.selection]) {
+    expect(rect).not.toBeNull();
+    expect(rect?.left).toBeGreaterThanOrEqual(0);
+    expect(rect?.right).toBeLessThanOrEqual(layout.viewportWidth);
+  }
+});
