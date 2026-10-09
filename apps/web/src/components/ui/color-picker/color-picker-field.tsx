@@ -4,6 +4,7 @@ import { Popover } from "@base-ui/react/popover";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditor } from "@/editor-react/use-editor";
 import { cn } from "@/lib/utils";
+import { PopoverContent } from "../popover";
 import { expireClickGuard } from "../select";
 import { ColorPicker } from "./color-picker";
 import { formatStorageValue, parseColorValue } from "./color-picker-value";
@@ -337,31 +338,19 @@ const ColorPickerField = ({
           size={size}
           value={value}
         />
-        <Popover.Portal>
-          <Popover.Positioner
-            align="start"
-            className="z-50"
-            side="bottom"
-            sideOffset={6}
-          >
-            <Popover.Popup
-              className="w-[19.5rem] origin-(--transform-origin) rounded-2xl border bg-popover p-3 text-popover-foreground shadow-lg/5 outline-none transition-[scale,opacity,translate] duration-150 data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0"
-              data-slot="popover-popup"
-              initialFocus={false}
-              onPointerDownCapture={handlePopupPointerDownCapture}
-              ref={popupRef}
-            >
-              <ColorPicker
-                className="border-0 p-0 shadow-none"
-                defaultValue="#ffffff"
-                onValueChange={(_, parsed) =>
-                  onChange(formatStorageValue(parsed))
-                }
-                value={value}
-              />
-            </Popover.Popup>
-          </Popover.Positioner>
-        </Popover.Portal>
+        <PopoverContent
+          align="start"
+          initialFocus={false}
+          onPointerDownCapture={handlePopupPointerDownCapture}
+          ref={popupRef}
+          sideOffset={6}
+        >
+          <ColorPicker
+            defaultValue="#ffffff"
+            onValueChange={(_, parsed) => onChange(formatStorageValue(parsed))}
+            value={value}
+          />
+        </PopoverContent>
       </Popover.Root>
     </div>
   );

@@ -73,17 +73,26 @@ export const UnsavedDocumentDialog = ({
           <DialogDescription>{dialogContent.description}</DialogDescription>
         </DialogHeader>
         <DialogFooter className="sm:items-center sm:justify-between">
-          <Button onClick={() => onChoice("cancel")} variant="ghost">
+          <Button
+            onClick={() => onChoice("cancel")}
+            size="chrome"
+            variant="ghost"
+          >
             Cancel
           </Button>
           <div className="flex flex-col-reverse gap-2 sm:flex-row">
             <Button
               onClick={() => onChoice("discard")}
+              size="chrome"
               variant="destructive-soft"
             >
               {dialogContent.destructiveActionLabel}
             </Button>
-            <Button onClick={() => onChoice("save")} ref={saveButtonRef}>
+            <Button
+              onClick={() => onChoice("save")}
+              ref={saveButtonRef}
+              size="chrome"
+            >
               Save
             </Button>
           </div>

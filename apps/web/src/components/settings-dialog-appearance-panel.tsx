@@ -34,24 +34,26 @@ export const SettingsDialogAppearancePanel = () => {
   return (
     <>
       <div className="space-y-1">
-        <h2 className="font-semibold text-foreground text-lg">Appearance</h2>
-        <p className="text-muted-foreground text-sm">
+        <h2 className="text-(length:--dialog-title-text) font-semibold text-foreground">
+          Appearance
+        </h2>
+        <p className="text-(length:--chrome-text) text-muted-foreground">
           Choose how PunchPress follows your preferred color theme.
         </p>
       </div>
 
-      <div className="space-y-3">
-        <h3 className="font-semibold text-muted-foreground text-xs uppercase tracking-wider">
+      <div className="space-y-(--section-title-gap)">
+        <h3 className="text-(length:--section-title-text) font-semibold text-(--section-title-color) tracking-(--section-title-tracking) [text-transform:var(--section-title-case)]">
           Theme
         </h3>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-2">
           {THEME_OPTIONS.map((option) => {
             const isActive = theme === option.value;
 
             return (
               <button
                 className={cn(
-                  "group relative flex flex-col items-center gap-3 rounded-xl border-2 px-5 py-6 text-center",
+                  "group relative flex flex-col items-center gap-2 rounded-(--surface-radius) border px-3 py-3 text-center",
                   isActive
                     ? "border-primary bg-primary/5 shadow-sm dark:border-primary/50 dark:bg-primary/10"
                     : "border-transparent bg-muted/50 hover:bg-muted dark:bg-muted/30 dark:hover:bg-muted/50"
@@ -62,24 +64,24 @@ export const SettingsDialogAppearancePanel = () => {
               >
                 <div
                   className={cn(
-                    "flex size-11 items-center justify-center rounded-xl",
+                    "flex size-7 items-center justify-center rounded-(--chrome-radius)",
                     isActive
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted-foreground/10 text-muted-foreground group-hover:bg-muted-foreground/15"
                   )}
                 >
-                  <option.icon className="size-5" />
+                  <option.icon className="size-(--chrome-icon)" />
                 </div>
                 <div className="flex flex-col gap-0.5">
                   <span
                     className={cn(
-                      "font-medium text-sm",
+                      "text-(length:--chrome-text) font-medium",
                       isActive ? "text-primary" : "text-foreground"
                     )}
                   >
                     {option.label}
                   </span>
-                  <span className="text-muted-foreground text-xs">
+                  <span className="text-(length:--chrome-text-sm) text-muted-foreground">
                     {option.description}
                   </span>
                 </div>

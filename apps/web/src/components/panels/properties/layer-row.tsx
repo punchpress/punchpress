@@ -110,15 +110,13 @@ const LayerRowSettings = ({
       <PopoverContent
         align="start"
         anchor={anchor}
-        className="max-h-(--available-height) w-64 overflow-y-auto p-3 [--field-label-width:56px]"
+        className="max-h-(--available-height) w-64 overflow-y-auto [--field-label-width:56px]"
         side="left"
         sideOffset={8}
       >
         <FieldLabelsProvider labels="left">
           <div className="grid gap-(--field-gap)">
-            <PopoverTitle className="text-(length:--section-title-text) mb-1">
-              {title}
-            </PopoverTitle>
+            <PopoverTitle className="mb-1">{title}</PopoverTitle>
             {children}
           </div>
         </FieldLabelsProvider>

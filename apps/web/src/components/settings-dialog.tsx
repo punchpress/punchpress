@@ -38,27 +38,27 @@ export const SettingsDialog = ({ onOpenChange, open }) => {
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogPopup
         bottomStickOnMobile={false}
-        className="max-w-5xl md:h-[560px]"
+        className="max-w-3xl md:h-[480px]"
         showCloseButton
       >
         <DialogPanel className="p-0 md:h-full" scrollFade={false}>
-          <div className="grid min-h-[560px] md:h-full md:min-h-0 md:grid-cols-[220px_1fr]">
+          <div className="grid min-h-[480px] md:h-full md:min-h-0 md:grid-cols-[180px_1fr]">
             {/* Left nav */}
-            <aside className="border-b bg-muted/40 px-3 py-5 md:border-r md:border-b-0">
+            <aside className="border-b bg-muted/40 p-(--dialog-pad) md:border-r md:border-b-0">
               <nav
                 aria-label="Settings sections"
-                className="flex flex-col gap-5"
+                className="flex flex-col gap-4"
               >
                 {NAV_SECTIONS.map((section) => (
                   <div className="flex flex-col gap-0.5" key={section.label}>
-                    <span className="px-2.5 pb-1.5 font-semibold text-[11px] text-muted-foreground/70 uppercase tracking-wider">
+                    <span className="text-(length:--section-title-text) px-(--menu-item-px) pb-(--section-title-gap) font-semibold text-(--section-title-color) tracking-(--section-title-tracking) [text-transform:var(--section-title-case)]">
                       {section.label}
                     </span>
                     {section.items.map((item) => (
                       <button
                         aria-pressed={activeSectionId === item.id}
                         className={cn(
-                          "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left font-medium text-sm",
+                          "text-(length:--chrome-text) flex h-(--menu-item-height) items-center gap-2 rounded-(--chrome-radius) px-(--menu-item-px) text-left font-medium",
                           activeSectionId === item.id
                             ? "bg-secondary text-secondary-foreground"
                             : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
@@ -67,7 +67,7 @@ export const SettingsDialog = ({ onOpenChange, open }) => {
                         onClick={() => setActiveSectionId(item.id)}
                         type="button"
                       >
-                        <item.icon className="size-4 opacity-60" />
+                        <item.icon className="size-(--chrome-icon) opacity-60" />
                         {item.label}
                       </button>
                     ))}
@@ -77,7 +77,7 @@ export const SettingsDialog = ({ onOpenChange, open }) => {
             </aside>
 
             {/* Content */}
-            <section className="flex min-h-0 flex-col gap-8 overflow-y-auto px-8 py-7">
+            <section className="flex min-h-0 flex-col gap-5 overflow-y-auto p-(--dialog-pad) pe-[calc(var(--dialog-pad)*2)]">
               {sectionContent}
             </section>
           </div>

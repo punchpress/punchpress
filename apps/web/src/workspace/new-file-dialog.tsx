@@ -10,12 +10,19 @@ import {
   DialogPopup,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import {
   ARTBOARD_PRESETS,
   DEFAULT_CUSTOM_ARTBOARD_SIZE,
 } from "./new-file-presets";
 
 const NO_ARTBOARD_ID = "none";
+const PRESET_CARD_CLASS =
+  "flex min-h-12 items-start justify-between rounded-(--surface-radius) border border-border bg-card px-2.5 py-2 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring data-[selected=true]:border-primary data-[selected=true]:bg-primary/8";
+const PRESET_DETAIL_CLASS =
+  "text-(length:--chrome-text-sm) text-muted-foreground";
+const SECTION_TITLE_CLASS =
+  "text-(length:--section-title-text) font-semibold text-(--section-title-color) tracking-(--section-title-tracking) [text-transform:var(--section-title-case)]";
 const CUSTOM_ARTBOARD_ID = "custom";
 
 const clampSize = (value: string, fallback: number) => {
@@ -86,7 +93,7 @@ export const NewFileDialog = ({ onCreate, onOpenChange, open }) => {
 
   return (
     <Dialog modal onOpenChange={onOpenChange} open={open}>
-      <DialogPopup bottomStickOnMobile={false} className="max-w-[620px]">
+      <DialogPopup bottomStickOnMobile={false} className="max-w-xl">
         <DialogHeader>
           <DialogTitle>New File</DialogTitle>
           <DialogDescription>
@@ -95,16 +102,14 @@ export const NewFileDialog = ({ onCreate, onOpenChange, open }) => {
         </DialogHeader>
 
         <DialogPanel>
-          <div className="grid gap-4">
+          <div className="grid gap-3">
             {[...presetGroups.entries()].map(([groupName, presets]) => (
-              <div className="grid gap-2" key={groupName}>
-                <div className="font-semibold text-[11px] text-muted-foreground uppercase tracking-wide">
-                  {groupName}
-                </div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="grid gap-(--section-title-gap)" key={groupName}>
+                <div className={SECTION_TITLE_CLASS}>{groupName}</div>
+                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                   {presets.map((preset) => (
                     <button
-                      className="flex min-h-[74px] items-start justify-between rounded-lg border border-border bg-card px-3 py-2.5 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring data-selected:border-primary data-selected:bg-primary/8"
+                      className={PRESET_CARD_CLASS}
                       data-selected={
                         selectedId === preset.id ? "true" : "false"
                       }
@@ -112,82 +117,86 @@ export const NewFileDialog = ({ onCreate, onOpenChange, open }) => {
                       onClick={() => setSelectedId(preset.id)}
                       type="button"
                     >
-                      <span className="grid gap-1">
-                        <span className="font-medium text-sm">
-                          {preset.name}
-                        </span>
-                        <span className="text-muted-foreground text-xs">
+                      <span className="grid gap-0.5">
+                        <span className="font-medium">{preset.name}</span>
+                        <span className={PRESET_DETAIL_CLASS}>
                           {preset.description}
                         </span>
                       </span>
-                      {selectedId === preset.id ? (
-                        <CheckIcon className="size-4 text-primary" />
-                      ) : null}
+                      {selectedId === preset.id ? <SelectedCheck /> : null}
                     </button>
                   ))}
                 </div>
               </div>
             ))}
 
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
               <button
-                className="flex min-h-[74px] items-start justify-between rounded-lg border border-border bg-card px-3 py-2.5 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring data-selected:border-primary data-selected:bg-primary/8"
+                className={PRESET_CARD_CLASS}
                 data-selected={
                   selectedId === CUSTOM_ARTBOARD_ID ? "true" : "false"
                 }
                 onClick={() => setSelectedId(CUSTOM_ARTBOARD_ID)}
                 type="button"
               >
-                <span className="grid gap-2">
-                  <span className="font-medium text-sm">Custom Size</span>
-                  <span className="flex items-center gap-2 text-xs">
-                    <input
+                <span className="grid gap-1">
+                  <span className="font-medium">Custom Size</span>
+                  <span className="flex items-center gap-1.5">
+                    <Input
                       aria-label="Custom width"
-                      className="h-7 w-20 rounded-md border border-border bg-background px-2"
+                      className="w-16"
+                      nativeInput
                       onChange={(event) => setCustomWidth(event.target.value)}
+                      size="field"
                       value={customWidth}
                     />
-                    <span className="text-muted-foreground">x</span>
-                    <input
+                    <span className={PRESET_DETAIL_CLASS}>x</span>
+                    <Input
                       aria-label="Custom height"
-                      className="h-7 w-20 rounded-md border border-border bg-background px-2"
+                      className="w-16"
+                      nativeInput
                       onChange={(event) => setCustomHeight(event.target.value)}
+                      size="field"
                       value={customHeight}
                     />
                   </span>
                 </span>
-                {selectedId === CUSTOM_ARTBOARD_ID ? (
-                  <CheckIcon className="size-4 text-primary" />
-                ) : null}
+                {selectedId === CUSTOM_ARTBOARD_ID ? <SelectedCheck /> : null}
               </button>
 
               <button
-                className="flex min-h-[74px] items-start justify-between rounded-lg border border-border bg-card px-3 py-2.5 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring data-selected:border-primary data-selected:bg-primary/8"
+                className={PRESET_CARD_CLASS}
                 data-selected={selectedId === NO_ARTBOARD_ID ? "true" : "false"}
                 onClick={() => setSelectedId(NO_ARTBOARD_ID)}
                 type="button"
               >
-                <span className="grid gap-1">
-                  <span className="font-medium text-sm">No Artboard</span>
-                  <span className="text-muted-foreground text-xs">
-                    Empty pasteboard
-                  </span>
+                <span className="grid gap-0.5">
+                  <span className="font-medium">No Artboard</span>
+                  <span className={PRESET_DETAIL_CLASS}>Empty pasteboard</span>
                 </span>
-                {selectedId === NO_ARTBOARD_ID ? (
-                  <CheckIcon className="size-4 text-primary" />
-                ) : null}
+                {selectedId === NO_ARTBOARD_ID ? <SelectedCheck /> : null}
               </button>
             </div>
           </div>
         </DialogPanel>
 
         <DialogFooter>
-          <Button onClick={() => onOpenChange(false)} variant="ghost">
+          <Button
+            onClick={() => onOpenChange(false)}
+            size="chrome"
+            variant="ghost"
+          >
             Cancel
           </Button>
-          <Button onClick={handleCreate}>Create</Button>
+          <Button onClick={handleCreate} size="chrome">
+            Create
+          </Button>
         </DialogFooter>
       </DialogPopup>
     </Dialog>
   );
 };
+
+const SelectedCheck = () => (
+  <CheckIcon className="size-(--chrome-icon) shrink-0 text-primary" />
+);

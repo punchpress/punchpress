@@ -73,10 +73,16 @@ export const MergeCurvesProvider = ({
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button onClick={() => setPendingMerge(null)} variant="ghost">
+            <Button
+              onClick={() => setPendingMerge(null)}
+              size="chrome"
+              variant="ghost"
+            >
               Cancel
             </Button>
-            <Button onClick={confirmMerge}>Merge Curves</Button>
+            <Button onClick={confirmMerge} size="chrome">
+              Merge Curves
+            </Button>
           </DialogFooter>
         </DialogPopup>
       </Dialog>

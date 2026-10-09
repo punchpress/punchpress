@@ -87,8 +87,8 @@ interface ColorInputProps
   value: string;
 }
 
-const PANEL_WIDTH = 288;
-const SQUARE_HEIGHT = 156;
+const PANEL_WIDTH = 232;
+const SQUARE_HEIGHT = 140;
 const FORMAT_LABELS: Record<ColorFormat, string> = {
   hex: "HEX",
   hsl: "HSL",
@@ -551,7 +551,7 @@ function SaturationSquare({
       aria-valuemin={0}
       aria-valuenow={Math.round(s * 100)}
       aria-valuetext={`${Math.round(s * 100)}% saturation, ${Math.round(v * 100)}% brightness`}
-      className="relative w-full touch-none select-none rounded-lg outline-none"
+      className="relative w-full touch-none select-none rounded-(--chrome-radius) outline-none"
       data-slot="color-picker-selection"
       onBlur={() => setFocused(false)}
       onFocus={(event) => {
@@ -596,7 +596,7 @@ function SaturationSquare({
       tabIndex={0}
     >
       <div
-        className="pointer-events-none absolute size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white shadow-[0_0_0_1px_rgb(0_0_0_/_0.45)]"
+        className="pointer-events-none absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white shadow-[0_0_0_1px_rgb(0_0_0_/_0.45)]"
         style={{
           backgroundColor: `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`,
           left: `${s * 100}%`,
@@ -617,7 +617,6 @@ function HueSlider({
   return (
     <Slider
       aria-label="Color picker slider"
-      className="[&_[data-slot=slider-track]]:border-transparent"
       data-slider-label="Hue"
       hideFill
       max={360}
@@ -625,6 +624,7 @@ function HueSlider({
       showValue={false}
       thumbBorderColor="var(--color-white)"
       thumbColor={`hsl(${h}, 100%, 50%)`}
+      trackClassName="h-3 border-transparent"
       trackStyle={{
         background:
           "linear-gradient(to right, hsl(0 100% 50%), hsl(60 100% 50%), hsl(120 100% 50%), hsl(180 100% 50%), hsl(240 100% 50%), hsl(300 100% 50%), hsl(360 100% 50%))",
@@ -650,7 +650,6 @@ function AlphaSlider({
   return (
     <Slider
       aria-label="Color picker slider"
-      className="[&_[data-slot=slider-track]]:border-transparent"
       data-slider-label="Alpha"
       hideFill
       max={100}
@@ -660,6 +659,7 @@ function AlphaSlider({
       showValue={false}
       thumbBorderColor="var(--color-white)"
       thumbColor={solidColor}
+      trackClassName="h-3 border-transparent"
       trackStyle={{
         backgroundClip: "padding-box, padding-box",
         backgroundImage: `linear-gradient(to right, ${transparentColor}, ${solidColor}), ${CHECKER_BG.backgroundImage}`,
@@ -730,13 +730,11 @@ const ColorInput = forwardRef<HTMLInputElement, ColorInputProps>(
       <div className={cn("relative min-w-0 flex-1", className)}>
         <span className="sr-only">{label}</span>
         <Input
-          className={cn(
-            "bg-secondary tabular-nums shadow-none",
-            align === "center" && "text-center"
-          )}
+          className={cn(align === "center" && "text-center")}
           leading={prefix}
           nativeInput
           ref={ref}
+          size="field"
           {...inputProps}
         />
       </div>
@@ -803,14 +801,14 @@ function ColorInputsRow({
 
   if (format === "hex") {
     return (
-      <div className="grid grid-cols-[minmax(0,1fr)_6rem] items-center gap-2">
+      <div className="grid grid-cols-[minmax(0,1fr)_4rem] items-center gap-(--field-gap)">
         <ChannelTooltip label="Hex">
           <ColorInput
             label="Hex"
             onCommit={(next) =>
               onChannelChange("hex", next.startsWith("#") ? next : `#${next}`)
             }
-            prefix={<HashIcon size={14} strokeWidth={1.9} />}
+            prefix={<HashIcon size={11} strokeWidth={1.9} />}
             value={parsed.hex.replace(HASH_PREFIX_REGEX, "").toUpperCase()}
           />
         </ChannelTooltip>
@@ -824,7 +822,7 @@ function ColorInputsRow({
 
   if (format === "rgb") {
     return (
-      <div className="grid grid-cols-4 gap-1">
+      <div className="grid grid-cols-4 gap-(--field-gap)">
         <ChannelTooltip label="Red">
           <ColorInput
             align="center"
@@ -870,7 +868,7 @@ function ColorInputsRow({
     const hsl = rgbToHsl(parsed.r, parsed.g, parsed.b);
 
     return (
-      <div className="grid grid-cols-4 gap-1">
+      <div className="grid grid-cols-4 gap-(--field-gap)">
         <ChannelTooltip label="Hue">
           <ColorInput
             align="center"
@@ -915,7 +913,7 @@ function ColorInputsRow({
   const oklch = rgbToOklch(parsed.r, parsed.g, parsed.b);
 
   return (
-    <div className="grid grid-cols-4 gap-1">
+    <div className="grid grid-cols-4 gap-(--field-gap)">
       <ChannelTooltip label="Lightness">
         <ColorInput
           align="center"
@@ -971,7 +969,7 @@ function FormatSelect({
       onValueChange={(next) => onChange(next as ColorFormat)}
       value={value}
     >
-      <SelectTrigger className="w-24 min-w-0">
+      <SelectTrigger className="w-20 min-w-0" size="field">
         <SelectValue>{() => selectedLabel}</SelectValue>
       </SelectTrigger>
       <SelectContent>
@@ -1004,8 +1002,8 @@ function EyeDropperButton({ onPick }: { onPick: (hex: string) => void }) {
     <button
       aria-label="Pick color from screen"
       className={cn(
-        buttonVariants({ size: "icon", variant: "ghost" }),
-        "size-10 rounded-xl text-muted-foreground"
+        buttonVariants({ size: "icon-field", variant: "ghost" }),
+        "text-muted-foreground"
       )}
       onClick={async () => {
         try {
@@ -1022,20 +1020,16 @@ function EyeDropperButton({ onPick }: { onPick: (hex: string) => void }) {
       }}
       type="button"
     >
-      <PipetteIcon aria-hidden="true" className="size-4" />
+      <PipetteIcon aria-hidden="true" />
     </button>
   );
 }
 
-function ColorTile({ color, size = 24 }: { color: string; size?: number }) {
+function ColorTile({ color }: { color: string }) {
   return (
     <span
-      className="relative inline-block shrink-0 overflow-hidden rounded-md"
-      style={{
-        ...CHECKER_BG,
-        height: size,
-        width: size,
-      }}
+      className="relative inline-block size-4 shrink-0 overflow-hidden rounded-(--field-swatch-radius)"
+      style={CHECKER_BG}
     >
       <span className="absolute inset-0" style={{ backgroundColor: color }} />
     </span>
@@ -1054,7 +1048,7 @@ function SwatchStrip({
   const normalizedCurrent = current.toLowerCase();
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-1.5">
       {swatches.map((color) => {
         const normalized = parseColor(color);
         const swatchValue = normalized
@@ -1066,14 +1060,14 @@ function SwatchStrip({
           <button
             aria-label={`Select color ${color}`}
             className={cn(
-              "rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              selected && "ring-2 ring-ring ring-offset-2 ring-offset-popover"
+              "rounded-(--field-swatch-radius) outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              selected && "ring-1 ring-ring ring-offset-1 ring-offset-popover"
             )}
             key={color}
             onClick={() => onPick(color)}
             type="button"
           >
-            <ColorTile color={color} size={24} />
+            <ColorTile color={color} />
           </button>
         );
       })}
@@ -1273,10 +1267,7 @@ const ColorPicker = forwardRef<HTMLDivElement, ColorPickerProps>(
 
     return (
       <div
-        className={cn(
-          "flex flex-col gap-3 rounded-xl border bg-popover p-3 text-popover-foreground shadow-lg/5",
-          className
-        )}
+        className={cn("flex flex-col gap-2", className)}
         data-slot="color-picker"
         ref={ref}
         style={{ width: PANEL_WIDTH }}
@@ -1289,7 +1280,7 @@ const ColorPicker = forwardRef<HTMLDivElement, ColorPickerProps>(
           v={hsv.v}
         />
 
-        <div className="grid gap-2">
+        <div className="grid gap-1.5">
           <HueSlider h={hsv.h} onChange={(h) => updateHsv({ h })} />
           <AlphaSlider
             a={hsv.a}
@@ -1298,13 +1289,11 @@ const ColorPicker = forwardRef<HTMLDivElement, ColorPickerProps>(
           />
         </div>
 
-        <div className="flex items-center justify-start gap-2">
-          <div className="flex items-center gap-2">
-            <FormatSelect onChange={handleFormatChange} value={currentFormat} />
-            {hideEyedropper ? null : (
-              <EyeDropperButton onPick={handleStringCommit} />
-            )}
-          </div>
+        <div className="flex items-center justify-between gap-(--field-gap)">
+          <FormatSelect onChange={handleFormatChange} value={currentFormat} />
+          {hideEyedropper ? null : (
+            <EyeDropperButton onPick={handleStringCommit} />
+          )}
         </div>
 
         <ColorInputsRow

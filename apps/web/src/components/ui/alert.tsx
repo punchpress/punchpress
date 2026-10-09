@@ -3,7 +3,7 @@ import { cva } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const alertVariants = cva(
-  "relative grid w-full items-start gap-x-2 gap-y-0.5 rounded-xl border px-3.5 py-3 text-card-foreground text-sm has-[>svg]:has-data-[slot=alert-action]:grid-cols-[calc(var(--spacing)*4)_1fr_auto] has-[>svg]:grid-cols-[calc(var(--spacing)*4)_1fr] has-data-[slot=alert-action]:grid-cols-[1fr_auto] has-[>svg]:gap-x-2 [&>svg]:h-lh [&>svg]:w-4",
+  "text-(length:--chrome-text) relative grid w-full items-start gap-x-2 gap-y-0.5 rounded-(--surface-radius) border px-2.5 py-2 text-card-foreground has-[>svg]:has-data-[slot=alert-action]:grid-cols-[var(--chrome-icon)_1fr_auto] has-[>svg]:grid-cols-[var(--chrome-icon)_1fr] has-data-[slot=alert-action]:grid-cols-[1fr_auto] has-[>svg]:gap-x-2 [&>svg]:h-lh [&>svg]:w-(--chrome-icon)",
   {
     defaultVariants: {
       variant: "default",
@@ -47,7 +47,7 @@ function AlertDescription({ className, ...props }) {
   return (
     <div
       className={cn(
-        "flex flex-col gap-2.5 text-muted-foreground [svg~&]:col-start-2",
+        "flex flex-col gap-1.5 text-muted-foreground [svg~&]:col-start-2",
         className
       )}
       data-slot="alert-description"

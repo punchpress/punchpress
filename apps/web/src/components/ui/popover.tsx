@@ -14,6 +14,8 @@ function PopoverContent({
   className,
   side = "bottom",
   sideOffset = 4,
+  // `flush` drops the padding for popups with edge-to-edge sections.
+  variant = "default",
   ...props
 }) {
   return (
@@ -29,7 +31,8 @@ function PopoverContent({
       >
         <BasePopoverPrimitive.Popup
           className={cn(
-            "relative origin-(--transform-origin) rounded-lg border bg-popover not-dark:bg-clip-padding text-popover-foreground shadow-lg/5 outline-none before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] before:shadow-[0_1px_--theme(--color-black/4%)] dark:before:shadow-[0_-1px_--theme(--color-white/6%)]",
+            "text-(length:--chrome-text) relative origin-(--transform-origin) rounded-(--surface-radius) border bg-popover not-dark:bg-clip-padding p-(--popover-pad) text-popover-foreground shadow-lg/5 outline-none before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--surface-radius)-1px)] before:shadow-[0_1px_--theme(--color-black/4%)] dark:before:shadow-[0_-1px_--theme(--color-white/6%)]",
+            variant === "flush" && "p-0",
             className
           )}
           data-slot="popover-popup"
@@ -45,7 +48,10 @@ function PopoverContent({
 function PopoverTitle({ className, ...props }) {
   return (
     <BasePopoverPrimitive.Title
-      className={cn("font-semibold text-foreground", className)}
+      className={cn(
+        "text-(length:--section-title-text) font-semibold text-(--section-title-color) tracking-(--section-title-tracking) [text-transform:var(--section-title-case)]",
+        className
+      )}
       data-slot="popover-title"
       {...props}
     />

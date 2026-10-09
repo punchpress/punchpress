@@ -62,34 +62,36 @@ export const SettingsDialogDebugPanel = ({ isActive }) => {
   return (
     <>
       <div className="space-y-1">
-        <h2 className="font-semibold text-foreground text-lg">Debug</h2>
-        <p className="text-muted-foreground text-sm">
+        <h2 className="text-(length:--dialog-title-text) font-semibold text-foreground">
+          Debug
+        </h2>
+        <p className="text-(length:--chrome-text) text-muted-foreground">
           Inspect the current editor debug dump and copy it to the clipboard for
           tests or agent workflows.
         </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button onClick={refreshDump} size="sm" variant="outline">
+        <Button onClick={refreshDump} size="chrome" variant="outline">
           <RefreshCwIcon />
           Refresh dump
         </Button>
-        <Button onClick={handleCopyDump} size="sm">
+        <Button onClick={handleCopyDump} size="chrome">
           {copyState === "copied" ? <CheckIcon /> : <CopyIcon />}
           {copyState === "copied" ? "Copied" : "Copy dump"}
         </Button>
         {copyState === "error" ? (
-          <span className="text-muted-foreground text-xs">
+          <span className="text-(length:--chrome-text-sm) text-muted-foreground">
             Clipboard access failed. Refresh and copy from the panel content.
           </span>
         ) : null}
       </div>
 
-      <div className="overflow-hidden rounded-xl border bg-muted/20">
-        <div className="border-b px-4 py-2.5 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+      <div className="overflow-hidden rounded-(--surface-radius) border bg-muted/20">
+        <div className="text-(length:--section-title-text) border-b px-3 py-2 font-semibold text-(--section-title-color) tracking-(--section-title-tracking) [text-transform:var(--section-title-case)]">
           Debug dump
         </div>
-        <pre className="max-h-[360px] overflow-auto whitespace-pre-wrap px-4 pt-3 pb-6 font-mono text-[11px] text-foreground leading-5">
+        <pre className="text-(length:--chrome-text-sm) max-h-[320px] overflow-auto whitespace-pre-wrap px-3 pt-2 pb-4 font-mono text-foreground leading-4">
           {dumpText}
         </pre>
       </div>

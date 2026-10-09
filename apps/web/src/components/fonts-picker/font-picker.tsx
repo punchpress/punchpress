@@ -129,9 +129,10 @@ export const FontPicker = ({
       {isOpen ? (
         <PopoverContent
           align="end"
-          className="w-[22rem] max-w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl"
+          className="w-[22rem] max-w-[min(22rem,calc(100vw-2rem))] overflow-hidden"
           initialFocus={false}
           sideOffset={4}
+          variant="flush"
         >
           <div className="border-border border-b px-2 py-2">
             <div className="relative block">

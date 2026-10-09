@@ -94,10 +94,14 @@ export const PerformanceBenchmarkConfirmDialog = ({
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="sm:items-center sm:justify-between">
-          <Button onClick={() => onOpenChange(false)} variant="ghost">
+          <Button
+            onClick={() => onOpenChange(false)}
+            size="chrome"
+            variant="ghost"
+          >
             Cancel
           </Button>
-          <Button onClick={onConfirm} variant="destructive-soft">
+          <Button onClick={onConfirm} size="chrome" variant="destructive-soft">
             Empty canvas and run
           </Button>
         </DialogFooter>

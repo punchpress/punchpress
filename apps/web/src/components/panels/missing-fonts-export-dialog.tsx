@@ -2,6 +2,7 @@ import type {
   LocalFontCatalogState,
   LocalFontDescriptor,
 } from "@punchpress/punch-schema";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -42,18 +43,24 @@ export const MissingFontsExportDialog = ({
             {getResolutionMessage(catalogState)}
           </DialogDescription>
         </DialogHeader>
-        <DialogPanel className="pt-0">
-          <div className="rounded-xl border bg-muted/50 px-4 py-3 text-sm">
-            <div className="font-medium text-foreground">Unresolved fonts</div>
-            <ul className="mt-2 flex list-none flex-col gap-1 pl-0 text-muted-foreground">
-              {missingFonts.map((font) => {
-                return <li key={font.postscriptName}>{font.fullName}</li>;
-              })}
-            </ul>
-          </div>
+        <DialogPanel>
+          <Alert>
+            <AlertTitle>Unresolved fonts</AlertTitle>
+            <AlertDescription>
+              <ul className="flex list-none flex-col gap-0.5 pl-0">
+                {missingFonts.map((font) => {
+                  return <li key={font.postscriptName}>{font.fullName}</li>;
+                })}
+              </ul>
+            </AlertDescription>
+          </Alert>
         </DialogPanel>
         <DialogFooter>
-          <Button onClick={() => onOpenChange(false)} type="button">
+          <Button
+            onClick={() => onOpenChange(false)}
+            size="chrome"
+            type="button"
+          >
             OK
           </Button>
         </DialogFooter>
