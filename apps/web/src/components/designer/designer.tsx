@@ -5,71 +5,11 @@ export const Designer = ({ children, className, ...props }) => {
     <div
       className={cn(
         "relative h-full w-full overflow-hidden bg-(--shell-bg) text-foreground",
-        "[--designer-bg:var(--background)] [--designer-surface:var(--card)]",
+        "[--designer-bg:var(--background)]",
         "[--designer-border:var(--border)]",
         "[--designer-border-strong:var(--input)]",
-        "[--designer-hover:var(--surface-hover)]",
-        "[--designer-text-muted:var(--muted-foreground)]",
         className
       )}
-      {...props}
-    >
-      {children}
-    </div>
-  );
-};
-
-export const DesignerHeader = ({ children, className, ...props }) => {
-  return (
-    <header className={cn("hidden", className)} {...props}>
-      {children}
-    </header>
-  );
-};
-
-export const DesignerHeaderGroup = ({ children, className, ...props }) => {
-  return (
-    <div
-      className={cn("flex items-center justify-between gap-3", className)}
-      {...props}
-    >
-      {children}
-    </div>
-  );
-};
-
-export const DesignerHeaderEyebrow = ({ children, className, ...props }) => {
-  return (
-    <p
-      className={cn(
-        "m-0 font-semibold text-[11px] text-[var(--designer-text-muted)] uppercase tracking-[0.04em]",
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </p>
-  );
-};
-
-export const DesignerHeaderTitle = ({ children, className, ...props }) => {
-  return (
-    <h1
-      className={cn(
-        "m-0 font-semibold text-foreground text-lg tracking-[-0.01em]",
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </h1>
-  );
-};
-
-export const DesignerHeaderMeta = ({ children, className, ...props }) => {
-  return (
-    <div
-      className={cn("flex flex-wrap items-center gap-2", className)}
       {...props}
     >
       {children}
@@ -115,7 +55,7 @@ export const DesignerPanel = ({
 // full-height docked surface, by container tokens.
 export const DesignerPane = ({ children, className, ...props }) => {
   return (
-    <section
+    <div
       className={cn(
         "border-(length:--pane-border-width) flex min-h-0 grow-(--pane-grow) flex-col overflow-hidden rounded-(--pane-radius) border-(--pane-border) bg-(--pane-surface) shadow-(--pane-shadow)",
         className
@@ -123,7 +63,7 @@ export const DesignerPane = ({ children, className, ...props }) => {
       {...props}
     >
       {children}
-    </section>
+    </div>
   );
 };
 
