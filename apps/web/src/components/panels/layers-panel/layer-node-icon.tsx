@@ -10,6 +10,15 @@ import {
 } from "@hugeicons-pro/core-stroke-rounded";
 import { LayerGlyph } from "./layer-glyph";
 
+const NODE_TYPE_ICONS = {
+  artboard: ArtboardToolIcon,
+  empty: Layers01Icon,
+  image: FileImageIcon,
+  path: Route01Icon,
+  shape: SquareIcon,
+  vector: GeometricShapes01Icon,
+};
+
 interface LayerNodeIconProps {
   isGroup?: boolean;
   nodeType?: string | null;
@@ -19,35 +28,11 @@ export const LayerNodeIcon = ({
   isGroup = false,
   nodeType = null,
 }: LayerNodeIconProps) => {
-  if (isGroup) {
-    return <LayerGlyph icon={Folder02Icon} size={16} strokeWidth={1.8} />;
-  }
+  const icon = isGroup
+    ? Folder02Icon
+    : (NODE_TYPE_ICONS[nodeType ?? ""] ?? TextFontIcon);
 
-  if (nodeType === "artboard") {
-    return <LayerGlyph icon={ArtboardToolIcon} size={16} strokeWidth={1.8} />;
-  }
-
-  if (nodeType === "empty") {
-    return <LayerGlyph icon={Layers01Icon} size={16} strokeWidth={1.8} />;
-  }
-
-  if (nodeType === "vector") {
-    return (
-      <LayerGlyph icon={GeometricShapes01Icon} size={16} strokeWidth={1.8} />
-    );
-  }
-
-  if (nodeType === "path") {
-    return <LayerGlyph icon={Route01Icon} size={16} strokeWidth={1.8} />;
-  }
-
-  if (nodeType === "shape") {
-    return <LayerGlyph icon={SquareIcon} size={16} strokeWidth={1.8} />;
-  }
-
-  if (nodeType === "image") {
-    return <LayerGlyph icon={FileImageIcon} size={16} strokeWidth={1.8} />;
-  }
-
-  return <LayerGlyph icon={TextFontIcon} size={16} strokeWidth={1.8} />;
+  return (
+    <LayerGlyph className="size-(--layer-icon)" icon={icon} strokeWidth={1.8} />
+  );
 };

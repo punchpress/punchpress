@@ -1,7 +1,7 @@
 import { getPathNodeContours } from "@punchpress/engine";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
-import { LayerContourRow } from "./layer-tree-row";
+import { LayerTreeRowParts } from "./layer-tree-row-parts";
 
 export const getLayerEditableContours = (node) => {
   if (node?.type === "path") {
@@ -35,25 +35,43 @@ export const LayerContourListRow = ({ contourIndex, depth, nodeId }) => {
     }
   );
 
-  return (
-    <LayerContourRow
-      depth={depth}
-      isSelected={isSelected}
-      label={`Contour ${contourIndex + 1}`}
-      onSelect={() => {
-        editor.select(nodeId);
-        if (editor.startPathEditing(nodeId)) {
-          editor.setActiveTool("node");
-        }
+  const handleSelect = () => {
+    editor.select(nodeId);
+    if (editor.startPathEditing(nodeId)) {
+      editor.setActiveTool("node");
+    }
 
-        if (hasSegments) {
-          editor.setPathEditingPoint({
-            contourIndex,
-            segmentIndex: 0,
-          });
-        }
-      }}
-      tone={isClosed ? "closed" : "open"}
-    />
+    if (hasSegments) {
+      editor.setPathEditingPoint({
+        contourIndex,
+        segmentIndex: 0,
+      });
+    }
+  };
+
+  // Contours sit in the icon column of their depth so labels line up with
+  // sibling layer names; the trailing pad keeps the action column clear.
+  return (
+    <LayerTreeRowParts.Root
+      className={isSelected ? undefined : "hover:bg-(--surface-hover)"}
+      depth={depth}
+      state={isSelected ? "selected" : "idle"}
+    >
+      <LayerTreeRowParts.Spacer />
+      <button
+        className="flex h-full min-w-0 flex-1 items-center gap-1.5 border-0 bg-transparent p-0 text-left text-inherit outline-none"
+        onClick={handleSelect}
+        type="button"
+      >
+        <LayerTreeRowParts.Icon />
+        <LayerTreeRowParts.Label className="flex-1 text-foreground/72 group-data-selected/layer-row:text-inherit">
+          {`Contour ${contourIndex + 1}`}
+        </LayerTreeRowParts.Label>
+        <span className="text-(length:--section-title-text) shrink-0 font-semibold text-(--section-title-color) uppercase tracking-(--section-title-tracking) group-data-selected/layer-row:text-white/80">
+          {isClosed ? "closed" : "open"}
+        </span>
+      </button>
+      <span aria-hidden="true" className="w-(--field-icon-button) shrink-0" />
+    </LayerTreeRowParts.Root>
   );
 };

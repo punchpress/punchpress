@@ -1,16 +1,22 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 
 export const LAYER_SHORTCUTS = {
-  duplicate: "\u2318J",
+  duplicate: "⌘J",
   bringToFront: "]",
-  group: "\u2318G",
+  group: "⌘G",
   sendToBack: "[",
-  ungroup: "\u21e7\u2318G",
+  ungroup: "⇧⌘G",
 };
 
-export const LayerGlyph = ({ icon, size = 18, strokeWidth = 1.8 }) => {
+export const LayerGlyph = ({
+  className = undefined,
+  icon,
+  size = 18,
+  strokeWidth = 1.8,
+}) => {
   return (
     <HugeiconsIcon
+      className={className}
       color="currentColor"
       icon={icon}
       size={size}

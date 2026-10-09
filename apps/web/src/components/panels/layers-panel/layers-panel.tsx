@@ -27,11 +27,8 @@ const isContainerLayerNode = (node) => {
   );
 };
 
-const LAYER_ROW_HEIGHT = 32;
 const LAYER_ROW_OVERSCAN = 8;
-const LAYER_EMPTY_STATE_HEIGHT = 42;
-const LAYER_LIST_VERTICAL_PADDING = 4;
-const LAYERS_PANEL_CHROME_HEIGHT = 82;
+const LAYERS_PANEL_CHROME_HEIGHT = 70;
 const LAYERS_PANEL_LIST_MAX_HEIGHT = `calc(100vh - var(--desktop-chrome-height, 0px) - var(--desktop-panel-top-gap, 16px) - 16px - ${LAYERS_PANEL_CHROME_HEIGHT}px)`;
 
 const getDisplayedChildIds = (editor, parentId = ROOT_PARENT_ID) => {
@@ -115,9 +112,31 @@ const getVisibleLayerRowKeys = (
   });
 };
 
-const getVirtualLayerRange = (scrollTop, viewportHeight, rowCount) => {
-  const visibleStartIndex = Math.floor(scrollTop / LAYER_ROW_HEIGHT);
-  const visibleRowCount = Math.ceil(viewportHeight / LAYER_ROW_HEIGHT);
+// Virtualization needs the row pitch in pixels; layout reads the token itself.
+const readLayerRowHeight = () => {
+  return Number.parseFloat(
+    getComputedStyle(document.documentElement).getPropertyValue(
+      "--layer-row-height"
+    )
+  );
+};
+
+const getLayerRowsHeight = (rowCount: number) => {
+  return `calc(${rowCount} * var(--layer-row-height))`;
+};
+
+const getVirtualLayerRange = ({
+  rowCount,
+  rowHeight,
+  scrollTop,
+  viewportHeight,
+}) => {
+  if (!(rowHeight > 0)) {
+    return { endIndex: rowCount, startIndex: 0 };
+  }
+
+  const visibleStartIndex = Math.floor(scrollTop / rowHeight);
+  const visibleRowCount = Math.ceil(viewportHeight / rowHeight);
   const startIndex = Math.max(0, visibleStartIndex - LAYER_ROW_OVERSCAN);
   const endIndex = Math.min(
     rowCount,
@@ -228,12 +247,9 @@ const moveLayerNode = (editor, activeId, overId) => {
   reorderLayerSiblings(editor, activeId, overId, activeParentId);
 };
 
-const getLayerListHeight = (visibleLayerCount, hasLayers) => {
-  if (!hasLayers) {
-    return LAYER_EMPTY_STATE_HEIGHT;
-  }
-
-  return visibleLayerCount * LAYER_ROW_HEIGHT + LAYER_LIST_VERTICAL_PADDING;
+// Rows plus the list's bottom padding (`pb-1`); the empty state is one row.
+const getLayerListHeight = (visibleLayerCount: number) => {
+  return `calc(${getLayerRowsHeight(Math.max(1, visibleLayerCount))} + var(--spacing))`;
 };
 
 export const LayersPanel = ({ documentCommands }) => {
@@ -245,6 +261,7 @@ export const LayersPanel = ({ documentCommands }) => {
   const [isLayerReorderActive, setIsLayerReorderActive] = useState(false);
   const [layerScrollTop, setLayerScrollTop] = useState(0);
   const [layerViewportHeight, setLayerViewportHeight] = useState(0);
+  const [layerRowHeight] = useState(readLayerRowHeight);
   const [collapsedGroupIds, setCollapsedGroupIds] = useState(() => new Set());
   const [expandedDenseGroupIds, setExpandedDenseGroupIds] = useState(
     () => new Set()
@@ -276,8 +293,7 @@ export const LayersPanel = ({ documentCommands }) => {
   const duplicateRecentDocumentNames =
     getDuplicateRecentDocumentNames(recentDocuments);
   const layerListHeight = getLayerListHeight(
-    visibleLayerRows.length,
-    layerNodeIds.length > 0
+    layerNodeIds.length > 0 ? visibleLayerRows.length : 1
   );
   const isLayerSortingEnabled =
     !isCanvasSelectionDragging &&
@@ -310,11 +326,12 @@ export const LayersPanel = ({ documentCommands }) => {
       return nextCollapsedGroupIds;
     });
   }, []);
-  const { endIndex, startIndex } = getVirtualLayerRange(
-    layerScrollTop,
-    layerViewportHeight,
-    visibleLayerRows.length
-  );
+  const { endIndex, startIndex } = getVirtualLayerRange({
+    rowCount: visibleLayerRows.length,
+    rowHeight: layerRowHeight,
+    scrollTop: layerScrollTop,
+    viewportHeight: layerViewportHeight,
+  });
   const renderedLayerRows = visibleLayerRows.slice(startIndex, endIndex);
   const isRenderedLayerSortingEnabled =
     isLayerSortingEnabled &&
@@ -322,11 +339,7 @@ export const LayersPanel = ({ documentCommands }) => {
   const renderedLayerNodeIds = renderedLayerRows
     .filter((row) => row.kind === "node")
     .map((row) => row.nodeId);
-  const virtualTopPadding = startIndex * LAYER_ROW_HEIGHT;
-  const virtualBottomPadding = Math.max(
-    0,
-    (visibleLayerRows.length - endIndex) * LAYER_ROW_HEIGHT
-  );
+  const virtualBottomRowCount = Math.max(0, visibleLayerRows.length - endIndex);
   const layerRows = renderedLayerRows.map((row) => {
     if (row.kind === "contour") {
       return (
@@ -347,7 +360,6 @@ export const LayersPanel = ({ documentCommands }) => {
         key={row.nodeId}
         nodeId={row.nodeId}
         onToggleCollapse={toggleCollapsedGroup}
-        renderChildren={false}
         sortable={isRenderedLayerSortingEnabled}
       />
     );
@@ -374,7 +386,7 @@ export const LayersPanel = ({ documentCommands }) => {
     };
   }, []);
   let layerListContent = (
-    <div className="px-2 py-2.5 text-[13px] text-[var(--designer-text-muted)]">
+    <div className="text-(length:--chrome-text-sm) flex h-(--layer-row-height) items-center px-(--menu-item-px) text-muted-foreground">
       No layers yet.
     </div>
   );
@@ -388,12 +400,7 @@ export const LayersPanel = ({ documentCommands }) => {
         }
         onReorderEnd={() => setIsLayerReorderActive(false)}
         onReorderStart={() => setIsLayerReorderActive(true)}
-        renderDragOverlay={(nodeId) => (
-          <LayerTreeDragGhost
-            collapsedGroupIds={collapsedGroupIds}
-            nodeId={nodeId}
-          />
-        )}
+        renderDragOverlay={(nodeId) => <LayerTreeDragGhost nodeId={nodeId} />}
       >
         {layerRows}
       </SortableList>
@@ -421,19 +428,19 @@ export const LayersPanel = ({ documentCommands }) => {
 
         <div className="mx-2.5 h-px bg-foreground/4" />
 
-        <div className="flex items-center justify-between px-3 pt-2.5 pb-1.5">
-          <span className="font-semibold text-[12px] text-foreground/70 tracking-[-0.01em]">
+        <div className="flex min-h-(--section-header-height) items-center justify-between ps-3 pe-2 pt-1.5 pb-0.5">
+          <h2 className="text-(length:--section-title-text) font-semibold text-(--section-title-color) tracking-(--section-title-tracking) [text-transform:var(--section-title-case)]">
             Layers
-          </span>
+          </h2>
           <Button
             aria-label="New layer"
             onClick={() => editor.addEmptyLayer()}
-            size="icon-sm"
+            size="icon-field"
             title="New layer"
             type="button"
             variant="ghost"
           >
-            <PlusIcon size={15} strokeWidth={2} />
+            <PlusIcon strokeWidth={2} />
           </Button>
         </div>
 
@@ -447,18 +454,20 @@ export const LayersPanel = ({ documentCommands }) => {
           scrollbarGutter
           scrollFade
           style={{
-            height: `${layerListHeight}px`,
+            height: layerListHeight,
             maxHeight: LAYERS_PANEL_LIST_MAX_HEIGHT,
           }}
           viewportRef={scrollViewportRef}
         >
-          <div className="flex flex-col gap-[0.5px] px-1 pb-1">
-            {virtualTopPadding > 0 ? (
-              <div style={{ height: `${virtualTopPadding}px` }} />
+          <div className="flex flex-col px-1 pb-1" data-testid="layers-list">
+            {startIndex > 0 ? (
+              <div style={{ height: getLayerRowsHeight(startIndex) }} />
             ) : null}
             {layerListContent}
-            {virtualBottomPadding > 0 ? (
-              <div style={{ height: `${virtualBottomPadding}px` }} />
+            {virtualBottomRowCount > 0 ? (
+              <div
+                style={{ height: getLayerRowsHeight(virtualBottomRowCount) }}
+              />
             ) : null}
           </div>
         </ScrollArea>
