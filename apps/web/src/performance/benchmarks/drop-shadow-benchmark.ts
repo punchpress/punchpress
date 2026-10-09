@@ -18,6 +18,7 @@ import {
   getMaxStackZoom,
   getShadowScrubPatch,
 } from "./drop-shadow-benchmark-scene";
+import { openLayerSettings } from "./open-layer-settings";
 import {
   captureViewportHost,
   getCameraCenteredOn,
@@ -50,6 +51,8 @@ const appearanceDraggingShadowBenchmark: PerformanceBenchmarkDefinition = {
 
 // Every node carries a blur-24 shadow; the selected center node also has a
 // center stroke. The scrub edits the shadow; the control edits the stroke.
+// Both open the shadow settings popover so the scrubbed offset and blur
+// fields are mounted, as they are while a user scrubs them.
 const createShadowScrubBenchmark = (
   control: boolean
 ): PerformanceBenchmarkDefinition => {
@@ -82,6 +85,7 @@ const createShadowScrubBenchmark = (
       positionViewport(editor, getCenteredViewport(editor, 1));
       editor.setSelectedNodes([targetId]);
       await waitForFrames(4);
+      await openLayerSettings("Shadow", waitForFrames);
     },
     run: (context) => scrubSelected(context, control),
     usesScratchDocument: true,
