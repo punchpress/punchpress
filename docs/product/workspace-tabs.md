@@ -22,6 +22,16 @@ files.
 - Opening an already-open file focuses its tab.
 - Opening a file never replaces the scratchpad or another file-backed tab.
 
+## Tab Bar
+
+- Tabs sit in a full-width title bar as flat segments; the active tab shares
+  the canvas background and joins the document below.
+- The scratchpad is a compact pinned icon tab, always first.
+- File tabs show their name and a slot on the right: a dot for unsaved
+  changes, replaced by the close button on hover or on a clean active tab.
+- Tab widths do not change with their names; when tabs overflow the bar,
+  the strip scrolls sideways and the new-tab button stays after the last tab.
+
 ## Scratchpad
 
 - The scratchpad is local internal document storage, not a user-selected file.

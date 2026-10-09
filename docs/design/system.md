@@ -69,16 +69,40 @@ controls, and `--surface-radius` (8px) for floating surfaces.
   a 13px title, and `chrome` footer buttons.
 - The tool dock and selection toolbar are the `Toolbar` primitives:
   `--toolbar-radius` surface, `--toolbar-pad`, and 28px `icon-toolbar` buttons
-  (`toolbar` for text actions). Tabs are `--tab-height` with `chrome` buttons.
+  (`toolbar` for text actions).
 - Layers rows read `--layer-row-height`, `--layer-indent`, and `--layer-icon`.
 
 Button sizes: `chrome` / `icon-chrome` (24px, the default), `toolbar` /
-`icon-toolbar` (28px), `field` / `icon-field` (22px / 20px). Toggle has
+`icon-toolbar` (28px), `field` / `icon-field` (22px / 20px), and
+`icon-tab` (a square, full-height title bar segment). Toggle has
 `field`, `icon-field`, and `icon-toolbar`. `Input` has `chrome` (the default,
 for search boxes in popovers and the command menu) and `field`. `SelectTrigger`,
 `ScrubSlider`, `ColorPickerField`, and `IconSegmentedControlItem` only come in
 `field`. These are the only sizes; add a token-backed size before reaching for
 a one-off height.
+
+## Title Bar and Tabs
+
+The workspace tabs sit in a full-width 40px title bar (`DesignerTitleBar`):
+the `--titlebar-bg` surface, a bottom hairline (`--titlebar-shadow`), and
+content starting after the desktop traffic-light inset. Empty bar space drags
+the desktop window; tab controls are `no-drag`.
+
+Tabs are the `Tab` family in `ui/tab.tsx`: flat full-height segments, no
+radius, split by `--tab-divider` hairlines (one also sits before the first
+tab). Inactive tabs show the bar surface with `--tab-fg` text and a
+`--tab-bg-hover` wash. The active tab takes `--designer-bg`, medium
+`--tab-fg-active` text, and covers the bar's hairline so it joins the canvas.
+Text tabs run `--tab-max-width` (200px) and shrink to `--tab-min-width`
+(120px) before the strip scrolls; titles truncate and never set the width.
+`TabClose` owns the status slot right of the title: the unsaved dot
+(`--tab-dirty`), swapped for the close button on hover, keyboard focus, or a
+clean active tab. The Scratchpad is a pinned icon tab (`size="icon"`,
+`TabIconTrigger` with a tooltip); the new-tab button is `variant="tab"`
+`size="icon-tab"`.
+
+On desktop the shell sets `--titlebar-inset-top` (6px) so segment content
+centers on the traffic lights (23px) instead of the bar (20px).
 
 ## UI Typography
 
