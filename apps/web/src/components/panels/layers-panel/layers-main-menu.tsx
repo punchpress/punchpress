@@ -48,18 +48,14 @@ export const LayersMainMenu = ({
           <ChevronDownIcon className="size-4 opacity-80" strokeWidth={2.2} />
         </span>
       </Button>
-      <MenuPopup
-        align="start"
-        className="min-w-[var(--menu-min-width)]"
-        sideOffset={12}
-      >
+      <MenuPopup align="start" sideOffset={12}>
         <MenuGroup>
           <MenuItem
             onClick={() => {
               runDocumentCommandSafely("new");
             }}
           >
-            <FilePlus2Icon size={15} />
+            <FilePlus2Icon />
             New
             <MenuShortcut>⌘N</MenuShortcut>
           </MenuItem>
@@ -68,7 +64,7 @@ export const LayersMainMenu = ({
               runDocumentCommandSafely("open");
             }}
           >
-            <FolderOpenIcon size={15} />
+            <FolderOpenIcon />
             Open
             <MenuShortcut>⌘O</MenuShortcut>
           </MenuItem>
@@ -77,7 +73,7 @@ export const LayersMainMenu = ({
               runDocumentCommandSafely("import-svg");
             }}
           >
-            <FileInputIcon size={15} />
+            <FileInputIcon />
             Import SVG...
           </MenuItem>
           {children}
@@ -86,7 +82,7 @@ export const LayersMainMenu = ({
               runDocumentCommandSafely("save");
             }}
           >
-            <SaveIcon size={15} />
+            <SaveIcon />
             Save
             <MenuShortcut>⌘S</MenuShortcut>
           </MenuItem>
@@ -95,7 +91,7 @@ export const LayersMainMenu = ({
               runDocumentCommandSafely("save-as");
             }}
           >
-            <SaveIcon size={15} />
+            <SaveIcon />
             Save As...
             <MenuShortcut>⇧⌘S</MenuShortcut>
           </MenuItem>
@@ -104,7 +100,7 @@ export const LayersMainMenu = ({
               runDocumentCommandSafely("export");
             }}
           >
-            <DownloadIcon size={15} />
+            <DownloadIcon />
             Export
             <MenuShortcut>⌘E</MenuShortcut>
           </MenuItem>

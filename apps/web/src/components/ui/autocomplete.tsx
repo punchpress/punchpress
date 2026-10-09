@@ -30,7 +30,7 @@ export function AutocompleteInput({
       {startAddon ? (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 start-px z-10 flex items-center ps-[calc(--spacing(3)-1px)] opacity-80 has-[+[data-size=sm]]:ps-[calc(--spacing(2.5)-1px)] [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:-mx-0.5"
+          className="pointer-events-none absolute inset-y-0 start-px z-10 flex items-center ps-[calc(--spacing(3)-1px)] opacity-80 has-[+[data-size=sm]]:ps-[calc(--spacing(2.5)-1px)] [&_svg:not([class*='size-'])]:size-(--chrome-icon)"
           data-slot="autocomplete-start-addon"
         >
           {startAddon}
@@ -81,7 +81,7 @@ export function AutocompleteItem({ className, children, ...props }) {
   return (
     <AutocompletePrimitive.Item
       className={cn(
-        "flex min-h-8 cursor-default select-none items-center rounded-sm px-2 py-1 text-base outline-none data-disabled:pointer-events-none data-highlighted:bg-accent data-highlighted:text-accent-foreground data-disabled:opacity-64 sm:min-h-7 sm:text-sm",
+        "text-(length:--chrome-text) flex min-h-(--menu-item-height) cursor-default select-none items-center gap-2 rounded-(--chrome-radius) px-(--menu-item-px) py-0.5 outline-none data-disabled:pointer-events-none data-highlighted:bg-accent data-highlighted:text-accent-foreground data-disabled:opacity-64 [&>svg:not([class*='size-'])]:size-(--chrome-icon) [&>svg]:pointer-events-none [&>svg]:shrink-0",
         className
       )}
       data-slot="autocomplete-item"
@@ -95,7 +95,10 @@ export function AutocompleteItem({ className, children, ...props }) {
 export function AutocompleteSeparator({ className, ...props }) {
   return (
     <AutocompletePrimitive.Separator
-      className={cn("mx-2 my-1 h-px bg-border last:hidden", className)}
+      className={cn(
+        "mx-(--menu-item-px) my-(--menu-pad) h-px bg-border last:hidden",
+        className
+      )}
       data-slot="autocomplete-separator"
       {...props}
     />
@@ -105,7 +108,7 @@ export function AutocompleteSeparator({ className, ...props }) {
 export function AutocompleteGroup({ className, ...props }) {
   return (
     <AutocompletePrimitive.Group
-      className={cn("[[role=group]+&]:mt-1.5", className)}
+      className={cn("[[role=group]+&]:mt-(--menu-pad)", className)}
       data-slot="autocomplete-group"
       {...props}
     />
@@ -116,7 +119,7 @@ export function AutocompleteGroupLabel({ className, ...props }) {
   return (
     <AutocompletePrimitive.GroupLabel
       className={cn(
-        "px-2 py-1.5 font-medium text-muted-foreground text-xs",
+        "text-(length:--section-title-text) flex h-(--menu-item-height) items-center px-(--menu-item-px) font-semibold text-(--section-title-color) tracking-(--section-title-tracking) [text-transform:var(--section-title-case)]",
         className
       )}
       data-slot="autocomplete-group-label"
@@ -129,7 +132,7 @@ export function AutocompleteEmpty({ className, ...props }) {
   return (
     <AutocompletePrimitive.Empty
       className={cn(
-        "not-empty:p-2 text-center text-base text-muted-foreground sm:text-sm",
+        "text-(length:--chrome-text) not-empty:p-2 text-center text-muted-foreground",
         className
       )}
       data-slot="autocomplete-empty"
@@ -143,7 +146,7 @@ export function AutocompleteList({ className, ...props }) {
     <ScrollArea scrollbarGutter scrollFade>
       <AutocompletePrimitive.List
         className={cn(
-          "not-empty:scroll-py-1 not-empty:p-1 in-data-has-overflow-y:pe-3",
+          "not-empty:scroll-py-(--menu-pad) not-empty:p-(--menu-pad) in-data-has-overflow-y:pe-3",
           className
         )}
         data-slot="autocomplete-list"

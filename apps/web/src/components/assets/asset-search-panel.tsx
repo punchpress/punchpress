@@ -182,7 +182,7 @@ export const AssetSearchPanel = ({
   } else {
     resultsContent = (
       <>
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(144px,1fr))] gap-2.5">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(144px,1fr))] gap-2">
           {assets.map((asset) => (
             <AssetCard
               asset={asset}
@@ -193,10 +193,10 @@ export const AssetSearchPanel = ({
           ))}
         </div>
         {loading || hasMoreResults ? (
-          <div className="flex h-14 items-center justify-center text-muted-foreground text-sm">
+          <div className="text-(length:--chrome-text-sm) flex h-12 items-center justify-center gap-1.5 text-muted-foreground">
             {loading ? (
               <>
-                <Loader2Icon className="mr-2 size-4 animate-spin" />
+                <Loader2Icon className="size-(--chrome-icon) animate-spin" />
                 Loading more
               </>
             ) : (
@@ -211,7 +211,7 @@ export const AssetSearchPanel = ({
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-background text-foreground">
       <form
-        className="flex shrink-0 items-center gap-2 border-border border-b px-4 py-3"
+        className="flex shrink-0 items-center gap-2 border-border border-b p-2"
         onSubmit={(event) => {
           event.preventDefault();
           submitSearch();
@@ -231,7 +231,7 @@ export const AssetSearchPanel = ({
             value={term}
           />
         </InputGroup>
-        <Button disabled={loading} size="sm" type="submit">
+        <Button disabled={loading} size="chrome" type="submit">
           {loading ? <Loader2Icon className="animate-spin" /> : <SearchIcon />}
           Search
         </Button>
@@ -242,7 +242,7 @@ export const AssetSearchPanel = ({
         onViewportScroll={handleResultsScroll}
         scrollbarGutter
       >
-        <div className="p-3">{resultsContent}</div>
+        <div className="p-(--popover-pad)">{resultsContent}</div>
       </ScrollArea>
     </div>
   );
@@ -273,7 +273,7 @@ const mergeAssetResults = (
 
 const AssetPanelEmpty = ({ children, icon }) => {
   return (
-    <div className="grid min-h-80 place-items-center text-center text-muted-foreground text-sm">
+    <div className="text-(length:--chrome-text) grid min-h-80 place-items-center text-center text-muted-foreground">
       <div className="flex max-w-72 flex-col items-center gap-2">
         <div className="text-foreground">{icon}</div>
         <p className="m-0 text-pretty">{children}</p>
@@ -302,13 +302,13 @@ const AssetCard = ({
 
   return (
     <button
-      className="group relative min-w-0 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+      className="group relative min-w-0 rounded-(--surface-radius) outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
       disabled={importing || !format}
       onClick={onAdd}
       title={title}
       type="button"
     >
-      <div className="grid aspect-square w-full place-items-center overflow-hidden rounded-lg bg-muted/70 outline-1 outline-black/5 -outline-offset-1 group-hover:outline-ring">
+      <div className="grid aspect-square w-full place-items-center overflow-hidden rounded-(--surface-radius) bg-muted/70 outline-1 outline-black/5 -outline-offset-1 group-hover:outline-ring">
         {previewUrl ? (
           <img
             alt=""
@@ -323,24 +323,24 @@ const AssetCard = ({
         )}
       </div>
       {format ? (
-        <span className="absolute top-1.5 right-1.5 rounded bg-background/90 px-1.5 py-0.5 font-medium text-[10px] text-foreground uppercase shadow-sm">
+        <span className="text-(length:--section-title-text) absolute top-1.5 right-1.5 rounded-(--chrome-radius) bg-background/90 px-1.5 py-0.5 font-medium text-foreground uppercase tracking-(--section-title-tracking) shadow-sm">
           {format}
         </span>
       ) : null}
       <span
         className={cn(
-          "absolute inset-x-1.5 bottom-1.5 flex translate-y-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 font-medium text-xs opacity-0 shadow-sm group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100 group-disabled:hidden",
+          "text-(length:--chrome-text) absolute inset-x-1.5 bottom-1.5 flex h-(--menu-item-height) translate-y-1 items-center justify-center gap-1.5 rounded-(--chrome-radius) px-(--menu-item-px) font-medium opacity-0 shadow-sm group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100 group-disabled:hidden",
           canAdd
             ? "bg-primary text-primary-foreground"
             : "bg-background/92 text-muted-foreground"
         )}
       >
-        <PlusIcon className="size-3.5" />
+        <PlusIcon className="size-(--chrome-icon)" />
         Add
       </span>
       {importing ? (
-        <div className="absolute inset-0 grid place-items-center rounded-lg bg-background/72">
-          <Loader2Icon className="size-4 animate-spin" />
+        <div className="absolute inset-0 grid place-items-center rounded-(--surface-radius) bg-background/72">
+          <Loader2Icon className="size-(--chrome-icon) animate-spin" />
         </div>
       ) : null}
     </button>

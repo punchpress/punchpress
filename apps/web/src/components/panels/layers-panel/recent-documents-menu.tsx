@@ -17,7 +17,7 @@ export const RecentDocumentsMenu = ({
   if (recentDocuments.length === 0) {
     return (
       <MenuItem disabled>
-        <FolderOpenIcon size={15} />
+        <FolderOpenIcon />
         Open Recent
       </MenuItem>
     );
@@ -26,7 +26,7 @@ export const RecentDocumentsMenu = ({
   return (
     <MenuSub>
       <MenuSubTrigger>
-        <FolderOpenIcon size={15} />
+        <FolderOpenIcon />
         Open Recent
       </MenuSubTrigger>
       <MenuSubPopup>
@@ -50,7 +50,7 @@ export const RecentDocumentsMenu = ({
                     {recentDocument.fileName}
                   </span>
                   {secondaryLabel ? (
-                    <span className="block truncate text-[11px] text-muted-foreground">
+                    <span className="text-(length:--chrome-text-sm) block truncate text-muted-foreground">
                       {secondaryLabel}
                     </span>
                   ) : null}

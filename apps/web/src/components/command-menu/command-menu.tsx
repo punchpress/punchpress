@@ -231,7 +231,7 @@ export const CommandMenu = () => {
                               onClick={openAssets}
                               value={item}
                             >
-                              <Icon className="size-4 text-muted-foreground" />
+                              <Icon className="text-muted-foreground" />
                               <span className="flex-1">{item.label}</span>
                               <CommandShortcut>Open</CommandShortcut>
                             </CommandItem>
@@ -281,12 +281,12 @@ export const CommandMenu = () => {
           </Command>
         ) : (
           <div className="relative z-10 flex h-[min(720px,calc(100vh-64px))] min-h-0 flex-col overflow-hidden rounded-[inherit] bg-background">
-            <div className="flex shrink-0 items-center gap-2 border-border border-b px-3 py-2">
-              <Button onClick={reset} size="sm" variant="ghost">
+            <div className="flex shrink-0 items-center gap-2 border-border border-b p-(--menu-pad)">
+              <Button onClick={reset} size="chrome" variant="ghost">
                 <ArrowLeftIcon />
                 Back
               </Button>
-              <div className="min-w-0 flex-1 truncate text-muted-foreground text-sm">
+              <div className="text-(length:--chrome-text) min-w-0 flex-1 truncate text-muted-foreground">
                 Assets
               </div>
             </div>

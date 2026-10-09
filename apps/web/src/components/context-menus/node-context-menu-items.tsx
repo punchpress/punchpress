@@ -53,20 +53,20 @@ const GroupNodeContextMenuItems = ({
     <>
       {canGroupSelection && (
         <ContextMenuItem onClick={() => editor.groupSelected()}>
-          <LayerGlyph icon={GroupLayersIcon} size={17} strokeWidth={1.7} />
+          <LayerGlyph icon={GroupLayersIcon} strokeWidth={1.7} />
           Group selection
           <ContextMenuShortcut>{LAYER_SHORTCUTS.group}</ContextMenuShortcut>
         </ContextMenuItem>
       )}
       {canUngroup && onStartRenaming ? (
         <ContextMenuItem onClick={onStartRenaming}>
-          <LayerGlyph icon={Edit01Icon} size={17} strokeWidth={1.7} />
+          <LayerGlyph icon={Edit01Icon} strokeWidth={1.7} />
           Rename group…
         </ContextMenuItem>
       ) : null}
       {canUngroup ? (
         <ContextMenuItem onClick={() => editor.ungroup(singleTargetNodeId)}>
-          <LayerGlyph icon={UngroupLayersIcon} size={17} strokeWidth={1.7} />
+          <LayerGlyph icon={UngroupLayersIcon} strokeWidth={1.7} />
           Ungroup
           <ContextMenuShortcut>{LAYER_SHORTCUTS.ungroup}</ContextMenuShortcut>
         </ContextMenuItem>
@@ -117,11 +117,7 @@ const CompoundNodeContextMenuItems = ({
         <ContextMenuItem
           onClick={() => editor.convertShapeToPath(singleTargetNodeId)}
         >
-          <LayerGlyph
-            icon={GeometricShapes01Icon}
-            size={17}
-            strokeWidth={1.7}
-          />
+          <LayerGlyph icon={GeometricShapes01Icon} strokeWidth={1.7} />
           Convert to path
         </ContextMenuItem>
       ) : null}
@@ -129,54 +125,38 @@ const CompoundNodeContextMenuItems = ({
         <ContextMenuItem
           onClick={() => editor.releaseCompoundPath(targetNodeIds)}
         >
-          <LayerGlyph icon={UngroupLayersIcon} size={17} strokeWidth={1.7} />
+          <LayerGlyph icon={UngroupLayersIcon} strokeWidth={1.7} />
           Release Compound Path
         </ContextMenuItem>
       ) : null}
       {canMergeCurves ? (
         <ContextMenuItem onClick={() => mergeCurves(targetNodeIds)}>
-          <LayerGlyph
-            icon={GeometricShapes01Icon}
-            size={17}
-            strokeWidth={1.7}
-          />
+          <LayerGlyph icon={GeometricShapes01Icon} strokeWidth={1.7} />
           Merge Curves
         </ContextMenuItem>
       ) : null}
       {canSeparateCurves ? (
         <ContextMenuItem onClick={() => editor.separateCurves(targetNodeIds)}>
-          <LayerGlyph icon={UngroupLayersIcon} size={17} strokeWidth={1.7} />
+          <LayerGlyph icon={UngroupLayersIcon} strokeWidth={1.7} />
           Separate Curves
         </ContextMenuItem>
       ) : null}
       {canJoinCurves ? (
         <ContextMenuItem onClick={() => editor.joinCurves(targetNodeIds)}>
-          <LayerGlyph
-            icon={GeometricShapes01Icon}
-            size={17}
-            strokeWidth={1.7}
-          />
+          <LayerGlyph icon={GeometricShapes01Icon} strokeWidth={1.7} />
           Join Curves
         </ContextMenuItem>
       ) : null}
       {!canReleaseCompoundPath && canMakeCompoundPath ? (
         <ContextMenuItem onClick={() => editor.makeCompoundPath(targetNodeIds)}>
-          <LayerGlyph
-            icon={GeometricShapes01Icon}
-            size={17}
-            strokeWidth={1.7}
-          />
+          <LayerGlyph icon={GeometricShapes01Icon} strokeWidth={1.7} />
           Make Compound Path
         </ContextMenuItem>
       ) : null}
       {compoundOperationTarget ? (
         <ContextMenuSub>
           <ContextMenuSubTrigger>
-            <LayerGlyph
-              icon={GeometricShapes01Icon}
-              size={17}
-              strokeWidth={1.7}
-            />
+            <LayerGlyph icon={GeometricShapes01Icon} strokeWidth={1.7} />
             Compound Operation
           </ContextMenuSubTrigger>
           <ContextMenuSubPopup>
@@ -251,7 +231,7 @@ const NodeContextMenuContent = ({
       />
 
       <ContextMenuItem onClick={() => editor.duplicate(nodeId)}>
-        <LayerGlyph icon={Copy01Icon} size={17} strokeWidth={1.7} />
+        <LayerGlyph icon={Copy01Icon} strokeWidth={1.7} />
         Duplicate
         <ContextMenuShortcut>{LAYER_SHORTCUTS.duplicate}</ContextMenuShortcut>
       </ContextMenuItem>
@@ -266,7 +246,6 @@ const NodeContextMenuContent = ({
       >
         <LayerGlyph
           icon={contextMenuState.nextVisibility ? ViewIcon : ViewOffIcon}
-          size={17}
           strokeWidth={1.7}
         />
         {contextMenuState.visibilityLabel}
@@ -298,7 +277,7 @@ const NodeContextMenuContent = ({
         }
         onClick={() => editor.bringToFront(nodeId)}
       >
-        <LayerGlyph icon={LayerBringToFrontIcon} size={17} strokeWidth={1.7} />
+        <LayerGlyph icon={LayerBringToFrontIcon} strokeWidth={1.7} />
         Bring to front
         <ContextMenuShortcut>
           {LAYER_SHORTCUTS.bringToFront}
@@ -311,16 +290,16 @@ const NodeContextMenuContent = ({
         }
         onClick={() => editor.sendToBack(nodeId)}
       >
-        <LayerGlyph icon={LayerSendToBackIcon} size={17} strokeWidth={1.7} />
+        <LayerGlyph icon={LayerSendToBackIcon} strokeWidth={1.7} />
         Send to back
         <ContextMenuShortcut>{LAYER_SHORTCUTS.sendToBack}</ContextMenuShortcut>
       </ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuItem
-        className="text-destructive-foreground data-highlighted:bg-destructive/10 data-highlighted:text-destructive-foreground"
         onClick={() => editor.deleteNode(nodeId)}
+        variant="destructive"
       >
-        <LayerGlyph icon={Delete02Icon} size={17} strokeWidth={1.7} />
+        <LayerGlyph icon={Delete02Icon} strokeWidth={1.7} />
         Delete
       </ContextMenuItem>
     </>
