@@ -37,7 +37,7 @@ const tabVariants = cva(
 );
 
 const triggerClassName =
-  "flex h-full w-full min-w-0 cursor-pointer items-center pt-(--titlebar-inset-top) outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset";
+  "flex h-full w-full min-w-0 cursor-pointer items-center outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset";
 
 interface TabState {
   active: boolean;
@@ -150,7 +150,7 @@ export const TabClose = ({
 
   return (
     <span
-      className="absolute top-(--titlebar-inset-top) right-(--tab-px) bottom-0 grid w-(--tab-slot) place-items-center"
+      className="absolute inset-y-0 right-(--tab-px) grid w-(--tab-slot) place-items-center"
       data-slot="tab-status"
     >
       <Button

@@ -51,7 +51,7 @@ export const WorkspaceTabs = ({ onCloseTab, onNewFile }) => {
         ))}
       </div>
 
-      <div className="flex shrink-0 items-center pt-(--titlebar-inset-top) pl-(--tab-add-gap)">
+      <div className="flex shrink-0 items-center pl-(--tab-add-gap)">
         <Button
           aria-label="New file"
           className="no-drag"

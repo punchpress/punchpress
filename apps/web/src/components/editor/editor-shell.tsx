@@ -24,20 +24,15 @@ import { DesktopUpdateIndicator } from "./desktop-update-indicator";
 const SHELL_CHROME_VARS = {
   desktop: {
     "--desktop-chrome-height": "40px",
-    "--desktop-drag-left-inset": "96px",
+    "--desktop-drag-left-inset": "88px",
     "--desktop-panel-top-gap": "4px",
     "--shell-logo-offset-x": "-7px",
-    // Centers title bar content on the traffic lights: Electron places them
-    // at y 16 and they are 14px tall, a 23px center; padding the 40px bar's
-    // segments by 6px moves their content center from 20px to 23px.
-    "--titlebar-inset-top": "6px",
   },
   web: {
     "--desktop-chrome-height": "40px",
     "--desktop-drag-left-inset": "0px",
     "--desktop-panel-top-gap": "16px",
     "--shell-logo-offset-x": "-7px",
-    "--titlebar-inset-top": "0px",
   },
 };
 

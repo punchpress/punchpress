@@ -90,9 +90,11 @@ export const createMainWindowController = () => {
         : {}),
       frame: false,
       backgroundColor: "#121212",
+      // Centers the ~13px lights on the 40px title bar (y 13 to 26), with
+      // the left gap matching the top gap.
       trafficLightPosition: {
-        x: 18,
-        y: 16,
+        x: 15,
+        y: 13,
       },
       webPreferences: {
         preload: path.join(import.meta.dirname, "../preload/preload.cjs"),
