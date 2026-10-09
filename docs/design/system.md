@@ -73,8 +73,7 @@ controls, and `--surface-radius` (8px) for floating surfaces.
 - Layers rows read `--layer-row-height`, `--layer-indent`, and `--layer-icon`.
 
 Button sizes: `chrome` / `icon-chrome` (24px, the default), `toolbar` /
-`icon-toolbar` (28px), `field` / `icon-field` (22px / 20px), and
-`icon-tab` (a square, full-height title bar segment). Toggle has
+`icon-toolbar` (28px), `field` / `icon-field` (22px / 20px). Toggle has
 `field`, `icon-field`, and `icon-toolbar`. `Input` has `chrome` (the default,
 for search boxes in popovers and the command menu) and `field`. `SelectTrigger`,
 `ScrubSlider`, `ColorPickerField`, and `IconSegmentedControlItem` only come in
@@ -89,17 +88,21 @@ content starting after the desktop traffic-light inset. Empty bar space drags
 the desktop window; tab controls are `no-drag`.
 
 Tabs are the `Tab` family in `ui/tab.tsx`: flat full-height segments, no
-radius, split by `--tab-divider` hairlines (one also sits before the first
-tab). Inactive tabs show the bar surface with `--tab-fg` text and a
-`--tab-bg-hover` wash. The active tab takes `--designer-bg`, medium
-`--tab-fg-active` text, and covers the bar's hairline so it joins the canvas.
-Text tabs run `--tab-max-width` (200px) and shrink to `--tab-min-width`
-(120px) before the strip scrolls; titles truncate and never set the width.
-`TabClose` owns the status slot right of the title: the unsaved dot
-(`--tab-dirty`), swapped for the close button on hover, keyboard focus, or a
-clean active tab. The Scratchpad is a pinned icon tab (`size="icon"`,
-`TabIconTrigger` with a tooltip); the new-tab button is `variant="tab"`
-`size="icon-tab"`.
+radius, each with a `--tab-divider` hairline on both sides (neighbors overlap
+by 1px), so the last tab always ends on a divider. Inactive tabs show the bar
+surface with `--tab-fg` text and a `--tab-bg-hover` wash. The active tab takes
+`--designer-bg`, medium `--tab-fg-active` text, and covers the bar's hairline
+so it joins the canvas. Text tabs fit their content (padding, title, the
+reserved status slot), clamped to `--tab-min-width` (96px) and
+`--tab-max-width` (200px); titles truncate at the max, and overflowing tabs
+shrink toward the min before the strip scrolls. `TabClose` owns the status
+slot right of the title: a 6px muted unsaved dot (`--tab-dirty`, slightly
+stronger `--tab-dirty-active` on the active tab), swapped for the close
+button on hover, keyboard focus, or a clean active tab. The Scratchpad is a
+pinned icon tab (`size="icon"`, `TabIconTrigger` with a tooltip, a
+`--tab-icon` 16px glyph). The new-tab button is not a tab: a borderless
+`variant="tab"` `icon-chrome` button with a rounded `--tab-add-hover` wash,
+`--tab-add-gap` after the last divider.
 
 On desktop the shell sets `--titlebar-inset-top` (6px) so segment content
 centers on the traffic lights (23px) instead of the bar (20px).

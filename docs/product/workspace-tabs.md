@@ -29,8 +29,9 @@ files.
 - The scratchpad is a compact pinned icon tab, always first.
 - File tabs show their name and a slot on the right: a dot for unsaved
   changes, replaced by the close button on hover or on a clean active tab.
-- Tab widths do not change with their names; when tabs overflow the bar,
-  the strip scrolls sideways and the new-tab button stays after the last tab.
+- File tabs fit their names up to a maximum width, then truncate; when tabs
+  overflow the bar they shrink toward a minimum, then the strip scrolls
+  sideways. The new-tab button stays just after the last tab.
 
 ## Scratchpad
 
