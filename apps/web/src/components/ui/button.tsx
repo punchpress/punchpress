@@ -15,13 +15,24 @@ const buttonVariants = cva(
     },
     variants: {
       size: {
+        // `chrome` sizes follow the chrome tokens in global.css: menus,
+        // dialogs, popovers, and panel headers.
+        chrome:
+          "text-(length:--chrome-text) sm:text-(length:--chrome-text) h-(--menu-item-height) gap-1.5 rounded-(--chrome-radius) px-(--menu-item-px) sm:h-(--menu-item-height) [&_svg:not([class*='size-'])]:size-(--chrome-icon) sm:[&_svg:not([class*='size-'])]:size-(--chrome-icon)",
         default: "h-9 px-[calc(--spacing(3)-1px)] sm:h-8",
         // `field` sizes follow the density tokens in global.css.
         field:
           "text-(length:--field-text) sm:text-(length:--field-text) h-(--field-height) gap-1 rounded-(--field-radius) px-(--field-px) sm:h-(--field-height) [&_svg:not([class*='size-'])]:size-3.5 sm:[&_svg:not([class*='size-'])]:size-3.5",
         icon: "size-9 sm:size-8",
+        // Text actions that sit beside `icon-toolbar` buttons.
+        toolbar:
+          "text-(length:--chrome-text) sm:text-(length:--chrome-text) h-(--toolbar-button) gap-1.5 rounded-(--chrome-radius) px-(--menu-item-px) sm:h-(--toolbar-button) [&_svg:not([class*='size-'])]:size-(--chrome-icon) sm:[&_svg:not([class*='size-'])]:size-(--chrome-icon)",
+        "icon-chrome":
+          "size-(--menu-item-height) rounded-(--chrome-radius) sm:size-(--menu-item-height) [&_svg:not([class*='size-'])]:size-(--chrome-icon) sm:[&_svg:not([class*='size-'])]:size-(--chrome-icon)",
         "icon-field":
           "size-(--field-icon-button) rounded-(--field-radius) sm:size-(--field-icon-button) [&_svg:not([class*='size-'])]:size-3.5 sm:[&_svg:not([class*='size-'])]:size-3.5",
+        "icon-toolbar":
+          "size-(--toolbar-button) rounded-(--chrome-radius) sm:size-(--toolbar-button) [&_svg:not([class*='size-'])]:size-(--toolbar-icon) sm:[&_svg:not([class*='size-'])]:size-(--toolbar-icon)",
         "icon-lg": "size-10 sm:size-9",
         "icon-sm": "size-8 sm:size-7",
         "icon-xl":

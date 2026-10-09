@@ -22,6 +22,8 @@ const toggleVariants = cva(
           "text-(length:--field-text) sm:text-(length:--field-text) h-(--field-height) min-w-(--field-height) rounded-(--field-radius) px-(--field-px) before:rounded-[calc(var(--field-radius)-1px)] sm:h-(--field-height) sm:min-w-(--field-height)",
         "icon-field":
           "size-(--field-icon-button) min-w-(--field-icon-button) rounded-(--field-radius) p-0 before:rounded-[calc(var(--field-radius)-1px)] sm:size-(--field-icon-button) sm:min-w-(--field-icon-button) [&_svg:not([class*='size-'])]:size-3.5 sm:[&_svg:not([class*='size-'])]:size-3.5",
+        "icon-toolbar":
+          "size-(--toolbar-button) min-w-(--toolbar-button) rounded-(--chrome-radius) p-0 before:rounded-[calc(var(--chrome-radius)-1px)] sm:size-(--toolbar-button) sm:min-w-(--toolbar-button) [&_svg:not([class*='size-'])]:size-(--toolbar-icon) sm:[&_svg:not([class*='size-'])]:size-(--toolbar-icon)",
         lg: "h-10 min-w-10 px-[calc(--spacing(2.5)-1px)] sm:h-9 sm:min-w-9",
         sm: "h-8 min-w-8 px-[calc(--spacing(1.5)-1px)] sm:h-7 sm:min-w-7",
       },

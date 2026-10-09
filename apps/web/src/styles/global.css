@@ -753,6 +753,37 @@ body[data-color-picker-open="true"] {
   --section-title-color: var(--muted-foreground);
 }
 
+/*
+ * Chrome density: menus, popovers, tooltips, dialogs, the layers tree, tabs,
+ * and toolbars use the same Pro scale as the inspector. Controls are 4px
+ * radius; floating surfaces round a little more.
+ */
+:root {
+  --chrome-text: 12px;
+  --chrome-text-sm: 11px;
+  --chrome-icon: 14px;
+  --chrome-radius: 4px;
+  --surface-radius: 8px;
+  --menu-item-height: 24px;
+  --menu-item-px: 8px;
+  --menu-pad: 4px;
+  --menu-radius: var(--surface-radius);
+  --popover-pad: 10px;
+  --tooltip-height: 20px;
+  --tooltip-px: 6px;
+  --dialog-radius: 12px;
+  --dialog-pad: 16px;
+  --dialog-title-text: 13px;
+  --layer-row-height: 24px;
+  --layer-indent: 12px;
+  --layer-icon: 14px;
+  --tab-height: 26px;
+  --toolbar-button: 28px;
+  --toolbar-icon: 16px;
+  --toolbar-pad: 3px;
+  --toolbar-radius: 8px;
+}
+
 @keyframes canvas-caret-blink {
   0%,
   45% {
