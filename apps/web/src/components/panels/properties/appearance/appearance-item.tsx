@@ -21,7 +21,7 @@ import { AppearancePaintSwatch } from "./appearance-paint-swatch";
 
 // One layer row: drag handle, visibility, paint color with opacity, remove.
 // `children` stay visible beneath the row (stroke width); `details` (paint
-// kind, stroke style) show beneath it or in a settings popover, by density.
+// kind, stroke style) open in the row's settings popover.
 // The row chrome subscribes to visibility only; paint and geometry controls
 // subscribe to their own values.
 export const AppearanceItem = ({
@@ -98,7 +98,6 @@ export const AppearanceItem = ({
             </Button>
           </LayerRow.Header>
           <LayerRow.Fields>{children}</LayerRow.Fields>
-          {details ? <LayerRow.Details>{details}</LayerRow.Details> : null}
         </LayerRow.Root>
       )}
     </SortableItem>

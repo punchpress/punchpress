@@ -4,15 +4,15 @@ import { useState } from "react";
 import { ColorPickerField } from "@/components/ui/color-picker/color-picker-field";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { FieldLabelsProvider, useFieldLayout } from "./field-layout";
+import { FieldLabelsProvider, useFieldLabels } from "./field-layout";
 
 const LABEL_CLASS =
   "select-none truncate text-(length:--field-label-text) text-sidebar-foreground/72 leading-normal sm:text-(length:--field-label-text) sm:leading-normal";
 const LABELED_GRID =
   "grid grid-cols-[var(--field-label-width)_minmax(0,1fr)] items-center";
 
-// One inspector section: a header with an optional actions slot (add
-// buttons), then rows. Sections divide themselves from the one above.
+// One inspector section: a collapsible header with an optional actions slot
+// (add buttons), then rows. Sections divide themselves from the one above.
 export const Section = ({
   actions,
   children,
@@ -25,9 +25,7 @@ export const Section = ({
   className?: string;
   title?: string;
 } & React.ComponentProps<"section">) => {
-  const { collapsibleSections } = useFieldLayout();
-  const [open, setOpen] = useState(true);
-  const isOpen = open || !collapsibleSections;
+  const [isOpen, setOpen] = useState(true);
 
   return (
     <section
@@ -45,24 +43,20 @@ export const Section = ({
           )}
         >
           <h3 className="text-(length:--section-title-text) min-w-0 font-semibold text-(--section-title-color) tracking-(--section-title-tracking) [text-transform:var(--section-title-case)]">
-            {collapsibleSections ? (
-              <button
-                aria-expanded={isOpen}
-                className="-ms-1 flex cursor-pointer items-center gap-0.5 rounded-sm ps-1 pe-1.5 outline-none [text-transform:inherit] hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
-                onClick={() => setOpen(!isOpen)}
-                type="button"
-              >
-                {title}
-                <HugeiconsIcon
-                  className={cn("opacity-60", !isOpen && "-rotate-90")}
-                  icon={ArrowDown01Icon}
-                  size={12}
-                  strokeWidth={2}
-                />
-              </button>
-            ) : (
-              title
-            )}
+            <button
+              aria-expanded={isOpen}
+              className="-ms-1 flex cursor-pointer items-center gap-0.5 rounded-sm ps-1 pe-1.5 outline-none [text-transform:inherit] hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+              onClick={() => setOpen(!isOpen)}
+              type="button"
+            >
+              {title}
+              <HugeiconsIcon
+                className={cn("opacity-60", !isOpen && "-rotate-90")}
+                icon={ArrowDown01Icon}
+                size={12}
+                strokeWidth={2}
+              />
+            </button>
           </h3>
           {actions ? (
             <div className="flex items-center gap-0.5">{actions}</div>
@@ -88,7 +82,7 @@ export const FieldRow = ({
   label: string;
   labelClassName?: string;
 }) => {
-  const { labels } = useFieldLayout();
+  const labels = useFieldLabels();
 
   if (labels === "inline") {
     return (
@@ -119,38 +113,34 @@ export const FieldRow = ({
   );
 };
 
-// Related scalar rows (X/Y, W/H) that share one line when the density pairs
-// fields; otherwise they stack as ordinary rows. Paired rows always label
-// inline, under the pair's own label when labels sit on the left.
+// Related scalar rows (X/Y, W/H) that share one line under the pair's left
+// label; the fields inside label inline. An optional `action` (an aspect
+// lock) trails the pair at the row's right edge.
 export const FieldPair = ({
+  action,
   children,
   label,
 }: {
+  action?: React.ReactNode;
   children: React.ReactNode;
   label: string;
 }) => {
-  const { labels, pairs } = useFieldLayout();
-
-  if (!pairs) {
-    return children;
-  }
-
-  const grid = (
-    <FieldLabelsProvider labels="inline">
-      <div className="grid min-w-0 grid-cols-2 gap-(--field-gap)">
-        {children}
-      </div>
-    </FieldLabelsProvider>
-  );
-
-  if (labels === "inline") {
-    return grid;
-  }
-
   return (
     <div className={LABELED_GRID}>
       <Label className={LABEL_CLASS}>{label}</Label>
-      {grid}
+      <FieldLabelsProvider labels="inline">
+        <div
+          className={cn(
+            "grid min-w-0 items-center gap-(--field-gap)",
+            action
+              ? "grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+              : "grid-cols-2"
+          )}
+        >
+          {children}
+          {action}
+        </div>
+      </FieldLabelsProvider>
     </div>
   );
 };

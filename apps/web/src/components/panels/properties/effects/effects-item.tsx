@@ -22,8 +22,7 @@ import {
 } from "./use-effect-controls";
 
 // One effect row: drag handle, visibility, shadow color with opacity, remove.
-// Kind-specific `details` show beneath the row or in a settings popover, by
-// density. The row chrome subscribes to visibility only; the color and fields
+// Kind-specific `details` open in the row's settings popover. The row chrome subscribes to visibility only; the color and fields
 // subscribe to their own values.
 export const EffectsItem = ({
   details,
@@ -91,7 +90,6 @@ export const EffectsItem = ({
               <HugeiconsIcon icon={Delete02Icon} size={14} strokeWidth={1.8} />
             </Button>
           </LayerRow.Header>
-          {details ? <LayerRow.Details>{details}</LayerRow.Details> : null}
         </LayerRow.Root>
       )}
     </SortableItem>

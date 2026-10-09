@@ -1,24 +1,20 @@
 import { createContext, useContext } from "react";
-import type { DensityLayout } from "../../density-preview/density-directions";
-import { useDensityLayout } from "../../density-preview/density-store";
 
-const FieldLabelsContext = createContext<DensityLayout["labels"] | null>(null);
+// Where a FieldRow draws its label: in the left column, or inside scrub and
+// text fields. Rows label left; paired rows (X/Y, W/H) label inline under the
+// pair's own left label.
+export type FieldLabels = "left" | "inline";
 
-// The panel's structural density choices. Label placement can be overridden
-// for a subtree: paired rows label inline, settings popovers label left.
-export const useFieldLayout = (): DensityLayout => {
-  const layout = useDensityLayout();
-  const labels = useContext(FieldLabelsContext);
+const FieldLabelsContext = createContext<FieldLabels>("left");
 
-  return labels ? { ...layout, labels } : layout;
-};
+export const useFieldLabels = () => useContext(FieldLabelsContext);
 
 export const FieldLabelsProvider = ({
   children,
   labels,
 }: {
   children: React.ReactNode;
-  labels: DensityLayout["labels"];
+  labels: FieldLabels;
 }) => {
   return (
     <FieldLabelsContext.Provider value={labels}>

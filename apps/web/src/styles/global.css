@@ -711,81 +711,10 @@ body[data-color-picker-open="true"] {
 /*
  * Field density. Controls with `size="field"` and the properties panel
  * primitives read these, so one block sets the density of every inspector
- * surface. The `[data-density]` blocks are a dev-only exploration (see
- * components/density-preview); the picked direction becomes the :root values.
+ * surface: 22px rows, 4px radii, a 68px left label column, and small
+ * uppercase section headers.
  */
 :root {
-  --field-height: 2rem;
-  --field-text: 0.875rem;
-  --field-px: 11px;
-  --field-radius: var(--radius-lg);
-  --field-scrub-radius: 9999px;
-  --field-gap: 0.5rem;
-  --field-label-width: 84px;
-  --field-label-text: 13px;
-  --field-icon-button: 1.5rem;
-  --field-swatch: 1.375rem;
-  --field-swatch-radius: 9999px;
-  --field-handle-width: 16px;
-  --field-segment-height: 2rem;
-  --panel-px: 0.875rem;
-  --panel-pt: 0.75rem;
-  --panel-pb: 0.875rem;
-  --section-py: 1rem;
-  --section-header-height: 1.5rem;
-  --section-title-text: 12px;
-  --section-title-gap: 0.5rem;
-  --section-title-case: none;
-  --section-title-tracking: -0.01em;
-  --section-title-color: color-mix(in srgb, var(--foreground) 70%, transparent);
-}
-
-:root[data-density="compact"] {
-  --field-height: 1.75rem;
-  --field-text: 12px;
-  --field-px: 9px;
-  --field-radius: 8px;
-  --field-gap: 6px;
-  --field-label-width: 64px;
-  --field-label-text: 12px;
-  --field-icon-button: 22px;
-  --field-swatch: 18px;
-  --field-handle-width: 14px;
-  --field-segment-height: 1.75rem;
-  --panel-px: 0.75rem;
-  --panel-pt: 0.625rem;
-  --panel-pb: 0.75rem;
-  --section-py: 0.75rem;
-  --section-header-height: 22px;
-  --section-title-gap: 6px;
-}
-
-:root[data-density="inspector"] {
-  --field-height: 1.5rem;
-  --field-text: 11px;
-  --field-px: 7px;
-  --field-radius: 6px;
-  --field-scrub-radius: 6px;
-  --field-gap: 6px;
-  --field-label-width: 0px;
-  --field-label-text: 11px;
-  --field-icon-button: 1.5rem;
-  --field-swatch: 14px;
-  --field-swatch-radius: 3px;
-  --field-handle-width: 12px;
-  --field-segment-height: 26px;
-  --panel-px: 0.75rem;
-  --panel-pt: 0.5rem;
-  --panel-pb: 0.625rem;
-  --section-py: 0.625rem;
-  --section-header-height: 1.5rem;
-  --section-title-text: 11px;
-  --section-title-gap: 4px;
-  --section-title-tracking: 0;
-  --section-title-color: var(--foreground);
-}
-
-:root[data-density="pro"] {
   --field-height: 22px;
   --field-text: 11px;
   --field-px: 6px;
@@ -798,7 +727,9 @@ body[data-color-picker-open="true"] {
   --field-swatch: 12px;
   --field-swatch-radius: 2px;
   --field-handle-width: 12px;
-  --field-segment-height: 24px;
+  /* Icon segments run taller than a field row so their glyphs stay legible. */
+  --field-segment-height: 28px;
+  --field-segment-icon: 22px;
   --panel-px: 0.625rem;
   --panel-pt: 0.25rem;
   --panel-pb: 0.5rem;

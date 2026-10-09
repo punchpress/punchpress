@@ -12,7 +12,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { FieldLabelsProvider, useFieldLayout } from "./field-layout";
+import { FieldLabelsProvider } from "./field-layout";
 
 // Shared chrome for stacked layer rows (fills, strokes, effects):
 // <LayerRow.Root>
@@ -22,10 +22,9 @@ import { FieldLabelsProvider, useFieldLayout } from "./field-layout";
 //     ...remove...
 //   </LayerRow.Header>
 //   <LayerRow.Fields>{always-visible fields}</LayerRow.Fields>
-//   <LayerRow.Details>{details}</LayerRow.Details>
 // </LayerRow.Root>
-// Settings and Details render the same fields; the density decides which
-// one shows them, so a row never draws its details twice.
+// Secondary settings (paint kind, stroke style, shadow offsets) live in the
+// Settings popover so each row stays one line.
 const LayerRowRoot = ({
   children,
   className,
@@ -63,14 +62,6 @@ const LayerRowFields = ({ children }: { children?: React.ReactNode }) => {
   ) : null;
 };
 
-const LayerRowDetails = ({ children }: { children: React.ReactNode }) => {
-  const { layerDetails } = useFieldLayout();
-
-  return layerDetails === "inline" ? (
-    <LayerRowFields>{children}</LayerRowFields>
-  ) : null;
-};
-
 const LayerRowSettings = ({
   children,
   title,
@@ -78,22 +69,8 @@ const LayerRowSettings = ({
   children: React.ReactNode;
   title: string;
 }) => {
-  const { layerDetails } = useFieldLayout();
-
-  return layerDetails === "popover" ? (
-    <LayerSettingsPopover title={title}>{children}</LayerSettingsPopover>
-  ) : null;
-};
-
-// Opens beside the panel, level with the row, the way a docked inspector
-// hands off to a flyout.
-const LayerSettingsPopover = ({
-  children,
-  title,
-}: {
-  children: React.ReactNode;
-  title: string;
-}) => {
+  // Opens beside the panel, level with the row, the way a docked inspector
+  // hands off to a flyout.
   const [trigger, setTrigger] = useState<HTMLElement | null>(null);
   const anchor = useMemo(() => {
     return trigger
@@ -151,7 +128,6 @@ const LayerSettingsPopover = ({
 };
 
 export const LayerRow = {
-  Details: LayerRowDetails,
   DragHandle: LayerRowDragHandle,
   Fields: LayerRowFields,
   Header: LayerRowHeader,
