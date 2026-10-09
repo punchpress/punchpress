@@ -69,6 +69,92 @@ test.describe("workspace tab bar", () => {
     });
   }
 
+  test("every tab, Scratchpad and active included, has dividers on both sides", async ({
+    page,
+  }) => {
+    await gotoEditor(page);
+    await addFileTab(page);
+    await addFileTab(page);
+
+    const borders = await page
+      .locator("[data-slot='tab']")
+      .evaluateAll((elements) =>
+        elements.map((element) => {
+          const style = getComputedStyle(element);
+          const rect = element.getBoundingClientRect();
+          return {
+            left: rect.left,
+            right: rect.right,
+            widths: [style.borderLeftWidth, style.borderRightWidth],
+          };
+        })
+      );
+
+    expect(borders.map((tab) => tab.widths)).toEqual([
+      ["1px", "1px"],
+      ["1px", "1px"],
+      ["1px", "1px"],
+    ]);
+    // Neighbors share one hairline instead of doubling it.
+    for (let index = 1; index < borders.length; index += 1) {
+      expect(borders[index].left).toBe(borders[index - 1].right - 1);
+    }
+  });
+
+  test("the Scratchpad home icon renders at 16px", async ({ page }) => {
+    await gotoEditor(page);
+
+    const icon = await page
+      .locator("button[aria-label='Scratchpad'] svg")
+      .boundingBox();
+
+    expect(icon?.width).toBe(16);
+    expect(icon?.height).toBe(16);
+  });
+
+  test("the new-tab button is a borderless control after the last divider", async ({
+    page,
+  }) => {
+    await gotoEditor(page);
+    const readLayout = () =>
+      page.evaluate(() => {
+        const tabs = [...document.querySelectorAll("[data-slot='tab']")];
+        const last = tabs.at(-1);
+        const button = document.querySelector("button[aria-label='New file']");
+        const style = button ? getComputedStyle(button) : null;
+
+        return {
+          borders: style
+            ? [
+                style.borderTopWidth,
+                style.borderRightWidth,
+                style.borderBottomWidth,
+                style.borderLeftWidth,
+              ]
+            : null,
+          buttonLeft: button?.getBoundingClientRect().left,
+          buttonSize: button?.getBoundingClientRect().height,
+          lastRight: last?.getBoundingClientRect().right,
+          lastRightBorder: last
+            ? getComputedStyle(last).borderRightWidth
+            : null,
+          radius: style?.borderTopLeftRadius,
+        };
+      });
+
+    // Scratchpad only, then after a file tab.
+    const scratchpadOnly = await readLayout();
+    expect(scratchpadOnly.buttonLeft).toBe((scratchpadOnly.lastRight ?? 0) + 6);
+    await addFileTab(page);
+    const layout = await readLayout();
+
+    expect(layout.borders).toEqual(["0px", "0px", "0px", "0px"]);
+    expect(layout.lastRightBorder).toBe("1px");
+    expect(layout.buttonLeft).toBe((layout.lastRight ?? 0) + 6);
+    expect(layout.buttonSize).toBe(24);
+    expect(layout.radius).toBe("4px");
+  });
+
   test("tab title, new-tab button, and scratchpad share one vertical center", async ({
     page,
   }) => {
@@ -113,6 +199,18 @@ test.describe("workspace tab bar", () => {
       Math.abs(dotBox.x + dotBox.width / 2 - (closeBox.x + closeBox.width / 2))
     ).toBeLessThanOrEqual(0.5);
     expect(dotBox.x).toBeGreaterThan(titleBefore.x + titleBefore.width);
+    expect(dotBox.width).toBeLessThanOrEqual(6);
+    const colors = await tab.evaluate((element) => ({
+      dot: getComputedStyle(
+        element.querySelector("[data-slot='tab-dirty-dot']") as Element
+      ).backgroundColor,
+      title: getComputedStyle(
+        element.querySelector("[data-slot='tab-title']") as Element
+      ).color,
+    }));
+    // Muted, not the foreground ink.
+    expect(colors.dot).not.toBe(colors.title);
+    expect(colors.dot).not.toBe("rgb(0, 0, 0)");
     expect(closeBox.x + closeBox.width).toBeLessThanOrEqual(
       tabBox.x + tabBox.width
     );
@@ -130,37 +228,59 @@ test.describe("workspace tab bar", () => {
     await expect(fileTabs(page)).toHaveCount(1);
   });
 
-  test("tab widths clamp between the min and max and overflow scrolls", async ({
+  test("tabs fit their content within the width clamps and overflow scrolls", async ({
     page,
   }) => {
     await page.setViewportSize({ height: 720, width: 1280 });
     await gotoEditor(page);
     await addFileTab(page);
-    await addFileTab(page);
 
-    const widths = () =>
+    const measure = () =>
       fileTabs(page).evaluateAll((elements) =>
-        elements.map((element) => element.getBoundingClientRect().width)
+        elements.map((element) => {
+          const style = getComputedStyle(element);
+          const trigger = element.querySelector("[data-slot='tab-trigger']");
+          const title = element.querySelector("[data-slot='tab-title']");
+          const triggerStyle = trigger ? getComputedStyle(trigger) : null;
+
+          return {
+            contentWidth:
+              Number.parseFloat(triggerStyle?.paddingLeft ?? "0") +
+              (title?.scrollWidth ?? 0) +
+              Number.parseFloat(triggerStyle?.paddingRight ?? "0") +
+              Number.parseFloat(style.borderLeftWidth) +
+              Number.parseFloat(style.borderRightWidth),
+            maxWidth: style.maxWidth,
+            minWidth: style.minWidth,
+            width: element.getBoundingClientRect().width,
+          };
+        })
       );
 
-    expect(await widths()).toEqual([200, 200]);
+    const [tab] = await measure();
+    expect(tab.minWidth).toBe("96px");
+    expect(tab.maxWidth).toBe("200px");
+    // Content-fit: padding, title, and the reserved slot; no empty void.
+    expect(Math.abs(tab.width - tab.contentWidth)).toBeLessThanOrEqual(1);
+    expect(tab.width).toBeLessThan(200);
 
-    await page.setViewportSize({ height: 720, width: 560 });
-    for (let index = 0; index < 3; index += 1) {
+    await page.setViewportSize({ height: 720, width: 480 });
+    for (let index = 0; index < 4; index += 1) {
       await addFileTab(page);
     }
 
-    for (const width of await widths()) {
-      expect(width).toBe(120);
+    for (const { width } of await measure()) {
+      expect(width).toBeGreaterThanOrEqual(96);
+      expect(width).toBeLessThan(tab.width);
     }
-    const strip = page
+    const overflow = await page
       .locator("[data-slot='tab']:has([data-slot='tab-title'])")
       .first()
-      .locator("..");
-    const overflow = await strip.evaluate((element) => ({
-      clientWidth: element.clientWidth,
-      scrollWidth: element.scrollWidth,
-    }));
+      .locator("..")
+      .evaluate((element) => ({
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+      }));
     expect(overflow.scrollWidth).toBeGreaterThan(overflow.clientWidth);
     await expect(
       page.getByRole("button", { name: "New file" })
@@ -200,8 +320,7 @@ test.describe("desktop title bar", () => {
     await addFileTab(page);
 
     const layout = await page.evaluate(() => {
-      const strip = document.querySelector("[data-workspace-tabs]");
-      const first = strip?.firstElementChild;
+      const first = document.querySelector("[data-slot='tab']");
       const bar = document.querySelector("[data-titlebar]");
 
       return {
@@ -251,7 +370,9 @@ test.describe("desktop title bar", () => {
     expect(regions.bar).toEqual(["drag"]);
     // app-region does not inherit; the strip just must not opt out of the bar.
     expect(regions.strip).not.toContain("no-drag");
-    expect(regions.tabGroups).toEqual(["no-drag", "no-drag"]);
+    // Scratchpad and file tabs opt out; the new-tab wrapper stays draggable.
+    expect(regions.tabGroups.slice(0, 2)).toEqual(["no-drag", "no-drag"]);
+    expect(regions.tabGroups[2]).not.toBe("no-drag");
     expect(regions.newFile).toEqual(["no-drag"]);
   });
 });
