@@ -3,9 +3,10 @@
  * Properties panes, and the canvas viewport read only these tokens, so a
  * container direction is one token block. Defaults are today's floating
  * cards. The canvas keeps its own coordinates: a direction only changes the
- * canvas section's insets, i.e. the visible viewport size.
+ * canvas section's insets, i.e. the visible viewport size. Tokens live on the
+ * shell root because they derive from its `--desktop-*` chrome variables.
  */
-:root {
+[data-editor-shell-root] {
   --pane-width: 240px;
   --pane-inset: 16px;
   --pane-top: calc(
@@ -42,7 +43,7 @@
 }
 
 @media (min-width: 1024px) {
-  :root {
+  [data-editor-shell-root] {
     --pane-width: 280px;
   }
 }
