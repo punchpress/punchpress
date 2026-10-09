@@ -346,6 +346,7 @@ const ColorPickerField = ({
           >
             <Popover.Popup
               className="w-[19.5rem] origin-(--transform-origin) rounded-2xl border bg-popover p-3 text-popover-foreground shadow-lg/5 outline-none transition-[scale,opacity,translate] duration-150 data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0"
+              data-slot="popover-popup"
               initialFocus={false}
               onPointerDownCapture={handlePopupPointerDownCapture}
               ref={popupRef}
