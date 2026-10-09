@@ -104,8 +104,9 @@ pinned icon tab (`size="icon"`, `TabIconTrigger` with a tooltip, a
 `variant="tab"` `icon-chrome` button with a rounded `--tab-add-hover` wash,
 `--tab-add-gap` after the last divider.
 
-On desktop the shell sets `--titlebar-inset-top` (6px) so segment content
-centers on the traffic lights (23px) instead of the bar (20px).
+Title bar content centers on the 40px bar (20px). On desktop, Electron
+places the traffic lights at {x: 15, y: 13} to match, with even gaps around
+them, and the strip starts at `--desktop-drag-left-inset` (88px).
 
 ## UI Typography
 
