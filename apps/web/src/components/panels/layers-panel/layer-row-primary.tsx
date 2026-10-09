@@ -73,7 +73,9 @@ export const LayerRowPrimary = ({
 
   return (
     <div className={PRIMARY_CLASS_NAME}>
-      <LayerTreeRowParts.Icon>
+      {/* The icon is the compound-operation menu trigger here, so it stays
+          exposed to assistive technology. */}
+      <LayerTreeRowParts.Icon aria-hidden={undefined}>
         <LayerCompoundOperationMenu
           className="inline-flex items-center justify-center"
           label={layer.label}
