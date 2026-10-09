@@ -1,0 +1,104 @@
+/*
+ * Dev-only pane container directions (components/panel-container-preview).
+ * Each block overrides the tokens in panel-container.css. Once a direction is
+ * picked, its values move into panel-container.css and this file goes away.
+ */
+
+/*
+ * (A) Refined floating: the same cards, tighter and flatter. Hairline border,
+ * almost no shadow, a smaller radius, and less inset and padding. The card is
+ * white over the off-white canvas so it reads as a surface without a shadow.
+ */
+:root[data-panel-container="refined"] {
+  --pane-inset: 8px;
+  --pane-top: calc(var(--desktop-chrome-height, 0px) + 4px);
+  --pane-bottom: 8px;
+  --pane-radius: 8px;
+  --panel-px: 8px;
+  --pane-border: rgb(0 0 0 / 9%);
+  --pane-shadow: 0 1px 2px rgb(0 0 0 / 0.03);
+  --pane-divider: rgb(0 0 0 / 6%);
+}
+
+:root.dark[data-panel-container="refined"] {
+  --pane-surface: color-mix(in srgb, var(--background) 94%, #fff);
+  --pane-header: var(--pane-surface);
+  --pane-border: rgb(255 255 255 / 9%);
+  --pane-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+  --pane-divider: rgb(255 255 255 / 6%);
+}
+
+/*
+ * (B) Docked sidebars, Figma/Illustrator style: edge to edge and full height
+ * under the tab bar, a 1px divider against the canvas, no radius, and
+ * section dividers instead of card padding. The tab bar sits on the panel
+ * surface, so chrome reads as one frame around the canvas.
+ */
+:root[data-panel-container="docked"] {
+  --pane-inset: 0px;
+  --pane-top: var(--desktop-chrome-height, 40px);
+  --pane-bottom: 0px;
+  --pane-height: calc(100% - var(--pane-top));
+  --pane-grow: 1;
+  --pane-radius: 0px;
+  --pane-surface: #fff;
+  --pane-header: #fff;
+  --pane-border-width: 0px;
+  --pane-shadow: none;
+  --pane-divider: rgb(0 0 0 / 7%);
+  --dock-bg: var(--pane-surface);
+  --dock-divider: rgb(0 0 0 / 9%);
+  --dock-divider-width: 1px;
+  --shell-bg: var(--pane-surface);
+  --canvas-inset-top: var(--desktop-chrome-height, 40px);
+  --canvas-border-top: 1px;
+}
+
+:root.dark[data-panel-container="docked"] {
+  --pane-surface: color-mix(in srgb, var(--background) 95%, #fff);
+  --pane-header: var(--pane-surface);
+  --pane-divider: rgb(255 255 255 / 6%);
+  --dock-divider: rgb(0 0 0 / 60%);
+}
+
+/*
+ * (C) Inset canvas: docked sidebars with no dividers, and the canvas as a
+ * rounded viewport set into a tinted app frame. Panels and tabs share one
+ * quiet surface; the canvas is the only bright, bordered region.
+ */
+:root[data-panel-container="inset"] {
+  --pane-inset: 0px;
+  --pane-top: var(--desktop-chrome-height, 40px);
+  --pane-bottom: 0px;
+  --pane-height: calc(100% - var(--pane-top));
+  --pane-grow: 1;
+  --pane-radius: 0px;
+  --pane-surface: #f0f0f0;
+  --pane-header: var(--pane-surface);
+  --pane-border-width: 0px;
+  --pane-shadow: none;
+  --pane-divider: rgb(0 0 0 / 7%);
+  --pane-hover: rgb(0 0 0 / 6%);
+  --dock-bg: transparent;
+  --shell-bg: var(--pane-surface);
+  --canvas-inset-top: var(--desktop-chrome-height, 40px);
+  --canvas-inset-bottom: 8px;
+  --canvas-radius: 10px;
+  --canvas-ring: 0 0 0 1px rgb(0 0 0 / 8%), 0 1px 2px rgb(0 0 0 / 0.04);
+}
+
+:root.dark[data-panel-container="inset"] {
+  --pane-surface: #0f0f0f;
+  --pane-header: var(--pane-surface);
+  --pane-divider: rgb(255 255 255 / 6%);
+  --pane-hover: rgb(255 255 255 / 6%);
+  --canvas-ring: 0 0 0 1px rgb(255 255 255 / 8%);
+}
+
+/* Sidebars only exist from md up; below that the canvas fills the window. */
+@media (min-width: 768px) {
+  :root[data-panel-container="docked"],
+  :root[data-panel-container="inset"] {
+    --canvas-inset-side: var(--pane-width);
+  }
+}

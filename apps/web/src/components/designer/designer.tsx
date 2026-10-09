@@ -4,7 +4,7 @@ export const Designer = ({ children, className, ...props }) => {
   return (
     <div
       className={cn(
-        "relative h-full w-full overflow-hidden bg-[var(--designer-bg)] text-foreground",
+        "relative h-full w-full overflow-hidden bg-(--shell-bg) text-foreground",
         "[--designer-bg:var(--background)] [--designer-surface:var(--card)]",
         "[--designer-border:var(--border)]",
         "[--designer-border-strong:var(--input)]",
@@ -85,26 +85,25 @@ export const DesignerContent = ({ children, className, ...props }) => {
   );
 };
 
+// A Layers or Properties sidebar slot. Its placement, size, and the column
+// behind it come from the pane container tokens in styles/panel-container.css.
 export const DesignerPanel = ({
   children,
   className,
   side = "left",
-  style,
   ...props
 }) => {
   return (
     <aside
       className={cn(
-        "absolute z-30 hidden md:flex md:w-[240px] md:flex-col lg:w-[280px]",
-        side === "left" ? "left-4" : "right-4",
+        "absolute top-(--pane-top) z-30 hidden h-(--pane-height) max-h-[calc(100%-var(--pane-top)-var(--pane-bottom))] bg-(--dock-bg) md:flex md:w-(--pane-width) md:flex-col",
+        "border-t-(length:--dock-divider-width) border-(--dock-divider)",
+        side === "left"
+          ? "border-e-(length:--dock-divider-width) left-(--pane-inset)"
+          : "border-s-(length:--dock-divider-width) right-(--pane-inset)",
         className
       )}
-      style={{
-        maxHeight:
-          "calc(100% - var(--desktop-chrome-height, 0px) - var(--desktop-panel-top-gap, 16px) - 16px)",
-        top: "calc(var(--desktop-chrome-height, 0px) + var(--desktop-panel-top-gap, 16px))",
-        ...style,
-      }}
+      data-side={side}
       {...props}
     >
       {children}
@@ -112,12 +111,13 @@ export const DesignerPanel = ({
   );
 };
 
+// The pane card inside a sidebar slot: floating card, flat card, or a
+// full-height docked surface, by container tokens.
 export const DesignerPane = ({ children, className, ...props }) => {
   return (
     <section
       className={cn(
-        "flex min-h-0 flex-col rounded-xl border border-[var(--designer-border)] bg-[var(--designer-surface)]",
-        "shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.06)]",
+        "border-(length:--pane-border-width) flex min-h-0 grow-(--pane-grow) flex-col overflow-hidden rounded-(--pane-radius) border-(--pane-border) bg-(--pane-surface) shadow-(--pane-shadow)",
         className
       )}
       {...props}
@@ -127,54 +127,17 @@ export const DesignerPane = ({ children, className, ...props }) => {
   );
 };
 
-export const DesignerPaneHeader = ({ children, className, ...props }) => {
-  return (
-    <div className={cn("px-3.5 pt-3.5", className)} {...props}>
-      {children}
-    </div>
-  );
-};
-
-export const DesignerPaneTitle = ({ children, className, ...props }) => {
-  return (
-    <h2
-      className={cn(
-        "m-0 font-semibold text-[13px] text-foreground tracking-[-0.01em]",
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </h2>
-  );
-};
-
-export const DesignerPaneDescription = ({ children, className, ...props }) => {
-  return (
-    <p className={cn("hidden", className)} {...props}>
-      {children}
-    </p>
-  );
-};
-
-export const DesignerPaneBody = ({ children, className, ...props }) => {
-  return (
-    <div
-      className={cn("flex min-h-0 flex-1 flex-col p-3.5", className)}
-      {...props}
-    >
-      {children}
-    </div>
-  );
-};
-
-export const DesignerCanvas = ({ children, className, style, ...props }) => {
+// The canvas viewport. Container directions only move its edges (and may
+// round it), so the camera keeps its coordinates and only the visible
+// viewport size changes.
+export const DesignerCanvas = ({ children, className, ...props }) => {
   return (
     <section
-      className={cn("absolute inset-0", className)}
-      style={{
-        ...style,
-      }}
+      className={cn(
+        "border-t-(length:--canvas-border-top) absolute top-(--canvas-inset-top) right-(--canvas-inset-side) bottom-(--canvas-inset-bottom) left-(--canvas-inset-side) overflow-hidden rounded-(--canvas-radius) border-(--dock-divider) shadow-(--canvas-ring)",
+        className
+      )}
+      data-designer-canvas=""
       {...props}
     >
       {children}

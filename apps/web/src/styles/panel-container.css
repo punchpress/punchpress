@@ -1,0 +1,48 @@
+/*
+ * Pane containers. The editor shell (components/designer), the Layers and
+ * Properties panes, and the canvas viewport read only these tokens, so a
+ * container direction is one token block. Defaults are today's floating
+ * cards. The canvas keeps its own coordinates: a direction only changes the
+ * canvas section's insets, i.e. the visible viewport size.
+ */
+:root {
+  --pane-width: 240px;
+  --pane-inset: 16px;
+  --pane-top: calc(
+    var(--desktop-chrome-height, 0px) +
+    var(--desktop-panel-top-gap, 16px)
+  );
+  --pane-bottom: 16px;
+  /* `auto` hugs content; a length fills the sidebar to that height. */
+  --pane-height: auto;
+  --pane-grow: 0;
+  --pane-radius: 16px;
+  --pane-surface: var(--card);
+  --pane-header: var(--card);
+  --pane-border: var(--border);
+  --pane-border-width: 1px;
+  --pane-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
+  --pane-divider: var(--border);
+  --pane-hover: var(--surface-hover);
+  /* Selected layer rows stay on the editor accent. */
+  --pane-selected: var(--canvas-selected);
+  --pane-selected-foreground: #fff;
+  /* The sidebar column behind docked panes and its canvas-side divider. */
+  --dock-bg: transparent;
+  --dock-divider: transparent;
+  --dock-divider-width: 0px;
+  /* The app background around the canvas section, and the canvas edge. */
+  --shell-bg: var(--background);
+  --canvas-border-top: 0px;
+  --canvas-inset-top: 0px;
+  --canvas-inset-side: 0px;
+  --canvas-inset-bottom: 0px;
+  --canvas-radius: 0px;
+  --canvas-ring: none;
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --pane-width: 280px;
+  }
+}

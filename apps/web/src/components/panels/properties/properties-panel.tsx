@@ -3,6 +3,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useEditor } from "../../../editor-react/use-editor";
 import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
+import { DesignerPane } from "../../designer/designer";
 import { AppearancePanel } from "./appearance/appearance";
 import { ArtboardFields } from "./artboard-fields";
 import { BrushFields } from "./brush-fields";
@@ -33,10 +34,7 @@ export const PropertiesPanel = () => {
   }
 
   return (
-    <div
-      className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--designer-border)] bg-[var(--designer-surface)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.06)]"
-      data-properties-panel=""
-    >
+    <DesignerPane data-properties-panel="">
       <div
         className="min-h-0 flex-1 overflow-y-auto px-(--panel-px) pt-(--panel-pt) pb-(--panel-pb)"
         data-testid="properties-panel-body"
@@ -84,7 +82,7 @@ export const PropertiesPanel = () => {
           </div>
         ) : null}
       </div>
-    </div>
+    </DesignerPane>
   );
 };
 

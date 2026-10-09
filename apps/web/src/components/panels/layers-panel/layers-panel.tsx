@@ -8,6 +8,7 @@ import { SortableList } from "@/components/ui/sortable-list";
 import { useEditor } from "../../../editor-react/use-editor";
 import { useEditorValue } from "../../../editor-react/use-editor-value";
 import { usePerformanceRenderCounter } from "../../../performance/use-performance-render-counter";
+import { DesignerPane } from "../../designer/designer";
 import { SettingsDialog } from "../../settings-dialog";
 import {
   getLayerEditableContours,
@@ -29,7 +30,8 @@ const isContainerLayerNode = (node) => {
 
 const LAYER_ROW_OVERSCAN = 8;
 const LAYERS_PANEL_CHROME_HEIGHT = 70;
-const LAYERS_PANEL_LIST_MAX_HEIGHT = `calc(100vh - var(--desktop-chrome-height, 0px) - var(--desktop-panel-top-gap, 16px) - 16px - ${LAYERS_PANEL_CHROME_HEIGHT}px)`;
+// The sidebar slot (pane container tokens) minus the menu and header rows.
+const LAYERS_PANEL_LIST_MAX_HEIGHT = `calc(100vh - var(--pane-top) - var(--pane-bottom) - ${LAYERS_PANEL_CHROME_HEIGHT}px)`;
 
 const getDisplayedChildIds = (editor, parentId = ROOT_PARENT_ID) => {
   return [...editor.getChildNodeIds(parentId)].reverse();
@@ -411,8 +413,8 @@ export const LayersPanel = ({ documentCommands }) => {
 
   return (
     <>
-      <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--designer-border)] bg-[var(--designer-surface)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.06)]">
-        <div className="flex items-center gap-2 px-2.5 pt-2.5 pb-1.5">
+      <DesignerPane data-layers-panel="">
+        <div className="flex items-center gap-2 px-(--panel-px) pt-(--panel-px) pb-1.5">
           <LayersMainMenu
             onOpenSettings={setIsSettingsOpen}
             runDocumentCommandSafely={runDocumentCommandSafely}
@@ -426,7 +428,7 @@ export const LayersPanel = ({ documentCommands }) => {
           </LayersMainMenu>
         </div>
 
-        <div className="mx-2.5 h-px bg-foreground/4" />
+        <div className="mx-(--panel-px) h-px bg-(--pane-divider)" />
 
         <div className="flex min-h-(--section-header-height) items-center justify-between ps-3 pe-2 pt-1.5 pb-0.5">
           <h2 className="text-(length:--section-title-text) font-semibold text-(--section-title-color) tracking-(--section-title-tracking) [text-transform:var(--section-title-case)]">
@@ -471,7 +473,7 @@ export const LayersPanel = ({ documentCommands }) => {
             ) : null}
           </div>
         </ScrollArea>
-      </div>
+      </DesignerPane>
 
       <SettingsDialog onOpenChange={setIsSettingsOpen} open={isSettingsOpen} />
     </>

@@ -53,7 +53,7 @@ export const LayerContourListRow = ({ contourIndex, depth, nodeId }) => {
   // sibling layer names; the trailing pad keeps the action column clear.
   return (
     <LayerTreeRowParts.Root
-      className={isSelected ? undefined : "hover:bg-(--surface-hover)"}
+      className={isSelected ? undefined : "hover:bg-(--pane-hover)"}
       depth={depth}
       state={isSelected ? "selected" : "idle"}
     >

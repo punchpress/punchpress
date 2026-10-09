@@ -28,8 +28,9 @@ const LayerTreeRowRoot = ({
     <div
       className={cn(
         "group/layer-row text-(length:--chrome-text-sm) box-border flex h-(--layer-row-height) w-full min-w-0 items-center gap-1 overflow-hidden rounded-(--chrome-radius) pe-[calc((var(--layer-row-height)-var(--field-icon-button))/2)]",
-        state === "selected" && "bg-(--canvas-selected) text-white",
-        state === "hovered" && "bg-(--surface-hover)",
+        state === "selected" &&
+          "bg-(--pane-selected) text-(--pane-selected-foreground)",
+        state === "hovered" && "bg-(--pane-hover)",
         className
       )}
       data-layer-depth={depth}

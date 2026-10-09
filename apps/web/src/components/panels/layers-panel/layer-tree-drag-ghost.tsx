@@ -17,7 +17,7 @@ export const LayerTreeDragGhost = ({ nodeId }) => {
 
   return (
     <LayerTreeRowParts.Root
-      className="cursor-grabbing border border-(--designer-border) bg-(--designer-surface) opacity-90 shadow-md"
+      className="cursor-grabbing border border-(--pane-border) bg-(--pane-surface) opacity-90 shadow-md"
       muted={!layer.isVisible}
     >
       <LayerTreeRowParts.Spacer />

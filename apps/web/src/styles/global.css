@@ -14,6 +14,7 @@
 @import "./canvas/preview.css";
 @import "./canvas/guide.css";
 @import "./canvas/handles.css";
+@import "./panel-container.css";
 
 @custom-variant dark (&:is(.dark *));
 

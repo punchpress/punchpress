@@ -13,6 +13,7 @@ import {
   DesignerPanel,
   DesignerWindowDragRegion,
 } from "../designer/designer";
+import { PanelContainerSwitcher } from "../panel-container-preview/panel-container-switcher";
 import { useDocumentCommands } from "../panels/document-commands/use-document-commands";
 import { LayersPanel } from "../panels/layers-panel/layers-panel";
 import { MissingFontsExportDialog } from "../panels/missing-fonts-export-dialog";
@@ -145,6 +146,7 @@ export const EditorShell = () => {
             className="pointer-events-none absolute bottom-4 left-4 z-40 grid justify-items-start gap-1"
             data-testid="dev-preview-switchers"
           >
+            <PanelContainerSwitcher />
             <UiFontSwitcher />
           </div>
         ) : null}
