@@ -11,14 +11,30 @@ const expectFitsViewport = async (surface: Locator) => {
   await expect(surface).toBeVisible();
   const metrics = await surface.evaluate((element) => {
     const rect = element.getBoundingClientRect();
-    const overflowing = [element, ...element.querySelectorAll("*")].some(
-      (node) => {
+    // Any box that scrolls or clips its content, on either axis. Deliberate
+    // one-line truncation (text-overflow: ellipsis), screen-reader-only
+    // text, and slider range inputs are allowed.
+    const overflowing = [element, ...element.querySelectorAll("*")]
+      .filter((node) => {
         const style = getComputedStyle(node);
-        const scrolls =
-          style.overflowY === "auto" || style.overflowY === "scroll";
-        return scrolls && node.scrollHeight > node.clientHeight + 1;
-      }
-    );
+
+        const visuallyHidden =
+          node.clientWidth <= 1 ||
+          (node instanceof HTMLInputElement && node.type === "range");
+
+        return (
+          !visuallyHidden &&
+          style.textOverflow !== "ellipsis" &&
+          (style.overflowX !== "visible" || style.overflowY !== "visible")
+        );
+      })
+      .filter((node) => {
+        return (
+          node.scrollHeight > node.clientHeight + 1 ||
+          node.scrollWidth > node.clientWidth + 1
+        );
+      })
+      .map((node) => node.getAttribute("data-slot") ?? node.tagName);
 
     return {
       bottom: rect.bottom,
@@ -33,7 +49,7 @@ const expectFitsViewport = async (surface: Locator) => {
   expect(metrics.left).toBeGreaterThanOrEqual(0);
   expect(metrics.bottom).toBeLessThanOrEqual(VIEWPORT.height);
   expect(metrics.right).toBeLessThanOrEqual(VIEWPORT.width);
-  expect(metrics.overflowing).toBe(false);
+  expect(metrics.overflowing).toEqual([]);
 };
 
 const openMainMenuItem = async (page: Page, name: string) => {
