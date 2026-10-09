@@ -221,6 +221,27 @@ test("a pinch hints top-level art roots and settles exact", async ({
   });
 });
 
+test("a pinch over an empty document clears the reuse mode on settle", async ({
+  page,
+}) => {
+  await loadDocument(
+    page,
+    JSON.stringify({ ...JSON.parse(DOCUMENT), nodes: [] })
+  );
+  await frames(page, 3);
+  await pinchTo(page, [0.9, 0.7]);
+
+  expect((await readReuse(page)).mode).toBe("reuse");
+
+  await endPinch(page);
+
+  expect(await readReuse(page)).toEqual({
+    hinted: [],
+    mode: null,
+    owner: null,
+  });
+});
+
 for (const dpr of [1, 2]) {
   test.describe(`settled pixels @ DPR ${dpr}`, () => {
     test.use({

@@ -23,11 +23,16 @@ export const useCanvasZoomRaster = (hostElement: HTMLElement | null) => {
 
   useLayoutEffect(() => {
     let hinted: HintedRoot[] = [];
+    // Tracked apart from the roots: a zoom over an empty document hints
+    // nothing but still marks the host and must clear it.
+    let active = false;
 
     const release = () => {
-      if (hinted.length === 0) {
+      if (!active) {
         return;
       }
+
+      active = false;
 
       for (const { element, previousWillChange } of hinted) {
         element.style.willChange = previousWillChange;
@@ -44,10 +49,11 @@ export const useCanvasZoomRaster = (hostElement: HTMLElement | null) => {
         return;
       }
 
-      if (hinted.length > 0) {
+      if (active) {
         return;
       }
 
+      active = true;
       hinted = getArtRoots(editor).map((element) => {
         const previousWillChange = element.style.willChange;
 
