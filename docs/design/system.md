@@ -53,6 +53,27 @@ takes an optional trailing `action` such as an aspect lock. Stacked fill,
 stroke, and shadow rows use `panels/properties/layer-row.tsx`; their secondary
 settings open in `LayerRow.Settings`, a popover beside the panel.
 
+## UI Typography
+
+UI text reads `--font-sans`, `--font-features` (OpenType features), and
+`--ui-tracking` from `:root`; `.canvas-surface` resets features and tracking
+so document text keeps its own. Numeric field values (`ScrubSlider`, field
+`Input`) use tabular figures.
+
+## Dev Previews
+
+`src/components/dev-preview/` holds temporary A/B switches. Each preview sets
+a `data-*` attribute on `<html>` that a token block styles, remembers the
+choice in localStorage, and is pinned to its first option in production. Dev
+builds show the switchers at the bottom left of the editor.
+
+- UI font (`components/ui-font-preview/`, `styles/ui-font-preview.css`,
+  Alt+Shift+F): Geist (default), Inter (`inter-ui`, the full upstream build
+  with cv11 and ss01; Fontsource's Google build strips them), and the system
+  stack. Once picked: move the winner's tokens into `:root`, delete the folder,
+  the stylesheet and its import, `ui-font-preview.spec.ts`, and `inter-ui` if
+  Inter lost.
+
 ## Migration Guidance
 
 If you find older references to Radix UI in docs, examples, or dependencies, treat them as stale unless the source code proves otherwise.
