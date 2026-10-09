@@ -322,3 +322,45 @@ test("paired values truncate before their inline labels", async ({ page }) => {
   await expect(page.getByRole("slider", { name: "Amplitude" })).toBeVisible();
   expect(overlaps).toEqual([]);
 });
+
+test("numeric fields use tabular figures", async ({ page }) => {
+  await gotoEditor(page);
+  await page.evaluate(() => {
+    const editor = window.__PUNCHPRESS_EDITOR__;
+
+    editor?.loadDocument(
+      JSON.stringify({
+        nodes: [
+          {
+            background: "#ffffff",
+            height: 260,
+            id: "font-artboard",
+            locked: false,
+            name: "Artboard",
+            parentId: "root",
+            transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 220, y: 160 },
+            type: "artboard",
+            visible: true,
+            width: 340,
+          },
+        ],
+        version: "1.8",
+      })
+    );
+    editor?.setSelectedNodes(["font-artboard"]);
+  });
+
+  // Frame W/H are field Inputs; scrub sliders cover the other numeric fields.
+  const inputs = page
+    .getByTestId("properties-panel-body")
+    .locator("input[inputmode='decimal']");
+
+  await expect(inputs).toHaveCount(2);
+  expect(
+    await inputs.evaluateAll((elements) => {
+      return elements.map((element) => {
+        return getComputedStyle(element).fontVariantNumeric;
+      });
+    })
+  ).toEqual(["tabular-nums", "tabular-nums"]);
+});
