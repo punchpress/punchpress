@@ -89,6 +89,10 @@ for (const container of CONTAINERS) {
       expect(region.bottom).toBeLessThanOrEqual(viewport.height);
     }
 
+    // Panes start below the 40px tab bar.
+    expect(left.top).toBeGreaterThanOrEqual(40);
+    expect(right.top).toBeGreaterThanOrEqual(40);
+
     // Both sidebars share one width.
     expect(Math.round(left.right - left.left)).toBe(
       Math.round(right.right - right.left)
@@ -128,15 +132,6 @@ for (const container of CONTAINERS) {
       ]
     );
     expect(pane.shadow === "none").toBe(DOCKED.has(container));
-
-    // The properties body scrolls inside its pane rather than the window.
-    const panelFits = await page
-      .getByTestId("properties-panel-body")
-      .evaluate((body) => {
-        return body.getBoundingClientRect().bottom <= window.innerHeight;
-      });
-
-    expect(panelFits).toBe(true);
   });
 
   test(`${container}: focusing an artboard centers it in the visible canvas`, async ({
@@ -228,3 +223,91 @@ test("the container switcher cycles with Alt+Shift+P", async ({ page }) => {
     "inset"
   );
 });
+
+// Switching directions resizes the canvas without a window resize; discrete
+// zoom must still keep the visible center fixed.
+test("zoom keeps its center after switching to a docked direction", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 720, width: 1280 });
+  await openWithContainer(page, "floating");
+  await loadArtboard(page);
+  await page
+    .getByTestId("panel-container-switcher")
+    .getByRole("button", { name: "Docked" })
+    .click();
+
+  const readCenter = () => {
+    return page.evaluate(() => {
+      return window.__PUNCHPRESS_EDITOR__?.getViewportCenter() ?? null;
+    });
+  };
+  const before = await readCenter();
+
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await expect
+    .poll(() => page.evaluate(() => window.__PUNCHPRESS_EDITOR__?.zoom))
+    .not.toBe(1);
+
+  const after = await readCenter();
+
+  expect(Math.abs((after?.x ?? 0) - (before?.x ?? 0))).toBeLessThan(1);
+  expect(Math.abs((after?.y ?? 0) - (before?.y ?? 0))).toBeLessThan(1);
+});
+
+for (const container of CONTAINERS) {
+  test(`${container}: a tall properties pane scrolls to its last control`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ height: 420, width: 1280 });
+    await openWithContainer(page, container);
+    await page.evaluate(() => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
+
+      editor?.loadDocument(
+        JSON.stringify({
+          nodes: [
+            {
+              fill: "#000000",
+              font: {
+                family: "Arial",
+                fullName: "Arial",
+                postscriptName: "ArialMT",
+                style: "Regular",
+              },
+              fontSize: 120,
+              id: "tall-text",
+              parentId: "root",
+              stroke: null,
+              strokeWidth: 0,
+              text: "TALL",
+              tracking: 0,
+              transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 380, y: 260 },
+              type: "text",
+              visible: true,
+              warp: { bend: 0.3, kind: "arch" },
+            },
+          ],
+          version: "1.8",
+        })
+      );
+      editor?.setSelectedNodes(["tall-text"]);
+      editor?.addStroke();
+      editor?.addEffect("drop-shadow");
+    });
+
+    const body = page.getByTestId("properties-panel-body");
+    const last = body.getByRole("button", { name: "Clear warp" });
+
+    await expect(last).toBeAttached();
+    expect(
+      await body.evaluate((element) => {
+        return element.scrollHeight > element.clientHeight;
+      })
+    ).toBe(true);
+    await expect(last).not.toBeInViewport();
+    await body.hover();
+    await page.mouse.wheel(0, 4000);
+    await expect(last).toBeInViewport({ ratio: 1 });
+  });
+}
