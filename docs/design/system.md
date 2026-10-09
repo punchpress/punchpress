@@ -101,6 +101,12 @@ placement and the card, `--pane-hover` / `--pane-selected` for rows.
 `DesignerPanel` places a pane slot and `DesignerPane` is the card; panes hide
 below the md breakpoint. The canvas never moves or resizes with the panes.
 
+Selected layer rows are a quiet accent tint (`--pane-selected`, 13% of the
+accent over the pane surface, 24% in dark; `--pane-selected-hover` on hover)
+under normal text and icons (`--pane-selected-foreground`). Hidden rows stay
+dimmed when selected. Only the layers tree uses these tokens; the canvas
+selection keeps the saturated accent.
+
 ## Migration Guidance
 
 If you find older references to Radix UI in docs, examples, or dependencies, treat them as stale unless the source code proves otherwise.
