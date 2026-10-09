@@ -113,71 +113,131 @@ test("layer rows use the row token, indent per level, and truncate long names", 
   expect(byId["long-text"].labelTruncated).toBe(true);
 });
 
-// Selected rows are a quiet accent tint under normal text, distinct from
-// hovered rows, and they still shift on hover. A hidden selected row keeps the
-// tint but dims its label. The canvas selection keeps the saturated accent.
-test("selected rows use a quiet tint that reads against hover and hidden rows", async ({
-  page,
-}) => {
-  await gotoEditor(page);
-  await loadDocument(page, createNestedDocument());
-  await page.evaluate(() => {
-    window.__PUNCHPRESS_EDITOR__?.setSelectedNodes(["outer"]);
-  });
+// Resolves CSS colors (any syntax) to opaque sRGB channels by painting each
+// over a base, so translucent text and fills compare as they are seen.
+const toRgb = (page: Page, colors: [string, string?][]) => {
+  return page.evaluate((pairs) => {
+    const canvas = window.document.createElement("canvas");
+    const context = canvas.getContext("2d", { willReadFrequently: true });
 
-  const row = (id: string) => page.locator(`[data-layer-row-id='${id}']`);
-  const read = (id: string) => {
-    return row(id).evaluate((element) => {
-      const label = element.querySelector(
-        "[data-layer-node-id] span:last-child"
-      );
+    return pairs.map(([value, base]) => {
+      if (!context) {
+        return [0, 0, 0];
+      }
 
+      context.fillStyle = base ?? "#808080";
+      context.fillRect(0, 0, 1, 1);
+      context.fillStyle = value;
+      context.fillRect(0, 0, 1, 1);
+      return [...context.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+    });
+  }, colors);
+};
+
+const distance = (left: number[], right: number[]) => {
+  return left.reduce((sum, channel, index) => {
+    return sum + Math.abs(channel - right[index]);
+  }, 0);
+};
+
+// Selected rows are a quiet accent tint under normal text, distinct from the
+// pane, the accent, and hovered rows, and they shift on hover. A hidden
+// selected row keeps the tint but dims its label. Checked in both themes.
+for (const colorScheme of ["light", "dark"] as const) {
+  test(`${colorScheme}: selected rows use a quiet tint that reads against hover and hidden rows`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme });
+    await gotoEditor(page);
+    await loadDocument(page, createNestedDocument());
+    await page.evaluate(() => {
+      window.__PUNCHPRESS_EDITOR__?.setSelectedNodes(["outer"]);
+    });
+
+    const row = (id: string) => page.locator(`[data-layer-row-id='${id}']`);
+    const read = (id: string) => {
+      return row(id).evaluate((element) => {
+        const label = element.querySelector(
+          "[data-layer-node-id] span:last-child"
+        );
+        const style = getComputedStyle(element);
+
+        return {
+          background: style.backgroundColor,
+          color: style.color,
+          labelColor: label ? getComputedStyle(label).color : "",
+        };
+      });
+    };
+    const theme = await page.evaluate(() => {
+      const pane = window.document.querySelector("[data-layers-panel]");
+      const probe = window.document.createElement("div");
+
+      probe.style.color = "var(--canvas-selected)";
+      window.document.body.append(probe);
+      const accent = getComputedStyle(probe).color;
+
+      probe.remove();
       return {
-        background: getComputedStyle(element).backgroundColor,
-        color: getComputedStyle(element).color,
-        labelColor: label ? getComputedStyle(label).color : null,
+        accent,
+        dark: window.document.documentElement.classList.contains("dark"),
+        foreground: getComputedStyle(window.document.body).color,
+        surface: pane ? getComputedStyle(pane).backgroundColor : "",
       };
     });
-  };
-  const { accent, foreground } = await page.evaluate(() => {
-    const probe = window.document.createElement("div");
 
-    probe.style.backgroundColor = "var(--canvas-selected)";
-    window.document.body.append(probe);
-    const color = getComputedStyle(probe).backgroundColor;
+    expect(theme.dark).toBe(colorScheme === "dark");
+    await expect(row("outer")).toHaveAttribute("data-selected", "");
+    await page.mouse.move(640, 700);
+    const selected = await read("outer");
 
-    probe.remove();
-    return {
-      accent: color,
-      foreground: getComputedStyle(window.document.body).color,
-    };
+    await row("long-text").hover();
+    const hovered = await read("long-text");
+
+    await row("outer").hover();
+    const selectedHover = await read("outer");
+
+    await page.mouse.move(640, 700);
+    await page.evaluate(() => {
+      window.__PUNCHPRESS_EDITOR__?.toggleVisibility("outer");
+    });
+    await expect(row("outer")).toHaveAttribute("data-muted", "");
+    await expect(row("outer")).toHaveAttribute("data-selected", "");
+    const hidden = await read("outer");
+
+    const [
+      accent,
+      surface,
+      foreground,
+      selectedBg,
+      selectedText,
+      hoveredBg,
+      selectedHoverBg,
+      hiddenBg,
+      selectedLabel,
+      hiddenLabel,
+    ] = await toRgb(page, [
+      [theme.accent],
+      [theme.surface],
+      [theme.foreground, theme.surface],
+      [selected.background, theme.surface],
+      [selected.color, selected.background],
+      [hovered.background, theme.surface],
+      [selectedHover.background, theme.surface],
+      [hidden.background, theme.surface],
+      [selected.labelColor, selected.background],
+      [hidden.labelColor, hidden.background],
+    ]);
+
+    // A visible tint, far from the saturated accent, under normal text.
+    expect(distance(selectedBg, surface)).toBeGreaterThan(20);
+    expect(distance(selectedBg, accent)).toBeGreaterThan(150);
+    expect(selectedText).toEqual(foreground);
+    // Selected, hovered, and selected-hover rows read as different states.
+    expect(distance(selectedBg, hoveredBg)).toBeGreaterThan(15);
+    expect(distance(selectedHoverBg, selectedBg)).toBeGreaterThan(8);
+    // Hidden selected rows keep the tint and dim the label.
+    expect(hiddenBg).toEqual(selectedBg);
+    expect(distance(hiddenLabel, selectedLabel)).toBeGreaterThan(30);
   });
-
-  await expect(row("outer")).toHaveAttribute("data-selected", "");
-  await page.mouse.move(640, 700);
-  const selected = await read("outer");
-
-  expect(selected.background).not.toBe(accent);
-  expect(selected.background).not.toBe("rgba(0, 0, 0, 0)");
-  expect(selected.color).toBe(foreground);
-
-  await row("long-text").hover();
-  const hovered = await read("long-text");
-
-  expect(hovered.background).not.toBe("rgba(0, 0, 0, 0)");
-  expect(hovered.background).not.toBe(selected.background);
-
-  await row("outer").hover();
-  expect((await read("outer")).background).not.toBe(selected.background);
-
-  await page.mouse.move(640, 700);
-  await page.evaluate(() => {
-    window.__PUNCHPRESS_EDITOR__?.toggleVisibility("outer");
-  });
-  await expect(row("outer")).toHaveAttribute("data-muted", "");
-  await expect(row("outer")).toHaveAttribute("data-selected", "");
-  const hiddenSelected = await read("outer");
-
-  expect(hiddenSelected.background).toBe(selected.background);
-  expect(hiddenSelected.labelColor).not.toBe(selected.labelColor);
-});
+}
