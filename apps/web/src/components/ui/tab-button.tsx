@@ -15,7 +15,7 @@ export const TabButton = ({
   return (
     <div
       className={cn(
-        "group relative h-(--tab-height) max-w-44 shrink-0",
+        "group relative flex h-(--tab-height) max-w-44 shrink-0",
         className
       )}
     >
