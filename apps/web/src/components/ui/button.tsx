@@ -29,6 +29,9 @@ const buttonVariants = cva(
           "size-(--menu-item-height) rounded-(--chrome-radius) [&_svg:not([class*='size-'])]:size-(--chrome-icon) sm:[&_svg:not([class*='size-'])]:size-(--chrome-icon)",
         "icon-field":
           "size-(--field-icon-button) rounded-(--field-radius) [&_svg:not([class*='size-'])]:size-3.5 sm:[&_svg:not([class*='size-'])]:size-3.5",
+        // A square, full-height title bar segment beside the workspace tabs.
+        "icon-tab":
+          "aspect-square h-full rounded-none pt-(--titlebar-inset-top) [&_svg:not([class*='size-'])]:size-(--chrome-icon) sm:[&_svg:not([class*='size-'])]:size-(--chrome-icon)",
         "icon-toolbar":
           "size-(--toolbar-button) rounded-(--chrome-radius) [&_svg:not([class*='size-'])]:size-(--toolbar-icon) sm:[&_svg:not([class*='size-'])]:size-(--toolbar-icon)",
       },
@@ -43,6 +46,8 @@ const buttonVariants = cva(
           "border-transparent text-foreground hover:bg-accent data-pressed:bg-accent",
         outline:
           "border-transparent bg-muted text-foreground hover:bg-accent data-pressed:bg-accent dark:bg-input/32 dark:data-pressed:bg-input/64 dark:hover:bg-input/64",
+        // Quiet title bar control: muted icon, the tab hover wash.
+        tab: "border-transparent text-(--tab-fg) hover:bg-(--tab-bg-hover) hover:text-(--tab-fg-active) data-pressed:bg-(--tab-bg-hover)",
         secondary:
           "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/90 data-pressed:bg-secondary/90 [:active,[data-pressed]]:bg-secondary/80",
       },

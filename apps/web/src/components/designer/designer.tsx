@@ -100,28 +100,24 @@ export const DesignerFloatingToolbar = ({ children, className, ...props }) => {
   );
 };
 
-export const DesignerWindowDragRegion = ({
-  children,
-  className,
-  style,
-  ...props
-}) => {
+// The title bar: a full-width strip on the title bar surface with a bottom
+// hairline. Its content starts after the desktop traffic-light inset, and
+// empty bar space drags the desktop window (controls opt out with `no-drag`).
+export const DesignerTitleBar = ({ children, className, style, ...props }) => {
   return (
-    <div
-      aria-hidden={children ? undefined : true}
+    <header
       className={cn(
-        "pointer-events-none absolute top-0 right-0 z-20",
+        "absolute top-0 right-0 left-0 z-20 flex h-(--desktop-chrome-height) bg-(--titlebar-bg) pl-(--desktop-drag-left-inset) shadow-(--titlebar-shadow)",
         className
       )}
+      data-titlebar=""
       style={{
         WebkitAppRegion: "drag",
-        height: "var(--desktop-chrome-height, 0px)",
-        left: "var(--desktop-drag-left-inset, 0px)",
         ...style,
       }}
       {...props}
     >
       {children}
-    </div>
+    </header>
   );
 };

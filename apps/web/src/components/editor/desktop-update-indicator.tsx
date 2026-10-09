@@ -59,7 +59,7 @@ export const DesktopUpdateIndicator = () => {
     return (
       <output
         aria-live="polite"
-        className="no-drag text-(length:--chrome-text) pointer-events-auto flex h-full shrink-0 translate-y-[3px] items-center gap-1.5 pr-3"
+        className="no-drag text-(length:--chrome-text) pointer-events-auto flex h-full shrink-0 items-center gap-1.5 pt-(--titlebar-inset-top) pr-3"
       >
         <HugeiconsIcon
           className={cn(
@@ -102,7 +102,7 @@ export const DesktopUpdateIndicator = () => {
 
   return (
     <div
-      className="no-drag pointer-events-auto flex h-full shrink-0 translate-y-[3px] items-center pr-2"
+      className="no-drag pointer-events-auto flex h-full shrink-0 items-center pt-(--titlebar-inset-top) pr-2"
       style={{ WebkitAppRegion: "no-drag" }}
     >
       <Button

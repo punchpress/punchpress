@@ -1,8 +1,13 @@
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Note01Icon } from "@hugeicons-pro/core-stroke-rounded";
 import { PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { TabButton } from "@/components/ui/tab-button";
+import { Tab, TabClose, TabIconTrigger, TabTrigger } from "@/components/ui/tab";
 import { useWorkspace } from "./use-workspace";
 
+// The title bar's tab strip: the pinned Scratchpad, the file tabs (scrolling
+// when they overflow), then the new-tab button. Tabs are `no-drag`; the empty
+// bar space after them stays a window drag region on desktop.
 export const WorkspaceTabs = ({ onCloseTab, onNewFile }) => {
   const workspace = useWorkspace();
   const scratchpadTab =
@@ -11,47 +16,49 @@ export const WorkspaceTabs = ({ onCloseTab, onNewFile }) => {
   const fileTabs = workspace.tabs.filter((tab) => tab.id !== scratchpadTab?.id);
 
   return (
-    <div className="pointer-events-auto flex h-full min-w-0 flex-1 translate-y-[3px] items-center gap-1 px-2">
+    <div className="flex h-full min-w-0 flex-1" data-workspace-tabs="">
       {scratchpadTab ? (
-        <div className="no-drag flex shrink-0 items-center">
-          <WorkspaceTab onCloseTab={onCloseTab} tab={scratchpadTab} />
+        <div className="no-drag flex shrink-0 border-(--tab-divider) border-l">
+          <Tab active={scratchpadTab.isActive} size="icon">
+            <TabIconTrigger
+              label={scratchpadTab.title}
+              onSelect={() => workspace.focusTab(scratchpadTab.id)}
+            >
+              <HugeiconsIcon
+                color="currentColor"
+                icon={Note01Icon}
+                strokeWidth={1.8}
+              />
+            </TabIconTrigger>
+          </Tab>
         </div>
       ) : null}
 
-      <div className="flex min-w-0 items-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="no-drag flex min-w-max items-center gap-1">
-          {fileTabs.map((tab) => (
-            <WorkspaceTab key={tab.id} onCloseTab={onCloseTab} tab={tab} />
-          ))}
-        </div>
+      <div className="no-drag flex min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {fileTabs.map((tab) => (
+          <Tab active={tab.isActive} dirty={tab.isDirty} key={tab.id}>
+            <TabTrigger onSelect={() => workspace.focusTab(tab.id)}>
+              {tab.title}
+            </TabTrigger>
+            {tab.isClosable ? (
+              <TabClose
+                label={`Close ${tab.title}`}
+                onClose={() => onCloseTab(tab.id)}
+              />
+            ) : null}
+          </Tab>
+        ))}
       </div>
 
       <Button
         aria-label="New file"
-        className="no-drag shrink-0"
+        className="no-drag"
         onClick={onNewFile}
-        size="icon-chrome"
-        variant="ghost"
+        size="icon-tab"
+        variant="tab"
       >
         <PlusIcon />
       </Button>
     </div>
-  );
-};
-
-const WorkspaceTab = ({ onCloseTab, tab }) => {
-  const workspace = useWorkspace();
-
-  return (
-    <TabButton
-      active={tab.isActive}
-      closable={tab.isClosable}
-      dirty={tab.isDirty}
-      onClose={() => onCloseTab(tab.id)}
-      onSelect={() => workspace.focusTab(tab.id)}
-      title={tab.title}
-    >
-      {tab.title}
-    </TabButton>
   );
 };

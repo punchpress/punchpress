@@ -246,12 +246,6 @@
   --canvas-guide-editing-active: var(--canvas-selected-strong);
   --canvas-guide-editing-active-opacity: 0.95;
   --canvas-guide-editing-active-width: 2.5px;
-  --workspace-tab-bg: transparent;
-  --workspace-tab-bg-hover: --alpha(var(--color-neutral-400) / 8%);
-  --workspace-tab-bg-active: --alpha(var(--color-neutral-500) / 10%);
-  --workspace-tab-text: color-mix(in srgb, var(--foreground) 72%, transparent);
-  --workspace-tab-text-active: var(--foreground);
-  --workspace-tab-shadow: 0 6px 14px rgb(15 23 42 / 0.035);
   --canvas-selection-fill: color-mix(
     in srgb,
     var(--canvas-selected) 10%,
@@ -779,11 +773,35 @@ body[data-color-picker-open="true"] {
   --layer-row-height: 24px;
   --layer-indent: 12px;
   --layer-icon: 14px;
-  --tab-height: 26px;
   --toolbar-button: 28px;
   --toolbar-icon: 16px;
   --toolbar-pad: 3px;
   --toolbar-radius: 8px;
+}
+
+/*
+ * Title bar: the full-width strip that holds the workspace tabs. Tabs are flat
+ * full-height segments split by hairline dividers. Inactive tabs show the bar
+ * surface; the active tab takes the canvas background (`--designer-bg`) and
+ * covers the bar's bottom hairline so it joins the document below. The shell
+ * sets `--titlebar-inset-top` to center content on the desktop traffic lights.
+ */
+:root {
+  --titlebar-bg: color-mix(in srgb, var(--background) 95%, var(--color-black));
+  --titlebar-border: --alpha(var(--color-black) / 9%);
+  --titlebar-shadow: inset 0 -1px 0 var(--titlebar-border);
+  --titlebar-inset-top: 0px;
+  --tab-divider: --alpha(var(--color-black) / 7%);
+  --tab-bg-hover: --alpha(var(--color-black) / 4%);
+  --tab-fg: var(--muted-foreground);
+  --tab-fg-active: var(--foreground);
+  --tab-dirty: var(--primary);
+  --tab-dirty-dot: 6px;
+  --tab-min-width: 120px;
+  --tab-max-width: 200px;
+  --tab-px: 12px;
+  --tab-slot: var(--field-icon-button);
+  --tab-slot-gap: 4px;
 }
 
 @keyframes canvas-caret-blink {
@@ -873,10 +891,10 @@ body[data-color-picker-open="true"] {
     transparent
   );
   --surface-hover: --alpha(var(--color-white) / 7%);
-  --workspace-tab-bg: transparent;
-  --workspace-tab-bg-hover: --alpha(var(--color-white) / 8%);
-  --workspace-tab-bg-active: --alpha(var(--color-white) / 10%);
-  --workspace-tab-shadow: 0 6px 14px rgb(0 0 0 / 0.2);
+  --titlebar-bg: color-mix(in srgb, var(--background) 60%, var(--color-black));
+  --titlebar-border: --alpha(var(--color-white) / 8%);
+  --tab-divider: --alpha(var(--color-white) / 7%);
+  --tab-bg-hover: --alpha(var(--color-white) / 4%);
   --canvas-transform-box-lines: oklch(0.32 0 0);
   --canvas-transform-box-handles: oklch(0.32 0 0);
   --canvas-transform-box-handles-border: oklch(0.42 0 0);

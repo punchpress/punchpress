@@ -11,7 +11,7 @@ import {
   DesignerCanvas,
   DesignerContent,
   DesignerPanel,
-  DesignerWindowDragRegion,
+  DesignerTitleBar,
 } from "../designer/designer";
 import { useDocumentCommands } from "../panels/document-commands/use-document-commands";
 import { LayersPanel } from "../panels/layers-panel/layers-panel";
@@ -27,12 +27,17 @@ const SHELL_CHROME_VARS = {
     "--desktop-drag-left-inset": "84px",
     "--desktop-panel-top-gap": "4px",
     "--shell-logo-offset-x": "-7px",
+    // Centers title bar content on the traffic lights: Electron places them
+    // at y 16 and they are 14px tall, a 23px center; padding the 40px bar's
+    // segments by 6px moves their content center from 20px to 23px.
+    "--titlebar-inset-top": "6px",
   },
   web: {
     "--desktop-chrome-height": "40px",
     "--desktop-drag-left-inset": "0px",
     "--desktop-panel-top-gap": "16px",
     "--shell-logo-offset-x": "-7px",
+    "--titlebar-inset-top": "0px",
   },
 };
 
@@ -107,24 +112,13 @@ export const EditorShell = () => {
       }}
     >
       <DesignerContent>
-        {isDesktopShell ? (
-          <DesignerWindowDragRegion className="flex items-start gap-2">
-            <WorkspaceTabs
-              onCloseTab={documentCommands.closeTabSafely}
-              onNewFile={() => documentCommands.runDocumentCommandSafely("new")}
-            />
-            <DesktopUpdateIndicator />
-          </DesignerWindowDragRegion>
-        ) : null}
-
-        {isDesktopShell ? null : (
-          <div className="absolute top-0 right-0 left-0 z-20 h-10">
-            <WorkspaceTabs
-              onCloseTab={documentCommands.closeTabSafely}
-              onNewFile={() => documentCommands.runDocumentCommandSafely("new")}
-            />
-          </div>
-        )}
+        <DesignerTitleBar>
+          <WorkspaceTabs
+            onCloseTab={documentCommands.closeTabSafely}
+            onNewFile={() => documentCommands.runDocumentCommandSafely("new")}
+          />
+          <DesktopUpdateIndicator />
+        </DesignerTitleBar>
 
         <DesignerCanvas>
           <Canvas />
