@@ -22,8 +22,9 @@ import {
 } from "./use-effect-controls";
 
 // One effect row: drag handle, visibility, shadow color with opacity, remove.
-// Kind-specific `details` open in the row's settings popover. The row chrome subscribes to visibility only; the color and fields
-// subscribe to their own values.
+// Kind-specific `details` open in the row's settings popover. The row chrome
+// subscribes to visibility only; the color and fields subscribe to their own
+// values.
 export const EffectsItem = ({
   details,
   effectId,

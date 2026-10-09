@@ -33,7 +33,7 @@ export const ArtboardFields = ({ nodeId }: { nodeId: string }) => {
   return (
     <Section title="Frame">
       <FieldPair label="Size">
-        <FieldRow label="Width">
+        <FieldRow label="W">
           <NumberField
             min={1}
             onValueChange={(nextWidth) => {
@@ -43,7 +43,7 @@ export const ArtboardFields = ({ nodeId }: { nodeId: string }) => {
           />
         </FieldRow>
 
-        <FieldRow label="Height">
+        <FieldRow label="H">
           <NumberField
             min={1}
             onValueChange={(nextHeight) => {

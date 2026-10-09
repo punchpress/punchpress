@@ -3,43 +3,47 @@ import { gotoEditor } from "./helpers/editor";
 
 const TEXT_ID = "panel-text";
 const ADD_BUTTON_NAME = /^Add (fill|stroke|effect)$/;
+const ARCH_WARP = { bend: 0.3, kind: "arch" };
 
 // A text node with every stacked section open: fill, stroke, effect, warp.
-const loadTallSelection = (page: Page) => {
-  return page.evaluate((nodeId) => {
-    const editor = window.__PUNCHPRESS_EDITOR__;
+const loadTallSelection = (page: Page, warp: object = ARCH_WARP) => {
+  return page.evaluate(
+    ([nodeId, nodeWarp]) => {
+      const editor = window.__PUNCHPRESS_EDITOR__;
 
-    editor?.loadDocument(
-      JSON.stringify({
-        nodes: [
-          {
-            fill: "#000000",
-            font: {
-              family: "Arial",
-              fullName: "Arial",
-              postscriptName: "ArialMT",
-              style: "Regular",
+      editor?.loadDocument(
+        JSON.stringify({
+          nodes: [
+            {
+              fill: "#000000",
+              font: {
+                family: "Arial",
+                fullName: "Arial",
+                postscriptName: "ArialMT",
+                style: "Regular",
+              },
+              fontSize: 120,
+              id: nodeId,
+              parentId: "root",
+              stroke: null,
+              strokeWidth: 0,
+              text: "PANEL",
+              tracking: 0,
+              transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 380, y: 260 },
+              type: "text",
+              visible: true,
+              warp: nodeWarp,
             },
-            fontSize: 120,
-            id: nodeId,
-            parentId: "root",
-            stroke: null,
-            strokeWidth: 0,
-            text: "PANEL",
-            tracking: 0,
-            transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 380, y: 260 },
-            type: "text",
-            visible: true,
-            warp: { bend: 0.3, kind: "arch" },
-          },
-        ],
-        version: "1.8",
-      })
-    );
-    editor?.setSelectedNodes([nodeId]);
-    editor?.addStroke();
-    editor?.addEffect("drop-shadow");
-  }, TEXT_ID);
+          ],
+          version: "1.8",
+        })
+      );
+      editor?.setSelectedNodes([nodeId]);
+      editor?.addStroke();
+      editor?.addEffect("drop-shadow");
+    },
+    [TEXT_ID, warp] as const
+  );
 };
 
 // Right edges of every control in the panel against the content box's right
@@ -283,4 +287,38 @@ test("section headers collapse their rows", async ({ page }) => {
   await fills.getByRole("button", { exact: true, name: "Fill" }).click();
   await expect(fills.getByTestId("appearance-fills-item")).toHaveCount(0);
   await expect(fills.getByRole("button", { name: "Add fill" })).toBeVisible();
+});
+
+test("paired values truncate before their inline labels", async ({ page }) => {
+  // The narrowest panel: 240px below the lg breakpoint.
+  await page.setViewportSize({ height: 800, width: 1000 });
+  await gotoEditor(page);
+  await loadTallSelection(page, {
+    amplitude: 1_234_567,
+    cycles: 2.5,
+    kind: "wave",
+  });
+
+  const overlaps = await page
+    .getByTestId("properties-panel-body")
+    .locator("[data-slot='field-row']:has(> label)")
+    .evaluateAll((rows) => {
+      return rows.flatMap((row) => {
+        const label = row.querySelector(":scope > label");
+        const value = row.querySelector("[data-slot='scrub-slider'] .truncate");
+
+        if (!(label && value)) {
+          return [];
+        }
+
+        const gap =
+          value.getBoundingClientRect().left -
+          label.getBoundingClientRect().right;
+
+        return gap < 0 ? [{ gap, label: label.textContent }] : [];
+      });
+    });
+
+  await expect(page.getByRole("slider", { name: "Amplitude" })).toBeVisible();
+  expect(overlaps).toEqual([]);
 });

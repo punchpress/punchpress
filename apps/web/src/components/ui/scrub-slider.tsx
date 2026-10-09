@@ -526,7 +526,7 @@ export const ScrubSlider = (props: ScrubSliderProps) => {
 
       {isEditing ? (
         <input
-          className="relative z-10 h-full w-full min-w-0 bg-transparent ps-(--field-label-inset) outline-none"
+          className="relative z-10 h-full w-full min-w-0 bg-transparent ps-(--field-label-inset) tabular-nums outline-none"
           inputMode="decimal"
           onBlur={commitDraftValue}
           onChange={(event) => {
@@ -545,7 +545,7 @@ export const ScrubSlider = (props: ScrubSliderProps) => {
           value={draftValue}
         />
       ) : (
-        <span className="pointer-events-none relative z-10 ml-auto flex min-w-0 items-center gap-1.5 font-medium text-foreground/84 tabular-nums">
+        <span className="pointer-events-none relative z-10 ml-auto flex min-w-0 items-center gap-1.5 ps-(--field-label-inset) font-medium text-foreground/84 tabular-nums">
           {valueBadge ? (
             <span className="shrink-0 rounded-full bg-foreground/7 px-1.5 py-0.5 font-semibold text-[10px] text-foreground/56 uppercase tracking-[0.08em]">
               {valueBadge}

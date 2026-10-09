@@ -102,7 +102,7 @@ export const ImageFields = ({ nodeId }: { nodeId: string }) => {
           }
           label="Size"
         >
-          <FieldRow label="Width">
+          <FieldRow label="W">
             <ScrubSlider
               ariaLabel="Image width"
               disabled={resize.pending}
@@ -115,7 +115,7 @@ export const ImageFields = ({ nodeId }: { nodeId: string }) => {
               value={resize.width}
             />
           </FieldRow>
-          <FieldRow label="Height">
+          <FieldRow label="H">
             <ScrubSlider
               ariaLabel="Image height"
               disabled={resize.pending}

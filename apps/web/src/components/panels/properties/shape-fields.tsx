@@ -75,7 +75,7 @@ export const ShapeFields = ({ nodeId }: { nodeId: string }) => {
       </FieldRow>
 
       <FieldPair label="Size">
-        <FieldRow label="Width">
+        <FieldRow label="W">
           <ScrubSlider
             ariaLabel="Shape width"
             max={SHAPE_SIZE_RANGE.max}
@@ -88,7 +88,7 @@ export const ShapeFields = ({ nodeId }: { nodeId: string }) => {
           />
         </FieldRow>
 
-        <FieldRow label="Height">
+        <FieldRow label="H">
           <ScrubSlider
             ariaLabel="Shape height"
             max={SHAPE_SIZE_RANGE.max}
