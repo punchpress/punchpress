@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.9.0 - 2026-10-10
+
+### Added
+
+- Build layered artwork with multiple fills and strokes, reorder them, and control each layer's visibility and opacity.
+- Apply linear gradients to fills and strokes, with editable colors, opacity, and gradient stops.
+- Align strokes inside, outside, or along the center of text, shapes, and paths.
+- Add drop shadows to text, shapes, paths, vectors, and groups, and recolor shadows through Selection Colors.
+- Paste images directly from the clipboard onto the canvas.
+
+### Changed
+
+- The workspace has compact controls, floating panels, native platform fonts, and document tabs integrated into the desktop title bar.
+- Large designs respond more smoothly when dragging groups, editing properties, undoing, panning, and continuously zooming.
+- Selected objects can be dragged from anywhere inside their selection bounds, and double-clicking drills into groups.
+- Older appearance data upgrades when opened. Documents saved with the new appearance and effects controls require this release or newer to preserve those features.
+
+### Fixed
+
+- Canceled drawing and transform gestures restore the original artwork, and Escape cancels shape placement.
+- Saving during an edit and switching away from the scratchpad preserve the correct document state.
+- Documents retain unresolved fonts, numeric property drafts, and text warp values outside slider ranges.
+- Canvas editing more reliably preserves path joins, boolean-operation layer names, and text-path dragging.
+- Color edits commit on outside clicks, and clicks in popups no longer start canvas selections.
+- Browser file tabs avoid duplicates, asset search pagination follows the submitted query, and manual desktop update checks show feedback.
+
 ## v0.8.0 - 2026-08-11
 
 ### Added
