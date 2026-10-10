@@ -86,6 +86,8 @@ test("keeps imported Raster pixels coherent when a Space-pan compositor frame is
       .send("Page.screencastFrameAck", { sessionId: event.sessionId })
       .catch(() => undefined);
   });
+  // Flush the setup zoom before recording pan frames.
+  await page.screenshot();
   await client.send("Page.startScreencast", {
     everyNthFrame: 1,
     format: "png",
