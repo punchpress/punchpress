@@ -13,3 +13,4 @@ npm-debug.log*
 
 # Claude Code worktrees live here; keep their contents out of the main checkout.
 .claude/worktrees/
+.design/renders/

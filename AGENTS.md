@@ -107,7 +107,8 @@ Tests, CLI workflows, and AI automation should converge on the same editor comma
 - `docs/reference/README.md` — exact contracts, formats, commands, and API references
 - `docs/operations/README.md` — development, testing, performance, and release workflows
 - `docs/decisions/README.md` — durable architecture decisions
-- `docs/design/system.md` — UI component system, Base UI policy, COSS UI workflow
+- `.design/guidelines.md` — UI component system, Base UI policy, COSS UI workflow
+- `.design/rejections.md` — design rejections go here
 
 ## Product Docs
 
